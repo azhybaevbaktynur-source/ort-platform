@@ -1,0 +1,32 @@
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Virtual environment
+venv/
+env/
+ENV/
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+local_db.json
+data/*.json
+data/*.db
+data/ort_platform.db
+data/test.db
+data/local_db.json
+
+# Local uploads
+data/uploads/
+uploads/
+
+# Secrets
+.env
+.env.*
+
+# Logs
+*.log
