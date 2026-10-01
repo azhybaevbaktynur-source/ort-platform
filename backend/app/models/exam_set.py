@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Integer, Text, JSON, DateTime
+from sqlalchemy.orm import relationship, foreign
 from app.db.session import Base
 
 
@@ -25,6 +26,11 @@ class ExamSet(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
+    # Cascading relationships: deleting an ExamSet cascades to questions, access rules, and attempts
+    questions = relationship("Question", back_populates="exam_set", cascade="all, delete-orphan")
+    access_rules = relationship("ExamAccess", back_populates="exam_set", cascade="all, delete-orphan")
+    attempts = relationship("TestAttempt", primaryjoin="ExamSet.id == foreign(TestAttempt.template_id)", cascade="all, delete-orphan")
+
     def to_dict(self):
         return {
             "id": self.id,
@@ -47,3 +53,4 @@ class ExamSet(Base):
             "createdAt": self.created_at.isoformat() if self.created_at else None,
             "updatedAt": self.updated_at.isoformat() if self.updated_at else None,
         }
+

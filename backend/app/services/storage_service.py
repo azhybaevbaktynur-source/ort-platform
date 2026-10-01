@@ -58,3 +58,4 @@ def get_storage_service() -> BaseStorageService:
     if storage_env in ("s3", "cloudinary", "gcs", "production"):
         return CloudStorageService(provider=storage_env)
     return LocalStorageService()
+

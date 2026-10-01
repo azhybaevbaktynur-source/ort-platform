@@ -1,5 +1,6 @@
 import uuid
-from datetime import datetime, timezone
+import secrets
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.security import get_current_user, hash_password, verify_password, create_access_token
@@ -14,7 +15,10 @@ from app.schemas.user import (
     UserRegisterRequest,
     UserLoginRequest,
     TokenResponse,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
 )
+from app.services.email_service import send_password_reset_email
 
 router = APIRouter()
 
@@ -42,6 +46,7 @@ async def register_user(
     user_id = f"usr_{uuid.uuid4().hex[:12]}"
     pwd_hash = hash_password(req.password)
     display_name = req.displayName.strip() if req.displayName and req.displayName.strip() else clean_email.split("@")[0]
+    phone_clean = req.phone.strip() if req.phone and req.phone.strip() else None
 
     # Strictly enforce role='student'
     new_user = User(
@@ -49,6 +54,7 @@ async def register_user(
         email=clean_email,
         password_hash=pwd_hash,
         role="student",
+        phone=phone_clean,
         target_score=200,
         display_name=display_name,
         created_at=datetime.now(timezone.utc),
@@ -68,6 +74,7 @@ async def register_user(
         id=new_user.id,
         email=new_user.email,
         displayName=display_name,
+        phone=phone_clean,
         role=UserRole.STUDENT,
         target_score=200,
         preferredLanguage="ky",
@@ -93,8 +100,12 @@ async def login_user(
     clean_email = req.email.strip().lower()
 
     user = db.query(User).filter(User.email == clean_email).first()
-    if not user or not verify_password(req.password, user.password_hash):
-        raise UnauthorizedException("Туура эмес email же сырсөз / Неверный email или пароль")
+    if not user or not user.password_hash or not verify_password(req.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password / Туура эмес email же сырсөз",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     token = create_access_token({
         "sub": user.id,
@@ -107,6 +118,7 @@ async def login_user(
         id=user.id,
         email=user.email,
         displayName=user.display_name or user.email.split("@")[0],
+        phone=user.phone,
         role=user_role,
         target_score=user.target_score or 200,
         preferredLanguage="ky",
@@ -151,3 +163,80 @@ async def update_target_score(
         db.commit()
 
     return current_user.targetScore
+
+
+@router.post("/forgot-password")
+async def forgot_password(
+    req: ForgotPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Initiates password reset:
+    If the email exists, generates a secure random token valid for 1 hour,
+    saves it to the database, and dispatches a reset link via email.
+    """
+    clean_email = req.email.strip().lower()
+    user = db.query(User).filter(User.email == clean_email).first()
+
+    if user:
+        token = secrets.token_urlsafe(32)
+        user.reset_token = token
+        user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
+        db.commit()
+        send_password_reset_email(to_email=user.email, token=token, lang=req.lang or "ky")
+
+    return {
+        "success": True,
+        "message": "Эгерде мындай email катталган болсо, сырсөздү калыбына келтирүү шилтемеси жөнөтүлдү / Если аккаунт с таким email существует, ссылка для сброса пароля отправлена",
+    }
+
+
+@router.post("/reset-password")
+async def reset_password(
+    req: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Completes password reset:
+    Validates token, ensures it has not expired, hashes the new password,
+    and clears the reset token.
+    """
+    token_str = req.token.strip()
+    if not token_str:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Жараксыз токен / Недействительный токен",
+        )
+
+    user = db.query(User).filter(User.reset_token == token_str).first()
+    now_utc = datetime.now(timezone.utc)
+
+    if not user or not user.reset_token_expires:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Жараксыз же мөөнөтү өткөн шилтеме / Недействительная или устаревшая ссылка",
+        )
+
+    exp = user.reset_token_expires
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+
+    if exp < now_utc:
+        user.reset_token = None
+        user.reset_token_expires = None
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Сырсөздү алмаштыруу шилтемесинин мөөнөтү бүттү / Срок действия ссылки для сброса пароля истек",
+        )
+
+    # Hash new password and clear token
+    user.password_hash = hash_password(req.new_password)
+    user.reset_token = None
+    user.reset_token_expires = None
+    db.commit()
+
+    return {
+        "success": True,
+        "message": "Сырсөз ийгиликтүү жаңыртылды! Эми жаңы сырсөз менен кире аласыз / Пароль успешно изменен! Теперь вы можете войти в систему",
+    }

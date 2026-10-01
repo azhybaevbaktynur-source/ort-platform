@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Text, JSON, DateTime, ForeignKey
+from sqlalchemy.orm import relationship
 from app.db.session import Base
 
 
@@ -22,11 +23,13 @@ class Question(Base):
     image_url = Column(String, nullable=True)
     passage_text = Column(Text, nullable=True)
     tags = Column(JSON, default=list, nullable=True)
-    exam_set_id = Column(String, ForeignKey("exam_sets.id", ondelete="SET NULL"), nullable=True, index=True)
+    exam_set_id = Column(String, ForeignKey("exam_sets.id", ondelete="CASCADE"), nullable=True, index=True)
     stats = Column(JSON, default=dict, nullable=True)
     created_by = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+    exam_set = relationship("ExamSet", back_populates="questions")
 
     def to_dict(self):
         return {
@@ -56,3 +59,4 @@ class Question(Base):
             "createdAt": self.created_at.isoformat() if self.created_at else None,
             "updatedAt": self.updated_at.isoformat() if self.updated_at else None,
         }
+

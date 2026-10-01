@@ -1,6 +1,10 @@
+from datetime import datetime, timezone
+import uuid
 import pytest
 from app.services.mock_test_service import MockTestService
 from app.services.question_service import QuestionService
+from app.db.session import SessionLocal
+from app.models.exam_access import ExamAccess
 from app.schemas.mock_test import (
     AnswerSubmission,
     ExamStatus,
@@ -151,6 +155,16 @@ class TestMockTestService:
             user_id="instructor_bio",
         )
 
+        db = SessionLocal()
+        db.add(ExamAccess(
+            id=f"acc_{uuid.uuid4().hex[:12]}",
+            user_id="usr_bio_student",
+            exam_set_id=bio_exam.id,
+            granted_at=datetime.now(timezone.utc),
+        ))
+        db.commit()
+        db.close()
+
         session = MockTestService.start_test_session(
             user_id="usr_bio_student",
             template_id=bio_exam.id,
@@ -161,6 +175,8 @@ class TestMockTestService:
         assert session.sections[0].section == SectionType.BIOLOGY
         assert len(session.questions[SectionType.BIOLOGY.value]) == 1
         assert session.questions[SectionType.BIOLOGY.value][0].id == bio_q.id
+        assert session.exam_type == "subject"
+        assert session.title == "Биология боюнча предметтик тест"
 
     def test_exam_set_crud_and_access_code(self):
         # Create an ExamSet with PIN access_code and draft status
@@ -187,6 +203,17 @@ class TestMockTestService:
             ExamSetUpdate(status=ExamSetStatus.PUBLISHED),
         )
         assert updated.status == "published"
+
+        # Grant access to student std_99 so they can reach PIN validation
+        db = SessionLocal()
+        db.add(ExamAccess(
+            id=f"acc_{uuid.uuid4().hex[:12]}",
+            user_id="std_99",
+            exam_set_id=created.id,
+            granted_at=datetime.now(timezone.utc),
+        ))
+        db.commit()
+        db.close()
 
         # Student without PIN fails
         with pytest.raises(ForbiddenException):

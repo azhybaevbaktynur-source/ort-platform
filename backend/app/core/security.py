@@ -108,6 +108,7 @@ async def get_current_user(
                     id=sql_user.id,
                     email=sql_user.email,
                     displayName=sql_user.display_name or sql_user.email.split("@")[0],
+                    phone=sql_user.phone,
                     role=UserRole(sql_user.role),
                     target_score=sql_user.target_score,
                     preferredLanguage="ky",

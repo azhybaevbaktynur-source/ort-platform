@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/context";
 import { Users, Award, TrendingUp, BarChart2, RefreshCw, AlertCircle, HelpCircle } from "lucide-react";
 import { apiClient } from "@/lib/api";
@@ -92,21 +93,24 @@ export default function InstructorAnalyticsPage() {
 
       {/* Cohort KPI Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs">
+        <Link
+          href={`/${lang}/students`}
+          className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs hover:border-indigo-400 hover:shadow-md transition-all cursor-pointer group"
+        >
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors flex items-center justify-center font-bold">
               <Users className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-xs text-slate-400 font-medium block">
-                {lang === "ky" ? "Окуучулар саны" : "Количество учеников"}
+              <span className="text-xs text-slate-400 font-medium block group-hover:text-indigo-600 transition-colors">
+                {lang === "ky" ? "Окуучулар саны →" : "Количество учеников →"}
               </span>
               <span className="text-2xl font-extrabold text-slate-900">
                 {loading ? "..." : (data?.totalStudents ?? 0)}
               </span>
             </div>
           </div>
-        </div>
+        </Link>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs">
           <div className="flex items-center gap-3 mb-2">

@@ -34,3 +34,4 @@ class TestAttempt(Base):
             "scores": self.scores,
             "review": self.review,
         }
+

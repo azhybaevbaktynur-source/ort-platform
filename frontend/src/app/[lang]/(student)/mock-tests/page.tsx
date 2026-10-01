@@ -146,9 +146,16 @@ export default function MockTestsHubPage() {
   };
 
   const fullMainExams = exams.filter(
-    (e) => e.exam_type === "full_main" || (!e.exam_type && !e.id.includes("subject"))
+    (e) =>
+      (e.exam_type === "full_main" || e.type === "fixed_full" || (!e.exam_type && !e.id.toLowerCase().includes("subject"))) &&
+      e.exam_type !== "practice_bank" &&
+      e.exam_type !== "subject" &&
+      e.type !== "subject" &&
+      !e.id.toLowerCase().includes("subject")
   );
-  const subjectExams = exams.filter((e) => e.exam_type === "subject");
+  const subjectExams = exams.filter(
+    (e) => e.exam_type === "subject" || e.type === "subject" || e.id.toLowerCase().includes("subject")
+  );
 
   const fastPracticeId = lang === "ru" ? "exam_practice_bank_ru" : "exam_practice_bank_ky";
 
@@ -425,8 +432,13 @@ export default function MockTestsHubPage() {
           <div className="p-8 text-center bg-white rounded-2xl border border-slate-200">
             <p className="text-sm font-semibold text-slate-600">
               {lang === "ky"
-                ? "Азырынча жарыяланган предметтик тесттер жок"
-                : "В данный момент нет опубликованных предметных тестов"}
+                ? "Азырынча сизге ачылган предметтик тесттер жок"
+                : "В данный момент нет открытых предметных тестов"}
+            </p>
+            <p className="text-xs text-slate-400 mt-1">
+              {lang === "ky"
+                ? "Куратор же администратор сизге предметтик тестке уруксат бергенден кийин, ал бул жерде пайда болот."
+                : "После того как администратор откроет вам доступ к предметному тесту, он появится здесь."}
             </p>
           </div>
         ) : (

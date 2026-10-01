@@ -107,3 +107,49 @@ class TestScoringService:
         assert result.review[0].isCorrect is True
         assert result.review[1].isCorrect is False
 
+    def test_subject_test_scoring_ceatm_standards(self):
+        # 1. Subject Test raw to scaled boundary conditions (scale 60 - 150)
+        assert ScoringService.raw_to_scaled(0, 30, exam_type="subject") == 60
+        assert ScoringService.raw_to_scaled(30, 30, exam_type="subject") == 150
+        assert ScoringService.raw_to_scaled(15, 30, exam_type="subject") == 105
+        assert ScoringService.raw_to_scaled(35, 30, exam_type="subject") == 150
+
+        # Compare with main test which scales up to 245
+        assert ScoringService.raw_to_scaled(30, 30, exam_type="full_main") == 245
+
+        # 2. Evaluation with exam_type="subject"
+        questions = [
+            {
+                "id": "chem_1",
+                "section": "chemistry",
+                "stem": "H2O молекуласынын түзүлүшү:",
+                "options": [{"id": "A", "text": "Бурчтук"}],
+                "correctOptionId": "A",
+            },
+            {
+                "id": "chem_2",
+                "section": "chemistry",
+                "stem": "Суутектин валенттүүлүгү:",
+                "options": [{"id": "A", "text": "I"}],
+                "correctOptionId": "A",
+            },
+        ]
+        user_answers = {
+            "chem_1": {"selectedOptionId": "A"},
+            "chem_2": {"selectedOptionId": "A"},
+        }
+        res = ScoringService.evaluate_test_submission(
+            attempt_id="att_chem_1",
+            user_id="usr_1",
+            template_id="subject_chemistry",
+            language="ky",
+            user_answers=user_answers,
+            questions_in_test=questions,
+            completed_at="2026-10-01T12:00:00Z",
+            exam_type="subject",
+        )
+        assert res.exam_type == "subject"
+        assert res.maxScaledScore == 150
+        assert res.totalScaledScore == 150  # 100% correct in subject test gives 150
+        assert res.isGoldenCertificate is False  # Subject tests do not award golden certificates
+

@@ -53,6 +53,14 @@ class Settings(BaseSettings):
     GOLDEN_CERTIFICATE_MIN_SCORE: int = 219
     TOTAL_ORT_QUESTIONS: int = 150
 
+    # SMTP Email Configuration & Reset Flow
+    SMTP_SERVER: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = "noreply@ort.kg"
+    FRONTEND_URL: str = "http://localhost:3000"
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 

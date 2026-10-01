@@ -23,6 +23,7 @@ import {
   Sparkles,
   RefreshCw,
   Award,
+  Lock,
 } from "lucide-react";
 import { getAuthHeader } from "@/lib/api";
 
@@ -62,6 +63,8 @@ interface MockTestFinalResult {
   percentile: number;
   isGoldenCertificate: boolean;
   sectionScores: Record<string, SectionScore>;
+  exam_type?: string;
+  maxScaledScore?: number;
 }
 
 const STRICT_SECTION_ORDER = [
@@ -101,6 +104,17 @@ function ExamRunnerContent() {
   const [loadingSession, setLoadingSession] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [maxAttemptsExceeded, setMaxAttemptsExceeded] = useState<{ isExceeded: boolean; message: string } | null>(null);
+  const [accessDenied, setAccessDenied] = useState<{ isDenied: boolean; message: string } | null>(null);
+
+  // Exam metadata state
+  const [examType, setExamType] = useState<string>("full_main");
+  const [examTitle, setExamTitle] = useState<string>("");
+  const [examTimeLimitMinutes, setExamTimeLimitMinutes] = useState<number | null>(null);
+  const [totalTimeSeconds, setTotalTimeSeconds] = useState<number>(170 * 60);
+
+  const isSubjectTest = useMemo(() => {
+    return examType === "subject" || testId.toLowerCase().includes("subject");
+  }, [examType, testId]);
 
   // PIN Access Code state
   const [requiresPin, setRequiresPin] = useState(false);
@@ -159,6 +173,7 @@ function ExamRunnerContent() {
       try {
         setLoadingSession(true);
         setSessionError(null);
+        setAccessDenied(null);
 
         const authHeader = await getAuthHeader();
         const res = await fetch("/api/v1/mock-tests/start", {
@@ -178,6 +193,18 @@ function ExamRunnerContent() {
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           const errMsg = err.detail || "Failed to start exam session";
+
+          const isAccessDenied =
+            res.status === 403 &&
+            (errMsg.includes("нет доступа") ||
+             errMsg.includes("мүмкүнчүлүгүңүз жок") ||
+             errMsg.toLowerCase().includes("access denied") ||
+             errMsg.toLowerCase().includes("not allowed"));
+
+          if (isAccessDenied) {
+            setAccessDenied({ isDenied: true, message: errMsg });
+            return;
+          }
 
           const isPinError =
             res.status === 403 &&
@@ -232,31 +259,85 @@ function ExamRunnerContent() {
           console.warn("Error hydrating cached answers:", e);
         }
 
-        const rawSections: SectionItem[] =
-          Array.isArray(data.sections) && data.sections.length > 0
-            ? data.sections
-            : DEFAULT_SECTIONS;
+        // Resolve exam metadata (type, title, custom time limit)
+        let fetchedExamType = data.exam_type;
+        let fetchedTitle = data.title;
+        let fetchedTimeLimit = data.time_limit_minutes;
+
+        if (!fetchedExamType || !fetchedTitle) {
+          try {
+            const examRes = await fetch(`/api/v1/exam-sets/${testId}`, {
+              headers: { ...authHeader },
+            });
+            if (examRes.ok) {
+              const examData = await examRes.json();
+              if (!fetchedExamType && examData.exam_type) fetchedExamType = examData.exam_type;
+              if (!fetchedTitle && examData.title) fetchedTitle = examData.title;
+              if (fetchedTimeLimit === undefined && examData.time_limit_minutes !== undefined) {
+                fetchedTimeLimit = examData.time_limit_minutes;
+              }
+            }
+          } catch (e) {
+            console.warn("Could not fetch extra exam metadata:", e);
+          }
+        }
+
+        const currentIsSubject =
+          fetchedExamType === "subject" || testId.toLowerCase().includes("subject");
+
+        setExamType(fetchedExamType || (currentIsSubject ? "subject" : "full_main"));
+        if (fetchedTitle) setExamTitle(fetchedTitle);
+        if (fetchedTimeLimit !== undefined) setExamTimeLimitMinutes(fetchedTimeLimit);
+        if (data.totalTimeSeconds) setTotalTimeSeconds(data.totalTimeSeconds);
+
         const questionsMap = data.questions || {};
-        setQuestionsBySection(questionsMap);
 
-        // Strictly sort sections by STRICT_SECTION_ORDER
-        const sortedSections = [...rawSections].sort((a, b) => {
-          const idxA = STRICT_SECTION_ORDER.indexOf(a.section);
-          const idxB = STRICT_SECTION_ORDER.indexOf(b.section);
-          return (idxA !== -1 ? idxA : 999) - (idxB !== -1 ? idxB : 999);
-        });
+        if (currentIsSubject) {
+          // Dynamic Sectioning for Subject Tests: group all questions into a single continuous section
+          const allQuestions: QuestionItem[] = Object.values(questionsMap).flat() as QuestionItem[];
+          const singleSectionKey = "subject";
+          const subjectTimeLimit =
+            fetchedTimeLimit ||
+            (data.totalTimeSeconds ? Math.round(data.totalTimeSeconds / 60) : 60);
 
-        // Filter out sections that have 0 questions if questions exist
-        const hasAnyQuestions = Object.values(questionsMap).some(
-          (arr: any) => Array.isArray(arr) && arr.length > 0
-        );
-        const validSections = hasAnyQuestions
-          ? sortedSections.filter(
-              (s) => Array.isArray(questionsMap[s.section]) && questionsMap[s.section].length > 0
-            )
-          : sortedSections;
+          setQuestionsBySection({ [singleSectionKey]: allQuestions });
+          setSections([
+            {
+              section: singleSectionKey,
+              questionCount: allQuestions.length,
+              timeLimitMinutes: subjectTimeLimit,
+            },
+          ]);
+          setCurrentSectionIndex(0);
+          setCurrentIndex(0);
+        } else {
+          // Standard full_main test sectioning
+          setQuestionsBySection(questionsMap);
 
-        setSections(validSections.length > 0 ? validSections : DEFAULT_SECTIONS);
+          const rawSections: SectionItem[] =
+            Array.isArray(data.sections) && data.sections.length > 0
+              ? data.sections
+              : DEFAULT_SECTIONS;
+
+          // Strictly sort sections by STRICT_SECTION_ORDER
+          const sortedSections = [...rawSections].sort((a, b) => {
+            const idxA = STRICT_SECTION_ORDER.indexOf(a.section);
+            const idxB = STRICT_SECTION_ORDER.indexOf(b.section);
+            return (idxA !== -1 ? idxA : 999) - (idxB !== -1 ? idxB : 999);
+          });
+
+          // Filter out sections that have 0 questions if questions exist
+          const hasAnyQuestions = Object.values(questionsMap).some(
+            (arr: any) => Array.isArray(arr) && arr.length > 0
+          );
+          const validSections = hasAnyQuestions
+            ? sortedSections.filter(
+                (s) => Array.isArray(questionsMap[s.section]) && questionsMap[s.section].length > 0
+              )
+            : sortedSections;
+
+          setSections(validSections.length > 0 ? validSections : DEFAULT_SECTIONS);
+        }
       } catch (err: any) {
         console.error("Session start error:", err);
         setSessionError(err.message || "Failed to start exam");
@@ -290,7 +371,7 @@ function ExamRunnerContent() {
   const currentQuestion = activeQuestions[currentIndex] || activeQuestions[0];
   const questionIds = useMemo(() => activeQuestions.map((q) => q.id), [activeQuestions]);
 
-  const isFinalSection = currentSectionIndex >= sections.length - 1;
+  const isFinalSection = isSubjectTest || currentSectionIndex >= sections.length - 1;
   const nextSection = !isFinalSection ? sections[currentSectionIndex + 1] : null;
 
   // Bluebook conditional layout check
@@ -361,7 +442,11 @@ function ExamRunnerContent() {
 
   // Section time expired or student clicks Finish Section
   const handleSectionTimeExpiredOrFinish = () => {
-    setIsTransitioning(true);
+    if (isSubjectTest) {
+      handleSubmitFinalTest();
+    } else {
+      setIsTransitioning(true);
+    }
   };
 
   // Complete Transition: student manually clicks Continue button to enter next section or submit
@@ -383,6 +468,7 @@ function ExamRunnerContent() {
 
   // Final Exam Submission
   const handleSubmitFinalTest = async () => {
+    if (isSubmittingFinal) return;
     setIsSubmittingFinal(true);
     try {
       const authHeader = await getAuthHeader();
@@ -403,6 +489,7 @@ function ExamRunnerContent() {
       // Clear localStorage cache on successful test submission
       try {
         localStorage.removeItem(`ort_attempt_answers_${attemptId}`);
+        sessionStorage.setItem(`ort_result_${testId}`, JSON.stringify(result));
       } catch {}
       setFinalResult(result);
     } catch (err: any) {
@@ -480,6 +567,44 @@ function ExamRunnerContent() {
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Access Denied screen
+  if (accessDenied?.isDenied) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-3xl border border-slate-200 p-8 text-center space-y-5 shadow-sm">
+          <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto border border-rose-200">
+            <Lock className="w-7 h-7" />
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-900 text-lg">
+              {lang === "ky" ? "Кирүүгө уруксат жок" : "Доступ ограничен"}
+            </h3>
+            <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+              {lang === "ky"
+                ? "Бул экзаменге кирүү мүмкүнчүлүгүңүз жок. Мугалимден же администратордон уруксат сураңыз."
+                : "У вас нет доступа к этому экзамену. Обратитесь к администратору для получения доступа."}
+            </p>
+          </div>
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Link
+              href={`/${lang}/dashboard`}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition shadow-xs"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>{lang === "ky" ? "Дашбордго кайтуу" : "Вернуться в дашборд"}</span>
+            </Link>
+            <Link
+              href={`/${lang}/mock-tests`}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-200 transition"
+            >
+              <span>{lang === "ky" ? "Сыноо тесттерге кайтуу" : "К списку тестов"}</span>
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -573,7 +698,11 @@ function ExamRunnerContent() {
           </h2>
 
           <p className="text-sm text-slate-500 max-w-md mx-auto">
-            {lang === "ky"
+            {isSubjectTest
+              ? lang === "ky"
+                ? "Тест ийгиликтүү аяктады. Сиздин жыйынтыгыңыз:"
+                : "Тест завершен. Ваш итоговый результат:"
+              : lang === "ky"
               ? "Бардык 5 бөлүм тапшырылды. Сиздин ОРТ нормативдик шкаласындагы упайыңыз:"
               : "Все разделы завершены. Ваш итоговый результат по нормативной шкале ОРТ:"}
           </p>
@@ -583,7 +712,13 @@ function ExamRunnerContent() {
               {finalResult.totalScaledScore}
             </span>
             <span className="text-sm text-slate-400 block mt-1">
-              {lang === "ky" ? "балл (60 — 245)" : "баллов (60 — 245)"}
+              {finalResult.exam_type === "subject" || isSubjectTest
+                ? lang === "ky"
+                  ? "балл (60 — 150)"
+                  : "баллов (60 - 150)"
+                : lang === "ky"
+                ? "балл (110 — 245)"
+                : "баллов (110 - 245)"}
             </span>
             {finalResult.isGoldenCertificate && (
               <span className="inline-block mt-2 px-3 py-1 bg-amber-100 text-amber-900 border border-amber-300 rounded-full text-xs font-bold">
@@ -597,7 +732,7 @@ function ExamRunnerContent() {
             {Object.entries(finalResult.sectionScores || {}).map(([sec, sc]) => (
               <div key={sec} className="p-3 bg-slate-50 rounded-xl border border-slate-100">
                 <span className="text-[10px] font-bold text-slate-400 uppercase block truncate">
-                  {sec}
+                  {isSubjectTest ? (examTitle || getSectionName(sec)) : getSectionName(sec)}
                 </span>
                 <span className="text-lg font-bold text-slate-900 block mt-0.5">
                   {sc.scaledScore}
@@ -630,8 +765,8 @@ function ExamRunnerContent() {
 
   return (
     <div className="space-y-6 pb-16">
-      {/* STATIC MANUAL SECTION TRANSITION INTERSTITIAL MODAL */}
-      {isTransitioning && (
+      {/* STATIC MANUAL SECTION TRANSITION INTERSTITIAL MODAL (Hidden for Subject Tests) */}
+      {!isSubjectTest && isTransitioning && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in">
           <div className="bg-white w-full max-w-md rounded-3xl p-8 text-center space-y-6 shadow-2xl border border-slate-100">
             <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
@@ -721,10 +856,14 @@ function ExamRunnerContent() {
           </span>
           <div>
             <span className="text-xs font-bold text-slate-900 block">
-              {getSectionName(activeSection.section)}
+              {isSubjectTest
+                ? (examTitle || (lang === "ky" ? "Предметтик тест" : "Предметный тест"))
+                : getSectionName(activeSection.section)}
             </span>
             <span className="text-[11px] text-slate-400">
-              {currentSectionIndex + 1} / {sections.length} {lang === "ky" ? "бөлүм" : "раздел"}
+              {isSubjectTest
+                ? `${activeQuestions.length} ${lang === "ky" ? "суроо" : "вопросов"}`
+                : `${currentSectionIndex + 1} / ${sections.length} ${lang === "ky" ? "бөлүм" : "раздел"}`}
             </span>
           </div>
         </div>
@@ -732,21 +871,30 @@ function ExamRunnerContent() {
         {/* Timer */}
         <div className="flex items-center gap-3">
           <ExamTimer
-            key={`timer_${activeSection.section}`}
-            initialSeconds={activeSection.timeLimitMinutes > 0 ? activeSection.timeLimitMinutes * 60 : null}
-            onTimeExpired={handleSectionTimeExpiredOrFinish}
+            key={isSubjectTest ? `timer_global_${attemptId}` : `timer_${activeSection.section}`}
+            initialSeconds={
+              isSubjectTest
+                ? (examTimeLimitMinutes ? examTimeLimitMinutes * 60 : (totalTimeSeconds || 60 * 60))
+                : (activeSection.timeLimitMinutes > 0 ? activeSection.timeLimitMinutes * 60 : null)
+            }
+            onTimeExpired={isSubjectTest ? handleSubmitFinalTest : handleSectionTimeExpiredOrFinish}
           />
 
           <button
-            onClick={handleSectionTimeExpiredOrFinish}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-700 rounded-xl text-xs font-semibold transition"
+            onClick={isSubjectTest ? handleSubmitFinalTest : handleSectionTimeExpiredOrFinish}
+            disabled={isSubmittingFinal}
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer disabled:opacity-50"
           >
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            {isSubmittingFinal ? (
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            )}
             <span>
-              {isFinalSection
+              {isSubjectTest || isFinalSection
                 ? lang === "ky"
                   ? "Экзаменди аяктоо"
-                  : "Завершить экзамен"
+                  : "Завершить тест"
                 : lang === "ky"
                 ? "Бөлүмдү тапшыруу"
                 : "Завершить раздел"}
@@ -809,7 +957,7 @@ function ExamRunnerContent() {
               <button
                 onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
                 disabled={currentIndex === 0}
-                className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition disabled:opacity-40 flex items-center gap-1.5"
+                className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
                 <span>{t("common.back")}</span>
@@ -820,15 +968,27 @@ function ExamRunnerContent() {
                   if (currentIndex < activeQuestions.length - 1) {
                     setCurrentIndex((prev) => prev + 1);
                   } else {
-                    handleSectionTimeExpiredOrFinish();
+                    if (isSubjectTest) {
+                      handleSubmitFinalTest();
+                    } else {
+                      handleSectionTimeExpiredOrFinish();
+                    }
                   }
                 }}
-                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition flex items-center gap-1.5"
+                disabled={isSubmittingFinal}
+                className={`px-5 py-2 rounded-xl text-white text-xs font-bold shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                  currentIndex === activeQuestions.length - 1 && (isSubjectTest || isFinalSection)
+                    ? "bg-emerald-600 hover:bg-emerald-700"
+                    : "bg-indigo-600 hover:bg-indigo-700"
+                }`}
               >
+                {isSubmittingFinal && currentIndex === activeQuestions.length - 1 && (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                )}
                 <span>
                   {currentIndex < activeQuestions.length - 1
                     ? t("common.next")
-                    : isFinalSection
+                    : isSubjectTest || isFinalSection
                     ? lang === "ky"
                       ? "Экзаменди аяктоо"
                       : "Завершить тест"
@@ -875,7 +1035,7 @@ function ExamRunnerContent() {
               <button
                 onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
                 disabled={currentIndex === 0}
-                className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition disabled:opacity-40 flex items-center gap-1.5"
+                className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
                 <span>{t("common.back")}</span>
@@ -886,15 +1046,27 @@ function ExamRunnerContent() {
                   if (currentIndex < activeQuestions.length - 1) {
                     setCurrentIndex((prev) => prev + 1);
                   } else {
-                    handleSectionTimeExpiredOrFinish();
+                    if (isSubjectTest) {
+                      handleSubmitFinalTest();
+                    } else {
+                      handleSectionTimeExpiredOrFinish();
+                    }
                   }
                 }}
-                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition flex items-center gap-1.5"
+                disabled={isSubmittingFinal}
+                className={`px-5 py-2 rounded-xl text-white text-xs font-bold shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                  currentIndex === activeQuestions.length - 1 && (isSubjectTest || isFinalSection)
+                    ? "bg-emerald-600 hover:bg-emerald-700"
+                    : "bg-indigo-600 hover:bg-indigo-700"
+                }`}
               >
+                {isSubmittingFinal && currentIndex === activeQuestions.length - 1 && (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                )}
                 <span>
                   {currentIndex < activeQuestions.length - 1
                     ? t("common.next")
-                    : isFinalSection
+                    : isSubjectTest || isFinalSection
                     ? lang === "ky"
                       ? "Экзаменди аяктоо"
                       : "Завершить тест"

@@ -5,13 +5,13 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { useAuth, UserRole } from "@/lib/auth-context";
-import { GraduationCap, ShieldCheck, Mail, Lock, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
+import { Mail, Lock, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { lang, setLang, t } = useTranslation();
-  const { signIn, loginAsDemo } = useAuth();
+  const { signIn } = useAuth();
 
   const redirectParam = searchParams.get("redirect");
 
@@ -37,19 +37,6 @@ function LoginForm() {
 
     try {
       const res = await signIn(email, password);
-      handleNavigateAfterAuth(res.role);
-    } catch (err: any) {
-      setError(err?.message || t("auth.loginError"));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDemo = async (role: UserRole) => {
-    setError(null);
-    setLoading(true);
-    try {
-      const res = await loginAsDemo(role);
       handleNavigateAfterAuth(res.role);
     } catch (err: any) {
       setError(err?.message || t("auth.loginError"));
@@ -147,6 +134,14 @@ function LoginForm() {
                   className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 text-sm outline-none transition-all"
                 />
               </div>
+              <div className="flex justify-end mt-1.5">
+                <Link
+                  href={`/${lang}/forgot-password`}
+                  className="text-xs text-brand-600 hover:text-brand-700 font-semibold hover:underline"
+                >
+                  {t("auth.forgotPassword")}
+                </Link>
+              </div>
             </div>
 
             <button
@@ -167,33 +162,6 @@ function LoginForm() {
               )}
             </button>
           </form>
-
-          {/* Quick Demo Logins for Pair Programming & Testing */}
-          <div className="mt-6 pt-6 border-t border-slate-100">
-            <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 text-center mb-3">
-              {lang === "ky" ? "Тез сыноо аккаунттары:" : "Быстрый вход для тестирования:"}
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleDemo("student")}
-                disabled={loading}
-                className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 text-xs font-semibold transition-colors disabled:opacity-50"
-              >
-                <GraduationCap className="w-4 h-4" />
-                <span>{t("auth.demoStudent")}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemo("admin")}
-                disabled={loading}
-                className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-100 text-xs font-semibold transition-colors disabled:opacity-50"
-              >
-                <ShieldCheck className="w-4 h-4" />
-                <span>{t("auth.demoAdmin")}</span>
-              </button>
-            </div>
-          </div>
 
           {/* Link to Register */}
           <div className="mt-6 text-center text-xs text-slate-500">

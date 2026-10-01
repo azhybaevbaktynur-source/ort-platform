@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import auth, users, questions, bulk, mock_tests, exam_sets, upload, planner, analytics, practice
+from app.api.v1.endpoints import auth, users, questions, bulk, mock_tests, exam_sets, upload, planner, analytics, practice, admin
 
 api_router = APIRouter()
 
@@ -13,5 +13,6 @@ api_router.include_router(upload.router, prefix="/upload", tags=["File & Image U
 api_router.include_router(planner.router, prefix="/planner", tags=["Daily Planner"])
 api_router.include_router(analytics.router, prefix="/analytics", tags=["Performance Analytics"])
 api_router.include_router(practice.router, prefix="/practice", tags=["Practice by Section"])
+api_router.include_router(admin.router, prefix="/admin", tags=["Admin & Access Management"])
 
 

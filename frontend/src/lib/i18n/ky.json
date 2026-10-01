@@ -27,7 +27,8 @@
       "examManagement": "Экзамендерди башкаруу",
       "questionBank": "Суроолор базасы (12,000+)",
       "bulkUpload": "CSV аркылуу жүктөө",
-      "studentAnalytics": "Окуучулардын аналитикасы"
+      "studentAnalytics": "Окуучулардын аналитикасы",
+      "students": "Окуучулар (Доступ)"
     }
   },
   "sections": {
@@ -94,6 +95,8 @@
     "passwordPlaceholder": "••••••••",
     "displayName": "Аты-жөнүңүз",
     "displayNamePlaceholder": "Айбек Жумабеков",
+    "phone": "Телефон номери (WhatsApp/Telegram)",
+    "phonePlaceholder": "+996 700 123 456",
     "role": "Сиздин ролуңуз",
     "studentRole": "Окуучу (ЖРТга даярдануу)",
     "instructorRole": "Мугалим / Администратор",
@@ -109,7 +112,19 @@
     "signingIn": "Кирүү аткарылууда...",
     "signingUp": "Аккаунт ачылууда...",
     "signOut": "Чыгуу",
-    "protectedRoute": "Бул баракчага өтүү үчүн алгач системага кириңиз"
+    "protectedRoute": "Бул баракчага өтүү үчүн алгач системага кириңиз",
+    "forgotPassword": "Сырсөздү унуттуңузбу?",
+    "forgotPasswordTitle": "Сырсөздү калыбына келтирүү",
+    "forgotPasswordSubtitle": "Электрондук почтаңызды жазыңыз, сырсөздү алмаштыруу шилтемесин жөнөтөбүз",
+    "sendResetLink": "Шилтемени жөнөтүү",
+    "resetPasswordTitle": "Жаңы сырсөз",
+    "resetPasswordSubtitle": "Аккаунтуңуз үчүн жаңы сырсөз жазыңыз",
+    "newPassword": "Жаңы сырсөз",
+    "confirmNewPassword": "Сырсөздү тастыктаңыз",
+    "resetPasswordButton": "Жаңы сырсөздү сактоо",
+    "resetLinkSent": "Сырсөздү алмаштыруу шилтемеси почтаңызга жөнөтүлдү (Спам папкасын да текшериңиз)",
+    "passwordResetSuccess": "Сырсөз ийгиликтүү алмаштырылды! Эми кире аласыз.",
+    "backToLogin": "Кирүүгө кайтуу"
   }
 }
 

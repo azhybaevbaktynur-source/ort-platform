@@ -84,6 +84,21 @@ class MockTestService:
         except Exception:
             pass
 
+        # Also load from SQLAlchemy exam_sets table to guarantee full synchronization
+        try:
+            from app.db.session import SessionLocal
+            from app.models.exam_set import ExamSet as ExamSetModel
+            sql_session = SessionLocal()
+            try:
+                sql_exams = sql_session.query(ExamSetModel).all()
+                for se in sql_exams:
+                    if se.id not in items_map:
+                        items_map[se.id] = ExamSet(**se.to_dict())
+            finally:
+                sql_session.close()
+        except Exception:
+            pass
+
         # Compute completions count for each exam set
         try:
             all_attempts = db.collection("test_attempts").get()
@@ -185,6 +200,43 @@ class MockTestService:
             data["totalTimeMinutes"] = sum(s.get("timeLimitMinutes", 0) for s in data["sections"])
 
         db.collection("mock_test_templates").document(exam_id).set(data)
+
+        # Sync to SQL exam_sets table
+        try:
+            from app.db.session import SessionLocal
+            from app.models.exam_set import ExamSet as ExamSetModel
+            sql_session = SessionLocal()
+            try:
+                now_dt = datetime.now(timezone.utc)
+                sql_exam = ExamSetModel(
+                    id=exam_id,
+                    title=data.get("title", ""),
+                    description=data.get("description", ""),
+                    language=data.get("language", "ky"),
+                    exam_type=data.get("exam_type", "full_main"),
+                    status=data.get("status", "draft"),
+                    available_from=data.get("available_from"),
+                    available_until=data.get("available_until"),
+                    access_code=data.get("access_code"),
+                    max_attempts=data.get("max_attempts", 1),
+                    sections=data.get("sections", []),
+                    total_questions=data.get("totalQuestions", 0),
+                    total_time_minutes=data.get("totalTimeMinutes", 170),
+                    time_limit_minutes=data.get("time_limit_minutes"),
+                    question_ids=data.get("questionIds", []),
+                    created_by=user_id,
+                    created_at=now_dt,
+                    updated_at=now_dt,
+                )
+                sql_session.merge(sql_exam)
+                sql_session.commit()
+            except Exception:
+                sql_session.rollback()
+            finally:
+                sql_session.close()
+        except Exception:
+            pass
+
         return ExamSet(**data)
 
     @classmethod
@@ -208,6 +260,30 @@ class MockTestService:
 
         doc_ref.update(update_fields)
         existing.update(update_fields)
+
+        # Sync update to SQL
+        try:
+            from app.db.session import SessionLocal
+            from app.models.exam_set import ExamSet as ExamSetModel
+            sql_session = SessionLocal()
+            try:
+                sql_item = sql_session.query(ExamSetModel).filter(ExamSetModel.id == exam_set_id).first()
+                if sql_item:
+                    for k, v in update_fields.items():
+                        if hasattr(sql_item, k):
+                            setattr(sql_item, k, v)
+                        elif k == "totalQuestions":
+                            sql_item.total_questions = v
+                        elif k == "totalTimeMinutes":
+                            sql_item.total_time_minutes = v
+                    sql_session.commit()
+            except Exception:
+                sql_session.rollback()
+            finally:
+                sql_session.close()
+        except Exception:
+            pass
+
         return ExamSet(**existing)
 
     @classmethod
@@ -215,9 +291,30 @@ class MockTestService:
         db = get_firestore_client()
         doc_ref = db.collection("mock_test_templates").document(exam_set_id)
         doc = doc_ref.get()
-        if not doc.exists:
+        fs_exists = doc.exists
+        if fs_exists:
+            doc_ref.delete()
+
+        # Sync delete to SQL with ORM cascade
+        sql_deleted = False
+        from app.db.session import SessionLocal
+        from app.models.exam_set import ExamSet as ExamSetModel
+        sql_session = SessionLocal()
+        try:
+            sql_item = sql_session.query(ExamSetModel).filter(ExamSetModel.id == exam_set_id).first()
+            if sql_item:
+                sql_session.delete(sql_item)
+                sql_session.commit()
+                sql_deleted = True
+        except Exception:
+            sql_session.rollback()
+            raise
+        finally:
+            sql_session.close()
+
+        if not fs_exists and not sql_deleted:
             raise EntityNotFoundException("ExamSet", exam_set_id)
-        doc_ref.delete()
+
         return True
 
     @classmethod
@@ -247,6 +344,22 @@ class MockTestService:
         )
 
         if not is_fast_practice:
+            # Canvas-style Rule 0: Exam Access Control (locked until Admin grants access)
+            es_type_str = exam_set.exam_type.value if hasattr(exam_set.exam_type, "value") else str(exam_set.exam_type)
+            if not is_instructor and es_type_str in ("full_main", "subject"):
+                from app.db.session import SessionLocal
+                from app.models.exam_access import ExamAccess
+                sql_session = SessionLocal()
+                try:
+                    has_access = sql_session.query(ExamAccess).filter(
+                        ExamAccess.user_id == user_id,
+                        ExamAccess.exam_set_id == template_id,
+                    ).first()
+                    if not has_access:
+                        raise ForbiddenException("У вас нет доступа к этому экзамену / Бул экзаменге кирүү мүмкүнчүлүгүңүз жок")
+                finally:
+                    sql_session.close()
+
             # Canvas-style Rule 1: Check Publish status
             if exam_set.status != ExamSetStatus.PUBLISHED.value and not is_instructor:
                 raise ForbiddenException("Бул экзамен жарыялана элек (Черновик) / Экзамен еще не опубликован")
@@ -505,6 +618,8 @@ class MockTestService:
             else:
                 total_time_secs = (exam_set.time_limit_minutes or exam_set.totalTimeMinutes or 170) * 60
 
+        es_type_str = exam_set.exam_type.value if hasattr(exam_set.exam_type, "value") else str(exam_set.exam_type or "full_main")
+
         # Store test attempt session in Firestore
         attempt_record = {
             "id": attempt_id,
@@ -517,6 +632,7 @@ class MockTestService:
             "totalTimeSeconds": total_time_secs,
             "questionIds": cached_question_ids,
             "answers": {},
+            "exam_type": es_type_str,
         }
         db.collection("test_attempts").document(attempt_id).set(attempt_record)
 
@@ -529,6 +645,9 @@ class MockTestService:
             totalTimeSeconds=total_time_secs,
             sections=active_sections,
             questions=section_questions_map,
+            exam_type=es_type_str,
+            title=exam_set.title,
+            time_limit_minutes=exam_set.time_limit_minutes or exam_set.totalTimeMinutes,
         )
 
     @classmethod
@@ -574,6 +693,17 @@ class MockTestService:
         template_id = attempt_data.get("templateId", "ort_main_standard")
         language = attempt_data.get("language", "ky")
 
+        # Determine exam_type (full_main vs subject)
+        exam_type = attempt_data.get("exam_type")
+        if not exam_type:
+            es = cls.get_exam_set_by_id(template_id)
+            if es:
+                exam_type = es.exam_type.value if hasattr(es.exam_type, "value") else str(es.exam_type)
+            elif "subject" in template_id.lower():
+                exam_type = "subject"
+            else:
+                exam_type = "full_main"
+
         # Fetch original questions with correct answers
         questions_coll = db.collection("questions")
         test_questions: List[Dict[str, Any]] = []
@@ -582,7 +712,7 @@ class MockTestService:
             if q_doc.exists:
                 test_questions.append(q_doc.to_dict())
 
-        # Evaluate score via ScoringService
+        # Evaluate score via ScoringService with CEATM standards
         serialized_answers = {k: v.model_dump() for k, v in answers.items()}
         result = ScoringService.evaluate_test_submission(
             attempt_id=attempt_id,
@@ -592,6 +722,7 @@ class MockTestService:
             user_answers=serialized_answers,
             questions_in_test=test_questions,
             completed_at=now_iso,
+            exam_type=exam_type,
         )
 
         # Update attempt record with results
@@ -599,9 +730,11 @@ class MockTestService:
             "status": ExamStatus.COMPLETED.value,
             "completedAt": now_iso,
             "answers": serialized_answers,
+            "exam_type": exam_type,
             "scores": {
                 "rawScore": result.totalRawScore,
                 "scaledScore": result.totalScaledScore,
+                "maxScaledScore": result.maxScaledScore,
                 "percentile": result.percentile,
                 "isGoldenCertificate": result.isGoldenCertificate,
                 "sectionBreakdown": {
@@ -611,10 +744,11 @@ class MockTestService:
             "review": [r.model_dump() for r in result.review],
         })
 
-        # Update user's currentEstimatedScore in users collection
-        user_ref = db.collection("users").document(user_id)
-        if user_ref.get().exists:
-            user_ref.update({"currentEstimatedScore": result.totalScaledScore})
+        # Update user's currentEstimatedScore in users collection (for main test)
+        if exam_type != "subject":
+            user_ref = db.collection("users").document(user_id)
+            if user_ref.get().exists:
+                user_ref.update({"currentEstimatedScore": result.totalScaledScore})
 
         # Increment completionsCount on ExamSet if document exists
         exam_ref = db.collection("mock_test_templates").document(template_id)

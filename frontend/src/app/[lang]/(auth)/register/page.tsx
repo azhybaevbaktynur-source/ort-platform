@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
-import { Mail, Lock, User, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
+import { Mail, Lock, User, Phone, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
 
 function RegisterForm() {
   const router = useRouter();
@@ -16,6 +16,7 @@ function RegisterForm() {
   const redirectParam = searchParams.get("redirect");
 
   const [displayName, setDisplayName] = useState("");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +28,7 @@ function RegisterForm() {
     setLoading(true);
 
     try {
-      await signUp(email, password, displayName);
+      await signUp(email, password, displayName, phone);
       if (redirectParam) {
         router.push(redirectParam);
       } else {
@@ -109,6 +110,23 @@ function RegisterForm() {
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder={t("auth.displayNamePlaceholder")}
+                  className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 text-sm outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                {t("auth.phone")}
+              </label>
+              <div className="relative">
+                <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <input
+                  type="tel"
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder={t("auth.phonePlaceholder")}
                   className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 text-sm outline-none transition-all"
                 />
               </div>

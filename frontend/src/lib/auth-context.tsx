@@ -10,6 +10,7 @@ export interface AuthUserProfile {
   email: string;
   displayName: string;
   role: UserRole;
+  phone?: string;
   target_score?: number;
   currentEstimatedScore?: number;
   streak?: {
@@ -24,7 +25,7 @@ interface AuthContextType {
   userProfile: AuthUserProfile | null;
   loading: boolean;
   signIn: (email: string, pass: string) => Promise<{ role: UserRole }>;
-  signUp: (email: string, pass: string, displayName: string) => Promise<void>;
+  signUp: (email: string, pass: string, displayName: string, phone?: string) => Promise<void>;
   signOut: () => Promise<void>;
   loginAsDemo: (role: UserRole) => Promise<{ role: UserRole }>;
   updateTargetScore: (score: number) => Promise<void>;
@@ -98,6 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               email: data.email,
               displayName: data.displayName || data.email.split("@")[0],
               role,
+              phone: data.phone,
               target_score: data.target_score || 200,
               currentEstimatedScore: data.currentEstimatedScore || 150,
             };
@@ -182,40 +184,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } as unknown as User);
 
       return { role };
-    } catch (err) {
-      // Offline / Demo fallback for local development
-      const cleanEmail = email.trim().toLowerCase();
-      const role: UserRole = cleanEmail.includes("admin") ? "admin" : "student";
-      const token = role === "admin" ? "mock_admin_token" : "mock_student_token";
-
-      setAuthCookies(token, role);
-      localStorage.setItem("ort_token", token);
-      localStorage.setItem("ort_role", role);
-
-      const profile: AuthUserProfile = {
-        uid: `usr_${Date.now()}`,
-        email: cleanEmail,
-        displayName: cleanEmail.split("@")[0],
-        role,
-        target_score: 200,
-      };
-
-      localStorage.setItem("ort_dev_auth_user", JSON.stringify(profile));
-      setUserProfile(profile);
-      setUser({
-        uid: profile.uid,
-        email: profile.email,
-        displayName: profile.displayName,
-        getIdToken: async () => token,
-      } as unknown as User);
-
-      return { role };
     } finally {
       setLoading(false);
     }
   };
 
-  const signUp = async (email: string, pass: string, displayName: string): Promise<void> => {
+  const signUp = async (email: string, pass: string, displayName: string, phone?: string): Promise<void> => {
     setLoading(true);
     try {
       const res = await fetch("/api/v1/auth/register", {
@@ -225,6 +199,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           email: email.trim(),
           password: pass,
           displayName: displayName.trim(),
+          phone: phone?.trim() || undefined,
         }),
       });
 
@@ -245,6 +220,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         uid: data.user.id,
         email: data.user.email,
         displayName: data.user.displayName || displayName || email.split("@")[0],
+        phone: data.user.phone || phone,
         role,
         target_score: 200,
       };

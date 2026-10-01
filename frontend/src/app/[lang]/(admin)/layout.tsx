@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
 import { Header } from "@/components/common/Header";
-import { ShieldCheck, Database, UploadCloud, BarChart3, GraduationCap, LogOut, BookOpenCheck } from "lucide-react";
+import { ShieldCheck, Database, UploadCloud, BarChart3, GraduationCap, LogOut, BookOpenCheck, Users } from "lucide-react";
 
 export default function AdminLayout({
   children,
@@ -54,6 +54,11 @@ export default function AdminLayout({
       name: t("nav.admin.questionBank"),
       href: `/${lang}/questions`,
       icon: Database,
+    },
+    {
+      name: t("nav.admin.students") || (lang === "ky" ? "Окуучулар (Доступ)" : "Ученики (Доступ)"),
+      href: `/${lang}/students`,
+      icon: Users,
     },
     {
       name: t("nav.admin.bulkUpload"),

@@ -69,6 +69,19 @@ export const Sidebar: React.FC = () => {
         </div>
       </div>
 
+      {/* Return to Admin Panel Button (for Admin accounts viewing student mode) */}
+      {userProfile?.role === "admin" && (
+        <div className="px-4 pt-4">
+          <Link
+            href={`/${lang}/analytics`}
+            className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-bold text-xs shadow-md shadow-indigo-950/50 border border-indigo-400/30 transition-all hover:scale-[1.02] active:scale-[0.98] group"
+          >
+            <span className="text-sm group-hover:-translate-x-0.5 transition-transform">🔙</span>
+            <span>{lang === "ky" ? "Админ-панелге кайтуу" : "Вернуться в админ-панель"}</span>
+          </Link>
+        </div>
+      )}
+
       {/* Quick Streak & Target Score Badge */}
       <div className="p-4 mx-4 my-4 rounded-xl bg-slate-800/80 border border-slate-700/50 space-y-2">
         <div className="flex items-center justify-between text-xs">

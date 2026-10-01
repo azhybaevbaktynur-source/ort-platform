@@ -483,6 +483,13 @@ async def test_upload_and_section_sequencing_workflow():
             },
         )
 
+        # Grant student access to the newly created full_main exam
+        await client.post(
+            f"/api/v1/admin/students/usr_student_01/access",
+            headers=instructor_headers,
+            json={"exam_set_id": exam_id, "granted": True},
+        )
+
         # 3. Start test session and verify STRICT_SECTION_ORDER and 0-question section skipping
         res_start = await client.post(
             "/api/v1/mock-tests/start",
@@ -506,7 +513,7 @@ async def test_student_exam_sets_endpoint():
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # Create published full_main exam
-        await client.post(
+        res_fm = await client.post(
             "/api/v1/exam-sets",
             headers=inst_headers,
             json={
@@ -517,8 +524,10 @@ async def test_student_exam_sets_endpoint():
                 "sections": [],
             },
         )
+        fm_id = res_fm.json()["id"]
+
         # Create published subject exam
-        await client.post(
+        res_sub = await client.post(
             "/api/v1/exam-sets",
             headers=inst_headers,
             json={
@@ -529,15 +538,34 @@ async def test_student_exam_sets_endpoint():
                 "sections": [],
             },
         )
+        sub_id = res_sub.json()["id"]
 
-        # Call GET /api/v1/exam-sets/student
+        # Call GET /api/v1/exam-sets/student before access is granted:
+        # Full_main and subject exams (fm_id, sub_id) MUST NOT be visible yet
+        res_initial = await client.get("/api/v1/exam-sets/student?lang=ky", headers=student_headers)
+        assert res_initial.status_code == 200
+        exams_initial = res_initial.json()
+        assert fm_id not in [e["id"] for e in exams_initial]
+        assert sub_id not in [e["id"] for e in exams_initial]
+
+        # Now admin grants access to both exams for usr_student_01
+        await client.post(
+            "/api/v1/admin/students/usr_student_01/access",
+            headers=inst_headers,
+            json={"exam_set_id": fm_id, "granted": True},
+        )
+        await client.post(
+            "/api/v1/admin/students/usr_student_01/access",
+            headers=inst_headers,
+            json={"exam_set_id": sub_id, "granted": True},
+        )
+
+        # Call GET /api/v1/exam-sets/student after access is granted:
         res = await client.get("/api/v1/exam-sets/student?lang=ky", headers=student_headers)
         assert res.status_code == 200
         exams = res.json()
         assert len(exams) >= 2
-        # practice_bank must not be in default student sets
         for e in exams:
-            assert e["exam_type"] != "practice_bank"
             assert e["status"] == "published"
             assert "user_attempts_count" in e
             assert e["user_attempts_count"] is not None
@@ -547,6 +575,7 @@ async def test_student_exam_sets_endpoint():
         assert res_subject.status_code == 200
         subject_exams = res_subject.json()
         assert all(e["exam_type"] == "subject" for e in subject_exams)
+        assert any(e["id"] == sub_id for e in subject_exams)
 
 
 @pytest.mark.asyncio
@@ -608,6 +637,13 @@ async def test_exam_set_dynamic_question_count_and_custom_timer():
         matching = [e for e in res_list.json() if e["id"] == exam_id]
         assert len(matching) == 1
         assert matching[0]["question_count"] == 2
+
+        # Grant student access to the exam
+        await client.post(
+            f"/api/v1/admin/students/usr_student_01/access",
+            headers=inst_headers,
+            json={"exam_set_id": exam_id, "granted": True},
+        )
 
         # 5. Start test session as student: verify timer is strictly 40 minutes (2400 seconds)
         res_start = await client.post(
@@ -710,6 +746,22 @@ async def test_pin_validation_and_fast_practice_exemption():
                 "option_d": "20",
                 "correct_option": "A",
             },
+        )
+
+        # 1.5 Try starting without access grant -> 403 Access Denied
+        res_no_access = await client.post(
+            "/api/v1/mock-tests/start",
+            headers=student_headers,
+            json={"templateId": exam_id, "language": "ky"},
+        )
+        assert res_no_access.status_code == 403
+        assert "доступа" in res_no_access.json()["detail"] or "мүмкүнчүлүгүңүз" in res_no_access.json()["detail"]
+
+        # Admin grants access to student
+        await client.post(
+            f"/api/v1/admin/students/usr_student_01/access",
+            headers=inst_headers,
+            json={"exam_set_id": exam_id, "granted": True},
         )
 
         # 2. Try starting without PIN -> 403
@@ -863,5 +915,298 @@ async def test_sql_auth_registration_and_login_flow():
             json={"title": "Official Admin Exam", "language": "ky", "exam_type": "full_main"},
         )
         assert res_admin_create.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_admin_student_management_and_access_control():
+    student_headers = {"Authorization": "Bearer mock_student_token"}
+    admin_headers = {"Authorization": "Bearer mock_admin_token"}
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # 1. Student cannot access GET /api/v1/admin/students -> 403 Forbidden
+        res_forbidden = await client.get("/api/v1/admin/students", headers=student_headers)
+        assert res_forbidden.status_code == 403
+
+        # 2. Admin can access GET /api/v1/admin/students
+        res_students = await client.get("/api/v1/admin/students", headers=admin_headers)
+        assert res_students.status_code == 200
+        students = res_students.json()
+        assert len(students) >= 1
+        student_01 = next((s for s in students if s["id"] == "usr_student_01"), None)
+        assert student_01 is not None
+        assert student_01["email"] == "student@ort.kg"
+        assert "grantedExamIds" in student_01
+
+        # 3. Create a locked full_main exam
+        res_create_exam = await client.post(
+            "/api/v1/exam-sets",
+            headers=admin_headers,
+            json={
+                "title": "Strictly Locked Exam",
+                "language": "ky",
+                "exam_type": "full_main",
+                "status": "published",
+                "sections": [],
+            },
+        )
+        assert res_create_exam.status_code == 200
+        locked_exam_id = res_create_exam.json()["id"]
+
+        # 4. Student queries their exams: locked_exam_id is NOT in the list
+        res_student_exams = await client.get("/api/v1/exam-sets/student?lang=ky", headers=student_headers)
+        assert res_student_exams.status_code == 200
+        visible_ids = [e["id"] for e in res_student_exams.json()]
+        assert locked_exam_id not in visible_ids
+
+        # 5. Admin grants access to locked_exam_id for usr_student_01
+        res_grant = await client.post(
+            f"/api/v1/admin/students/usr_student_01/access",
+            headers=admin_headers,
+            json={"exam_set_id": locked_exam_id, "granted": True},
+        )
+        assert res_grant.status_code == 200
+        grant_data = res_grant.json()
+        assert grant_data["granted"] is True
+        assert locked_exam_id in grant_data["grantedExamIds"]
+
+        # 6. Student queries their exams again: locked_exam_id IS NOW VISIBLE
+        res_student_exams_after = await client.get("/api/v1/exam-sets/student?lang=ky", headers=student_headers)
+        assert res_student_exams_after.status_code == 200
+        visible_ids_after = [e["id"] for e in res_student_exams_after.json()]
+        assert locked_exam_id in visible_ids_after
+
+        # 7. Check GET /api/v1/admin/students/{user_id}/access
+        res_access_list = await client.get(
+            "/api/v1/admin/students/usr_student_01/access",
+            headers=admin_headers,
+        )
+        assert res_access_list.status_code == 200
+        assert locked_exam_id in res_access_list.json()
+
+        # 8. Admin revokes access
+        res_revoke = await client.post(
+            f"/api/v1/admin/students/usr_student_01/access",
+            headers=admin_headers,
+            json={"exam_set_id": locked_exam_id, "granted": False},
+        )
+        assert res_revoke.status_code == 200
+        assert res_revoke.json()["granted"] is False
+        assert locked_exam_id not in res_revoke.json()["grantedExamIds"]
+
+        # 9. Student queries their exams: locked_exam_id is hidden again
+        res_final = await client.get("/api/v1/exam-sets/student?lang=ky", headers=student_headers)
+        assert res_final.status_code == 200
+        assert locked_exam_id not in [e["id"] for e in res_final.json()]
+
+
+@pytest.mark.asyncio
+async def test_exam_set_cascading_deletion():
+    """
+    Tests that deleting an ExamSet cascades and deletes its linked
+    Questions, ExamAccess records, and TestAttempts without foreign key errors.
+    """
+    from datetime import datetime, timezone
+    from app.db.session import SessionLocal
+    from app.models.exam_set import ExamSet as ExamSetModel
+    from app.models.question import Question as QuestionModel
+    from app.models.exam_access import ExamAccess as ExamAccessModel
+    from app.models.test_attempt import TestAttempt as TestAttemptModel
+
+    admin_headers = {"Authorization": "Bearer mock_admin_token"}
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # 1. Create new exam set
+        res_create = await client.post(
+            "/api/v1/exam-sets",
+            headers=admin_headers,
+            json={
+                "title": "Cascade Test Exam",
+                "description": "Testing cascading deletes",
+                "language": "ky",
+                "exam_type": "full_main",
+                "status": "published",
+                "time_limit_minutes": 60,
+                "sections": [],
+            },
+        )
+        assert res_create.status_code == 200
+        exam_id = res_create.json()["id"]
+
+        # 2. Attach a Question, ExamAccess, and TestAttempt directly in SQL
+        db = SessionLocal()
+        try:
+            q_id = f"q_casc_{exam_id[:8]}"
+            db.add(
+                QuestionModel(
+                    id=q_id,
+                    language="ky",
+                    section="math_1",
+                    topic="cascade",
+                    difficulty="easy",
+                    stem="Cascade Q",
+                    option_a="1",
+                    option_b="2",
+                    option_c="3",
+                    option_d="4",
+                    correct_option="A",
+                    exam_set_id=exam_id,
+                    created_at=datetime.now(timezone.utc),
+                )
+            )
+
+            acc_id = f"acc_casc_{exam_id[:8]}"
+            db.add(
+                ExamAccessModel(
+                    id=acc_id,
+                    user_id="usr_student_01",
+                    exam_set_id=exam_id,
+                    granted_at=datetime.now(timezone.utc),
+                )
+            )
+
+            att_id = f"att_casc_{exam_id[:8]}"
+            db.add(
+                TestAttemptModel(
+                    id=att_id,
+                    user_id="usr_student_01",
+                    template_id=exam_id,
+                    language="ky",
+                    status="in_progress",
+                    started_at=datetime.now(timezone.utc),
+                )
+            )
+            db.commit()
+
+            # Verify rows exist
+            assert db.query(QuestionModel).filter(QuestionModel.id == q_id).first() is not None
+            assert db.query(ExamAccessModel).filter(ExamAccessModel.id == acc_id).first() is not None
+            assert db.query(TestAttemptModel).filter(TestAttemptModel.id == att_id).first() is not None
+        finally:
+            db.close()
+
+        # 3. Delete ExamSet via DELETE endpoint
+        res_del = await client.delete(f"/api/v1/exam-sets/{exam_id}", headers=admin_headers)
+        assert res_del.status_code == 200
+        assert res_del.json()["success"] is True
+
+        # 4. Verify in DB that ExamSet AND all cascading records are deleted
+        db = SessionLocal()
+        try:
+            assert db.query(ExamSetModel).filter(ExamSetModel.id == exam_id).first() is None
+            assert db.query(QuestionModel).filter(QuestionModel.id == q_id).first() is None
+            assert db.query(ExamAccessModel).filter(ExamAccessModel.id == acc_id).first() is None
+            assert db.query(TestAttemptModel).filter(TestAttemptModel.id == att_id).first() is None
+        finally:
+            db.close()
+
+
+@pytest.mark.asyncio
+async def test_registration_phone_and_admin_students_display():
+    """
+    Tests that phone number is accepted during registration, stored in DB,
+    and returned in GET /api/v1/admin/students.
+    """
+    import uuid
+    rand_email = f"phone_user_{uuid.uuid4().hex[:6]}@example.com"
+    phone_num = "+996 700 889900"
+
+    admin_headers = {"Authorization": "Bearer mock_admin_token"}
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # Register user with phone
+        res_reg = await client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": rand_email,
+                "password": "securepassword123",
+                "displayName": "Телефондуу Окуучу",
+                "phone": phone_num,
+            },
+        )
+        assert res_reg.status_code == 200
+        reg_data = res_reg.json()
+        assert reg_data["user"]["phone"] == phone_num
+
+        # Admin lists students
+        res_students = await client.get("/api/v1/admin/students", headers=admin_headers)
+        assert res_students.status_code == 200
+        students = res_students.json()
+
+        matched = next((s for s in students if s["email"] == rand_email), None)
+        assert matched is not None
+        assert matched["phone"] == phone_num
+
+
+@pytest.mark.asyncio
+async def test_forgot_and_reset_password_flow():
+    """
+    Tests self-service password reset flow:
+    1. Register user
+    2. Request reset link (generates token in DB)
+    3. Reset password using token
+    4. Verify old password fails and new password succeeds
+    """
+    import uuid
+    from app.db.session import SessionLocal
+    from app.models.user import User as UserModel
+
+    rand_email = f"reset_test_{uuid.uuid4().hex[:6]}@example.com"
+    initial_pass = "oldPassword123"
+    new_pass = "newSuperSecretPassword456"
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # 1. Register
+        res_reg = await client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": rand_email,
+                "password": initial_pass,
+                "displayName": "Reset Test User",
+            },
+        )
+        assert res_reg.status_code == 200
+
+        # 2. Request forgot password
+        res_forgot = await client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": rand_email, "lang": "ru"},
+        )
+        assert res_forgot.status_code == 200
+        assert res_forgot.json()["success"] is True
+
+        # 3. Retrieve token from DB
+        db = SessionLocal()
+        try:
+            db_user = db.query(UserModel).filter(UserModel.email == rand_email).first()
+            assert db_user is not None
+            assert db_user.reset_token is not None
+            token = db_user.reset_token
+        finally:
+            db.close()
+
+        # 4. Submit reset password
+        res_reset = await client.post(
+            "/api/v1/auth/reset-password",
+            json={"token": token, "new_password": new_pass},
+        )
+        assert res_reset.status_code == 200
+        assert res_reset.json()["success"] is True
+
+        # 5. Verify old password fails
+        res_old_login = await client.post(
+            "/api/v1/auth/login",
+            json={"email": rand_email, "password": initial_pass},
+        )
+        assert res_old_login.status_code == 401
+
+        # 6. Verify new password succeeds
+        res_new_login = await client.post(
+            "/api/v1/auth/login",
+            json={"email": rand_email, "password": new_pass},
+        )
+        assert res_new_login.status_code == 200
+        assert "access_token" in res_new_login.json()
+
+
 
 

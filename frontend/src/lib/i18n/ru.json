@@ -27,7 +27,8 @@
       "examManagement": "Управление Экзаменами",
       "questionBank": "Банк вопросов (12,000+)",
       "bulkUpload": "Массовая загрузка CSV",
-      "studentAnalytics": "Аналитика учеников"
+      "studentAnalytics": "Аналитика учеников",
+      "students": "Ученики (Доступ)"
     }
   },
   "sections": {
@@ -94,6 +95,8 @@
     "passwordPlaceholder": "••••••••",
     "displayName": "Ваше имя и фамилия",
     "displayNamePlaceholder": "Айбек Жумабеков",
+    "phone": "Номер телефона (WhatsApp/Telegram)",
+    "phonePlaceholder": "+996 700 123 456",
     "role": "Ваша роль",
     "studentRole": "Ученик (Подготовка к ОРТ)",
     "instructorRole": "Преподаватель / Администратор",
@@ -109,7 +112,19 @@
     "signingIn": "Выполняется вход...",
     "signingUp": "Создание аккаунта...",
     "signOut": "Выйти",
-    "protectedRoute": "Для доступа к этой странице необходимо войти в систему"
+    "protectedRoute": "Для доступа к этой странице необходимо войти в систему",
+    "forgotPassword": "Забыли пароль?",
+    "forgotPasswordTitle": "Восстановление пароля",
+    "forgotPasswordSubtitle": "Введите ваш email, и мы отправим ссылку для сброса пароля",
+    "sendResetLink": "Отправить ссылку",
+    "resetPasswordTitle": "Новый пароль",
+    "resetPasswordSubtitle": "Введите новый пароль для вашей учетной записи",
+    "newPassword": "Новый пароль",
+    "confirmNewPassword": "Подтвердите пароль",
+    "resetPasswordButton": "Сохранить новый пароль",
+    "resetLinkSent": "Ссылка для сброса пароля отправлена на ваш email (проверьте также папку Спам)",
+    "passwordResetSuccess": "Пароль успешно изменен! Теперь вы можете войти.",
+    "backToLogin": "Вернуться ко входу"
   }
 }
 

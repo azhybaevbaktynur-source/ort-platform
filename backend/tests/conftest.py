@@ -9,9 +9,13 @@ from app.schemas.question import (
 )
 
 
+from app.db.init_db import init_db
+
+
 @pytest.fixture(autouse=True)
 def reset_db():
-    """Reset the mock database before each test."""
+    """Reset the mock database and ensure SQL database is initialized before each test."""
+    init_db()
     mock_firestore_db.reset()
     yield
     mock_firestore_db.reset()

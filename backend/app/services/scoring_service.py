@@ -18,6 +18,12 @@ class ScoringService:
     SD_SCALED_SCORE = 30.0
     GOLDEN_CERTIFICATE_THRESHOLD = settings.GOLDEN_CERTIFICATE_MIN_SCORE  # 219
 
+    # Subject Test standards (CEATM / ЦООМО: scale 60 - 150)
+    SUBJECT_MIN_SCALED_SCORE = 60
+    SUBJECT_MAX_SCALED_SCORE = 150
+    SUBJECT_MEAN_SCALED_SCORE = 105.0
+    SUBJECT_SD_SCALED_SCORE = 20.0
+
     # Standard section weightings for ORT Main Test
     SECTION_WEIGHTS: Dict[str, float] = {
         SectionType.MATH_1.value: 1.0,
@@ -28,48 +34,72 @@ class ScoringService:
     }
 
     @classmethod
-    def raw_to_scaled(cls, raw_score: int, max_raw_score: int = 150) -> int:
+    def raw_to_scaled(
+        cls,
+        raw_score: int,
+        max_raw_score: int = 150,
+        exam_type: str = "full_main",
+    ) -> int:
         """
-        Converts raw score to ORT standardized scaled score (60 - 245).
+        Converts raw score to ORT standardized scaled score:
+        - full_main: 60 - 245 (mean ~150)
+        - subject: 60 - 150 (mean ~105)
         Uses a smooth calibrated logistic-normative curve matching the historical ORT distributions.
         """
-        if max_raw_score <= 0:
-            return cls.MIN_SCALED_SCORE
-        if raw_score <= 0:
-            return cls.MIN_SCALED_SCORE
+        if exam_type == "subject":
+            min_score = cls.SUBJECT_MIN_SCALED_SCORE
+            max_score = cls.SUBJECT_MAX_SCALED_SCORE
+            mean_score = cls.SUBJECT_MEAN_SCALED_SCORE
+        else:
+            min_score = cls.MIN_SCALED_SCORE
+            max_score = cls.MAX_SCALED_SCORE
+            mean_score = cls.MEAN_SCALED_SCORE
+
+        if max_raw_score <= 0 or raw_score <= 0:
+            return min_score
         if raw_score >= max_raw_score:
-            return cls.MAX_SCALED_SCORE
+            return max_score
 
         ratio = raw_score / max_raw_score
 
         # Calibrated non-linear scaling curve modeling the Kyrgyz ORT normative scale
-        # Centered around ratio = 0.5 -> scaled score = 150
+        # Centered around ratio = 0.5 -> scaled score = mean_score
         if ratio < 0.5:
-            # Range [60, 150]
             # normalized sub-ratio 0 to 1
             sub_ratio = ratio / 0.5
             # slight power curve to account for guessing threshold
-            scaled = cls.MIN_SCALED_SCORE + (cls.MEAN_SCALED_SCORE - cls.MIN_SCALED_SCORE) * (sub_ratio ** 1.05)
+            scaled = min_score + (mean_score - min_score) * (sub_ratio ** 1.05)
         else:
-            # Range [150, 245]
             sub_ratio = (ratio - 0.5) / 0.5
             # power curve rewarding high-accuracy performance near the top
-            scaled = cls.MEAN_SCALED_SCORE + (cls.MAX_SCALED_SCORE - cls.MEAN_SCALED_SCORE) * (sub_ratio ** 0.95)
+            scaled = mean_score + (max_score - mean_score) * (sub_ratio ** 0.95)
 
         return int(round(scaled))
 
     @classmethod
-    def calculate_percentile(cls, scaled_score: int) -> float:
+    def calculate_percentile(cls, scaled_score: int, exam_type: str = "full_main") -> float:
         """
         Calculates cumulative percentile rank using normal CDF:
-        Z = (scaled_score - 150) / 30
+        - full_main: Z = (scaled_score - 150) / 30
+        - subject: Z = (scaled_score - 105) / 20
         """
-        if scaled_score <= cls.MIN_SCALED_SCORE:
+        if exam_type == "subject":
+            min_score = cls.SUBJECT_MIN_SCALED_SCORE
+            max_score = cls.SUBJECT_MAX_SCALED_SCORE
+            mean_score = cls.SUBJECT_MEAN_SCALED_SCORE
+            sd_score = cls.SUBJECT_SD_SCALED_SCORE
+        else:
+            min_score = cls.MIN_SCALED_SCORE
+            max_score = cls.MAX_SCALED_SCORE
+            mean_score = cls.MEAN_SCALED_SCORE
+            sd_score = cls.SD_SCALED_SCORE
+
+        if scaled_score <= min_score:
             return 1.0
-        if scaled_score >= cls.MAX_SCALED_SCORE:
+        if scaled_score >= max_score:
             return 99.9
 
-        z = (scaled_score - cls.MEAN_SCALED_SCORE) / cls.SD_SCALED_SCORE
+        z = (scaled_score - mean_score) / sd_score
         # Standard normal CDF approximation (error function)
         percentile = 0.5 * (1.0 + math.erf(z / math.sqrt(2.0))) * 100.0
         return round(min(max(percentile, 1.0), 99.9), 1)
@@ -84,6 +114,7 @@ class ScoringService:
         user_answers: Dict[str, Any],  # question_id -> {selectedOptionId, timeSpentSeconds, flagged}
         questions_in_test: List[Dict[str, Any]],  # full question dicts with correctOptionId and explanation
         completed_at: str,
+        exam_type: str = "full_main",
     ) -> MockTestResult:
         """
         Processes a student's full mock test submission:
@@ -175,7 +206,7 @@ class ScoringService:
             tot = section_total_counts.get(section, 1)
             accuracy = round((raw / tot) * 100.0, 1) if tot > 0 else 0.0
             # Scaled section score proportional to standard ORT sub-scale
-            section_scaled = cls.raw_to_scaled(raw, tot)
+            section_scaled = cls.raw_to_scaled(raw, tot, exam_type=exam_type)
             section_scores[section] = SectionScoreResult(
                 section=section,
                 rawScore=raw,
@@ -184,9 +215,9 @@ class ScoringService:
                 accuracyPercentage=accuracy,
             )
 
-        total_scaled_score = cls.raw_to_scaled(total_raw_score, total_questions)
-        percentile = cls.calculate_percentile(total_scaled_score)
-        is_golden = total_scaled_score >= cls.GOLDEN_CERTIFICATE_THRESHOLD
+        total_scaled_score = cls.raw_to_scaled(total_raw_score, total_questions, exam_type=exam_type)
+        percentile = cls.calculate_percentile(total_scaled_score, exam_type=exam_type)
+        is_golden = (exam_type != "subject") and (total_scaled_score >= cls.GOLDEN_CERTIFICATE_THRESHOLD)
 
         return MockTestResult(
             attemptId=attempt_id,
@@ -201,5 +232,7 @@ class ScoringService:
             isGoldenCertificate=is_golden,
             sectionScores=section_scores,
             review=reviews,
+            exam_type=exam_type,
+            maxScaledScore=150 if exam_type == "subject" else 245,
         )
 

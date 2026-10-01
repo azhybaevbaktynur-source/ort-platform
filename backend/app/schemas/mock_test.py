@@ -114,6 +114,9 @@ class TestSessionResponse(BaseModel):
     totalTimeSeconds: int
     sections: List[MockTestTemplateSection]
     questions: Dict[str, List[QuestionStudentView]]  # section_name -> List of safe questions
+    exam_type: Optional[str] = "full_main"
+    title: Optional[str] = None
+    time_limit_minutes: Optional[int] = None
 
 
 class SectionScoreResult(BaseModel):
@@ -154,3 +157,5 @@ class MockTestResult(BaseModel):
     isGoldenCertificate: bool
     sectionScores: Dict[str, SectionScoreResult]
     review: List[DetailedQuestionReview] = []
+    exam_type: Optional[str] = "full_main"
+    maxScaledScore: Optional[int] = 245

@@ -25,6 +25,7 @@ class StreakInfo(BaseModel):
 class UserBase(BaseModel):
     email: EmailStr
     displayName: str
+    phone: Optional[str] = None
     role: UserRole = UserRole.STUDENT
     preferredLanguage: str = Field(default="ky", pattern="^(ky|ru)$")
 
@@ -35,6 +36,7 @@ class UserCreate(UserBase):
 
 class UserProfile(UserBase):
     id: str
+    phone: Optional[str] = None
     targetScore: TargetScore = Field(default_factory=TargetScore)
     target_score: Optional[int] = Field(default=200, ge=60, le=245)
     currentEstimatedScore: int = 150
@@ -47,6 +49,17 @@ class UserRegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6, description="Password at least 6 characters")
     displayName: Optional[str] = None
+    phone: Optional[str] = None
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+    lang: Optional[str] = Field("ky", pattern="^(ky|ru)$")
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=6, description="New password at least 6 characters")
 
 
 class UserLoginRequest(BaseModel):

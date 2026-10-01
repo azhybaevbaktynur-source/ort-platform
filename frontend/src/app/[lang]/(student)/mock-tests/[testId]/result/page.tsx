@@ -27,18 +27,36 @@ export default function MockTestResultPage() {
     }
   }, [testId]);
 
-  // Demo calibrated results
-  const scaledScore = 194;
-  const percentile = 88.5;
-  const isGolden = scaledScore >= 219;
+  const isSubject = resultData?.exam_type === "subject" || testId.toLowerCase().includes("subject");
+  const scaledScore = resultData?.totalScaledScore ?? resultData?.scaledScore ?? (isSubject ? 120 : 194);
+  const percentile = resultData?.percentileRank ?? 88.5;
+  const isGolden = !isSubject && (resultData?.isGoldenCertificate ?? (scaledScore >= 219));
 
-  const sectionBreakdown = [
-    { name: t("sections.math_1"), raw: "1 / 1", scaled: 45, accuracy: 100 },
-    { name: t("sections.analogies"), raw: "1 / 1", scaled: 42, accuracy: 100 },
-    { name: t("sections.reading"), raw: "1 / 1", scaled: 40, accuracy: 100 },
-    { name: t("sections.grammar"), raw: "0 / 1", scaled: 30, accuracy: 0 },
-    { name: t("sections.math_2"), raw: "1 / 1", scaled: 47, accuracy: 100 },
-  ];
+  const sectionBreakdown = resultData?.sectionScores
+    ? Object.entries(resultData.sectionScores).map(([sec, sc]: [string, any]) => ({
+        name: isSubject
+          ? resultData?.exam_title || (lang === "ky" ? "Предметтик тест" : "Предметный тест")
+          : (t(`sections.${sec}`) || sec),
+        raw: `${sc.rawScore} / ${sc.totalQuestions}`,
+        scaled: sc.scaledScore,
+        accuracy: sc.accuracyPercentage,
+      }))
+    : isSubject
+    ? [
+        {
+          name: lang === "ky" ? "Предметтик тест" : "Предметный тест",
+          raw: "25 / 30",
+          scaled: 120,
+          accuracy: 83,
+        },
+      ]
+    : [
+        { name: t("sections.math_1"), raw: "1 / 1", scaled: 45, accuracy: 100 },
+        { name: t("sections.analogies"), raw: "1 / 1", scaled: 42, accuracy: 100 },
+        { name: t("sections.reading"), raw: "1 / 1", scaled: 40, accuracy: 100 },
+        { name: t("sections.grammar"), raw: "0 / 1", scaled: 30, accuracy: 0 },
+        { name: t("sections.math_2"), raw: "1 / 1", scaled: 47, accuracy: 100 },
+      ];
 
   const reviewedQuestions = [
     {
@@ -107,7 +125,15 @@ export default function MockTestResultPage() {
               <span className="text-5xl font-black text-brand-600 tracking-tight">
                 {scaledScore}
               </span>
-              <span className="text-xs text-slate-400 block mt-1">шкала 60-245</span>
+              <span className="text-xs text-slate-400 block mt-1">
+                {isSubject
+                  ? lang === "ky"
+                    ? "балл (60 — 150)"
+                    : "баллов (60 - 150)"
+                  : lang === "ky"
+                  ? "балл (110 — 245)"
+                  : "баллов (110 - 245)"}
+              </span>
             </div>
 
             <div className="w-px h-16 bg-slate-200" />
@@ -123,25 +149,27 @@ export default function MockTestResultPage() {
             </div>
           </div>
 
-          {/* Golden Certificate status badge */}
-          <div
-            className={`p-4 rounded-2xl border text-xs font-semibold flex items-center justify-center gap-2 ${
-              isGolden
-                ? "bg-amber-50 border-amber-300 text-amber-900"
-                : "bg-slate-50 border-slate-200 text-slate-700"
-            }`}
-          >
-            <Award className="w-5 h-5 text-amber-500 flex-shrink-0" />
-            <span>
-              {isGolden
-                ? lang === "ky"
-                  ? "Куттуктайбыз! Сиз Алтын сертификаттын босогосунан (219+) аштыңыз!"
-                  : "Поздравляем! Вы превысили порог Золотого сертификата (219+)!"
-                : lang === "ky"
-                ? `Алтын сертификатка (219+) чейин дагы +${219 - scaledScore} балл калды. Каталар менен иштеп, машыгууну улантыңыз!`
-                : `До Золотого сертификата (219+) осталось +${219 - scaledScore} баллов. Продолжайте тренировки!`}
-            </span>
-          </div>
+          {/* Golden Certificate status badge (Main ORT only) */}
+          {!isSubject && (
+            <div
+              className={`p-4 rounded-2xl border text-xs font-semibold flex items-center justify-center gap-2 ${
+                isGolden
+                  ? "bg-amber-50 border-amber-300 text-amber-900"
+                  : "bg-slate-50 border-slate-200 text-slate-700"
+              }`}
+            >
+              <Award className="w-5 h-5 text-amber-500 flex-shrink-0" />
+              <span>
+                {isGolden
+                  ? lang === "ky"
+                    ? "Куттуктайбыз! Сиз Алтын сертификаттын босогосунан (219+) аштыңыз!"
+                    : "Поздравляем! Вы превысили порог Золотого сертификата (219+)!"
+                  : lang === "ky"
+                  ? `Алтын сертификатка (219+) чейин дагы +${Math.max(0, 219 - scaledScore)} балл калды. Каталар менен иштеп, машыгууну улантыңыз!`
+                  : `До Золотого сертификата (219+) осталось +${Math.max(0, 219 - scaledScore)} баллов. Продолжайте тренировки!`}
+              </span>
+            </div>
+          )}
 
           {/* CTAs */}
           <div className="pt-2 flex justify-center gap-3">
@@ -173,7 +201,7 @@ export default function MockTestResultPage() {
           </h3>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className={`grid grid-cols-1 ${isSubject ? "md:grid-cols-1 max-w-sm mx-auto" : "md:grid-cols-5"} gap-4`}>
           {sectionBreakdown.map((sec) => (
             <div key={sec.name} className="p-4 rounded-xl border border-slate-100 bg-slate-50/60 space-y-2">
               <span className="text-xs font-bold text-slate-700 block truncate">{sec.name}</span>

@@ -9,6 +9,7 @@ export function middleware(request: NextRequest) {
     pathname.includes("/exams") ||
     pathname.includes("/questions") ||
     pathname.includes("/bulk-upload") ||
+    pathname.includes("/students") ||
     (pathname.includes("/analytics") && !pathname.includes("/student"));
 
   if (isAdminRoute) {
@@ -39,6 +40,8 @@ export const config = {
     "/(ky|ru)/bulk-upload",
     "/(ky|ru)/analytics/:path*",
     "/(ky|ru)/analytics",
+    "/(ky|ru)/students/:path*",
+    "/(ky|ru)/students",
   ],
 };
 
