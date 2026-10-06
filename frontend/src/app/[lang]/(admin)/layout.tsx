@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
 import { Header } from "@/components/common/Header";
-import { ShieldCheck, Database, UploadCloud, BarChart3, GraduationCap, LogOut, BookOpenCheck, Users } from "lucide-react";
+import { ShieldCheck, Database, UploadCloud, BarChart3, GraduationCap, LogOut, BookOpenCheck, Users, X } from "lucide-react";
 
 export default function AdminLayout({
   children,
@@ -17,6 +17,12 @@ export default function AdminLayout({
   const router = useRouter();
   const { lang, t } = useTranslation();
   const { user, userProfile, loading, signOut } = useAuth();
+
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!loading) {
@@ -72,11 +78,10 @@ export default function AdminLayout({
     },
   ];
 
-  return (
-    <div className="flex min-h-screen bg-slate-50">
-      {/* Admin Sidebar */}
-      <aside className="w-64 bg-slate-950 text-slate-300 min-h-screen flex flex-col border-r border-slate-800">
-        <div className="p-6 border-b border-slate-800 flex items-center space-x-3">
+  const renderAdminNav = () => (
+    <div className="flex flex-col h-full">
+      <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+        <div className="flex items-center space-x-3">
           <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold text-base shadow-sm">
             <ShieldCheck className="w-5 h-5" />
           </div>
@@ -90,77 +95,114 @@ export default function AdminLayout({
           </div>
         </div>
 
-        <nav className="flex-1 px-4 py-4 space-y-1.5">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-3 py-2">
-            {lang === "ky" ? "Башкаруу панели" : "Панель управления"}
-          </div>
-          {navLinks.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+        <button
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-900 transition"
+          aria-label="Close menu"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center px-3.5 py-2.5 text-sm font-medium rounded-xl transition-all ${
-                  isActive
-                    ? "bg-indigo-600 text-white shadow-sm"
-                    : "text-slate-400 hover:bg-slate-900 hover:text-white"
-                }`}
-              >
-                <Icon className="w-5 h-5 mr-3 flex-shrink-0" />
-                <span className="truncate">{item.name}</span>
-              </Link>
-            );
-          })}
-
-          <div className="pt-6">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-3 py-2">
-              {lang === "ky" ? "Окуучу режими" : "Режим ученика"}
-            </div>
-            <Link
-              href={`/${lang}/dashboard`}
-              className="flex items-center px-3.5 py-2.5 text-sm font-medium rounded-xl text-slate-400 hover:bg-slate-900 hover:text-white transition-all"
-            >
-              <GraduationCap className="w-5 h-5 mr-3 text-brand-400" />
-              <span>{lang === "ky" ? "Окуучу порталына өтүү" : "Перейти к ученику"}</span>
-            </Link>
-          </div>
-        </nav>
-
-        {/* Admin profile footer */}
-        <div className="p-4 border-t border-slate-800 flex items-center justify-between text-xs">
-          <div className="flex items-center space-x-2.5 truncate flex-1 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-indigo-700/50 border border-indigo-500/50 flex items-center justify-center font-bold text-white text-xs flex-shrink-0">
-              {userProfile?.displayName ? userProfile.displayName.slice(0, 2).toUpperCase() : "АД"}
-            </div>
-            <div className="truncate">
-              <div className="font-semibold text-white truncate">
-                {userProfile?.displayName || user?.displayName || (lang === "ky" ? "Администратор" : "Администратор")}
-              </div>
-              <div className="text-slate-400 text-[10px] truncate">
-                {userProfile?.email || user?.email || "admin@ort.kg"}
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={async () => {
-              await signOut();
-              router.push(`/${lang}/login`);
-            }}
-            title={t("common.logout")}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-900 transition-colors ml-2 flex-shrink-0"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+      <nav className="flex-1 px-4 py-4 space-y-1.5 overflow-y-auto">
+        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-3 py-2">
+          {lang === "ky" ? "Башкаруу панели" : "Панель управления"}
         </div>
+        {navLinks.map((item) => {
+          const Icon = item.icon;
+          const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`flex items-center px-3.5 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                isActive
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "text-slate-400 hover:bg-slate-900 hover:text-white"
+              }`}
+            >
+              <Icon className="w-5 h-5 mr-3 flex-shrink-0" />
+              <span className="truncate">{item.name}</span>
+            </Link>
+          );
+        })}
+
+        <div className="pt-6">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-3 py-2">
+            {lang === "ky" ? "Окуучу режими" : "Режим ученика"}
+          </div>
+          <Link
+            href={`/${lang}/dashboard`}
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="flex items-center px-3.5 py-2.5 text-sm font-medium rounded-xl text-slate-400 hover:bg-slate-900 hover:text-white transition-all"
+          >
+            <GraduationCap className="w-5 h-5 mr-3 text-brand-400" />
+            <span>{lang === "ky" ? "Окуучу порталына өтүү" : "Перейти к ученику"}</span>
+          </Link>
+        </div>
+      </nav>
+
+      {/* Admin profile footer */}
+      <div className="p-4 border-t border-slate-800 flex items-center justify-between text-xs">
+        <div className="flex items-center space-x-2.5 truncate flex-1 min-w-0">
+          <div className="w-8 h-8 rounded-full bg-indigo-700/50 border border-indigo-500/50 flex items-center justify-center font-bold text-white text-xs flex-shrink-0">
+            {userProfile?.displayName ? userProfile.displayName.slice(0, 2).toUpperCase() : "АД"}
+          </div>
+          <div className="truncate">
+            <div className="font-semibold text-white truncate">
+              {userProfile?.displayName || user?.displayName || (lang === "ky" ? "Администратор" : "Администратор")}
+            </div>
+            <div className="text-slate-400 text-[10px] truncate">
+              {userProfile?.email || user?.email || "admin@ort.kg"}
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={async () => {
+            setIsMobileMenuOpen(false);
+            await signOut();
+            router.push(`/${lang}/login`);
+          }}
+          title={t("common.logout")}
+          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-900 transition-colors ml-2 flex-shrink-0 cursor-pointer"
+        >
+          <LogOut className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex min-h-screen bg-slate-50">
+      {/* Desktop Admin Sidebar */}
+      <aside className="hidden md:flex w-64 bg-slate-950 text-slate-300 min-h-screen flex-col border-r border-slate-800 shrink-0">
+        {renderAdminNav()}
+      </aside>
+
+      {/* Mobile Backdrop */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-xs z-40 md:hidden animate-in fade-in"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Mobile Drawer */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-950 text-slate-300 flex flex-col border-r border-slate-800 shadow-2xl transform transition-transform duration-300 ease-in-out md:hidden ${
+          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {renderAdminNav()}
       </aside>
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        <Header />
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto">
+        <Header onMenuClick={() => setIsMobileMenuOpen((prev) => !prev)} />
+        <main className="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto">
           <div className="max-w-7xl mx-auto">{children}</div>
         </main>
       </div>

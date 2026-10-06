@@ -17,7 +17,8 @@ MOCK_USERS = {
         displayName="Айбек Жумабеков",
         role=UserRole.STUDENT,
         preferredLanguage="ky",
-        currentEstimatedScore=172,
+        currentEstimatedScore=0,
+        exams_taken=0,
         target_score=200,
     ),
     "mock_admin_token": UserProfile(

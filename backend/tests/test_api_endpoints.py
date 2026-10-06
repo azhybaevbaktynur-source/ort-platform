@@ -673,11 +673,29 @@ async def test_user_target_score_endpoint():
         assert data["target_score"] == 224
         assert data["overall"] == 224
 
-        # Verify GET /api/v1/users/me reflects this target score
+        # Test PATCH on /api/v1/users/me/target-score
+        res_patch = await client.patch(
+            "/api/v1/users/me/target-score",
+            headers=student_headers,
+            json={"target_score": 219},
+        )
+        assert res_patch.status_code == 200
+        patch_data = res_patch.json()
+        assert patch_data["target_score"] == 219
+
+        # Verify GET /api/v1/users/me reflects this target score and has exams_taken default
         res_me = await client.get("/api/v1/users/me", headers=student_headers)
         assert res_me.status_code == 200
         me_data = res_me.json()
-        assert me_data["target_score"] == 224
+        assert me_data["target_score"] == 219
+        assert "exams_taken" in me_data
+
+        # Verify new student with 0 attempts has currentEstimatedScore == 0 in analytics
+        res_analytics = await client.get("/api/v1/analytics/student", headers=student_headers)
+        assert res_analytics.status_code == 200
+        analytics_data = res_analytics.json()
+        if analytics_data["totalTestsCompleted"] == 0:
+            assert analytics_data["currentEstimatedScore"] == 0
 
 
 @pytest.mark.asyncio

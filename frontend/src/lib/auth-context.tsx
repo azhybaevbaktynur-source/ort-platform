@@ -13,6 +13,8 @@ export interface AuthUserProfile {
   phone?: string;
   target_score?: number;
   currentEstimatedScore?: number;
+  exams_taken?: number;
+  starting_score?: number;
   streak?: {
     current: number;
     longest: number;
@@ -101,7 +103,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               role,
               phone: data.phone,
               target_score: data.target_score || 200,
-              currentEstimatedScore: data.currentEstimatedScore || 150,
+              currentEstimatedScore: data.currentEstimatedScore ?? 0,
+              exams_taken: data.exams_taken ?? 0,
+              starting_score: data.starting_score ?? 0,
             };
 
             setAuthCookies(storedToken, role);

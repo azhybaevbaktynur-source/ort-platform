@@ -25,6 +25,8 @@ class StudentAnalyticsResponse(BaseModel):
     scoreGap: int
     streak: int = 0
     totalTestsCompleted: int
+    exams_taken: int = 0
+    starting_score: int = 0
     totalQuestionsPracticed: int
     overallAccuracy: float
     sectionsMastery: Dict[str, SectionMastery]

@@ -80,8 +80,10 @@ async def get_student_analytics(
 
     if user_attempts and recent_scores:
         est_score = recent_scores[-1]["scaled"]
+        starting_score = recent_scores[0]["scaled"]
     else:
-        est_score = current_user.currentEstimatedScore or 150
+        est_score = 0
+        starting_score = 0
 
     gap = max(0, target - est_score)
     overall_accuracy = round((total_correct / total_questions * 100), 1) if total_questions > 0 else 0.0
@@ -166,6 +168,8 @@ async def get_student_analytics(
         scoreGap=gap,
         streak=streak_count,
         totalTestsCompleted=len(user_attempts),
+        exams_taken=len(user_attempts),
+        starting_score=starting_score,
         totalQuestionsPracticed=total_questions,
         overallAccuracy=overall_accuracy,
         sectionsMastery=sections_mastery,

@@ -264,7 +264,7 @@ export default function StudentProgressPage() {
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-medium text-slate-500">
-              {lang === "ky" ? "Стрик режими" : "Ударный режим"}
+              {lang === "ky" ? "Күндөлүк катар" : "Ударный режим"}
             </span>
             <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
               <Flame className="w-4 h-4 fill-amber-500 text-amber-500" />
@@ -277,7 +277,7 @@ export default function StudentProgressPage() {
             </span>
           </div>
           <span className="text-[11px] text-slate-400 mt-1 block">
-            {lang === "ky" ? "Максат: 30 күндүк стрик" : "Цель: 30 дней подряд"}
+            {lang === "ky" ? "Максат: 30 күн катары менен" : "Цель: 30 дней подряд"}
           </span>
         </div>
       </div>

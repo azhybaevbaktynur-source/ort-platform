@@ -39,7 +39,10 @@ class UserProfile(UserBase):
     phone: Optional[str] = None
     targetScore: TargetScore = Field(default_factory=TargetScore)
     target_score: Optional[int] = Field(default=200, ge=60, le=245)
-    currentEstimatedScore: int = 150
+    currentEstimatedScore: int = 0
+    exams_taken: int = 0
+    current_score: int = 0
+    starting_score: int = 0
     streak: StreakInfo = Field(default_factory=StreakInfo)
     createdAt: Optional[str] = None
     updatedAt: Optional[str] = None

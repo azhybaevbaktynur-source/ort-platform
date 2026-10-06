@@ -16,6 +16,9 @@ class User(Base):
     reset_token = Column(String, nullable=True, index=True)
     reset_token_expires = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    exams_taken = Column(Integer, default=0, nullable=False)
+    current_score = Column(Integer, default=0, nullable=False)
+    starting_score = Column(Integer, default=0, nullable=False)
 
     def to_dict(self):
         return {
@@ -26,5 +29,8 @@ class User(Base):
             "target_score": self.target_score,
             "displayName": self.display_name or self.email.split("@")[0],
             "createdAt": self.created_at.isoformat() if self.created_at else None,
+            "exams_taken": self.exams_taken or 0,
+            "current_score": self.current_score or 0,
+            "starting_score": self.starting_score or 0,
         }
 

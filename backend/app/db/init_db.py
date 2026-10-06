@@ -34,10 +34,19 @@ def init_db():
                         conn.execute(text("ALTER TABLE users ADD COLUMN reset_token VARCHAR"))
                     if "reset_token_expires" not in existing_cols:
                         conn.execute(text("ALTER TABLE users ADD COLUMN reset_token_expires TIMESTAMP"))
+                    if "exams_taken" not in existing_cols:
+                        conn.execute(text("ALTER TABLE users ADD COLUMN exams_taken INTEGER DEFAULT 0"))
+                    if "current_score" not in existing_cols:
+                        conn.execute(text("ALTER TABLE users ADD COLUMN current_score INTEGER DEFAULT 0"))
+                    if "starting_score" not in existing_cols:
+                        conn.execute(text("ALTER TABLE users ADD COLUMN starting_score INTEGER DEFAULT 0"))
             else:
                 conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR"))
                 conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token VARCHAR"))
                 conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMP"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS exams_taken INTEGER DEFAULT 0"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS current_score INTEGER DEFAULT 0"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS starting_score INTEGER DEFAULT 0"))
     except Exception as e:
         logger.warning(f"Column migration notice: {e}")
 

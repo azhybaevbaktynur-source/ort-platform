@@ -1,9 +1,22 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useTranslation } from "@/lib/i18n/context";
+import { useAuth } from "@/lib/auth-context";
 import { apiClient } from "@/lib/api";
-import { Award, TrendingUp, Loader2 } from "lucide-react";
+import { Award, TrendingUp, Loader2, ChevronDown, Check } from "lucide-react";
+
+const TARGET_OPTIONS = [
+  { value: 110, descKy: "Босого балл", descRu: "Пороговый балл" },
+  { value: 140, descKy: "ЖОЖдорго кабыл алуу", descRu: "Поступление в ВУЗ" },
+  { value: 160, descKy: "Орточо балл", descRu: "Средний балл" },
+  { value: 175, descKy: "Бюджет / Гранттык орундар", descRu: "Бюджет / Грант" },
+  { value: 190, descKy: "Престиждүү адистиктер", descRu: "Престижные специальности" },
+  { value: 200, descKy: "Топ-Университеттер", descRu: "Топ-Университеты" },
+  { value: 219, descKy: "Алтын сертификат (босого)", descRu: "Золотой сертификат" },
+  { value: 230, descKy: "Мыкты натыйжа", descRu: "Высокий результат" },
+  { value: 245, descKy: "Максималдуу балл", descRu: "Максимум" },
+];
 
 interface SectionMastery {
   section: string;
@@ -19,6 +32,8 @@ interface StudentAnalytics {
   targetScore: number;
   scoreGap: number;
   totalTestsCompleted: number;
+  exams_taken?: number;
+  starting_score?: number;
   totalQuestionsPracticed: number;
   overallAccuracy: number;
   sectionsMastery: Record<string, SectionMastery>;
@@ -28,8 +43,11 @@ interface StudentAnalytics {
 interface UserProfileResponse {
   id: string;
   displayName: string;
-  currentEstimatedScore: number;
-  targetScore: {
+  currentEstimatedScore?: number;
+  exams_taken?: number;
+  starting_score?: number;
+  target_score?: number;
+  targetScore?: {
     overall: number;
     math: number;
     reading: number;
@@ -40,11 +58,37 @@ interface UserProfileResponse {
 
 export const TargetScoreWidget: React.FC = () => {
   const { lang, t } = useTranslation();
+  const { updateTargetScore, userProfile } = useAuth();
 
   const [isLoading, setIsLoading] = useState(true);
-  const [currentScore, setCurrentScore] = useState(150);
-  const [targetScore, setTargetScore] = useState(200);
-  const [gap, setGap] = useState(50);
+  const [currentScore, setCurrentScore] = useState(0);
+  const [targetScore, setTargetScore] = useState(userProfile?.target_score || 200);
+  const [startingScore, setStartingScore] = useState(0);
+  const [examsTaken, setExamsTaken] = useState(0);
+  const [gap, setGap] = useState(0);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsDropdownOpen(false);
+      }
+    }
+    if (isDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isDropdownOpen]);
   const [sectionData, setSectionData] = useState<
     Array<{ nameKy: string; nameRu: string; current: number; target: number; max: number }>
   >([
@@ -66,14 +110,18 @@ export const TargetScoreWidget: React.FC = () => {
 
         if (!isMounted) return;
 
-        let cur = 150;
-        let tgt = 200;
+        let cur = 0;
+        let tgt = userProfile?.target_score || 200;
+        let taken = 0;
+        let start = 0;
         let mastery: Record<string, SectionMastery> = {};
         let tgtBreakdown = { math: 50, reading: 25, grammar: 25, analogies: 25 };
 
         if (profile.status === "fulfilled" && profile.value) {
-          cur = profile.value.currentEstimatedScore || cur;
-          tgt = profile.value.targetScore?.overall || tgt;
+          tgt = profile.value.target_score || profile.value.targetScore?.overall || tgt;
+          taken = profile.value.exams_taken ?? taken;
+          start = profile.value.starting_score ?? start;
+          cur = profile.value.currentEstimatedScore ?? cur;
           if (profile.value.targetScore) {
             tgtBreakdown = {
               math: profile.value.targetScore.math || 50,
@@ -85,12 +133,22 @@ export const TargetScoreWidget: React.FC = () => {
         }
 
         if (analytics.status === "fulfilled" && analytics.value) {
-          cur = analytics.value.currentEstimatedScore || cur;
-          tgt = analytics.value.targetScore || tgt;
-          mastery = analytics.value.sectionsMastery || {};
+          const a = analytics.value;
+          taken = a.totalTestsCompleted ?? a.exams_taken ?? taken;
+          tgt = a.targetScore || tgt;
+          mastery = a.sectionsMastery || {};
+          if (taken > 0) {
+            cur = a.currentEstimatedScore || cur;
+            start = a.starting_score || (a.recentScores && a.recentScores[0]?.scaled) || start || cur;
+          } else {
+            cur = 0;
+            start = 0;
+          }
         }
 
+        setExamsTaken(taken);
         setCurrentScore(cur);
+        setStartingScore(start);
         setTargetScore(tgt);
         setGap(Math.max(0, tgt - cur));
 
@@ -135,7 +193,22 @@ export const TargetScoreWidget: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [userProfile?.target_score]);
+
+  const handleTargetScoreChange = async (newScore: number) => {
+    if (isNaN(newScore)) return;
+    const clamped = Math.max(60, Math.min(245, newScore));
+    // 1. Optimistic UI update
+    setTargetScore(clamped);
+    setGap(Math.max(0, clamped - currentScore));
+
+    // 2. Auth context update & localStorage sync & DB persist via API
+    try {
+      await updateTargetScore(clamped);
+    } catch (e) {
+      console.warn("Failed to persist target score:", e);
+    }
+  };
 
   const isGolden = currentScore >= 219;
 
@@ -187,8 +260,8 @@ export const TargetScoreWidget: React.FC = () => {
                 <span className="text-[11px] text-slate-500 block font-medium mb-1">
                   {lang === "ky" ? "Баштапкы" : "Базовый"}
                 </span>
-                <span className="text-3xl font-bold text-slate-700 tracking-tight block">
-                  110
+                <span className="text-2xl md:text-3xl font-bold text-slate-700 tracking-tight block">
+                  {examsTaken > 0 ? (startingScore || 110) : "—"}
                 </span>
               </div>
 
@@ -196,39 +269,134 @@ export const TargetScoreWidget: React.FC = () => {
                 <span className="text-[11px] text-indigo-600 block font-bold mb-1">
                   {lang === "ky" ? "Учурдагы балл" : "Текущий балл"}
                 </span>
-                <span className="text-3xl font-bold text-indigo-600 tracking-tight block">
-                  {currentScore}
-                </span>
+                {examsTaken > 0 ? (
+                  <span className="text-2xl md:text-3xl font-bold text-indigo-600 tracking-tight block">
+                    {currentScore}
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-semibold text-slate-400 block py-1.5 leading-tight">
+                    {lang === "ky" ? "Сыноо тапшырыла элек" : "Тест еще не сдан"}
+                  </span>
+                )}
               </div>
 
-              <div className="flex-1 px-2">
+              <div className="flex-1 px-2 relative" ref={dropdownRef}>
                 <span className="text-[11px] text-emerald-600 block font-bold mb-1">
-                  {lang === "ky" ? "Максат" : "Цель"}
+                  {lang === "ky" ? "Максат (балл)" : "Цель (балл)"}
                 </span>
-                <span className="text-3xl font-bold text-emerald-600 tracking-tight block">
-                  {targetScore}
-                </span>
+                <div className="flex flex-col items-center gap-1.5">
+                  <div className="relative inline-block">
+                    <button
+                      type="button"
+                      onClick={() => setIsDropdownOpen((prev) => !prev)}
+                      className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl font-bold hover:bg-emerald-100 transition-all cursor-pointer whitespace-nowrap inline-flex items-center justify-center gap-1.5 border border-emerald-200/60 shadow-xs"
+                      aria-expanded={isDropdownOpen}
+                      aria-haspopup="listbox"
+                    >
+                      <span>
+                        {targetScore} {lang === "ky" ? "балл" : "баллов"}
+                      </span>
+                      <ChevronDown
+                        className={`w-4 h-4 text-emerald-600 transition-transform duration-200 ${
+                          isDropdownOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+
+                    {/* Floating Menu Layout */}
+                    {isDropdownOpen && (
+                      <div
+                        role="listbox"
+                        className="absolute right-0 top-full mt-2 w-64 sm:w-72 max-w-[90vw] bg-white shadow-xl rounded-2xl border border-gray-100 p-1 z-50 overflow-hidden text-left animate-in fade-in zoom-in-95 duration-150"
+                      >
+                        <ul className="max-h-64 overflow-y-auto space-y-0.5 list-none p-0 m-0">
+                          {TARGET_OPTIONS.map((opt) => {
+                            const isSelected = targetScore === opt.value;
+                            return (
+                              <li
+                                key={opt.value}
+                                role="option"
+                                aria-selected={isSelected}
+                                onClick={() => {
+                                  handleTargetScoreChange(opt.value);
+                                  setIsDropdownOpen(false);
+                                }}
+                                className={`px-4 py-3 text-sm rounded-lg cursor-pointer transition-colors flex items-center justify-between gap-2 ${
+                                  isSelected
+                                    ? "bg-emerald-50 text-emerald-700 font-bold"
+                                    : "text-gray-700 hover:bg-gray-50"
+                                }`}
+                              >
+                                <div className="flex flex-col">
+                                  <span className="font-bold flex items-center gap-1.5">
+                                    {opt.value} {lang === "ky" ? "балл" : "баллов"}
+                                    {opt.value >= 219 && (
+                                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                                        {lang === "ky" ? "Алтын" : "Золото"}
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span className="text-xs text-gray-500 font-normal">
+                                    {lang === "ky" ? opt.descKy : opt.descRu}
+                                  </span>
+                                </div>
+                                {isSelected && (
+                                  <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+
+                  <input
+                    type="range"
+                    min={60}
+                    max={245}
+                    step={5}
+                    value={targetScore}
+                    onChange={(e) => handleTargetScoreChange(Number(e.target.value))}
+                    className="w-full max-w-[140px] accent-emerald-600 cursor-pointer"
+                    title={lang === "ky" ? "Максаттуу баллды тууралоо" : "Настроить целевой балл ползунком"}
+                  />
+                </div>
               </div>
             </div>
 
             {/* Gap summary pill */}
-            <div className="flex items-center justify-between text-xs px-3.5 py-2.5 rounded-xl bg-emerald-50 text-emerald-800 font-medium mb-6">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>
-                  {gap > 0
-                    ? lang === "ky"
-                      ? `Максатка жетүү үчүн дагы +${gap} балл керек`
-                      : `До цели осталось набрать +${gap} баллов`
-                    : lang === "ky"
-                    ? "Максаттуу баллга жеттиңиз! Азаматсыз!"
-                    : "Целевой балл достигнут! Отличная работа!"}
+            {examsTaken === 0 ? (
+              <div className="flex items-center justify-between text-xs px-3.5 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-medium mb-6">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-slate-500 shrink-0" />
+                  <span>
+                    {lang === "ky"
+                      ? "Биринчи сынамык тестти тапшырып, учурдагы деңгээлиңизди аныктаңыз"
+                      : "Сдайте первый тест, чтобы определить ваш начальный уровень"}
+                  </span>
+                </div>
+                <span className="font-bold text-[11px] text-slate-500">0%</span>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between text-xs px-3.5 py-2.5 rounded-xl bg-emerald-50 text-emerald-800 font-medium mb-6">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>
+                    {gap > 0
+                      ? lang === "ky"
+                        ? `Максатка жетүү үчүн дагы +${gap} балл керек`
+                        : `До цели осталось набрать +${gap} баллов`
+                      : lang === "ky"
+                      ? "Максаттуу баллга жеттиңиз! Азаматсыз!"
+                      : "Целевой балл достигнут! Отличная работа!"}
+                  </span>
+                </div>
+                <span className="font-bold text-[11px] text-emerald-700">
+                  {Math.min(100, Math.round((currentScore / targetScore) * 100))}%
                 </span>
               </div>
-              <span className="font-bold text-[11px] text-emerald-700">
-                {Math.min(100, Math.round((currentScore / targetScore) * 100))}%
-              </span>
-            </div>
+            )}
 
             {/* Section Progress Breakdown */}
             <div className="space-y-3.5">

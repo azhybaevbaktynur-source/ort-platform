@@ -750,6 +750,25 @@ class MockTestService:
             if user_ref.get().exists:
                 user_ref.update({"currentEstimatedScore": result.totalScaledScore})
 
+        # Update SQL User model (exams_taken, current_score, starting_score)
+        try:
+            from app.db.session import SessionLocal
+            from app.models.user import User as SqlUser
+            sql_db = SessionLocal()
+            try:
+                sql_user = sql_db.query(SqlUser).filter(SqlUser.id == user_id).first()
+                if sql_user:
+                    sql_user.exams_taken = (sql_user.exams_taken or 0) + 1
+                    if exam_type != "subject":
+                        sql_user.current_score = result.totalScaledScore
+                        if not sql_user.starting_score or sql_user.starting_score == 0:
+                            sql_user.starting_score = result.totalScaledScore
+                    sql_db.commit()
+            finally:
+                sql_db.close()
+        except Exception:
+            pass
+
         # Increment completionsCount on ExamSet if document exists
         exam_ref = db.collection("mock_test_templates").document(template_id)
         exam_doc = exam_ref.get()

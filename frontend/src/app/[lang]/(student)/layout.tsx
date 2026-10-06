@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Sidebar } from "@/components/common/Sidebar";
 import { Header } from "@/components/common/Header";
@@ -16,6 +16,11 @@ export default function StudentLayout({
   const router = useRouter();
   const pathname = usePathname();
   const { lang, t } = useTranslation();
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    setIsMobileNavOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -40,10 +45,10 @@ export default function StudentLayout({
 
   return (
     <div className="flex min-h-screen bg-slate-50">
-      <Sidebar />
+      <Sidebar isOpen={isMobileNavOpen} onClose={() => setIsMobileNavOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0">
-        <Header />
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto">
+        <Header onMenuClick={() => setIsMobileNavOpen((prev) => !prev)} />
+        <main className="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto">
           <div className="max-w-7xl mx-auto">
             {children}
           </div>
