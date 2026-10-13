@@ -2,6 +2,12 @@ import React from "react";
 import { LanguageProvider, Language } from "@/lib/i18n/context";
 import { AuthProvider } from "@/lib/auth-context";
 
+// Pre-render every page for both languages at build time, so pages such as /ky/login are served
+// as static files from Vercel's CDN instead of running a server function on each visit.
+export function generateStaticParams() {
+  return [{ lang: "ky" }, { lang: "ru" }];
+}
+
 export default async function LangLayout({
   children,
   params,

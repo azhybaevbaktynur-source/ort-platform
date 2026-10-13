@@ -4,7 +4,9 @@ import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
-import { useAuth, UserRole } from "@/lib/auth-context";
+import { AuthError, useAuth, UserRole } from "@/lib/auth-context";
+import { useBackendWarmup, useSlowHint } from "@/lib/useBackendWarmup";
+import { VerifyEmailStep, authErrorMessage } from "@/components/auth/VerifyEmailStep";
 import { Mail, Lock, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
 
 function LoginForm() {
@@ -19,6 +21,11 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Set when the account exists but its email has not been confirmed with the emailed code yet
+  const [pendingVerification, setPendingVerification] = useState<{ email: string; resendAfterSeconds: number } | null>(null);
+
+  useBackendWarmup();
+  const slow = useSlowHint(loading);
 
   const handleNavigateAfterAuth = (userRole: UserRole) => {
     if (redirectParam) {
@@ -38,8 +45,15 @@ function LoginForm() {
     try {
       const res = await signIn(email, password);
       handleNavigateAfterAuth(res.role);
-    } catch (err: any) {
-      setError(err?.message || t("auth.loginError"));
+    } catch (err) {
+      if (err instanceof AuthError && err.code === "email_not_verified") {
+        setPendingVerification({
+          email: String(err.details.email || email.trim().toLowerCase()),
+          resendAfterSeconds: Number(err.details.resendAfterSeconds) || 60,
+        });
+      } else {
+        setError(authErrorMessage(err, t, "auth.loginError"));
+      }
     } finally {
       setLoading(false);
     }
@@ -85,6 +99,17 @@ function LoginForm() {
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
         <div className="bg-white py-8 px-6 sm:px-10 shadow-lg border border-slate-200/80 rounded-3xl">
+          {pendingVerification ? (
+            <VerifyEmailStep
+              email={pendingVerification.email}
+              password={password}
+              resendAfterSeconds={pendingVerification.resendAfterSeconds}
+              reason="notVerified"
+              onVerified={handleNavigateAfterAuth}
+              onChangeEmail={() => setPendingVerification(null)}
+            />
+          ) : (
+          <>
           <div className="mb-6 text-center">
             <h2 className="text-2xl font-bold tracking-tight text-slate-900">
               {t("auth.signInTitle")}
@@ -161,6 +186,7 @@ function LoginForm() {
                 </>
               )}
             </button>
+            {slow && <p className="text-[11px] text-center text-slate-500">{t("auth.wakingServer")}</p>}
           </form>
 
           {/* Link to Register */}
@@ -173,6 +199,8 @@ function LoginForm() {
               {t("auth.signUpButton")}
             </Link>
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>

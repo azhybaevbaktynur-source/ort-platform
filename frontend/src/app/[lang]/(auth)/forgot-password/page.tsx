@@ -3,6 +3,7 @@
 import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/context";
+import { useBackendWarmup } from "@/lib/useBackendWarmup";
 import { Mail, ArrowRight, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 
 function ForgotPasswordForm() {
@@ -12,6 +13,8 @@ function ForgotPasswordForm() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useBackendWarmup();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, DateTime
+from sqlalchemy import Column, String, Integer, DateTime, Boolean
 from app.db.session import Base
 
 
@@ -13,8 +13,16 @@ class User(Base):
     phone = Column(String, nullable=True)
     target_score = Column(Integer, default=200, nullable=True)
     display_name = Column(String, nullable=True)
-    reset_token = Column(String, nullable=True, index=True)
+    reset_token = Column(String, nullable=True, index=True)  # sha256 of the emailed reset token, never the token itself
     reset_token_expires = Column(DateTime, nullable=True)
+    reset_requested_at = Column(DateTime, nullable=True)
+    # False only for self-registered accounts that have not entered the emailed one-time code yet.
+    # Accounts created by admins/seeds (and all accounts that existed before verification) count as verified.
+    email_verified = Column(Boolean, default=True, nullable=False)
+    email_code_hash = Column(String, nullable=True)
+    email_code_expires = Column(DateTime, nullable=True)
+    email_code_attempts = Column(Integer, default=0, nullable=False)
+    email_code_sent_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     exams_taken = Column(Integer, default=0, nullable=False)
     current_score = Column(Integer, default=0, nullable=False)

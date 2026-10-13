@@ -1,3 +1,11 @@
+import os
+
+# Tests authenticate with the dev shortcut tokens ("mock_admin_token" ...), which are disabled by default
+os.environ.setdefault("ALLOW_MOCK_TOKENS", "true")
+# Environment variables win over backend/.env: never send real email or run in production mode from tests
+os.environ.setdefault("ENVIRONMENT", "development")
+os.environ.setdefault("EMAIL_PROVIDER", "console")
+
 import pytest
 from app.db.firebase import mock_firestore_db
 from app.schemas.question import (

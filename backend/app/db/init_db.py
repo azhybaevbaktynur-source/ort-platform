@@ -8,6 +8,7 @@ from app.models.exam_set import ExamSet
 from app.models.question import Question
 from app.models.test_attempt import TestAttempt
 from app.models.exam_access import ExamAccess
+from app.db.user_migrations import ensure_user_auth_columns
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ def init_db():
     """Initializes SQLite/PostgreSQL schema and seeds canonical data."""
     # Ensure all models are registered with Base metadata before creating tables
     Base.metadata.create_all(bind=engine)
+    ensure_user_auth_columns(engine)
 
     # Automatically ensure new columns exist in existing SQLite/Postgres tables
     try:

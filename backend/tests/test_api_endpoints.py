@@ -1,5 +1,7 @@
 import pytest
 import io
+from unittest.mock import patch
+from tests.auth_helpers import register_and_verify
 from httpx import AsyncClient, ASGITransport
 from app.main import app
 
@@ -876,9 +878,8 @@ async def test_sql_auth_registration_and_login_flow():
             "password": "securepassword123",
             "displayName": "Жаңы Окуучу",
         }
-        res_reg = await client.post("/api/v1/auth/register", json=reg_payload)
-        assert res_reg.status_code == 200
-        reg_data = res_reg.json()
+        # Registration emails a one-time code; the account signs in only after it is entered
+        reg_data = await register_and_verify(client, reg_payload)
         assert reg_data["role"] == "student"
         assert "access_token" in reg_data
         jwt_token = reg_data["access_token"]
@@ -1132,17 +1133,15 @@ async def test_registration_phone_and_admin_students_display():
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # Register user with phone
-        res_reg = await client.post(
-            "/api/v1/auth/register",
-            json={
+        reg_data = await register_and_verify(
+            client,
+            {
                 "email": rand_email,
                 "password": "securepassword123",
                 "displayName": "Телефондуу Окуучу",
                 "phone": phone_num,
             },
         )
-        assert res_reg.status_code == 200
-        reg_data = res_reg.json()
         assert reg_data["user"]["phone"] == phone_num
 
         # Admin lists students
@@ -1174,31 +1173,36 @@ async def test_forgot_and_reset_password_flow():
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # 1. Register
-        res_reg = await client.post(
-            "/api/v1/auth/register",
-            json={
+        await register_and_verify(
+            client,
+            {
                 "email": rand_email,
                 "password": initial_pass,
                 "displayName": "Reset Test User",
             },
         )
-        assert res_reg.status_code == 200
 
         # 2. Request forgot password
-        res_forgot = await client.post(
-            "/api/v1/auth/forgot-password",
-            json={"email": rand_email, "lang": "ru"},
-        )
+        sent_tokens = []
+        with patch(
+            "app.api.v1.endpoints.auth.send_password_reset_email",
+            side_effect=lambda to_email, token, lang="ky": sent_tokens.append(token) or True,
+        ):
+            res_forgot = await client.post(
+                "/api/v1/auth/forgot-password",
+                json={"email": rand_email, "lang": "ru"},
+            )
         assert res_forgot.status_code == 200
         assert res_forgot.json()["success"] is True
 
-        # 3. Retrieve token from DB
+        # 3. Token is taken from the email (the DB stores only its hash)
+        assert len(sent_tokens) == 1
+        token = sent_tokens[0]
         db = SessionLocal()
         try:
             db_user = db.query(UserModel).filter(UserModel.email == rand_email).first()
             assert db_user is not None
-            assert db_user.reset_token is not None
-            token = db_user.reset_token
+            assert db_user.reset_token is not None and db_user.reset_token != token
         finally:
             db.close()
 

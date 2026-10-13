@@ -1,5 +1,3 @@
-import { auth } from "./firebase";
-
 // When running in the browser, relative "/api/v1" is proxied by Next.js rewrites to FastAPI (http://127.0.0.1:8000/api/v1).
 // Alternatively, if NEXT_PUBLIC_API_URL is explicitly set, use that.
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -9,43 +7,14 @@ interface RequestOptions extends RequestInit {
 }
 
 export async function getAuthHeader(): Promise<Record<string, string>> {
+  // Backend JWT saved at login. Without it no header is sent and the API answers 401.
   if (typeof window !== "undefined") {
-    // 1. Check for real JWT access token
     const token = localStorage.getItem("ort_token");
     if (token) {
       return { Authorization: `Bearer ${token}` };
     }
   }
-
-  // 2. Check Firebase User
-  const currentUser = auth.currentUser;
-  if (currentUser) {
-    try {
-      const idToken = await currentUser.getIdToken();
-      return { Authorization: `Bearer ${idToken}` };
-    } catch {
-      // ignore
-    }
-  }
-
-  // 3. Check dev user in localStorage for local development fallback
-  let devRole = "student";
-  if (typeof window !== "undefined") {
-    try {
-      const stored = localStorage.getItem("ort_dev_auth_user");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.role === "admin" || parsed.role === "instructor") {
-          devRole = "admin";
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  const fallbackToken = devRole === "admin" ? "mock_admin_token" : "mock_student_token";
-  return { Authorization: `Bearer ${fallbackToken}` };
+  return {};
 }
 
 export async function apiClient<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {

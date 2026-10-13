@@ -45,7 +45,15 @@ MOCK_USERS = {
 
 def hash_password(plain_password: str) -> str:
     """Hashes a password with bcrypt salt."""
-    return bcrypt.hashpw(plain_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    return bcrypt.hashpw(plain_password.encode("utf-8"), bcrypt.gensalt(settings.BCRYPT_ROUNDS)).decode("utf-8")
+
+
+def password_needs_rehash(hashed_password: str) -> bool:
+    """True for hashes made with a different bcrypt cost (e.g. old cost-12 hashes), so login can upgrade them."""
+    try:
+        return int(hashed_password.split("$")[2]) != settings.BCRYPT_ROUNDS
+    except (IndexError, ValueError):
+        return False
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -68,17 +76,19 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return encoded_jwt
 
 
-async def get_current_user(
+def get_current_user(
     authorization: Optional[str] = Header(None)
 ) -> UserProfile:
     """
     Verifies Bearer token:
-    1. Checks for dev mock tokens.
+    1. Checks for dev mock tokens (only when ALLOW_MOCK_TOKENS is enabled, i.e. tests/local dev).
     2. Decodes JWT token signed by our auth service and queries SQL DB.
     3. Handles fallback Firebase token verification.
+    Plain `def` (not async): FastAPI runs it in a worker thread, so the blocking DB query
+    does not stall every other request on the server.
     """
     if not authorization:
-        if settings.DEBUG:
+        if settings.ALLOW_MOCK_TOKENS and settings.DEBUG:
             return MOCK_USERS["mock_student_token"]
         raise UnauthorizedException("Authorization header missing")
 
@@ -88,17 +98,14 @@ async def get_current_user(
 
     token = parts[1]
 
-    # 1. Handle mock tokens
-    if token in MOCK_USERS:
+    # 1. Handle mock tokens (tests / local development only)
+    if settings.ALLOW_MOCK_TOKENS and token in MOCK_USERS:
         return MOCK_USERS[token]
 
     # 2. Try decoding as JWT token
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         user_id = payload.get("sub")
-        email = payload.get("email", "")
-        role_str = payload.get("role", "student")
-        role = UserRole.ADMIN if role_str == "admin" else UserRole.STUDENT
 
         # Query user from SQLite/PostgreSQL
         db = SessionLocal()
@@ -117,19 +124,13 @@ async def get_current_user(
         finally:
             db.close()
 
-        # If user not in DB (or mock JWT), fallback to claims
-        return UserProfile(
-            id=user_id or "usr_jwt",
-            email=email,
-            displayName=email.split("@")[0] if email else "User",
-            role=role,
-            preferredLanguage="ky",
-        )
+        # Valid signature but the account no longer exists (deleted user): reject
+        raise UnauthorizedException("User account not found")
     except jwt.PyJWTError:
         pass
 
-    # 3. Fallback for mock mode dynamic tokens
-    if settings.FIREBASE_MOCK_MODE:
+    # 3. Fallback for mock mode dynamic tokens (tests / local development only)
+    if settings.ALLOW_MOCK_TOKENS and settings.FIREBASE_MOCK_MODE:
         role = UserRole.ADMIN if ("admin" in token or "instructor" in token) else UserRole.STUDENT
         return UserProfile(
             id=f"usr_{token[:12]}",
@@ -139,7 +140,9 @@ async def get_current_user(
             preferredLanguage="ky",
         )
 
-    # 4. Live Firebase ID Token Verification
+    # 4. Live Firebase ID Token Verification (only when real Firebase credentials are configured)
+    if settings.FIREBASE_MOCK_MODE or not settings.FIREBASE_CREDENTIALS_PATH:
+        raise UnauthorizedException("Invalid or expired token")
     try:
         from firebase_admin import auth
         decoded_token = auth.verify_id_token(token)

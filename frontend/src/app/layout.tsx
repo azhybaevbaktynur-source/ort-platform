@@ -13,13 +13,6 @@ export default function RootLayout({
 }) {
   return (
     <html>
-      <head>
-        <link
-          rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css"
-          crossOrigin="anonymous"
-        />
-      </head>
       <body suppressHydrationWarning className="min-h-screen bg-slate-50 antialiased font-sans">
         {children}
       </body>

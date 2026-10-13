@@ -1,6 +1,7 @@
-from typing import List, Union
+import json
+from typing import Annotated, List, Union
 from pydantic import field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -9,14 +10,15 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
 
-    # CORS & Allowed Origins
-    ALLOWED_ORIGINS: List[str] = [
+    # CORS & Allowed Origins. NoDecode: the env value reaches the validator as raw text, so both
+    # "https://a.app,https://b.app" and '["https://a.app"]' work (otherwise only JSON would parse).
+    ALLOWED_ORIGINS: Annotated[List[str], NoDecode] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:8000",
         "http://127.0.0.1:8000",
     ]
-    BACKEND_CORS_ORIGINS: List[str] = [
+    BACKEND_CORS_ORIGINS: Annotated[List[str], NoDecode] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:8000",
@@ -26,9 +28,9 @@ class Settings(BaseSettings):
     @field_validator("ALLOWED_ORIGINS", "BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
-        if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",") if i.strip()]
-        elif isinstance(v, list):
+        if isinstance(v, str):
+            v = json.loads(v) if v.strip().startswith("[") else v.split(",")
+        if isinstance(v, list):
             return [str(i).strip() for i in v if str(i).strip()]
         return v
 
@@ -53,6 +55,28 @@ class Settings(BaseSettings):
     GOLDEN_CERTIFICATE_MIN_SCORE: int = 219
     TOTAL_ORT_QUESTIONS: int = 150
 
+    # Dev/test shortcut tokens ("mock_admin_token" etc.). NEVER enable in production:
+    # anyone who knows the token string would get that role.
+    ALLOW_MOCK_TOKENS: bool = False
+
+    # Password hashing cost (bcrypt). 10 is OWASP's minimum and ~4x faster than 12 on small servers.
+    BCRYPT_ROUNDS: int = 10
+
+    # Email delivery: "resend", "brevo", "smtp" or "console" (prints to the server log).
+    # Empty = pick automatically from whichever credentials are set.
+    # Note: Render free instances block outbound SMTP ports, so use an HTTP API (Resend/Brevo) there.
+    EMAIL_PROVIDER: str = ""
+    EMAIL_FROM: str = ""             # e.g. "noreply@yourdomain.kg" (must be verified with the provider)
+    EMAIL_FROM_NAME: str = "ОРТ Платформа"
+    RESEND_API_KEY: str = ""
+    BREVO_API_KEY: str = ""
+
+    # Email one-time codes (registration) and password reset
+    EMAIL_CODE_TTL_MINUTES: int = 10
+    EMAIL_CODE_MAX_ATTEMPTS: int = 5
+    EMAIL_RESEND_COOLDOWN_SECONDS: int = 60
+    PASSWORD_RESET_TTL_MINUTES: int = 60
+
     # SMTP Email Configuration & Reset Flow
     SMTP_SERVER: str = ""
     SMTP_PORT: int = 587
@@ -65,3 +89,9 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+DEFAULT_SECRET_KEY = "ort_secret_jwt_key_2026_super_secure_academic_prep"
+
+
+def is_production() -> bool:
+    return settings.ENVIRONMENT.strip().lower() == "production"

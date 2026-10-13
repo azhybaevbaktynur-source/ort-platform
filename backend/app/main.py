@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.core.config import settings
+from app.core.config import settings, is_production, DEFAULT_SECRET_KEY
 from app.db.init_db import init_db
 from app.api.v1.router import api_router
 
@@ -19,6 +19,11 @@ async def lifespan(app: FastAPI):
         init_db()
     except Exception as e:
         logger.warning(f"Database startup initialization notice: {e}")
+    if is_production():
+        if settings.SECRET_KEY == DEFAULT_SECRET_KEY:
+            logger.critical("SECRET_KEY is the public default from the repository: anyone can forge login tokens. Set SECRET_KEY.")
+        if settings.ALLOW_MOCK_TOKENS:
+            logger.critical("ALLOW_MOCK_TOKENS is enabled in production: 'mock_admin_token' grants admin access. Disable it.")
     yield
 
 

@@ -1,9 +1,17 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { User } from "firebase/auth";
+import { useTranslation } from "@/lib/i18n/context";
 
 export type UserRole = "student" | "admin";
+
+/** Minimal signed-in user (the app authenticates with its own backend JWT, not Firebase). */
+export interface AuthUser {
+  uid: string;
+  email: string;
+  displayName: string;
+  getIdToken: () => Promise<string>;
+}
 
 export interface AuthUserProfile {
   uid: string;
@@ -22,14 +30,38 @@ export interface AuthUserProfile {
   };
 }
 
+export interface RegisterResult {
+  email: string;
+  resendAfterSeconds: number;
+  codeTtlMinutes: number;
+}
+
+/**
+ * Error from the auth API. `code` is machine-readable (e.g. "email_not_verified", "invalid_code")
+ * so pages can show a translated message; `details` carries extras like attemptsLeft.
+ */
+export class AuthError extends Error {
+  code?: string;
+  status: number;
+  details: Record<string, unknown>;
+
+  constructor(status: number, message: string, code?: string, details: Record<string, unknown> = {}) {
+    super(message);
+    this.status = status;
+    this.code = code;
+    this.details = details;
+  }
+}
+
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   userProfile: AuthUserProfile | null;
   loading: boolean;
   signIn: (email: string, pass: string) => Promise<{ role: UserRole }>;
-  signUp: (email: string, pass: string, displayName: string, phone?: string) => Promise<void>;
+  signUp: (email: string, pass: string, displayName: string, phone?: string) => Promise<RegisterResult>;
+  verifyEmail: (email: string, pass: string, code: string) => Promise<{ role: UserRole }>;
+  resendCode: (email: string) => Promise<{ resendAfterSeconds: number }>;
   signOut: () => Promise<void>;
-  loginAsDemo: (role: UserRole) => Promise<{ role: UserRole }>;
   updateTargetScore: (score: number) => Promise<void>;
 }
 
@@ -38,24 +70,14 @@ const AuthContext = createContext<AuthContextType>({
   userProfile: null,
   loading: true,
   signIn: async () => ({ role: "student" }),
-  signUp: async () => {},
+  signUp: async () => ({ email: "", resendAfterSeconds: 60, codeTtlMinutes: 10 }),
+  verifyEmail: async () => ({ role: "student" }),
+  resendCode: async () => ({ resendAfterSeconds: 60 }),
   signOut: async () => {},
-  loginAsDemo: async () => ({ role: "student" }),
   updateTargetScore: async () => {},
 });
 
-const DEMO_USERS: Record<UserRole, { email: string; pass: string; displayName: string }> = {
-  student: {
-    email: "student@ort.kg",
-    pass: "student123",
-    displayName: "Айбек Жумабеков",
-  },
-  admin: {
-    email: "admin@ort.kg",
-    pass: "admin123",
-    displayName: "Нурлан Админ",
-  },
-};
+const PROFILE_KEY = "ort_dev_auth_user";
 
 function setAuthCookies(token: string, role: string) {
   if (typeof document !== "undefined") {
@@ -71,191 +93,155 @@ function clearAuthCookies() {
   }
 }
 
+function toAuthUser(profile: AuthUserProfile, token: string): AuthUser {
+  return {
+    uid: profile.uid,
+    email: profile.email,
+    displayName: profile.displayName,
+    getIdToken: async () => token,
+  };
+}
+
+async function postJson(path: string, body: unknown): Promise<any> {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data?.detail;
+    if (detail && typeof detail === "object" && !Array.isArray(detail)) {
+      const { code, message, ...rest } = detail as Record<string, unknown>;
+      throw new AuthError(res.status, String(message || `HTTP ${res.status}`), code as string | undefined, rest);
+    }
+    throw new AuthError(res.status, typeof detail === "string" ? detail : `HTTP ${res.status}`);
+  }
+  return data;
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const { lang } = useTranslation();
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [userProfile, setUserProfile] = useState<AuthUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Sync auth state on mount
-  useEffect(() => {
-    async function loadStoredAuth() {
-      if (typeof window === "undefined") {
-        setLoading(false);
-        return;
-      }
-
-      const storedToken = localStorage.getItem("ort_token");
-      const storedDevUser = localStorage.getItem("ort_dev_auth_user");
-
-      if (storedToken) {
-        try {
-          // Fetch current profile from backend using stored token
-          const res = await fetch("/api/v1/auth/me", {
-            headers: { Authorization: `Bearer ${storedToken}` },
-          });
-          if (res.ok) {
-            const data = await res.json();
-            const role: UserRole = data.role === "admin" ? "admin" : "student";
-            const profile: AuthUserProfile = {
-              uid: data.id,
-              email: data.email,
-              displayName: data.displayName || data.email.split("@")[0],
-              role,
-              phone: data.phone,
-              target_score: data.target_score || 200,
-              currentEstimatedScore: data.currentEstimatedScore ?? 0,
-              exams_taken: data.exams_taken ?? 0,
-              starting_score: data.starting_score ?? 0,
-            };
-
-            setAuthCookies(storedToken, role);
-            setUserProfile(profile);
-            setUser({
-              uid: profile.uid,
-              email: profile.email,
-              displayName: profile.displayName,
-              getIdToken: async () => storedToken,
-            } as unknown as User);
-            setLoading(false);
-            return;
-          }
-        } catch (e) {
-          console.warn("Could not verify session with backend, falling back to local cache:", e);
-        }
-      }
-
-      // Fallback to cached dev user
-      if (storedDevUser) {
-        try {
-          const parsed = JSON.parse(storedDevUser) as AuthUserProfile;
-          const role: UserRole = parsed.role === "admin" ? "admin" : "student";
-          setAuthCookies(storedToken || (role === "admin" ? "mock_admin_token" : "mock_student_token"), role);
-          setUserProfile(parsed);
-          setUser({
-            uid: parsed.uid,
-            email: parsed.email,
-            displayName: parsed.displayName,
-            getIdToken: async () => (role === "admin" ? "mock_admin_token" : "mock_student_token"),
-          } as unknown as User);
-        } catch {
-          localStorage.removeItem("ort_dev_auth_user");
-        }
-      }
-
-      setLoading(false);
-    }
-
-    loadStoredAuth();
-  }, []);
-
-  const signIn = async (email: string, pass: string): Promise<{ role: UserRole }> => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/v1/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password: pass }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || "Authentication failed");
-      }
-
-      const data = await res.json();
-      const role: UserRole = data.role === "admin" ? "admin" : "student";
-      const token = data.access_token;
-
-      setAuthCookies(token, role);
-      localStorage.setItem("ort_token", token);
-      localStorage.setItem("ort_role", role);
-
-      const profile: AuthUserProfile = {
-        uid: data.user.id,
-        email: data.user.email,
-        displayName: data.user.displayName || email.split("@")[0],
-        role,
-        target_score: data.user.target_score || 200,
-      };
-
-      localStorage.setItem("ort_dev_auth_user", JSON.stringify(profile));
-      setUserProfile(profile);
-      setUser({
-        uid: profile.uid,
-        email: profile.email,
-        displayName: profile.displayName,
-        getIdToken: async () => token,
-      } as unknown as User);
-
-      return { role };
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const signUp = async (email: string, pass: string, displayName: string, phone?: string): Promise<void> => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/v1/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: email.trim(),
-          password: pass,
-          displayName: displayName.trim(),
-          phone: phone?.trim() || undefined,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || "Registration failed");
-      }
-
-      const data = await res.json();
-      const token = data.access_token;
-      const role: UserRole = "student";
-
-      setAuthCookies(token, role);
-      localStorage.setItem("ort_token", token);
-      localStorage.setItem("ort_role", role);
-
-      const profile: AuthUserProfile = {
-        uid: data.user.id,
-        email: data.user.email,
-        displayName: data.user.displayName || displayName || email.split("@")[0],
-        phone: data.user.phone || phone,
-        role,
-        target_score: 200,
-      };
-
-      localStorage.setItem("ort_dev_auth_user", JSON.stringify(profile));
-      setUserProfile(profile);
-      setUser({
-        uid: profile.uid,
-        email: profile.email,
-        displayName: profile.displayName,
-        getIdToken: async () => token,
-      } as unknown as User);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const signOut = async () => {
+  const clearSession = () => {
     clearAuthCookies();
     if (typeof window !== "undefined") {
       localStorage.removeItem("ort_token");
       localStorage.removeItem("ort_role");
-      localStorage.removeItem("ort_dev_auth_user");
+      localStorage.removeItem(PROFILE_KEY);
     }
     setUser(null);
     setUserProfile(null);
   };
 
-  const loginAsDemo = async (role: UserRole): Promise<{ role: UserRole }> => {
-    const demo = DEMO_USERS[role];
-    return await signIn(demo.email, demo.pass);
+  const startSession = (token: string, profile: AuthUserProfile) => {
+    setAuthCookies(token, profile.role);
+    localStorage.setItem("ort_token", token);
+    localStorage.setItem("ort_role", profile.role);
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    setUserProfile(profile);
+    setUser(toAuthUser(profile, token));
+  };
+
+  // Restore the session instantly from the cached profile, then confirm it with the backend in the
+  // background. Pages no longer wait for /auth/me (slow while the server wakes up) before rendering.
+  useEffect(() => {
+    const storedToken = localStorage.getItem("ort_token");
+    if (!storedToken) {
+      setLoading(false);
+      return;
+    }
+
+    let cached: AuthUserProfile | null = null;
+    try {
+      const raw = localStorage.getItem(PROFILE_KEY);
+      cached = raw ? (JSON.parse(raw) as AuthUserProfile) : null;
+    } catch {
+      localStorage.removeItem(PROFILE_KEY);
+    }
+    if (cached) {
+      setAuthCookies(storedToken, cached.role === "admin" ? "admin" : "student");
+      setUserProfile(cached);
+      setUser(toAuthUser(cached, storedToken));
+      setLoading(false);
+    }
+
+    (async () => {
+      try {
+        const res = await fetch("/api/v1/auth/me", {
+          headers: { Authorization: `Bearer ${storedToken}` },
+        });
+        if (res.status === 401 || res.status === 403) {
+          clearSession();
+          return;
+        }
+        if (res.ok) {
+          const data = await res.json();
+          const profile: AuthUserProfile = {
+            uid: data.id,
+            email: data.email,
+            displayName: data.displayName || data.email.split("@")[0],
+            role: data.role === "admin" ? "admin" : "student",
+            phone: data.phone,
+            target_score: data.target_score || 200,
+            currentEstimatedScore: data.currentEstimatedScore ?? 0,
+            exams_taken: data.exams_taken ?? 0,
+            starting_score: data.starting_score ?? 0,
+          };
+          startSession(storedToken, profile);
+        }
+      } catch (e) {
+        // Network problem: keep the cached session; the backend still checks the token on every call.
+        console.warn("Could not verify session with backend:", e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const finishLogin = (data: any): { role: UserRole } => {
+    const role: UserRole = data.role === "admin" ? "admin" : "student";
+    startSession(data.access_token, {
+      uid: data.user.id,
+      email: data.user.email,
+      displayName: data.user.displayName || data.user.email.split("@")[0],
+      phone: data.user.phone || undefined,
+      role,
+      target_score: data.user.target_score || 200,
+    });
+    return { role };
+  };
+
+  const signIn = async (email: string, pass: string): Promise<{ role: UserRole }> => {
+    const data = await postJson("/api/v1/auth/login", { email: email.trim(), password: pass, lang });
+    return finishLogin(data);
+  };
+
+  const signUp = async (email: string, pass: string, displayName: string, phone?: string): Promise<RegisterResult> => {
+    return postJson("/api/v1/auth/register", {
+      email: email.trim(),
+      password: pass,
+      displayName: displayName.trim(),
+      phone: phone?.trim() || undefined,
+      lang,
+    });
+  };
+
+  const verifyEmail = async (email: string, pass: string, code: string): Promise<{ role: UserRole }> => {
+    const data = await postJson("/api/v1/auth/verify-email", { email: email.trim(), password: pass, code: code.trim() });
+    return finishLogin(data);
+  };
+
+  const resendCode = async (email: string): Promise<{ resendAfterSeconds: number }> => {
+    return postJson("/api/v1/auth/resend-code", { email: email.trim(), lang });
+  };
+
+  const signOut = async () => {
+    clearSession();
   };
 
   const updateTargetScore = async (score: number) => {
@@ -278,7 +264,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!prev) return null;
       const updated = { ...prev, target_score: score };
       try {
-        localStorage.setItem("ort_dev_auth_user", JSON.stringify(updated));
+        localStorage.setItem(PROFILE_KEY, JSON.stringify(updated));
       } catch {}
       return updated;
     });
@@ -292,8 +278,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         signIn,
         signUp,
+        verifyEmail,
+        resendCode,
         signOut,
-        loginAsDemo,
         updateTargetScore,
       }}
     >

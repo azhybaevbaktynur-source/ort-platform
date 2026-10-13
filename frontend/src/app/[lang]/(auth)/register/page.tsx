@@ -4,7 +4,9 @@ import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, RegisterResult } from "@/lib/auth-context";
+import { useBackendWarmup, useSlowHint } from "@/lib/useBackendWarmup";
+import { VerifyEmailStep, authErrorMessage } from "@/components/auth/VerifyEmailStep";
 import { Mail, Lock, User, Phone, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
 
 function RegisterForm() {
@@ -21,6 +23,19 @@ function RegisterForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Step 2: the account is created but must be confirmed with the code emailed to the user
+  const [registered, setRegistered] = useState<RegisterResult | null>(null);
+
+  useBackendWarmup();
+  const slow = useSlowHint(loading);
+
+  const goToApp = () => {
+    if (redirectParam) {
+      router.push(redirectParam);
+    } else {
+      router.push(`/${lang}/dashboard`);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,14 +43,9 @@ function RegisterForm() {
     setLoading(true);
 
     try {
-      await signUp(email, password, displayName, phone);
-      if (redirectParam) {
-        router.push(redirectParam);
-      } else {
-        router.push(`/${lang}/dashboard`);
-      }
-    } catch (err: any) {
-      setError(err?.message || t("auth.registerError"));
+      setRegistered(await signUp(email, password, displayName, phone));
+    } catch (err) {
+      setError(authErrorMessage(err, t, "auth.registerError"));
     } finally {
       setLoading(false);
     }
@@ -81,6 +91,18 @@ function RegisterForm() {
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
         <div className="bg-white py-8 px-6 sm:px-10 shadow-lg border border-slate-200/80 rounded-3xl">
+          {registered ? (
+            <VerifyEmailStep
+              email={registered.email}
+              password={password}
+              resendAfterSeconds={registered.resendAfterSeconds}
+              codeTtlMinutes={registered.codeTtlMinutes}
+              reason="registered"
+              onVerified={goToApp}
+              onChangeEmail={() => setRegistered(null)}
+            />
+          ) : (
+          <>
           <div className="mb-6 text-center">
             <h2 className="text-2xl font-bold tracking-tight text-slate-900">
               {t("auth.signUpTitle")}
@@ -184,6 +206,7 @@ function RegisterForm() {
                 </>
               )}
             </button>
+            {slow && <p className="text-[11px] text-center text-slate-500">{t("auth.wakingServer")}</p>}
           </form>
 
           {/* Link to Login */}
@@ -196,6 +219,8 @@ function RegisterForm() {
               {t("auth.signInButton")}
             </Link>
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>
