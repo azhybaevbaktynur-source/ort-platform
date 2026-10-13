@@ -101,7 +101,8 @@ def send_email(to_email: str, subject: str, text: str, html: str) -> bool:
     senders = {"resend": _send_resend, "brevo": _send_brevo, "smtp": _send_smtp}
     sender = senders.get(provider)
     if sender is None:
-        logger.error("Unknown EMAIL_PROVIDER '%s'", provider)
+        # Never log the value itself: a key pasted into the wrong variable would end up in the logs
+        logger.error("EMAIL_PROVIDER is not one of resend/brevo/smtp/console; no email sent")
         return False
     if not _sender_address():
         logger.error("EMAIL_FROM is not set; cannot send email via %s", provider)

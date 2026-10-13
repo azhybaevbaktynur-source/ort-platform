@@ -1,7 +1,7 @@
 import pytest
 import io
 from unittest.mock import patch
-from tests.auth_helpers import register_and_verify
+from tests.auth_helpers import register_and_verify, TEST_PASSWORDS
 from httpx import AsyncClient, ASGITransport
 from app.main import app
 
@@ -915,10 +915,10 @@ async def test_sql_auth_registration_and_login_flow():
         )
         assert res_admin_block.status_code == 403
 
-        # 6. Admin login works with seeded account
+        # 6. Admin login works (test account created by tests/auth_helpers.py with a random password)
         admin_login = {
             "email": "admin@ort.kg",
-            "password": "admin123",
+            "password": TEST_PASSWORDS["admin@ort.kg"],
         }
         res_admin = await client.post("/api/v1/auth/login", json=admin_login)
         assert res_admin.status_code == 200

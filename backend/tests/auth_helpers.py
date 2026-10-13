@@ -1,6 +1,31 @@
 """Helpers for tests that need a registered (email-verified) user."""
+import secrets
 from contextlib import contextmanager
 from unittest.mock import patch
+
+# The app no longer seeds accounts with known passwords. Tests create the two accounts behind the
+# dev mock tokens (same ids as app.core.security.MOCK_USERS) with passwords random to each test run.
+TEST_ACCOUNTS = {
+    "admin@ort.kg": {"id": "usr_admin_01", "role": "admin", "display_name": "Нурлан Админ", "target_score": 240},
+    "student@ort.kg": {"id": "usr_student_01", "role": "student", "display_name": "Айбек Жумабеков", "target_score": 200},
+}
+TEST_PASSWORDS = {email: secrets.token_urlsafe(16) for email in TEST_ACCOUNTS}
+
+
+def ensure_test_accounts() -> None:
+    """Creates the test admin/student accounts (with this run's random passwords) if they are missing."""
+    from app.core.security import hash_password
+    from app.db.session import SessionLocal
+    from app.models.user import User
+
+    session = SessionLocal()
+    try:
+        for email, fields in TEST_ACCOUNTS.items():
+            if session.query(User).filter(User.email == email).first() is None:
+                session.add(User(email=email, password_hash=hash_password(TEST_PASSWORDS[email]), **fields))
+        session.commit()
+    finally:
+        session.close()
 
 
 @contextmanager

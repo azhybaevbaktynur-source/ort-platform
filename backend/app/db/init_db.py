@@ -1,5 +1,4 @@
 import logging
-import bcrypt
 from datetime import datetime, timezone
 from sqlalchemy import text
 from app.db.session import engine, Base, SessionLocal
@@ -11,10 +10,6 @@ from app.models.exam_access import ExamAccess
 from app.db.user_migrations import ensure_user_auth_columns
 
 logger = logging.getLogger(__name__)
-
-
-def hash_pw(plain: str) -> str:
-    return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def init_db():
@@ -54,46 +49,15 @@ def init_db():
 
     session = SessionLocal()
     try:
-        # 1. Seed or enforce Admin user
-        total_users = session.query(User).count()
-        admin_user = session.query(User).filter(User.email == "admin@ort.kg").first()
-        if not admin_user:
-            admin_user = User(
-                id="usr_admin_01",
-                email="admin@ort.kg",
-                password_hash=hash_pw("admin123"),
-                role="admin",
-                target_score=240,
-                display_name="Нурлан Админ",
-                created_at=datetime.now(timezone.utc),
-            )
-            session.add(admin_user)
-            logger.info("Seeded canonical admin account (admin@ort.kg / admin123)")
-        elif admin_user.role != "admin":
-            # Auto-restore admin role to ensure developer is never locked out
-            admin_user.role = "admin"
-            logger.info("Restored role='admin' on admin@ort.kg")
+        # No accounts with built-in passwords are created here: the repository is public, so any
+        # seeded password would be public too. Admins are made with `python make_admin.py <email>`
+        # after the person registers and confirms their email.
 
         # Explicitly check for primary account azhybaev.baktynur@gmail.com and ensure role is 'admin'
         primary_user = session.query(User).filter(User.email == "azhybaev.baktynur@gmail.com").first()
         if primary_user and primary_user.role != "admin":
             primary_user.role = "admin"
             logger.info("Forcefully promoted primary account azhybaev.baktynur@gmail.com to admin")
-
-        # 2. Seed Student user if not present
-        student_user = session.query(User).filter(User.email == "student@ort.kg").first()
-        if not student_user:
-            student_user = User(
-                id="usr_student_01",
-                email="student@ort.kg",
-                password_hash=hash_pw("student123"),
-                role="student",
-                target_score=200,
-                display_name="Айбек Жумабеков",
-                created_at=datetime.now(timezone.utc),
-            )
-            session.add(student_user)
-            logger.info("Seeded canonical student account (student@ort.kg / student123)")
 
         # 3. Seed canonical ExamSets (Practice Banks, Full Main, and Subject Tests)
         canonical_exams = [
