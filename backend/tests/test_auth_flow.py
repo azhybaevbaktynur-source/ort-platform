@@ -170,8 +170,17 @@ async def test_register_reports_email_failure():
         with patch("app.api.v1.endpoints.auth.send_verification_code_email", return_value=False):
             res = await c.post("/api/v1/auth/register", json={"email": email, "password": PASSWORD})
         assert res.status_code == 503 and res.json()["detail"]["code"] == "email_send_failed"
-        # A retry after the cooldown works and keeps one pending account
-        update_user(email, email_code_sent_at=datetime.now(timezone.utc) - timedelta(minutes=5))
+        # A failed send starts no resend wait and leaves no code behind
+        user = db_user(email)
+        assert user.email_code_sent_at is None and user.email_code_hash is None
+
+        # Logging in reports honestly that no code was sent, with nothing to wait for
+        with patch("app.api.v1.endpoints.auth.send_verification_code_email", return_value=False):
+            res = await c.post("/api/v1/auth/login", json={"email": email, "password": PASSWORD})
+        assert res.status_code == 403
+        assert res.json()["detail"]["codeSent"] is False and res.json()["detail"]["resendAfterSeconds"] == 0
+
+        # An immediate retry works and keeps one pending account
         with capture_email_codes() as codes:
             res = await c.post("/api/v1/auth/register", json={"email": email, "password": PASSWORD})
         assert res.status_code == 200 and email in codes

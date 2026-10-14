@@ -79,7 +79,14 @@ def _issue_email_code(user: User, db: Session, lang: str) -> bool:
     user.email_code_attempts = 0
     user.email_code_sent_at = _now()
     db.commit()
-    return send_verification_code_email(to_email=user.email, code=code, lang=lang if lang in ("ky", "ru") else "ky")
+    sent = send_verification_code_email(to_email=user.email, code=code, lang=lang if lang in ("ky", "ru") else "ky")
+    if not sent:
+        # Nothing reached the user: no resend wait, and no code that could only be guessed
+        user.email_code_sent_at = None
+        user.email_code_hash = None
+        user.email_code_expires = None
+        db.commit()
+    return sent
 
 
 def _token_response(user: User) -> TokenResponse:
@@ -253,9 +260,9 @@ def login_user(
     if not user.email_verified:
         wait = _cooldown_left(user.email_code_sent_at)
         sent = _issue_email_code(user, db, req.lang or "ky") if not wait else True
+        resend_after = wait or (settings.EMAIL_RESEND_COOLDOWN_SECONDS if sent else 0)
         raise _error(403, "email_not_verified", "Email is not verified yet. Enter the code we emailed you.",
-                     email=user.email, codeSent=sent,
-                     resendAfterSeconds=wait or settings.EMAIL_RESEND_COOLDOWN_SECONDS)
+                     email=user.email, codeSent=sent, resendAfterSeconds=resend_after)
 
     return _token_response(user)
 

@@ -62,4 +62,6 @@ async def health_check():
         "firebase_mock_mode": settings.FIREBASE_MOCK_MODE,
         "database": "connected",
         "storage": settings.STORAGE_ENV,
+        # Deployed commit (Render sets RENDER_GIT_COMMIT), to confirm which code is live
+        "commit": os.getenv("RENDER_GIT_COMMIT", "")[:7] or None,
     }

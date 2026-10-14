@@ -46,10 +46,14 @@ function LoginForm() {
       const res = await signIn(email, password);
       handleNavigateAfterAuth(res.role);
     } catch (err) {
-      if (err instanceof AuthError && err.code === "email_not_verified") {
+      if (err instanceof AuthError && err.code === "email_not_verified" && err.details.codeSent === false) {
+        // Account not verified and the new code could not be emailed: say so instead of waiting for a code
+        setError(t("auth.errors.email_send_failed"));
+      } else if (err instanceof AuthError && err.code === "email_not_verified") {
+        const wait = err.details.resendAfterSeconds;
         setPendingVerification({
           email: String(err.details.email || email.trim().toLowerCase()),
-          resendAfterSeconds: Number(err.details.resendAfterSeconds) || 60,
+          resendAfterSeconds: typeof wait === "number" ? wait : 60,
         });
       } else {
         setError(authErrorMessage(err, t, "auth.loginError"));
