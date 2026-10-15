@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import { Award, CheckCircle2, XCircle, BarChart3, RotateCcw, ArrowRight } from "lucide-react";
+import { getAuthHeader } from "@/lib/api";
 
 export default function MockTestResultPage() {
   const params = useParams();
@@ -15,15 +16,42 @@ export default function MockTestResultPage() {
   const [resultData, setResultData] = useState<any>(null);
 
   useEffect(() => {
+    let found = false;
     if (typeof window !== "undefined") {
       const stored = sessionStorage.getItem(`ort_result_${testId}`);
       if (stored) {
         try {
           setResultData(JSON.parse(stored));
+          found = true;
         } catch {
           // ignore parse error
         }
       }
+    }
+
+    if (!found) {
+      // Fetch latest completed attempt from backend
+      (async () => {
+        try {
+          const authHeader = await getAuthHeader();
+          const res = await fetch("/api/v1/mock-tests/attempts", { headers: authHeader });
+          if (res.ok) {
+            const list = await res.json();
+            if (Array.isArray(list)) {
+              const match = list.find((a: any) => a.templateId === testId || a.id === testId);
+              if (match) {
+                const resObj = match.result || match;
+                setResultData(resObj);
+                try {
+                  sessionStorage.setItem(`ort_result_${testId}`, JSON.stringify(resObj));
+                } catch {}
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("Could not fetch attempt result from backend:", e);
+        }
+      })();
     }
   }, [testId]);
 

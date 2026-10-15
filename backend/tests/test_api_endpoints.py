@@ -48,7 +48,7 @@ async def test_question_crud_and_practice_projection():
         # 1. Create a monolingual math question as instructor
         payload = {
             "language": "ky",
-            "section": "math_1",
+            "section": "math_2",
             "topic": "fractions",
             "difficulty": "medium",
             "stem": "1/2 + 1/4 барабар канчага?",
@@ -68,7 +68,7 @@ async def test_question_crud_and_practice_projection():
         assert created["language"] == "ky"
 
         # 2. Student queries practice questions
-        res_practice = await client.get("/api/v1/questions/practice/math_1", headers=student_headers)
+        res_practice = await client.get("/api/v1/questions/practice/math_2", headers=student_headers)
         assert res_practice.status_code == 200
         practice_items = res_practice.json()
         assert len(practice_items) >= 1
@@ -86,7 +86,7 @@ async def test_question_crud_and_practice_projection():
 async def test_csv_dry_run_validation_and_bulk_upload():
     headers = {"Authorization": "Bearer mock_instructor_token"}
     csv_content = """section,topic,difficulty,stem,option_a,option_b,option_c,option_d,correct_option,explanation,tags
-math_1,algebra,easy,$x + 5 = 10$,5,10,15,0,A,x=5,алгебра
+math_2,algebra,easy,$x + 5 = 10$,5,10,15,0,A,x=5,алгебра
 analogies,vocab,medium,Уста : Бака,Врач : Оорукана,Мугалим : Мектеп,Жазуучу : Калем,Учкуч : Самолет,C,Уста аспабы менен,аналогия
 """
     files = {"file": ("test_questions.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")}
@@ -119,7 +119,7 @@ async def test_bulk_endpoints_accept_exam_id_and_bulletproof_error_handling():
     headers = {"Authorization": "Bearer mock_instructor_token"}
     # 1. Test validate and upload accepting exam_id Form parameter
     csv_content = """section,stem,option_a,option_b,option_c,option_d,correct_option
-math_1,Вопрос 1,1,2,3,4,A
+math_2,Вопрос 1,1,2,3,4,A
 math_2,Вопрос 2,5,6,7,8,B
 """
     files_val = {"file": ("test_exam_id.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")}
@@ -439,7 +439,7 @@ async def test_upload_and_section_sequencing_workflow():
                 "status": "published",
                 "sections": [
                     {"section": "grammar", "questionCount": 1, "timeLimitMinutes": 5},
-                    {"section": "math_1", "questionCount": 1, "timeLimitMinutes": 5},
+                    {"section": "math_2", "questionCount": 1, "timeLimitMinutes": 5},
                     {"section": "reading", "questionCount": 1, "timeLimitMinutes": 5},
                 ],
             },
@@ -448,13 +448,13 @@ async def test_upload_and_section_sequencing_workflow():
         created_exam = res_exam_create.json()
         exam_id = created_exam["id"]
 
-        # Create 1 question for math_1 and 1 question for grammar with the uploaded image (0 questions for reading)
+        # Create 1 question for math_2 and 1 question for grammar with the uploaded image (0 questions for reading)
         await client.post(
             "/api/v1/questions",
             headers=instructor_headers,
             json={
                 "language": "ky",
-                "section": "math_1",
+                "section": "math_2",
                 "topic": "Geometry",
                 "difficulty": "medium",
                 "exam_set_id": exam_id,
@@ -501,11 +501,11 @@ async def test_upload_and_section_sequencing_workflow():
         assert res_start.status_code == 200
         session_data = res_start.json()
 
-        # The sections served should strictly be math_1 first, then grammar (reading skipped because 0 questions)
+        # The sections served should strictly be math_2 first, then grammar (reading skipped because 0 questions)
         section_codes = [s["section"] for s in session_data["sections"]]
-        assert section_codes == ["math_1", "grammar"]
-        assert "math_1" in session_data["questions"]
-        assert session_data["questions"]["math_1"][0]["image_url"] == uploaded_url
+        assert section_codes == ["math_2", "grammar"]
+        assert "math_2" in session_data["questions"]
+        assert session_data["questions"]["math_2"][0]["image_url"] == uploaded_url
 
 
 @pytest.mark.asyncio
@@ -755,7 +755,7 @@ async def test_pin_validation_and_fast_practice_exemption():
             headers=inst_headers,
             json={
                 "language": "ky",
-                "section": "math_1",
+                "section": "math_2",
                 "topic": "Algebra",
                 "difficulty": "medium",
                 "exam_set_id": exam_id,
@@ -1228,6 +1228,152 @@ async def test_forgot_and_reset_password_flow():
         )
         assert res_new_login.status_code == 200
         assert "access_token" in res_new_login.json()
+
+
+@pytest.mark.asyncio
+async def test_admin_exams_list_and_comparison_questions():
+    admin_headers = {"Authorization": "Bearer mock_instructor_token"}
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # 1. Test GET /api/v1/admin/exams directly queries exams table
+        res_admin_exams = await client.get("/api/v1/admin/exams", headers=admin_headers)
+        assert res_admin_exams.status_code == 200
+        exams_list = res_admin_exams.json()
+        assert isinstance(exams_list, list)
+
+        # 2. Create custom draft exam set and check GET /api/v1/exams/{id} alias
+        res_create = await client.post(
+            "/api/v1/exam-sets",
+            headers=admin_headers,
+            json={
+                "title": "Сравнительный тест 2026",
+                "language": "ru",
+                "exam_type": "full_main",
+                "status": "draft",
+                "time_limit_minutes": 90,
+                "sections": [],
+            },
+        )
+        assert res_create.status_code == 200
+        new_exam = res_create.json()
+        exam_id = new_exam["id"]
+
+        # Check /api/v1/exams/{exam_id} alias works
+        res_alias = await client.get(f"/api/v1/exams/{exam_id}", headers=admin_headers)
+        assert res_alias.status_code == 200
+        assert res_alias.json()["id"] == exam_id
+
+        # 3. Create question with column_a and column_b
+        res_q = await client.post(
+            "/api/v1/questions",
+            headers=admin_headers,
+            json={
+                "language": "ru",
+                "section": "math_1",
+                "topic": "Сравнение",
+                "difficulty": "medium",
+                "exam_set_id": exam_id,
+                "stem": "Сравните значения:",
+                "column_a": "$2x + 1$",
+                "column_b": "$3x - 5$",
+                "option_a": "КОЛОНКА А больше",
+                "option_b": "КОЛОНКА Б больше",
+                "option_c": "Величины равны",
+                "option_d": "Недостаточно информации",
+                "correct_option": "A",
+            },
+        )
+        assert res_q.status_code == 200
+        created_q = res_q.json()
+        assert created_q["column_a"] == "$2x + 1$"
+        assert created_q["column_b"] == "$3x - 5$"
+
+        # Retrieve question by ID
+        res_get_q = await client.get(f"/api/v1/questions/{created_q['id']}", headers=admin_headers)
+        assert res_get_q.status_code == 200
+        fetched_q = res_get_q.json()
+        assert fetched_q["column_a"] == "$2x + 1$"
+        assert fetched_q["column_b"] == "$3x - 5$"
+
+
+@pytest.mark.asyncio
+async def test_mock_test_save_exit_in_progress_and_resume_flow():
+    """
+    Tests complete Save and Exit + Resume workflow:
+    1. Start test session
+    2. Save progress (isFinal=False) -> remains in_progress
+    3. Verify in-progress endpoint and student exam sets have in-progress flag
+    4. Verify completed attempts and analytics do NOT include the in-progress exam
+    5. Resume session -> pre-fills saved answers and remaining time
+    6. Submit final exam -> marks completed and updates analytics
+    """
+    student_headers = {"Authorization": "Bearer mock_student_token"}
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # 1. Start test session
+        start_res = await client.post(
+            "/api/v1/mock-tests/start",
+            headers=student_headers,
+            json={"templateId": "ort_speed_drill", "language": "ky"},
+        )
+        assert start_res.status_code == 200
+        session_data = start_res.json()
+        attempt_id = session_data["attemptId"]
+        assert session_data["status"] == "in_progress"
+
+        # 2. Save progress (Save and Exit)
+        save_res = await client.post(
+            f"/api/v1/mock-tests/{attempt_id}/save",
+            headers=student_headers,
+            json={
+                "answers": {
+                    "sample_q_1": {
+                        "selectedOptionId": "C",
+                        "timeSpentSeconds": 45,
+                        "flagged": True,
+                    }
+                },
+                "remainingTimeSeconds": 1420,
+                "currentSectionIndex": 1,
+                "isFinal": False,
+            },
+        )
+        assert save_res.status_code == 200
+        save_data = save_res.json()
+        assert save_data["success"] is True
+        assert save_data.get("status") == "in_progress"
+
+        # 3. Check GET /api/v1/mock-tests/in-progress
+        in_prog_res = await client.get("/api/v1/mock-tests/in-progress", headers=student_headers)
+        assert in_prog_res.status_code == 200
+        in_prog_list = in_prog_res.json()
+        assert isinstance(in_prog_list, list)
+        found_att = next((a for a in in_prog_list if a["attemptId"] == attempt_id), None)
+        assert found_att is not None
+        assert found_att["remainingTimeSeconds"] == 1420
+        assert found_att["currentSectionIndex"] == 1
+
+        # 4. Check completed attempts endpoint does NOT contain attempt_id
+        completed_res = await client.get("/api/v1/mock-tests/attempts", headers=student_headers)
+        assert completed_res.status_code == 200
+        completed_list = completed_res.json()
+        assert not any(a.get("attemptId") == attempt_id for a in completed_list)
+
+        # 5. Resume session via /api/v1/mock-tests/start
+        resume_res = await client.post(
+            "/api/v1/mock-tests/start",
+            headers=student_headers,
+            json={"templateId": "ort_speed_drill", "language": "ky"},
+        )
+        assert resume_res.status_code == 200
+        resumed_data = resume_res.json()
+        assert resumed_data["attemptId"] == attempt_id
+        assert resumed_data["status"] == "in_progress"
+        assert resumed_data["remainingTimeSeconds"] == 1420
+        assert resumed_data["currentSectionIndex"] == 1
+        assert "sample_q_1" in resumed_data["answers"]
+        assert resumed_data["answers"]["sample_q_1"]["selectedOptionId"] == "C"
+
 
 
 

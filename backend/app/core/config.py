@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     # Cloud Storage (Ephemeral local storage vs S3 / Cloudinary)
     STORAGE_ENV: str = "local"  # "local", "s3", "cloudinary"
     STORAGE_BASE_URL: str = "/uploads"
+    LOCAL_UPLOAD_DIR: str = ""  # Overrides backend/data/uploads (used by tests to keep dev uploads clean)
 
     # Firebase (Legacy compatibility / Auth)
     FIREBASE_PROJECT_ID: str = "ort-platform-dev"

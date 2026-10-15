@@ -4,7 +4,9 @@ from fastapi import APIRouter, Depends, UploadFile, File, Form, Query
 from app.core.security import require_instructor
 from app.schemas.user import UserProfile
 from app.schemas.bulk_upload import CsvValidationReport, CsvUploadResult, RowValidationError
-from app.services.csv_service import CsvService
+from app.schemas.bundle_import import BundleImportReport, BundleIssue
+from app.services.bundle_service import BundleService, MAX_ZIP_BYTES
+from app.services.csv_image_rule import PlainCsvService as CsvService
 
 logger = logging.getLogger(__name__)
 
@@ -232,3 +234,71 @@ async def upload_csv_batch(
             examSetId=target_exam_id,
             examSetTitle=mock_test_title,
         )
+
+
+def _bundle_file_error(code: str, message: str) -> BundleImportReport:
+    return BundleImportReport(
+        ok=False,
+        committed=False,
+        errors=[BundleIssue(severity="error", code=code, message=message)],
+    )
+
+
+async def _read_bundle_upload(file: UploadFile):
+    """Reads an uploaded zip. The file name is never trusted; the content must be a zip archive."""
+    try:
+        contents = await file.read(MAX_ZIP_BYTES + 1)
+    except Exception as e:
+        logger.warning(f"Error reading uploaded bundle: {e}")
+        return None, _bundle_file_error("file_unreadable", f"Could not read uploaded file: {e}")
+    if not contents:
+        return None, _bundle_file_error("file_empty", "The uploaded file is empty.")
+    if len(contents) > MAX_ZIP_BYTES:
+        return None, _bundle_file_error("zip_too_large", "The zip is larger than 200 MB.")
+    if not contents.startswith((b"PK\x03\x04", b"PK\x05\x06")):
+        return None, _bundle_file_error("zip_invalid", "The file is not a zip archive.")
+    return contents, None
+
+
+@router.post("/validate-bundle", response_model=BundleImportReport)
+async def validate_bundle_upload(
+    file: UploadFile = File(...),
+    language: Optional[str] = Form(None),
+    current_user: UserProfile = Depends(require_instructor),
+):
+    """
+    Dry run for an ort-digitizer question bundle (.zip): finds the bundles, validates every row and
+    image, and reports what an import would create or update. Nothing is saved.
+    `language` is used only for bundles without manifest.json.
+    """
+    contents, error = await _read_bundle_upload(file)
+    if error:
+        return error
+    try:
+        return BundleService.preview(contents, language=language or "ky")
+    except Exception as e:
+        logger.exception(f"Unexpected error in validate_bundle_upload: {e}")
+        return _bundle_file_error("system", f"Validation failed: {e}")
+
+
+@router.post("/import-bundle", response_model=BundleImportReport)
+async def import_bundle_upload(
+    file: UploadFile = File(...),
+    language: Optional[str] = Form(None),
+    current_user: UserProfile = Depends(require_instructor),
+):
+    """
+    Imports an ort-digitizer question bundle (.zip). Validates everything first; if any error exists,
+    nothing is saved. Images go to content-addressed storage keys; questions are created or updated
+    (matched by manifest external_id) in one database transaction, one exam set per source.
+    """
+    contents, error = await _read_bundle_upload(file)
+    if error:
+        return error
+    try:
+        return await BundleService.import_bundle(
+            contents, language=language or "ky", created_by_user_id=current_user.id
+        )
+    except Exception as e:
+        logger.exception(f"Unexpected error in import_bundle_upload: {e}")
+        return _bundle_file_error("system", f"Import failed: {e}")

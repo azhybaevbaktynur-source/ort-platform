@@ -3,7 +3,10 @@
 import React from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { MathRenderer } from "@/components/math/MathRenderer";
+import { ComparisonQuestionCard } from "@/components/exam/ComparisonQuestionCard";
 import { Bookmark } from "lucide-react";
+
+export { ComparisonQuestionCard };
 
 interface QuestionCardProps {
   question: {
@@ -11,6 +14,8 @@ interface QuestionCardProps {
     section: string;
     topic: string;
     stem: string | { ky: string; ru: string };
+    column_a?: string | null;
+    column_b?: string | null;
     option_a?: string | null;
     option_b?: string | null;
     option_c?: string | null;
@@ -47,10 +52,32 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
         : question.stem.ru
       : String(question.stem || "");
 
-  // Normalize options A, B, C, D
+  // Quantitative comparison questions delegate directly to isolated ComparisonQuestionCard
+  const isComparison = Boolean(question.column_a || question.column_b);
+  if (isComparison) {
+    return (
+      <ComparisonQuestionCard
+        question={question}
+        questionNumber={questionNumber}
+        totalQuestions={totalQuestions}
+        selectedOptionId={selectedOptionId}
+        isFlagged={isFlagged}
+        onSelectOption={onSelectOption}
+        onToggleFlag={onToggleFlag}
+      />
+    );
+  }
+
+  // Normalize options A, B, C, D, E for standard multiple choice
   let optionItems: Array<{ id: string; text: string }> = [];
 
-  if (question.option_a || question.option_b || question.option_c || question.option_d || question.option_e) {
+  if (
+    question.option_a ||
+    question.option_b ||
+    question.option_c ||
+    question.option_d ||
+    question.option_e
+  ) {
     optionItems = [
       { id: "A", text: question.option_a || "" },
       { id: "B", text: question.option_b || "" },
@@ -75,18 +102,15 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
       {/* Top Header of Question */}
       <div className="flex items-center justify-between border-b border-slate-100 pb-4">
         <div className="flex items-center gap-3">
-          <span className="px-3 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-xs">
+          <span className="px-3 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-sans font-bold text-xs uppercase tracking-wide">
             {t("exam.question")} {questionNumber} {t("exam.of")} {totalQuestions}
-          </span>
-          <span className="text-xs text-slate-400 font-medium">
-            {question.topic}
           </span>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={onToggleFlag}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-sans font-semibold border transition-all cursor-pointer ${
               isFlagged
                 ? "bg-amber-100 border-amber-300 text-amber-800"
                 : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
@@ -98,13 +122,13 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
         </div>
       </div>
 
-      {/* Stem Content */}
+      {/* Main Standard Question Body */}
       <div className="min-h-[70px]">
-        <MathRenderer content={stemText} className="text-base text-slate-900 leading-relaxed font-medium" />
+        <MathRenderer content={stemText} className="font-serif text-gray-900 leading-relaxed text-base md:text-lg" />
       </div>
 
-      {/* Options List */}
-      <div className="space-y-3 pt-2">
+      {/* Universal Touch-Friendly Option Cards */}
+      <div className="pt-1">
         {optionItems.map((opt) => {
           const isSelected = selectedOptionId === opt.id;
 
@@ -112,22 +136,22 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
             <button
               key={opt.id}
               onClick={() => onSelectOption(opt.id)}
-              className={`flex items-center w-full p-4 rounded-xl border text-left text-sm transition-all ${
+              className={`flex items-center w-full py-3 px-4 gap-3 mb-2 rounded-xl border text-left transition-all cursor-pointer ${
                 isSelected
-                  ? "border-indigo-600 bg-indigo-50/80 text-indigo-950 font-semibold ring-2 ring-indigo-200 shadow-xs"
-                  : "border-slate-200 hover:border-slate-300 bg-slate-50/40 text-slate-800 hover:bg-slate-50"
+                  ? "border-indigo-600 bg-indigo-50/40 ring-1 ring-indigo-600 font-medium text-slate-900 shadow-xs"
+                  : "border-slate-200 hover:border-indigo-300 bg-white text-slate-800 hover:bg-slate-50/50"
               }`}
             >
               <span
-                className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs mr-3 transition-colors ${
+                className={`w-7 h-7 rounded-full flex items-center justify-center font-sans font-semibold text-sm shrink-0 transition-colors ${
                   isSelected
                     ? "bg-indigo-600 text-white shadow-xs"
-                    : "bg-white border border-slate-200 text-slate-600"
+                    : "bg-slate-100 border border-slate-200 text-slate-700"
                 }`}
               >
                 {opt.id}
               </span>
-              <MathRenderer content={opt.text} className="flex-1" />
+              <MathRenderer content={opt.text} className="flex-1 font-serif text-gray-900 leading-relaxed text-base" />
             </button>
           );
         })}

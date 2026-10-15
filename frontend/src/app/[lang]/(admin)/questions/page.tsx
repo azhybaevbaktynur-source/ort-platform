@@ -30,6 +30,8 @@ interface QuestionItem {
   difficulty: "easy" | "medium" | "hard";
   exam_set_id?: string | null;
   stem: string;
+  column_a?: string | null;
+  column_b?: string | null;
   option_a: string;
   option_b: string;
   option_c: string;
@@ -51,8 +53,8 @@ interface ExamSetOption {
 }
 
 const SECTION_OPTIONS = [
-  { value: "math_1", ky: "Математика I", ru: "Математика I" },
-  { value: "math_2", ky: "Математика II (Салыштыруу)", ru: "Математика II (Сравнение)" },
+  { value: "math_1", ky: "Математика I (Салыштыруу)", ru: "Математика I (Сравнение)" },
+  { value: "math_2", ky: "Математика II", ru: "Математика II" },
   { value: "reading", ky: "Окуу жана түшүнүү", ru: "Чтение и понимание" },
   { value: "analogies", ky: "Аналогиялар", ru: "Аналогии" },
   { value: "grammar", ky: "Практикалык грамматика", ru: "Практическая грамматика" },
@@ -95,6 +97,8 @@ export default function QuestionBankManagerPage() {
   const [formDifficulty, setFormDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [formExamSetId, setFormExamSetId] = useState("");
   const [formStem, setFormStem] = useState("");
+  const [formColumnA, setFormColumnA] = useState("");
+  const [formColumnB, setFormColumnB] = useState("");
   const [formOptionA, setFormOptionA] = useState("");
   const [formOptionB, setFormOptionB] = useState("");
   const [formOptionC, setFormOptionC] = useState("");
@@ -143,6 +147,8 @@ export default function QuestionBankManagerPage() {
     setFormDifficulty("medium");
     setFormExamSetId("");
     setFormStem("");
+    setFormColumnA("");
+    setFormColumnB("");
     setFormOptionA("");
     setFormOptionB("");
     setFormOptionC("");
@@ -163,6 +169,8 @@ export default function QuestionBankManagerPage() {
     setFormDifficulty(q.difficulty || "medium");
     setFormExamSetId(q.exam_set_id || "");
     setFormStem(q.stem || "");
+    setFormColumnA(q.column_a || "");
+    setFormColumnB(q.column_b || "");
     setFormOptionA(q.option_a || "");
     setFormOptionB(q.option_b || "");
     setFormOptionC(q.option_c || "");
@@ -264,7 +272,16 @@ export default function QuestionBankManagerPage() {
 
   const handleSaveQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formStem.trim()) {
+    // math_1 is always quantitative comparison: Column A and Column B are required, stem/options optional
+    const isComparisonSection = formSection === "math_1";
+    if (isComparisonSection && (!formColumnA.trim() || !formColumnB.trim())) {
+      setNotification({
+        type: "error",
+        message: lang === "ky" ? "Колонка А жана Колонка Б толтурулушу керек" : "Заполните Колонку А и Колонку Б",
+      });
+      return;
+    }
+    if (!isComparisonSection && !formStem.trim()) {
       setNotification({
         type: "error",
         message: lang === "ky" ? "Суроонун текстин жазыңыз" : "Укажите текст вопроса",
@@ -286,6 +303,9 @@ export default function QuestionBankManagerPage() {
         difficulty: formDifficulty,
         exam_set_id: formExamSetId.trim() || null,
         stem: formStem.trim(),
+        // "" (not null) clears columns when a question leaves math_1, because updates skip null fields
+        column_a: isComparisonSection ? formColumnA.trim() : "",
+        column_b: isComparisonSection ? formColumnB.trim() : "",
         option_a: formOptionA.trim(),
         option_b: formOptionB.trim(),
         option_c: formOptionC.trim(),
@@ -870,7 +890,7 @@ export default function QuestionBankManagerPage() {
                 </div>
                 <textarea
                   rows={3}
-                  required
+                  required={formSection !== "math_1"}
                   placeholder="Суроонун мазмуну (LaTeX формулаларын $...$ ичинде жазса болот)"
                   value={formStem}
                   onChange={(e) => setFormStem(e.target.value)}
@@ -882,6 +902,34 @@ export default function QuestionBankManagerPage() {
                   </div>
                 )}
               </div>
+
+              {/* math_1 = Quantitative comparison: Column A vs Column B */}
+              {formSection === "math_1" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">КОЛОНКА А *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder={lang === "ky" ? "мис: $2x + 5$" : "напр.: $2x + 5$"}
+                      value={formColumnA}
+                      onChange={(e) => setFormColumnA(e.target.value)}
+                      className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">КОЛОНКА Б *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder={lang === "ky" ? "мис: $3x - 1$" : "напр.: $3x - 1$"}
+                      value={formColumnB}
+                      onChange={(e) => setFormColumnB(e.target.value)}
+                      className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Options A, B, C, D */}
               <div className="space-y-2">
@@ -895,7 +943,7 @@ export default function QuestionBankManagerPage() {
                     </span>
                     <input
                       type="text"
-                      required
+                      required={formSection !== "math_1"}
                       placeholder="Вариант A"
                       value={formOptionA}
                       onChange={(e) => setFormOptionA(e.target.value)}
@@ -908,7 +956,7 @@ export default function QuestionBankManagerPage() {
                     </span>
                     <input
                       type="text"
-                      required
+                      required={formSection !== "math_1"}
                       placeholder="Вариант B"
                       value={formOptionB}
                       onChange={(e) => setFormOptionB(e.target.value)}
@@ -921,7 +969,7 @@ export default function QuestionBankManagerPage() {
                     </span>
                     <input
                       type="text"
-                      required
+                      required={formSection !== "math_1"}
                       placeholder="Вариант C"
                       value={formOptionC}
                       onChange={(e) => setFormOptionC(e.target.value)}
@@ -934,7 +982,7 @@ export default function QuestionBankManagerPage() {
                     </span>
                     <input
                       type="text"
-                      required
+                      required={formSection !== "math_1"}
                       placeholder="Вариант D"
                       value={formOptionD}
                       onChange={(e) => setFormOptionD(e.target.value)}

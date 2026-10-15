@@ -45,7 +45,7 @@ app.add_middleware(
 )
 
 # Ensure local uploads directory exists and mount static handler if local
-uploads_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/uploads"))
+uploads_dir = settings.LOCAL_UPLOAD_DIR or os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/uploads"))
 os.makedirs(uploads_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 

@@ -9,11 +9,27 @@ from app.schemas.question import (
     QuestionStudentView,
     SectionType,
     DifficultyLevel,
+    math_section_rule_error,
 )
 from app.services.question_service import QuestionService
-from app.core.exceptions import EntityNotFoundException
+from app.core.exceptions import EntityNotFoundException, ValidationException
 
 router = APIRouter()
+
+
+def _enforce_math_section_rule(section, column_a, column_b) -> None:
+    """math_1 is always quantitative comparison (Column A and B required); math_2 and others never use columns."""
+    if math_section_rule_error(section, column_a, column_b):
+        sec = section.value if hasattr(section, "value") else str(section)
+        if sec == SectionType.MATH_1.value:
+            raise ValidationException(
+                "Математика I — салыштыруу бөлүмү: Колонка А жана Колонка Б толтурулушу керек / "
+                "Математика I — раздел сравнения: заполните Колонку А и Колонку Б"
+            )
+        raise ValidationException(
+            "Колонка А/Б салыштыруу суроолору үчүн гана (Математика I) / "
+            "Колонки А/Б используются только в вопросах сравнения (Математика I)"
+        )
 
 
 @router.get("", response_model=dict)
@@ -92,6 +108,7 @@ async def create_question(
     """
     Instructor creates a new question with correct answers and explanations.
     """
+    _enforce_math_section_rule(question_in.section, question_in.column_a, question_in.column_b)
     return QuestionService.create_question(question_in, user_id=current_user.id)
 
 
@@ -104,6 +121,14 @@ async def update_question(
     """
     Instructor updates question attributes.
     """
+    if update_in.section is not None or update_in.column_a is not None or update_in.column_b is not None:
+        existing = QuestionService.get_question_by_id(question_id)
+        if existing:
+            _enforce_math_section_rule(
+                update_in.section if update_in.section is not None else existing.section,
+                update_in.column_a if update_in.column_a is not None else existing.column_a,
+                update_in.column_b if update_in.column_b is not None else existing.column_b,
+            )
     return QuestionService.update_question(question_id, update_in)
 
 

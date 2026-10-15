@@ -14,6 +14,8 @@ class TestAttempt(Base):
     started_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     completed_at = Column(DateTime, nullable=True)
     total_time_seconds = Column(Integer, default=0, nullable=False)
+    remaining_time_seconds = Column(Integer, nullable=True)
+    current_section_index = Column(Integer, default=0, nullable=True)
     question_ids = Column(JSON, default=list, nullable=True)
     answers = Column(JSON, default=dict, nullable=True)
     scores = Column(JSON, nullable=True)
@@ -29,6 +31,8 @@ class TestAttempt(Base):
             "startedAt": self.started_at.isoformat() if self.started_at else None,
             "completedAt": self.completed_at.isoformat() if self.completed_at else None,
             "totalTimeSeconds": self.total_time_seconds,
+            "remainingTimeSeconds": self.remaining_time_seconds,
+            "currentSectionIndex": self.current_section_index,
             "questionIds": self.question_ids or [],
             "answers": self.answers or {},
             "scores": self.scores,

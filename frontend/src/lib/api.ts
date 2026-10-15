@@ -54,6 +54,7 @@ export async function apiClient<T>(endpoint: string, options: RequestOptions = {
   let response: Response;
   try {
     response = await fetch(url, {
+      cache: "no-store",
       ...customConfig,
       headers: reqHeaders,
     });

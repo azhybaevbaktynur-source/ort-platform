@@ -8,6 +8,7 @@ from app.schemas.question import (
     SectionType,
     DifficultyLevel,
     QuestionCreate,
+    math_section_rule_error,
 )
 from app.schemas.bulk_upload import (
     CsvValidationReport,
@@ -36,6 +37,9 @@ SECTION_ALIASES = {
     "math1": "math_1",
     "math-1": "math_1",
     "math 1": "math_1",
+    "quantitative_comparison": "math_1",
+    "quantitative comparison": "math_1",
+    "салыштыруу": "math_1",
     "mathematics_1": "math_1",
     "mathematics 1": "math_1",
     "математика_1": "math_1",
@@ -51,14 +55,11 @@ SECTION_ALIASES = {
     "math 2": "math_2",
     "mathematics_2": "math_2",
     "mathematics 2": "math_2",
-    "quantitative_comparison": "math_2",
-    "quantitative comparison": "math_2",
     "математика_2": "math_2",
     "математика 2": "math_2",
     "математика-2": "math_2",
     "математика ii": "math_2",
     "математика 2-бөлүк": "math_2",
-    "салыштыруу": "math_2",
     # Analogies
     "analogies": "analogies",
     "analogy": "analogies",
@@ -164,8 +165,23 @@ COLUMN_ALIASES = {
     "diff": "difficulty",
     "level": "difficulty",
     "subtopic": "topic",
-    "theme": "topic",
     "category": "topic",
+    "column_a": "column_a",
+    "column a": "column_a",
+    "col_a": "column_a",
+    "cola": "column_a",
+    "колонка_а": "column_a",
+    "колонка а": "column_a",
+    "колонка_a": "column_a",
+    "колонка a": "column_a",
+    "column_b": "column_b",
+    "column b": "column_b",
+    "col_b": "column_b",
+    "colb": "column_b",
+    "колонка_б": "column_b",
+    "колонка б": "column_b",
+    "колонка_b": "column_b",
+    "колонка b": "column_b",
 }
 
 VALID_SECTIONS = {s.value for s in SectionType}
@@ -290,27 +306,53 @@ class CsvService:
             except Exception:
                 raw_dict = dict(row)
 
-        # 1. Check mandatory fields
-        for field in MANDATORY_CSV_FIELDS:
-            val = get_field_value(raw_dict, field, language)
-            if not val:
-                errors.append(
-                    RowValidationError(
-                        rowNumber=row_number,
-                        field=field,
-                        errorMessage=f"Required field '{field}' is missing or empty.",
-                        rawData=raw_dict,
-                    )
-                )
+        # Extract column_a and column_b for quantitative comparison
+        col_a = get_field_value(raw_dict, "column_a", language)
+        col_b = get_field_value(raw_dict, "column_b", language)
 
-        if errors:
-            return None, errors
-
-        # 2. Section normalization & validation
+        # Section normalization & validation
         section_raw = get_field_value(raw_dict, "section", language).lower()
         section_clean = section_raw.replace("-", "_").replace(" ", "_")
         section_str = SECTION_ALIASES.get(section_raw) or SECTION_ALIASES.get(section_clean) or section_clean
 
+        # math_1 is always quantitative comparison (Column A vs Column B)
+        is_comparison = bool(col_a or col_b) or section_str == "math_1"
+
+        # If comparison row has no section specified, default to math_1
+        if is_comparison and not section_str:
+            section_str = "math_1"
+
+        # 1. Check mandatory fields
+        if is_comparison:
+            # For comparison rows, stem is optional (nullable), options A-E can be empty.
+            # Only correct_option is strictly required.
+            correct_val = get_field_value(raw_dict, "correct_option", language)
+            if not correct_val:
+                errors.append(
+                    RowValidationError(
+                        rowNumber=row_number,
+                        field="correct_option",
+                        errorMessage="Required field 'correct_option' is missing or empty for quantitative comparison.",
+                        rawData=raw_dict,
+                    )
+                )
+        else:
+            for field in MANDATORY_CSV_FIELDS:
+                val = get_field_value(raw_dict, field, language)
+                if not val:
+                    errors.append(
+                        RowValidationError(
+                            rowNumber=row_number,
+                            field=field,
+                            errorMessage=f"Required field '{field}' is missing or empty.",
+                            rawData=raw_dict,
+                        )
+                    )
+
+        if errors:
+            return None, errors
+
+        # 2. Section validation
         if section_str not in VALID_SECTIONS:
             errors.append(
                 RowValidationError(
@@ -340,8 +382,33 @@ class CsvService:
                 )
             )
 
+        # 4b. Platform rule: math_1 = comparison only, math_2 = multiple choice only
+        if section_str in VALID_SECTIONS:
+            rule_error = math_section_rule_error(section_str, col_a, col_b)
+            if rule_error:
+                errors.append(
+                    RowValidationError(
+                        rowNumber=row_number,
+                        field=rule_error[0],
+                        errorMessage=rule_error[1],
+                        rawData=raw_dict,
+                    )
+                )
+            elif section_str == "math_1" and correct_opt == "E":
+                errors.append(
+                    RowValidationError(
+                        rowNumber=row_number,
+                        field="correct_option",
+                        errorMessage="math_1 (quantitative comparison) answers must be A, B, C or D.",
+                        rawData=raw_dict,
+                    )
+                )
+
         if errors:
             return None, errors
+
+        # Ensure language is strictly 'ky' or 'ru'
+        lang_normalized = "ru" if "ru" in (language or "ky").lower() else "ky"
 
         # 5. Extract optional fields safely
         stem_str = get_field_value(raw_dict, "stem", language)
@@ -351,16 +418,26 @@ class CsvService:
         opt_d = get_field_value(raw_dict, "option_d", language)
         opt_e = get_field_value(raw_dict, "option_e", language) or None
 
-        topic_str = get_field_value(raw_dict, "topic", language) or "General"
+        # In quantitative comparison rows, automatically map 4 standard choices if options are omitted
+        if is_comparison and not opt_a and not opt_b and not opt_c and not opt_d:
+            if lang_normalized == "ky":
+                opt_a = "КОЛОНКА А чоңураак"
+                opt_b = "КОЛОНКА Б чоңураак"
+                opt_c = "Эки чоңдук барабар"
+                opt_d = "Маалымат жетишсиз"
+            else:
+                opt_a = "КОЛОНКА А больше"
+                opt_b = "КОЛОНКА Б больше"
+                opt_c = "Величины равны"
+                opt_d = "Недостаточно информации для определения"
+
+        topic_str = get_field_value(raw_dict, "topic", language) or ("Салыштыруу" if is_comparison else "General")
         passage_str = get_field_value(raw_dict, "passage_text", language) or None
         image_str = get_field_value(raw_dict, "image_url", language) or None
         explanation_str = get_field_value(raw_dict, "explanation", language) or None
 
         tags_raw = get_field_value(raw_dict, "tags", language)
         tags = [t.strip() for t in tags_raw.split(",") if t.strip() and t.lower() != "nan"]
-
-        # Ensure language is strictly 'ky' or 'ru'
-        lang_normalized = "ru" if "ru" in (language or "ky").lower() else "ky"
 
         # 6. Construct QuestionCreate with strict Pydantic error catching
         try:
@@ -370,11 +447,13 @@ class CsvService:
                 section=SectionType(section_str),
                 topic=topic_str,
                 difficulty=DifficultyLevel(diff_str),
-                stem=stem_str,
-                option_a=opt_a,
-                option_b=opt_b,
-                option_c=opt_c,
-                option_d=opt_d,
+                column_a=col_a or None,
+                column_b=col_b or None,
+                stem=stem_str or "",
+                option_a=opt_a or "",
+                option_b=opt_b or "",
+                option_c=opt_c or "",
+                option_d=opt_d or "",
                 option_e=opt_e,
                 correct_option=correct_opt,
                 image_url=image_str,
@@ -566,6 +645,46 @@ class CsvService:
 
                 batch.commit()
 
+            # Sync questions to SQL database
+            try:
+                from app.db.session import SessionLocal
+                from app.models.question import Question as QuestionModel
+                from app.models.exam_set import ExamSet as ExamSetModel
+                sql_session = SessionLocal()
+                try:
+                    for q, q_id in zip(report.previewQuestions, imported_ids):
+                        sql_q = QuestionModel(
+                            id=q_id,
+                            language=lang_normalized,
+                            section=q.section.value,
+                            topic=q.topic,
+                            difficulty=q.difficulty.value,
+                            column_a=q.column_a,
+                            column_b=q.column_b,
+                            stem=q.stem or "",
+                            option_a=q.option_a or "",
+                            option_b=q.option_b or "",
+                            option_c=q.option_c or "",
+                            option_d=q.option_d or "",
+                            option_e=q.option_e,
+                            correct_option=q.correct_option,
+                            explanation=q.explanation,
+                            image_url=q.image_url,
+                            passage_text=q.passage_text,
+                            tags=q.tags,
+                            exam_set_id=target_exam_set_id,
+                            created_by=created_by_user_id,
+                        )
+                        sql_session.merge(sql_q)
+                    sql_session.commit()
+                except Exception as sq_err:
+                    logger.warning(f"Error syncing questions to SQL: {sq_err}")
+                    sql_session.rollback()
+                finally:
+                    sql_session.close()
+            except Exception as se_err:
+                logger.warning(f"Error opening SQL session for question sync: {se_err}")
+
             # Update or create ExamSet
             if target_exam_set_id and imported_ids:
                 section_counts: Dict[str, int] = {}
@@ -620,6 +739,51 @@ class CsvService:
                         "completionsCount": 0,
                     }
                     exam_ref.set(template_doc)
+
+                # Sync ExamSet to SQL database
+                try:
+                    from app.db.session import SessionLocal
+                    from app.models.exam_set import ExamSet as ExamSetModel
+                    sql_session = SessionLocal()
+                    try:
+                        sql_exam = sql_session.query(ExamSetModel).filter(ExamSetModel.id == target_exam_set_id).first()
+                        from datetime import datetime as dt
+                        now_dt = dt.now(timezone.utc)
+                        if not sql_exam:
+                            title_str = mock_test_title or (
+                                f"ОРТ Тест ({lang_normalized.upper()})" if lang_normalized == "ky" else f"Тест ОРТ ({lang_normalized.upper()})"
+                            )
+                            sql_exam = ExamSetModel(
+                                id=target_exam_set_id,
+                                title=title_str,
+                                description=f"{title_str} ({len(imported_ids)} суроо / вопросов).",
+                                language=lang_normalized,
+                                exam_type=exam_type,
+                                status="published",
+                                max_attempts=999 if exam_type == "practice_bank" else 1,
+                                sections=template_sections,
+                                total_questions=len(imported_ids),
+                                total_time_minutes=sum(sec["timeLimitMinutes"] for sec in template_sections) or (30 if exam_type == "practice_bank" else 170),
+                                question_ids=imported_ids,
+                                created_by=created_by_user_id,
+                                created_at=now_dt,
+                                updated_at=now_dt,
+                            )
+                            sql_session.add(sql_exam)
+                        else:
+                            existing_q_ids = sql_exam.question_ids or []
+                            combined_ids = list(dict.fromkeys(existing_q_ids + imported_ids))
+                            sql_exam.question_ids = combined_ids
+                            sql_exam.total_questions = len(combined_ids)
+                            sql_exam.updated_at = now_dt
+                        sql_session.commit()
+                    except Exception as sq_err:
+                        logger.warning(f"Error syncing ExamSet to SQL: {sq_err}")
+                        sql_session.rollback()
+                    finally:
+                        sql_session.close()
+                except Exception as se_err:
+                    logger.warning(f"Error opening SQL session for ExamSet sync: {se_err}")
 
             return CsvUploadResult(
                 success=True,

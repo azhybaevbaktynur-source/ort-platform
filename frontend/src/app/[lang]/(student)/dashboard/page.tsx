@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/context";
@@ -7,7 +9,7 @@ import { useAuth } from "@/lib/auth-context";
 import { apiClient } from "@/lib/api";
 import { DailyPlannerWidget } from "@/components/planner/DailyPlannerWidget";
 import { TargetScoreWidget } from "@/components/planner/TargetScoreWidget";
-import { Clock, Play, ArrowRight, History, Award, BookOpen, ChevronRight } from "lucide-react";
+import { Clock, Play, ArrowRight, History, Award, BookOpen, ChevronRight, RotateCcw } from "lucide-react";
 
 interface RecentScoreItem {
   attemptId?: string;
@@ -35,6 +37,15 @@ interface ExamSetSummary {
   totalTimeMinutes?: number;
   totalQuestions?: number;
   question_count?: number;
+  has_in_progress?: boolean;
+}
+
+interface InProgressAttemptItem {
+  attemptId: string;
+  templateId: string;
+  remainingTimeSeconds?: number;
+  currentSectionIndex?: number;
+  language?: string;
 }
 
 export default function StudentDashboardPage() {
@@ -43,6 +54,7 @@ export default function StudentDashboardPage() {
 
   const [recentTests, setRecentTests] = useState<RecentScoreItem[]>([]);
   const [availableExams, setAvailableExams] = useState<ExamSetSummary[]>([]);
+  const [inProgressAttempts, setInProgressAttempts] = useState<InProgressAttemptItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const studentName =
@@ -52,9 +64,10 @@ export default function StudentDashboardPage() {
     let isMounted = true;
     async function fetchDashboardData() {
       try {
-        const [analyticsRes, examsRes] = await Promise.allSettled([
+        const [analyticsRes, examsRes, inProgRes] = await Promise.allSettled([
           apiClient<StudentAnalytics>("/analytics/student"),
           apiClient<ExamSetSummary[]>(`/exam-sets/student?lang=${lang}`),
+          apiClient<InProgressAttemptItem[]>("/mock-tests/in-progress"),
         ]);
 
         if (!isMounted) return;
@@ -68,6 +81,10 @@ export default function StudentDashboardPage() {
 
         if (examsRes.status === "fulfilled" && Array.isArray(examsRes.value)) {
           setAvailableExams(examsRes.value);
+        }
+
+        if (inProgRes.status === "fulfilled" && Array.isArray(inProgRes.value)) {
+          setInProgressAttempts(inProgRes.value);
         }
       } catch {
         // Fallback or keep empty
@@ -98,6 +115,15 @@ export default function StudentDashboardPage() {
     ? `${speedDrillTimeMinutes} ${lang === "ky" ? "мүнөт" : "минут"}`
     : (lang === "ky" ? "Чектөөсүз" : "Без ограничений");
 
+  const isFullMainInProgress = Boolean(fullMainExam?.has_in_progress);
+  const isSpeedDrillInProgress = Boolean(speedDrillExam?.has_in_progress);
+  const primaryInProgress = inProgressAttempts.find(
+    (a) =>
+      (fullMainExam && a.templateId === fullMainExam.id && fullMainExam.has_in_progress) ||
+      (speedDrillExam && a.templateId === speedDrillExam.id && speedDrillExam.has_in_progress) ||
+      availableExams.some((e) => e.id === a.templateId && e.has_in_progress)
+  ) || null;
+
   return (
     <div className="space-y-8">
       {/* Banner */}
@@ -121,13 +147,23 @@ export default function StudentDashboardPage() {
           </p>
 
           <div className="pt-2 flex flex-wrap gap-3">
-            <Link
-              href={`/${lang}/mock-tests`}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-indigo-800 font-bold text-xs shadow-xs hover:bg-indigo-50 transition-colors"
-            >
-              <Play className="w-4 h-4 fill-current" />
-              <span>{lang === "ky" ? "Сыноо тестин баштоо" : "Начать пробный тест"}</span>
-            </Link>
+            {primaryInProgress ? (
+              <Link
+                href={`/${lang}/mock-tests/${primaryInProgress.templateId}`}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs shadow-xs transition-colors"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>{lang === "ky" ? "Тестти улантуу" : "Возобновить тест"}</span>
+              </Link>
+            ) : (
+              <Link
+                href={`/${lang}/mock-tests`}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-indigo-800 font-bold text-xs shadow-xs hover:bg-indigo-50 transition-colors"
+              >
+                <Play className="w-4 h-4 fill-current" />
+                <span>{lang === "ky" ? "Сыноо тестин баштоо" : "Начать пробный тест"}</span>
+              </Link>
+            )}
 
             <Link
               href={`/${lang}/practice`}
@@ -184,18 +220,35 @@ export default function StudentDashboardPage() {
               </p>
             </div>
             <Link
-              href={`/${lang}/mock-tests`}
-              className="inline-flex items-center justify-center w-full py-2 px-3 rounded-xl bg-indigo-600 text-white font-semibold text-xs hover:bg-indigo-700 transition-colors"
+              href={
+                isSpeedDrillInProgress
+                  ? `/${lang}/mock-tests/${speedDrillExam?.id || "ort_speed_drill"}`
+                  : `/${lang}/mock-tests/${speedDrillExam?.id || "ort_speed_drill"}?force_new=true`
+              }
+              className={`inline-flex items-center justify-center gap-1.5 w-full py-2 px-3 rounded-xl font-semibold text-xs transition-colors ${
+                isSpeedDrillInProgress
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                  : "bg-indigo-600 text-white hover:bg-indigo-700"
+              }`}
             >
-              {lang === "ky" ? "Тестти баштоо" : "Начать тест"}
+              {isSpeedDrillInProgress && <RotateCcw className="w-3.5 h-3.5" />}
+              <span>
+                {isSpeedDrillInProgress
+                  ? (lang === "ky" ? "Машыгууну улантуу" : "Возобновить спринт")
+                  : (lang === "ky" ? "Жаңы машыгууну баштоо" : "Начать новую тренировку")}
+              </span>
             </Link>
           </div>
 
           {/* Full Standard ORT Test */}
           <div className="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 hover:border-indigo-400 hover:bg-white transition-all space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800">
-                {lang === "ky" ? "Толук формат" : "Полный формат"}
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
+                isFullMainInProgress ? "bg-amber-100 text-amber-800" : "bg-indigo-100 text-indigo-800"
+              }`}>
+                {isFullMainInProgress
+                  ? (lang === "ky" ? "Улантылууда" : "В процессе")
+                  : (lang === "ky" ? "Толук формат" : "Полный формат")}
               </span>
               <span className="text-xs text-slate-500 font-medium">⏱️ {mainTimeDisplay}</span>
             </div>
@@ -210,10 +263,19 @@ export default function StudentDashboardPage() {
               </p>
             </div>
             <Link
-              href={`/${lang}/mock-tests`}
-              className="inline-flex items-center justify-center w-full py-2 px-3 rounded-xl bg-slate-900 text-white font-semibold text-xs hover:bg-slate-800 transition-colors"
+              href={`/${lang}/mock-tests/${fullMainExam?.id || "ort_main_standard"}`}
+              className={`inline-flex items-center justify-center gap-1.5 w-full py-2 px-3 rounded-xl font-semibold text-xs transition-colors ${
+                isFullMainInProgress
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                  : "bg-slate-900 text-white hover:bg-slate-800"
+              }`}
             >
-              {lang === "ky" ? "Толук тестти баштоо" : "Начать полный экзамен"}
+              {isFullMainInProgress && <RotateCcw className="w-3.5 h-3.5" />}
+              <span>
+                {isFullMainInProgress
+                  ? (lang === "ky" ? "Тестти улантуу" : "Возобновить экзамен")
+                  : (lang === "ky" ? "Толук тестти баштоо" : "Начать полный экзамен")}
+              </span>
             </Link>
           </div>
         </div>

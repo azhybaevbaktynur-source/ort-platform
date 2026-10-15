@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import List, Dict, Optional, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from app.schemas.question import SectionType, QuestionStudentView
 
 
@@ -80,6 +80,8 @@ class ExamSet(ExamSetBase):
     completionsCount: int = 0
     question_count: Optional[int] = None
     user_attempts_count: Optional[int] = None
+    has_in_progress: Optional[bool] = False
+    in_progress_attempt_id: Optional[str] = None
 
 
 # Backwards compatibility alias
@@ -91,6 +93,7 @@ class TestSessionStartRequest(BaseModel):
     language: str = Field(default="ky", pattern="^(ky|ru)$")
     access_code: Optional[str] = Field(None, description="4-digit PIN if proctored")
     pin: Optional[str] = Field(None, description="Alias for access_code")
+    force_new: Optional[bool] = Field(default=False, description="Force create a new attempt, bypassing in_progress session resume")
 
 
 class AnswerSubmission(BaseModel):
@@ -103,6 +106,24 @@ class TestSessionSaveProgress(BaseModel):
     answers: Dict[str, AnswerSubmission] = {}
     currentSectionIndex: int = 0
     remainingTimeSeconds: int = 0
+    isFinal: Optional[bool] = False
+    is_final: Optional[bool] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def sync_final_flags(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            final_val = data.get("is_final") if data.get("is_final") is not None else data.get("isFinal")
+            if final_val is not None:
+                data["is_final"] = bool(final_val)
+                data["isFinal"] = bool(final_val)
+        return data
+
+    @property
+    def final_flag(self) -> bool:
+        if self.is_final is not None:
+            return bool(self.is_final)
+        return bool(self.isFinal)
 
 
 class TestSessionResponse(BaseModel):
@@ -117,6 +138,10 @@ class TestSessionResponse(BaseModel):
     exam_type: Optional[str] = "full_main"
     title: Optional[str] = None
     time_limit_minutes: Optional[int] = None
+    remainingTimeSeconds: Optional[int] = None
+    currentSectionIndex: Optional[int] = 0
+    currentIndex: Optional[int] = 0
+    answers: Optional[Dict[str, Any]] = None
 
 
 class SectionScoreResult(BaseModel):

@@ -8,6 +8,7 @@ from app.schemas.practice import (
     PracticeSetSubmission,
     PracticeSetSubmitResponse,
 )
+from app.services.scoring_service import ScoringService
 
 
 class PracticeService:
@@ -210,8 +211,12 @@ class PracticeService:
         correct_count = sum(1 for a in submission.answers if a.is_correct)
         accuracy = round((correct_count / max(1, total_questions)) * 100, 1) if total_questions > 0 else 0.0
 
-        scaled_score = int(60 + round((correct_count / max(1, total_questions)) * 185))
-        percentile = accuracy
+        if correct_count == 0 or total_questions == 0:
+            scaled_score = 0
+            percentile = 0.0
+        else:
+            scaled_score = ScoringService.raw_to_scaled(correct_count, total_questions, exam_type="full_main")
+            percentile = ScoringService.calculate_percentile(scaled_score, exam_type="full_main")
 
         attempt_id = f"prac_{uuid.uuid4().hex[:12]}"
 

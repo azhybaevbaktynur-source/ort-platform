@@ -4,16 +4,19 @@ from app.services.scoring_service import ScoringService
 
 class TestScoringService:
     def test_raw_to_scaled_boundary_conditions(self):
-        # Min boundary (0 raw points out of 150)
-        assert ScoringService.raw_to_scaled(0, 150) == 60
-        assert ScoringService.raw_to_scaled(-5, 150) == 60
+        # Min boundary (0 raw points out of 150) -> returns 0
+        assert ScoringService.raw_to_scaled(0, 150) == 0
+        assert ScoringService.raw_to_scaled(-5, 150) == 0
+
+        # At least 1 point awards baseline ORT normative scaled score
+        assert ScoringService.raw_to_scaled(1, 150) >= 60
 
         # Max boundary (150 raw points out of 150)
         assert ScoringService.raw_to_scaled(150, 150) == 245
         assert ScoringService.raw_to_scaled(160, 150) == 245
 
         # Degenerate max raw score
-        assert ScoringService.raw_to_scaled(10, 0) == 60
+        assert ScoringService.raw_to_scaled(10, 0) == 0
 
     def test_raw_to_scaled_median_and_progression(self):
         # 50% performance (75 / 150) should be near the normative mean of 150
@@ -109,7 +112,8 @@ class TestScoringService:
 
     def test_subject_test_scoring_ceatm_standards(self):
         # 1. Subject Test raw to scaled boundary conditions (scale 60 - 150)
-        assert ScoringService.raw_to_scaled(0, 30, exam_type="subject") == 60
+        assert ScoringService.raw_to_scaled(0, 30, exam_type="subject") == 0
+        assert ScoringService.raw_to_scaled(1, 30, exam_type="subject") >= 60
         assert ScoringService.raw_to_scaled(30, 30, exam_type="subject") == 150
         assert ScoringService.raw_to_scaled(15, 30, exam_type="subject") == 105
         assert ScoringService.raw_to_scaled(35, 30, exam_type="subject") == 150
@@ -152,4 +156,23 @@ class TestScoringService:
         assert res.maxScaledScore == 150
         assert res.totalScaledScore == 150  # 100% correct in subject test gives 150
         assert res.isGoldenCertificate is False  # Subject tests do not award golden certificates
+
+    def test_calculate_score(self):
+        # 0 correct answers must yield 0 raw, 0 scaled, 0.0 percentile
+        zero_res = ScoringService.calculate_score(0, 150, exam_type="full_main")
+        assert zero_res["raw_score"] == 0
+        assert zero_res["scaled_score"] == 0
+        assert zero_res["percentile"] == 0.0
+
+        # Subject test with 0 correct
+        zero_subj = ScoringService.calculate_score(0, 40, exam_type="subject")
+        assert zero_subj["raw_score"] == 0
+        assert zero_subj["scaled_score"] == 0
+        assert zero_subj["percentile"] == 0.0
+
+        # Valid score
+        mid_res = ScoringService.calculate_score(75, 150, exam_type="full_main")
+        assert mid_res["raw_score"] == 75
+        assert 148 <= mid_res["scaled_score"] <= 152
+        assert mid_res["percentile"] > 40.0
 

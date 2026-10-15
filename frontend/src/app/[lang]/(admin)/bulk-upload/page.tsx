@@ -19,6 +19,17 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { getAuthHeader } from "@/lib/api";
+import { BundleImportPanel } from "@/components/bulk/BundleImportPanel";
+
+// A zip is recognised by its content ("PK" signature), never by its file name
+async function isZipFile(file: File): Promise<boolean> {
+  try {
+    const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+    return head[0] === 0x50 && head[1] === 0x4b && (head[2] === 0x03 || head[2] === 0x05) && (head[3] === 0x04 || head[3] === 0x06);
+  } catch {
+    return false;
+  }
+}
 
 interface ExamSetSummary {
   id: string;
@@ -35,6 +46,8 @@ function BulkUploadContent() {
   const preselectedLang = searchParams.get("lang") as "ky" | "ru" | null;
 
   const [file, setFile] = useState<File | null>(null);
+  const [isBundle, setIsBundle] = useState(false);
+  const [fileInputKey, setFileInputKey] = useState(0);
   const [isValidating, setIsValidating] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadComplete, setUploadComplete] = useState(false);
@@ -102,12 +115,22 @@ function BulkUploadContent() {
     };
   }, [preselectedExamSetId]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+      const selected = e.target.files[0];
+      setIsBundle(await isZipFile(selected));
+      setFile(selected);
       setReport(null);
       setUploadComplete(false);
     }
+  };
+
+  const resetFile = () => {
+    setFile(null);
+    setIsBundle(false);
+    setReport(null);
+    setUploadComplete(false);
+    setFileInputKey((k) => k + 1);
   };
 
   const handleValidate = async () => {
@@ -252,6 +275,7 @@ function BulkUploadContent() {
             ? "CSV аркылуу суроолорду топтому менен текшерип, тандалган Экзамен топтомуна түз жүктөңүз."
             : "Линейная загрузка базы вопросов через CSV с авто-каскадированием языка и привязкой к экзаменационным сетам."}
         </p>
+        <p className="text-sm text-slate-500 mt-1">{t("bundleImport.subtitle")}</p>
       </div>
 
       {/* STEP 1: Global Language Selection */}
@@ -293,13 +317,23 @@ function BulkUploadContent() {
           </div>
         </div>
         <p className="text-xs text-slate-500">
-          {lang === "ky"
+          {isBundle
+            ? t("bundleImport.languageNote")
+            : lang === "ky"
             ? "CSV файлынын ичинде 'language' тилкеси кереги жок. Бардык суроолорго бул тил автоматтык түрдө ыйгарылат."
             : "Колонка языка внутри CSV не требуется. Все вопросы будут созданы на выбранном языке."}
         </p>
       </div>
 
-      {/* STEP 2: Destination ExamSet Selection */}
+      {/* STEP 2: Destination ExamSet Selection (a zip bundle gets one exam set per source automatically) */}
+      {isBundle ? (
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 shadow-xs space-y-2">
+          <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider block">
+            {lang === "ky" ? "2-Кадам: Экзамен топтому (ExamSet)" : "Шаг 2: Экзаменационный сет (ExamSet)"}
+          </span>
+          <p className="text-sm text-slate-700">{t("bundleImport.examSetAuto")}</p>
+        </div>
+      ) : (
       <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 shadow-xs space-y-5">
         <div className="flex items-center justify-between">
           <div>
@@ -429,20 +463,27 @@ function BulkUploadContent() {
           </div>
         )}
       </div>
+      )}
 
       {/* STEP 3: CSV File Dropzone & Validation */}
       <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 shadow-xs space-y-5">
         <div>
           <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider block">
-            {lang === "ky" ? "3-Кадам: CSV Файлын жүктөө" : "Шаг 3: Загрузка файла CSV"}
+            {lang === "ky" ? "3-Кадам: CSV же ZIP файлын жүктөө" : "Шаг 3: Загрузка файла CSV или ZIP"}
           </span>
           <h3 className="text-base font-bold text-slate-900 mt-0.5">
             {lang === "ky" ? "Монолингвалдык CSV файлы" : "Монолингвальный файл вопросов"}
           </h3>
         </div>
 
+        {isBundle && (
+          <div className="p-3.5 bg-indigo-50/60 rounded-2xl border border-indigo-100 text-xs font-semibold text-indigo-900">
+            {t("bundleImport.detectedZip")}
+          </div>
+        )}
+
         {/* CSV Format Pills / Columns */}
-        <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
+        <div className={`p-3.5 bg-slate-50 rounded-2xl border border-slate-200 ${isBundle ? "hidden" : ""}`}>
           <div className="text-xs font-bold text-slate-700 mb-1.5">
             {lang === "ky" ? "Керектүү тилкелер (Колонки):" : "Обязательные и опциональные колонки:"}
           </div>
@@ -482,20 +523,25 @@ function BulkUploadContent() {
           <p className="text-sm font-semibold text-slate-800">
             {file ? file.name : lang === "ky" ? "CSV файлын тандаңыз же сүйрөп келиңиз" : "Перетащите CSV файл или выберите на диске"}
           </p>
-          <p className="text-xs text-slate-400 mt-0.5">UTF-8 (.csv)</p>
+          <p className="text-xs text-slate-400 mt-0.5">UTF-8 (.csv) · ZIP (.zip)</p>
 
           <label className="mt-3 inline-flex items-center px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 cursor-pointer transition">
             <span>{lang === "ky" ? "Файлды тандоо" : "Обзор файла"}</span>
             <input
+              key={fileInputKey}
               type="file"
-              accept=".csv"
+              accept=".csv,.zip,application/zip"
               onChange={handleFileChange}
               className="hidden"
             />
           </label>
         </div>
 
-        {file && !report && (
+        {file && isBundle && (
+          <BundleImportPanel key={`${file.name}-${file.size}-${file.lastModified}`} file={file} language={selectedLanguage} onReset={resetFile} />
+        )}
+
+        {file && !isBundle && !report && (
           <button
             onClick={handleValidate}
             disabled={isValidating}

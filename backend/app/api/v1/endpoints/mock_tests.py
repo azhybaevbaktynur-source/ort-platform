@@ -1,5 +1,8 @@
+from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Path, Query, Body
+from sqlalchemy.orm import Session
+from app.db.session import get_db
 from app.core.security import get_current_user, require_instructor
 from app.schemas.user import UserProfile
 from app.schemas.mock_test import (
@@ -11,6 +14,7 @@ from app.schemas.mock_test import (
     TestSessionResponse,
     TestSessionSaveProgress,
     MockTestResult,
+    ExamStatus,
 )
 from app.services.mock_test_service import MockTestService
 from app.core.exceptions import EntityNotFoundException, ValidationException
@@ -125,6 +129,7 @@ async def start_mock_test_session(
     pin: Optional[str] = Query(None, description="Optional 4-digit PIN query param"),
     access_code: Optional[str] = Query(None, description="Optional access code query param"),
     lang: Optional[str] = Query(None, description="Optional language parameter ('ky' or 'ru')"),
+    force_new: Optional[bool] = Query(False, description="Force start new attempt"),
     current_user: UserProfile = Depends(get_current_user),
 ):
     """
@@ -136,6 +141,7 @@ async def start_mock_test_session(
     is_instructor = current_user.role in ["instructor", "admin"]
     effective_pin = request.pin or request.access_code or pin or access_code
     effective_lang = request.language or lang or "ky"
+    is_force_new = bool(request.force_new or force_new)
 
     if not request.templateId:
         raise ValidationException("templateId талап кылынат / templateId обязателен")
@@ -146,6 +152,7 @@ async def start_mock_test_session(
         language=effective_lang,
         access_code=effective_pin,
         is_instructor=is_instructor,
+        force_new=is_force_new,
     )
 
 
@@ -156,6 +163,7 @@ async def start_mock_test_session_by_id(
     pin: Optional[str] = Query(None, description="Optional 4-digit PIN query param"),
     access_code: Optional[str] = Query(None, description="Optional access code query param"),
     lang: Optional[str] = Query(None, description="Optional language parameter ('ky' or 'ru')"),
+    force_new: Optional[bool] = Query(False, description="Force start new attempt"),
     current_user: UserProfile = Depends(get_current_user),
 ):
     """
@@ -166,6 +174,7 @@ async def start_mock_test_session_by_id(
     is_instructor = current_user.role in ["instructor", "admin"]
     effective_pin = (request.pin if request else None) or (request.access_code if request else None) or pin or access_code
     effective_lang = (request.language if request else None) or lang or "ky"
+    is_force_new = bool((request.force_new if request else False) or force_new)
 
     return MockTestService.start_test_session(
         user_id=current_user.id,
@@ -173,6 +182,7 @@ async def start_mock_test_session_by_id(
         language=effective_lang,
         access_code=effective_pin,
         is_instructor=is_instructor,
+        force_new=is_force_new,
     )
 
 
@@ -181,16 +191,46 @@ async def save_session_progress(
     progress: TestSessionSaveProgress,
     attempt_id: str = Path(...),
     current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     Autosaves in-flight answers and flagged questions to Firestore.
+    If is_final is True, completes, scores, and locks the exam.
+    If is_final is False, preserves status as in_progress without grading.
     """
+    request_data = progress.model_dump()
+    print("Received submission request:", request_data)
+    is_final = progress.final_flag
+    if is_final:
+        print(f"save_session_progress: final flag is True for attempt {attempt_id}")
+        MockTestService.submit_and_score_test(
+            attempt_id=attempt_id,
+            user_id=current_user.id,
+            answers=progress.answers,
+        )
+        try:
+            from app.models.test_attempt import TestAttempt
+            sql_att = db.query(TestAttempt).filter(TestAttempt.id == attempt_id).first()
+            if sql_att:
+                sql_att.status = ExamStatus.COMPLETED.value
+                sql_att.completed_at = datetime.now(timezone.utc)
+                db.commit()
+                print(f"Explicitly set status = 'completed' and committed SQL TestAttempt {attempt_id}")
+        except Exception as e:
+            print(f"Error committing SQL TestAttempt in save_session_progress: {e}")
+            db.rollback()
+
+        return {"success": True, "attemptId": attempt_id, "status": "completed"}
+
     MockTestService.save_session_progress(
         attempt_id=attempt_id,
         user_id=current_user.id,
         answers=progress.answers,
+        remaining_time_seconds=progress.remainingTimeSeconds,
+        current_section_index=progress.currentSectionIndex,
+        is_final=False,
     )
-    return {"success": True, "attemptId": attempt_id}
+    return {"success": True, "attemptId": attempt_id, "status": "in_progress"}
 
 
 @router.post("/{attempt_id}/submit", response_model=MockTestResult)
@@ -198,16 +238,42 @@ async def submit_mock_test(
     progress: TestSessionSaveProgress,
     attempt_id: str = Path(...),
     current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     Submits final test answers, verifies keys, computes ORT normative scaled scores (60-245),
     percentiles, and section breakdowns, and returns complete review with explanations.
     """
-    return MockTestService.submit_and_score_test(
+    request_data = progress.model_dump()
+    print("Received submission request:", request_data)
+    res = MockTestService.submit_and_score_test(
         attempt_id=attempt_id,
         user_id=current_user.id,
         answers=progress.answers,
     )
+    try:
+        from app.models.test_attempt import TestAttempt
+        sql_att = db.query(TestAttempt).filter(TestAttempt.id == attempt_id).first()
+        if sql_att:
+            sql_att.status = ExamStatus.COMPLETED.value
+            sql_att.completed_at = datetime.now(timezone.utc)
+            db.commit()
+            print(f"Explicitly set status = 'completed' and committed SQL TestAttempt {attempt_id}")
+    except Exception as e:
+        print(f"Error committing SQL TestAttempt in submit_mock_test: {e}")
+        db.rollback()
+
+    return res
+
+
+@router.get("/in-progress", response_model=List[dict])
+async def list_user_in_progress_attempts(
+    current_user: UserProfile = Depends(get_current_user),
+):
+    """
+    Returns all in-progress or paused test attempts for the current student.
+    """
+    return MockTestService.get_user_in_progress_attempts(user_id=current_user.id)
 
 
 @router.get("/attempts", response_model=List[dict])

@@ -56,7 +56,7 @@ class ScoringService:
             mean_score = cls.MEAN_SCALED_SCORE
 
         if max_raw_score <= 0 or raw_score <= 0:
-            return min_score
+            return 0
         if raw_score >= max_raw_score:
             return max_score
 
@@ -83,6 +83,9 @@ class ScoringService:
         - full_main: Z = (scaled_score - 150) / 30
         - subject: Z = (scaled_score - 105) / 20
         """
+        if scaled_score <= 0:
+            return 0.0
+
         if exam_type == "subject":
             min_score = cls.SUBJECT_MIN_SCALED_SCORE
             max_score = cls.SUBJECT_MAX_SCALED_SCORE
@@ -103,6 +106,36 @@ class ScoringService:
         # Standard normal CDF approximation (error function)
         percentile = 0.5 * (1.0 + math.erf(z / math.sqrt(2.0))) * 100.0
         return round(min(max(percentile, 1.0), 99.9), 1)
+
+    @classmethod
+    def calculate_score(
+        cls,
+        correct_answers: int,
+        total_questions: int,
+        exam_type: str = "full_main",
+    ) -> Dict[str, Any]:
+        """
+        Calculates raw and scaled scores according to official ORT standards:
+        - Raw score: 1 point per correct answer, 0 for incorrect/blank (starts at 0).
+        - If raw_score == 0: returns 0 scaled score and 0.0 percentile.
+        - Otherwise scales to 60-245 (full_main) or 60-150 (subject).
+        """
+        raw_score = max(0, int(correct_answers))
+        if total_questions <= 0 or raw_score == 0:
+            return {
+                "raw_score": 0,
+                "total_questions": total_questions,
+                "scaled_score": 0,
+                "percentile": 0.0,
+            }
+        scaled_score = cls.raw_to_scaled(raw_score, total_questions, exam_type=exam_type)
+        percentile = cls.calculate_percentile(scaled_score, exam_type=exam_type)
+        return {
+            "raw_score": raw_score,
+            "total_questions": total_questions,
+            "scaled_score": scaled_score,
+            "percentile": percentile,
+        }
 
     @classmethod
     def evaluate_test_submission(

@@ -20,6 +20,7 @@ import {
   Check,
 } from "lucide-react";
 import { getAuthHeader } from "@/lib/api";
+import { toast } from "@/components/ui/Toast";
 
 interface StudentItem {
   id: string;
@@ -76,27 +77,29 @@ export default function StudentsManagementPage() {
     }
   }, []);
 
-  // Fetch all published exams
+  // Fetch all exams from database
   const fetchExams = useCallback(async () => {
     try {
       const authHeader = await getAuthHeader();
-      const res = await fetch("/api/v1/exam-sets", {
+      // Dynamically query all records from the exams table (ORDER BY created_at DESC)
+      const res = await fetch("/api/v1/admin/exams", {
         headers: {
           ...authHeader,
         },
       });
       if (res.ok) {
         const data = await res.json();
-        // Explicitly include BOTH full_main AND subject published exams for access management
-        const lockableExams = (data as ExamSet[]).filter((e) => {
-          const isPublished = e.status === "published";
-          const isSubject = e.exam_type === "subject" || (e as any).type === "subject" || e.id.toLowerCase().includes("subject");
-          const isFullMain = e.exam_type === "full_main" || (!e.exam_type && !isSubject && !e.id.includes("practice"));
-          const isPractice = e.exam_type === "practice_bank" || (e as any).type === "fast_practice" || e.id.includes("practice_bank");
-
-          return isPublished && (isFullMain || isSubject) && !isPractice;
+        // Allow managing access for all exams (custom, full_main, subject)
+        setExams(data as ExamSet[]);
+      } else {
+        // Fallback to /api/v1/exam-sets if needed
+        const fallbackRes = await fetch("/api/v1/exam-sets", {
+          headers: { ...authHeader },
         });
-        setExams(lockableExams);
+        if (fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json();
+          setExams(fallbackData as ExamSet[]);
+        }
       }
     } catch (err) {
       console.error("Failed to load exams:", err);
@@ -187,9 +190,17 @@ export default function StudentsManagementPage() {
             : s
         )
       );
+
+      toast.success(
+        nextGranted
+          ? (lang === "ky" ? "Кирүү уруксаты берилди" : "Доступ к экзамену открыт")
+          : (lang === "ky" ? "Кирүү уруксаты жабылды" : "Доступ к экзамену закрыт")
+      );
     } catch (err: any) {
       console.error("Access toggle error:", err);
-      setActionError(err.message || "Failed to toggle access");
+      const errMsg = err.message || (lang === "ky" ? "Ката кетти" : "Не удалось обновить доступ");
+      setActionError(errMsg);
+      toast.error(errMsg);
     } finally {
       setTogglingExamId(null);
     }

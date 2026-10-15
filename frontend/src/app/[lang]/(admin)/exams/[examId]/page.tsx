@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import { getAuthHeader } from "@/lib/api";
+import { toast } from "@/components/ui/Toast";
 import {
   ArrowLeft,
   BookOpenCheck,
@@ -60,6 +61,8 @@ interface QuestionItem {
   option_d: string;
   option_e?: string | null;
   correct_option: string;
+  column_a?: string | null;
+  column_b?: string | null;
   passage_text?: string | null;
   image_url?: string | null;
   explanation?: string | null;
@@ -67,8 +70,8 @@ interface QuestionItem {
 }
 
 const SECTION_OPTIONS = [
-  { value: "math_1", ky: "Математика I", ru: "Математика I" },
-  { value: "math_2", ky: "Математика II (Салыштыруу)", ru: "Математика II (Сравнение)" },
+  { value: "math_1", ky: "Математика I (Салыштыруу)", ru: "Математика I (Сравнение)" },
+  { value: "math_2", ky: "Математика II", ru: "Математика II" },
   { value: "reading", ky: "Окуу жана түшүнүү", ru: "Чтение и понимание" },
   { value: "analogies", ky: "Аналогиялар", ru: "Аналогии" },
   { value: "grammar", ky: "Практикалык грамматика", ru: "Практическая грамматика" },
@@ -110,6 +113,8 @@ export default function ExamDeepDivePage({
   const [formTopic, setFormTopic] = useState("");
   const [formDifficulty, setFormDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [formStem, setFormStem] = useState("");
+  const [formColumnA, setFormColumnA] = useState("");
+  const [formColumnB, setFormColumnB] = useState("");
   const [formOptionA, setFormOptionA] = useState("");
   const [formOptionB, setFormOptionB] = useState("");
   const [formOptionC, setFormOptionC] = useState("");
@@ -163,6 +168,8 @@ export default function ExamDeepDivePage({
     setFormTopic("");
     setFormDifficulty("medium");
     setFormStem("");
+    setFormColumnA("");
+    setFormColumnB("");
     setFormOptionA("");
     setFormOptionB("");
     setFormOptionC("");
@@ -183,6 +190,8 @@ export default function ExamDeepDivePage({
     setFormTopic(q.topic);
     setFormDifficulty(q.difficulty);
     setFormStem(q.stem);
+    setFormColumnA(q.column_a || "");
+    setFormColumnB(q.column_b || "");
     setFormOptionA(q.option_a);
     setFormOptionB(q.option_b);
     setFormOptionC(q.option_c);
@@ -220,8 +229,9 @@ export default function ExamDeepDivePage({
 
       const data = await res.json();
       setFormImageUrl(data.imageUrl || data.url);
+      toast.success(lang === "ky" ? "Сүрөт ийгиликтүү жүктөлдү" : "Изображение успешно загружено");
     } catch (err: any) {
-      alert(err.message || "Image upload failed");
+      toast.error(err.message || (lang === "ky" ? "Сүрөт жүктөө катасы" : "Ошибка загрузки изображения"));
     } finally {
       setIsUploadingImage(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -242,6 +252,9 @@ export default function ExamDeepDivePage({
         difficulty: formDifficulty,
         exam_set_id: exam.id,
         stem: formStem.trim(),
+        // math_1 is always comparison; "" (not null) clears columns when a question leaves math_1
+        column_a: formSection === "math_1" ? formColumnA.trim() : "",
+        column_b: formSection === "math_1" ? formColumnB.trim() : "",
         option_a: formOptionA.trim(),
         option_b: formOptionB.trim(),
         option_c: formOptionC.trim(),
@@ -286,8 +299,13 @@ export default function ExamDeepDivePage({
 
       setIsModalOpen(false);
       await loadData();
+      toast.success(
+        editingQuestion
+          ? (lang === "ky" ? "Суроо ийгиликтүү жаңыланды" : "Вопрос успешно обновлен")
+          : (lang === "ky" ? "Жаңы суроо кошулду" : "Новый вопрос успешно добавлен")
+      );
     } catch (err: any) {
-      alert(err.message || "Failed to save question");
+      toast.error(err.message || (lang === "ky" ? "Суроону сактоо катасы" : "Ошибка сохранения вопроса"));
     } finally {
       setSaving(false);
     }
@@ -314,8 +332,9 @@ export default function ExamDeepDivePage({
       setExam((prev) => (prev ? { ...prev, totalQuestions: Math.max(0, (prev.totalQuestions || 1) - 1) } : null));
       setDeletingQuestion(null);
       await loadData();
+      toast.success(lang === "ky" ? "Суроо өчүрүлдү" : "Вопрос успешно удален");
     } catch (err: any) {
-      alert(err.message || "Failed to delete question");
+      toast.error(err.message || (lang === "ky" ? "Суроону өчүрүү катасы" : "Ошибка удаления вопроса"));
     } finally {
       setSaving(false);
     }
@@ -617,6 +636,11 @@ export default function ExamDeepDivePage({
                           <MathRenderer content={q.stem} />
                         </div>
                         <div className="flex items-center gap-2 mt-1">
+                          {(q.column_a || q.column_b) && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
+                              Колонка А/Б
+                            </span>
+                          )}
                           {q.passage_text && (
                             <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200">
                               <FileText className="w-2.5 h-2.5" />
@@ -765,14 +789,79 @@ export default function ExamDeepDivePage({
                 ) : (
                   <textarea
                     rows={3}
-                    required
-                    placeholder="мис: Эгер $2x + 4 = 10$ болсо, $x$ тапкыла..."
+                    placeholder={
+                      formColumnA || formColumnB
+                        ? (lang === "ky" ? "Шарт / кошумча маалымат (опционал)..." : "Условие / дополнительная информация (опционально)...")
+                        : "мис: Эгер $2x + 4 = 10$ болсо, $x$ тапкыла..."
+                    }
                     value={formStem}
                     onChange={(e) => setFormStem(e.target.value)}
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   />
                 )}
               </div>
+
+              {/* math_1 = Quantitative Comparison: Column A vs Column B (only shown for math_1) */}
+              {formSection === "math_1" && (
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <span className="font-bold text-slate-800 text-xs block">
+                      {lang === "ky" ? "Сандык салыштыруу (Колонка А жана Б):" : "Количественное сравнение (Колонка А и Б):"}
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      {lang === "ky" ? "Эгер бул салыштыруу суроосу болсо, чоңдуктарды жазыңыз" : "Если это вопрос на сравнение, заполните величины для обеих колонок"}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (lang === "ky") {
+                        setFormOptionA("КОЛОНКА А чоңураак");
+                        setFormOptionB("КОЛОНКА Б чоңураак");
+                        setFormOptionC("Эки чоңдук барабар");
+                        setFormOptionD("Маалымат жетишсиз");
+                      } else {
+                        setFormOptionA("КОЛОНКА А больше");
+                        setFormOptionB("КОЛОНКА Б больше");
+                        setFormOptionC("Величины равны");
+                        setFormOptionD("Недостаточно информации для определения");
+                      }
+                    }}
+                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-100 transition self-start sm:self-auto cursor-pointer"
+                  >
+                    {lang === "ky" ? "Стандарттык жоопторду толтуруу (A-D)" : "Заполнить стандартные ответы (A-D)"}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                      {lang === "ky" ? "КОЛОНКА А" : "КОЛОНКА А"}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="мис: $2x + 5$"
+                      value={formColumnA}
+                      onChange={(e) => setFormColumnA(e.target.value)}
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none text-xs text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                      {lang === "ky" ? "КОЛОНКА Б" : "КОЛОНКА Б"}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="мис: $3x - 1$"
+                      value={formColumnB}
+                      onChange={(e) => setFormColumnB(e.target.value)}
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none text-xs text-slate-900"
+                    />
+                  </div>
+                </div>
+              </div>
+              )}
 
               {/* Options A-D + E */}
               <div className="space-y-2">
@@ -791,7 +880,7 @@ export default function ExamDeepDivePage({
                         <span className="font-mono font-bold text-slate-500 px-1">{opt}</span>
                         <input
                           type="text"
-                          required
+                          required={formSection !== "math_1"}
                           value={val}
                           onChange={(e) => setter(e.target.value)}
                           placeholder={`Вариант ${opt}`}
@@ -919,11 +1008,14 @@ export default function ExamDeepDivePage({
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-xs transition disabled:opacity-50"
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-xs transition disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
                 >
-                  {saving
-                    ? (lang === "ky" ? "Сакталууда..." : "Сохранение...")
-                    : (lang === "ky" ? "Сактоо" : "Сохранить")}
+                  {saving && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                  <span>
+                    {saving
+                      ? (lang === "ky" ? "Сакталууда..." : "Сохранение...")
+                      : (lang === "ky" ? "Сактоо" : "Сохранить")}
+                  </span>
                 </button>
               </div>
             </form>
@@ -958,9 +1050,10 @@ export default function ExamDeepDivePage({
                 type="button"
                 onClick={handleDeleteQuestion}
                 disabled={saving}
-                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs transition disabled:opacity-50"
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs transition disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
               >
-                {saving ? (lang === "ky" ? "Өчүрүлүүдө..." : "Удаление...") : (lang === "ky" ? "Өчүрүү" : "Удалить")}
+                {saving && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                <span>{saving ? (lang === "ky" ? "Өчүрүлүүдө..." : "Удаление...") : (lang === "ky" ? "Өчүрүү" : "Удалить")}</span>
               </button>
             </div>
           </div>

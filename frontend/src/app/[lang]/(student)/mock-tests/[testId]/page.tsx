@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback, Suspense } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/context";
+import { useAuth } from "@/lib/auth-context";
 import { ExamTimer } from "@/components/exam/ExamTimer";
-import { QuestionPalette } from "@/components/exam/QuestionPalette";
 import { QuestionCard } from "@/components/exam/QuestionCard";
 import { MathRenderer } from "@/components/math/MathRenderer";
+import { NumberedPassage } from "@/components/exam/NumberedPassage";
 import {
   ArrowLeft,
   ArrowRight,
@@ -24,14 +25,24 @@ import {
   RefreshCw,
   Award,
   Lock,
+  Save,
+  Bookmark,
+  EyeOff,
+  Scale,
+  ChevronUp,
+  MapPin,
+  X,
 } from "lucide-react";
 import { getAuthHeader } from "@/lib/api";
+import { toast } from "@/components/ui/Toast";
 
 interface QuestionItem {
   id: string;
   section: string;
   topic: string;
   stem: string;
+  column_a?: string | null;
+  column_b?: string | null;
   option_a: string;
   option_b: string;
   option_c: string;
@@ -70,21 +81,23 @@ interface MockTestFinalResult {
 const STRICT_SECTION_ORDER = [
   "math_1",
   "math_2",
-  "reading",
   "analogies",
+  "reading",
   "grammar",
   "chemistry",
   "biology",
   "physics",
+  "advanced_math",
   "history",
   "english",
+  "native_language",
 ];
 
 const DEFAULT_SECTIONS: SectionItem[] = [
-  { section: "math_1", questionCount: 30, timeLimitMinutes: 30 },
-  { section: "math_2", questionCount: 30, timeLimitMinutes: 30 },
-  { section: "reading", questionCount: 30, timeLimitMinutes: 45 },
+  { section: "math_1", questionCount: 30, timeLimitMinutes: 45 },
+  { section: "math_2", questionCount: 30, timeLimitMinutes: 45 },
   { section: "analogies", questionCount: 30, timeLimitMinutes: 30 },
+  { section: "reading", questionCount: 30, timeLimitMinutes: 60 },
   { section: "grammar", questionCount: 30, timeLimitMinutes: 35 },
 ];
 
@@ -93,6 +106,23 @@ function ExamRunnerContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { lang, t } = useTranslation();
+  const { userProfile, user } = useAuth();
+  const studentName = userProfile?.displayName || user?.displayName || (lang === "ky" ? "Студент" : "Студент");
+
+  // Popover question grid open state
+  const [isGridOpen, setIsGridOpen] = useState(false);
+
+  // Close grid popover on Escape key
+  useEffect(() => {
+    if (!isGridOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsGridOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isGridOpen]);
 
   const testId = (params?.testId as string) || "ort_main_standard";
   const pinParam = searchParams.get("pin");
@@ -110,7 +140,7 @@ function ExamRunnerContent() {
   const [examType, setExamType] = useState<string>("full_main");
   const [examTitle, setExamTitle] = useState<string>("");
   const [examTimeLimitMinutes, setExamTimeLimitMinutes] = useState<number | null>(null);
-  const [totalTimeSeconds, setTotalTimeSeconds] = useState<number>(170 * 60);
+  const [totalTimeSeconds, setTotalTimeSeconds] = useState<number>(215 * 60);
 
   const isSubjectTest = useMemo(() => {
     return examType === "subject" || testId.toLowerCase().includes("subject");
@@ -136,17 +166,38 @@ function ExamRunnerContent() {
   const [isSubmittingFinal, setIsSubmittingFinal] = useState(false);
   const [finalResult, setFinalResult] = useState<MockTestFinalResult | null>(null);
 
+  // Timer Expiration & Auto-submit modal state
+  const [isTimeExpiredModalOpen, setIsTimeExpiredModalOpen] = useState(false);
+
+  // Save and Exit & Debounced auto-save state
+  const [isSavingAndExiting, setIsSavingAndExiting] = useState(false);
+  const remainingSecondsRef = useRef<number>(215 * 60);
+  const [customRemainingSeconds, setCustomRemainingSeconds] = useState<number | null>(null);
+  const debounceSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Visual elimination/strike-through of options
+  const [eliminatedOptions, setEliminatedOptions] = useState<Record<string, Record<string, boolean>>>({});
+  const toggleEliminate = (questionId: string, optId: string) => {
+    setEliminatedOptions((prev) => ({
+      ...prev,
+      [questionId]: {
+        ...(prev[questionId] || {}),
+        [optId]: !prev[questionId]?.[optId],
+      },
+    }));
+  };
+
   // Section names dictionary
   const getSectionName = (secCode: string) => {
     switch (secCode) {
       case "math_1":
         return lang === "ky" ? "1-Бөлүм: Математика I" : "Раздел 1: Математика I";
       case "math_2":
-        return lang === "ky" ? "2-Бөлүм: Математика II (Салыштыруу)" : "Раздел 2: Математика II (Сравнение)";
-      case "reading":
-        return lang === "ky" ? "3-Бөлүм: Окуу жана түшүнүү" : "Раздел 3: Чтение и понимание";
+        return lang === "ky" ? "2-Бөлүм: Математика II" : "Раздел 2: Математика II";
       case "analogies":
-        return lang === "ky" ? "4-Бөлүм: Аналогиялар" : "Раздел 4: Аналогии";
+        return lang === "ky" ? "3-Бөлүм: Аналогиялар жана сүйлөмдү толуктоо" : "Раздел 3: Аналогии и дополнение предложений";
+      case "reading":
+        return lang === "ky" ? "4-Бөлүм: Окуу жана түшүнүү" : "Раздел 4: Чтение и понимание текста";
       case "grammar":
         return lang === "ky" ? "5-Бөлүм: Практикалык грамматика" : "Раздел 5: Практическая грамматика";
       case "chemistry":
@@ -155,10 +206,14 @@ function ExamRunnerContent() {
         return lang === "ky" ? "Биология" : "Биология";
       case "physics":
         return lang === "ky" ? "Физика" : "Физика";
+      case "advanced_math":
+        return lang === "ky" ? "Профилдик математика" : "Профильная математика";
       case "history":
         return lang === "ky" ? "Тарых" : "История";
       case "english":
         return lang === "ky" ? "Англис тили" : "Английский язык";
+      case "native_language":
+        return lang === "ky" ? "Кыргыз тили жана адабияты" : "Русский язык и литература";
       default:
         return secCode;
     }
@@ -169,11 +224,19 @@ function ExamRunnerContent() {
     async (customPin?: string) => {
       const activePin =
         customPin !== undefined ? customPin : (pinParam || undefined);
+      const isForceNew =
+        searchParams.get("force_new") === "true" || searchParams.get("retake") === "true";
 
       try {
         setLoadingSession(true);
         setSessionError(null);
         setAccessDenied(null);
+
+        if (isForceNew) {
+          try {
+            localStorage.removeItem(`ort_active_attempt_${testId}`);
+          } catch {}
+        }
 
         const authHeader = await getAuthHeader();
         const res = await fetch("/api/v1/mock-tests/start", {
@@ -187,6 +250,7 @@ function ExamRunnerContent() {
             language: lang,
             access_code: activePin || undefined,
             pin: activePin || undefined,
+            force_new: isForceNew,
           }),
         });
 
@@ -247,13 +311,55 @@ function ExamRunnerContent() {
         setPinError(null);
         setAttemptId(data.attemptId);
 
-        // Hydrate locally cached answers or backend answers
+        // Hydrate locally cached answers or backend answers (Anti-Data Loss & Resume)
         try {
-          const cached = localStorage.getItem(`ort_attempt_answers_${data.attemptId}`);
-          if (cached) {
-            setAnswers(JSON.parse(cached));
-          } else if (data.answers) {
-            setAnswers(data.answers);
+          if (isForceNew) {
+            setAnswers(data.answers || {});
+            setCurrentIndex(0);
+            setCurrentSectionIndex(0);
+          } else {
+            const activeCached = localStorage.getItem(`ort_active_attempt_${testId}`);
+            const attemptCached = localStorage.getItem(`ort_attempt_answers_${data.attemptId}`);
+            let hydrated = false;
+
+            if (activeCached) {
+              const parsed = JSON.parse(activeCached);
+              if (parsed.answers && Object.keys(parsed.answers).length > 0) {
+                setAnswers(parsed.answers);
+                if (typeof parsed.currentIndex === "number") {
+                  setCurrentIndex(parsed.currentIndex);
+                }
+                if (typeof parsed.currentSectionIndex === "number") {
+                  setCurrentSectionIndex(parsed.currentSectionIndex);
+                }
+                if (typeof parsed.remainingTimeSeconds === "number" && parsed.remainingTimeSeconds > 0) {
+                  setTotalTimeSeconds(parsed.remainingTimeSeconds);
+                  remainingSecondsRef.current = parsed.remainingTimeSeconds;
+                  setCustomRemainingSeconds(parsed.remainingTimeSeconds);
+                }
+                hydrated = true;
+              }
+            }
+
+            if (!hydrated) {
+              if (attemptCached) {
+                setAnswers(JSON.parse(attemptCached));
+              } else if (data.answers && Object.keys(data.answers).length > 0) {
+                setAnswers(data.answers);
+              }
+
+              if (typeof data.currentSectionIndex === "number") {
+                setCurrentSectionIndex(data.currentSectionIndex);
+              }
+              if (typeof data.currentIndex === "number") {
+                setCurrentIndex(data.currentIndex);
+              }
+              if (typeof data.remainingTimeSeconds === "number" && data.remainingTimeSeconds > 0) {
+                setTotalTimeSeconds(data.remainingTimeSeconds);
+                remainingSecondsRef.current = data.remainingTimeSeconds;
+                setCustomRemainingSeconds(data.remainingTimeSeconds);
+              }
+            }
           }
         } catch (e) {
           console.warn("Error hydrating cached answers:", e);
@@ -345,7 +451,7 @@ function ExamRunnerContent() {
         setLoadingSession(false);
       }
     },
-    [testId, lang, pinParam]
+    [testId, lang, pinParam, searchParams]
   );
 
   useEffect(() => {
@@ -374,14 +480,120 @@ function ExamRunnerContent() {
   const isFinalSection = isSubjectTest || currentSectionIndex >= sections.length - 1;
   const nextSection = !isFinalSection ? sections[currentSectionIndex + 1] : null;
 
-  // Bluebook conditional layout check
-  const hasRichContent = Boolean(
-    currentQuestion && (currentQuestion.passage_text || currentQuestion.image_url)
+  // Overall question count & progress calculations
+  const totalQuestionsCount = useMemo(() => {
+    let count = 0;
+    for (const key in questionsBySection) {
+      count += questionsBySection[key]?.length || 0;
+    }
+    return count;
+  }, [questionsBySection]);
+
+  const answeredCount = useMemo(() => {
+    return Object.values(answers).filter((a) => Boolean(a?.selectedOptionId)).length;
+  }, [answers]);
+
+  const progressPercentage = useMemo(() => {
+    if (!totalQuestionsCount) return 0;
+    return Math.min(100, Math.round((answeredCount / totalQuestionsCount) * 100));
+  }, [answeredCount, totalQuestionsCount]);
+
+  // Immediate localStorage persistence on answer or index change (Anti-Data Loss)
+  useEffect(() => {
+    if (!attemptId || finalResult) return;
+    try {
+      const activeState = {
+        attemptId,
+        testId,
+        answers,
+        currentSectionIndex,
+        currentIndex,
+        timestamp: Date.now(),
+      };
+      localStorage.setItem(`ort_active_attempt_${testId}`, JSON.stringify(activeState));
+      localStorage.setItem(`ort_attempt_answers_${attemptId}`, JSON.stringify(answers));
+    } catch (e) {
+      console.warn("Failed to persist exam state to localStorage:", e);
+    }
+  }, [attemptId, testId, answers, currentSectionIndex, currentIndex, finalResult]);
+
+  // BeforeUnload navigation guard while exam is active
+  useEffect(() => {
+    if (!attemptId || finalResult) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+      return "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [attemptId, finalResult]);
+
+  // Bluebook conditional layout check: ONLY split into 2 columns if passage, image, or comparison
+  const isSplitScreen = Boolean(
+    currentQuestion && (
+      Boolean(currentQuestion.passage_text) ||
+      Boolean(currentQuestion.image_url) ||
+      Boolean(currentQuestion.column_a || currentQuestion.column_b)
+    )
   );
 
-  // Batch sync answers to backend
+  // Extract clean stem text
+  const stemText = useMemo(() => {
+    if (!currentQuestion) return "";
+    const s = currentQuestion.stem;
+    if (typeof s === "object" && s !== null) {
+      return lang === "ky" ? (s as any).ky : (s as any).ru;
+    }
+    return String(s || "").trim();
+  }, [currentQuestion, lang]);
+
+  // Extract options for currentQuestion (standard or comparison)
+  const currentOptions = useMemo(() => {
+    if (!currentQuestion) return [];
+    const q = currentQuestion;
+
+    const defaultComparisonTexts: Record<string, { ky: string; ru: string }> = {
+      A: { ky: "КОЛОНКА А чоңураак", ru: "Значение в Колонке А больше" },
+      B: { ky: "КОЛОНКА Б чоңураак", ru: "Значение в Колонке Б больше" },
+      C: { ky: "Эки чоңдук барабар", ru: "Величины равны" },
+      D: { ky: "Маалымат жетишсиз", ru: "Недостаточно информации для определения" },
+    };
+
+    const isComparison = Boolean(q.column_a || q.column_b);
+
+    if (isComparison) {
+      if (q.option_a || q.option_b || q.option_c || q.option_d) {
+        return [
+          { id: "A", text: q.option_a || (lang === "ky" ? defaultComparisonTexts.A.ky : defaultComparisonTexts.A.ru) },
+          { id: "B", text: q.option_b || (lang === "ky" ? defaultComparisonTexts.B.ky : defaultComparisonTexts.B.ru) },
+          { id: "C", text: q.option_c || (lang === "ky" ? defaultComparisonTexts.C.ky : defaultComparisonTexts.C.ru) },
+          { id: "D", text: q.option_d || (lang === "ky" ? defaultComparisonTexts.D.ky : defaultComparisonTexts.D.ru) },
+          ...(q.option_e ? [{ id: "E", text: q.option_e }] : []),
+        ];
+      }
+      return ["A", "B", "C", "D"].map((id) => ({
+        id,
+        text: lang === "ky" ? defaultComparisonTexts[id].ky : defaultComparisonTexts[id].ru,
+      }));
+    }
+
+    return [
+      { id: "A", text: q.option_a || "" },
+      { id: "B", text: q.option_b || "" },
+      { id: "C", text: q.option_c || "" },
+      { id: "D", text: q.option_d || "" },
+      ...(q.option_e ? [{ id: "E", text: q.option_e }] : []),
+    ].filter((o) => Boolean(o.text));
+  }, [currentQuestion, lang]);
+
+  // Batch sync answers & progress to backend
   const batchSyncAnswers = async () => {
-    if (!attemptId) return;
+    if (!attemptId || finalResult) return;
     try {
       const authHeader = await getAuthHeader();
       await fetch(`/api/v1/mock-tests/${attemptId}/save`, {
@@ -390,10 +602,119 @@ function ExamRunnerContent() {
           "Content-Type": "application/json",
           ...authHeader,
         },
-        body: JSON.stringify({ answers }),
+        body: JSON.stringify({
+          answers,
+          currentSectionIndex,
+          remainingTimeSeconds: remainingSecondsRef.current || totalTimeSeconds,
+          isFinal: false,
+          is_final: false,
+        }),
       });
     } catch (e) {
       console.warn("Batch sync failed:", e);
+    }
+  };
+
+  // Debounced auto-save to backend whenever answers change
+  useEffect(() => {
+    if (!attemptId || finalResult || Object.keys(answers).length === 0) return;
+
+    if (debounceSaveTimeoutRef.current) {
+      clearTimeout(debounceSaveTimeoutRef.current);
+    }
+
+    debounceSaveTimeoutRef.current = setTimeout(async () => {
+      try {
+        const authHeader = await getAuthHeader();
+        await fetch(`/api/v1/mock-tests/${attemptId}/save`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeader,
+          },
+          body: JSON.stringify({
+            answers,
+            currentSectionIndex,
+            remainingTimeSeconds: remainingSecondsRef.current || totalTimeSeconds,
+            isFinal: false,
+            is_final: false,
+          }),
+        });
+      } catch (e) {
+        console.warn("Auto-save sync to backend failed:", e);
+      }
+    }, 1200);
+
+    return () => {
+      if (debounceSaveTimeoutRef.current) {
+        clearTimeout(debounceSaveTimeoutRef.current);
+      }
+    };
+  }, [answers, attemptId, currentSectionIndex, totalTimeSeconds, finalResult]);
+
+  // Handle Save and Exit: saves answers + remaining time and navigates to mock-tests
+  const handleSaveAndExit = async () => {
+    if (!attemptId) {
+      router.push(`/${lang}/mock-tests`);
+      return;
+    }
+
+    setIsSavingAndExiting(true);
+    try {
+      const authHeader = await getAuthHeader();
+      const payload = {
+        answers,
+        currentSectionIndex,
+        remainingTimeSeconds: remainingSecondsRef.current || totalTimeSeconds,
+        isFinal: false,
+        is_final: false,
+      };
+      console.log("Saving payload:", payload);
+
+      // Immediate local state persistence
+      try {
+        localStorage.setItem(
+          `ort_active_attempt_${testId}`,
+          JSON.stringify({
+            attemptId,
+            testId,
+            answers,
+            currentSectionIndex,
+            currentIndex,
+            remainingTimeSeconds: remainingSecondsRef.current,
+            timestamp: Date.now(),
+          })
+        );
+        localStorage.setItem(`ort_attempt_answers_${attemptId}`, JSON.stringify(answers));
+      } catch (e) {
+        console.warn("Failed to cache to localStorage on exit:", e);
+      }
+
+      await fetch(`/api/v1/mock-tests/${attemptId}/save`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeader,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      toast.success(
+        lang === "ky"
+          ? "Сиздин прогрессиңиз ийгиликтүү сакталды!"
+          : "Ваш прогресс успешно сохранен!"
+      );
+      router.refresh();
+      router.push(`/${lang}/mock-tests`);
+    } catch (err) {
+      console.error("Save & Exit error:", err);
+      toast.error(
+        lang === "ky"
+          ? "Сактоодо ката кетти. Кайра аракет кылыңыз."
+          : "Ошибка при сохранении. Попробуйте еще раз."
+      );
+    } finally {
+      setIsSavingAndExiting(false);
     }
   };
 
@@ -460,6 +781,7 @@ function ExamRunnerContent() {
       // High-concurrency batch sync before switching section
       await batchSyncAnswers();
       // Move to next section
+      setCustomRemainingSeconds(null);
       setCurrentSectionIndex((prev) => prev + 1);
       setCurrentIndex(0);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -467,18 +789,31 @@ function ExamRunnerContent() {
   };
 
   // Final Exam Submission
-  const handleSubmitFinalTest = async () => {
+  const handleSubmitFinalTest = async (isAutoSubmit = false) => {
     if (isSubmittingFinal) return;
+    if (debounceSaveTimeoutRef.current) {
+      clearTimeout(debounceSaveTimeoutRef.current);
+      debounceSaveTimeoutRef.current = null;
+    }
     setIsSubmittingFinal(true);
     try {
       const authHeader = await getAuthHeader();
+      const payload = {
+        answers,
+        currentSectionIndex,
+        remainingTimeSeconds: 0,
+        isFinal: true,
+        is_final: true,
+      };
+      console.log("Submitting payload:", payload);
+
       const res = await fetch(`/api/v1/mock-tests/${attemptId}/submit`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...authHeader,
         },
-        body: JSON.stringify({ answers }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -488,15 +823,43 @@ function ExamRunnerContent() {
       const result = await res.json();
       // Clear localStorage cache on successful test submission
       try {
+        localStorage.removeItem(`ort_active_attempt_${testId}`);
         localStorage.removeItem(`ort_attempt_answers_${attemptId}`);
         sessionStorage.setItem(`ort_result_${testId}`, JSON.stringify(result));
       } catch {}
       setFinalResult(result);
+      setIsTimeExpiredModalOpen(false);
+      router.refresh();
+      toast.success(
+        lang === "ky"
+          ? "Экзамен ийгиликтүү аяктады жана бааланды!"
+          : "Экзамен успешно завершен и проверен!"
+      );
     } catch (err: any) {
-      alert(err.message || "Submission failed");
+      console.error("Submit test error:", err);
+      if (isAutoSubmit) {
+        try {
+          await batchSyncAnswers();
+        } catch {}
+        setIsTimeExpiredModalOpen(false);
+        toast.error(
+          lang === "ky"
+            ? "Убакыт бүттү. Жыйынтыктар сакталды."
+            : "Время вышло. Результаты сохранены."
+        );
+        router.push(`/${lang}/dashboard`);
+      } else {
+        toast.error(err.message || (lang === "ky" ? "Жөнөтүү катасы" : "Ошибка отправки теста"));
+      }
     } finally {
       setIsSubmittingFinal(false);
     }
+  };
+
+  // Dedicated Auto-submit handler triggered when timer expires (00:00)
+  const handleTimeExpiredAutoSubmit = async () => {
+    setIsTimeExpiredModalOpen(true);
+    await handleSubmitFinalTest(true);
   };
 
   // PIN Access Code Required Screen
@@ -751,20 +1114,146 @@ function ExamRunnerContent() {
             >
               {lang === "ky" ? "Каталарды талдоо" : "Разбор ошибок"}
             </Link>
-            <Link
-              href={`/${lang}/mock-tests`}
-              className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition"
+            <button
+              onClick={() => {
+                router.refresh();
+                router.push(`/${lang}/mock-tests`);
+              }}
+              className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer"
             >
               {lang === "ky" ? "Сыноо тесттерге кайтуу" : "К списку тестов"}
-            </Link>
+            </button>
           </div>
         </div>
       </div>
     );
   }
 
+  // Question Header Component (Teacher topic slugs removed)
+  const renderQuestionHeader = () => (
+    <div className="flex items-center justify-between border-b border-slate-200/60 pb-3.5">
+      <div className="flex items-center gap-2.5">
+        <span className="px-3 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-sans font-bold text-xs uppercase tracking-wide">
+          {t("exam.question")} {currentIndex + 1} {t("exam.of")} {activeQuestions.length}
+        </span>
+      </div>
+
+      <button
+        type="button"
+        onClick={handleToggleFlag}
+        disabled={isTimeExpiredModalOpen}
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-sans font-semibold border transition-all cursor-pointer ${
+          answers[currentQuestion?.id]?.flagged
+            ? "bg-amber-100 border-amber-300 text-amber-800"
+            : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+        }`}
+      >
+        <Bookmark className={`w-3.5 h-3.5 ${answers[currentQuestion?.id]?.flagged ? "fill-amber-600 text-amber-600" : ""}`} />
+        <span>{answers[currentQuestion?.id]?.flagged ? t("exam.unflag") : t("exam.flagForReview")}</span>
+      </button>
+    </div>
+  );
+
+  // Compact Option Buttons Component (Bluebook typography and styling)
+  const renderOptions = () => (
+    <div className="pt-1">
+      {currentOptions.map((opt) => {
+        const isSelected = answers[currentQuestion?.id]?.selectedOptionId === opt.id;
+        const isEliminated = Boolean(eliminatedOptions[currentQuestion?.id]?.[opt.id]);
+        const isComparison = Boolean(currentQuestion?.column_a || currentQuestion?.column_b);
+
+        return (
+          <div
+            key={opt.id}
+            onClick={() => {
+              if (isTimeExpiredModalOpen || isSubmittingFinal) return;
+              if (isEliminated) {
+                toggleEliminate(currentQuestion.id, opt.id);
+              }
+              handleSelectOption(opt.id);
+            }}
+            className={`flex items-center justify-between w-full py-3 px-4 gap-3 mb-2 rounded-xl border text-left transition-all cursor-pointer ${
+              isEliminated
+                ? "opacity-40 line-through bg-slate-50 border-slate-200 text-slate-400"
+                : isSelected
+                ? "border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-500 font-medium text-slate-900 shadow-xs"
+                : "border-slate-200 hover:border-indigo-300 bg-white text-slate-800 hover:bg-slate-50/50"
+            }`}
+          >
+            <div className="flex items-center gap-3 flex-1 min-w-0 pr-2">
+              <span
+                className={`w-7 h-7 rounded-full flex items-center justify-center font-sans font-semibold text-sm shrink-0 transition-colors ${
+                  isEliminated
+                    ? "bg-slate-200 text-slate-500"
+                    : isSelected
+                    ? "bg-indigo-600 text-white shadow-xs"
+                    : "bg-slate-100 border border-slate-200 text-slate-700"
+                }`}
+              >
+                {opt.id}
+              </span>
+              <div className={`flex-1 font-serif text-gray-900 leading-relaxed text-base ${isEliminated ? "line-through text-slate-400" : ""}`}>
+                <MathRenderer content={opt.text} />
+              </div>
+            </div>
+
+            {isComparison && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleEliminate(currentQuestion.id, opt.id);
+                }}
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ${
+                  isEliminated
+                    ? "text-slate-700 bg-slate-200/80 hover:bg-slate-300"
+                    : "text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                }`}
+                title={
+                  isEliminated
+                    ? (lang === "ky" ? "Вариантты кайтаруу" : "Восстановить вариант")
+                    : (lang === "ky" ? "Вариантты чийип салуу" : "Исключить вариант (зачеркнуть)")
+                }
+                aria-label={lang === "ky" ? "Вариантты чийип салуу" : "Исключить вариант"}
+              >
+                <EyeOff className={`w-3.5 h-3.5 ${isEliminated ? "stroke-[2.5]" : ""}`} />
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+
   return (
-    <div className="space-y-6 pb-16">
+    <div className="h-auto lg:h-[calc(100vh-80px)] overflow-y-auto lg:overflow-hidden flex flex-col pb-24 relative">
+      {/* TIME EXPIRED NON-DISMISSIBLE MODAL */}
+      {isTimeExpiredModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in select-none">
+          <div className="bg-white w-full max-w-md rounded-3xl p-8 text-center space-y-5 shadow-2xl border border-slate-100">
+            <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200">
+              <Clock className="w-8 h-8 animate-pulse" />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold text-slate-900 font-sans">
+                {lang === "ky" ? "Убакыт бүттү" : "Время вышло"}
+              </h3>
+              <p className="text-sm text-slate-600 font-sans leading-relaxed">
+                {lang === "ky"
+                  ? "Убакыт бүттү. Жыйынтыктар сакталууда..."
+                  : "Время вышло. Сохранение результатов..."}
+              </p>
+            </div>
+
+            <div className="flex items-center justify-center gap-2 text-indigo-600 font-medium text-xs font-sans pt-2">
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              <span>{lang === "ky" ? "Сураныч, күтө туруңуз..." : "Пожалуйста, подождите..."}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* STATIC MANUAL SECTION TRANSITION INTERSTITIAL MODAL (Hidden for Subject Tests) */}
       {!isSubjectTest && isTransitioning && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in">
@@ -848,249 +1337,427 @@ function ExamRunnerContent() {
       )}
 
       {/* TOP CBT EXAM BAR */}
-      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200/80 px-6 py-3.5 shadow-xs flex items-center justify-between gap-4">
-        {/* Section title & progress */}
-        <div className="flex items-center gap-3">
-          <span className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">
-            <Layers className="w-4 h-4" />
-          </span>
-          <div>
-            <span className="text-xs font-bold text-slate-900 block">
-              {isSubjectTest
-                ? (examTitle || (lang === "ky" ? "Предметтик тест" : "Предметный тест"))
-                : getSectionName(activeSection.section)}
+      <div className="shrink-0 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden mb-4">
+        <div className="px-5 py-3 flex items-center justify-between gap-4">
+          {/* Section title & progress */}
+          <div className="flex items-center gap-3">
+            <span className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
+              <Layers className="w-4 h-4" />
             </span>
-            <span className="text-[11px] text-slate-400">
-              {isSubjectTest
-                ? `${activeQuestions.length} ${lang === "ky" ? "суроо" : "вопросов"}`
-                : `${currentSectionIndex + 1} / ${sections.length} ${lang === "ky" ? "бөлүм" : "раздел"}`}
-            </span>
+            <div>
+              <span className="text-xs font-bold text-slate-900 block">
+                {isSubjectTest
+                  ? (examTitle || (lang === "ky" ? "Предметтик тест" : "Предметный тест"))
+                  : getSectionName(activeSection.section)}
+              </span>
+              <span className="text-[11px] text-slate-400">
+                {isSubjectTest
+                  ? `${answeredCount} / ${activeQuestions.length} ${lang === "ky" ? "жооп берилди" : "отвечено"}`
+                  : `${currentSectionIndex + 1} / ${sections.length} ${lang === "ky" ? "бөлүм" : "раздел"} • ${answeredCount} / ${totalQuestionsCount} ${lang === "ky" ? "жооп берилди" : "отвечено"}`}
+              </span>
+            </div>
+          </div>
+
+          {/* Timer & Action buttons */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* "Сохранить и выйти" (Save and Exit) Button */}
+            <button
+              type="button"
+              onClick={handleSaveAndExit}
+              disabled={isSavingAndExiting}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+              title={lang === "ky" ? "Сактоо жана чыгуу" : "Сохранить и выйти"}
+            >
+              {isSavingAndExiting ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+              ) : (
+                <Save className="w-3.5 h-3.5 text-slate-600" />
+              )}
+              <span className="hidden sm:inline">
+                {lang === "ky" ? "Сактоо жана чыгуу" : "Сохранить и выйти"}
+              </span>
+            </button>
+
+            <ExamTimer
+              key={
+                isSubjectTest
+                  ? `timer_global_${attemptId}`
+                  : `timer_${activeSection?.section}_${customRemainingSeconds ?? "default"}`
+              }
+              initialSeconds={
+                customRemainingSeconds !== null
+                  ? customRemainingSeconds
+                  : isSubjectTest
+                  ? (examTimeLimitMinutes ? examTimeLimitMinutes * 60 : (totalTimeSeconds || 60 * 60))
+                  : (activeSection?.timeLimitMinutes > 0 ? activeSection.timeLimitMinutes * 60 : null)
+              }
+              onTimeExpired={handleTimeExpiredAutoSubmit}
+              onTick={(sec) => {
+                remainingSecondsRef.current = sec;
+              }}
+            />
+
+            <button
+              onClick={() => {
+                if (isSubjectTest || isFinalSection) {
+                  handleSubmitFinalTest(false);
+                } else {
+                  handleSectionTimeExpiredOrFinish();
+                }
+              }}
+              disabled={isSubmittingFinal || isTimeExpiredModalOpen}
+              className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+            >
+              {isSubmittingFinal ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              )}
+              <span>
+                {isSubjectTest || isFinalSection
+                  ? lang === "ky"
+                    ? "Экзаменди аяктоо"
+                    : "Завершить тест"
+                  : lang === "ky"
+                  ? "Бөлүмдү тапшыруу"
+                  : "Завершить раздел"}
+              </span>
+            </button>
           </div>
         </div>
 
-        {/* Timer */}
-        <div className="flex items-center gap-3">
-          <ExamTimer
-            key={isSubjectTest ? `timer_global_${attemptId}` : `timer_${activeSection.section}`}
-            initialSeconds={
-              isSubjectTest
-                ? (examTimeLimitMinutes ? examTimeLimitMinutes * 60 : (totalTimeSeconds || 60 * 60))
-                : (activeSection.timeLimitMinutes > 0 ? activeSection.timeLimitMinutes * 60 : null)
-            }
-            onTimeExpired={isSubjectTest ? handleSubmitFinalTest : handleSectionTimeExpiredOrFinish}
+        {/* Thin progress bar */}
+        <div className="w-full bg-slate-100 h-1 overflow-hidden">
+          <div
+            className="h-1 bg-indigo-600 transition-all duration-300 ease-out"
+            style={{ width: `${progressPercentage}%` }}
           />
-
-          <button
-            onClick={isSubjectTest ? handleSubmitFinalTest : handleSectionTimeExpiredOrFinish}
-            disabled={isSubmittingFinal}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer disabled:opacity-50"
-          >
-            {isSubmittingFinal ? (
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            )}
-            <span>
-              {isSubjectTest || isFinalSection
-                ? lang === "ky"
-                  ? "Экзаменди аяктоо"
-                  : "Завершить тест"
-                : lang === "ky"
-                ? "Бөлүмдү тапшыруу"
-                : "Завершить раздел"}
-            </span>
-          </button>
         </div>
       </div>
 
-      {/* BLUEBOOK CONDITIONAL EXAM AREA */}
-      {hasRichContent ? (
-        /* 50/50 SPLIT-SCREEN LAYOUT FOR PASSAGE / IMAGE QUESTIONS */
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left Column: Reading Passage & Image (Independent Scroll) */}
-          <div className="lg:col-span-6 space-y-4 max-h-[calc(100vh-170px)] overflow-y-auto pr-1">
-            {/* Diagram Image if available */}
-            {currentQuestion.image_url && (
-              <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
-                <div className="text-[11px] font-bold text-purple-700 uppercase tracking-wider mb-2 flex items-center gap-1">
-                  <ImageIcon className="w-3.5 h-3.5" />
-                  <span>{lang === "ky" ? "Диаграмма / Геометрия" : "Диаграмма / Чертеж"}</span>
+      {/* CONDITIONAL LAYOUT: Single-Column (Default) vs Two-Column (Split-Screen) */}
+      {!isSplitScreen ? (
+        /* SINGLE-COLUMN LAYOUT: Centered for standard multiple-choice questions */
+        <div className="flex-1 min-h-0 max-w-3xl mx-auto w-full flex flex-col justify-between lg:overflow-hidden pb-1">
+          <div className="h-full overflow-y-auto bg-white rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8 flex flex-col justify-between space-y-6">
+            {currentQuestion ? (
+              <div className="space-y-5">
+                {renderQuestionHeader()}
+
+                {/* Question Stem directly rendered (no Context header block) */}
+                <div className="font-serif text-gray-900 leading-relaxed text-base md:text-lg">
+                  <MathRenderer content={stemText} />
                 </div>
-                <img
-                  src={currentQuestion.image_url}
-                  alt="Problem figure"
-                  className="max-w-full max-h-72 mx-auto object-contain rounded-lg"
-                />
+
+                {/* Options placed directly below the stem */}
+                {renderOptions()}
+              </div>
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400 text-sm">
+                {lang === "ky" ? "Суроолор жүктөлүүдө..." : "Загрузка вопросов..."}
               </div>
             )}
-
-            {/* Reading Passage if available */}
-            {currentQuestion.passage_text && (
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-3 font-serif leading-relaxed text-sm text-slate-800">
-                <div className="text-[11px] font-sans font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2">
-                  <FileText className="w-4 h-4" />
-                  <span>{lang === "ky" ? "Окуу тексти (Passage)" : "Материал для чтения"}</span>
-                </div>
-                <div className="whitespace-pre-line text-slate-800">
-                  {currentQuestion.passage_text}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Right Column: Question Card + Palette */}
-          <div className="lg:col-span-6 space-y-6">
-            {currentQuestion && (
-              <QuestionCard
-                question={currentQuestion}
-                questionNumber={currentIndex + 1}
-                totalQuestions={activeQuestions.length}
-                selectedOptionId={answers[currentQuestion.id]?.selectedOptionId}
-                isFlagged={Boolean(answers[currentQuestion.id]?.flagged)}
-                onSelectOption={handleSelectOption}
-                onToggleFlag={handleToggleFlag}
-              />
-            )}
-
-            {/* Navigation buttons */}
-            <div className="flex items-center justify-between gap-3">
-              <button
-                onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
-                disabled={currentIndex === 0}
-                className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>{t("common.back")}</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  if (currentIndex < activeQuestions.length - 1) {
-                    setCurrentIndex((prev) => prev + 1);
-                  } else {
-                    if (isSubjectTest) {
-                      handleSubmitFinalTest();
-                    } else {
-                      handleSectionTimeExpiredOrFinish();
-                    }
-                  }
-                }}
-                disabled={isSubmittingFinal}
-                className={`px-5 py-2 rounded-xl text-white text-xs font-bold shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
-                  currentIndex === activeQuestions.length - 1 && (isSubjectTest || isFinalSection)
-                    ? "bg-emerald-600 hover:bg-emerald-700"
-                    : "bg-indigo-600 hover:bg-indigo-700"
-                }`}
-              >
-                {isSubmittingFinal && currentIndex === activeQuestions.length - 1 && (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                )}
-                <span>
-                  {currentIndex < activeQuestions.length - 1
-                    ? t("common.next")
-                    : isSubjectTest || isFinalSection
-                    ? lang === "ky"
-                      ? "Экзаменди аяктоо"
-                      : "Завершить тест"
-                    : lang === "ky"
-                    ? "Кийинки бөлүм"
-                    : "Следующий раздел"}
-                </span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* Question Palette */}
-            <QuestionPalette
-              totalQuestions={activeQuestions.length}
-              currentIndex={currentIndex}
-              onSelectIndex={setCurrentIndex}
-              answers={answers}
-              questionIds={questionIds}
-            />
           </div>
         </div>
       ) : (
-        /* SINGLE-COLUMN CENTERED LAYOUT FOR STANDARD QUESTIONS */
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          <div className="lg:col-span-8 max-w-3xl w-full mx-auto space-y-6">
+        /* TWO-COLUMN GRID: ONLY when passage_text, image_url, or comparison (column_a/b) exist */
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-6 lg:overflow-hidden pb-1">
+          {/* Left Pane (Context/Reading/Comparison/Image) */}
+          <div className="h-full overflow-y-auto bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
             {currentQuestion ? (
-              <QuestionCard
-                question={currentQuestion}
-                questionNumber={currentIndex + 1}
-                totalQuestions={activeQuestions.length}
-                selectedOptionId={answers[currentQuestion.id]?.selectedOptionId}
-                isFlagged={Boolean(answers[currentQuestion.id]?.flagged)}
-                onSelectOption={handleSelectOption}
-                onToggleFlag={handleToggleFlag}
-              />
+              <>
+                {currentQuestion.passage_text ? (
+                  /* READING PASSAGE WITH 5-LINE NUMBERING */
+                  <div className="space-y-4">
+                    <div className="text-[11px] font-sans font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-3">
+                      <FileText className="w-4 h-4" />
+                      <span>{lang === "ky" ? "Окуу тексти (Материал)" : "Материал для чтения (Текст)"}</span>
+                    </div>
+
+                    {currentQuestion.image_url && (
+                      <div className="bg-slate-50 rounded-xl border border-slate-200 p-3">
+                        <div className="text-[11px] font-sans font-bold text-purple-700 uppercase tracking-wider mb-2 flex items-center gap-1">
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          <span>{lang === "ky" ? "Диаграмма / Иллюстрация" : "Диаграмма / Иллюстрация"}</span>
+                        </div>
+                        <img
+                          src={currentQuestion.image_url}
+                          alt="Reading illustration"
+                          className="max-w-full max-h-60 mx-auto object-contain rounded-lg"
+                        />
+                      </div>
+                    )}
+
+                    <NumberedPassage text={currentQuestion.passage_text} />
+                  </div>
+                ) : (currentQuestion.column_a || currentQuestion.column_b) ? (
+                  /* QUANTITATIVE COMPARISONS GIVEN CONDITIONS & COLUMNS */
+                  <div className="space-y-4">
+                    {/* Stem text if condition is given (without redundant context headers) */}
+                    {stemText && (
+                      <div className="font-serif text-gray-900 leading-relaxed text-base">
+                        <MathRenderer content={stemText} />
+                      </div>
+                    )}
+
+                    {currentQuestion.image_url && (
+                      <div className="bg-slate-50 rounded-xl border border-slate-200 p-3">
+                        <img
+                          src={currentQuestion.image_url}
+                          alt="Comparison figure"
+                          className="max-w-full max-h-60 mx-auto object-contain rounded-lg"
+                        />
+                      </div>
+                    )}
+
+                    {/* Side-by-side comparison boxes */}
+                    <div className="grid grid-cols-2 gap-4 pt-2">
+                      {/* Column A */}
+                      <div className="bg-slate-50/60 rounded-2xl border-2 border-slate-200 p-4 md:p-6 flex flex-col justify-between text-center shadow-xs">
+                        <div className="inline-block bg-gray-100 text-gray-500 font-bold text-xs tracking-widest uppercase px-3 py-1 rounded-md mx-auto mb-3">
+                          {lang === "ky" ? "КОЛОНКА А" : "КОЛОНКА А"}
+                        </div>
+                        <div className="py-2 flex items-center justify-center min-h-[60px] text-xl font-semibold text-gray-900">
+                          <MathRenderer content={currentQuestion.column_a || "—"} />
+                        </div>
+                      </div>
+
+                      {/* Column B */}
+                      <div className="bg-slate-50/60 rounded-2xl border-2 border-slate-200 p-4 md:p-6 flex flex-col justify-between text-center shadow-xs">
+                        <div className="inline-block bg-gray-100 text-gray-500 font-bold text-xs tracking-widest uppercase px-3 py-1 rounded-md mx-auto mb-3">
+                          {lang === "ky" ? "КОЛОНКА Б" : "КОЛОНКА Б"}
+                        </div>
+                        <div className="py-2 flex items-center justify-center min-h-[60px] text-xl font-semibold text-gray-900">
+                          <MathRenderer content={currentQuestion.column_b || "—"} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* STANDARD QUESTION WITH IMAGE */
+                  <div className="space-y-4">
+                    {currentQuestion.image_url && (
+                      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+                        <img
+                          src={currentQuestion.image_url}
+                          alt="Problem figure"
+                          className="max-w-full max-h-72 mx-auto object-contain rounded-lg"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-400">
-                Суроолор жүктөлүүдө...
+              <div className="h-full flex items-center justify-center text-slate-400 text-sm">
+                {lang === "ky" ? "Суроолор жүктөлүүдө..." : "Загрузка вопросов..."}
               </div>
             )}
-
-            {/* Navigation buttons */}
-            <div className="flex items-center justify-between gap-3">
-              <button
-                onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
-                disabled={currentIndex === 0}
-                className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>{t("common.back")}</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  if (currentIndex < activeQuestions.length - 1) {
-                    setCurrentIndex((prev) => prev + 1);
-                  } else {
-                    if (isSubjectTest) {
-                      handleSubmitFinalTest();
-                    } else {
-                      handleSectionTimeExpiredOrFinish();
-                    }
-                  }
-                }}
-                disabled={isSubmittingFinal}
-                className={`px-5 py-2 rounded-xl text-white text-xs font-bold shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
-                  currentIndex === activeQuestions.length - 1 && (isSubjectTest || isFinalSection)
-                    ? "bg-emerald-600 hover:bg-emerald-700"
-                    : "bg-indigo-600 hover:bg-indigo-700"
-                }`}
-              >
-                {isSubmittingFinal && currentIndex === activeQuestions.length - 1 && (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                )}
-                <span>
-                  {currentIndex < activeQuestions.length - 1
-                    ? t("common.next")
-                    : isSubjectTest || isFinalSection
-                    ? lang === "ky"
-                      ? "Экзаменди аяктоо"
-                      : "Завершить тест"
-                    : lang === "ky"
-                    ? "Кийинки бөлүм"
-                    : "Следующий раздел"}
-                </span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
           </div>
 
-          {/* Sidebar Palette */}
-          <div className="lg:col-span-4">
-            <QuestionPalette
-              totalQuestions={activeQuestions.length}
-              currentIndex={currentIndex}
-              onSelectIndex={setCurrentIndex}
-              answers={answers}
-              questionIds={questionIds}
-            />
+          {/* Right Pane (Questions & Options) */}
+          <div className="h-full overflow-y-auto bg-gray-50/50 rounded-2xl p-6 flex flex-col justify-between space-y-6">
+            {currentQuestion ? (
+              <div className="space-y-5">
+                {renderQuestionHeader()}
+
+                {/* Question Stem / Prompt */}
+                <div className="font-serif text-gray-900 text-base leading-relaxed">
+                  {currentQuestion.passage_text ? (
+                    <MathRenderer content={stemText} />
+                  ) : (currentQuestion.column_a || currentQuestion.column_b) ? (
+                    <span>{lang === "ky" ? "Чоңдуктарды салыштырып, туура вариантты тандаңыз:" : "Сравните величины и выберите верное утверждение:"}</span>
+                  ) : (
+                    <MathRenderer content={stemText} />
+                  )}
+                </div>
+
+                {/* Compact Multiple Choice Options */}
+                {renderOptions()}
+              </div>
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400 text-sm">
+                {lang === "ky" ? "Суроолор жүктөлүүдө..." : "Загрузка вопросов..."}
+              </div>
+            )}
           </div>
         </div>
       )}
+
+      {/* FIXED BOTTOM BAR (CollegeBoard Bluebook Style) */}
+      <footer className="fixed bottom-0 left-0 right-0 h-16 bg-[#f4f4f4] border-t border-gray-300 flex items-center justify-between px-6 z-50 select-none">
+        {/* Left Section: Student's name */}
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="font-sans font-medium text-gray-800 text-sm truncate max-w-[160px] sm:max-w-xs">
+            {studentName}
+          </span>
+        </div>
+
+        {/* Center Section: Popover Trigger & Anchored Popover Box */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setIsGridOpen((prev) => !prev)}
+            className="bg-gray-800 text-white px-4 py-2 rounded-md font-sans text-sm font-medium flex items-center gap-2 hover:bg-gray-700 transition-colors cursor-pointer shadow-xs"
+          >
+            <span>
+              {lang === "ky"
+                ? `Суроо ${currentIndex + 1} / ${activeQuestions.length}`
+                : lang === "ru"
+                ? `Вопрос ${currentIndex + 1} из ${activeQuestions.length}`
+                : `Question ${currentIndex + 1} of ${activeQuestions.length}`}
+            </span>
+            <ChevronUp className={`w-4 h-4 transition-transform duration-200 ${isGridOpen ? "rotate-180" : ""}`} />
+          </button>
+
+          {/* Popover Question Grid */}
+          {isGridOpen && (
+            <>
+              {/* Click-away backdrop */}
+              <div
+                className="fixed inset-0 z-40 bg-transparent cursor-default"
+                onClick={() => setIsGridOpen(false)}
+              />
+
+              {/* Popover Box anchored just above the center button */}
+              <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-white rounded-2xl shadow-2xl border border-gray-200 w-[400px] max-w-[calc(100vw-32px)] p-0 overflow-hidden z-50 flex flex-col animate-in fade-in zoom-in-95 duration-150">
+                {/* Popover Header */}
+                <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-white">
+                  <h4 className="font-sans font-bold text-gray-900 text-sm sm:text-base truncate">
+                    {isSubjectTest
+                      ? (examTitle || (lang === "ky" ? "Предметтик тест" : "Предметный тест"))
+                      : getSectionName(activeSection.section)}
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setIsGridOpen(false)}
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+                    aria-label="Close"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Legend */}
+                <div className="flex items-center justify-around px-4 py-2.5 bg-gray-50/90 border-b border-gray-100 text-xs font-sans text-gray-600">
+                  <div className="flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-black fill-black shrink-0" />
+                    <span>{lang === "ky" ? "Учурдагы" : lang === "ru" ? "Текущий" : "Current"}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3.5 h-3.5 border-2 border-dashed border-gray-400 rounded-xs shrink-0 inline-block" />
+                    <span>{lang === "ky" ? "Жоопсуз" : lang === "ru" ? "Не отвечено" : "Unanswered"}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Bookmark className="w-3.5 h-3.5 text-red-500 fill-red-500 shrink-0" />
+                    <span>{lang === "ky" ? "Белгиленген" : lang === "ru" ? "На проверку" : "For Review"}</span>
+                  </div>
+                </div>
+
+                {/* The Grid: grid grid-cols-6 gap-3 p-6 */}
+                <div className="grid grid-cols-6 gap-3 p-6 max-h-[300px] overflow-y-auto">
+                  {questionIds.map((qId, idx) => {
+                    const isCurrent = currentIndex === idx;
+                    const ans = answers[qId];
+                    const isAnswered = ans && Boolean(ans.selectedOptionId);
+                    const isFlagged = ans && Boolean(ans.flagged);
+
+                    return (
+                      <button
+                        key={qId}
+                        type="button"
+                        onClick={() => {
+                          setCurrentIndex(idx);
+                          setIsGridOpen(false);
+                        }}
+                        className={`relative w-10 h-10 flex items-center justify-center font-sans font-medium text-blue-700 cursor-pointer transition-all ${
+                          isCurrent
+                            ? "border-2 border-black rounded-sm bg-white font-bold"
+                            : isAnswered
+                            ? "border-2 border-solid border-gray-400 rounded-sm bg-blue-50/20 hover:border-blue-500"
+                            : "border-2 border-dashed border-gray-400 rounded-sm hover:border-gray-600"
+                        }`}
+                      >
+                        {/* Map pin icon for Current */}
+                        {isCurrent && (
+                          <span className="absolute -top-3 left-1/2 -translate-x-1/2 pointer-events-none">
+                            <MapPin className="w-3.5 h-3.5 text-black fill-black" />
+                          </span>
+                        )}
+
+                        {/* Red Bookmark icon for Flagged */}
+                        {isFlagged && (
+                          <span className="absolute -top-1.5 -right-1.5 pointer-events-none">
+                            <Bookmark className="w-3.5 h-3.5 text-red-500 fill-red-500" />
+                          </span>
+                        )}
+
+                        <span className="text-sm font-semibold">{idx + 1}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Review Page Button */}
+                <div className="border-t border-gray-100 pt-3 pb-4 text-center bg-white">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsGridOpen(false);
+                      setCurrentIndex(activeQuestions.length - 1);
+                    }}
+                    className="text-blue-600 font-sans font-medium text-sm pb-1 hover:underline cursor-pointer"
+                  >
+                    {lang === "ky" ? "Кароо барагына өтүү" : lang === "ru" ? "Перейти к странице обзора" : "Go to Review Page"}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Right Section: Back (transparent) and Next (pill) */}
+        <div className="flex items-center gap-2">
+          {currentIndex > 0 && (
+            <button
+              type="button"
+              onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
+              disabled={isTimeExpiredModalOpen}
+              className="text-gray-700 font-sans font-medium text-sm px-4 py-2 hover:text-gray-900 transition-colors cursor-pointer disabled:opacity-40"
+            >
+              {lang === "ky" ? "Артка" : "Назад"}
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              if (currentIndex < activeQuestions.length - 1) {
+                setCurrentIndex((prev) => prev + 1);
+              } else {
+                if (isSubjectTest) {
+                  handleSubmitFinalTest();
+                } else {
+                  handleSectionTimeExpiredOrFinish();
+                }
+              }
+            }}
+            disabled={isSubmittingFinal || isTimeExpiredModalOpen}
+            className="bg-blue-600 text-white px-8 py-2 rounded-full font-sans font-medium text-sm hover:bg-blue-700 transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {isSubmittingFinal && currentIndex === activeQuestions.length - 1 && (
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+            )}
+            <span>
+              {currentIndex < activeQuestions.length - 1
+                ? (lang === "ky" ? "Кийинки" : "Далее")
+                : isSubjectTest || isFinalSection
+                ? (lang === "ky" ? "Экзаменди аяктоо" : "Завершить тест")
+                : (lang === "ky" ? "Кийинки бөлүм" : "Следующий раздел")}
+            </span>
+          </button>
+        </div>
+      </footer>
     </div>
   );
 }

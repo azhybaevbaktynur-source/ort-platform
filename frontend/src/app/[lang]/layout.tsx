@@ -1,6 +1,7 @@
 import React from "react";
 import { LanguageProvider, Language } from "@/lib/i18n/context";
 import { AuthProvider } from "@/lib/auth-context";
+import { ToastProvider } from "@/components/ui/Toast";
 
 // Pre-render every page for both languages at build time, so pages such as /ky/login are served
 // as static files from Vercel's CDN instead of running a server function on each visit.
@@ -21,7 +22,9 @@ export default async function LangLayout({
   return (
     <LanguageProvider initialLang={currentLang}>
       <AuthProvider>
-        {children}
+        <ToastProvider>
+          {children}
+        </ToastProvider>
       </AuthProvider>
     </LanguageProvider>
   );

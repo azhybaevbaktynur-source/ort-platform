@@ -9,6 +9,7 @@ api_router.include_router(questions.router, prefix="/questions", tags=["Question
 api_router.include_router(bulk.router, prefix="/bulk", tags=["CSV Bulk Operations"])
 api_router.include_router(mock_tests.router, prefix="/mock-tests", tags=["Mock Test Simulator"])
 api_router.include_router(exam_sets.router, prefix="/exam-sets", tags=["Exam Sets LMS"])
+api_router.include_router(exam_sets.router, prefix="/exams", tags=["Exams LMS Alias"])
 api_router.include_router(upload.router, prefix="/upload", tags=["File & Image Uploads"])
 api_router.include_router(planner.router, prefix="/planner", tags=["Daily Planner"])
 api_router.include_router(analytics.router, prefix="/analytics", tags=["Performance Analytics"])

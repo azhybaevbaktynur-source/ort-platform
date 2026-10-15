@@ -234,3 +234,112 @@ class TestMockTestService:
             is_instructor=False,
         )
         assert session.attemptId.startswith("att_")
+
+    def test_save_progress_keeps_in_progress_state_and_resumes(self):
+        # Seed question
+        created_q = QuestionService.create_question(
+            QuestionCreate(
+                language="ky",
+                section=SectionType.MATH_1,
+                topic="test_topic",
+                difficulty=DifficultyLevel.EASY,
+                stem="Машыгуу суроосу",
+                option_a="A",
+                option_b="B",
+                option_c="C",
+                option_d="D",
+                correct_option="A",
+            ),
+            user_id="inst_res",
+        )
+
+        # 1. Start a mock test session
+        session = MockTestService.start_test_session(
+            user_id="std_resume_01",
+            template_id="ort_speed_drill",
+            language="ky",
+        )
+        attempt_id = session.attemptId
+        assert session.status == ExamStatus.IN_PROGRESS
+
+        # 2. Save progress (Save and Exit scenario)
+        sample_q_id = created_q.id
+        partial_answers = {
+            sample_q_id: AnswerSubmission(selectedOptionId="B", timeSpentSeconds=40, flagged=True)
+        }
+        saved = MockTestService.save_session_progress(
+            attempt_id=attempt_id,
+            user_id="std_resume_01",
+            answers=partial_answers,
+            remaining_time_seconds=1250,
+            current_section_index=2,
+            is_final=False,
+        )
+        assert saved is True
+
+        # Verify in-progress attempts list includes it
+        in_prog_list = MockTestService.get_user_in_progress_attempts("std_resume_01")
+        assert len(in_prog_list) >= 1
+        att_entry = next((a for a in in_prog_list if a["attemptId"] == attempt_id), None)
+        assert att_entry is not None
+        assert att_entry["status"] == ExamStatus.IN_PROGRESS.value
+        assert att_entry["remainingTimeSeconds"] == 1250
+        assert att_entry["currentSectionIndex"] == 2
+
+        # Verify completed attempts does NOT include it
+        completed_list = MockTestService.get_user_completed_attempts("std_resume_01")
+        assert not any(a["attemptId"] == attempt_id for a in completed_list)
+
+        # 3. Resume the session via start_test_session
+        resumed_session = MockTestService.start_test_session(
+            user_id="std_resume_01",
+            template_id="ort_speed_drill",
+            language="ky",
+        )
+        assert resumed_session.attemptId == attempt_id
+        assert resumed_session.status == ExamStatus.IN_PROGRESS
+        assert resumed_session.remainingTimeSeconds == 1250
+        assert resumed_session.currentSectionIndex == 2
+        assert sample_q_id in resumed_session.answers
+        assert resumed_session.answers[sample_q_id]["selectedOptionId"] == "B"
+
+        # 4. Final submit marks it as completed
+        scored_result = MockTestService.submit_and_score_test(
+            attempt_id=attempt_id,
+            user_id="std_resume_01",
+            answers={
+                sample_q_id: AnswerSubmission(selectedOptionId="A", timeSpentSeconds=50)
+            },
+        )
+        assert scored_result.totalScaledScore >= 0
+
+        # Verify completed attempts has it, in-progress does NOT
+        in_prog_after_submit = MockTestService.get_user_in_progress_attempts("std_resume_01")
+        assert not any(a["attemptId"] == attempt_id for a in in_prog_after_submit)
+
+        completed_after_submit = MockTestService.get_user_completed_attempts("std_resume_01")
+        assert any(a["attemptId"] == attempt_id for a in completed_after_submit)
+
+        # 5. Delayed save_session_progress must NOT overwrite the completed state
+        delayed_saved = MockTestService.save_session_progress(
+            attempt_id=attempt_id,
+            user_id="std_resume_01",
+            answers=partial_answers,
+            remaining_time_seconds=1000,
+            current_section_index=1,
+            is_final=False,
+        )
+        # Still not in in_prog list
+        in_prog_after_delayed = MockTestService.get_user_in_progress_attempts("std_resume_01")
+        assert not any(a["attemptId"] == attempt_id for a in in_prog_after_delayed)
+
+        # 6. Starting with force_new=True generates a brand new session, does not resume completed attempt
+        new_session = MockTestService.start_test_session(
+            user_id="std_resume_01",
+            template_id="ort_speed_drill",
+            language="ky",
+            force_new=True,
+        )
+        assert new_session.attemptId != attempt_id
+        assert new_session.status == ExamStatus.IN_PROGRESS
+        assert new_session.answers == {}

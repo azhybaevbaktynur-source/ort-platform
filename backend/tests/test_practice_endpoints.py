@@ -15,7 +15,7 @@ async def test_practice_topics_endpoint():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         headers = {"Authorization": "Bearer mock_student_token"}
-        res = await ac.get("/api/v1/practice/topics?section=math_1&lang=ky", headers=headers)
+        res = await ac.get("/api/v1/practice/topics?section=math_2&lang=ky", headers=headers)
         assert res.status_code == 200
         topics = res.json()
         assert isinstance(topics, list)
@@ -28,7 +28,7 @@ async def test_practice_questions_strict_bank_and_limit():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         headers = {"Authorization": "Bearer mock_student_token"}
-        res = await ac.get("/api/v1/practice/questions?section=math_1&lang=ky&limit=10", headers=headers)
+        res = await ac.get("/api/v1/practice/questions?section=math_2&lang=ky&limit=10", headers=headers)
         assert res.status_code == 200
         questions = res.json()
         assert isinstance(questions, list)
@@ -37,7 +37,7 @@ async def test_practice_questions_strict_bank_and_limit():
 
         # Verify all required instant-evaluation fields are present
         for q in questions:
-            assert q["section"] == "math_1"
+            assert q["section"] == "math_2"
             assert "stem" in q and len(q["stem"]) > 0
             assert "option_a" in q
             assert "option_b" in q
@@ -50,7 +50,7 @@ async def test_practice_questions_topic_filter():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         headers = {"Authorization": "Bearer mock_student_token"}
-        res = await ac.get("/api/v1/practice/questions?section=math_1&topic=geometry_area&lang=ky", headers=headers)
+        res = await ac.get("/api/v1/practice/questions?section=math_2&topic=geometry_area&lang=ky", headers=headers)
         assert res.status_code == 200
         questions = res.json()
         assert isinstance(questions, list)
@@ -66,7 +66,7 @@ async def test_practice_submit_set_and_mastery_sync():
         headers = {"Authorization": "Bearer mock_student_token"}
 
         # 1. Fetch practice questions to get real IDs
-        q_res = await ac.get("/api/v1/practice/questions?section=math_1&lang=ky&limit=2", headers=headers)
+        q_res = await ac.get("/api/v1/practice/questions?section=math_2&lang=ky&limit=2", headers=headers)
         assert q_res.status_code == 200
         questions = q_res.json()
         assert len(questions) >= 2
@@ -75,7 +75,7 @@ async def test_practice_submit_set_and_mastery_sync():
 
         # 2. Submit practice set of answers
         submit_payload = {
-            "section": "math_1",
+            "section": "math_2",
             "topic": "algebra_linear",
             "language": "ky",
             "answers": [
@@ -108,7 +108,7 @@ async def test_practice_submit_set_and_mastery_sync():
         assert ana_res.status_code == 200
         ana_data = ana_res.json()
 
-        math_1_mastery = ana_data["sectionsMastery"]["math_1"]
-        assert math_1_mastery["totalAttempted"] >= 2
-        assert math_1_mastery["correctCount"] >= 1
+        math_2_mastery = ana_data["sectionsMastery"]["math_2"]
+        assert math_2_mastery["totalAttempted"] >= 2
+        assert math_2_mastery["correctCount"] >= 1
 

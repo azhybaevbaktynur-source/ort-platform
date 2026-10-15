@@ -40,15 +40,66 @@ class QuestionService:
         doc_ref = db.collection("questions").document(q_id)
         doc_ref.set(q_dict)
 
+        # Sync to SQL
+        try:
+            from app.db.session import SessionLocal
+            from app.models.question import Question as QuestionModel
+            sql_session = SessionLocal()
+            try:
+                sql_q = QuestionModel(
+                    id=q_id,
+                    language=question_in.language,
+                    section=question_in.section.value,
+                    topic=question_in.topic,
+                    difficulty=question_in.difficulty.value,
+                    column_a=question_in.column_a,
+                    column_b=question_in.column_b,
+                    stem=question_in.stem or "",
+                    option_a=question_in.option_a or "",
+                    option_b=question_in.option_b or "",
+                    option_c=question_in.option_c or "",
+                    option_d=question_in.option_d or "",
+                    option_e=question_in.option_e,
+                    correct_option=question_in.correct_option,
+                    explanation=question_in.explanation,
+                    image_url=question_in.image_url,
+                    passage_text=question_in.passage_text,
+                    tags=question_in.tags,
+                    exam_set_id=question_in.exam_set_id,
+                    created_by=user_id,
+                )
+                sql_session.merge(sql_q)
+                sql_session.commit()
+            except Exception:
+                sql_session.rollback()
+            finally:
+                sql_session.close()
+        except Exception:
+            pass
+
         return QuestionInDB(**q_dict)
 
     @classmethod
     def get_question_by_id(cls, question_id: str) -> Optional[QuestionInDB]:
         db = get_firestore_client()
         doc = db.collection("questions").document(question_id).get()
-        if not doc.exists:
-            return None
-        return QuestionInDB(**doc.to_dict())
+        if doc.exists:
+            return QuestionInDB(**doc.to_dict())
+
+        # Check SQL database fallback
+        try:
+            from app.db.session import SessionLocal
+            from app.models.question import Question as QuestionModel
+            sql_session = SessionLocal()
+            try:
+                sq = sql_session.query(QuestionModel).filter(QuestionModel.id == question_id).first()
+                if sq:
+                    return QuestionInDB(**sq.to_dict())
+            finally:
+                sql_session.close()
+        except Exception:
+            pass
+        return None
 
     @classmethod
     def update_question(cls, question_id: str, update_in: QuestionUpdate) -> QuestionInDB:
@@ -66,6 +117,26 @@ class QuestionService:
 
         doc_ref.update(update_data)
         existing.update(update_data)
+
+        # Sync to SQL
+        try:
+            from app.db.session import SessionLocal
+            from app.models.question import Question as QuestionModel
+            sql_session = SessionLocal()
+            try:
+                sq = sql_session.query(QuestionModel).filter(QuestionModel.id == question_id).first()
+                if sq:
+                    for k, v in update_data.items():
+                        if hasattr(sq, k):
+                            setattr(sq, k, v)
+                    sql_session.commit()
+            except Exception:
+                sql_session.rollback()
+            finally:
+                sql_session.close()
+        except Exception:
+            pass
+
         return QuestionInDB(**existing)
 
     @classmethod
@@ -76,6 +147,24 @@ class QuestionService:
         if not doc.exists:
             raise EntityNotFoundException("Question", question_id)
         doc_ref.delete()
+
+        # Delete from SQL
+        try:
+            from app.db.session import SessionLocal
+            from app.models.question import Question as QuestionModel
+            sql_session = SessionLocal()
+            try:
+                sq = sql_session.query(QuestionModel).filter(QuestionModel.id == question_id).first()
+                if sq:
+                    sql_session.delete(sq)
+                    sql_session.commit()
+            except Exception:
+                sql_session.rollback()
+            finally:
+                sql_session.close()
+        except Exception:
+            pass
+
         return True
 
     @classmethod
@@ -92,6 +181,7 @@ class QuestionService:
     ) -> Tuple[List[QuestionInDB], int]:
         """
         Indexed multi-criteria search for instructors and question bank.
+        Merges results from both Firestore and SQLAlchemy SQL models.
         """
         db = get_firestore_client()
         coll = db.collection("questions")
@@ -110,6 +200,7 @@ class QuestionService:
 
         docs = query.get()
         results: List[QuestionInDB] = []
+        seen_ids = set()
 
         for d in docs:
             data = d.to_dict()
@@ -129,7 +220,41 @@ class QuestionService:
                     q_text = str(stem_raw).lower()
                 if search_query.lower() not in q_text:
                     continue
+            seen_ids.add(d.id)
             results.append(QuestionInDB(**data))
+
+        # If Firestore had no matching questions and SQL has questions, fallback to SQL
+        if not results:
+            try:
+                from app.db.session import SessionLocal
+                from app.models.question import Question as QuestionModel
+                sql_session = SessionLocal()
+                try:
+                    sq_query = sql_session.query(QuestionModel)
+                    if section:
+                        sq_query = sq_query.filter(QuestionModel.section == section.value)
+                    if difficulty:
+                        sq_query = sq_query.filter(QuestionModel.difficulty == difficulty.value)
+                    if language:
+                        sq_query = sq_query.filter(QuestionModel.language == language)
+                    if exam_set_id:
+                        if exam_question_ids:
+                            sq_query = sq_query.filter(
+                                (QuestionModel.exam_set_id == exam_set_id) | (QuestionModel.id.in_(list(exam_question_ids)))
+                            )
+                        else:
+                            sq_query = sq_query.filter(QuestionModel.exam_set_id == exam_set_id)
+                    if topic:
+                        sq_query = sq_query.filter(QuestionModel.topic.ilike(f"%{topic}%"))
+                    if search_query:
+                        sq_query = sq_query.filter(QuestionModel.stem.ilike(f"%{search_query}%"))
+
+                    for sq_row in sq_query.all():
+                        results.append(QuestionInDB(**sq_row.to_dict()))
+                finally:
+                    sql_session.close()
+            except Exception:
+                pass
 
         total_count = len(results)
         paginated_results = results[offset : offset + limit]

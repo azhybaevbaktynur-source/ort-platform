@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { getAuthHeader } from "@/lib/api";
+import { toast } from "@/components/ui/Toast";
 
 interface SectionConfig {
   section: string;
@@ -180,12 +181,14 @@ export default function ExamManagementPage() {
       });
       if (res.ok) {
         setExams((prev) => prev.filter((e) => e.id !== examId));
+        toast.success(lang === "ky" ? "Экзамен топтому өчүрүлдү" : "Экзаменационный сет успешно удален");
       } else {
-        const data = await res.json();
-        alert(data.detail || "Error deleting exam set");
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.detail || (lang === "ky" ? "Экзаменди өчүрүү катасы" : "Ошибка при удалении экзамена"));
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to delete exam:", err);
+      toast.error(err.message || (lang === "ky" ? "Ката кетти" : "Произошла ошибка"));
     }
   };
 
@@ -236,14 +239,20 @@ export default function ExamManagementPage() {
       });
 
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         throw new Error(err.detail || "Error saving exam set");
       }
 
       setIsModalOpen(false);
       await fetchExams();
+      toast.success(
+        editingExam
+          ? (lang === "ky" ? "Экзамен топтому жаңыланды" : "Экзаменационный сет обновлен")
+          : (lang === "ky" ? "Жаңы экзамен түзүлдү" : "Экзаменационный сет успешно создан")
+      );
     } catch (err: any) {
       setErrorMsg(err.message || "Failed to save");
+      toast.error(err.message || (lang === "ky" ? "Сактоо катасы" : "Ошибка сохранения"));
     } finally {
       setSaving(false);
     }

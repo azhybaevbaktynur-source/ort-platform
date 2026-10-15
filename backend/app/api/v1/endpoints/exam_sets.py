@@ -110,25 +110,67 @@ async def list_student_exam_sets(
 
     results = list(combined_map.values())
 
-    # Populate user_attempts_count for current student
+    # Populate user_attempts_count and in_progress status for current student
     try:
+        from app.models.test_attempt import TestAttempt
         fdb = get_firestore_client()
-        user_attempts = (
+
+        # 1. Gather all attempts for current_user from Firestore
+        fs_attempts = (
             fdb.collection("test_attempts")
             .where("userId", "==", current_user.id)
-            .where("status", "==", ExamStatus.COMPLETED.value)
             .get()
         )
-        attempts_map = {}
-        for att in user_attempts:
+        all_attempts_map: Dict[str, Dict[str, Any]] = {}
+        for att in fs_attempts:
             data = att.to_dict()
-            tid = data.get("templateId")
+            att_id = data.get("id") or att.id
+            data["id"] = att_id
+            all_attempts_map[att_id] = data
+
+        # 2. Gather from SQL test_attempts table
+        sql_attempts = db.query(TestAttempt).filter(
+            TestAttempt.user_id == current_user.id
+        ).all()
+        for sa in sql_attempts:
+            if sa.id not in all_attempts_map:
+                all_attempts_map[sa.id] = sa.to_dict()
+            else:
+                if sa.status == ExamStatus.COMPLETED.value:
+                    all_attempts_map[sa.id]["status"] = ExamStatus.COMPLETED.value
+
+        # 3. Group by templateId
+        grouped_by_template: Dict[str, List[Dict[str, Any]]] = {}
+        for att in all_attempts_map.values():
+            tid = att.get("templateId")
             if tid:
-                attempts_map[tid] = attempts_map.get(tid, 0) + 1
+                grouped_by_template.setdefault(tid, []).append(att)
+
         for es in results:
-            es.user_attempts_count = attempts_map.get(es.id, 0)
-    except Exception:
-        pass
+            attempts_for_es = grouped_by_template.get(es.id, [])
+            # Count completed attempts
+            es.user_attempts_count = sum(
+                1 for a in attempts_for_es if a.get("status") == ExamStatus.COMPLETED.value
+            )
+
+            # Sort attempts strictly by timestamp DESC and check the latest
+            if attempts_for_es:
+                def get_ts(a):
+                    return a.get("startedAt") or a.get("createdAt") or a.get("completedAt") or ""
+                attempts_for_es.sort(key=get_ts, reverse=True)
+                latest_attempt = attempts_for_es[0]
+                if latest_attempt.get("status") == ExamStatus.IN_PROGRESS.value:
+                    es.has_in_progress = True
+                    es.in_progress_attempt_id = latest_attempt.get("id")
+                else:
+                    es.has_in_progress = False
+                    es.in_progress_attempt_id = None
+            else:
+                es.has_in_progress = False
+                es.in_progress_attempt_id = None
+    except Exception as err:
+        logger.error(f"Error populating user attempts status: {err}", exc_info=True)
+
 
     return results
 
@@ -137,24 +179,42 @@ async def list_student_exam_sets(
 async def get_exam_set(
     exam_set_id: str = Path(...),
     current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     Returns full details of an ExamSet.
+    Admins can view both drafts and published exams.
+    Students can only view published exams or practice bank.
     """
     exam_set = MockTestService.get_exam_set_by_id(exam_set_id)
     if not exam_set:
         raise EntityNotFoundException("ExamSet", exam_set_id)
 
+    is_admin = current_user.role in ["instructor", "admin"]
+    if not is_admin and exam_set.status != "published" and exam_set.exam_type != "practice_bank":
+        raise EntityNotFoundException("ExamSet", exam_set_id)
+
     try:
-        db = get_firestore_client()
+        fdb = get_firestore_client()
         user_attempts = (
-            db.collection("test_attempts")
+            fdb.collection("test_attempts")
             .where("userId", "==", current_user.id)
             .where("templateId", "==", exam_set_id)
             .where("status", "==", ExamStatus.COMPLETED.value)
             .get()
         )
         exam_set.user_attempts_count = len(user_attempts)
+
+        in_prog = (
+            fdb.collection("test_attempts")
+            .where("userId", "==", current_user.id)
+            .where("templateId", "==", exam_set_id)
+            .where("status", "==", ExamStatus.IN_PROGRESS.value)
+            .get()
+        )
+        if in_prog:
+            exam_set.has_in_progress = True
+            exam_set.in_progress_attempt_id = in_prog[0].id
     except Exception:
         pass
 

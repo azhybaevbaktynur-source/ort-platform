@@ -145,3 +145,32 @@ async def toggle_student_exam_access(
         grantedExamIds=granted_ids,
     )
 
+
+@router.get("/exams")
+async def list_admin_all_exams(
+    current_user: UserProfile = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Returns all records from the exam_sets table:
+    SELECT * FROM exam_sets ORDER BY created_at DESC.
+    Also merges any Firestore templates so all custom created exams are viewable and lockable.
+    """
+    sql_exams = db.query(ExamSet).order_by(ExamSet.created_at.desc()).all()
+    results = []
+    seen_ids = set()
+    for se in sql_exams:
+        seen_ids.add(se.id)
+        results.append(se.to_dict())
+
+    try:
+        fs_exams = MockTestService.get_exam_sets(is_instructor=True)
+        for fe in fs_exams:
+            if fe.id not in seen_ids:
+                seen_ids.add(fe.id)
+                results.append(fe.model_dump())
+    except Exception:
+        pass
+
+    return results
+

@@ -27,6 +27,16 @@ def reset_db():
     init_db()
     ensure_test_accounts()
     mock_firestore_db.reset()
+    from app.db.session import SessionLocal
+    from app.models.test_attempt import TestAttempt
+    session = SessionLocal()
+    try:
+        session.query(TestAttempt).delete()
+        session.commit()
+    except Exception:
+        session.rollback()
+    finally:
+        session.close()
     yield
     mock_firestore_db.reset()
 

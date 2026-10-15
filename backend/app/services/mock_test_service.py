@@ -1,8 +1,11 @@
 import uuid
+import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 from app.db.firebase import get_firestore_client
 import random
+
+logger = logging.getLogger(__name__)
 from app.schemas.mock_test import (
     ExamSet,
     ExamSetCreate,
@@ -28,14 +31,16 @@ from app.core.exceptions import EntityNotFoundException, ValidationException, Fo
 STRICT_SECTION_ORDER = [
     "math_1",
     "math_2",
-    "reading",
     "analogies",
+    "reading",
     "grammar",
     "chemistry",
     "biology",
     "physics",
+    "advanced_math",
     "history",
     "english",
+    "native_language",
 ]
 
 
@@ -149,9 +154,40 @@ class MockTestService:
 
     @classmethod
     def get_exam_set_by_id(cls, exam_set_id: str) -> Optional[ExamSet]:
+        target_id = str(exam_set_id).strip()
+
+        # 1. Check SQL database first (source of truth for created/uploaded exams)
+        try:
+            from app.db.session import SessionLocal
+            from app.models.exam_set import ExamSet as ExamSetModel
+            from app.models.question import Question as QuestionModel
+            sql_session = SessionLocal()
+            try:
+                se = sql_session.query(ExamSetModel).filter(
+                    (ExamSetModel.id == target_id) | (ExamSetModel.id == exam_set_id)
+                ).first()
+                if not se and target_id.isdigit():
+                    se = sql_session.query(ExamSetModel).filter(ExamSetModel.id == str(int(target_id))).first()
+                if se:
+                    eset = ExamSet(**se.to_dict())
+                    q_count = sql_session.query(QuestionModel).filter(
+                        (QuestionModel.exam_set_id == se.id)
+                    ).count()
+                    if q_count > 0:
+                        eset.question_count = q_count
+                        eset.totalQuestions = q_count
+                    return eset
+            finally:
+                sql_session.close()
+        except Exception:
+            pass
+
+        # 2. Check Firestore mock_test_templates
         try:
             db = get_firestore_client()
-            doc = db.collection("mock_test_templates").document(exam_set_id).get()
+            doc = db.collection("mock_test_templates").document(target_id).get()
+            if not doc.exists and target_id != exam_set_id:
+                doc = db.collection("mock_test_templates").document(exam_set_id).get()
             if doc.exists:
                 data = doc.to_dict()
                 if isinstance(data.get("title"), dict):
@@ -165,8 +201,8 @@ class MockTestService:
                     all_questions = db.collection("questions").get()
                     real_count = sum(
                         1 for q_doc in all_questions
-                        if q_doc.to_dict().get("exam_set_id") == exam_set_id
-                        or q_doc.to_dict().get("exam_id") == exam_set_id
+                        if q_doc.to_dict().get("exam_set_id") in (target_id, exam_set_id)
+                        or q_doc.to_dict().get("exam_id") in (target_id, exam_set_id)
                         or q_doc.id in eset.questionIds
                     )
                     eset.question_count = real_count
@@ -325,6 +361,7 @@ class MockTestService:
         language: str = "ky",
         access_code: Optional[str] = None,
         is_instructor: bool = False,
+        force_new: bool = False,
     ) -> TestSessionResponse:
         exam_set = cls.get_exam_set_by_id(template_id)
         if not exam_set and template_id in ("fast_practice", "ort_speed_drill", "ort_speed_drill_ru"):
@@ -395,6 +432,165 @@ class MockTestService:
 
         questions_coll = db.collection("questions")
         all_questions = questions_coll.get()
+
+        # Check if user already has an active IN_PROGRESS attempt for this template to resume
+        if not force_new:
+            try:
+                in_prog_docs = (
+                    db.collection("test_attempts")
+                    .where("userId", "==", user_id)
+                    .where("templateId", "==", template_id)
+                    .where("status", "==", ExamStatus.IN_PROGRESS.value)
+                    .get()
+                )
+                if in_prog_docs:
+                    docs_sorted = sorted(
+                        in_prog_docs,
+                        key=lambda d: d.to_dict().get("startedAt", ""),
+                        reverse=True,
+                    )
+                    existing_attempt_doc = docs_sorted[0]
+                    att_data = existing_attempt_doc.to_dict()
+                    attempt_id = att_data.get("id") or existing_attempt_doc.id
+                    saved_q_ids = att_data.get("questionIds", [])
+                    saved_answers = att_data.get("answers", {}) or {}
+                    if not saved_q_ids and saved_answers:
+                        saved_q_ids = list(saved_answers.keys())
+
+                    if saved_q_ids:
+                        saved_remaining_time = att_data.get("remainingTimeSeconds")
+                        saved_section_index = att_data.get("currentSectionIndex", 0)
+                        saved_total_time = att_data.get("totalTimeSeconds") or (exam_set.totalTimeMinutes * 60 if exam_set else 170 * 60)
+                        exam_lang = att_data.get("language") or exam_set.language or language
+
+                        q_map = {d.id: d.to_dict() for d in all_questions}
+                        grouped_by_section: Dict[str, List[Dict[str, Any]]] = {}
+                        for q_id in saved_q_ids:
+                            if q_id in q_map:
+                                qd = q_map[q_id]
+                                sec = qd.get("section", SectionType.MATH_1.value)
+                                grouped_by_section.setdefault(sec, []).append(qd)
+                            else:
+                                qd = {
+                                    "id": q_id,
+                                    "section": SectionType.MATH_1.value,
+                                    "stem": f"Question {q_id}",
+                                    "options": [
+                                        {"id": "A", "text": "A"},
+                                        {"id": "B", "text": "B"},
+                                        {"id": "C", "text": "C"},
+                                        {"id": "D", "text": "D"},
+                                    ],
+                                }
+                                grouped_by_section.setdefault(SectionType.MATH_1.value, []).append(qd)
+
+                        ordered_secs = [s for s in STRICT_SECTION_ORDER if s in grouped_by_section and grouped_by_section[s]]
+                        for s in grouped_by_section:
+                            if s not in ordered_secs and grouped_by_section[s]:
+                                ordered_secs.append(s)
+
+                        configured_sections_map = {
+                            (s.section.value if hasattr(s.section, "value") else str(s.section)): s
+                            for s in (exam_set.sections or [])
+                        }
+
+                        resumed_section_questions_map: Dict[str, List[QuestionStudentView]] = {}
+                        resumed_active_sections: List[MockTestTemplateSection] = []
+
+                        for sec_val in ordered_secs:
+                            sec_docs = grouped_by_section[sec_val]
+                            safe_views: List[QuestionStudentView] = []
+                            for d in sec_docs:
+                                stem_val = d.get("stem", "")
+                                stem_str = stem_val.get(exam_lang, stem_val.get("ky", "")) if isinstance(stem_val, dict) else str(stem_val or "")
+                                opt_a = d.get("option_a", "")
+                                opt_b = d.get("option_b", "")
+                                opt_c = d.get("option_c", "")
+                                opt_d = d.get("option_d", "")
+                                opt_e = d.get("option_e")
+                                if not opt_a and "options" in d and isinstance(d["options"], list):
+                                    for o in d["options"]:
+                                        oid = o.get("id", "").upper()
+                                        otxt = o.get("text", "")
+                                        if isinstance(otxt, dict):
+                                            otxt = otxt.get(exam_lang, otxt.get("ky", ""))
+                                        if oid == "A": opt_a = otxt
+                                        elif oid == "B": opt_b = otxt
+                                        elif oid == "C": opt_c = otxt
+                                        elif oid == "D": opt_d = otxt
+                                        elif oid == "E": opt_e = opt_e
+    
+                                sec_type = SectionType(sec_val) if sec_val in SectionType._value2member_map_ else sec_val
+                                safe_views.append(
+                                    QuestionStudentView(
+                                        id=d.get("id", ""),
+                                        language=exam_lang,
+                                        section=sec_type,
+                                        topic=d.get("topic", "General"),
+                                        difficulty=d.get("difficulty", "medium"),
+                                        stem=stem_str,
+                                        column_a=d.get("column_a"),
+                                        column_b=d.get("column_b"),
+                                        option_a=opt_a,
+                                        option_b=opt_b,
+                                        option_c=opt_c,
+                                        option_d=opt_d,
+                                        option_e=opt_e,
+                                        image_url=d.get("image_url"),
+                                        passage_text=d.get("passage_text"),
+                                        tags=d.get("tags", []),
+                                        exam_set_id=d.get("exam_set_id"),
+                                        correct_option_id="",
+                                    )
+                                )
+    
+                            if safe_views:
+                                resumed_section_questions_map[sec_val] = safe_views
+                                conf_sec = configured_sections_map.get(sec_val)
+                                time_lim = conf_sec.timeLimitMinutes if conf_sec and conf_sec.timeLimitMinutes else 30
+                                sec_type = SectionType(sec_val) if sec_val in SectionType._value2member_map_ else sec_val
+                                resumed_active_sections.append(
+                                    MockTestTemplateSection(
+                                        section=sec_type,
+                                        questionCount=len(safe_views),
+                                        timeLimitMinutes=time_lim,
+                                    )
+                                )
+    
+                        es_type_str = exam_set.exam_type.value if hasattr(exam_set.exam_type, "value") else str(exam_set.exam_type or "full_main")
+    
+                        return TestSessionResponse(
+                            attemptId=attempt_id,
+                            templateId=template_id,
+                            language=exam_lang,
+                            status=ExamStatus.IN_PROGRESS,
+                            startedAt=att_data.get("startedAt", now_iso),
+                            totalTimeSeconds=saved_total_time,
+                            remainingTimeSeconds=saved_remaining_time if saved_remaining_time is not None else saved_total_time,
+                            currentSectionIndex=saved_section_index,
+                            sections=resumed_active_sections,
+                            questions=resumed_section_questions_map,
+                            exam_type=es_type_str,
+                            title=exam_set.title,
+                            time_limit_minutes=exam_set.time_limit_minutes or exam_set.totalTimeMinutes,
+                            answers=saved_answers,
+                        )
+            except Exception as e:
+                logger.error(f"Error resuming session: {e}", exc_info=True)
+        else:
+            # force_new requested: supersede any lingering in_progress attempts for this template
+            try:
+                old_in_prog = (
+                    db.collection("test_attempts")
+                    .where("userId", "==", user_id)
+                    .where("templateId", "==", template_id)
+                    .where("status", "==", ExamStatus.IN_PROGRESS.value)
+                    .get()
+                )
+                for od in old_in_prog:
+                    od.reference.update({"status": ExamStatus.TIMED_OUT.value})
+            except Exception:
+                pass
 
         section_questions_map: Dict[str, List[QuestionStudentView]] = {}
         cached_question_ids: List[str] = []
@@ -484,6 +680,8 @@ class MockTestService:
                             topic=d.get("topic", "General"),
                             difficulty=d.get("difficulty", "medium"),
                             stem=stem_str,
+                            column_a=d.get("column_a"),
+                            column_b=d.get("column_b"),
                             option_a=opt_a,
                             option_b=opt_b,
                             option_c=opt_c,
@@ -582,6 +780,8 @@ class MockTestService:
                             topic=d.get("topic", "General"),
                             difficulty=d.get("difficulty", "medium"),
                             stem=stem_str,
+                            column_a=d.get("column_a"),
+                            column_b=d.get("column_b"),
                             option_a=opt_a,
                             option_b=opt_b,
                             option_c=opt_c,
@@ -632,9 +832,40 @@ class MockTestService:
             "totalTimeSeconds": total_time_secs,
             "questionIds": cached_question_ids,
             "answers": {},
+            "remainingTimeSeconds": total_time_secs,
+            "currentSectionIndex": 0,
             "exam_type": es_type_str,
         }
         db.collection("test_attempts").document(attempt_id).set(attempt_record)
+
+        # Sync attempt record to SQL test_attempts table
+        try:
+            from app.db.session import SessionLocal
+            from app.models.test_attempt import TestAttempt
+            sql_session = SessionLocal()
+            try:
+                now_dt = datetime.now(timezone.utc)
+                sql_attempt = TestAttempt(
+                    id=attempt_id,
+                    user_id=user_id,
+                    template_id=template_id,
+                    language=exam_lang,
+                    status=ExamStatus.IN_PROGRESS.value,
+                    started_at=now_dt,
+                    total_time_seconds=total_time_secs,
+                    remaining_time_seconds=total_time_secs,
+                    current_section_index=0,
+                    question_ids=cached_question_ids,
+                    answers={},
+                )
+                sql_session.merge(sql_attempt)
+                sql_session.commit()
+            except Exception:
+                sql_session.rollback()
+            finally:
+                sql_session.close()
+        except Exception:
+            pass
 
         return TestSessionResponse(
             attemptId=attempt_id,
@@ -643,11 +874,14 @@ class MockTestService:
             status=ExamStatus.IN_PROGRESS,
             startedAt=now_iso,
             totalTimeSeconds=total_time_secs,
+            remainingTimeSeconds=total_time_secs,
+            currentSectionIndex=0,
             sections=active_sections,
             questions=section_questions_map,
             exam_type=es_type_str,
             title=exam_set.title,
             time_limit_minutes=exam_set.time_limit_minutes or exam_set.totalTimeMinutes,
+            answers={},
         )
 
     @classmethod
@@ -656,6 +890,9 @@ class MockTestService:
         attempt_id: str,
         user_id: str,
         answers: Dict[str, AnswerSubmission],
+        remaining_time_seconds: Optional[int] = None,
+        current_section_index: Optional[int] = None,
+        is_final: Optional[bool] = False,
     ) -> bool:
         db = get_firestore_client()
         attempt_ref = db.collection("test_attempts").document(attempt_id)
@@ -667,8 +904,55 @@ class MockTestService:
         if data.get("userId") != user_id:
             raise ValidationException("You are not authorized to update this test attempt.")
 
+        # CRITICAL LOCK: If attempt is already completed, NEVER revert back to in_progress!
+        if data.get("status") == ExamStatus.COMPLETED.value:
+            return True
+
+        # If is_final is true (User clicked Submit or Timer hit 00:00),
+        # update the database record to status = 'completed', calculate final score, and lock the exam!
+        if is_final:
+            cls.submit_and_score_test(
+                attempt_id=attempt_id,
+                user_id=user_id,
+                answers=answers,
+            )
+            return True
+
         serialized_answers = {k: v.model_dump() for k, v in answers.items()}
-        attempt_ref.update({"answers": serialized_answers})
+        update_payload: Dict[str, Any] = {
+            "answers": serialized_answers,
+            "status": ExamStatus.IN_PROGRESS.value,
+        }
+        if remaining_time_seconds is not None:
+            update_payload["remainingTimeSeconds"] = remaining_time_seconds
+        if current_section_index is not None:
+            update_payload["currentSectionIndex"] = current_section_index
+
+        attempt_ref.update(update_payload)
+
+        # Sync to SQL test_attempts table
+        try:
+            from app.db.session import SessionLocal
+            from app.models.test_attempt import TestAttempt
+            sql_session = SessionLocal()
+            try:
+                sql_attempt = sql_session.query(TestAttempt).filter(TestAttempt.id == attempt_id).first()
+                if sql_attempt:
+                    if sql_attempt.status != ExamStatus.COMPLETED.value:
+                        sql_attempt.answers = serialized_answers
+                        sql_attempt.status = ExamStatus.IN_PROGRESS.value
+                        if remaining_time_seconds is not None and hasattr(sql_attempt, "remaining_time_seconds"):
+                            sql_attempt.remaining_time_seconds = remaining_time_seconds
+                        if current_section_index is not None and hasattr(sql_attempt, "current_section_index"):
+                            sql_attempt.current_section_index = current_section_index
+                        sql_session.commit()
+            except Exception:
+                sql_session.rollback()
+            finally:
+                sql_session.close()
+        except Exception:
+            pass
+
         return True
 
     @classmethod
@@ -744,6 +1028,21 @@ class MockTestService:
             "review": [r.model_dump() for r in result.review],
         })
 
+        # Also supersede any other lingering in_progress docs for this template in Firestore
+        try:
+            lingering_docs = (
+                db.collection("test_attempts")
+                .where("userId", "==", user_id)
+                .where("templateId", "==", template_id)
+                .where("status", "==", ExamStatus.IN_PROGRESS.value)
+                .get()
+            )
+            for ld in lingering_docs:
+                if ld.id != attempt_id:
+                    ld.reference.update({"status": ExamStatus.TIMED_OUT.value})
+        except Exception:
+            pass
+
         # Update user's currentEstimatedScore in users collection (for main test)
         if exam_type != "subject":
             user_ref = db.collection("users").document(user_id)
@@ -769,6 +1068,63 @@ class MockTestService:
         except Exception:
             pass
 
+        # Sync completion to SQL TestAttempt
+        try:
+            from app.db.session import SessionLocal
+            from app.models.test_attempt import TestAttempt
+            sql_session = SessionLocal()
+            try:
+                sql_attempt = sql_session.query(TestAttempt).filter(TestAttempt.id == attempt_id).first()
+                if sql_attempt:
+                    sql_attempt.status = ExamStatus.COMPLETED.value
+                    sql_attempt.completed_at = datetime.now(timezone.utc)
+                    sql_attempt.answers = serialized_answers
+                    sql_attempt.scores = {
+                        "rawScore": result.totalRawScore,
+                        "scaledScore": result.totalScaledScore,
+                        "maxScaledScore": result.maxScaledScore,
+                        "percentile": result.percentile,
+                        "isGoldenCertificate": result.isGoldenCertificate,
+                    }
+                else:
+                    sql_attempt = TestAttempt(
+                        id=attempt_id,
+                        user_id=user_id,
+                        template_id=template_id,
+                        language=language,
+                        status=ExamStatus.COMPLETED.value,
+                        started_at=datetime.now(timezone.utc),
+                        completed_at=datetime.now(timezone.utc),
+                        answers=serialized_answers,
+                        scores={
+                            "rawScore": result.totalRawScore,
+                            "scaledScore": result.totalScaledScore,
+                            "maxScaledScore": result.maxScaledScore,
+                            "percentile": result.percentile,
+                            "isGoldenCertificate": result.isGoldenCertificate,
+                        },
+                    )
+                    sql_session.add(sql_attempt)
+
+                # Also supersede any other in-progress SQL attempts for this template
+                sql_session.query(TestAttempt).filter(
+                    TestAttempt.user_id == user_id,
+                    TestAttempt.template_id == template_id,
+                    TestAttempt.status == ExamStatus.IN_PROGRESS.value,
+                    TestAttempt.id != attempt_id,
+                ).update({
+                    "status": ExamStatus.TIMED_OUT.value,
+                })
+
+                sql_session.commit()
+            except Exception as sql_err:
+                logger.error(f"Error updating SQL TestAttempt: {sql_err}", exc_info=True)
+                sql_session.rollback()
+            finally:
+                sql_session.close()
+        except Exception:
+            pass
+
         # Increment completionsCount on ExamSet if document exists
         exam_ref = db.collection("mock_test_templates").document(template_id)
         exam_doc = exam_ref.get()
@@ -790,7 +1146,7 @@ class MockTestService:
             .where("status", "==", ExamStatus.COMPLETED.value)
             .get()
         )
-        attempts = []
+        attempts_map: Dict[str, Dict[str, Any]] = {}
         for d in docs:
             data = d.to_dict()
             att_id = data.get("id") or d.id
@@ -801,8 +1157,109 @@ class MockTestService:
                 es = cls.get_exam_set_by_id(tid)
                 if es:
                     data["templateTitle"] = es.title
-            attempts.append(data)
+            attempts_map[att_id] = data
 
-        attempts.sort(key=lambda a: a.get("completedAt") or "", reverse=True)
-        return attempts
+        # Also load from SQL
+        try:
+            from app.db.session import SessionLocal
+            from app.models.test_attempt import TestAttempt
+            sql_session = SessionLocal()
+            try:
+                sql_items = sql_session.query(TestAttempt).filter(
+                    TestAttempt.user_id == user_id,
+                    TestAttempt.status == ExamStatus.COMPLETED.value,
+                ).all()
+                for si in sql_items:
+                    if si.id not in attempts_map:
+                        d = si.to_dict()
+                        d["attemptId"] = si.id
+                        tid = d.get("templateId")
+                        if tid:
+                            es = cls.get_exam_set_by_id(tid)
+                            if es:
+                                d["templateTitle"] = es.title
+                        attempts_map[si.id] = d
+            finally:
+                sql_session.close()
+        except Exception:
+            pass
+
+        results = list(attempts_map.values())
+        results.sort(key=lambda a: a.get("completedAt") or a.get("startedAt") or "", reverse=True)
+        return results
+
+    @classmethod
+    def get_user_in_progress_attempts(cls, user_id: str) -> List[Dict[str, Any]]:
+        """
+        Retrieves all active or paused in-progress test attempts for a student.
+        Strictly evaluates the latest attempt per template:
+        if the latest attempt for a template has status == 'completed',
+        it will NEVER return an older in_progress attempt for that template.
+        """
+        db = get_firestore_client()
+        fs_docs = (
+            db.collection("test_attempts")
+            .where("userId", "==", user_id)
+            .get()
+        )
+        all_attempts_map: Dict[str, Dict[str, Any]] = {}
+        for d in fs_docs:
+            data = d.to_dict()
+            att_id = data.get("id") or d.id
+            data["id"] = att_id
+            data["attemptId"] = att_id
+            all_attempts_map[att_id] = data
+
+        # Fetch all attempts from SQL test_attempts table
+        try:
+            from app.db.session import SessionLocal
+            from app.models.test_attempt import TestAttempt
+            sql_session = SessionLocal()
+            try:
+                sql_items = sql_session.query(TestAttempt).filter(
+                    TestAttempt.user_id == user_id,
+                ).all()
+                for si in sql_items:
+                    if si.id not in all_attempts_map:
+                        d = si.to_dict()
+                        d["attemptId"] = si.id
+                        all_attempts_map[si.id] = d
+                    else:
+                        if si.status == ExamStatus.COMPLETED.value:
+                            all_attempts_map[si.id]["status"] = ExamStatus.COMPLETED.value
+            finally:
+                sql_session.close()
+        except Exception:
+            pass
+
+        # Group attempts by templateId
+        grouped_by_template: Dict[str, List[Dict[str, Any]]] = {}
+        for att in all_attempts_map.values():
+            tid = att.get("templateId")
+            if tid:
+                grouped_by_template.setdefault(tid, []).append(att)
+
+        in_progress_results: List[Dict[str, Any]] = []
+
+        # For each template, sort by timestamp DESC and check the LATEST attempt
+        for tid, attempts_list in grouped_by_template.items():
+            def get_timestamp(a):
+                return a.get("startedAt") or a.get("createdAt") or a.get("completedAt") or ""
+
+            attempts_list.sort(key=get_timestamp, reverse=True)
+            latest = attempts_list[0]
+
+            # If latest attempt is completed, this template has NO active in-progress attempt!
+            if latest.get("status") == ExamStatus.COMPLETED.value:
+                continue
+
+            if latest.get("status") == ExamStatus.IN_PROGRESS.value:
+                es = cls.get_exam_set_by_id(tid)
+                if es:
+                    latest["templateTitle"] = es.title
+                in_progress_results.append(latest)
+
+        in_progress_results.sort(key=lambda a: a.get("startedAt") or "", reverse=True)
+        return in_progress_results
+
 

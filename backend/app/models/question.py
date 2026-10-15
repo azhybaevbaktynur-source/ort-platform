@@ -12,11 +12,13 @@ class Question(Base):
     section = Column(String, nullable=False, index=True)
     topic = Column(String, nullable=False, index=True)
     difficulty = Column(String, default="medium", nullable=False)
-    stem = Column(Text, nullable=False)
-    option_a = Column(Text, nullable=False)
-    option_b = Column(Text, nullable=False)
-    option_c = Column(Text, nullable=False)
-    option_d = Column(Text, nullable=False)
+    column_a = Column(Text, nullable=True)
+    column_b = Column(Text, nullable=True)
+    stem = Column(Text, nullable=True, default="")
+    option_a = Column(Text, nullable=True, default="")
+    option_b = Column(Text, nullable=True, default="")
+    option_c = Column(Text, nullable=True, default="")
+    option_d = Column(Text, nullable=True, default="")
     option_e = Column(Text, nullable=True)
     correct_option = Column(String, nullable=False)
     explanation = Column(Text, nullable=True)
@@ -38,11 +40,13 @@ class Question(Base):
             "section": self.section,
             "topic": self.topic,
             "difficulty": self.difficulty,
-            "stem": self.stem,
-            "option_a": self.option_a,
-            "option_b": self.option_b,
-            "option_c": self.option_c,
-            "option_d": self.option_d,
+            "stem": self.stem or "",
+            "column_a": self.column_a,
+            "column_b": self.column_b,
+            "option_a": self.option_a or "",
+            "option_b": self.option_b or "",
+            "option_c": self.option_c or "",
+            "option_d": self.option_d or "",
             "option_e": self.option_e,
             "correct_option": self.correct_option,
             "explanation": self.explanation,

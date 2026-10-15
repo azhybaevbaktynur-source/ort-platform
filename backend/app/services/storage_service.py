@@ -16,6 +16,14 @@ class BaseStorageService(ABC):
         """Saves file content and returns the publicly accessible URL."""
         pass
 
+    def exists(self, filename: str) -> bool:
+        """Whether a file is already stored under this key (lets content-addressed uploads be skipped)."""
+        return False
+
+    def public_url(self, filename: str) -> str:
+        """Public URL for a stored key."""
+        return f"{settings.STORAGE_BASE_URL.rstrip('/')}/{filename}"
+
 
 class LocalStorageService(BaseStorageService):
     """
@@ -23,7 +31,7 @@ class LocalStorageService(BaseStorageService):
     Suitable for local development where ephemeral storage is not an issue.
     """
     def __init__(self, upload_dir: Optional[str] = None, base_url: Optional[str] = None):
-        self.upload_dir = upload_dir or os.path.abspath(
+        self.upload_dir = upload_dir or settings.LOCAL_UPLOAD_DIR or os.path.abspath(
             os.path.join(os.path.dirname(__file__), "../../../backend/data/uploads")
         )
         self.base_url = (base_url or settings.STORAGE_BASE_URL).rstrip("/")
@@ -31,8 +39,15 @@ class LocalStorageService(BaseStorageService):
 
     async def upload_file(self, content: bytes, filename: str, content_type: Optional[str] = None) -> str:
         target_path = os.path.join(self.upload_dir, filename)
+        os.makedirs(os.path.dirname(target_path), exist_ok=True)
         with open(target_path, "wb") as f:
             f.write(content)
+        return f"{self.base_url}/{filename}"
+
+    def exists(self, filename: str) -> bool:
+        return os.path.isfile(os.path.join(self.upload_dir, filename))
+
+    def public_url(self, filename: str) -> str:
         return f"{self.base_url}/{filename}"
 
 

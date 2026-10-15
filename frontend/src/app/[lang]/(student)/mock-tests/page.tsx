@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -20,6 +22,8 @@ import {
   BookOpenCheck,
   Compass,
   RotateCcw,
+  CheckCircle2,
+  BarChart3,
 } from "lucide-react";
 import { getAuthHeader } from "@/lib/api";
 
@@ -42,6 +46,8 @@ interface ExamSetItem {
   user_attempts_count?: number;
   completionsCount?: number;
   sections?: Array<{ section: string; questionCount: number; timeLimitMinutes: number }>;
+  has_in_progress?: boolean;
+  in_progress_attempt_id?: string | null;
 }
 
 export default function MockTestsHubPage() {
@@ -49,6 +55,8 @@ export default function MockTestsHubPage() {
   const router = useRouter();
 
   const [exams, setExams] = useState<ExamSetItem[]>([]);
+  const [inProgressMap, setInProgressMap] = useState<Record<string, any>>({});
+  const [completedAttemptsMap, setCompletedAttemptsMap] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
 
   // PIN Access Code Modal State
@@ -60,15 +68,61 @@ export default function MockTestsHubPage() {
     try {
       setLoading(true);
       const authHeader = await getAuthHeader();
-      // Dedicated student endpoint strictly returns published non-practice-bank sets
-      const res = await fetch(`/api/v1/exam-sets/student?lang=${lang}`, {
-        headers: authHeader,
-      });
-      if (res.ok) {
-        const data = await res.json();
+      const [resExams, resInProg, resAttempts] = await Promise.all([
+        fetch(`/api/v1/exam-sets/student?lang=${lang}`, { headers: authHeader, cache: "no-store" }),
+        fetch(`/api/v1/mock-tests/in-progress`, { headers: authHeader, cache: "no-store" }).catch(() => null),
+        fetch(`/api/v1/mock-tests/attempts`, { headers: authHeader, cache: "no-store" }).catch(() => null),
+      ]);
+
+      const inProgObj: Record<string, any> = {};
+      if (resInProg && resInProg.ok) {
+        const inProgList = await resInProg.json().catch(() => []);
+        if (Array.isArray(inProgList)) {
+          for (const item of inProgList) {
+            if (item.templateId) {
+              inProgObj[item.templateId] = item;
+            }
+          }
+        }
+      }
+      setInProgressMap(inProgObj);
+
+      const completedObj: Record<string, any> = {};
+      if (resAttempts && resAttempts.ok) {
+        const attemptsList = await resAttempts.json().catch(() => []);
+        if (Array.isArray(attemptsList)) {
+          for (const item of attemptsList) {
+            const tid = item.templateId || item.id;
+            if (tid && !completedObj[tid]) {
+              completedObj[tid] = item;
+            }
+          }
+        }
+      }
+      setCompletedAttemptsMap(completedObj);
+
+      if (resExams.ok) {
+        const data = await resExams.json();
         if (Array.isArray(data)) {
           const uniqueExams: ExamSetItem[] = Array.from(
-            new Map(data.map((item: any) => [item.id, item])).values()
+            new Map(
+              data.map((item: any) => {
+                const inProg = inProgObj[item.id];
+                const comp = completedObj[item.id];
+                let hasInProg = Boolean(item.has_in_progress);
+                if (inProg && comp) {
+                  const inProgTime = new Date(inProg.startedAt || inProg.createdAt || 0).getTime();
+                  const compTime = new Date(comp.completedAt || comp.startedAt || 0).getTime();
+                  hasInProg = inProgTime > compTime;
+                } else if (inProg) {
+                  hasInProg = true;
+                } else if (comp) {
+                  hasInProg = false;
+                }
+                const attemptsCount = item.user_attempts_count ?? (comp ? 1 : 0);
+                return [item.id, { ...item, has_in_progress: hasInProg, user_attempts_count: attemptsCount }];
+              })
+            ).values()
           );
           setExams(uniqueExams);
         }
@@ -85,16 +139,20 @@ export default function MockTestsHubPage() {
   }, [lang]);
 
   const handleStartExamClick = (exam: ExamSetItem) => {
-    // Check if max attempts reached
-    const attemptsCount = exam.user_attempts_count ?? 0;
-    const maxAttempts = exam.max_attempts ?? 1;
-    if (maxAttempts < 99 && attemptsCount >= maxAttempts) {
-      alert(
-        lang === "ky"
-          ? `Сиз бул тест боюнча бардык мүмкүн болгон аракеттерди колдондуңуз (${attemptsCount}/${maxAttempts}).`
-          : `Вы исчерпали лимит попыток для этого экзамена (${attemptsCount}/${maxAttempts}).`
-      );
-      return;
+    const isResuming = Boolean(exam.has_in_progress || inProgressMap[exam.id]);
+
+    // Check if max attempts reached (only when starting a brand new attempt)
+    if (!isResuming) {
+      const attemptsCount = exam.user_attempts_count ?? 0;
+      const maxAttempts = exam.max_attempts ?? 1;
+      if (maxAttempts < 99 && attemptsCount >= maxAttempts) {
+        alert(
+          lang === "ky"
+            ? `Сиз бул тест боюнча бардык мүмкүн болгон аракеттерди колдондуңуз (${attemptsCount}/${maxAttempts}).`
+            : `Вы исчерпали лимит попыток для этого экзамена (${attemptsCount}/${maxAttempts}).`
+        );
+        return;
+      }
     }
 
     // Check if locked by date
@@ -128,6 +186,45 @@ export default function MockTestsHubPage() {
     router.push(`/${lang}/mock-tests/${exam.id}`);
   };
 
+  const handleRetakeExamClick = (exam: ExamSetItem) => {
+    // Check if locked by date
+    const nowIso = new Date().toISOString();
+    if (exam.available_from && nowIso < exam.available_from) {
+      alert(
+        lang === "ky"
+          ? `Экзамен ${new Date(exam.available_from).toLocaleString()} башталат`
+          : `Экзамен откроется ${new Date(exam.available_from).toLocaleString()}`
+      );
+      return;
+    }
+    if (exam.available_until && nowIso > exam.available_until) {
+      alert(
+        lang === "ky"
+          ? "Экзамендин мөөнөтү бүттү (Заблокирован)"
+          : "Срок сдачи экзамена истек (Заблокирован)"
+      );
+      return;
+    }
+
+    if (exam.access_code && exam.access_code.trim()) {
+      setPinModalExam({ ...exam, isRetake: true } as any);
+      setEnteredPin("");
+      setPinError(null);
+      return;
+    }
+
+    router.push(`/${lang}/mock-tests/${exam.id}?force_new=true`);
+  };
+
+  const handleViewResult = (examId: string, completedAttempt?: any) => {
+    if (completedAttempt?.result) {
+      try {
+        sessionStorage.setItem(`ort_result_${examId}`, JSON.stringify(completedAttempt.result));
+      } catch {}
+    }
+    router.push(`/${lang}/mock-tests/${examId}/result`);
+  };
+
   const handleVerifyPinAndStart = (e: React.FormEvent) => {
     e.preventDefault();
     if (!pinModalExam) return;
@@ -141,8 +238,14 @@ export default function MockTestsHubPage() {
 
     const examId = pinModalExam.id;
     const pin = enteredPin.trim();
+    const isRetake = (pinModalExam as any).isRetake;
     setPinModalExam(null);
-    router.push(`/${lang}/mock-tests/${examId}?pin=${encodeURIComponent(pin)}`);
+    const query = new URLSearchParams();
+    query.set("pin", pin);
+    if (isRetake) {
+      query.set("force_new", "true");
+    }
+    router.push(`/${lang}/mock-tests/${examId}?${query.toString()}`);
   };
 
   const fullMainExams = exams.filter(
@@ -158,19 +261,43 @@ export default function MockTestsHubPage() {
   );
 
   const fastPracticeId = lang === "ru" ? "exam_practice_bank_ru" : "exam_practice_bank_ky";
+  const fastPracticeInProg =
+    inProgressMap[fastPracticeId] ||
+    inProgressMap["ort_speed_drill"] ||
+    inProgressMap["exam_practice_bank_ky"] ||
+    inProgressMap["exam_practice_bank_ru"];
+  const fastPracticeComp =
+    completedAttemptsMap[fastPracticeId] ||
+    completedAttemptsMap["ort_speed_drill"] ||
+    completedAttemptsMap["exam_practice_bank_ky"] ||
+    completedAttemptsMap["exam_practice_bank_ru"];
+
+  let isFastPracticeResuming = false;
+  if (fastPracticeInProg) {
+    if (fastPracticeComp) {
+      const inProgTime = new Date(fastPracticeInProg.startedAt || fastPracticeInProg.createdAt || 0).getTime();
+      const compTime = new Date(fastPracticeComp.completedAt || fastPracticeComp.startedAt || 0).getTime();
+      isFastPracticeResuming = inProgTime > compTime;
+    } else {
+      isFastPracticeResuming = true;
+    }
+  }
 
   const renderExamCard = (test: ExamSetItem) => {
+    const isResuming = Boolean(test.has_in_progress || inProgressMap[test.id]);
+    const completedAttempt = completedAttemptsMap[test.id];
+    const attemptsCount = test.user_attempts_count ?? (completedAttempt ? 1 : 0);
+    const maxAttempts = test.max_attempts ?? 1;
+    const isUnlimitedAttempts = maxAttempts >= 99;
+    const isAttemptsExceeded = !isUnlimitedAttempts && attemptsCount >= maxAttempts;
+    const isCompleted = !isResuming && (attemptsCount > 0 || Boolean(completedAttempt));
+    const canRetake = isCompleted && (isUnlimitedAttempts || attemptsCount < maxAttempts);
+
     const nowIso = new Date().toISOString();
     const isLockedEarly = test.available_from && nowIso < test.available_from;
     const isLockedLate = test.available_until && nowIso > test.available_until;
     const isLocked = Boolean(isLockedEarly || isLockedLate);
     const hasPin = Boolean(test.access_code && test.access_code.trim());
-
-    // Attempts calculation
-    const attemptsCount = test.user_attempts_count ?? 0;
-    const maxAttempts = test.max_attempts ?? 1;
-    const isUnlimitedAttempts = maxAttempts >= 99;
-    const isAttemptsExceeded = !isUnlimitedAttempts && attemptsCount >= maxAttempts;
 
     // Custom timer calculation
     const timeMinutes = test.time_limit_minutes !== undefined && test.time_limit_minutes !== null
@@ -180,13 +307,17 @@ export default function MockTestsHubPage() {
       ? `${timeMinutes} ${lang === "ky" ? "мүнөт" : "минут"}`
       : (lang === "ky" ? "Чектөөсүз" : "Без ограничений");
 
-    const isActionDisabled = isLocked || isAttemptsExceeded;
+    const isActionDisabled = !isResuming && !isCompleted && (isLocked || isAttemptsExceeded);
 
     return (
       <div
         key={test.id}
         className={`bg-white rounded-2xl border p-6 flex flex-col justify-between shadow-xs transition-all relative overflow-hidden ${
-          isActionDisabled
+          isResuming
+            ? "border-emerald-300 ring-1 ring-emerald-200/60 hover:shadow-md"
+            : isCompleted
+            ? "border-slate-200 hover:border-slate-300 hover:shadow-md"
+            : isActionDisabled
             ? "border-slate-200 bg-slate-50/60 opacity-80"
             : "border-slate-200 hover:border-indigo-300 hover:shadow-md"
         }`}
@@ -210,8 +341,18 @@ export default function MockTestsHubPage() {
               )}
             </div>
 
-            {/* Lock / Attempt Status */}
-            {isAttemptsExceeded ? (
+            {/* Lock / Attempt Status / In Progress Status */}
+            {isResuming ? (
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>{lang === "ky" ? "Улантууда" : "В процессе"}</span>
+              </span>
+            ) : isCompleted ? (
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{lang === "ky" ? "Аяктады" : "Завершен"}</span>
+              </span>
+            ) : isAttemptsExceeded ? (
               <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-600 bg-rose-50 px-2.5 py-1 rounded-full border border-rose-200">
                 <AlertCircle className="w-3.5 h-3.5" />
                 <span>{lang === "ky" ? "Лимит бүттү" : "Лимит исчерпан"}</span>
@@ -246,7 +387,7 @@ export default function MockTestsHubPage() {
             </div>
             <div className="flex items-center gap-1.5">
               <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
-              <span className={isAttemptsExceeded ? "text-rose-600 font-bold" : ""}>
+              <span className={isAttemptsExceeded && !isResuming ? "text-rose-600 font-bold" : ""}>
                 {lang === "ky" ? "Аракеттер:" : "Попытки:"}{" "}
                 {isUnlimitedAttempts
                   ? (lang === "ky" ? "Чектөөсүз" : "Без лимита")
@@ -267,33 +408,62 @@ export default function MockTestsHubPage() {
           </div>
         </div>
 
-        {/* Action Button */}
-        <button
-          onClick={() => handleStartExamClick(test)}
-          disabled={isActionDisabled}
-          className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs ${
-            isActionDisabled
-              ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-              : "bg-indigo-600 hover:bg-indigo-700 text-white"
-          }`}
-        >
-          {isAttemptsExceeded ? (
-            <>
-              <AlertCircle className="w-3.5 h-3.5" />
-              <span>{lang === "ky" ? "Аракеттер чеги бүттү" : "Лимит попыток исчерпан"}</span>
-            </>
-          ) : isLocked ? (
-            <>
-              <Lock className="w-3.5 h-3.5" />
-              <span>{lang === "ky" ? "Жабык" : "Недоступно"}</span>
-            </>
-          ) : (
-            <>
-              <span>{lang === "ky" ? "Тестти баштоо" : "Начать тест"}</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </>
-          )}
-        </button>
+        {/* Action Button(s) */}
+        {isResuming ? (
+          <button
+            onClick={() => handleStartExamClick(test)}
+            className="w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-100"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>{lang === "ky" ? "Улантуу" : "Возобновить"}</span>
+          </button>
+        ) : isCompleted ? (
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => handleViewResult(test.id, completedAttempt)}
+              className="w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs cursor-pointer bg-slate-900 hover:bg-slate-800 text-white"
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>{lang === "ky" ? "Аяктады / Жыйынтыгын көрүү" : "Завершен / Посмотреть результат"}</span>
+            </button>
+            {canRetake && (
+              <button
+                onClick={() => handleRetakeExamClick(test)}
+                className="w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition border border-indigo-200 text-indigo-700 bg-indigo-50/60 hover:bg-indigo-100 cursor-pointer"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>{lang === "ky" ? "Кайра тапшыруу" : "Пересдать"}</span>
+              </button>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={() => handleStartExamClick(test)}
+            disabled={isActionDisabled}
+            className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs cursor-pointer ${
+              isActionDisabled
+                ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                : "bg-indigo-600 hover:bg-indigo-700 text-white"
+            }`}
+          >
+            {isAttemptsExceeded ? (
+              <>
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span>{lang === "ky" ? "Аракеттер чеги бүттү" : "Лимит попыток исчерпан"}</span>
+              </>
+            ) : isLocked ? (
+              <>
+                <Lock className="w-3.5 h-3.5" />
+                <span>{lang === "ky" ? "Жабык" : "Недоступно"}</span>
+              </>
+            ) : (
+              <>
+                <span>{lang === "ky" ? "Тестти баштоо" : "Начать тест"}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </>
+            )}
+          </button>
+        )}
       </div>
     );
   };
@@ -316,10 +486,20 @@ export default function MockTestsHubPage() {
       <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-md relative overflow-hidden">
         <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-64 h-64 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
         <div className="relative z-10 max-w-2xl space-y-4">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-400/30">
-            <Zap className="w-3.5 h-3.5 fill-emerald-300" />
+          <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+            isFastPracticeResuming
+              ? "bg-amber-400/20 text-amber-300 border-amber-400/30"
+              : "bg-emerald-500/20 text-emerald-300 border-emerald-400/30"
+          }`}>
+            {isFastPracticeResuming ? (
+              <RotateCcw className="w-3.5 h-3.5" />
+            ) : (
+              <Zap className="w-3.5 h-3.5 fill-emerald-300" />
+            )}
             <span>
-              {lang === "ky" ? "Ылдам машыгуу (25 суроо)" : "Экспресс-тренировка (25 вопросов)"}
+              {isFastPracticeResuming
+                ? (lang === "ky" ? "Машыгуу улантылууда" : "Тренировка в процессе")
+                : (lang === "ky" ? "Ылдам машыгуу (25 суроо)" : "Экспресс-тренировка (25 вопросов)")}
             </span>
           </div>
 
@@ -352,11 +532,28 @@ export default function MockTestsHubPage() {
 
           <div className="pt-2">
             <Link
-              href={`/${lang}/mock-tests/${fastPracticeId}`}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-white text-emerald-950 font-bold rounded-2xl hover:bg-emerald-50 shadow-md transition-all text-sm group"
+              href={
+                isFastPracticeResuming
+                  ? `/${lang}/mock-tests/${fastPracticeInProg?.templateId || fastPracticeId}`
+                  : `/${lang}/mock-tests/${fastPracticeId}?force_new=true`
+              }
+              className={`inline-flex items-center gap-2 px-6 py-3 font-bold rounded-2xl shadow-md transition-all text-sm group ${
+                isFastPracticeResuming
+                  ? "bg-amber-400 text-slate-950 hover:bg-amber-300"
+                  : "bg-white text-emerald-950 hover:bg-emerald-50"
+              }`}
             >
-              <span>{lang === "ky" ? "Ылдам машыгууну баштоо" : "Начать экспресс-тренировку"}</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              {isFastPracticeResuming ? (
+                <>
+                  <RotateCcw className="w-4 h-4" />
+                  <span>{lang === "ky" ? "Машыгууну улантуу" : "Возобновить экспресс-тренировку"}</span>
+                </>
+              ) : (
+                <>
+                  <span>{lang === "ky" ? "Жаңы машыгууну баштоо" : "Начать новую тренировку"}</span>
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
             </Link>
           </div>
         </div>
