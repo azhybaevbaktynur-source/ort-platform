@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Text, JSON, DateTime, ForeignKey
+from sqlalchemy import Column, String, Text, JSON, DateTime, ForeignKey, Integer, Index
 from sqlalchemy.orm import relationship
 from app.db.session import Base
 
@@ -7,7 +7,7 @@ from app.db.session import Base
 class Question(Base):
     __tablename__ = "questions"
 
-    id = Column(String, primary_key=True, index=True)
+    id = Column(String, primary_key=True)
     language = Column(String, default="ky", nullable=False)
     section = Column(String, nullable=False, index=True)
     topic = Column(String, nullable=False, index=True)
@@ -26,12 +26,18 @@ class Question(Base):
     passage_text = Column(Text, nullable=True)
     tags = Column(JSON, default=list, nullable=True)
     exam_set_id = Column(String, ForeignKey("exam_sets.id", ondelete="CASCADE"), nullable=True, index=True)
+    # Place of the question in its original document/set (1-based, across sections). Every listing
+    # orders by section order, then position (see app/services/question_order.py).
+    position = Column(Integer, nullable=True)
+    q_num = Column(String, nullable=True)  # question number printed in the source document, if known
     stats = Column(JSON, default=dict, nullable=True)
     created_by = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
     exam_set = relationship("ExamSet", back_populates="questions")
+
+    __table_args__ = (Index("ix_questions_exam_set_position", "exam_set_id", "position"),)
 
     def to_dict(self):
         return {
@@ -54,6 +60,8 @@ class Question(Base):
             "passage_text": self.passage_text,
             "tags": self.tags or [],
             "exam_set_id": self.exam_set_id,
+            "position": self.position,
+            "q_num": self.q_num,
             "stats": self.stats or {
                 "totalAttempts": 0,
                 "correctAttempts": 0,

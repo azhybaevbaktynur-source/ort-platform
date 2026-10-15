@@ -78,6 +78,8 @@ class QuestionBase(BaseModel):
     passage_text: Optional[str] = Field(None, description="Optional reading passage text")
     tags: List[str] = []
     exam_set_id: Optional[str] = None
+    position: Optional[int] = Field(None, description="Place in the original document/set (document order)")
+    q_num: Optional[str] = Field(None, description="Question number printed in the source document")
 
 
 class QuestionCreate(QuestionBase):

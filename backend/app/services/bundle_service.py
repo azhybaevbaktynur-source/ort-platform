@@ -24,6 +24,7 @@ from app.schemas.bundle_import import BundleImportReport, BundleIssue, BundleSum
 from app.schemas.question import SectionType
 from app.services.csv_image_rule import is_stored_image_url
 from app.services.csv_service import CsvService
+from app.services.question_order import sql_order_by
 from app.services.storage_service import get_storage_service
 
 logger = logging.getLogger(__name__)
@@ -704,16 +705,17 @@ class BundleService:
 
             created_ids: List[str] = []
             bundle_ids: List[str] = []
-            for r in b.rows:
+            for position, r in enumerate(b.rows, start=1):
                 q = r.question
                 image_url = urls[r.image.key] if r.image else r.image_url
+                # Document order = row order in questions.csv (manifest questions[].row); q_num from the manifest
                 fields = dict(
                     language=b.language, section=q.section.value, topic=q.topic, difficulty=q.difficulty.value,
                     column_a=q.column_a, column_b=q.column_b, stem=q.stem or "",
                     option_a=q.option_a or "", option_b=q.option_b or "", option_c=q.option_c or "",
                     option_d=q.option_d or "", option_e=q.option_e, correct_option=q.correct_option,
                     explanation=q.explanation, image_url=image_url, passage_text=q.passage_text,
-                    exam_set_id=b.exam_set_id,
+                    exam_set_id=b.exam_set_id, position=position, q_num=r.q_num,
                 )
                 mapping = mappings.get(r.external_id) if r.external_id else None
                 row_obj = session.get(Question, mapping.question_id) if mapping is not None else None
@@ -742,7 +744,15 @@ class BundleService:
             session.flush()
 
             # Exam set: bundle questions in official order, then any earlier questions not in this bundle.
-            old_ids = [i for i in (exam.question_ids or []) if i not in set(bundle_ids)]
+            in_bundle = set(bundle_ids)
+            old_ids = [i for i in (exam.question_ids or []) if i not in in_bundle]
+            # Questions of this set that are not in the bundle keep their relative order after it
+            leftovers = (session.query(Question).filter(Question.exam_set_id == b.exam_set_id,
+                                                        Question.id.notin_(bundle_ids))
+                         .order_by(*sql_order_by(Question)).all())
+            for offset, q_row in enumerate(leftovers, start=len(bundle_ids) + 1):
+                q_row.position = offset
+            old_ids = list(dict.fromkeys(old_ids + [q_row.id for q_row in leftovers]))
             all_ids = bundle_ids + old_ids
             counts: Dict[str, int] = {}
             for r in b.rows:

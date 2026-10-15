@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 from app.db.firebase import get_firestore_client
+from app.services.question_order import load_question_docs, question_sort_key
 import random
 
 logger = logging.getLogger(__name__)
@@ -430,8 +431,12 @@ class MockTestService:
                         f"Сиз максималдуу аракеттер санын колдондуңуз ({exam_set.max_attempts}/{exam_set.max_attempts}) / Лимит попыток исчерпан"
                     )
 
-        questions_coll = db.collection("questions")
-        all_questions = questions_coll.get()
+        # Questions come from the database (the permanent store) in document order: one query for
+        # just this exam's questions (Firestore only fills in questions the database does not have).
+        if is_fast_practice:
+            all_questions = load_question_docs(language=exam_set.language or language)
+        else:
+            all_questions = load_question_docs(exam_set_ids=[exam_set.id], ids=exam_set.questionIds or [])
 
         # Check if user already has an active IN_PROGRESS attempt for this template to resume
         if not force_new:
@@ -634,6 +639,8 @@ class MockTestService:
             pool = practice_candidates
             num_to_sample = min(25, len(pool))
             selected_docs = random.sample(pool, num_to_sample) if num_to_sample > 0 else []
+            # Random choice of questions, but shown in document order
+            selected_docs.sort(key=question_sort_key)
 
             # Group selected questions by section
             grouped_selected: Dict[str, List[Dict[str, Any]]] = {}
@@ -884,6 +891,22 @@ class MockTestService:
             answers={},
         )
 
+    @staticmethod
+    def _load_attempt(attempt_id: str) -> Optional[Dict[str, Any]]:
+        """Attempt record from the in-memory store, or from the database after a restart."""
+        doc = get_firestore_client().collection("test_attempts").document(attempt_id).get()
+        if doc.exists:
+            return doc.to_dict()
+        from app.db.session import SessionLocal
+        from app.models.test_attempt import TestAttempt
+
+        session = SessionLocal()
+        try:
+            row = session.get(TestAttempt, attempt_id)
+            return row.to_dict() if row is not None else None
+        finally:
+            session.close()
+
     @classmethod
     def save_session_progress(
         cls,
@@ -896,11 +919,9 @@ class MockTestService:
     ) -> bool:
         db = get_firestore_client()
         attempt_ref = db.collection("test_attempts").document(attempt_id)
-        doc = attempt_ref.get()
-        if not doc.exists:
+        data = cls._load_attempt(attempt_id)
+        if data is None:
             raise EntityNotFoundException("TestAttempt", attempt_id)
-
-        data = doc.to_dict()
         if data.get("userId") != user_id:
             raise ValidationException("You are not authorized to update this test attempt.")
 
@@ -964,11 +985,9 @@ class MockTestService:
     ) -> MockTestResult:
         db = get_firestore_client()
         attempt_ref = db.collection("test_attempts").document(attempt_id)
-        doc = attempt_ref.get()
-        if not doc.exists:
+        attempt_data = cls._load_attempt(attempt_id)
+        if attempt_data is None:
             raise EntityNotFoundException("TestAttempt", attempt_id)
-
-        attempt_data = doc.to_dict()
         if attempt_data.get("userId") != user_id:
             raise ValidationException("You are not authorized to submit this test attempt.")
 
@@ -988,13 +1007,9 @@ class MockTestService:
             else:
                 exam_type = "full_main"
 
-        # Fetch original questions with correct answers
-        questions_coll = db.collection("questions")
-        test_questions: List[Dict[str, Any]] = []
-        for q_id in question_ids:
-            q_doc = questions_coll.document(q_id).get()
-            if q_doc.exists:
-                test_questions.append(q_doc.to_dict())
+        # Fetch original questions with correct answers in one query, keeping the test's order
+        q_by_id = {d.id: d.to_dict() for d in load_question_docs(ids=question_ids)}
+        test_questions: List[Dict[str, Any]] = [q_by_id[q_id] for q_id in question_ids if q_id in q_by_id]
 
         # Evaluate score via ScoringService with CEATM standards
         serialized_answers = {k: v.model_dump() for k, v in answers.items()}
@@ -1068,7 +1083,17 @@ class MockTestService:
         except Exception:
             pass
 
-        # Sync completion to SQL TestAttempt
+        # Sync completion to SQL TestAttempt, including the per-question review used by the results and
+        # mistakes pages (the database copy is what remains after the in-memory store restarts)
+        full_scores = {
+            "rawScore": result.totalRawScore,
+            "scaledScore": result.totalScaledScore,
+            "maxScaledScore": result.maxScaledScore,
+            "percentile": result.percentile,
+            "isGoldenCertificate": result.isGoldenCertificate,
+            "sectionBreakdown": {k: v.model_dump() for k, v in result.sectionScores.items()},
+        }
+        review_items = [r.model_dump() for r in result.review]
         try:
             from app.db.session import SessionLocal
             from app.models.test_attempt import TestAttempt
@@ -1079,13 +1104,10 @@ class MockTestService:
                     sql_attempt.status = ExamStatus.COMPLETED.value
                     sql_attempt.completed_at = datetime.now(timezone.utc)
                     sql_attempt.answers = serialized_answers
-                    sql_attempt.scores = {
-                        "rawScore": result.totalRawScore,
-                        "scaledScore": result.totalScaledScore,
-                        "maxScaledScore": result.maxScaledScore,
-                        "percentile": result.percentile,
-                        "isGoldenCertificate": result.isGoldenCertificate,
-                    }
+                    sql_attempt.scores = full_scores
+                    sql_attempt.review = review_items
+                    if not sql_attempt.question_ids:
+                        sql_attempt.question_ids = question_ids
                 else:
                     sql_attempt = TestAttempt(
                         id=attempt_id,
@@ -1096,13 +1118,9 @@ class MockTestService:
                         started_at=datetime.now(timezone.utc),
                         completed_at=datetime.now(timezone.utc),
                         answers=serialized_answers,
-                        scores={
-                            "rawScore": result.totalRawScore,
-                            "scaledScore": result.totalScaledScore,
-                            "maxScaledScore": result.maxScaledScore,
-                            "percentile": result.percentile,
-                            "isGoldenCertificate": result.isGoldenCertificate,
-                        },
+                        question_ids=question_ids,
+                        scores=full_scores,
+                        review=review_items,
                     )
                     sql_session.add(sql_attempt)
 
@@ -1147,16 +1165,23 @@ class MockTestService:
             .get()
         )
         attempts_map: Dict[str, Dict[str, Any]] = {}
+        titles: Dict[str, Optional[str]] = {}
+
+        def template_title(tid: str) -> Optional[str]:
+            # One lookup per exam set, not one per attempt
+            if tid not in titles:
+                es = cls.get_exam_set_by_id(tid)
+                titles[tid] = es.title if es else None
+            return titles[tid]
+
         for d in docs:
             data = d.to_dict()
             att_id = data.get("id") or d.id
             data["id"] = att_id
             data["attemptId"] = att_id
             tid = data.get("templateId")
-            if tid:
-                es = cls.get_exam_set_by_id(tid)
-                if es:
-                    data["templateTitle"] = es.title
+            if tid and template_title(tid):
+                data["templateTitle"] = template_title(tid)
             attempts_map[att_id] = data
 
         # Also load from SQL
@@ -1174,10 +1199,8 @@ class MockTestService:
                         d = si.to_dict()
                         d["attemptId"] = si.id
                         tid = d.get("templateId")
-                        if tid:
-                            es = cls.get_exam_set_by_id(tid)
-                            if es:
-                                d["templateTitle"] = es.title
+                        if tid and template_title(tid):
+                            d["templateTitle"] = template_title(tid)
                         attempts_map[si.id] = d
             finally:
                 sql_session.close()

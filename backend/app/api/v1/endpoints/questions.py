@@ -1,4 +1,5 @@
-from typing import Optional, List
+from typing import Optional, List, Literal
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, Query, Path
 from app.core.security import get_current_user, require_instructor
 from app.schemas.user import UserProfile
@@ -130,6 +131,23 @@ async def update_question(
                 update_in.column_b if update_in.column_b is not None else existing.column_b,
             )
     return QuestionService.update_question(question_id, update_in)
+
+
+class MoveQuestionRequest(BaseModel):
+    direction: Literal["up", "down"]
+
+
+@router.post("/{question_id}/move", response_model=dict)
+def move_question(
+    question_id: str,
+    req: MoveQuestionRequest,
+    current_user: UserProfile = Depends(require_instructor),
+):
+    """
+    Admin reordering: moves a question one place up or down within its section of the exam set.
+    Returns the set's question ids in the new order.
+    """
+    return {"questionId": question_id, "order": QuestionService.move_question(question_id, req.direction)}
 
 
 @router.delete("/{question_id}", response_model=dict)

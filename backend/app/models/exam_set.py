@@ -7,7 +7,7 @@ from app.db.session import Base
 class ExamSet(Base):
     __tablename__ = "exam_sets"
 
-    id = Column(String, primary_key=True, index=True)
+    id = Column(String, primary_key=True)
     title = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     language = Column(String, default="ky", nullable=False)

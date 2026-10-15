@@ -8,6 +8,7 @@ from app.models.question import Question
 from app.models.test_attempt import TestAttempt
 from app.models.exam_access import ExamAccess
 from app.db.user_migrations import ensure_user_auth_columns
+from app.db.question_order_migration import ensure_question_order_columns, run_backfill
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,7 @@ def init_db():
     # Ensure all models are registered with Base metadata before creating tables
     Base.metadata.create_all(bind=engine)
     ensure_user_auth_columns(engine)
+    ensure_question_order_columns(engine)
 
     # Automatically ensure new columns exist in existing SQLite/Postgres tables
     try:
@@ -348,3 +350,6 @@ def init_db():
         logger.warning(f"Database initialization warning: {e}")
     finally:
         session.close()
+
+    # Give questions imported before `position` existed their document order (idempotent)
+    run_backfill(engine)

@@ -1,5 +1,6 @@
 import uuid
 import random
+from app.services.question_order import load_question_docs, question_sort_key
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any, Set
 from app.db.firebase import get_firestore_client
@@ -29,6 +30,23 @@ class PracticeService:
                     if lang and d.get("language") and d.get("language") != lang:
                         continue
                     practice_bank_ids.append(doc.id)
+        except Exception:
+            pass
+        # Practice banks saved in the database (the in-memory store loses them on restart)
+        try:
+            from app.db.session import SessionLocal
+            from app.models.exam_set import ExamSet
+
+            sql_session = SessionLocal()
+            try:
+                query = sql_session.query(ExamSet.id).filter(ExamSet.exam_type == "practice_bank", ExamSet.status == "published")
+                if lang:
+                    query = query.filter(ExamSet.language == lang)
+                for (set_id,) in query:
+                    if set_id not in practice_bank_ids:
+                        practice_bank_ids.append(set_id)
+            finally:
+                sql_session.close()
         except Exception:
             pass
 
@@ -78,10 +96,11 @@ class PracticeService:
         db = get_firestore_client()
         bank_ids = set(cls.get_published_practice_bank_ids(lang))
 
-        # 1. Fetch matching candidate questions
+        # 1. Fetch matching candidate questions (database first, Firestore only fills gaps)
+        all_section_docs = load_question_docs(language=lang or None, section=section)
         candidate_docs: List[Dict[str, Any]] = []
         try:
-            for doc in db.collection("questions").get():
+            for doc in all_section_docs:
                 d = doc.to_dict()
                 d["id"] = d.get("id", doc.id)
 
@@ -104,7 +123,7 @@ class PracticeService:
         # Fallback if no questions in practice bank for section: search all questions for that section & language
         if not candidate_docs:
             try:
-                for doc in db.collection("questions").get():
+                for doc in all_section_docs:
                     d = doc.to_dict()
                     d["id"] = d.get("id", doc.id)
                     if d.get("section") == section:
@@ -136,6 +155,30 @@ class PracticeService:
                         incorrect_question_ids.add(q_id)
         except Exception:
             pass
+        # Completed tests are also kept in the database, which survives restarts of the in-memory store
+        try:
+            from app.db.session import SessionLocal
+            from app.models.test_attempt import TestAttempt
+
+            sql_session = SessionLocal()
+            try:
+                for answers, review in sql_session.query(TestAttempt.answers, TestAttempt.review).filter(
+                    TestAttempt.user_id == user_id, TestAttempt.status == "completed"
+                ):
+                    for q_id, ans in (answers or {}).items():
+                        seen_question_ids.add(q_id)
+                        if isinstance(ans, dict) and ans.get("isCorrect") is False:
+                            incorrect_question_ids.add(q_id)
+                    # Mock tests keep correctness in the review list, not in the answers
+                    for item in review if isinstance(review, list) else []:
+                        if isinstance(item, dict) and item.get("questionId"):
+                            seen_question_ids.add(item["questionId"])
+                            if item.get("isCorrect") is False:
+                                incorrect_question_ids.add(item["questionId"])
+            finally:
+                sql_session.close()
+        except Exception:
+            pass
 
         # 3. Smart Prioritization Buckets
         bucket_unseen: List[Dict[str, Any]] = []
@@ -159,6 +202,8 @@ class PracticeService:
         # Priority order: Unseen -> Previously missed -> Mastered
         prioritized_pool = bucket_unseen + bucket_incorrect + bucket_mastered
         selected_questions = prioritized_pool[:limit]
+        # Smart selection decides WHICH questions; they are shown in document order
+        selected_questions.sort(key=question_sort_key)
 
         results: List[PracticeQuestionItem] = []
         for q in selected_questions:

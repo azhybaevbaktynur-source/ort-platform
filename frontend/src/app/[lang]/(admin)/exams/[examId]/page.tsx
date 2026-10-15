@@ -28,6 +28,8 @@ import {
   MessageSquare,
   HelpCircle,
   Compass,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 
 interface ExamSetDetail {
@@ -67,6 +69,8 @@ interface QuestionItem {
   image_url?: string | null;
   explanation?: string | null;
   tags?: string[];
+  position?: number | null;
+  q_num?: string | null;
 }
 
 const SECTION_OPTIONS = [
@@ -143,18 +147,46 @@ export default function ExamDeepDivePage({
       const examData = await examRes.json();
       setExam(examData);
 
-      // 2. Fetch questions strictly bound to this exam
-      const qRes = await fetch(`/api/v1/questions?exam_id=${examId}&limit=500`, {
-        headers: authHeader,
-      });
-      if (qRes.ok) {
-        const qData = await qRes.json();
-        setQuestions(qData.items || []);
-      }
+      // 2. Fetch questions strictly bound to this exam (the API returns them in document order)
+      await reloadQuestions();
     } catch (err: any) {
       setErrorMsg(err.message || "Ката кетти");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const reloadQuestions = async () => {
+    const authHeader = await getAuthHeader();
+    const qRes = await fetch(`/api/v1/questions?exam_id=${examId}&limit=500`, {
+      headers: authHeader,
+    });
+    if (qRes.ok) {
+      const qData = await qRes.json();
+      setQuestions(qData.items || []);
+    }
+  };
+
+  // Admin reordering: move a question one place up/down within its section
+  const [movingId, setMovingId] = useState<string | null>(null);
+  const handleMoveQuestion = async (q: QuestionItem, direction: "up" | "down") => {
+    setMovingId(q.id);
+    try {
+      const authHeader = await getAuthHeader();
+      const res = await fetch(`/api/v1/questions/${q.id}/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader },
+        body: JSON.stringify({ direction }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(typeof err.detail === "string" ? err.detail : "Failed to move question");
+      }
+      await reloadQuestions();
+    } catch (err: any) {
+      toast.error(err.message || (lang === "ky" ? "Жылдыруу ишке ашкан жок" : "Не удалось переместить вопрос"));
+    } finally {
+      setMovingId(null);
     }
   };
 
@@ -289,13 +321,12 @@ export default function ExamDeepDivePage({
         throw new Error(err.detail || "Failed to save question");
       }
 
-      const savedQ = await res.json();
-      if (editingQuestion) {
-        setQuestions((prev) => prev.map((q) => (q.id === savedQ.id ? savedQ : q)));
-      } else {
-        setQuestions((prev) => [savedQ, ...prev]);
+      await res.json();
+      if (!editingQuestion) {
         setExam((prev) => (prev ? { ...prev, totalQuestions: (prev.totalQuestions || 0) + 1 } : null));
       }
+      // Reload so the list shows the real document order (a new question goes to the end of its section)
+      await reloadQuestions();
 
       setIsModalOpen(false);
       await loadData();
@@ -614,6 +645,11 @@ export default function ExamDeepDivePage({
                         <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 text-[10px] uppercase font-bold">
                           {secLabel}
                         </span>
+                        {q.q_num && (
+                          <span className="ml-1.5 text-[10px] font-mono text-slate-400" title={lang === "ky" ? "Документтеги номери" : "Номер в документе"}>
+                            №{q.q_num}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3.5 px-4 text-slate-600 max-w-[140px] truncate">
                         {q.topic || "General"}
@@ -668,6 +704,22 @@ export default function ExamDeepDivePage({
                       </td>
                       <td className="py-3.5 px-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => handleMoveQuestion(q, "up")}
+                            disabled={movingId !== null}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition disabled:opacity-40"
+                            title={lang === "ky" ? "Жогору жылдыруу" : "Переместить вверх"}
+                          >
+                            <ArrowUp className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleMoveQuestion(q, "down")}
+                            disabled={movingId !== null}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition disabled:opacity-40"
+                            title={lang === "ky" ? "Төмөн жылдыруу" : "Переместить вниз"}
+                          >
+                            <ArrowDown className="w-4 h-4" />
+                          </button>
                           <button
                             onClick={() => openEditQuestionModal(q)}
                             className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition"

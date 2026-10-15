@@ -573,12 +573,12 @@ class CsvService:
         language: str = "ky",
     ) -> CsvUploadResult:
         """
-        Validates and commits questions into Firestore using chunked batch writes.
+        Validates, then saves questions to the database in one transaction (positions in CSV row
+        order), then mirrors them into Firestore in chunked batch writes.
         All questions are strictly bound to an ExamSet.
         Never crashes with a 500 error; returns CsvUploadResult with errors on failure.
         """
         from datetime import datetime, timezone
-        now_iso = datetime.now(timezone.utc).isoformat()
         lang_normalized = "ru" if "ru" in (language or "ky").lower() else "ky"
 
         # Determine target exam set id
@@ -611,211 +611,173 @@ class CsvService:
                 examSetTitle=mock_test_title,
             )
 
-        db = get_firestore_client()
-        questions_coll = db.collection("questions")
-        imported_ids: List[str] = []
-        batch_count = 0
+        from app.db.session import SessionLocal
+        from app.models.question import Question as QuestionModel
+        from app.models.exam_set import ExamSet as ExamSetModel
+        from app.services.question_order import ordered_question_ids
+        from sqlalchemy import func
 
-        # Chunk validated questions into safe batches (max 500 per Firestore write)
-        chunks = [
-            report.previewQuestions[i : i + batch_size]
-            for i in range(0, len(report.previewQuestions), batch_size)
+        section_counts: Dict[str, int] = {}
+        for q in report.previewQuestions:
+            section_counts[q.section.value] = section_counts.get(q.section.value, 0) + 1
+        template_sections = [
+            {
+                "section": s,
+                "questionCount": count,
+                "timeLimitMinutes": 30 if "math" in s or "analog" in s else (45 if "reading" in s else 35),
+            }
+            for s, count in section_counts.items()
         ]
+        title_str = mock_test_title or (
+            f"ОРТ Тест ({lang_normalized.upper()})" if lang_normalized == "ky" else f"Тест ОРТ ({lang_normalized.upper()})"
+        )
 
-        try:
-            for chunk in chunks:
-                batch = db.batch()
-                batch_count += 1
-                for q in chunk:
-                    q_id = f"q_{uuid.uuid4().hex[:12]}"
-                    doc_ref = questions_coll.document(q_id)
-                    q_dict = q.model_dump()
-                    q_dict["id"] = q_id
-                    q_dict["createdBy"] = created_by_user_id
-                    q_dict["createdAt"] = now_iso
-                    q_dict["language"] = lang_normalized
-                    q_dict["exam_set_id"] = target_exam_set_id
-                    q_dict["stats"] = {
-                        "totalAttempts": 0,
-                        "correctAttempts": 0,
-                        "discriminationIndex": 0.0,
-                    }
-                    batch.set(doc_ref, q_dict)
-                    imported_ids.append(q_id)
-
-                batch.commit()
-
-            # Sync questions to SQL database
-            try:
-                from app.db.session import SessionLocal
-                from app.models.question import Question as QuestionModel
-                from app.models.exam_set import ExamSet as ExamSetModel
-                sql_session = SessionLocal()
-                try:
-                    for q, q_id in zip(report.previewQuestions, imported_ids):
-                        sql_q = QuestionModel(
-                            id=q_id,
-                            language=lang_normalized,
-                            section=q.section.value,
-                            topic=q.topic,
-                            difficulty=q.difficulty.value,
-                            column_a=q.column_a,
-                            column_b=q.column_b,
-                            stem=q.stem or "",
-                            option_a=q.option_a or "",
-                            option_b=q.option_b or "",
-                            option_c=q.option_c or "",
-                            option_d=q.option_d or "",
-                            option_e=q.option_e,
-                            correct_option=q.correct_option,
-                            explanation=q.explanation,
-                            image_url=q.image_url,
-                            passage_text=q.passage_text,
-                            tags=q.tags,
-                            exam_set_id=target_exam_set_id,
-                            created_by=created_by_user_id,
-                        )
-                        sql_session.merge(sql_q)
-                    sql_session.commit()
-                except Exception as sq_err:
-                    logger.warning(f"Error syncing questions to SQL: {sq_err}")
-                    sql_session.rollback()
-                finally:
-                    sql_session.close()
-            except Exception as se_err:
-                logger.warning(f"Error opening SQL session for question sync: {se_err}")
-
-            # Update or create ExamSet
-            if target_exam_set_id and imported_ids:
-                section_counts: Dict[str, int] = {}
-                for q in report.previewQuestions:
-                    s = q.section.value
-                    section_counts[s] = section_counts.get(s, 0) + 1
-
-                template_sections = [
-                    {
-                        "section": s,
-                        "questionCount": count,
-                        "timeLimitMinutes": 30 if "math" in s or "analog" in s else (45 if "reading" in s else 35),
-                    }
-                    for s, count in section_counts.items()
-                ]
-
-                exam_ref = db.collection("mock_test_templates").document(target_exam_set_id)
-                existing_exam = exam_ref.get()
-
-                if existing_exam and existing_exam.exists:
-                    exam_data = existing_exam.to_dict() or {}
-                    existing_q_ids = exam_data.get("questionIds", [])
-                    combined_ids = list(dict.fromkeys(existing_q_ids + imported_ids))
-                    exam_ref.update({
-                        "questionIds": combined_ids,
-                        "totalQuestions": len(combined_ids),
-                        "updatedAt": now_iso,
-                    })
-                else:
-                    title_str = mock_test_title or (
-                        f"ОРТ Тест ({lang_normalized.upper()})" if lang_normalized == "ky" else f"Тест ОРТ ({lang_normalized.upper()})"
-                    )
-                    template_doc = {
-                        "id": target_exam_set_id,
-                        "title": title_str,
-                        "description": f"{title_str} ({len(imported_ids)} суроо / вопросов).",
-                        "language": lang_normalized,
-                        "exam_type": exam_type,
-                        "type": "fixed_full" if exam_type != "practice_bank" else "fast_practice",
-                        "status": "published",
-                        "available_from": None,
-                        "available_until": None,
-                        "access_code": None,
-                        "max_attempts": 999 if exam_type == "practice_bank" else 1,
-                        "sections": template_sections,
-                        "totalQuestions": len(imported_ids),
-                        "totalTimeMinutes": sum(sec["timeLimitMinutes"] for sec in template_sections) or (30 if exam_type == "practice_bank" else 170),
-                        "questionIds": imported_ids,
-                        "createdBy": created_by_user_id,
-                        "createdAt": now_iso,
-                        "updatedAt": now_iso,
-                        "completionsCount": 0,
-                    }
-                    exam_ref.set(template_doc)
-
-                # Sync ExamSet to SQL database
-                try:
-                    from app.db.session import SessionLocal
-                    from app.models.exam_set import ExamSet as ExamSetModel
-                    sql_session = SessionLocal()
-                    try:
-                        sql_exam = sql_session.query(ExamSetModel).filter(ExamSetModel.id == target_exam_set_id).first()
-                        from datetime import datetime as dt
-                        now_dt = dt.now(timezone.utc)
-                        if not sql_exam:
-                            title_str = mock_test_title or (
-                                f"ОРТ Тест ({lang_normalized.upper()})" if lang_normalized == "ky" else f"Тест ОРТ ({lang_normalized.upper()})"
-                            )
-                            sql_exam = ExamSetModel(
-                                id=target_exam_set_id,
-                                title=title_str,
-                                description=f"{title_str} ({len(imported_ids)} суроо / вопросов).",
-                                language=lang_normalized,
-                                exam_type=exam_type,
-                                status="published",
-                                max_attempts=999 if exam_type == "practice_bank" else 1,
-                                sections=template_sections,
-                                total_questions=len(imported_ids),
-                                total_time_minutes=sum(sec["timeLimitMinutes"] for sec in template_sections) or (30 if exam_type == "practice_bank" else 170),
-                                question_ids=imported_ids,
-                                created_by=created_by_user_id,
-                                created_at=now_dt,
-                                updated_at=now_dt,
-                            )
-                            sql_session.add(sql_exam)
-                        else:
-                            existing_q_ids = sql_exam.question_ids or []
-                            combined_ids = list(dict.fromkeys(existing_q_ids + imported_ids))
-                            sql_exam.question_ids = combined_ids
-                            sql_exam.total_questions = len(combined_ids)
-                            sql_exam.updated_at = now_dt
-                        sql_session.commit()
-                    except Exception as sq_err:
-                        logger.warning(f"Error syncing ExamSet to SQL: {sq_err}")
-                        sql_session.rollback()
-                    finally:
-                        sql_session.close()
-                except Exception as se_err:
-                    logger.warning(f"Error opening SQL session for ExamSet sync: {se_err}")
-
-            return CsvUploadResult(
-                success=True,
-                importedCount=len(imported_ids),
-                failedCount=report.invalidRowsCount,
-                batchCount=batch_count,
-                errors=report.errors,
-                importedIds=imported_ids,
-                createdTemplateId=target_exam_set_id,
-                mockTestTitle=mock_test_title,
-                examSetId=target_exam_set_id,
-                examSetTitle=mock_test_title,
-            )
-
-        except Exception as e:
-            logger.exception(f"Error during CSV batch ingestion: {e}")
+        def failure(message: str) -> CsvUploadResult:
             return CsvUploadResult(
                 success=False,
-                importedCount=len(imported_ids),
-                failedCount=report.totalRows - len(imported_ids),
-                batchCount=batch_count,
+                importedCount=0,
+                failedCount=report.totalRows,
+                batchCount=0,
                 errors=report.errors + [
-                    RowValidationError(
-                        rowNumber=0,
-                        field="system",
-                        errorMessage=f"Ingestion database error: {str(e)}",
-                        rawData={},
-                    )
+                    RowValidationError(rowNumber=0, field="system", errorMessage=message, rawData={})
                 ],
-                importedIds=imported_ids,
+                importedIds=[],
                 createdTemplateId=target_exam_set_id,
                 mockTestTitle=mock_test_title,
                 examSetId=target_exam_set_id,
                 examSetTitle=mock_test_title,
             )
+
+        # 1. Database first (the permanent store), in ONE transaction: the exam set must exist before its
+        #    questions (PostgreSQL enforces the foreign key), and rows get `position` in CSV row order.
+        imported_ids: List[str] = []
+        new_exam = False
+        now_dt = datetime.now(timezone.utc)
+        sql_session = SessionLocal()
+        try:
+            sql_exam = sql_session.get(ExamSetModel, target_exam_set_id)
+            if sql_exam is None:
+                new_exam = True
+                sql_exam = ExamSetModel(
+                    id=target_exam_set_id,
+                    title=title_str,
+                    description=f"{title_str} ({len(report.previewQuestions)} суроо / вопросов).",
+                    language=lang_normalized,
+                    exam_type=exam_type,
+                    status="published",
+                    max_attempts=999 if exam_type == "practice_bank" else 1,
+                    sections=template_sections,
+                    total_time_minutes=sum(sec["timeLimitMinutes"] for sec in template_sections) or (30 if exam_type == "practice_bank" else 170),
+                    created_by=created_by_user_id,
+                    created_at=now_dt,
+                    updated_at=now_dt,
+                )
+                sql_session.add(sql_exam)
+                sql_session.flush()
+
+            # New rows continue after the set's current last question
+            start_pos = (sql_session.query(func.max(QuestionModel.position))
+                         .filter(QuestionModel.exam_set_id == target_exam_set_id).scalar() or 0)
+            for offset, q in enumerate(report.previewQuestions, start=1):
+                q_id = f"q_{uuid.uuid4().hex[:12]}"
+                sql_session.add(QuestionModel(
+                    id=q_id,
+                    language=lang_normalized,
+                    section=q.section.value,
+                    topic=q.topic,
+                    difficulty=q.difficulty.value,
+                    column_a=q.column_a,
+                    column_b=q.column_b,
+                    stem=q.stem or "",
+                    option_a=q.option_a or "",
+                    option_b=q.option_b or "",
+                    option_c=q.option_c or "",
+                    option_d=q.option_d or "",
+                    option_e=q.option_e,
+                    correct_option=q.correct_option,
+                    explanation=q.explanation,
+                    image_url=q.image_url,
+                    passage_text=q.passage_text,
+                    tags=q.tags,
+                    exam_set_id=target_exam_set_id,
+                    position=start_pos + offset,
+                    created_by=created_by_user_id,
+                    created_at=now_dt,
+                    updated_at=now_dt,
+                ))
+                imported_ids.append(q_id)
+            sql_session.flush()
+
+            all_ids = ordered_question_ids(sql_session, target_exam_set_id)
+            sql_exam.question_ids = all_ids
+            sql_exam.total_questions = len(all_ids)
+            sql_exam.updated_at = now_dt
+            sql_session.commit()
+        except Exception as e:
+            sql_session.rollback()
+            logger.exception(f"CSV import: saving to the database failed: {e}")
+            return failure(f"Saving to the database failed, nothing was imported: {e}")
+        finally:
+            sql_session.close()
+
+        # 2. Mirror into Firestore (read by parts of the app that have not moved to the database yet)
+        batch_count = 0
+        try:
+            db = get_firestore_client()
+            questions_coll = db.collection("questions")
+            now_iso = now_dt.isoformat()
+            pairs = list(zip(report.previewQuestions, imported_ids))
+            for i in range(0, len(pairs), batch_size):
+                batch = db.batch()
+                batch_count += 1
+                for offset, (q, q_id) in enumerate(pairs[i:i + batch_size], start=start_pos + i + 1):
+                    q_dict = q.model_dump()
+                    q_dict.update({
+                        "id": q_id, "createdBy": created_by_user_id, "createdAt": now_iso,
+                        "language": lang_normalized, "exam_set_id": target_exam_set_id, "position": offset,
+                        "stats": {"totalAttempts": 0, "correctAttempts": 0, "discriminationIndex": 0.0},
+                    })
+                    batch.set(questions_coll.document(q_id), q_dict)
+                batch.commit()
+
+            exam_ref = db.collection("mock_test_templates").document(target_exam_set_id)
+            existing_exam = exam_ref.get()
+            if existing_exam and existing_exam.exists and not new_exam:
+                exam_ref.update({"questionIds": all_ids, "totalQuestions": len(all_ids), "updatedAt": now_iso})
+            else:
+                exam_ref.set({
+                    "id": target_exam_set_id,
+                    "title": title_str,
+                    "description": f"{title_str} ({len(imported_ids)} суроо / вопросов).",
+                    "language": lang_normalized,
+                    "exam_type": exam_type,
+                    "type": "fixed_full" if exam_type != "practice_bank" else "fast_practice",
+                    "status": "published",
+                    "available_from": None,
+                    "available_until": None,
+                    "access_code": None,
+                    "max_attempts": 999 if exam_type == "practice_bank" else 1,
+                    "sections": template_sections,
+                    "totalQuestions": len(all_ids),
+                    "totalTimeMinutes": sum(sec["timeLimitMinutes"] for sec in template_sections) or (30 if exam_type == "practice_bank" else 170),
+                    "questionIds": all_ids,
+                    "createdBy": created_by_user_id,
+                    "createdAt": now_iso,
+                    "updatedAt": now_iso,
+                    "completionsCount": 0,
+                })
+        except Exception as e:
+            logger.warning(f"CSV import saved to the database, but the Firestore copy failed: {e}")
+
+        return CsvUploadResult(
+            success=True,
+            importedCount=len(imported_ids),
+            failedCount=report.invalidRowsCount,
+            batchCount=batch_count,
+            errors=report.errors,
+            importedIds=imported_ids,
+            createdTemplateId=target_exam_set_id,
+            mockTestTitle=mock_test_title,
+            examSetId=target_exam_set_id,
+            examSetTitle=mock_test_title,
+        )

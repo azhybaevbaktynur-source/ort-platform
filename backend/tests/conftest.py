@@ -29,9 +29,16 @@ def reset_db():
     mock_firestore_db.reset()
     from app.db.session import SessionLocal
     from app.models.test_attempt import TestAttempt
+    from app.models.question import Question
+    from app.models.question_source import QuestionSource
     session = SessionLocal()
     try:
         session.query(TestAttempt).delete()
+        # Questions are read from the database now, so every test starts with an empty question bank
+        # (the in-memory store used to provide this isolation by being wiped)
+        QuestionSource.__table__.create(bind=session.get_bind(), checkfirst=True)
+        session.query(QuestionSource).delete()
+        session.query(Question).delete()
         session.commit()
     except Exception:
         session.rollback()

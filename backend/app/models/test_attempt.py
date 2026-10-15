@@ -6,7 +6,7 @@ from app.db.session import Base
 class TestAttempt(Base):
     __tablename__ = "test_attempts"
 
-    id = Column(String, primary_key=True, index=True)
+    id = Column(String, primary_key=True)
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     template_id = Column(String, nullable=False, index=True)
     language = Column(String, default="ky", nullable=False)

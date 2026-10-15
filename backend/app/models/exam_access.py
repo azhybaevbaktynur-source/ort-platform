@@ -8,7 +8,7 @@ from app.db.session import Base
 class ExamAccess(Base):
     __tablename__ = "exam_access"
 
-    id = Column(String, primary_key=True, index=True, default=lambda: f"acc_{uuid.uuid4().hex[:12]}")
+    id = Column(String, primary_key=True, default=lambda: f"acc_{uuid.uuid4().hex[:12]}")
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     exam_set_id = Column(String, ForeignKey("exam_sets.id", ondelete="CASCADE"), nullable=False, index=True)
     granted_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
