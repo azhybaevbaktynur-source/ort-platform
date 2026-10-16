@@ -249,6 +249,7 @@ class PracticeService:
         cls,
         user_id: str,
         submission: PracticeSetSubmission,
+        is_preview: bool = False,
     ) -> PracticeSetSubmitResponse:
         db = get_firestore_client()
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -300,6 +301,7 @@ class PracticeService:
         attempt_doc = {
             "id": attempt_id,
             "userId": user_id,
+            "isPreview": bool(is_preview),  # admin in student mode: excluded from statistics
             "templateId": f"practice_{submission.section}",
             "templateTitle": f"Машыгуу: {submission.section}",
             "language": submission.language,

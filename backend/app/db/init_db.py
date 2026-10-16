@@ -9,6 +9,7 @@ from app.models.test_attempt import TestAttempt
 from app.models.exam_access import ExamAccess
 from app.db.user_migrations import ensure_user_auth_columns
 from app.db.question_order_migration import ensure_question_order_columns, run_backfill
+from app.db.attempt_migrations import ensure_attempt_preview_column
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,7 @@ def init_db():
     Base.metadata.create_all(bind=engine)
     ensure_user_auth_columns(engine)
     ensure_question_order_columns(engine)
+    ensure_attempt_preview_column(engine)
 
     # Automatically ensure new columns exist in existing SQLite/Postgres tables
     try:

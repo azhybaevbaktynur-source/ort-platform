@@ -63,5 +63,7 @@ async def submit_practice_set(
     return PracticeService.submit_practice_set(
         user_id=current_user.id,
         submission=submission,
+        # Role comes from the database via the token check, never from the client
+        is_preview=current_user.role in ("instructor", "admin"),
     )
 

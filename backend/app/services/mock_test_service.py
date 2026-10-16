@@ -111,7 +111,7 @@ class MockTestService:
             completions_by_test: Dict[str, int] = {}
             for att_doc in all_attempts:
                 att_data = att_doc.to_dict()
-                if att_data.get("status") == ExamStatus.COMPLETED.value:
+                if att_data.get("status") == ExamStatus.COMPLETED.value and not att_data.get("isPreview"):
                     tid = att_data.get("templateId")
                     if tid:
                         completions_by_test[tid] = completions_by_test.get(tid, 0) + 1
@@ -417,8 +417,8 @@ class MockTestService:
                 if provided_pin != expected_pin:
                     raise ForbiddenException("Туура эмес кирүү коду (PIN) / Неверный код доступа (PIN)")
 
-            # Canvas-style Rule 4: Max attempts check
-            if exam_set.max_attempts and exam_set.max_attempts < 99:
+            # Canvas-style Rule 4: Max attempts check (admin previews are unlimited and never counted)
+            if exam_set.max_attempts and exam_set.max_attempts < 99 and not is_instructor:
                 user_completed_docs = (
                     db.collection("test_attempts")
                     .where("userId", "==", user_id)
@@ -842,6 +842,8 @@ class MockTestService:
             "remainingTimeSeconds": total_time_secs,
             "currentSectionIndex": 0,
             "exam_type": es_type_str,
+            # Admin in student mode: a preview, excluded from all statistics (role checked on the server)
+            "isPreview": bool(is_instructor),
         }
         db.collection("test_attempts").document(attempt_id).set(attempt_record)
 
@@ -864,6 +866,7 @@ class MockTestService:
                     current_section_index=0,
                     question_ids=cached_question_ids,
                     answers={},
+                    is_preview=bool(is_instructor),
                 )
                 sql_session.merge(sql_attempt)
                 sql_session.commit()
@@ -992,6 +995,7 @@ class MockTestService:
             raise ValidationException("You are not authorized to submit this test attempt.")
 
         now_iso = datetime.now(timezone.utc).isoformat()
+        is_preview = bool(attempt_data.get("isPreview"))
         question_ids = attempt_data.get("questionIds", [])
         template_id = attempt_data.get("templateId", "ort_main_standard")
         language = attempt_data.get("language", "ky")
@@ -1058,8 +1062,8 @@ class MockTestService:
         except Exception:
             pass
 
-        # Update user's currentEstimatedScore in users collection (for main test)
-        if exam_type != "subject":
+        # Update user's currentEstimatedScore in users collection (for main test; previews never count)
+        if exam_type != "subject" and not is_preview:
             user_ref = db.collection("users").document(user_id)
             if user_ref.get().exists:
                 user_ref.update({"currentEstimatedScore": result.totalScaledScore})
@@ -1071,7 +1075,7 @@ class MockTestService:
             sql_db = SessionLocal()
             try:
                 sql_user = sql_db.query(SqlUser).filter(SqlUser.id == user_id).first()
-                if sql_user:
+                if sql_user and not is_preview:
                     sql_user.exams_taken = (sql_user.exams_taken or 0) + 1
                     if exam_type != "subject":
                         sql_user.current_score = result.totalScaledScore
@@ -1121,6 +1125,7 @@ class MockTestService:
                         question_ids=question_ids,
                         scores=full_scores,
                         review=review_items,
+                        is_preview=is_preview,
                     )
                     sql_session.add(sql_attempt)
 

@@ -200,9 +200,26 @@ async def get_instructor_analytics(
     except Exception:
         student_ids = set()
 
-    # 2. Total Completed Exams & Scaled Scores
+    # 2. Total Completed Exams & Scaled Scores. Only real students count: admin previews (student mode)
+    #    and any attempt by an admin account are excluded.
+    admin_ids = set()
+    try:
+        from app.db.session import SessionLocal
+        from app.models.user import User as SqlUser
+
+        sql_session = SessionLocal()
+        try:
+            admin_ids = {uid for (uid,) in sql_session.query(SqlUser.id).filter(SqlUser.role != "student")}
+        finally:
+            sql_session.close()
+    except Exception:
+        pass
+    student_ids -= admin_ids
     completed_attempts_docs = db.collection("test_attempts").where("status", "==", "completed").get()
-    completed_attempts = [d.to_dict() for d in completed_attempts_docs]
+    completed_attempts = [
+        a for a in (d.to_dict() for d in completed_attempts_docs)
+        if not a.get("isPreview") and a.get("userId") not in admin_ids
+    ]
 
     for att in completed_attempts:
         uid = att.get("userId")

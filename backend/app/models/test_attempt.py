@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, JSON, DateTime, ForeignKey
+from sqlalchemy import Column, String, Integer, JSON, DateTime, ForeignKey, Boolean
 from app.db.session import Base
 
 
@@ -20,6 +20,8 @@ class TestAttempt(Base):
     answers = Column(JSON, default=dict, nullable=True)
     scores = Column(JSON, nullable=True)
     review = Column(JSON, nullable=True)
+    # Attempt made by an admin in student mode: never counted in statistics or analytics
+    is_preview = Column(Boolean, default=False, nullable=False)
 
     def to_dict(self):
         return {
@@ -37,5 +39,6 @@ class TestAttempt(Base):
             "answers": self.answers or {},
             "scores": self.scores,
             "review": self.review,
+            "isPreview": bool(self.is_preview),
         }
 

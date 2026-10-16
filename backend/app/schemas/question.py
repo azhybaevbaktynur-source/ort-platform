@@ -16,6 +16,9 @@ class SectionType(str, Enum):
     PHYSICS = "physics"             # Физика
     HISTORY = "history"             # Тарых
     ENGLISH = "english"             # Англис тили
+    # Used by the seeded subject exam sets; without them those sets fail validation and break exam lists
+    ADVANCED_MATH = "advanced_math"     # Математика (предметтик тест)
+    NATIVE_LANGUAGE = "native_language" # Кыргыз / орус тили жана адабияты
 
 
 def math_section_rule_error(section: Any, column_a: Optional[str], column_b: Optional[str]) -> Optional[Tuple[str, str]]:
