@@ -21,3 +21,4 @@ Source: answers to the 15 open questions in `PROJECT_UNDERSTANDING.md` §8. The 
 | Hard-coded admin email | Removed (done). |
 | Production access | Read access to Render/Neon granted for measuring. |
 | Order of work | Security/integrity fixes first (done on `fix/security-integrity`), then architecture design, then storage/DB changes. |
+| Scale | Target about 6,000 students active at the same time (added 2026-10-22). Hosting (Vercel/Render/Neon) must be verified against this. |

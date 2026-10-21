@@ -5,6 +5,8 @@
 > **Source of Truth**: Verified against real application code, SQLAlchemy models, FastAPI routes, and Next.js 15 pages.  
 > **Note for Autonomous Agents**: Read this entire document before executing any task. It documents the real architecture, operational commands, schemas, and hard constraints so you can start building immediately without exploratory token burn.
 
+> **Next agent: start with `docs/HANDOFF_NEXT_AGENT.md`** (current state, decisions, plan, model/token rules). Direction: teacher-owned LMS, see `docs/IMPLEMENTATION_PLAN.md`. Target: ~6,000 concurrent students.
+
 ---
 
 ## 1. Project Overview & Mission
