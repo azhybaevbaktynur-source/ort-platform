@@ -79,12 +79,6 @@ def init_db():
         # seeded password would be public too. Admins are made with `python make_admin.py <email>`
         # after the person registers and confirms their email.
 
-        # Explicitly check for primary account azhybaev.baktynur@gmail.com and ensure role is 'admin'
-        primary_user = session.query(User).filter(User.email == "azhybaev.baktynur@gmail.com").first()
-        if primary_user and primary_user.role != "admin":
-            primary_user.role = "admin"
-            logger.info("Forcefully promoted primary account azhybaev.baktynur@gmail.com to admin")
-
         # 3. Seed canonical ExamSets (Practice Banks, Full Main, and Subject Tests)
         canonical_exams = [
             {

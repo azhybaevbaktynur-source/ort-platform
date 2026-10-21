@@ -1,4 +1,5 @@
-from typing import List, Optional
+import logging
+from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy.orm import Session
 from app.core.security import get_current_user, require_instructor
@@ -17,6 +18,7 @@ from app.services.mock_test_service import MockTestService
 from app.core.exceptions import EntityNotFoundException
 from app.db.firebase import get_firestore_client
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -32,11 +34,10 @@ async def list_exam_sets(
     Instructors see drafts, published sets, and student completion counts.
     """
     is_instructor = current_user.role in ["instructor", "admin"]
-    return MockTestService.get_exam_sets(
-        lang=lang,
-        status=status,
-        is_instructor=is_instructor,
-    )
+    return [
+        MockTestService.for_viewer(e, is_instructor)
+        for e in MockTestService.get_exam_sets(lang=lang, status=status, is_instructor=is_instructor)
+    ]
 
 
 @router.get("/student", response_model=List[ExamSet])
@@ -172,7 +173,7 @@ async def list_student_exam_sets(
         logger.error(f"Error populating user attempts status: {err}", exc_info=True)
 
 
-    return results
+    return [MockTestService.for_viewer(e, is_admin) for e in results]
 
 
 @router.get("/{exam_set_id}", response_model=ExamSet)
@@ -218,7 +219,7 @@ async def get_exam_set(
     except Exception:
         pass
 
-    return exam_set
+    return MockTestService.for_viewer(exam_set, is_admin)
 
 
 @router.post("", response_model=ExamSet)

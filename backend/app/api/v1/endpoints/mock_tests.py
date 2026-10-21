@@ -38,11 +38,10 @@ async def list_exam_sets(
     Instructors see drafts, published sets, and student completion counts.
     """
     is_instructor = current_user.role in ["instructor", "admin"]
-    return MockTestService.get_exam_sets(
-        lang=lang,
-        status=status,
-        is_instructor=is_instructor,
-    )
+    return [
+        MockTestService.for_viewer(e, is_instructor)
+        for e in MockTestService.get_exam_sets(lang=lang, status=status, is_instructor=is_instructor)
+    ]
 
 
 @router.get("/exam-sets/{exam_set_id}", response_model=ExamSet)
@@ -56,7 +55,10 @@ async def get_exam_set(
     exam_set = MockTestService.get_exam_set_by_id(exam_set_id)
     if not exam_set:
         raise EntityNotFoundException("ExamSet", exam_set_id)
-    return exam_set
+    is_admin = current_user.role in ["instructor", "admin"]
+    if not is_admin and exam_set.status != "published" and exam_set.exam_type != "practice_bank":
+        raise EntityNotFoundException("ExamSet", exam_set_id)
+    return MockTestService.for_viewer(exam_set, is_admin)
 
 
 @router.post("/exam-sets", response_model=ExamSet)
@@ -102,7 +104,8 @@ async def list_mock_test_templates(
     """
     Returns available standard ORT mock exam templates.
     """
-    return MockTestService.get_templates()
+    is_admin = current_user.role in ["instructor", "admin"]
+    return [MockTestService.for_viewer(t, is_admin) for t in MockTestService.get_templates(is_instructor=is_admin)]
 
 
 @router.get("/templates/{template_id}", response_model=MockTestTemplate)
@@ -116,7 +119,10 @@ async def get_mock_test_template(
     template = MockTestService.get_template_by_id(template_id)
     if not template:
         raise EntityNotFoundException("MockTestTemplate", template_id)
-    return template
+    is_admin = current_user.role in ["instructor", "admin"]
+    if not is_admin and template.status != "published" and template.exam_type != "practice_bank":
+        raise EntityNotFoundException("MockTestTemplate", template_id)
+    return MockTestService.for_viewer(template, is_admin)
 
 
 # -------------------------------------------------------------
@@ -211,7 +217,7 @@ async def save_session_progress(
         try:
             from app.models.test_attempt import TestAttempt
             sql_att = db.query(TestAttempt).filter(TestAttempt.id == attempt_id).first()
-            if sql_att:
+            if sql_att and sql_att.status != ExamStatus.COMPLETED.value:
                 sql_att.status = ExamStatus.COMPLETED.value
                 sql_att.completed_at = datetime.now(timezone.utc)
                 db.commit()
@@ -254,7 +260,7 @@ async def submit_mock_test(
     try:
         from app.models.test_attempt import TestAttempt
         sql_att = db.query(TestAttempt).filter(TestAttempt.id == attempt_id).first()
-        if sql_att:
+        if sql_att and sql_att.status != ExamStatus.COMPLETED.value:
             sql_att.status = ExamStatus.COMPLETED.value
             sql_att.completed_at = datetime.now(timezone.utc)
             db.commit()

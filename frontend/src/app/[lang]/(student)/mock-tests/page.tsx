@@ -37,7 +37,7 @@ interface ExamSetItem {
   status: "draft" | "published";
   available_from?: string | null;
   available_until?: string | null;
-  access_code?: string | null;
+  has_pin?: boolean;
   max_attempts: number;
   totalQuestions: number;
   totalTimeMinutes: number;
@@ -175,7 +175,7 @@ export default function MockTestsHubPage() {
     }
 
     // Check if PIN required
-    if (exam.access_code && exam.access_code.trim()) {
+    if (exam.has_pin) {
       setPinModalExam(exam);
       setEnteredPin("");
       setPinError(null);
@@ -206,7 +206,7 @@ export default function MockTestsHubPage() {
       return;
     }
 
-    if (exam.access_code && exam.access_code.trim()) {
+    if (exam.has_pin) {
       setPinModalExam({ ...exam, isRetake: true } as any);
       setEnteredPin("");
       setPinError(null);
@@ -229,12 +229,8 @@ export default function MockTestsHubPage() {
     e.preventDefault();
     if (!pinModalExam) return;
 
-    if (enteredPin.trim() !== pinModalExam.access_code?.trim()) {
-      setPinError(
-        lang === "ky" ? "Туура эмес 4 орундуу PIN-код!" : "Неверный 4-значный PIN-код!"
-      );
-      return;
-    }
+    // The PIN is checked by the server when the test starts; students never receive it.
+    if (!enteredPin.trim()) return;
 
     const examId = pinModalExam.id;
     const pin = enteredPin.trim();
@@ -297,7 +293,7 @@ export default function MockTestsHubPage() {
     const isLockedEarly = test.available_from && nowIso < test.available_from;
     const isLockedLate = test.available_until && nowIso > test.available_until;
     const isLocked = Boolean(isLockedEarly || isLockedLate);
-    const hasPin = Boolean(test.access_code && test.access_code.trim());
+    const hasPin = Boolean(test.has_pin);
 
     // Custom timer calculation
     const timeMinutes = test.time_limit_minutes !== undefined && test.time_limit_minutes !== null

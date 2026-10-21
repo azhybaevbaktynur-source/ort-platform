@@ -78,6 +78,8 @@ class ExamSet(ExamSetBase):
     createdAt: Optional[str] = None
     updatedAt: Optional[str] = None
     completionsCount: int = 0
+    # True when a PIN is set. Students get this instead of the PIN itself (see MockTestService.for_viewer).
+    has_pin: bool = False
     question_count: Optional[int] = None
     user_attempts_count: Optional[int] = None
     has_in_progress: Optional[bool] = False

@@ -153,6 +153,15 @@ class MockTestService:
     # Backward compatibility alias
     get_templates = get_exam_sets
 
+    @staticmethod
+    def for_viewer(exam_set: ExamSet, is_admin: bool) -> ExamSet:
+        """Copy of the exam set safe to return to this viewer: students never receive the PIN, only `has_pin`."""
+        out = exam_set.model_copy()
+        out.has_pin = bool((exam_set.access_code or "").strip())
+        if not is_admin:
+            out.access_code = None
+        return out
+
     @classmethod
     def get_exam_set_by_id(cls, exam_set_id: str) -> Optional[ExamSet]:
         target_id = str(exam_set_id).strip()
@@ -278,50 +287,52 @@ class MockTestService:
 
     @classmethod
     def update_exam_set(cls, exam_set_id: str, exam_set_in: ExamSetUpdate) -> ExamSet:
+        """SQL is the source of truth; the in-memory store is only updated when it still holds the exam
+        (it is empty after a restart)."""
+        from app.db.session import SessionLocal
+        from app.models.exam_set import ExamSet as ExamSetModel
+
         db = get_firestore_client()
         doc_ref = db.collection("mock_test_templates").document(exam_set_id)
         doc = doc_ref.get()
 
-        now_iso = datetime.now(timezone.utc).isoformat()
-
-        if not doc.exists:
-            raise EntityNotFoundException("ExamSet", exam_set_id)
-
-        existing = doc.to_dict()
         update_fields = {k: v for k, v in exam_set_in.model_dump().items() if v is not None}
-        update_fields["updatedAt"] = now_iso
-
+        update_fields["updatedAt"] = datetime.now(timezone.utc).isoformat()
         if update_fields.get("sections"):
             update_fields["totalQuestions"] = sum(s.get("questionCount", 0) for s in update_fields["sections"])
             update_fields["totalTimeMinutes"] = sum(s.get("timeLimitMinutes", 0) for s in update_fields["sections"])
 
-        doc_ref.update(update_fields)
-        existing.update(update_fields)
-
-        # Sync update to SQL
+        sql_session = SessionLocal()
         try:
-            from app.db.session import SessionLocal
-            from app.models.exam_set import ExamSet as ExamSetModel
-            sql_session = SessionLocal()
-            try:
-                sql_item = sql_session.query(ExamSetModel).filter(ExamSetModel.id == exam_set_id).first()
-                if sql_item:
-                    for k, v in update_fields.items():
-                        if hasattr(sql_item, k):
-                            setattr(sql_item, k, v)
-                        elif k == "totalQuestions":
-                            sql_item.total_questions = v
-                        elif k == "totalTimeMinutes":
-                            sql_item.total_time_minutes = v
-                    sql_session.commit()
-            except Exception:
-                sql_session.rollback()
-            finally:
-                sql_session.close()
+            sql_item = sql_session.query(ExamSetModel).filter(ExamSetModel.id == exam_set_id).first()
+            if sql_item is None and not doc.exists:
+                raise EntityNotFoundException("ExamSet", exam_set_id)
+            if sql_item is not None:
+                for k, v in update_fields.items():
+                    if k == "totalQuestions":
+                        sql_item.total_questions = v
+                    elif k == "totalTimeMinutes":
+                        sql_item.total_time_minutes = v
+                    elif k == "questionIds":
+                        sql_item.question_ids = v
+                    elif k == "updatedAt":
+                        continue
+                    elif hasattr(sql_item, k):
+                        setattr(sql_item, k, v)
+                sql_session.commit()
         except Exception:
-            pass
+            sql_session.rollback()
+            raise
+        finally:
+            sql_session.close()
 
-        return ExamSet(**existing)
+        if doc.exists:
+            doc_ref.update(update_fields)
+
+        updated = cls.get_exam_set_by_id(exam_set_id)
+        if updated is None:
+            raise EntityNotFoundException("ExamSet", exam_set_id)
+        return updated
 
     @classmethod
     def delete_exam_set(cls, exam_set_id: str) -> bool:
@@ -419,14 +430,19 @@ class MockTestService:
 
             # Canvas-style Rule 4: Max attempts check (admin previews are unlimited and never counted)
             if exam_set.max_attempts and exam_set.max_attempts < 99 and not is_instructor:
-                user_completed_docs = (
-                    db.collection("test_attempts")
-                    .where("userId", "==", user_id)
-                    .where("templateId", "==", template_id)
-                    .where("status", "==", ExamStatus.COMPLETED.value)
-                    .get()
-                )
-                if len(user_completed_docs) >= exam_set.max_attempts:
+                from app.db.session import SessionLocal
+                from app.models.test_attempt import TestAttempt as AttemptModel
+                _s = SessionLocal()
+                try:
+                    completed_count = _s.query(AttemptModel).filter(
+                        AttemptModel.user_id == user_id,
+                        AttemptModel.template_id == template_id,
+                        AttemptModel.status == ExamStatus.COMPLETED.value,
+                        AttemptModel.is_preview == False,  # noqa: E712
+                    ).count()
+                finally:
+                    _s.close()
+                if completed_count >= exam_set.max_attempts:
                     raise ForbiddenException(
                         f"Сиз максималдуу аракеттер санын колдондуңуз ({exam_set.max_attempts}/{exam_set.max_attempts}) / Лимит попыток исчерпан"
                     )
@@ -1015,8 +1031,15 @@ class MockTestService:
         q_by_id = {d.id: d.to_dict() for d in load_question_docs(ids=question_ids)}
         test_questions: List[Dict[str, Any]] = [q_by_id[q_id] for q_id in question_ids if q_id in q_by_id]
 
+        # A completed attempt is final: submitting again returns the stored result computed from the
+        # stored answers. New answers are ignored and no counters, scores or statuses change.
+        already_completed = attempt_data.get("status") == ExamStatus.COMPLETED.value
+        if already_completed:
+            serialized_answers = attempt_data.get("answers") or {}
+        else:
+            serialized_answers = {k: v.model_dump() for k, v in answers.items()}
+
         # Evaluate score via ScoringService with CEATM standards
-        serialized_answers = {k: v.model_dump() for k, v in answers.items()}
         result = ScoringService.evaluate_test_submission(
             attempt_id=attempt_id,
             user_id=user_id,
@@ -1024,9 +1047,11 @@ class MockTestService:
             language=language,
             user_answers=serialized_answers,
             questions_in_test=test_questions,
-            completed_at=now_iso,
+            completed_at=attempt_data.get("completedAt") or now_iso if already_completed else now_iso,
             exam_type=exam_type,
         )
+        if already_completed:
+            return result
 
         # Update attempt record with results
         attempt_ref.update({

@@ -8,7 +8,7 @@ from app.services.storage_service import get_storage_service
 
 router = APIRouter()
 
-ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"}
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 
 
 @router.post("", response_model=dict)

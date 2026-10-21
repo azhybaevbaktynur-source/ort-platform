@@ -44,11 +44,11 @@ async def list_questions(
     search: Optional[str] = Query(None, description="Search keyword in question stems"),
     limit: int = Query(50, ge=1, le=1000),
     offset: int = Query(0, ge=0),
-    current_user: UserProfile = Depends(get_current_user),
+    current_user: UserProfile = Depends(require_instructor),
 ):
     """
     Search and filter questions from the 12,000+ question bank.
-    Instructors receive full question data; students receive practice projections.
+    Staff only: results include the answer key. Students use /questions/practice/{section} or /practice.
     """
     target_exam_id = exam_id or exam_set_id
     questions, total_count = QuestionService.query_questions(
@@ -90,10 +90,10 @@ async def get_practice_questions(
 @router.get("/{question_id}", response_model=QuestionInDB)
 async def get_question(
     question_id: str,
-    current_user: UserProfile = Depends(get_current_user),
+    current_user: UserProfile = Depends(require_instructor),
 ):
     """
-    Retrieve single question by ID.
+    Retrieve single question by ID (with the answer key: staff only; students get answers only in their own test review).
     """
     question = QuestionService.get_question_by_id(question_id)
     if not question:
