@@ -20,6 +20,14 @@ STATUSES = ["draft", "published", "concluded", "deleted"]
 _USERS: dict = {}
 
 
+@pytest.fixture(autouse=True)
+def _reset_users():
+    # the LMS conftest wipes users before each test, so the actor cache must not outlive a test
+    _USERS.clear()
+    yield
+    _USERS.clear()
+
+
 def users(db):
     if not _USERS:
         _USERS["O"] = make_user(db, teacher_status="approved")

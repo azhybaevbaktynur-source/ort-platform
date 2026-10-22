@@ -74,7 +74,7 @@ async def test_disabled_admin_gets_401(client, db):
 
 async def test_disable_enable_flow_and_audit(client, db):
     admin = make_user(db, platform_admin=True)
-    target = make_user(db, email="victim.person@test.example", display_name="Victim Person")
+    target = make_user(db, email=f"victim.{uuid.uuid4().hex[:8]}@test.example", display_name="Victim Person")
     headers = auth(target)
     assert (await client.get("/api/v1/auth/me", headers=headers)).status_code == 200
 
