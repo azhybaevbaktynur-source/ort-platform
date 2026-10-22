@@ -8,8 +8,11 @@
  * - remainingMs(): deadline minus server time, recomputed every call (never decremented).
  * - AutosaveQueue: coalesces per position, mirrors to localStorage, batches <= 20, retries with backoff,
  *   classifies server errors (closed / invalid / auth / transient).
+ * - Last minute (B2): when the running deadline is <= 60 s away, every change is sent at once (0 ms timer, no
+ *   debounce) and a 5 s heartbeat re-sends anything still dirty (also cutting a longer backoff short), so the
+ *   submit body carries as little as possible.
  */
-import type { AnswerIn, AttemptSectionState, AttemptState, SaveOut } from "./attemptTypes";
+import type { AnswerIn, AttemptSectionState, AttemptState, RejectedAnswer, SaveOut } from "./attemptTypes";
 
 // ---------- server clock ----------
 
@@ -179,7 +182,12 @@ export interface QueueHandlers {
 export const MAX_BATCH = 20;
 export const IDLE_FLUSH_MS = 1500;
 export const MAX_DIRTY_MS = 5000;
-export const CONTINUOUS_FLUSH_MS = 1000;
+/** Last-minute mode: changes are sent on the next tick (0 ms timer only coalesces same-tick changes). */
+export const CONTINUOUS_FLUSH_MS = 0;
+/** Last-minute mode starts when the running deadline is this close. */
+export const LAST_MINUTE_MS = 60_000;
+/** Last-minute mode: re-send dirty entries this often, whatever the backoff says. */
+export const LAST_MINUTE_HEARTBEAT_MS = 5000;
 /** Queue mirror key. Keyed by user too (when known) so a different account on the same browser never sees it. */
 export const storageKey = (attemptId: string, userId?: string | null) =>
   userId ? `lms_attempt_q_${userId}_${attemptId}` : `lms_attempt_q_${attemptId}`;
@@ -191,6 +199,7 @@ export class AutosaveQueue {
   private idleTimer: unknown = null;
   private maxTimer: unknown = null;
   private retryTimer: unknown = null;
+  private heartbeat: unknown = null;
   private inflight: Promise<void> | null = null;
   private failures = 0;
   private batchLimit = MAX_BATCH;
@@ -236,11 +245,20 @@ export class AutosaveQueue {
     this.emit(this.inflight ? "saving" : "idle");
   }
 
-  /** Last-minute mode: flush shortly after every change. */
+  /** Last-minute mode: flush right after every change, plus a heartbeat every 5 s while anything is dirty. */
   setContinuous(on: boolean): void {
     if (this.continuous === on) return;
     this.continuous = on;
-    if (on && this.entries.size) this.schedule();
+    if (on) {
+      this.armHeartbeat();
+      if (this.entries.size) this.schedule();
+    } else {
+      this.stopHeartbeat();
+    }
+  }
+
+  get lastMinute(): boolean {
+    return this.continuous;
   }
 
   /** Entries to ride along with a submit request (oldest first, <= 20). */
@@ -296,6 +314,7 @@ export class AutosaveQueue {
 
   dispose(): void {
     this.clearTimers();
+    this.stopHeartbeat();
     if (this.retryTimer) this.env.clearTimer(this.retryTimer);
     this.retryTimer = null;
   }
@@ -320,6 +339,24 @@ export class AutosaveQueue {
         void this.flushNow();
       }, MAX_DIRTY_MS);
     }
+  }
+
+  private armHeartbeat(): void {
+    if (this.heartbeat) return;
+    this.heartbeat = this.env.setTimer(() => {
+      this.heartbeat = null;
+      if (!this.continuous || this.stopped) return;
+      this.armHeartbeat();
+      if (!this.entries.size || this.inflight || this.authBlocked) return;
+      if (this.retryTimer) this.env.clearTimer(this.retryTimer);
+      this.retryTimer = null;
+      void this.flushNow();
+    }, LAST_MINUTE_HEARTBEAT_MS);
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeat) this.env.clearTimer(this.heartbeat);
+    this.heartbeat = null;
   }
 
   private clearTimers(): void {
@@ -449,6 +486,45 @@ export class AutosaveQueue {
       void this.flushNow();
     }
   }
+}
+
+// ---------- submit outcome (B2) ----------
+
+/** How the after-submit notice groups `SubmitOut.rejected`; each group has its own message. */
+export type UnsavedGroup = "deadline" | "already_submitted" | "section_closed" | "other";
+export const UNSAVED_GROUPS: readonly UnsavedGroup[] = ["deadline", "already_submitted", "section_closed", "other"];
+
+/** Distinct rejected positions per group (a position counts once, in its first reported group). */
+export function summarizeUnsaved(rejected: readonly RejectedAnswer[] | null | undefined): Partial<Record<UnsavedGroup, number>> {
+  const out: Partial<Record<UnsavedGroup, number>> = {};
+  const seen = new Set<number>();
+  for (const r of rejected ?? []) {
+    if (!r || typeof r.position !== "number" || seen.has(r.position)) continue;
+    seen.add(r.position);
+    const g: UnsavedGroup = (UNSAVED_GROUPS as readonly string[]).includes(r.reason) ? (r.reason as UnsavedGroup) : "other";
+    out[g] = (out[g] ?? 0) + 1;
+  }
+  return out;
+}
+
+/** `?unsaved=` value carried to the result page, e.g. "deadline:2,other:1"; "" when nothing was rejected. */
+export function unsavedParam(rejected: readonly RejectedAnswer[] | null | undefined): string {
+  const sum = summarizeUnsaved(rejected);
+  return UNSAVED_GROUPS.filter((g) => (sum[g] ?? 0) > 0).map((g) => `${g}:${sum[g]}`).join(",");
+}
+
+/** Inverse of `unsavedParam`; unknown groups and bad counts are ignored. */
+export function parseUnsavedParam(value: string | null | undefined): [UnsavedGroup, number][] {
+  if (!value) return [];
+  const out: [UnsavedGroup, number][] = [];
+  for (const part of value.split(",")) {
+    const [g, n] = part.split(":");
+    const count = Number(n);
+    if ((UNSAVED_GROUPS as readonly string[]).includes(g) && Number.isInteger(count) && count > 0 && count <= 10_000) {
+      out.push([g as UnsavedGroup, count]);
+    }
+  }
+  return out;
 }
 
 /** Browser wiring helper: real timers, wall clock and localStorage (guarded). */

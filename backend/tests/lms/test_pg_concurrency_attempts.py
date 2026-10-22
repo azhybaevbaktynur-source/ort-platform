@@ -370,3 +370,58 @@ def test_second_sweep_returns_immediately_while_first_holds_lock(setup_db, Sessi
         holder.commit()
         holder.close()
     assert sweep.run_sweep() == 3              # lock released after a sweep, so the next one works
+
+
+def test_parallel_submits_report_body_answers_b2(setup_db, Session):
+    """B2: every racing submit reports its body. The winner stored its body; losers see `already_submitted`, except
+    for answers identical to what the winner stored (reported saved)."""
+    q = make_quiz(setup_db, sections=[("a", 5, None)])
+    uid, cid, aid = q.student.id, q.course.id, q.assessment.id
+    attempt_id, _ = start_as(Session, uid, cid, aid)
+
+    def body(i):
+        out = [AnswerIn(position=1, response={"choice_id": "B"}, client_ts=1)]
+        if i % 2:
+            out.append(AnswerIn(position=2, response={"choice_id": "A"}, client_ts=1))
+        return out
+
+    out, errors = run_parallel(10, lambda i: (i, submit_as(Session, uid, attempt_id, body(i))))
+    assert not errors, errors
+    winners = [(i, o) for i, o in out if not o.already_submitted]
+    assert len(winners) == 1
+    wi, w = winners[0]
+    assert w.saved == [p.position for p in body(wi)] and w.rejected == []
+    for i, o in out:
+        if not o.already_submitted:
+            continue
+        assert 1 in o.saved  # identical to the winner's stored answer
+        if i % 2:
+            if wi % 2:
+                assert o.saved == [1, 2] and o.rejected == []
+            else:
+                assert [(r.position, r.reason) for r in o.rejected] == [(2, "already_submitted")]
+
+
+def test_submit_after_deadline_rejects_body_b2(setup_db, Session, frozen_clock):
+    q = make_quiz(setup_db, sections=[("a", 3, None)], time_limit_s=600)
+    uid, cid, aid = q.student.id, q.course.id, q.assessment.id
+    attempt_id, _ = start_as(Session, uid, cid, aid)
+    frozen_clock.advance(646)
+    out = submit_as(Session, uid, attempt_id, [AnswerIn(position=2, response={"choice_id": "B"}, client_ts=1)])
+    assert out.already_submitted is False and out.saved == []
+    assert [(r.position, r.reason) for r in out.rejected] == [(2, "deadline")]
+    setup_db.expire_all()
+    row = setup_db.get(Attempt, uuid.UUID(attempt_id))
+    assert row.submit_reason == "timeout"
+    it = setup_db.scalar(select(AttemptItem).where(AttemptItem.attempt_id == row.id, AttemptItem.position == 2))
+    assert it.response is None
+
+
+def test_submit_forward_only_lazy_advance_saves_next_section_b2(setup_db, Session, frozen_clock):
+    q = make_quiz(setup_db, sections=[("a", 2, 600), ("b", 2, 600)], navigation="section_forward_only")
+    uid, cid, aid = q.student.id, q.course.id, q.assessment.id
+    attempt_id, _ = start_as(Session, uid, cid, aid)
+    frozen_clock.advance(646)
+    out = submit_as(Session, uid, attempt_id, [AnswerIn(position=1, response={"choice_id": "B"}, client_ts=1),
+                                               AnswerIn(position=3, response={"choice_id": "B"}, client_ts=1)])
+    assert out.saved == [3] and [(r.position, r.reason) for r in out.rejected] == [(1, "deadline")]

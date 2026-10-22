@@ -28,7 +28,8 @@ from app.lms.assessments.models import Assessment
 from app.lms.attempts import timing
 from app.lms.attempts.models import Attempt, AttemptItem, AttemptSection
 from app.lms.attempts.schemas import (
-    AttemptItemStateOut, AttemptSectionStateOut, AttemptStateOut, MyAttemptOut, StartIn, SubmitIn, SubmitOut,
+    AttemptItemStateOut, AttemptSectionStateOut, AttemptStateOut, MyAttemptOut, RejectedAnswer, StartIn, SubmitIn,
+    SubmitOut,
 )
 from app.lms.core import ratelimit
 from app.lms.core.errors import Conflict, NotFound, ValidationFailed
@@ -440,12 +441,19 @@ def close_section(db: Session, user, attempt_id, pos: int, *, now: datetime) -> 
 
 def submit(db: Session, user, attempt_id, data: SubmitIn, *, now: datetime) -> SubmitOut:
     """P3-21. Takes the attempt row lock FIRST (so a loser never holds item locks while waiting on the winner),
-    applies the optional last answers, then finalizes (A4: one-shot UPDATE + grade + write in this transaction)."""
+    applies the optional last answers, then finalizes (A4: one-shot UPDATE + grade + write in this transaction).
+
+    B2: `saved` / `rejected` report the fate of every body answer. Already final on arrival: one read of the body's
+    items; an answer whose stored value is identical counts as saved, the rest are rejected (`deadline` if the
+    attempt was finalized by timeout/sweep, `attempt_closed` if closed, else `already_submitted`). Lazily finalized
+    here (deadline + grace passed, or course closed): every body answer is rejected `deadline` / `attempt_closed`."""
     from app.lms.attempts import autosave
 
+    entries = data.answers or []
     attempt, env = load_attempt_bundle(db, user, attempt_id, for_update=True)
     if attempt.status != "in_progress":
-        out = _submit_out(db, attempt, env, plan=None, now=now, already=True)
+        saved, rejected = _classify_after_final(db, attempt, entries)
+        out = _submit_out(db, attempt, env, plan=None, now=now, already=True, saved=saved, rejected=rejected)
         db.rollback()
         return out
     plan = plan_for(db, attempt)
@@ -454,33 +462,68 @@ def submit(db: Session, user, attempt_id, data: SubmitIn, *, now: datetime) -> S
     if not can_access(attempt, env, A.ATTEMPT_READ_OWN):  # enrollment removed meanwhile (P3-30)
         db.rollback()
         raise attempt_not_found()
+    if lz.changed:  # autoflush is off: the item UPDATE guard must see a lazily opened section (B2)
+        db.flush()
     already = False
+    saved: list[int] = []
+    rejected: list[RejectedAnswer] = []
     if not lz.finalized and attempt.status == "in_progress":
         # Lock every item row once, ascending, before any item write: a concurrent autosave holds at most a lower
         # item while waiting for nothing we hold, so the finalize pass below cannot form a lock cycle with it.
         db.execute(select(AttemptItem.position).where(AttemptItem.attempt_id == attempt.id)
                    .order_by(AttemptItem.position).with_for_update())
-        if data.answers:
-            autosave.apply_entries_lenient(db, attempt, user.id, data.answers, now=now)
+        if entries:
+            saved, rejected = autosave.apply_entries_lenient(db, attempt, user.id, entries, now=now,
+                                                             sections=lz.sections or sections)
         reason = "manual" if timing.writable(attempt.deadline_at, now, settings.ATTEMPT_GRACE_S) else "timeout"
         outcome = grading_api().finalize(db, attempt.id, reason=reason, now=now)
         already = not _won(outcome, True)
+    elif entries:  # finalized just now by lazy expiry: nothing from the body was stored
+        why = "attempt_closed" if _env_closed(attempt, env) else "deadline"
+        rejected = [RejectedAnswer(position=p, reason=why) for p in _dedupe_positions(entries)]
     db.flush()
     if already or attempt.status == "in_progress":  # the winner's finalize already refreshed the row
         db.refresh(attempt)  # inside the transaction: no read after the commit (one pool checkout per request)
-    out = _submit_out(db, attempt, env, plan=plan, now=now, already=already)
+    out = _submit_out(db, attempt, env, plan=plan, now=now, already=already, saved=saved, rejected=rejected)
     db.commit()
     return out
 
 
-def _submit_out(db: Session, attempt: Attempt, env: AttemptEnv, *, plan, now: datetime, already: bool) -> SubmitOut:
+def _dedupe_positions(entries) -> list[int]:
+    return sorted(dict.fromkeys(e.position for e in entries))
+
+
+def _classify_after_final(db: Session, attempt: Attempt, entries) -> tuple[list[int], list[RejectedAnswer]]:
+    """Repeat submit on a final attempt (B2): one read of the body's items. Identical = same `response` (when the
+    entry carries one) and same `flagged` (when it carries one); identical entries are reported saved."""
+    if not entries:
+        return [], []
+    why = {"timeout": "deadline", "sweep": "deadline", "closed": "attempt_closed"}.get(
+        attempt.submit_reason or "", "already_submitted")
+    t = AttemptItem.__table__
+    stored = {r.position: r for r in db.execute(select(t.c.position, t.c.response, t.c.flagged).where(
+        t.c.attempt_id == attempt.id, t.c.position.in_([e.position for e in entries]))).all()}
+    saved: dict[int, None] = {}
+    bad: dict[int, None] = {}
+    for e in entries:
+        row = stored.get(e.position)
+        same = row is not None and (
+            ("response" not in e.model_fields_set or (row.response or None) == e.response)
+            and (e.flagged is None or bool(row.flagged) == e.flagged))
+        (saved if same else bad)[e.position] = None
+    return (sorted(saved), [RejectedAnswer(position=p, reason=why) for p in sorted(bad) if p not in saved])
+
+
+def _submit_out(db: Session, attempt: Attempt, env: AttemptEnv, *, plan, now: datetime, already: bool,
+                saved: Optional[list[int]] = None, rejected: Optional[list[RejectedAnswer]] = None) -> SubmitOut:
     visible = results_available(env.assessment, attempt, now, staff=bool(attempt.is_preview))
     result = None
     mod = results_api()
     if visible and mod is not None and hasattr(mod, "result_out") and attempt.status in ("graded", "needs_review"):
         result = mod.result_out(attempt, plan if plan is not None else plan_for(db, attempt))
     return SubmitOut(status=attempt.status, submitted_at=timing.as_utc(attempt.submitted_at),
-                     results_available=visible, already_submitted=already, result=result)
+                     results_available=visible, already_submitted=already, result=result,
+                     saved=saved or [], rejected=rejected or [])
 
 
 # --------------------------------------------------------------------------- start

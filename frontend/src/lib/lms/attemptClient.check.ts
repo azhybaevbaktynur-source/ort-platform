@@ -5,7 +5,8 @@
  *     src/lib/lms/attemptClient.ts src/lib/lms/attemptClient.check.ts && node /tmp/agy_f2_check/attemptClient.check.js
  */
 import {
-  AutosaveQueue, ServerClock, backoffMs, classifyCloseFailure, classifyFailure, remainingMs, storageKey, type QueueEnv,
+  AutosaveQueue, LAST_MINUTE_HEARTBEAT_MS, ServerClock, backoffMs, classifyCloseFailure, classifyFailure,
+  parseUnsavedParam, remainingMs, storageKey, summarizeUnsaved, unsavedParam, type QueueEnv,
 } from "./attemptClient";
 import type { AnswerIn, SaveOut } from "./attemptTypes";
 
@@ -158,6 +159,77 @@ const out = (): SaveOut => ({ saved: [], stale: [], server_now: new Date().toISO
   ok(classifyCloseFailure({ status: 409, code: "section_not_current" }) === "not_current", "close: section_not_current");
   ok(classifyCloseFailure({ status: 409, code: "attempt_closed" }) === "closed", "close: attempt_closed");
   ok(classifyCloseFailure({ status: 0, code: "network" }) === "other", "close: network -> other");
+
+  // last minute (B2): every change goes out at once, no debounce
+  const lm: AnswerIn[][] = [];
+  const m8 = makeEnv(async (b) => { lm.push(b); return out(); }, {});
+  const q8 = new AutosaveQueue("A8", m8.env);
+  q8.setContinuous(true);
+  ok(q8.lastMinute, "last-minute mode on");
+  q8.set(1, { response: { text: "a" } });
+  await m8.advance(0);
+  ok(lm.length === 1 && q8.pending === 0, "last minute: change sent immediately (no 1.5 s debounce)");
+  q8.set(2, { response: { text: "b" } });
+  q8.set(3, { response: { text: "c" } });
+  await m8.advance(0);
+  ok(lm.length === 2 && lm[1].length === 2, "last minute: same-tick changes go in one request");
+  q8.setContinuous(false);
+  q8.set(4, { response: { text: "d" } });
+  await m8.advance(100);
+  ok(lm.length === 2 && q8.pending === 1, "normal mode debounces again");
+  await m8.advance(1500);
+  ok(lm.length === 3 && q8.pending === 0, "normal mode flushes after idle");
+
+  // last minute: the 5 s heartbeat re-sends dirty entries and cuts a long backoff short
+  let down = 3;
+  const hb: number[] = [];
+  const m9 = makeEnv(async (b) => {
+    hb.push(b.length);
+    if (down-- > 0) throw { status: 503, code: "unknown" };
+    return out();
+  }, {});
+  const q9 = new AutosaveQueue("A9", m9.env);
+  q9.set(1, { response: { text: "a" } });
+  await q9.flushNow(); // fail 1 -> backoff 1 s
+  await m9.advance(1000); // fail 2 -> backoff 2 s
+  await m9.advance(2000); // fail 3 -> backoff 4 s, next retry would be at +4 s
+  ok(hb.length === 3 && q9.pending === 1, "three failures, entry kept");
+  q9.setContinuous(true);
+  await m9.advance(LAST_MINUTE_HEARTBEAT_MS - 1);
+  ok(hb.length === 4 && q9.pending === 0, "backoff retry delivers the entry");
+  q9.set(2, { response: { text: "b" } });
+  await m9.advance(0);
+  ok(hb.length === 5 && q9.pending === 0, "and later changes go out immediately");
+  // heartbeat with nothing dirty sends nothing
+  await m9.advance(LAST_MINUTE_HEARTBEAT_MS * 3);
+  ok(hb.length === 5, "heartbeat is silent while nothing is dirty");
+
+  // heartbeat beats a 30 s backoff in the last minute
+  let fails = 10;
+  const hb2: number[] = [];
+  const m10 = makeEnv(async (b) => { hb2.push(b.length); if (fails-- > 0) throw { status: 0, code: "network" }; return out(); }, {});
+  const q10 = new AutosaveQueue("A10", m10.env);
+  q10.set(1, { response: { text: "a" } });
+  for (let i = 0; i < 6; i++) { await q10.flushNow(); } // drive the backoff up without advancing time
+  const before = hb2.length;
+  fails = 0;
+  q10.setContinuous(true);
+  await m10.advance(LAST_MINUTE_HEARTBEAT_MS);
+  ok(hb2.length === before + 1 && q10.pending === 0, "heartbeat retries within 5 s despite a long backoff");
+  q10.dispose();
+  ok(m10.timers.size === 0, "dispose clears the heartbeat");
+
+  // after-submit notice helpers
+  const rejs = [
+    { position: 3, reason: "deadline" as const }, { position: 4, reason: "deadline" as const },
+    { position: 5, reason: "stale" as const }, { position: 5, reason: "deadline" as const },
+    { position: 6, reason: "already_submitted" as const },
+  ];
+  const sum = summarizeUnsaved(rejs);
+  ok(sum.deadline === 2 && sum.other === 1 && sum.already_submitted === 1 && !sum.section_closed, "rejected grouped, positions counted once");
+  ok(unsavedParam(rejs) === "deadline:2,already_submitted:1,other:1", "unsaved param encodes groups in a fixed order");
+  ok(unsavedParam([]) === "" && unsavedParam(undefined) === "", "nothing rejected -> no param");
+  ok(JSON.stringify(parseUnsavedParam("deadline:2,bogus:4,other:x,section_closed:1")) === '[["deadline",2],["section_closed",1]]', "parse ignores junk");
 
   if (failed) { console.error(failed + " check(s) failed"); process.exit(1); }
   console.log("all checks passed");
