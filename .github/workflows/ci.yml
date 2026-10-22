@@ -79,9 +79,8 @@ jobs:
       - name: Old suite on Postgres
         env:
           DATABASE_URL: ${{ env.PG_BASE }}/ci_suite
-        run: |
-          alembic upgrade head
-          python -m pytest -q -p no:cacheprovider -W ignore --ignore=tests/test_migrations.py
+        # Tables come from init_db()'s create_all (autouse fixture); migrations are covered above.
+        run: python -m pytest -q -p no:cacheprovider -W ignore --ignore=tests/test_migrations.py
 
   frontend:
     runs-on: ubuntu-latest
