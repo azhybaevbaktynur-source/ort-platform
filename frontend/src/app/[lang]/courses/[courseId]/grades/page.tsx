@@ -1,11 +1,13 @@
 "use client";
 
 import React from "react";
-import { useParams } from "next/navigation";
+import { useCourse } from "@/components/lms/CourseContext";
+import { StaffGradebook } from "@/components/lms/gradebook/StaffGradebook";
 import { StudentGrades } from "@/components/lms/results/StudentGrades";
 
-// Student branch only; the staff gradebook branch (slice F3) is merged in by the orchestrator.
+/** Grades tab: staff see the gradebook, students their own grades. The server decides what each may read. */
 export default function GradesPage() {
-  const { courseId } = useParams<{ courseId: string }>();
-  return <StudentGrades courseId={courseId} />;
+  const { course } = useCourse();
+  const role = course.my_enrollment.role;
+  return role === "teacher" || role === "assistant" ? <StaffGradebook /> : <StudentGrades courseId={course.id} />;
 }

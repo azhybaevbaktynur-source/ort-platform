@@ -1479,6 +1479,192 @@
       "regradeDone": "Regraded {count} submission(s)."
     }
   },
+  "gradebook": {
+    "tab": "Grades",
+    "title": "Gradebook",
+    "subtitle": "The kept result of every student for each published assessment. Select a cell for details, a column header for release and regrade.",
+    "student": "Student",
+    "unnamed": "Unnamed student",
+    "untitled": "Untitled assessment",
+    "refresh": "Refresh",
+    "close": "Close",
+    "noAssessments": "No published assessments yet. Grades appear here once an assessment is published.",
+    "noStudents": "No active students in this course yet.",
+    "readOnlyConcluded": "This course is concluded: grades are read-only.",
+    "totalsStale": "Totals may be out of date after your changes.",
+    "legend": {
+      "title": "Legend",
+      "missing": "No submission after the due date"
+    },
+    "states": {
+      "none": "Not submitted",
+      "missing": "Missing",
+      "needs_review": "Needs review",
+      "excused": "Excused",
+      "graded": "Graded"
+    },
+    "flags": {
+      "late": "Late",
+      "overridden": "Overridden",
+      "released": "Released",
+      "unreleased": "Not released",
+      "threshold": "Threshold reached"
+    },
+    "cell": {
+      "excusedShort": "EX",
+      "points": "{points} points",
+      "open": "{student}, {title}: {state}. Open details"
+    },
+    "header": {
+      "actionsFor": "Grade actions for {title}",
+      "outOf": "out of {n}",
+      "releasedN": "{n}/{total} released",
+      "staleN": "{n} to regrade",
+      "omitted": "Not in total"
+    },
+    "total": {
+      "title": "Total",
+      "hint": "current",
+      "final": "final {value}"
+    },
+    "warnings": {
+      "points_possible_mismatch": "Attempts were taken on versions with different maximum points; grades compare by percent.",
+      "uncategorized_excluded": "Assessments without a category are left out of the weighted total.",
+      "unknown": "Check this assessment's grading settings."
+    },
+    "columns": {
+      "button": "Columns",
+      "countOf": "Columns: {shown} of {total}",
+      "title": "Choose columns",
+      "all": "Select all",
+      "none": "Clear",
+      "apply": "Apply",
+      "hint": "Selecting nothing shows every column."
+    },
+    "releaseMode": {
+      "auto": "Automatic (when graded)",
+      "manual": "Manual (teacher releases)"
+    },
+    "actions": {
+      "submissions": "Submissions",
+      "releasedOf": "{released} of {total} released",
+      "releaseMode": "Release",
+      "keptRule": "Kept attempt",
+      "scheme": "Scheme",
+      "noScheme": "None (points only)",
+      "due": "Due",
+      "total": "Total",
+      "staleN": "{n} grades were computed with older settings. Regrade to apply the current scheme, kept-attempt rule and late policy.",
+      "releaseAll": "Release all grades",
+      "unreleaseAll": "Hide all grades",
+      "unreleaseConfirm": "Hide every grade of this assessment from students? You can release them again later.",
+      "releasedN": "{n} grades released.",
+      "unreleasedN": "{n} grades hidden.",
+      "releaseHint": "Students see a released grade only when the results policy of the assessment also allows it.",
+      "regrade": "Regrade",
+      "regrading": "Regrading...",
+      "regradeHint": "Regrade recomputes out-of-date grades. Large courses are processed in several rounds automatically.",
+      "regradeProgress": "Regrading: {done} done, {pending} remaining",
+      "regradeDone": "Regrade finished: {n} grades recomputed.",
+      "regradeStalled": "Regrade stopped making progress with {pending} remaining. Try again later.",
+      "regradePaused": "Regrade paused with {pending} remaining. Run it again to continue.",
+      "stop": "Stop",
+      "openAttempts": "All attempts"
+    },
+    "panel": {
+      "summary": "Kept result",
+      "rawPoints": "Raw points",
+      "override": "Override",
+      "lateDeduction": "Late deduction",
+      "effective": "Counted points",
+      "percentile": "Percentile",
+      "attemptsCounted": "Attempts counted",
+      "releasedAt": "Released",
+      "release": "Release to student",
+      "unrelease": "Hide from student",
+      "openKept": "Open kept attempt",
+      "attempts": "Attempts",
+      "attempt": "Attempt",
+      "attemptN": "Attempt {n}",
+      "kept": "Kept",
+      "lateBy": "Late {days} d {hours} h",
+      "points": "Points",
+      "grade": "Grade",
+      "submitted": "Submitted",
+      "openAttempt": "Open attempt",
+      "noAttempts": "No counted attempts.",
+      "gone": "This submission no longer exists (all its attempts may have been voided)."
+    },
+    "override": {
+      "title": "Override and excuse",
+      "hint": "An override replaces the earned points; the late deduction and the scheme still apply. The reason is kept in the history.",
+      "points": "Points",
+      "pointsMax": "Points (0–{max})",
+      "save": "Save override",
+      "clear": "Clear override",
+      "clearTitle": "Clear the override?",
+      "clearBody": "The grade goes back to the points earned in the kept attempt.",
+      "issues": {
+        "points_required": "Enter the points.",
+        "points_invalid": "Enter a number.",
+        "points_range": "Points must be between 0 and {max}.",
+        "reason_required": "Give a reason for the override.",
+        "reason_too_long": "The reason is too long (500 characters at most)."
+      }
+    },
+    "excuse": {
+      "excuse": "Excuse",
+      "unexcuse": "Remove excuse",
+      "excuseTitle": "Excuse this student?",
+      "excuseBody": "An excused assessment does not count toward the student's total.",
+      "unexcuseTitle": "Remove the excuse?",
+      "unexcuseBody": "The assessment counts toward the student's total again."
+    },
+    "void": {
+      "action": "Void",
+      "title": "Void this attempt?",
+      "body": "The attempt stops counting and the kept grade is recomputed. The student sees it as voided. This cannot be undone.",
+      "bodyN": "Attempt {n} stops counting and the kept grade is recomputed. The student sees it as voided. This cannot be undone.",
+      "confirm": "Void attempt"
+    },
+    "reason": {
+      "required": "Reason (required)",
+      "optional": "Reason (optional)",
+      "missing": "Enter a reason."
+    },
+    "events": {
+      "title": "History",
+      "empty": "No changes yet.",
+      "system": "System",
+      "reason": "Reason",
+      "types": {
+        "override": "Grade overridden",
+        "override_cleared": "Override cleared",
+        "excused": "Excused",
+        "unexcused": "Excuse removed",
+        "released": "Released to student",
+        "unreleased": "Hidden from student",
+        "regraded": "Regraded",
+        "attempt_voided": "Attempt voided"
+      }
+    },
+    "fields": {
+      "override_points": "Override",
+      "released_at": "Released",
+      "excused": "Excused",
+      "state": "State",
+      "display_value": "Grade",
+      "effective_points": "Counted points",
+      "raw_points": "Raw points",
+      "kept_attempt_id": "Kept attempt",
+      "scheme_version_id": "Scheme version",
+      "status": "Status",
+      "label": "Label",
+      "late_deduction": "Late deduction",
+      "yes": "yes",
+      "no": "no"
+    }
+  },
   "results": {
     "acceptedAnswers": "Accepted answers",
     "answered": "Answered",

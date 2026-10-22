@@ -51,3 +51,6 @@ export const getStaffAttempt = (courseId: string, attemptId: string) =>
   lmsFetch<AttemptStaffOut>(`/courses/${e(courseId)}/attempts/${e(attemptId)}`);
 export const scoreAttemptItem = (courseId: string, attemptId: string, position: number, body: ScoreIn) =>
   lmsFetch<AttemptStaffOut>(`/courses/${e(courseId)}/attempts/${e(attemptId)}/items/${position}/score`, { method: "PUT", body });
+/** Phase 4 (P4-20): void a graded or needs-review attempt; the kept result is recomputed server-side. Reason <= 500. */
+export const voidAttempt = (courseId: string, attemptId: string, reason: string) =>
+  lmsFetch<AttemptStaffOut>(`/courses/${e(courseId)}/attempts/${e(attemptId)}/void`, { method: "POST", body: { reason } });
