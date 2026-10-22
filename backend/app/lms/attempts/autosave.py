@@ -23,7 +23,7 @@ from app.core.config import settings
 from app.lms.assessments.models import Assessment
 from app.lms.attempts import engine, timing
 from app.lms.attempts.models import Attempt, AttemptItem, AttemptSection
-from app.lms.attempts.schemas import AnswerIn, SaveOut
+from app.lms.attempts.schemas import AnswerIn, RejectedAnswer, SaveOut
 from app.lms.content.types import get_type
 from app.lms.core import clock
 from app.lms.core.errors import Conflict, NotFound, PayloadTooLarge, RateLimited, ValidationFailed
@@ -253,23 +253,61 @@ def _can_write(attempt: Attempt, env: engine.AttemptEnv) -> bool:
 
 
 def apply_entries_lenient(db: Session, attempt: Attempt, user_id: str, entries: list[AnswerIn], *,
-                          now: datetime) -> tuple[list[int], list[int]]:
-    """Used by submit (inside its transaction, attempt row already locked): apply what is accepted, skip the rest.
-    Returns (saved positions, rejected positions). Responses are validated BEFORE the update so a bad one never
-    needs undoing."""
-    if len(entries) > settings.AUTOSAVE_MAX_ENTRIES:
-        entries = entries[: settings.AUTOSAVE_MAX_ENTRIES]
+                          now: datetime, sections: Optional[list] = None) -> tuple[list[int], list[RejectedAnswer]]:
+    """Used by submit (inside its transaction, attempt row and every item row already locked): apply what is
+    accepted, skip the rest. Returns (saved positions, rejected [position + reason]) (B2). Responses are validated
+    BEFORE the update so a bad one never needs undoing. Rejections are classified from the one item read below and
+    the already-loaded `sections`: no extra statement per answer. A position that is saved by one body entry is
+    never also reported as rejected (e.g. two entries for one position, the older one stale)."""
+    rejected: list[RejectedAnswer] = []
+    cap = settings.AUTOSAVE_MAX_ENTRIES
+    if len(entries) > cap:
+        rejected += [RejectedAnswer(position=e.position, reason="too_many_answers") for e in entries[cap:]]
+        entries = entries[:cap]
     t = _AI
-    qv_by_pos = {r.position: r.question_version_id for r in db.execute(
-        select(t.c.position, t.c.question_version_id).where(
+    items = {r.position: r for r in db.execute(
+        select(t.c.position, t.c.question_version_id, t.c.section_pos, t.c.client_ts, t.c.correctness).where(
             t.c.attempt_id == attempt.id, t.c.position.in_([e.position for e in entries]))).all()}
     ok: list[AnswerIn] = []
-    rejected: list[int] = []
     for e in entries:
-        qv = qv_by_pos.get(e.position)
-        if qv is None or (e.response is not None and not _response_ok(db, qv, e.response)):
-            rejected.append(e.position)
+        it = items.get(e.position)
+        if it is None:
+            rejected.append(RejectedAnswer(position=e.position, reason="item_not_found"))
+        elif e.response is not None and not _response_ok(db, it.question_version_id, e.response):
+            rejected.append(RejectedAnswer(position=e.position, reason="invalid_response"))
         else:
             ok.append(e)
     saved, failed, _ = _fast(db, attempt.id, user_id, ok, now)
-    return _dedupe(e.position for e, _ in saved), rejected + [e.position for e in failed]
+    if failed:
+        by_pos = {s.section_pos: s for s in (sections or [])}
+        rejected += [RejectedAnswer(position=e.position, reason=_lenient_reason(attempt, items[e.position], by_pos,
+                                                                                e, now)) for e in failed]
+    saved_pos = _dedupe(e.position for e, _ in saved)
+    done = set(saved_pos)
+    seen: set[int] = set()
+    out: list[RejectedAnswer] = []
+    for r in sorted(rejected, key=lambda r: r.position):
+        if r.position not in done and r.position not in seen:
+            seen.add(r.position)
+            out.append(r)
+    return saved_pos, out
+
+
+def _lenient_reason(attempt: Attempt, it, by_pos: dict, e: AnswerIn, now: datetime) -> str:
+    """Why the conditional UPDATE refused `e` (mirrors the `_guard` predicates and the `_slow` checks)."""
+    grace = timedelta(seconds=settings.ATTEMPT_GRACE_S)
+    if it.correctness is not None:
+        return "attempt_closed"
+    if not timing.writable(attempt.deadline_at, now, settings.ATTEMPT_GRACE_S):
+        return "deadline"
+    sec = by_pos.get(it.section_pos)
+    if sec is None or sec.started_at is None:
+        return "section_closed"
+    if sec.closed_at is not None:
+        return "deadline" if sec.close_reason == "timeout" else "section_closed"
+    sdl = timing.as_utc(sec.deadline_at)
+    if sdl is not None and sdl + grace < now:
+        return "deadline"
+    if it.client_ts is not None and it.client_ts > e.client_ts:
+        return "stale"
+    return "attempt_closed"

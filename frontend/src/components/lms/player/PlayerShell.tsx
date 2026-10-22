@@ -10,10 +10,10 @@ import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import {
   closeSection, getAttempt, getAttemptContent, saveAnswers, saveAnswersKeepalive, submitAttempt,
 } from "@/lib/lms/attempts";
-import type { AttemptContent, AttemptItemState, AttemptState } from "@/lib/lms/attemptTypes";
+import type { AttemptContent, AttemptItemState, AttemptState, SubmitOut } from "@/lib/lms/attemptTypes";
 import {
-  AutosaveQueue, ServerClock, browserQueueEnv, classifyCloseFailure, classifyFailure, backoffMs, effectiveDeadlineMs,
-  timeUpSubmitDelayMs, watchOtherTabs, type QueueSnapshot,
+  AutosaveQueue, LAST_MINUTE_MS, ServerClock, browserQueueEnv, classifyCloseFailure, classifyFailure, backoffMs,
+  effectiveDeadlineMs, timeUpSubmitDelayMs, unsavedParam, watchOtherTabs, type QueueSnapshot,
 } from "@/lib/lms/attemptClient";
 import { DeadlineTimer } from "./DeadlineTimer";
 import { ItemView } from "./ItemView";
@@ -61,7 +61,11 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
   meIdRef.current = me?.id ?? null;
   answersRef.current = answers;
   const resultHref = `/${lang}/courses/${courseId}/attempts/${attemptId}/result`;
-  const goResult = useCallback(() => router.replace(resultHref), [router, resultHref]);
+  /** To the result page; body answers the server did not store (B2) ride along as `?unsaved=` for the notice. */
+  const goResult = useCallback((out?: SubmitOut | null) => {
+    const unsaved = unsavedParam(out?.rejected);
+    router.replace(unsaved ? `${resultHref}?unsaved=${encodeURIComponent(unsaved)}` : resultHref);
+  }, [router, resultHref]);
 
   /** Run a request and feed the clock estimator with its `server_now`. */
   const timed = useCallback(async <T extends { server_now?: string }>(fn: () => Promise<T>): Promise<T> => {
@@ -336,9 +340,9 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
     for (let attempt = 0; ; attempt++) {
       try {
         await q?.flushNow();
-        await submitAttempt(attemptId, { answers: q?.peek(20) ?? [] });
+        const out = await submitAttempt(attemptId, { answers: q?.peek(20) ?? [] });
         q?.clear();
-        goResult();
+        goResult(out);
         return;
       } catch (e) {
         const info = classifyFailure(e);
@@ -437,9 +441,9 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
         setDialogError({ code: "network" });
         return;
       }
-      await submitAttempt(attemptId, { answers: q?.peek(20) ?? [] });
+      const out = await submitAttempt(attemptId, { answers: q?.peek(20) ?? [] });
       q?.clear();
-      goResult();
+      goResult(out);
     } catch (e) {
       const info = classifyFailure(e);
       if (info.kind === "closed") {
@@ -525,7 +529,7 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
           <div className="flex items-center gap-3">
             <SaveStatus snap={snap} onRetry={() => queueRef.current?.retryNow()} />
             <DeadlineTimer deadlineMs={deadline} getNowMs={() => clock.now()} onExpire={onTimerExpire}
-              onTick={(rem) => queueRef.current?.setContinuous(rem <= 60_000)} />
+              onTick={(rem) => queueRef.current?.setContinuous(rem <= LAST_MINUTE_MS)} />
           </div>
         </div>
         <div className="h-1 w-full bg-slate-100" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPct} aria-label={t("player.progressBar")}>

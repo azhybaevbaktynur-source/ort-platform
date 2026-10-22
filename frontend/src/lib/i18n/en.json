@@ -1355,6 +1355,12 @@
     },
     "true": "True",
     "unflag": "Remove flag",
+    "unsaved": {
+      "deadline": "Answers not saved because time ran out: {n}",
+      "already_submitted": "Answers not saved because the attempt had already been submitted: {n}",
+      "section_closed": "Answers not saved because their section was already closed: {n}",
+      "other": "Answers the server could not save: {n}"
+    },
     "working": "Working..."
   },
   "grading": {

@@ -86,12 +86,26 @@ class SaveOut(BaseModel):
     current_section_pos: int
 
 
+RejectReason = Literal["deadline", "already_submitted", "attempt_closed", "section_closed", "stale", "item_not_found",
+                       "invalid_response", "too_many_answers"]
+
+
+class RejectedAnswer(BaseModel):
+    """A submit-body answer that was NOT stored (B2). Reasons reuse the autosave error codes, plus `deadline`
+    (deadline + grace passed; also a timed-out section) and `already_submitted` (the attempt was already final)."""
+    position: int
+    reason: RejectReason
+
+
 class SubmitOut(BaseModel):
     status: AttemptStatus
     submitted_at: Optional[datetime] = None
     results_available: bool
     already_submitted: bool = False
     result: Optional[Any] = None
+    # B2: what happened to the answers in the submit body. Positions in neither list were not in the body.
+    saved: list[int] = Field(default_factory=list)
+    rejected: list[RejectedAnswer] = Field(default_factory=list)
 
 
 class MyAttemptOut(BaseModel):

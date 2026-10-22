@@ -148,12 +148,32 @@ export interface AttemptResultOut {
   submitted_at: string | null;
 }
 
+/** Why a submit-body answer was not stored (B2). Autosave error codes plus `deadline` and `already_submitted`. */
+export type SubmitRejectReason =
+  | "deadline"
+  | "already_submitted"
+  | "attempt_closed"
+  | "section_closed"
+  | "stale"
+  | "item_not_found"
+  | "invalid_response"
+  | "too_many_answers";
+
+export interface RejectedAnswer {
+  position: number;
+  reason: SubmitRejectReason;
+}
+
 export interface SubmitOut {
   status: AttemptStatus;
   submitted_at: string | null;
   results_available: boolean;
   already_submitted?: boolean;
   result?: AttemptResultOut | null;
+  /** Positions from the submit body that were stored (absent on older servers). */
+  saved?: number[];
+  /** Submit-body answers that were NOT stored, with the reason. */
+  rejected?: RejectedAnswer[];
 }
 
 export interface StartIn {
