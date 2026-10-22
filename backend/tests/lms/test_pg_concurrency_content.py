@@ -292,3 +292,46 @@ def test_content_parallel_translations_different_languages_both_succeed(pg):
         groups = {r.translation_group_id for r in s.execute(select(BankQuestion).where(
             BankQuestion.bank_id == ids["bank"])).scalars()}
         assert len(groups) == 1 and None not in groups
+
+
+# ---------------------------------------------------------------- C5: importer
+
+def test_import_parallel_commits_of_same_bundle_one_bank_no_duplicates(pg, monkeypatch, tmp_path):
+    import os
+
+    from app.lms.content.importers import ImportOptions
+    from app.lms.content.importers import service as import_svc
+    from app.lms.content.models import QuestionBank
+    from app.lms.files import media
+
+    monkeypatch.setattr(settings, "LMS_STORAGE_DRIVER", "local")
+    monkeypatch.setattr(settings, "LMS_LOCAL_STORAGE_DIR", str(tmp_path / "blobs"))
+    storage.reset_blob_storage()
+    media.reset_media_cache()
+    Session, User, ids = _c4_world(pg)
+    raw = open(os.path.join(os.path.dirname(__file__), "..", "fixtures", "bundles", "tsoomo19.zip"), "rb").read()
+    opts = ImportOptions(exam_type="full_main", language="ru", allowed_languages=["en", "ru", "ky"])
+
+    def run_import(_i):
+        return _c4_call(Session, User, ids, lambda s, ctx, c: import_svc.commit(
+            s, ctx, c, raw, "t.zip", opts).model_dump()["banks"][0]["source_id"])
+
+    out, errors = _run_parallel(4, run_import)
+    assert not errors, errors
+    oks = [v for k, v in out if k == "ok"]
+    busy = [v for k, v in out if k == "lms"]
+    assert oks and all(v == "tsoomo19" for v in oks)
+    assert set(busy) <= {"import_busy"}, out
+    with Session() as s:
+        banks = s.execute(select(QuestionBank).where(QuestionBank.source_id == "tsoomo19")).scalars().all()
+        assert len(banks) == 1
+        qs = s.execute(select(BankQuestion).where(BankQuestion.bank_id == banks[0].id)).scalars().all()
+        assert len(qs) == 150 and len({q.source_ref for q in qs}) == 150
+        assert s.scalar(select(func.max(QuestionVersion.version_no)).join(
+            BankQuestion, BankQuestion.id == QuestionVersion.question_id).where(BankQuestion.bank_id == banks[0].id)) == 1
+        assert s.scalar(select(func.count()).select_from(Asset).where(Asset.owner_id == ids["owner"])) == 14
+    # a clean second pass after the race changes nothing
+    again = _c4_call(Session, User, ids, lambda s, ctx, c: import_svc.commit(s, ctx, c, raw, "t.zip", opts))
+    assert again[0] == "ok" and sum(again[1].banks[0].unchanged.values()) == 150
+    storage.reset_blob_storage()
+    media.reset_media_cache()

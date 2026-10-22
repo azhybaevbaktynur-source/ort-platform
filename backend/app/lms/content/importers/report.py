@@ -11,7 +11,8 @@ from .schemas import ImportBankSummary, ImportReport
 def section_counts(bundle: ParsedBundle) -> dict[str, int]:
     out: dict[str, int] = {}
     for it in bundle.items:
-        out[it.section] = out.get(it.section, 0) + 1
+        k = it.section or "other"
+        out[k] = out.get(k, 0) + 1
     return out
 
 
