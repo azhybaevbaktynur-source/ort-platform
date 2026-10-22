@@ -1,0 +1,39 @@
+{
+ "label": "r6_w2_p10_t20_admit20_n3000",
+ "assessment_id": "bbcb5937-e033-4109-b3a4-5aabb815a651",
+ "attempts": 3000,
+ "attempts_per_user_max": 1,
+ "status": {
+  "graded": 3000
+ },
+ "submit_reason": {
+  "manual": 2942,
+  "sweep": 57,
+  "timeout": 1
+ },
+ "in_progress_left": 0,
+ "graded_at_missing": 0,
+ "hook_calls": 3000,
+ "hook_double": 0,
+ "hook_missing": 0,
+ "hook_on_unfinalized": 0,
+ "items_total": 450000,
+ "attempts_with_ungraded_items": 0,
+ "raw_score_mismatch": 0,
+ "answers_after_grading": 0,
+ "open_sections_on_finalized": 0,
+ "key_mismatch": 0,
+ "acked_positions_checked": 258573,
+ "acked_exact": 258573,
+ "acked_superseded": 0,
+ "submit_body_rejected_late": 0,
+ "lost_answers": 0,
+ "lost_by_src": {},
+ "lost_examples": [],
+ "acked_entries_total": 415155,
+ "started_ok": 3000,
+ "5xx_or_transport": {
+  "autosave:ReadError": 1
+ },
+ "ok": false
+}

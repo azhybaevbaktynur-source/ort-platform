@@ -1,0 +1,126 @@
+{
+ "label": "w1",
+ "students": 1000,
+ "concurrency": 8,
+ "exam": {
+  "assessment_id": "13e626e7-066d-4ae8-a34b-22916e7165b0",
+  "version_id": "5150d357-1acc-4953-b892-aceee3f762a2",
+  "t0": 1792683761.923142,
+  "until": 1792701761.923142,
+  "ramp_s": 0,
+  "section_s": 3600,
+  "last_min_s": 3600
+ },
+ "steps": [
+  {
+   "step": "start",
+   "n": 1000,
+   "rps": 63.3,
+   "server_cpu_ms_per_req": 20.86,
+   "pg_cpu_ms_per_req": 2.94,
+   "p50_ms": 119.9,
+   "p95_ms": 176.46,
+   "codes": {}
+  },
+  {
+   "step": "content",
+   "n": 1000,
+   "rps": 574.1,
+   "server_cpu_ms_per_req": 1.86,
+   "pg_cpu_ms_per_req": 0.55,
+   "p50_ms": 12.66,
+   "p95_ms": 19.84,
+   "codes": {}
+  },
+  {
+   "step": "content_304",
+   "n": 1000,
+   "rps": 589.1,
+   "server_cpu_ms_per_req": 1.88,
+   "pg_cpu_ms_per_req": 0.51,
+   "p50_ms": 12.68,
+   "p95_ms": 17.88,
+   "codes": {}
+  },
+  {
+   "step": "state",
+   "n": 1000,
+   "rps": 311.0,
+   "server_cpu_ms_per_req": 3.72,
+   "pg_cpu_ms_per_req": 0.69,
+   "p50_ms": 23.7,
+   "p95_ms": 30.7,
+   "codes": {}
+  },
+  {
+   "step": "autosave_1",
+   "n": 1000,
+   "rps": 520.6,
+   "server_cpu_ms_per_req": 2.06,
+   "pg_cpu_ms_per_req": 0.73,
+   "p50_ms": 14.65,
+   "p95_ms": 19.8,
+   "codes": {}
+  },
+  {
+   "step": "autosave_3",
+   "n": 1000,
+   "rps": 335.7,
+   "server_cpu_ms_per_req": 3.21,
+   "pg_cpu_ms_per_req": 1.64,
+   "p50_ms": 23.12,
+   "p95_ms": 28.76,
+   "codes": {}
+  },
+  {
+   "step": "autosave_5",
+   "n": 1000,
+   "rps": 245.5,
+   "server_cpu_ms_per_req": 4.25,
+   "pg_cpu_ms_per_req": 2.43,
+   "p50_ms": 30.59,
+   "p95_ms": 38.82,
+   "codes": {}
+  },
+  {
+   "step": "autosave_20",
+   "n": 1000,
+   "rps": 83.1,
+   "server_cpu_ms_per_req": 12.81,
+   "pg_cpu_ms_per_req": 9.42,
+   "p50_ms": 93.25,
+   "p95_ms": 126.12,
+   "codes": {}
+  },
+  {
+   "step": "section_close",
+   "n": 1000,
+   "rps": 250.3,
+   "server_cpu_ms_per_req": 4.41,
+   "pg_cpu_ms_per_req": 0.98,
+   "p50_ms": 28.18,
+   "p95_ms": 70.58,
+   "codes": {}
+  },
+  {
+   "step": "content_s2",
+   "n": 1000,
+   "rps": 529.1,
+   "server_cpu_ms_per_req": 1.93,
+   "pg_cpu_ms_per_req": 0.54,
+   "p50_ms": 13.05,
+   "p95_ms": 21.3,
+   "codes": {}
+  },
+  {
+   "step": "submit",
+   "n": 1000,
+   "rps": 100.0,
+   "server_cpu_ms_per_req": 10.58,
+   "pg_cpu_ms_per_req": 3.17,
+   "p50_ms": 75.46,
+   "p95_ms": 121.42,
+   "codes": {}
+  }
+ ]
+}

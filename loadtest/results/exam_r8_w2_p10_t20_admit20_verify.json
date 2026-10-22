@@ -1,0 +1,41 @@
+{
+ "label": "r8_w2_p10_t20_admit20",
+ "assessment_id": "d6c89bac-187a-4d8a-8a00-978b825c2efe",
+ "attempts": 6000,
+ "attempts_per_user_max": 1,
+ "status": {
+  "graded": 6000
+ },
+ "submit_reason": {
+  "manual": 4977,
+  "timeout": 919,
+  "sweep": 104
+ },
+ "in_progress_left": 0,
+ "graded_at_missing": 0,
+ "hook_calls": 6000,
+ "hook_double": 0,
+ "hook_missing": 0,
+ "hook_on_unfinalized": 0,
+ "items_total": 900000,
+ "attempts_with_ungraded_items": 0,
+ "raw_score_mismatch": 0,
+ "answers_after_grading": 0,
+ "open_sections_on_finalized": 0,
+ "key_mismatch": 0,
+ "acked_positions_checked": 479231,
+ "acked_exact": 477966,
+ "acked_superseded": 0,
+ "submit_body_rejected_late": 1265,
+ "lost_answers": 0,
+ "lost_by_src": {},
+ "lost_examples": [],
+ "acked_entries_total": 695705,
+ "started_ok": 6000,
+ "5xx_or_transport": {
+  "autosave:ReadError": 7,
+  "content:ReadError": 1,
+  "state_reload:ReadError": 1
+ },
+ "ok": false
+}
