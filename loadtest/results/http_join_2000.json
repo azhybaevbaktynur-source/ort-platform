@@ -1,0 +1,33 @@
+{
+ "scenario": "join",
+ "users": 2000,
+ "wall_s": 172.0,
+ "endpoints": {
+  "join": {
+   "n": 2000,
+   "rps": 11.6,
+   "p50_ms": 76132.5,
+   "p95_ms": 93400.5,
+   "p99_ms": 97264.2,
+   "err_pct": 98.2,
+   "codes": {
+    "500": 200,
+    "ReadTimeout": 1764
+   }
+  },
+  "me_lms": {
+   "n": 2000,
+   "rps": 11.6,
+   "p50_ms": 64839.6,
+   "p95_ms": 69693.7,
+   "p99_ms": 71049.6,
+   "err_pct": 100.0,
+   "codes": {
+    "ReadError": 4,
+    "ReadTimeout": 1996
+   }
+  }
+ },
+ "total_rps": 23.3,
+ "total_err_pct": 99.1
+}

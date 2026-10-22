@@ -1,0 +1,35 @@
+{
+ "conns_50": {
+  "ok": 1500,
+  "errors": 0,
+  "wall_s": 10.09,
+  "rate_per_s": 148.7,
+  "p50_ms": 242.3,
+  "p95_ms": 361.7,
+  "p99_ms": 719.7,
+  "max_ms": 1210.7,
+  "est_6000_attempts_s": 40.3
+ },
+ "conns_100": {
+  "ok": 2000,
+  "errors": 0,
+  "wall_s": 8.01,
+  "rate_per_s": 249.8,
+  "p50_ms": 253.2,
+  "p95_ms": 391.8,
+  "p99_ms": 773.0,
+  "max_ms": 1230.8,
+  "est_6000_attempts_s": 24.0
+ },
+ "conns_200": {
+  "ok": 3000,
+  "errors": 0,
+  "wall_s": 7.12,
+  "rate_per_s": 421.2,
+  "p50_ms": 258.7,
+  "p95_ms": 729.0,
+  "p99_ms": 851.4,
+  "max_ms": 1283.0,
+  "est_6000_attempts_s": 14.2
+ }
+}

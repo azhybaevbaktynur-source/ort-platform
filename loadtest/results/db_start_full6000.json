@@ -1,0 +1,12 @@
+{
+ "ok": 0,
+ "errors": 0,
+ "wall_s": 3.5,
+ "rate_per_s": 0.0,
+ "p50_ms": null,
+ "p95_ms": null,
+ "p99_ms": null,
+ "max_ms": null,
+ "attempts_inserted": 0,
+ "pre_existing": 14200
+}

@@ -1,0 +1,31 @@
+{
+ "conns_100": {
+  "ok": 6000,
+  "errors": 0,
+  "wall_s": 17.64,
+  "rate_per_s": 340.1,
+  "p50_ms": 232.4,
+  "p95_ms": 318.9,
+  "p99_ms": 681.7,
+  "max_ms": 1110.3
+ },
+ "conns_300": {
+  "ok": 6000,
+  "errors": 0,
+  "wall_s": 8.51,
+  "rate_per_s": 705.3,
+  "p50_ms": 265.7,
+  "p95_ms": 713.5,
+  "p99_ms": 793.3,
+  "max_ms": 2441.3
+ },
+ "explain_analyze": [
+  "  Buffers: shared hit=3",
+  "Planning Time: 0.100 ms",
+  "Execution Time: 0.235 ms"
+ ],
+ "attempt_items_size_rows": [
+  "195 MB",
+  2130000
+ ]
+}

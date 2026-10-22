@@ -1,0 +1,27 @@
+{
+ "scenario": "join",
+ "users": 500,
+ "wall_s": 13.3,
+ "endpoints": {
+  "join": {
+   "n": 500,
+   "rps": 37.5,
+   "p50_ms": 8.7,
+   "p95_ms": 27.8,
+   "p99_ms": 116.1,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "me_lms": {
+   "n": 500,
+   "rps": 37.5,
+   "p50_ms": 2.6,
+   "p95_ms": 17.9,
+   "p99_ms": 26.3,
+   "err_pct": 0.0,
+   "codes": {}
+  }
+ },
+ "total_rps": 75.0,
+ "total_err_pct": 0.0
+}

@@ -1,0 +1,18 @@
+{
+ "scenario": "login",
+ "users": 5,
+ "wall_s": 15.8,
+ "endpoints": {
+  "login": {
+   "n": 48,
+   "rps": 3.0,
+   "p50_ms": 772.7,
+   "p95_ms": 1930.8,
+   "p99_ms": 2507.9,
+   "err_pct": 0.0,
+   "codes": {}
+  }
+ },
+ "total_rps": 3.0,
+ "total_err_pct": 0.0
+}
