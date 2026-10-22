@@ -66,6 +66,34 @@ class Settings(BaseSettings):
     # IP-keyed rate-limit rules count and log but never deny until the proxy chain is verified.
     RATE_LIMIT_IP_ENFORCE: bool = False
 
+    # --- Phase 2: files and content library (docs/phases/PHASE_2_DESIGN.md) ---
+    # Blob storage driver: "local" (tests/dev), "db" (asset_blobs table, production until R2), "r2".
+    LMS_STORAGE_DRIVER: str = "db"
+    LMS_LOCAL_STORAGE_DIR: str = ""  # empty = {LOCAL_UPLOAD_DIR}/lms
+    R2_ACCOUNT_ID: str = ""
+    R2_ACCESS_KEY_ID: str = ""
+    R2_SECRET_ACCESS_KEY: str = ""
+    R2_BUCKET: str = "ort-lms-media"
+    R2_PUBLIC_BASE_URL: str = ""  # CDN base for public images; empty = served by /api/v1/media
+    MEDIA_BASE_URL: str = "/api/v1/media"
+    MEDIA_CACHE_BYTES: int = 64 * 1024 * 1024
+    # Images (P2-4, P2-6)
+    ASSET_MAX_UPLOAD_BYTES: int = 5 * 1024 * 1024
+    ASSET_MAX_BUNDLE_IMAGE_BYTES: int = 10 * 1024 * 1024
+    ASSET_MAX_PIXELS: int = 40_000_000
+    ASSET_MAX_SIDE: int = 1600
+    ASSET_MAX_STORED_BYTES: int = 2 * 1024 * 1024
+    ASSET_QUOTA_BYTES_PER_USER: int = 200 * 1024 * 1024
+    ASSET_DB_MAX_TOTAL_BYTES: int = 300 * 1024 * 1024
+    ASSET_UPLOAD_RATE_PER_HOUR: int = 300
+    # Import limits (P2-22)
+    IMPORT_MAX_UPLOAD_BYTES: int = 50 * 1024 * 1024
+    IMPORT_MAX_UNCOMPRESSED_BYTES: int = 150 * 1024 * 1024
+    IMPORT_MAX_ZIP_ENTRIES: int = 5000
+    IMPORT_MAX_ROWS: int = 5000
+    IMPORT_MAX_IMAGES: int = 1000
+    CONTENT_IMPORT_RATE_PER_HOUR: int = 60
+
     # Password hashing cost (bcrypt). 10 is OWASP's minimum and ~4x faster than 12 on small servers.
     BCRYPT_ROUNDS: int = 10
 

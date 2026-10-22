@@ -1,6 +1,6 @@
 """LMS test isolation: every LMS test starts with empty LMS tables and only the seeded test accounts."""
 import pytest
-from sqlalchemy import delete
+from sqlalchemy import delete, update
 
 from app.db import session as db_session
 
@@ -18,10 +18,39 @@ def clean_lms_tables(reset_db):
     from app.models.test_attempt import TestAttempt
     from app.models.user import User
 
+    from app.lms.content.models import (
+        BankQuestion, Passage, PassageVersion, QuestionBank, QuestionVersion, TranslationGroup,
+    )
+    from app.lms.files.models import Asset, AssetBlob
+
     # FK-safe order: children first, users last. Seed accounts stay.
-    tables = [EnrollmentEvent, Enrollment, TeacherRequest, AdminAuditLog, RateLimitBucket, Course, ExamAccess, TestAttempt]
+    phase2 = [QuestionVersion, BankQuestion, PassageVersion, Passage, TranslationGroup, QuestionBank, Asset, AssetBlob]
+    tables = phase2 + [EnrollmentEvent, Enrollment, TeacherRequest, AdminAuditLog, RateLimitBucket, Course, ExamAccess, TestAttempt]
     with db_session.engine.begin() as conn:
+        # Break the circular version FKs first.
+        conn.execute(update(BankQuestion.__table__).values(current_version_id=None, imported_version_id=None))
+        conn.execute(update(Passage.__table__).values(current_version_id=None, imported_version_id=None))
         for model in tables:
             conn.execute(delete(model.__table__))
         conn.execute(delete(User.__table__).where(User.id.notin_(SEED_USER_IDS)))
+    _reset_storage_caches()
     yield
+
+
+def _reset_storage_caches() -> None:
+    """Reset the blob-storage singleton and media LRU once slice C3 provides them."""
+    try:
+        from app.lms.files import storage
+    except ImportError:
+        return
+    for name in ("reset_blob_storage", "reset_storage_singleton"):
+        fn = getattr(storage, name, None)
+        if callable(fn):
+            fn()
+    try:
+        from app.lms.files import media
+    except ImportError:
+        return
+    fn = getattr(media, "reset_media_cache", None)
+    if callable(fn):
+        fn()

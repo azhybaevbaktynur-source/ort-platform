@@ -28,3 +28,14 @@ api_router.include_router(_me_router, prefix="/me", tags=["Me"])
 api_router.include_router(_courses_router, prefix="/courses", tags=["Courses"])
 api_router.include_router(_platform_router, prefix="/platform", tags=["Platform Admin"])
 api_router.include_router(_platform_courses_router, prefix="/platform", tags=["Platform Admin"])
+
+# Phase 2 (content library): stub routers filled by later slices
+from app.lms.content.router import router as _content_router  # noqa: E402
+from app.lms.content.import_router import router as _import_router  # noqa: E402
+from app.lms.files.router import router as _files_router  # noqa: E402
+from app.lms.files.media import router as _media_router  # noqa: E402
+
+api_router.include_router(_content_router, prefix="/courses", tags=["Question Bank (LMS)"])
+api_router.include_router(_import_router, prefix="/courses", tags=["Content Import"])
+api_router.include_router(_files_router, tags=["Files"])
+api_router.include_router(_media_router, prefix="/media", tags=["Media"])
