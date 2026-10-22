@@ -3,7 +3,10 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/context";
-import { getStaffAttempt, type AttemptStaffOut } from "@/lib/lms/staffAttempts";
+import { getStaffAttempt, voidAttempt, type AttemptStaffOut } from "@/lib/lms/staffAttempts";
+import { useCanEditContent } from "@/components/lms/content/StaffGate";
+import { ReasonModal } from "@/components/lms/gradebook/ReasonModal";
+import { canVoid } from "@/components/lms/gradebook/gradebookModel";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { fmtDateTime, fmtPoints } from "@/components/lms/assessments/format";
 import { ReviewItemCard } from "./ReviewItemCard";
@@ -17,6 +20,11 @@ export function StaffAttemptDetail({ courseId, assessmentId, attemptId }: { cour
   const [data, setData] = useState<AttemptStaffOut | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [onlyPending, setOnlyPending] = useState(false);
+  // write access mirrors the gradebook: teacher/assistant on a course that is not concluded (server enforces grades.manage)
+  const canWrite = useCanEditContent();
+  const [voidOpen, setVoidOpen] = useState(false);
+  const [voidBusy, setVoidBusy] = useState(false);
+  const [voidError, setVoidError] = useState<unknown>(null);
 
   const load = useCallback(async () => {
     try {
@@ -27,6 +35,20 @@ export function StaffAttemptDetail({ courseId, assessmentId, attemptId }: { cour
     }
   }, [courseId, attemptId]);
   useEffect(() => { void load(); }, [load]);
+
+  async function doVoid(reason: string) {
+    setVoidBusy(true);
+    setVoidError(null);
+    try {
+      await voidAttempt(courseId, attemptId, reason);
+      setVoidOpen(false);
+      await load();
+    } catch (e) {
+      setVoidError(e);
+    } finally {
+      setVoidBusy(false);
+    }
+  }
 
   const back = `/${lang}/courses/${courseId}/assessments/${assessmentId}/attempts`;
   const backLink = <Link href={back} className="text-sm font-medium text-brand-700 hover:underline">{t("grading.backToAttempts")}</Link>;
@@ -52,7 +74,15 @@ export function StaffAttemptDetail({ courseId, assessmentId, attemptId }: { cour
             {data.submit_reason ? ` · ${t(`grading.reason.${data.submit_reason}`)}` : ""}
           </p>
         </div>
-        {data.is_preview && <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">{t("results.preview")}</span>}
+        <div className="flex flex-wrap items-center gap-2">
+          {data.is_preview && <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">{t("results.preview")}</span>}
+          {canWrite && canVoid(data) && (
+            <button type="button" onClick={() => { setVoidError(null); setVoidOpen(true); }}
+              className="rounded-xl border border-red-200 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50">
+              {t("gradebook.void.action")}
+            </button>
+          )}
+        </div>
       </div>
       <ErrorMessage error={error} onRetry={() => void load()} />
       {data.status === "needs_review" && (
@@ -91,6 +121,10 @@ export function StaffAttemptDetail({ courseId, assessmentId, attemptId }: { cour
           );
         })}
       </div>
+      <ReasonModal open={voidOpen} danger title={t("gradebook.void.title")}
+        body={data.attempt_no ? t("gradebook.void.bodyN", { n: data.attempt_no }) : t("gradebook.void.body")}
+        confirmLabel={t("gradebook.void.confirm")} busy={voidBusy} error={voidError}
+        onConfirm={(r) => void doVoid(r)} onCancel={() => setVoidOpen(false)} />
     </div>
   );
 }
