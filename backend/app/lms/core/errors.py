@@ -17,6 +17,7 @@ PHASE4_ERROR_CODES = (
     "grading_scheme_not_found", "scheme_version_not_found", "scheme_params_invalid", "version_unchanged",
     "submission_not_found", "grade_conflict", "override_reason_required", "category_not_found", "category_in_use",
     "too_many_categories", "too_many_rows", "value_out_of_range", "attempt_in_progress", "already_void",
+    "grade_release_auto",
 )
 
 

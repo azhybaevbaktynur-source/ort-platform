@@ -362,7 +362,8 @@
       "too_many_rows": "Too many rows in one request.",
       "value_out_of_range": "A value is outside the allowed range.",
       "attempt_in_progress": "The attempt is still in progress.",
-      "already_void": "This attempt is already voided."
+      "already_void": "This attempt is already voided.",
+      "grade_release_auto": "Grades of this assessment are released automatically, so they cannot be hidden. Switch grade release to manual first."
     }
   },
   "courses": {
@@ -1557,6 +1558,7 @@
       "staleN": "{n} grades were computed with older settings. Regrade to apply the current scheme, kept-attempt rule and late policy.",
       "releaseAll": "Release all grades",
       "unreleaseAll": "Hide all grades",
+      "unreleaseAutoHint": "Grades of this assessment are released automatically. To hide grades, switch grade release to manual in the assessment settings.",
       "unreleaseConfirm": "Hide every grade of this assessment from students? You can release them again later.",
       "releasedN": "{n} grades released.",
       "unreleasedN": "{n} grades hidden.",
@@ -1582,6 +1584,7 @@
       "releasedAt": "Released",
       "release": "Release to student",
       "unrelease": "Hide from student",
+      "unreleaseAutoHint": "Released automatically: to hide this grade, switch the assessment to manual grade release.",
       "openKept": "Open kept attempt",
       "attempts": "Attempts",
       "attempt": "Attempt",

@@ -22,7 +22,7 @@ from app.lms.core.types import JSONType
 
 SCHEME_TYPES = ("points", "percent", "bands", "pass_fail", "piecewise_curve", "lookup_table")
 _TYPE_CHECK = "type IN ('points','percent','bands','pass_fail','piecewise_curve','lookup_table')"
-SUBMISSION_STATES = ("pending_review", "graded", "excused")
+SUBMISSION_STATES = ("pending_review", "graded", "excused", "no_attempts")
 GRADE_EVENTS = ("override", "override_cleared", "excused", "unexcused", "released", "unreleased", "regraded",
                 "attempt_voided")
 _KEY_SET = text("key IS NOT NULL")
@@ -149,7 +149,7 @@ class Submission(UUIDPKMixin, TimestampMixin, Base):
 
     __table_args__ = (
         UniqueConstraint("enrollment_id", "assessment_id", name="uq_submissions_enrollment_assessment"),
-        CheckConstraint("state IN ('pending_review','graded','excused')", name="state_valid"),
+        CheckConstraint("state IN ('pending_review','graded','excused','no_attempts')", name="state_valid"),
         Index("ix_submissions_assessment_id_state_released_at", "assessment_id", "state", "released_at"),
         Index("ix_submissions_course_id_enrollment_id", "course_id", "enrollment_id"),
         Index("ix_submissions_kept_attempt_id", "kept_attempt_id"),
@@ -249,3 +249,45 @@ event.listen(GradingSchemeVersion, "before_update", _forbid_version)
 event.listen(GradingSchemeVersion, "before_delete", _forbid_version)
 event.listen(GradeEvent, "before_update", _forbid_event)
 event.listen(GradeEvent, "before_delete", _forbid_event)
+
+
+# ------------------------------------------------------------------ PostgreSQL guards (S7)
+# The DB-level twin of the ORM listeners above, so Core statements and raw SQL are refused too. Created by migration
+# 0005 (keep this copy identical) and, for create_all databases (tests), by the `after_create` listeners below.
+# Exceptions: the FK `ON DELETE SET NULL` of the user column (only that column becoming NULL) and the session
+# setting `lms.allow_grade_purge = 'on'` (maintenance / test teardown; no API path sets it).
+GUARD_FN_SQL = """
+CREATE OR REPLACE FUNCTION lms_grading_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+    col text := TG_ARGV[0];
+BEGIN
+    IF coalesce(current_setting('lms.allow_grade_purge', true), '') = 'on' THEN
+        IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+        RETURN NEW;
+    END IF;
+    IF TG_OP = 'UPDATE' AND col IS NOT NULL AND (to_jsonb(OLD) ->> col) IS NOT NULL
+       AND (to_jsonb(NEW) ->> col) IS NULL AND (to_jsonb(NEW) - col) = (to_jsonb(OLD) - col) THEN
+        RETURN NEW;
+    END IF;
+    RAISE EXCEPTION '% rows are immutable (% refused)', TG_TABLE_NAME, TG_OP USING ERRCODE = 'raise_exception';
+END
+$$
+"""
+GUARD_TRIGGERS = {
+    "grade_events": ("trg_grade_events_append_only", "BEFORE UPDATE OR DELETE", "actor_id"),
+    "grading_scheme_versions": ("trg_grading_scheme_versions_immutable", "BEFORE UPDATE", "created_by_id"),
+}
+ALLOW_PURGE_SQL = "SET LOCAL lms.allow_grade_purge = 'on'"
+
+
+def _create_guard(target, connection, **_kw) -> None:
+    if connection.dialect.name != "postgresql":
+        return
+    name, when, col = GUARD_TRIGGERS[target.name]
+    connection.execute(text(GUARD_FN_SQL))
+    connection.execute(text(f"CREATE TRIGGER {name} {when} ON {target.name} FOR EACH ROW "
+                            f"EXECUTE FUNCTION lms_grading_immutable('{col}')"))
+
+
+event.listen(GradingSchemeVersion.__table__, "after_create", _create_guard)
+event.listen(GradeEvent.__table__, "after_create", _create_guard)

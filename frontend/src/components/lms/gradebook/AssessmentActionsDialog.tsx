@@ -97,6 +97,8 @@ export function AssessmentActionsDialog({
 
   const attemptsHref = `/${lang}/courses/${courseId}/assessments/${a.id}/attempts`;
   const scheme = a.scheme;
+  // auto release: the next scoring or regrade would release again, so the server refuses to hide (409)
+  const autoRelease = a.grade_release === "auto";
   return (
     <Modal open={open} title={title || t("gradebook.untitled")} onClose={close} busy={!!busy}>
       <div className="space-y-4 text-sm">
@@ -136,17 +138,20 @@ export function AssessmentActionsDialog({
               <button type="button" disabled={!!busy} onClick={() => void release()} className={btnPrimary}>
                 {busy === "release" ? t("lms.common.loading") : t("gradebook.actions.releaseAll")}
               </button>
-              <button type="button" disabled={!!busy} onClick={() => setConfirmUnrelease(true)} className={btnSecondary}>
-                {t("gradebook.actions.unreleaseAll")}
-              </button>
+              {!autoRelease && (
+                <button type="button" disabled={!!busy} onClick={() => setConfirmUnrelease(true)} className={btnSecondary}>
+                  {t("gradebook.actions.unreleaseAll")}
+                </button>
+              )}
               <button type="button" disabled={!!busy} onClick={() => void regrade()} className={btnSecondary}>
                 {busy === "regrade" ? t("gradebook.actions.regrading") : t("gradebook.actions.regrade")}
               </button>
             </div>
             <p className="text-xs text-slate-500">{t("gradebook.actions.releaseHint")}</p>
+            {autoRelease && <p className="text-xs text-slate-500">{t("gradebook.actions.unreleaseAutoHint")}</p>}
             <p className="text-xs text-slate-500">{t("gradebook.actions.regradeHint")}</p>
 
-            {confirmUnrelease && (
+            {confirmUnrelease && !autoRelease && (
               <div role="alertdialog" aria-label={t("gradebook.actions.unreleaseAll")} className="rounded-xl border border-red-200 bg-red-50 p-3">
                 <p className="text-red-900">{t("gradebook.actions.unreleaseConfirm")}</p>
                 <div className="mt-2 flex gap-2">

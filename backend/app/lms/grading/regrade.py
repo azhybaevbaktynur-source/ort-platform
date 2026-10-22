@@ -1,9 +1,9 @@
 """Regrade (design 3.6, P4-12, P4-15): synchronous, chunked, resumable, capped.
 
-Targets: submissions of the assessment with `scheme_version_id IS DISTINCT FROM assessment.grading_scheme_version_id`
-or `computed_at < assessment.grading_changed_at` (set by PATCH when the scheme / score_policy / due_at change), or
-with a counted attempt whose attempt_grades row is not at the assessment's version (G2 addition: the hook only
-regrades its own attempt, so a submission recomputed after a scheme switch can still hold older attempt grades).
+Targets: `submissions.stale_predicate` (the one stale definition, shared with the gradebook's `stale_count`):
+other scheme version, computed before the assessment's grading settings changed, late and computed before the
+course late policy changed, a counted attempt with a missing / other-version attempt grade, or a never-computed
+placeholder. Ensure pass first: counted attempts without a submission get a placeholder row (chunked, capped).
 Each chunk of <= GRADES_REGRADE_CHUNK submissions is one transaction that commits: a crash mid-way leaves every
 committed chunk regraded and the rest still targeted, so the next call finishes. At most GRADES_REGRADE_MAX per call;
 `pending` tells the UI to call again.
@@ -15,7 +15,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Optional
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, distinct, func, select
 from sqlalchemy.orm import Session
 
 from app.core.authz import AuthzContext
@@ -31,27 +31,48 @@ from app.lms.grading.schemes import get_version_data
 S = subs.S
 
 
-def _attempt_grades_stale(vid):
-    """A counted attempt of the submission whose attempt_grades row is not at version `vid` (missing while `vid` is
-    set, or still holding values while `vid` is None). Covers a submission the hook already recomputed with the new
-    version (its own attempt only) while older attempts keep the previous version's grade."""
-    at, ag = subs.AT, subs.AG
-    q = select(at.c.id).select_from(at.outerjoin(ag, ag.c.attempt_id == at.c.id)).where(
-        at.c.assessment_id == S.c.assessment_id, at.c.enrollment_id == S.c.enrollment_id,
-        at.c.is_preview.is_(False), at.c.status.in_(subs.COUNTED))
-    if vid is None:
-        q = q.where(ag.c.scheme_version_id.is_not(None))
-    else:
-        q = q.where(or_(ag.c.attempt_id.is_(None), ag.c.scheme_version_id.is_distinct_from(vid)))
-    return q.correlate(S).exists()
-
-
 def _target(ctx_row):
-    vid = ctx_row.grading_scheme_version_id
-    conds = [S.c.scheme_version_id.is_distinct_from(vid), _attempt_grades_stale(vid)]
-    if ctx_row.grading_changed_at is not None:
-        conds.append(S.c.computed_at < ctx_row.grading_changed_at)
-    return or_(*conds)
+    """Regrade targets = `submissions.stale_predicate` (the gradebook's `stale_count` uses the same one)."""
+    return subs.stale_predicate(ctx_row.grading_scheme_version_id, ctx_row.grading_changed_at,
+                                ctx_row.late_policy_changed_at)
+
+
+def _missing(assessment_id):
+    """Counted non-preview attempts of the assessment whose (enrollment, assessment) has no submission row."""
+    at = subs.AT
+    has_sub = select(S.c.id).where(S.c.enrollment_id == at.c.enrollment_id,
+                                   S.c.assessment_id == at.c.assessment_id).exists()
+    return and_(at.c.assessment_id == assessment_id, at.c.is_preview.is_(False), at.c.status.in_(subs.COUNTED),
+                ~has_sub)
+
+
+def missing_count(db: Session, assessment_id) -> int:
+    at = subs.AT
+    return int(db.execute(select(func.count(distinct(at.c.enrollment_id))).where(_missing(assessment_id)))
+               .scalar_one())
+
+
+def ensure_chunk(db: Session, ctx_row, assessment_id, *, limit: int) -> int:
+    """Ensure pass (S2): create up to `limit` placeholder submissions (computed_at = NEVER_COMPUTED, so they are
+    regrade targets) for enrollments with counted attempts but no submission, in ONE transaction (committed here).
+    INSERT ... ON CONFLICT DO NOTHING: a concurrent hook that created the row first wins. Returns the number of
+    enrollments handled (0 = nothing missing)."""
+    at = subs.AT
+    rows = db.execute(
+        select(at.c.enrollment_id, at.c.user_id, at.c.course_id).where(_missing(assessment_id)).distinct()
+        .order_by(at.c.enrollment_id).limit(limit)
+    ).all()
+    if not rows:
+        db.rollback()
+        return 0
+    now = clock.now()
+    values = [subs.placeholder_row(course_id=r.course_id, assessment_id=assessment_id, enrollment_id=r.enrollment_id,
+                                   user_id=r.user_id, kept_policy=ctx_row.score_policy or "highest", now=now,
+                                   computed_at=subs.NEVER_COMPUTED) for r in rows]
+    ins = subs._upsert(db)(S).on_conflict_do_nothing(index_elements=[S.c.enrollment_id, S.c.assessment_id])
+    db.execute(ins, values)
+    db.commit()
+    return len(rows)
 
 
 def _context(db: Session, course_id, assessment_id):
@@ -114,6 +135,12 @@ def regrade(db: Session, ctx: AuthzContext, course: Course, assessment_id) -> gs
     aid, actor_id = ctx_row.assessment_id, ctx.user.id  # plain values: ORM rows expire at each chunk commit
     cap = max(0, int(settings.GRADES_REGRADE_MAX))
     chunk = max(1, int(settings.GRADES_REGRADE_CHUNK))
+    created = 0
+    while created < cap:  # ensure pass: counted attempts without a submission get a (stale) placeholder
+        n = ensure_chunk(db, ctx_row, aid, limit=min(chunk, cap - created))
+        if not n:
+            break
+        created += n
     done, after = 0, None
     while done < cap:
         ids = regrade_chunk(db, ctx_row, aid, actor_id=actor_id, limit=min(chunk, cap - done), after=after)
@@ -121,6 +148,6 @@ def regrade(db: Session, ctx: AuthzContext, course: Course, assessment_id) -> gs
             break
         done += len(ids)
         after = ids[-1]
-    pending = pending_count(db, aid, ctx_row)
+    pending = pending_count(db, aid, ctx_row) + missing_count(db, aid)
     db.rollback()
     return gs.RegradeOut(regraded=done, pending=pending, scheme_version_id=ctx_row.grading_scheme_version_id)

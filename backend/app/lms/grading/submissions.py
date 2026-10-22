@@ -25,7 +25,8 @@ from decimal import ROUND_HALF_UP, Decimal
 from types import SimpleNamespace
 from typing import Any, Iterable, Optional, Sequence
 
-from sqlalchemy import bindparam, func, select, update
+from sqlalchemy import and_, bindparam, false, func, or_, select, update
+from sqlalchemy.sql.elements import ClauseElement
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.orm import Session
 
@@ -43,6 +44,8 @@ S = Submission.__table__
 AG = AttemptGrade.__table__
 AT = Attempt.__table__
 COUNTED = ("graded", "needs_review")
+# computed_at of a placeholder row nobody computed yet (0005 backfill, regrade's ensure pass): always stale.
+NEVER_COMPUTED = datetime(1970, 1, 1, tzinfo=timezone.utc)
 ZERO = Decimal("0.00")
 _TWO = Decimal("0.01")
 _LABEL_MAX = 40
@@ -83,13 +86,74 @@ def load_context(db: Session, assessment_id) -> Any:
     return db.execute(
         select(Assessment.id.label("assessment_id"), Assessment.course_id, Assessment.score_policy,
                Assessment.grading_scheme_version_id, Assessment.due_at, Assessment.grade_release,
-               Assessment.grading_changed_at, Course.late_policy)
+               Assessment.grading_changed_at, Course.late_policy, Course.late_policy_changed_at)
         .join(Course, Course.id == Assessment.course_id)
         .where(Assessment.id == assessment_id)
     ).one()
 
 
+# ------------------------------------------------------------------ the one stale definition (Q2)
+
+def _is_sql(x) -> bool:
+    """A column / SQL expression (incl. ORM attributes) rather than a plain value."""
+    return isinstance(x, ClauseElement) or hasattr(x, "__clause_element__")
+
+
+def _attempt_grades_stale(vid):
+    """EXISTS a counted attempt of the submission whose attempt_grades row is not at version `vid` (missing while
+    `vid` is set, or still holding values while `vid` is NULL). Covers a submission the hook already recomputed
+    with the new version (its own attempt only) while older attempts keep the previous version's grade. `vid` is a
+    value or a column of an enclosing query (the gradebook's per-assessment counts)."""
+    at, ag = AT, AG
+    q = select(at.c.id).select_from(at.outerjoin(ag, ag.c.attempt_id == at.c.id)).where(
+        at.c.assessment_id == S.c.assessment_id, at.c.enrollment_id == S.c.enrollment_id,
+        at.c.is_preview.is_(False), at.c.status.in_(COUNTED))
+    if _is_sql(vid):
+        q = q.where(or_(and_(ag.c.attempt_id.is_(None), vid.is_not(None)),
+                        and_(ag.c.attempt_id.is_not(None), ag.c.scheme_version_id.is_distinct_from(vid))))
+    elif vid is None:
+        q = q.where(ag.c.scheme_version_id.is_not(None))
+    else:
+        q = q.where(or_(ag.c.attempt_id.is_(None), ag.c.scheme_version_id.is_distinct_from(vid)))
+    return q.correlate_except(at, ag).exists()
+
+
+def _before(changed_at):
+    """`computed_at < changed_at`; a NULL value (never changed) is never stale."""
+    if _is_sql(changed_at):
+        return and_(changed_at.is_not(None), S.c.computed_at < changed_at)
+    return S.c.computed_at < changed_at if changed_at is not None else false()
+
+
+def stale_predicate(scheme_version_id, grading_changed_at, late_policy_changed_at):
+    """THE stale definition of a submission row (regrade targets AND the gradebook's `stale_count`). Arguments are
+    the assessment's `grading_scheme_version_id` / `grading_changed_at` and the course's `late_policy_changed_at`,
+    each a value or a column of an enclosing query. Stale when any of:
+    - `scheme_version_id IS DISTINCT FROM` the assessment's version;
+    - computed before the assessment's grading settings changed (scheme / score_policy / due_at);
+    - late (`late_seconds > 0`) and computed before the course late policy changed (Q1);
+    - a counted attempt has a missing / other-version attempt_grades row;
+    - a placeholder never computed (`computed_at <= NEVER_COMPUTED`)."""
+    vid = scheme_version_id
+    by_version = S.c.scheme_version_id.is_distinct_from(vid)
+    return or_(
+        by_version,
+        _before(grading_changed_at),
+        and_(S.c.late_seconds > 0, _before(late_policy_changed_at)),
+        _attempt_grades_stale(vid),
+        S.c.computed_at <= NEVER_COMPUTED,
+    )
+
+
 # ------------------------------------------------------------------ statement 2: the submission row lock
+
+def placeholder_row(*, course_id, assessment_id, enrollment_id, user_id, kept_policy: str, now: datetime,
+                    computed_at: Optional[datetime] = None) -> dict:
+    """Values of a fresh submissions row before its first computation."""
+    return dict(id=uuid.uuid4(), course_id=course_id, assessment_id=assessment_id, enrollment_id=enrollment_id,
+                user_id=user_id, state="graded", kept_policy=kept_policy, attempts_counted=0, late_seconds=0,
+                late_deduction=ZERO, computed_at=computed_at or now, version=1, created_at=now, updated_at=now)
+
 
 def lock_or_create_submission(db: Session, *, course_id, assessment_id, enrollment_id, user_id,
                               kept_policy: str = "highest", now: Optional[datetime] = None) -> dict:
@@ -97,11 +161,9 @@ def lock_or_create_submission(db: Session, *, course_id, assessment_id, enrollme
     serializes writers). Returns the current row as a dict (placeholder values on a fresh row until
     `recompute_submission` writes them in the same transaction)."""
     now = now or clock.now()
-    ins = _upsert(db)(S).values(
-        id=uuid.uuid4(), course_id=course_id, assessment_id=assessment_id, enrollment_id=enrollment_id,
-        user_id=user_id, state="graded", kept_policy=kept_policy, attempts_counted=0, late_seconds=0,
-        late_deduction=ZERO, computed_at=now, version=1, created_at=now, updated_at=now,
-    )
+    ins = _upsert(db)(S).values(**placeholder_row(
+        course_id=course_id, assessment_id=assessment_id, enrollment_id=enrollment_id, user_id=user_id,
+        kept_policy=kept_policy, now=now))
     stmt = ins.on_conflict_do_update(
         index_elements=[S.c.enrollment_id, S.c.assessment_id], set_={"version": S.c.version},
     ).returning(*S.c)
@@ -200,6 +262,8 @@ def compute_values(db: Session, sub: dict, assessment_row, course_row, attempts:
     kept, raw, possible, counted = kept_attempt(policy, attempts)
     if sub.get("state") == "excused":
         state = "excused"
+    elif kept is None:  # every counted attempt was voided (Q3): nothing to grade, totals ignore the row
+        state = "no_attempts"
     elif kept is not None and (kept.status == "needs_review"
                                or (policy == "average" and any(a.status == "needs_review" for a in attempts))):
         state = "pending_review"

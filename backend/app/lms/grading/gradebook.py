@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, Iterable, Optional
 
-from sqlalchemy import and_, case, func, or_, select
+from sqlalchemy import and_, case, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
@@ -32,11 +32,13 @@ from app.lms.courses import service as course_svc
 from app.lms.courses.models import Course
 from app.lms.enrollments import service as enr_svc
 from app.lms.enrollments.models import Enrollment
+from app.lms.grading import late as late_mod
 from app.lms.grading import repository as repo
 from app.lms.grading import serializers as ser
 from app.lms.grading.models import AttemptGrade, CourseGrade, GradeEvent, GradingScheme, GradingSchemeVersion, Submission
 from app.lms.grading.registry import SchemeVersionData, apply, apply_sections
 from app.lms.grading.schemes import get_version_data, version_data_from_row
+from app.lms.grading.submissions import stale_predicate
 from app.lms.grading.totals import UNCATEGORIZED_EXCLUDED, compute_totals, map_total
 from app.models.user import User
 
@@ -78,9 +80,10 @@ def parse_assessment_ids(values: Optional[Iterable[str]]) -> Optional[list[uuid.
 
 # ------------------------------------------------------------------ shared reads
 
-def _assessment_rows(db: Session, course_id: uuid.UUID, *, staff: bool) -> list:
+def _assessment_rows(db: Session, course_id: uuid.UUID, *, staff: bool, late_policy_changed_at=None) -> list:
     """Live published assessments of the course in course order (one statement). Staff rows also carry the scheme
-    brief and per-assessment submission/released/stale counts."""
+    brief and per-assessment submission/released/stale counts (stale = `submissions.stale_predicate`, the regrade
+    target definition; `late_policy_changed_at` is the course's)."""
     cols = [
         Assessment.id, Assessment.title, Assessment.grade_category_id.label("category_id"),
         Assessment.omit_from_total, Assessment.due_at, Assessment.results_policy, Assessment.available_until,
@@ -88,10 +91,8 @@ def _assessment_rows(db: Session, course_id: uuid.UUID, *, staff: bool) -> list:
     ]
     stmt = select(*cols).outerjoin(AssessmentVersion, AssessmentVersion.id == Assessment.published_version_id)
     if staff:
-        stale = or_(
-            Submission.scheme_version_id.is_distinct_from(Assessment.grading_scheme_version_id),
-            and_(Assessment.grading_changed_at.is_not(None), Submission.computed_at < Assessment.grading_changed_at),
-        )
+        stale = stale_predicate(Assessment.grading_scheme_version_id, Assessment.grading_changed_at,
+                                late_policy_changed_at)
         agg = (
             select(Submission.assessment_id.label("aid"), func.count().label("n"),
                    func.count(Submission.released_at).label("released"),
@@ -209,7 +210,7 @@ def gradebook_page(db: Session, ctx: AuthzContext, course: Course, *, cursor: Op
         db, enr_svc.roster_query(course.id, role="student"), sort_col=Enrollment.created_at, id_col=Enrollment.id,
         entity_of=lambda r: r[0], cursor=cursor, limit=limit, descending=False,
     )
-    assessments = _assessment_rows(db, course.id, staff=True)
+    assessments = _assessment_rows(db, course.id, staff=True, late_policy_changed_at=course.late_policy_changed_at)
     if assessment_ids:
         wanted = set(assessment_ids)
         columns = [a for a in assessments if a.id in wanted]
@@ -268,6 +269,8 @@ def _student_state(a, sub, visible: set) -> str:
         return "missing"
     if sub.state == "excused":
         return "excused"
+    if sub.state == "no_attempts":  # every counted attempt voided (Q3)
+        return "pending"
     if sub.state != "graded" or sub.released_at is None or a.id not in visible:
         return "pending"
     return "graded"
@@ -275,7 +278,7 @@ def _student_state(a, sub, visible: set) -> str:
 
 def my_grades(db: Session, ctx: AuthzContext, course: Course, *, now: datetime) -> ser.MyGradesOut:
     """The caller's own grades in `course` (`course:grades.read_own`); the enrollment is derived from `ctx`, never
-    from the request. Writes the caller's `course_grades` row."""
+    from the request. Writes the caller's `course_grades` row (student enrollments only)."""
     enr = db.execute(select(Enrollment.id, Enrollment.role).where(
         Enrollment.course_id == course.id, Enrollment.user_id == ctx.user.id, Enrollment.state == "active")).first()
     ctx.enrollment_cache[course.id] = enr.role if enr is not None else None  # same answer the resolver would give
@@ -302,8 +305,9 @@ def my_grades(db: Session, ctx: AuthzContext, course: Course, *, now: datetime) 
     all_t = compute_totals(course, categories, assessments, {enr.id: subs}, released_only=False)[enr.id]
     rel_t = compute_totals(course, categories, assessments,
                            {enr.id: [s for s in subs if s.assessment_id in visible]}, released_only=True)[enr.id]
-    write_course_grades(db, [_course_grade_row(course.id, enr.id, all_t, rel_t,
-                                               map_total(course_v, all_t.current_percent), now)])
+    if enr.role == "student":  # the cache holds students only (staff may open "my grades" too)
+        write_course_grades(db, [_course_grade_row(course.id, enr.id, all_t, rel_t,
+                                                   map_total(course_v, all_t.current_percent), now)])
     by_assessment = {s.assessment_id: s for s in subs}
     items = []
     for a in assessments:
@@ -324,15 +328,6 @@ def load_submission(db: Session, course_id: uuid.UUID, submission_id: uuid.UUID)
     if sub is None:
         raise submission_not_found()
     return sub
-
-
-def _late_seconds(submitted_at, due_at, late_policy: Optional[dict]) -> int:
-    due = course_svc._aware(due_at)
-    sub = course_svc._aware(submitted_at)
-    if due is None or sub is None:
-        return 0
-    grace = int((late_policy or {}).get("grace_minutes") or 0) * 60
-    return max(0, int((sub - due).total_seconds()) - grace)
 
 
 def _stored_grade(ag: Optional[AttemptGrade], db: Session, *, is_kept: bool, released: bool
@@ -370,7 +365,7 @@ def submission_staff_out(db: Session, course: Course, sub: Submission) -> ser.Su
         attempts=[ser.SubmissionAttemptOut(
             id=a.id, attempt_no=a.attempt_no, status=a.status, raw_score=a.raw_score,
             points_possible=a.points_possible, submitted_at=a.submitted_at,
-            late_seconds=_late_seconds(a.submitted_at, due_at, course.late_policy),
+            late_seconds=late_mod.late_seconds(a.submitted_at, due_at, course.late_policy),
             grade=_stored_grade(ag, db, is_kept=a.id == sub.kept_attempt_id, released=released) if a.status != "void"
             else None,
         ) for a, ag in attempts],

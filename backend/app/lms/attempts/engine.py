@@ -374,8 +374,16 @@ def state_for(db: Session, attempt: Attempt, env: AttemptEnv, sections: list, pl
     return build_state(db, attempt, env.assessment, sections, load_item_rows(db, attempt.id), plan, now)
 
 
+def hide_void(attempt: Attempt) -> None:
+    """A voided attempt (P4-20) is hidden from every student read except `/result` (which says it was voided):
+    404 `attempt_not_found`, like any other attempt the caller cannot see."""
+    if attempt.status == "void":
+        raise attempt_not_found()
+
+
 def get_state(db: Session, user, attempt_id, *, now: datetime) -> AttemptStateOut:
     attempt, env = load_attempt_bundle(db, user, attempt_id)
+    hide_void(attempt)
     plan = plan_for(db, attempt)
     sections = load_sections(db, attempt.id)
     lz = apply_lazy(db, attempt, sections, plan, now=now, env=env)

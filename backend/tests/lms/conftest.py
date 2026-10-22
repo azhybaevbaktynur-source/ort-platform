@@ -33,6 +33,12 @@ def clean_lms_tables(reset_db):
     phase2 = [QuestionVersion, BankQuestion, PassageVersion, Passage, TranslationGroup, QuestionBank, Asset, AssetBlob]
     tables = phase2 + [EnrollmentEvent, Enrollment, TeacherRequest, AdminAuditLog, RateLimitBucket, Course, ExamAccess, TestAttempt]
     with db_session.engine.begin() as conn:
+        if conn.dialect.name == "postgresql":  # teardown may purge the append-only grade_events (S7 guard)
+            from sqlalchemy import text
+
+            from app.lms.grading.models import ALLOW_PURGE_SQL
+
+            conn.execute(text(ALLOW_PURGE_SQL))
         # Phase 4 first (design 2.8): grade rows, then the FKs into categories and scheme versions.
         for model in (GradeEvent, CourseGrade, AttemptGrade, Submission):
             conn.execute(delete(model.__table__))

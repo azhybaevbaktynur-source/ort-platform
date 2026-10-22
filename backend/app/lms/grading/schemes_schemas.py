@@ -4,9 +4,11 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Annotated, Any, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.lms.grading.params import VALUE_LIMIT
 
 from app.lms.grading.schemes import SchemeCreateIn, SchemeTitle  # noqa: F401  (re-export)
 
@@ -61,8 +63,8 @@ class SchemePreviewIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     type: str
     params: dict
-    possible: Decimal
-    raws: list[Decimal]
+    possible: Decimal = Field(gt=0, le=VALUE_LIMIT, max_digits=12, decimal_places=2)
+    raws: list[Annotated[Decimal, Field(ge=0, le=VALUE_LIMIT, max_digits=12, decimal_places=2)]]
 
 
 class SchemePreviewRowOut(BaseModel):

@@ -15,20 +15,21 @@ from app.core.authz import AuthzContext, get_authz
 from app.lms.courses import service as course_svc
 from app.lms.grading import actions, regrade as regrade_svc
 from app.lms.grading import schemas as gs
+from app.lms.grading import serializers as ser
 
 router = APIRouter()
 
 _C = "/courses/{course_id}"
 
 
-@router.put(f"{_C}/submissions/{{submission_id}}/override", response_model=gs.SubmissionStaffOut)
+@router.put(f"{_C}/submissions/{{submission_id}}/override", response_model=ser.SubmissionStaffOut)
 def put_override(course_id: uuid.UUID, submission_id: uuid.UUID, body: gs.OverrideIn,
                  ctx: AuthzContext = Depends(get_authz)):
     course = course_svc.load_course(ctx.db, course_id)
     return actions.override(ctx.db, ctx, course, submission_id, body)
 
 
-@router.put(f"{_C}/submissions/{{submission_id}}/excuse", response_model=gs.SubmissionStaffOut)
+@router.put(f"{_C}/submissions/{{submission_id}}/excuse", response_model=ser.SubmissionStaffOut)
 def put_excuse(course_id: uuid.UUID, submission_id: uuid.UUID, body: gs.ExcuseIn,
                ctx: AuthzContext = Depends(get_authz)):
     course = course_svc.load_course(ctx.db, course_id)

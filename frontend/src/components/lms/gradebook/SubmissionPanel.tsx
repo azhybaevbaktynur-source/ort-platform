@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
-import type { CellOut, SubmissionAttemptOut, SubmissionStaffOut } from "@/lib/lms/gradingTypes";
+import type { CellOut, GradeRelease, SubmissionAttemptOut, SubmissionStaffOut } from "@/lib/lms/gradingTypes";
 import { excuseSubmission, getSubmission, overrideSubmission, releaseGrades, unreleaseGrades } from "@/lib/lms/grading";
 import { voidAttempt } from "@/lib/lms/staffAttempts";
 import { useSchemeLabel } from "@/components/lms/grading/schemes/labels";
@@ -25,6 +25,8 @@ export interface PanelTarget {
   studentName: string;
   assessmentTitle: string;
   dueAt: string | null;
+  /** the assessment's grade release mode: with "auto" a grade cannot be hidden (server 409 grade_release_auto) */
+  gradeRelease?: GradeRelease;
 }
 
 type Dialog = null | { kind: "clear" } | { kind: "excuse"; excused: boolean } | { kind: "void"; attempt: SubmissionAttemptOut };
@@ -211,12 +213,15 @@ export function SubmissionPanel({
                   {sub.kept_attempt_id && (
                     <Link href={attemptHref(sub.kept_attempt_id)} className="text-sm font-medium text-brand-700 hover:underline">{t("gradebook.panel.openKept")}</Link>
                   )}
-                  {canManage && (
+                  {canManage && !(v.released && target.gradeRelease === "auto") && (
                     <button type="button" disabled={!!busy} onClick={() => void toggleRelease(!v.released)} className={btnSmall}>
                       {busy === "release" ? t("lms.common.loading") : v.released ? t("gradebook.panel.unrelease") : t("gradebook.panel.release")}
                     </button>
                   )}
                 </div>
+                {canManage && v.released && target.gradeRelease === "auto" && (
+                  <p className="text-xs text-slate-500">{t("gradebook.panel.unreleaseAutoHint")}</p>
+                )}
                 <SchemeError error={actionError} />
               </section>
 

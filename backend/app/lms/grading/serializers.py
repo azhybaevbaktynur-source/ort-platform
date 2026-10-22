@@ -6,6 +6,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from collections.abc import Mapping
 from typing import Any, Optional
 
 from pydantic import BaseModel
@@ -121,12 +122,16 @@ class GradebookPageOut(BaseModel):
 
 
 def cell_fields(s: Any) -> dict:
+    """CellOut fields from a submissions row: an ORM `Submission` or a mapping (Core row / dict)."""
+    g = s.__getitem__ if isinstance(s, Mapping) else (lambda k: getattr(s, k))
     return dict(
-        submission_id=s.id, state=s.state, kept_attempt_id=s.kept_attempt_id, attempts_counted=s.attempts_counted,
-        raw_points=s.raw_points, points_possible=s.points_possible, late_deduction=s.late_deduction,
-        override_points=s.override_points, has_override=s.override_points is not None,
-        effective_points=s.effective_points, display_value=s.display_value, label=s.label, percentile=s.percentile,
-        passed=s.passed, thresholds=s.thresholds, released_at=s.released_at, version=s.version,
+        submission_id=g("id"), state=g("state"), kept_attempt_id=g("kept_attempt_id"),
+        attempts_counted=g("attempts_counted") or 0, raw_points=g("raw_points"), points_possible=g("points_possible"),
+        late_deduction=g("late_deduction") if g("late_deduction") is not None else Decimal("0"),
+        override_points=g("override_points"), has_override=g("override_points") is not None,
+        effective_points=g("effective_points"), display_value=g("display_value"), label=g("label"),
+        percentile=g("percentile"), passed=g("passed"), thresholds=g("thresholds"), released_at=g("released_at"),
+        version=g("version"),
     )
 
 

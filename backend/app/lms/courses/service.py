@@ -440,6 +440,8 @@ def update_grading_settings(db: Session, ctx: AuthzContext, course: Course, data
     course.late_policy = late
     if (course.grading_total_mode, course.grading_scheme_version_id, course.late_policy) != before:
         course.grading_changed_at = clock.now()
+    if course.late_policy != before[2]:  # late submissions computed before this are regrade targets (Q1)
+        course.late_policy_changed_at = course.grading_changed_at
     db.commit()
     return course
 

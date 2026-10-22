@@ -66,6 +66,7 @@ def get_content(attempt_id: str, request: Request, section: Optional[int] = None
     payload, `?section=<pos>` (default: the current section); only sections up to the current one (after lazy
     advance) are served, later ones are 409 `section_not_current` (review finding 7)."""
     attempt, env = engine.load_attempt_bundle(db, user, attempt_id)
+    engine.hide_void(attempt)
     if not engine.can_access(attempt, env):
         raise engine.attempt_not_found()
     plan = engine.plan_for(db, attempt)
@@ -140,6 +141,7 @@ def _open_for_results(db: Session, user: User, attempt_id: str, *, allow_void: b
         if not engine.can_access(attempt, env):
             raise engine.attempt_not_found()
         return attempt, env, None
+    engine.hide_void(attempt)
     plan = engine.plan_for(db, attempt)
     engine.apply_lazy(db, attempt, engine.load_sections(db, attempt.id), plan, now=now, env=env)
     if not engine.can_access(attempt, env):

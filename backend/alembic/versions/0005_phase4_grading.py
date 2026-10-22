@@ -4,6 +4,7 @@ Revision ID: 0005_phase4_grading
 Revises: 0004_phase3_assessments
 Create Date: 2026-10-23
 """
+from datetime import datetime, timezone
 from typing import Sequence, Union
 
 from alembic import op
@@ -21,6 +22,35 @@ _FALSE = sa.text("false")
 _TYPES = "type IN ('points','percent','bands','pass_fail','piecewise_curve','lookup_table')"
 _EVENTS = ("event IN ('override','override_cleared','excused','unexcused','released','unreleased','regraded',"
            "'attempt_voided')")
+_STATES = "state IN ('pending_review','graded','excused','no_attempts')"
+# computed_at of a backfilled placeholder: always a regrade target (app.lms.grading.submissions.NEVER_COMPUTED)
+_NEVER_COMPUTED = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+# PostgreSQL guards (S7): grade_events append-only, grading_scheme_versions immutable. Two exceptions: the FK
+# `ON DELETE SET NULL` of the user columns (a user row deleted: only that column becomes NULL), and the session
+# setting `lms.allow_grade_purge = 'on'` (maintenance / test teardown only; no API path sets it). The same DDL is
+# attached to the models for create_all (app/lms/grading/models.py); keep both copies identical.
+_GUARD_FN = """
+CREATE OR REPLACE FUNCTION lms_grading_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+    col text := TG_ARGV[0];
+BEGIN
+    IF coalesce(current_setting('lms.allow_grade_purge', true), '') = 'on' THEN
+        IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+        RETURN NEW;
+    END IF;
+    IF TG_OP = 'UPDATE' AND col IS NOT NULL AND (to_jsonb(OLD) ->> col) IS NOT NULL
+       AND (to_jsonb(NEW) ->> col) IS NULL AND (to_jsonb(NEW) - col) = (to_jsonb(OLD) - col) THEN
+        RETURN NEW;
+    END IF;
+    RAISE EXCEPTION '% rows are immutable (% refused)', TG_TABLE_NAME, TG_OP USING ERRCODE = 'raise_exception';
+END
+$$
+"""
+_GUARD_TRIGGERS = (
+    ("trg_grade_events_append_only", "grade_events", "BEFORE UPDATE OR DELETE", "actor_id"),
+    ("trg_grading_scheme_versions_immutable", "grading_scheme_versions", "BEFORE UPDATE", "created_by_id"),
+)
 
 
 def _ts(name: str) -> sa.Column:
@@ -105,6 +135,7 @@ def upgrade() -> None:
         b.add_column(sa.Column("grading_scheme_version_id", UUID, nullable=True))
         b.add_column(sa.Column("late_policy", JSONType, nullable=True))
         b.add_column(_tstz("grading_changed_at"))
+        b.add_column(_tstz("late_policy_changed_at"))
         b.create_check_constraint(op.f("ck_courses_grading_total_mode_valid"),
                                   "grading_total_mode IN ('points','weighted')")
         b.create_foreign_key(op.f("fk_courses_grading_scheme_version_id_grading_scheme_versions"),
@@ -161,7 +192,7 @@ def upgrade() -> None:
         _fk("submissions", "kept_attempt_id", "attempts", "RESTRICT"),
         _fk("submissions", "override_by_id", "users", "SET NULL"),
         _fk("submissions", "scheme_version_id", "grading_scheme_versions", "RESTRICT"),
-        sa.CheckConstraint("state IN ('pending_review','graded','excused')", name=op.f("ck_submissions_state_valid")),
+        sa.CheckConstraint(_STATES, name=op.f("ck_submissions_state_valid")),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_submissions")),
         sa.UniqueConstraint("enrollment_id", "assessment_id", name="uq_submissions_enrollment_assessment"),
     )
@@ -225,8 +256,43 @@ def upgrade() -> None:
     )
     op.create_index("ix_course_grades_course_id", "course_grades", ["course_id"])
 
+    _backfill_submissions()
+    if op.get_bind().dialect.name == "postgresql":
+        op.execute(_GUARD_FN)
+        for name, table, when, col in _GUARD_TRIGGERS:
+            op.execute(f"CREATE TRIGGER {name} {when} ON {table} FOR EACH ROW "
+                       f"EXECUTE FUNCTION lms_grading_immutable('{col}')")
+
+
+def _backfill_submissions() -> None:
+    """S2: one placeholder submission per (enrollment, assessment) with counted attempts (non-preview,
+    graded / needs_review) that existed before this migration. `computed_at = _NEVER_COMPUTED` marks them stale:
+    the gradebook counts them and the next regrade computes them. Portable INSERT ... SELECT ... ON CONFLICT DO
+    NOTHING (the `WHERE true` keeps SQLite's parser from reading ON CONFLICT as a join constraint)."""
+    bind = op.get_bind()
+    new_id = "gen_random_uuid()" if bind.dialect.name == "postgresql" else "lower(hex(randomblob(16)))"
+    stmt = sa.text(
+        "INSERT INTO submissions (id, created_at, updated_at, course_id, assessment_id, enrollment_id, user_id, "
+        "state, kept_policy, attempts_counted, late_seconds, late_deduction, computed_at, version) "
+        f"SELECT {new_id}, :now, :now, x.course_id, x.assessment_id, x.enrollment_id, x.user_id, 'graded', "
+        "x.kept_policy, 0, 0, 0, :never, 1 FROM ("
+        "SELECT DISTINCT a.course_id, a.assessment_id, a.enrollment_id, a.user_id, s.score_policy AS kept_policy "
+        "FROM attempts a JOIN assessments s ON s.id = a.assessment_id "
+        "WHERE a.is_preview = :no AND a.status IN ('graded', 'needs_review')"
+        ") x WHERE true ON CONFLICT (enrollment_id, assessment_id) DO NOTHING"
+    ).bindparams(
+        sa.bindparam("now", datetime.now(timezone.utc), type_=sa.DateTime(timezone=True)),
+        sa.bindparam("never", _NEVER_COMPUTED, type_=sa.DateTime(timezone=True)),
+        sa.bindparam("no", False, type_=sa.Boolean()),
+    )
+    bind.execute(stmt)
+
 
 def downgrade() -> None:
+    if op.get_bind().dialect.name == "postgresql":
+        for name, table, _when, _col in _GUARD_TRIGGERS:
+            op.execute(f"DROP TRIGGER IF EXISTS {name} ON {table}")
+        op.execute("DROP FUNCTION IF EXISTS lms_grading_immutable()")
     for table in ("course_grades", "grade_events", "attempt_grades", "submissions"):
         op.drop_table(table)
     with op.batch_alter_table("assessments") as b:
@@ -239,7 +305,8 @@ def downgrade() -> None:
     with op.batch_alter_table("courses") as b:
         b.drop_constraint(op.f("fk_courses_grading_scheme_version_id_grading_scheme_versions"), type_="foreignkey")
         b.drop_constraint(op.f("ck_courses_grading_total_mode_valid"), type_="check")
-        for col in ("grading_changed_at", "late_policy", "grading_scheme_version_id", "grading_total_mode"):
+        for col in ("late_policy_changed_at", "grading_changed_at", "late_policy", "grading_scheme_version_id",
+                    "grading_total_mode"):
             b.drop_column(col)
     op.drop_table("grade_categories")
     with op.batch_alter_table("grading_schemes") as b:

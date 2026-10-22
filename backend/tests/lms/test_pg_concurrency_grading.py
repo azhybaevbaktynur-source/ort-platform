@@ -403,3 +403,120 @@ def test_two_overrides_same_version_one_conflict(setup_db, Session):
     assert_consistent(setup_db, w.ids.assessment)
     evs = events(setup_db)
     assert len(evs) == 10 and len({e.id for e in evs}) == 10
+
+
+# ------------------------------------------------------------------ the engine's submit path (review C1)
+
+def do_submit(Session, user_id, attempt_id):
+    """`engine.submit` like the route: FOR UPDATE OF attempts, item locks, finalize + hook, commit."""
+    from app.lms.attempts import engine
+    from app.lms.attempts.schemas import SubmitIn
+
+    def run():
+        with Session() as s:
+            out = engine.submit(s, s.get(User, user_id), str(attempt_id), SubmitIn(), now=clock.now())
+            return out.status
+    return run
+
+
+def _sub_of(db, attempt_id):
+    db.expire_all()
+    sub = db.scalars(select(Submission).join(Attempt, Attempt.enrollment_id == Submission.enrollment_id)
+                     .where(Attempt.id == attempt_id)).first()
+    out = (sub.id, sub.version)
+    db.rollback()
+    return out
+
+
+def test_engine_submit_vs_manual_score_and_void_or_override_on_sibling(setup_db, Session):
+    """submit(A2) || manual_score(A1) || void(A1) / override: the only legitimate error is manual_score losing to
+    void (409 attempt_not_submitted)."""
+    w = world(setup_db)
+    for i in range(30):
+        u = student(setup_db, w)
+        a1 = graded(setup_db, w, u, 1, CORRECT)   # needs_review sibling (counted)
+        a2 = opened(setup_db, w, u, 2, PARTIAL)   # in progress, submitted through the engine
+        sid, version = _sub_of(setup_db, a1)
+        fns = [do_submit(Session, u.id, a2), do_score(Session, w.ids.teacher, w.ids.course, a1, "10")]
+        fns.append(do_void(Session, w.ids.teacher, w.ids.course, a1) if i % 2 else
+                   do_override(Session, w.ids.teacher, w.ids.course, sid, "2", version))
+        out, errors = run_parallel(fns)
+        real = [e for e in errors if not (e[0] == 1 and i % 2 and "attempt_not_submitted" in e[1])]
+        assert not real, real
+        assert out[0] in ("graded", "needs_review")
+        if not i % 2:
+            assert out[2][0] in ("ok", "grade_conflict")
+    rows = assert_consistent(setup_db, w.ids.assessment)
+    assert len(rows) == 30 and len(events(setup_db, "attempt_voided")) == 15
+
+
+def test_two_regrades_vs_void_and_engine_submit(setup_db, Session):
+    w = world(setup_db, scheme=None)
+    submits, voids = [], []
+    for i in range(24):
+        u = student(setup_db, w)
+        a1 = graded(setup_db, w, u, 1, CORRECT)
+        if i % 3 == 0:
+            submits.append((u.id, opened(setup_db, w, u, 2, PARTIAL)))
+        elif i % 3 == 1:
+            voids.append(a1)
+    a = setup_db.get(Assessment, w.ids.assessment)
+    a.grading_scheme_version_id = ORT_SUBJECT_V1_ID
+    a.grading_changed_at = clock.now()
+    setup_db.commit()
+    fns = [do_regrade(Session, w.ids.teacher, w.ids.course, w.ids.assessment),
+           do_regrade(Session, w.ids.teacher, w.ids.course, w.ids.assessment)]
+    fns += [do_submit(Session, uid, aid) for uid, aid in submits]
+    fns += [do_void(Session, w.ids.teacher, w.ids.course, x) for x in voids]
+    out, errors = run_parallel(fns)
+    assert not errors, errors
+    regrade_mod.regrade(setup_db, _ctx(setup_db, w.ids.teacher), setup_db.get(Course, w.ids.course),
+                        w.ids.assessment)
+    rows = assert_consistent(setup_db, w.ids.assessment)
+    assert len(rows) == 24 and all(r["scheme_version_id"] == ORT_SUBJECT_V1_ID for r in rows.values())
+    assert sum(r["state"] == "no_attempts" for r in rows.values()) == len(voids)  # their only attempt voided
+    assert len(events(setup_db, "attempt_voided")) == len(voids)
+
+
+# ------------------------------------------------------------------ DB-level guards (review S7)
+
+def test_pg_guards_grade_events_append_only_and_versions_immutable(setup_db, Session):
+    from sqlalchemy import text
+    from sqlalchemy.exc import DBAPIError
+
+    from app.lms.grading.events import event_row, insert_events
+    from app.lms.grading.models import ALLOW_PURGE_SQL, GradingSchemeVersion
+
+    w = world(setup_db)
+    u = student(setup_db, w)
+    a1 = graded(setup_db, w, u, 1, PARTIAL)
+    sid, version = _sub_of(setup_db, a1)
+    assert do_override(Session, w.ids.teacher, w.ids.course, sid, "2", version)()[0] == "ok"
+    for sql in ("UPDATE grade_events SET reason = 'edited'", "DELETE FROM grade_events",
+                "UPDATE grade_events SET actor_id = NULL, reason = 'x'",
+                "UPDATE grading_scheme_versions SET params_hash = params_hash"):
+        with Session() as s:
+            with pytest.raises(DBAPIError, match="immutable"):
+                s.execute(text(sql))
+            s.rollback()
+    # the FK ON DELETE SET NULL of the actor still works (a deleted user keeps the audit row)
+    actor = make_user(setup_db)
+    actor_id = actor.id
+    with Session() as s:
+        insert_events(s, [event_row(submission_id=sid, course_id=w.ids.course, actor_id=actor_id, event="released",
+                                    now=clock.now(), old={}, new={})])
+        s.commit()
+        s.execute(text("DELETE FROM users WHERE id = :u"), {"u": actor_id})
+        s.commit()
+        assert s.execute(text("SELECT count(*) FROM grade_events WHERE actor_id IS NULL")).scalar() == 1
+    assert setup_db.scalar(select(func.count()).select_from(GradeEvent)) == 2
+    # maintenance purge (test teardown) is the only DELETE path
+    with Session() as s:
+        s.execute(text(ALLOW_PURGE_SQL))
+        assert s.execute(text("DELETE FROM grade_events")).rowcount == 2
+        s.rollback()
+    with Session() as s:  # SET LOCAL ended with the transaction
+        with pytest.raises(DBAPIError):
+            s.execute(text("DELETE FROM grade_events"))
+        s.rollback()
+    assert setup_db.scalar(select(func.count()).select_from(GradingSchemeVersion)) > 0

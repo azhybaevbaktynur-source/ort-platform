@@ -240,8 +240,10 @@ async def test_void_attempt_renders_status_only(db, api):
     db.commit()
     r = await get(api, w.student, f"/attempts/{att.id}/result")
     assert r.status_code == 200 and r.json() == {"status": "void"}
-    rev = await get(api, w.student, f"/attempts/{att.id}/review")
-    assert rev.status_code == 403
+    # every other student read hides a voided attempt like any attempt the caller cannot see (S4)
+    for path in ("review", "content", ""):
+        rev = await get(api, w.student, f"/attempts/{att.id}/{path}".rstrip("/"))
+        assert rev.status_code == 404 and rev.json()["error"]["code"] == "attempt_not_found", (path, rev.text)
     # another user's void attempt stays a 404
     other = make_user(db)
     enroll(db, w.course, other)

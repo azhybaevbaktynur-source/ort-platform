@@ -212,3 +212,41 @@ def test_0005_up_down_up(alembic_engine):
                 assert not cols & {c["name"] for c in inspect(conn).get_columns(table)}
         command.upgrade(cfg, "head")
         conn.commit()
+
+
+def test_0005_backfill_and_guards_on_pg(alembic_engine):
+    """S2: pre-Phase-4 counted attempts get a stale placeholder submission; S7: the append-only / immutable
+    triggers exist after upgrade and are gone after downgrade; Q1: courses.late_policy_changed_at."""
+    from alembic import command
+
+    from app.db.migrate import _config
+    from tests.test_migration_0005_data import check_backfill, seed_0004
+
+    def triggers(conn):
+        return set(conn.execute(text(
+            "SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgname LIKE 'trg_grad%'")).scalars())
+
+    cfg = _config(TEST_URL)
+    with alembic_engine.connect() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "0004_phase3_assessments")
+        conn.commit()
+        # FK checks off (session-wide) for the minimal seed: its parents (courses, users, ...) do not exist
+        conn.execute(text("SET session_replication_role = replica"))
+        conn.commit()
+        seeded = seed_0004(conn)
+        conn.commit()
+        command.upgrade(cfg, "0005_phase4_grading")
+        conn.commit()
+        check_backfill(conn, seeded)
+        assert triggers(conn) == {"trg_grade_events_append_only", "trg_grading_scheme_versions_immutable"}
+        assert "late_policy_changed_at" in {c["name"] for c in inspect(conn).get_columns("courses")}
+        command.downgrade(cfg, "0004_phase3_assessments")
+        conn.commit()
+        assert triggers(conn) == set()
+        assert conn.execute(text("SELECT count(*) FROM pg_proc WHERE proname = 'lms_grading_immutable'")).scalar() == 0
+        command.upgrade(cfg, "head")
+        conn.commit()
+        check_backfill(conn, seeded)
+        conn.execute(text("SET session_replication_role = DEFAULT"))
+        conn.commit()

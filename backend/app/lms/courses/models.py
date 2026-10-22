@@ -46,6 +46,8 @@ class Course(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
     )
     late_policy: Mapped[Optional[dict]] = mapped_column(JSONType, nullable=True)
     grading_changed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # set only when the late policy itself changes: late submissions computed before it are regrade targets
+    late_policy_changed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint("grading_total_mode IN ('points','weighted')", name="grading_total_mode_valid"),

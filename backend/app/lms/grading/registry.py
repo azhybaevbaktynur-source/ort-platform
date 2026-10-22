@@ -24,7 +24,7 @@ from typing import Any, Optional, Union
 
 from app.core.config import settings
 from app.lms.core.errors import ValidationFailed
-from app.lms.grading.params import validate_params, scale_bounds
+from app.lms.grading.params import VALUE_LIMIT, validate_params, scale_bounds
 
 _MODES = {"half_even": ROUND_HALF_EVEN, "half_up": ROUND_HALF_UP, "floor": ROUND_FLOOR, "ceil": ROUND_CEILING}
 _HUNDRED = Decimal(100)
@@ -133,10 +133,32 @@ def _zero(v: SchemeVersionData, zr: dict) -> GradeValue:
     )
 
 
+_LIMIT = Decimal(str(VALUE_LIMIT))
+
+
+def value_out_of_range(value: Any = None) -> ValidationFailed:
+    return ValidationFailed("Value out of range", code="value_out_of_range",
+                            details={"min": str(-_LIMIT), "max": str(_LIMIT),
+                                     **({} if value is None else {"value": str(value)[:40]})})
+
+
+def checked(x: Number) -> Decimal:
+    """`x` as a Decimal; non-finite or |x| > VALUE_LIMIT -> 422 `value_out_of_range` (never a 500 from Decimal
+    or float overflow further down)."""
+    try:
+        d = _dec(x)
+    except (ArithmeticError, ValueError, TypeError):
+        raise value_out_of_range() from None
+    if not d.is_finite() or abs(d) > _LIMIT:
+        raise value_out_of_range(x)
+    return d
+
+
 def apply(v: SchemeVersionData, raw: Number, possible: Number) -> GradeValue:
-    """Evaluate one (raw, possible) pair. Never raises for validated params."""
+    """Evaluate one (raw, possible) pair. Never raises for validated params and stored (Numeric(10, 2)) values;
+    non-finite or over-limit inputs -> 422 `value_out_of_range`."""
     p = v.params
-    raw_d, possible_d = _dec(raw), _dec(possible)
+    raw_d, possible_d = checked(raw), checked(possible)
     zr = p.get("zero_raw")
     if zr is not None and (possible_d <= 0 or raw_d <= 0):
         return _zero(v, zr)
@@ -216,4 +238,5 @@ def preview(type: str, params: dict, possible: Number, raws: list[Number]) -> li
         raise ValidationFailed(f"At most {settings.GRADING_PREVIEW_MAX_POINTS} preview points",
                                code="too_many_rows", details={"max": settings.GRADING_PREVIEW_MAX_POINTS})
     v = build_version_data(type, validate_params(type, params))
-    return [apply(v, r, possible) for r in raws]
+    possible_d = checked(possible)
+    return [apply(v, checked(r), possible_d) for r in raws]

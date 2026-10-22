@@ -29,6 +29,7 @@ from app.lms.courses.models import Course
 from app.lms.courses.service import require_course
 from app.lms.grading import late as late_mod
 from app.lms.grading import schemas as gs
+from app.lms.grading import serializers as ser
 from app.lms.grading import submissions as subs
 from app.lms.grading.events import event_row, insert_events, list_events
 from app.lms.grading.schemes import get_version_data
@@ -101,33 +102,26 @@ def _live_assessment(db: Session, course_id, assessment_id) -> Assessment:
 
 # ------------------------------------------------------------------ staff payload
 
-def _attempt_grade_out(a, sub: dict) -> Optional[gs.AttemptGradeOut]:
-    if a.g_computed_at is None or a.g_scheme_version_id is None:
-        return None
-    return gs.AttemptGradeOut(
-        scheme_type=a.g_type, scale_min=a.g_scale_min, scale_max=a.g_scale_max, display_value=a.g_display_value,
-        label=a.g_label, percentile=a.g_percentile, passed=a.g_passed, thresholds=a.g_thresholds,
-        sections=a.g_sections, is_kept=a.id == sub["kept_attempt_id"], released=sub["released_at"] is not None)
-
-
 def staff_out(db: Session, sub: dict, settings_row, attempts: list, override_by_name: Optional[str]
-              ) -> gs.SubmissionStaffOut:
+              ) -> ser.SubmissionStaffOut:
     """SubmissionStaffOut from rows already read (attempts with grade columns) + one events statement."""
     out_attempts = []
+    released = sub["released_at"] is not None
     for a in attempts:
         g = None
-        if getattr(a, "g_scheme_version_id", None) is not None:
-            v = get_version_data(db, a.g_scheme_version_id)
-            g = _attempt_grade_out(SimpleNamespace(**a._mapping, g_type=v.type, g_scale_min=v.scale_min,
-                                                   g_scale_max=v.scale_max), sub)
-        out_attempts.append(gs.SubmissionAttemptOut(
+        if getattr(a, "g_scheme_version_id", None) is not None and a.g_computed_at is not None:
+            g = ser.attempt_grade(get_version_data(db, a.g_scheme_version_id), display_value=a.g_display_value,
+                                  label=a.g_label, percentile=a.g_percentile, passed=a.g_passed,
+                                  thresholds=a.g_thresholds, sections=a.g_sections,
+                                  is_kept=a.id == sub["kept_attempt_id"], released=released)
+        out_attempts.append(ser.SubmissionAttemptOut(
             id=a.id, attempt_no=a.attempt_no, status=a.status, raw_score=a.raw_score,
             points_possible=a.points_possible, submitted_at=a.submitted_at,
             late_seconds=late_mod.late_seconds(a.submitted_at, settings_row.due_at, settings_row.late_policy),
             grade=g))
-    events = [gs.GradeEventOut(**e) for e in list_events(db, sub["id"])]
-    return gs.SubmissionStaffOut(
-        **gs.cell_fields(sub), override_reason=sub["override_reason"], override_by_name=override_by_name,
+    events = [ser.GradeEventOut(**e) for e in list_events(db, sub["id"])]
+    return ser.SubmissionStaffOut(
+        **ser.cell_fields(sub), override_reason=sub["override_reason"], override_by_name=override_by_name,
         override_at=sub["override_at"], attempts=out_attempts, events=events)
 
 
@@ -149,7 +143,7 @@ def _points(value: Decimal, possible) -> Decimal:
 
 
 def override(db: Session, ctx: AuthzContext, course: Course, submission_id, data: gs.OverrideIn
-             ) -> gs.SubmissionStaffOut:
+             ) -> ser.SubmissionStaffOut:
     """GRADES_MANAGE. points None clears; reason required (<= 500) when points set; 0 <= points <= points_possible
     (422 points_out_of_range); stale version -> 409 grade_conflict. Survives every recompute."""
     _gate(ctx, course, ratelimit.grade_item_limit())
@@ -181,7 +175,7 @@ def override(db: Session, ctx: AuthzContext, course: Course, submission_id, data
 
 
 def excuse(db: Session, ctx: AuthzContext, course: Course, submission_id, data: gs.ExcuseIn
-           ) -> gs.SubmissionStaffOut:
+           ) -> ser.SubmissionStaffOut:
     """GRADES_MANAGE. excused=True -> state excused (kept fields still update on later recomputes); False ->
     state recomputed (graded / pending_review). Same state as requested -> no write, no event."""
     _gate(ctx, course, ratelimit.grade_item_limit())
@@ -269,10 +263,15 @@ def release(db: Session, ctx: AuthzContext, course: Course, assessment_id, submi
 
 def unrelease(db: Session, ctx: AuthzContext, course: Course, assessment_id, submission_ids: Optional[list]
               ) -> gs.UnreleaseOut:
-    """Symmetric to `release`: released_at -> NULL (the student view hides the grade)."""
+    """Symmetric to `release`: released_at -> NULL (the student view hides the grade). Only for `manual` release:
+    with `auto` the next hook or regrade would silently release again -> 409 `grade_release_auto`."""
     _gate(ctx, course, ratelimit.grades_release_limit())
     a = _live_assessment(db, course.id, assessment_id)
     aid = a.id
+    if (a.grade_release or "auto") == "auto":
+        db.rollback()
+        raise Conflict("Grades of this assessment are released automatically", code="grade_release_auto",
+                       details={"grade_release": "auto"})
     return gs.UnreleaseOut(unreleased=_release_chunks(db, ctx, course, aid, submission_ids, release=False))
 
 

@@ -15,7 +15,8 @@ Semantics:
   percent inside the category; all-zero weights -> None; uncategorized assessments are excluded (warning
   `uncategorized_excluded`);
 - current: counted submissions only; final: also every listed non-omitted assessment with `points_possible > 0`
-  and no submission at all counts as 0 out of its points.
+  and no submission at all counts as 0 out of its points;
+- a `no_attempts` submission (every counted attempt voided) is ignored, i.e. treated like no submission.
 """
 from __future__ import annotations
 
@@ -29,6 +30,7 @@ _Q = Decimal("0.01")
 _ZERO = Decimal(0)
 _HUNDRED = Decimal(100)
 UNCATEGORIZED_EXCLUDED = "uncategorized_excluded"
+NO_ATTEMPTS = "no_attempts"
 
 
 @dataclass(frozen=True)
@@ -93,6 +95,8 @@ def compute_totals(course_row: Any, categories: Iterable[Any], assessments: Iter
         current: list[tuple[Any, Decimal, Decimal]] = []
         seen: set = set()
         for s in subs:
+            if s.state == NO_ATTEMPTS:  # ignored: as if the submission did not exist (final counts it as 0)
+                continue
             seen.add(s.assessment_id)
             if s.assessment_id not in listed or s.state != "graded":
                 continue
