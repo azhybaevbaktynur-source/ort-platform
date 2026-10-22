@@ -108,8 +108,14 @@ class Settings(BaseSettings):
     ATTEMPT_SWEEP_INTERVAL_S: int = 60
     ATTEMPT_SWEEP_BATCH: int = 100
     ATTEMPT_SWEEP_TOKEN: str = ""
-    # anyio worker-thread limit per process; keep equal to DB_POOL_SIZE + DB_MAX_OVERFLOW (L5). 0 = leave default.
+    # anyio worker-thread limit per process (L5). 0 = leave anyio's default (40). Matching it to
+    # DB_POOL_SIZE + DB_MAX_OVERFLOW does not prevent the overload deadlock (B1); the admission gate below does.
     LMS_THREADPOOL_TOKENS: int = 20
+    # Admission gate (B1, app/lms/core/admission.py): at most N requests per process inside the app. 0 = auto:
+    # min(thread tokens, DB_POOL_SIZE + DB_MAX_OVERFLOW) minus the sweep's app-pool reserve (0 on Postgres).
+    LMS_ADMISSION_LIMIT: int = 0
+    # Longest wait for a slot before 503 server_busy (Retry-After: 2). <= 0 waits without a limit.
+    LMS_ADMISSION_WAIT_SECONDS: float = 20.0
     # Rate limits (P3-28): DB-backed start/manual scoring; in-process autosave token bucket per (worker, user)
     ATTEMPT_START_RATE_PER_10M: int = 20
     GRADE_ITEM_RATE_PER_HOUR: int = 600

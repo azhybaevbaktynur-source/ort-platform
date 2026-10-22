@@ -55,6 +55,11 @@ class PayloadTooLarge(LMSError):
     code = "payload_too_large"
 
 
+class ServerBusy(LMSError):
+    status_code = 503
+    code = "server_busy"
+
+
 def error_body(exc: LMSError) -> dict:
     return {"error": {"code": exc.code, "message": exc.message, "details": exc.details}}
 

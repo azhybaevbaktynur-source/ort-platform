@@ -147,3 +147,16 @@ python <repo>/loadtest/exam_load.py calib w1 1000 8; DATABASE_URL=… python <re
 ```
 
 Kill uvicorn by PID: `pkill` does not stop stuck workers. After a collapsed run, run the app's `run_sweep` to clear leftovers before the next run.
+
+## 11. B1 fix (admission gate in app code), re-run 2026-10-23
+
+**Fix**: `backend/app/lms/core/admission.py`, registered innermost in `main.py` (inside CORS, GZip and BodyCap). Each process admits at most N requests; the rest wait in the event loop. N = `LMS_ADMISSION_LIMIT`, or auto = min(thread tokens, `DB_POOL_SIZE` + `DB_MAX_OVERFLOW`) − sweep reserve (0 on Postgres: the sweep has its own engine), at least 1. A request waiting more than `LMS_ADMISSION_WAIT_SECONDS` (20) gets 503 `server_busy` with `Retry-After: 2`. `/health`, `/uploads`, `OPTIONS` are not gated. The startup log shows N. Regression test: `backend/tests/lms/test_admission.py` (Postgres, pool 2, threads 2, 8 slow requests: pool timeouts without the gate, none with it).
+
+**Re-run** (same harness and settings as R5 and R8, `LT_ADMIT` unset, the app's own gate: N = 20 per worker; fresh DB `lt3b`):
+
+| Run | As | VUs | Workers | QueuePool errors | 503 `server_busy` | 5xx + transport errors | Client p95 autosave / start / submit | Server p95 (incl. gate wait) | Integrity |
+|---|---|---|---|---|---|---|---|---|---|
+| R9 | R5 | 6,000 | 4 | **0** (R5: 860) | 0 | 48 client `ReadError` of 165k = **0.03 %** (R5: 0.71 %; R4 with `LT_ADMIT`: 180) | 24.2 / 15.3 / 26.2 s | 349 / 217 / 1,785 ms | 0 lost, 0 double grades, all 6,000 finalized |
+| R10 | R8 | 6,000 | 2 | **0** | 0 | **0** of 334k | 12.7 / 4.6 / 17.0 s (R8: 21.9 / 7.1 / 30.9 s) | 1,198 / 1,284 / 2,557 ms | `ok`: 0 lost, 0 double grades, 0 late-rejected submit answers |
+
+No request waited 20 s for a slot, so the 503 path did not fire. The high client latencies come from the CPU-bound local stack (pre-ASGI queueing, §5 and §8.3): R9 oversubscribes this M1 (load average 8.6, max 13.5) like R4. The `ReadError`s are the same client-side connection drops seen in R4, R6 and R8. Raw data: `loadtest/results/exam_r9_w4_p10_t20_gate*.json`, `exam_r10_w2_p10_t20_gate*.json`. **B1 is closed**; B2 and the plan decision (§9) remain.

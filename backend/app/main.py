@@ -10,6 +10,7 @@ from app.core.config import settings, is_production, DEFAULT_SECRET_KEY
 from app.db.init_db import init_db
 from app.db.migrate import run_migrations
 from app.api.v1.router import api_router
+from app.lms.core import admission
 from app.lms.core.errors import register_error_handlers
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,7 @@ async def lifespan(app: FastAPI):
         if settings.ALLOW_MOCK_TOKENS:
             logger.critical("ALLOW_MOCK_TOKENS is enabled in production: 'mock_admin_token' grants admin access. Disable it.")
     await _configure_thread_limiter()
+    admission.logger.info("admission gate configured", extra=admission.describe())
     yield
 
 
@@ -55,6 +57,8 @@ app = FastAPI(
 # Set CORS origins from environment variable list
 cors_origins = settings.ALLOWED_ORIGINS or settings.BACKEND_CORS_ORIGINS or ["*"]
 from app.lms.attempts.bodycap import BodyCapMiddleware
+# Innermost (added first): Content-Length 413s and CORS preflights never wait for a slot; CORS still wraps the 503 (B1).
+app.add_middleware(admission.AdmissionMiddleware)
 app.add_middleware(BodyCapMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(
