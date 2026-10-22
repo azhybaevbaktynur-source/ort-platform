@@ -22,3 +22,14 @@ Source: answers to the 15 open questions in `PROJECT_UNDERSTANDING.md` §8. The 
 | Production access | Read access to Render/Neon granted for measuring. |
 | Order of work | Security/integrity fixes first (done on `fix/security-integrity`), then architecture design, then storage/DB changes. |
 | Scale | Target about 6,000 students active at the same time (added 2026-10-22). Hosting (Vercel/Render/Neon) must be verified against this. |
+
+## Decisions 2026-10-22 (hosting and deploy)
+
+| Topic | Decision |
+|---|---|
+| Security branch | Merged to `main` and deployed (`ca48b1f`) on 2026-10-22; Neon backup branch `backup-2026-10-22-before-security-deploy` taken first. |
+| D1-D18 | Owner has not replied per item; recommended defaults stand until changed (D4 stays open until the capacity review). |
+| Budget | Owner is cost-sensitive: target about $30/month at most. A VPS plus Neon was rejected as more expensive than the current three vendors. |
+| Hosting | Keep Vercel + Render + Neon for now. Render is on the **Free** plan (sleeps, ~0.1 CPU, 1 worker) and must be upgraded before launch. Scale Render up only for exam windows (billed per second). A VPS for the API is the fallback if the load test shows daily heavy load. |
+| Domain | None yet; added after the LMS is finished. |
+| Scale | 6,000 concurrent target and "plan for more later" confirmed. |
