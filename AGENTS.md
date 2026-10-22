@@ -107,7 +107,7 @@ ort-platform/
 │   │           ├── analytics.py            # Student mastery breakdown & instructor cohort metrics
 │   │           ├── upload.py               # Image upload handler (/uploads)
 │   │           └── planner.py              # Daily planner tasks (currently in-memory stub)
-│   ├── tests/                              # Pytest Test Suite (106 tests)
+│   ├── tests/                              # Pytest Test Suite (112 tests)
 │   │   ├── conftest.py                     # Test environment setup, mock tokens, DB reset fixtures
 │   │   ├── auth_helpers.py                 # Test account seeds (usr_admin_01, usr_student_01)
 │   │   ├── test_api_endpoints.py           # Integration tests across all endpoints
@@ -334,7 +334,7 @@ cd backend && /bin/rm -rf /tmp/agy_t && /bin/mkdir -p /tmp/agy_t/up && \
 DATABASE_URL="sqlite:////tmp/agy_t/test.db" LOCAL_UPLOAD_DIR="/tmp/agy_t/up" \
 venv/bin/python -m pytest -q -p no:cacheprovider -W ignore
 ```
-*(Expected output: 106 passed in ~7 seconds).*
+*(Expected output: 112 passed in ~8 seconds).*
 
 ```bash
 # Run specific test modules:
@@ -385,29 +385,20 @@ cd frontend && npm run dev
 2. **Never commit passwords to code or seeds**:
    * Repository is public. `init_db.py` must never create accounts with hardcoded passwords.
    * Admins are created via `make_admin.py` after registration, or via test helpers with dynamic passwords in `tests/auth_helpers.py`.
-3. **Strict Bilingual Discipline**:
-   * Every user-facing UI label, button, error message, or prompt MUST exist in both Kyrgyz (`ky`) and Russian (`ru`).
-   * Add keys to both `frontend/src/lib/i18n/ky.json` and `ru.json`. Hardcoded single-language strings are prohibited.
+3. **Strict Trilingual Discipline**:
+   * Every user-facing UI label, button, error message, or prompt MUST exist in English (`en`), Kyrgyz (`ky`) and Russian (`ru`).
+   * Add keys to `en.json` (added in Phase 0), `ky.json` and `ru.json` in `frontend/src/lib/i18n/`. Hardcoded single-language strings are prohibited.
 4. **Shell Alias Safety**:
    * Interactive shells alias `rm`, `cp`, `mv` to interactive `-i`. Always use `/bin/rm -f`, `/bin/cp -f`, `/bin/mv -f` in automation scripts.
 5. **Server-Side Authorization**:
    * Never trust client JWT claims for role checks. Always query the `users` table via `get_current_user` to verify permissions.
 6. **No Unbounded Firestore Reads**:
    * Always paginate question queries using `limit` and `offset`. Never load the entire 12,000+ question bank into frontend memory.
+7. **Git and production**:
+   * Commit locally. Never push any branch, merge, deploy or write to production without the owner's explicit OK for that action (every pushed branch builds a Vercel preview; `main` auto-deploys to Render and Vercel).
 
 ---
 
-## 8. Current Roadmap & High-Priority Tasks
+## 8. Current Roadmap
 
-Autonomous agents continuing work on this platform should focus on these concrete next steps:
-
-1. **Persist the Daily Study Planner**:
-   * Current status: `backend/app/api/v1/endpoints/planner.py` uses an in-memory dictionary `USER_DAILY_TASKS` with static dummy tasks.
-   * Task: Create a SQL model `StudyTask` linked to `users.id`, generating tasks dynamically from the student's weak topics identified in `/analytics/student`.
-2. **Wire Real Reviews to Mock Test Result Page**:
-   * Current status: `frontend/src/app/[lang]/(student)/mock-tests/[testId]/result/page.tsx` renders real score cards, but the bottom question review section renders a static 2-item mock array (`reviewedQuestions`).
-   * Task: Replace the static mock array with the real `attempt.review` data already calculated by `submit_and_score_test` and displayed in `mistakes/page.tsx`.
-3. **Canvas LMS Orchestration Layer (Phase 1)**:
-   * Implement the non-destructive Canvas wrapper specified in `docs/CANVAS_INTEGRATION_SPEC.md` and `docs/CANVAS_EXPLAINER_FOR_FOUNDER.md`:
-   * Models to add: `Account` (School/Center), `Course` (Curriculum), `Section` (Cohort), `Enrollment` (Student/Teacher linkage), `Module`, and `ModuleItem`.
-   * Gating Engine: Add sequential completion rules unlocking Module $N+1$ based on Module $N$ quiz scores.
+The old roadmap (planner, result-page review, Accounts/Sections Canvas wrapper) is **cancelled**. The plan is `docs/IMPLEMENTATION_PLAN.md` (phases 0-9, LMS built beside the old app, old code frozen until the Phase 5 cutover). Current state and decisions: `docs/HANDOFF_NEXT_AGENT.md` and `docs/PRODUCT_DECISIONS.md`.

@@ -11,7 +11,7 @@
 2. **Integration branch.** Long-lived `lms` branch off `main`. Each phase is a short-lived branch merged into `lms` by PR after its exit criteria pass. `main` only receives fixes until Phase 5.
 3. **Every phase ships a vertical slice**: migration + models + service + endpoints + teacher/student UI + i18n (en/ru/ky) + tests. No phase ends with "backend only, UI later".
 4. **Gates that apply to every phase** (definition of done):
-   - `pytest` green on SQLite *and* Postgres 16 in CI; `alembic upgrade head` + `alembic check` clean; frontend `tsc --noEmit` and `next build` clean (isolated copy, per `AGENTS.md`).
+   - `pytest` green on SQLite *and* Postgres 18 (matches Neon) in CI; `alembic upgrade head` + `alembic check` clean; frontend `tsc --noEmit` and `next build` clean (isolated copy, per `AGENTS.md`).
    - Every new route is in the permission matrix (route-inventory test), with table-driven action × role × status tests and cross-tenant tests (teacher A cannot see or edit teacher B's anything).
    - i18n key parity across `en.json`, `ky.json`, `ru.json` (CI check). No hard-coded user-facing strings.
    - No answer keys, PINs, join codes or other users' data in any student-facing payload (contract tests on serializers).
@@ -53,7 +53,7 @@ Phases 6, 7, 8 are independent of each other after the cutover and may run in an
 **Work**
 - **0.0 Capacity review (first task, before any schema work)**: follow `docs/CAPACITY_REVIEW_BRIEF.md`; deliver `docs/CAPACITY_REVIEW.md` with measured numbers and a go/no-go on Vercel + Render + Neon, plus the cheapest upgrade path. Its findings can change D4 and the attempt-engine design (e.g. write batching, connection pooling).
 - **Alembic baseline of the *current* schema** (autogenerate against an empty Postgres, review by hand, `stamp` Neon). Naming convention for constraints; batch mode for SQLite dev. From now on schema changes are Alembic revisions only; the runtime `ALTER` helpers stay until cutover, then are deleted. Migrations run as a pre-deploy step (D4).
-- **CI** (GitHub Actions): backend tests on SQLite and Postgres 16, `alembic upgrade head`, `alembic check`, pytest-alembic built-ins, frontend `tsc` + build, i18n key-parity check, lint.
+- **CI** (GitHub Actions): backend tests on SQLite and Postgres 18, `alembic upgrade head`, `alembic check`, pytest-alembic built-ins, frontend `tsc` + build, i18n key-parity check, lint.
 - **Shared building blocks** in `app/lms/core/`: UUID PK + timestamps + soft-delete mixin; `LocalizedText` JSON type with Pydantic validation and read fallback; `JSON().with_variant(JSONB, "postgresql")` helper; error shape; cursor pagination helper; structured logging without PII.
 - **`app/core/authz.py` scaffolding**: `can()/require()` interfaces, `ROLE_GRANTS`, the route-inventory test (initially whitelisting all existing routes so the gate is live from day one).
 - **Hardening carried over from the review**: upload content check (magic bytes via Pillow) and size cap; remove `print()` of payloads; PIN stays only in old code (removed at cutover).
