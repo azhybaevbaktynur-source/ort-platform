@@ -9,7 +9,7 @@ from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.responses import JSONResponse
 
 
-LMS_PATH_PREFIXES = ("/api/v1/me", "/api/v1/courses", "/api/v1/platform")
+LMS_PATH_PREFIXES = ("/api/v1/me", "/api/v1/courses", "/api/v1/platform", "/api/v1/assets", "/api/v1/media")
 
 
 class LMSError(Exception):

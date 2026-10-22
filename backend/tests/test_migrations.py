@@ -116,3 +116,30 @@ def test_0002_data_migration_promotes_admins(alembic_engine):
         command.upgrade(cfg, "head")
         conn.commit()
         assert "courses" in inspect(conn).get_table_names()
+
+
+def test_0003_up_down_up(alembic_engine):
+    """Phase 2 tables (with the circular version FKs) create and drop cleanly, twice."""
+    from alembic import command
+
+    from app.db.migrate import _config
+
+    phase2 = {"assets", "asset_blobs", "question_banks", "translation_groups", "passages", "passage_versions",
+              "bank_questions", "question_versions"}
+    cfg = _config(TEST_URL)
+    with alembic_engine.connect() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "0002_phase1_courses")
+        conn.commit()
+        assert not phase2 & set(inspect(conn).get_table_names())
+        for _ in range(2):
+            command.upgrade(cfg, "head")
+            conn.commit()
+            assert phase2 <= set(inspect(conn).get_table_names())
+            fks = {fk["name"] for fk in inspect(conn).get_foreign_keys("bank_questions")}
+            assert {"fk_bank_questions_current_version_id", "fk_bank_questions_imported_version_id"} <= fks
+            command.downgrade(cfg, "0002_phase1_courses")
+            conn.commit()
+            assert not phase2 & set(inspect(conn).get_table_names())
+        command.upgrade(cfg, "head")
+        conn.commit()

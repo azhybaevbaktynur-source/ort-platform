@@ -81,3 +81,21 @@ The full list is P1-1 … P1-23 in `docs/phases/PHASE_1_DESIGN.md` §1. Highligh
 | Rate limits | DB-backed fixed windows, own small connection pool. Per-user join limits enforced; the per-IP rule is **log-only** (`RATE_LIMIT_IP_ENFORCE=False`) until the real Vercel→Render `X-Forwarded-For` chain is verified. |
 | Add staff | Every miss returns the same `user_not_found` (no email enumeration). Invite-accept for staff is a Phase 7 candidate. |
 | Errors | New endpoints (incl. request validation) use `{"error":{code,message,details}}`; old endpoints keep `detail`. |
+
+## Decisions 2026-10-22 (Phase 2, agent defaults)
+
+Full list: P2-* in `docs/phases/PHASE_2_DESIGN.md` §1. Highlights and review outcomes:
+
+| Topic | Decision |
+|---|---|
+| Image storage | Driver setting `LMS_STORAGE_DRIVER=local|db|r2`. Production uses `db` (Postgres `asset_blobs`) until the owner provides Cloudflare R2 keys; `scripts/copy_blobs.py` moves blobs later. Global db cap 300 MiB, 200 MiB per user. |
+| Image URLs | Content-hashed `/api/v1/media/{sha}.webp`, immutable cache headers; built at read time, never stored. |
+| Image processing | PNG/JPEG/GIF/WEBP by content only, no SVG; ≤ 12 MP (lowered from 40 MP after a memory review: Render Free has 512 MB), downscaled to 1600 px, re-encoded to WebP (lossless for PNG/GIF), EXIF stripped; one encode at a time per process. |
+| Private files | Content may reference only public assets. Private files need a separate R2 bucket (`R2_PRIVATE_BUCKET`); never stored in the public bucket. |
+| Quota | Deleting an asset does not free quota (blobs are kept for history). |
+| Versioning | Every content edit creates an immutable version; stale saves get 409; revert creates a new version; metadata (topic, section, position, tags) is not versioned. |
+| Delete | Soft delete; versions used by quizzes/attempts keep working; a passage in use cannot be deleted. |
+| Import scope (P2-17) | `source_ref` is unique per bank and one bank per source per course (plan said "per owner"; changed so re-importing into a second course never touches the first). |
+| External images (P2-21) | Import rejects `http(s)` and `/uploads` image URLs (no hotlinking/SSRF). |
+| Import conflicts | A question edited by a teacher since its last import is skipped with a warning unless "overwrite" is chosen; deleted matches are skipped; questions missing from a new bundle are kept. Re-import never changes tags. |
+| Import safety | One import at a time per process (409 `import_busy`); a failed import stores no images; orphan blobs older than 1 h are swept; uploads need `Content-Length`. |
