@@ -39,7 +39,8 @@ export interface ThresholdParams {
 
 export interface ZeroRawParams {
   value: number;
-  percentile: number;
+  /** optional on the server (null/absent = no percentile for a zero raw) */
+  percentile?: number | null;
 }
 
 /** Optional blocks shared by every type (P4-3). */
@@ -91,6 +92,7 @@ export interface CurveParams extends CommonParams {
   scale_max: number;
   /** contiguous from 0 to 1 */
   segments: CurveSegment[];
+  pass_threshold_percent?: number | null;
 }
 
 export interface LookupRow {
@@ -100,12 +102,12 @@ export interface LookupRow {
   label?: string | null;
 }
 
+/** No `scale_min`/`scale_max` here: the server derives the scale from the row values and rejects unknown keys. */
 export interface LookupTableParams extends CommonParams {
-  scale_min?: number | null;
-  scale_max?: number | null;
   /** sorted, non-overlapping, covering 0..expected_possible */
   rows: LookupRow[];
   expected_possible?: number | null;
+  pass_threshold_percent?: number | null;
 }
 
 export interface SchemeParamsByType {
@@ -156,11 +158,17 @@ export interface SchemeVersionOut {
   scale_min: Num | null;
   scale_max: Num | null;
   params: SchemeParams;
-  /** label key (band key, `pass`, `fail`, lookup label) -> localized text */
-  labels: Record<string, LocalizedText>;
+  /**
+   * Label key -> display text. Bands: band key -> LocalizedText. Lookup tables: label -> the same plain string.
+   * Pass/fail: empty (labels come from i18n). Render with `labelText()` (components/lms/grading/schemes/labels.ts).
+   */
+  labels: Record<string, SchemeLabelValue>;
   created_at: string;
   in_use_count: number;
 }
+
+/** A value of `SchemeVersionOut.labels`: plain string (lookup_table) or localized text (bands). */
+export type SchemeLabelValue = string | LocalizedText;
 
 export interface SchemeOut extends SchemeSummaryOut {
   versions: SchemeVersionOut[];
@@ -184,9 +192,8 @@ export interface SchemePreviewIn {
   type: SchemeType;
   params: SchemeParams;
   possible: Num;
-  /** <= 1001 values */
-  raws?: Num[];
-  step?: Num;
+  /** required; <= 1001 values (the server has no `step`: a step list is expanded by the client) */
+  raws: Num[];
 }
 
 export interface GradeValueOut {
@@ -272,14 +279,17 @@ export interface CategoryOut {
   assessment_count: number;
 }
 
-export type CourseGradingWarning = "uncategorized_excluded" | "points_possible_mismatch" | (string & {});
+export type CourseGradingWarning =
+  | "uncategorized_excluded" | "weights_all_zero" | "points_possible_mismatch" | (string & {});
 
 export interface CourseGradingStaffOut {
   total_mode: TotalMode;
+  grading_scheme_version_id?: string | null;
   scheme: SchemeVersionRef | null;
   late_policy: LatePolicy | null;
   categories: CategoryOut[];
   warnings: CourseGradingWarning[];
+  grading_changed_at?: string | null;
 }
 
 export interface CourseGradingStudentOut {

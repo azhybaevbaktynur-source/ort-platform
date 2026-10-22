@@ -5,8 +5,6 @@ import { Check, X } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { previewScheme } from "@/lib/lms/grading";
 import type { SchemeParams, SchemePreviewRow, SchemeType } from "@/lib/lms/gradingTypes";
-import { pickLocalized } from "@/lib/lms/localized";
-import type { Lang } from "@/lib/lms/types";
 import { cardCls, inputCls, labelCls } from "@/components/lms/content/ui";
 import { NumInput } from "./fields";
 import { bandLabels, fmtNum, fmtPercentile, previewRaws, stableStringify } from "./params";
@@ -27,7 +25,7 @@ export function SchemePreview({
   blocked: boolean;
   defaultPossible?: number | null;
 }) {
-  const { lang, t } = useTranslation();
+  const { t } = useTranslation();
   const id = useId();
   const [possible, setPossible] = useState<number | null>(defaultPossible ?? 30);
   const [useStep, setUseStep] = useState(false);
@@ -65,11 +63,7 @@ export function SchemePreview({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, blocked]);
 
-  const label = (r: SchemePreviewRow) => {
-    if (!r.label) return "";
-    if (type === "bands" && bands[r.label]) return pickLocalized(bands[r.label], lang as Lang) || r.label;
-    return labelOf(r.label);
-  };
+  const label = (r: SchemePreviewRow) => (r.label ? labelOf(r.label, type === "bands" ? bands : null) : "");
   const showPct = rows?.some((r) => r.percentile !== null && r.percentile !== undefined);
   const showPassed = rows?.some((r) => r.passed !== null && r.passed !== undefined);
   const showLabel = rows?.some((r) => !!r.label);

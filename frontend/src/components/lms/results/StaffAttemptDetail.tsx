@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/context";
 import { getStaffAttempt, type AttemptStaffOut } from "@/lib/lms/staffAttempts";
-import type { AttemptGradeOut } from "@/lib/lms/gradingTypes";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { fmtDateTime, fmtPoints } from "@/components/lms/assessments/format";
 import { ReviewItemCard } from "./ReviewItemCard";
@@ -15,7 +14,7 @@ import { GradeBadge } from "./GradeBadge";
 export function StaffAttemptDetail({ courseId, assessmentId, attemptId }: { courseId: string; assessmentId: string; attemptId: string }) {
   const { lang, t } = useTranslation();
   const canGrade = true; // StaffGate already limits the page to teachers/assistants; the server enforces grades.manage
-  const [data, setData] = useState<(AttemptStaffOut & { grade?: AttemptGradeOut | null }) | null>(null);
+  const [data, setData] = useState<AttemptStaffOut | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [onlyPending, setOnlyPending] = useState(false);
 

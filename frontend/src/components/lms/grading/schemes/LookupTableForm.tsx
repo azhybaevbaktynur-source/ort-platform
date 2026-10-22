@@ -44,8 +44,6 @@ export function LookupTableForm({
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <NumField label={t("schemes.lookup.expectedPossible")} value={params.expected_possible ?? null}
           hint={t("schemes.lookup.expectedPossibleHint")} onChange={(v) => onChange({ ...params, expected_possible: v })} />
-        <NumField label={t("schemes.fields.scaleMinOptional")} value={params.scale_min ?? null} onChange={(v) => onChange({ ...params, scale_min: v })} />
-        <NumField label={t("schemes.fields.scaleMaxOptional")} value={params.scale_max ?? null} onChange={(v) => onChange({ ...params, scale_max: v })} />
       </div>
 
       <div className="max-h-[28rem] overflow-auto rounded-xl border border-slate-200">

@@ -192,8 +192,8 @@ export interface MyAttemptOut {
   started_at: string;
   submitted_at: string | null;
   results_available: boolean;
+  /** Phase 4: the grade is `result.grade` (the server nests it; there is no top-level `grade`). */
   result?: AttemptResultOut | null;
-  grade?: AttemptGradeOut | null;
 }
 
 /** Review/result DTOs for F3 (shape per section 3.9; fields beyond these may be added by A4). */

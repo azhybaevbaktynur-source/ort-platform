@@ -58,7 +58,7 @@ def list_attempts(course_id: uuid.UUID, assessment_id: uuid.UUID, status: Option
         names = {u.id: (u.display_name or u.email)
                  for u in db.execute(select(User).where(User.id.in_(uids))).scalars()}
     return PageOut[ser.AttemptStaffSummaryOut](
-        items=[ser.staff_summary(a, names.get(a.user_id)) for a in page.items], next_cursor=page.next_cursor)
+        items=results.staff_summaries(db, page.items, names), next_cursor=page.next_cursor)
 
 
 def _course_attempt(ctx: AuthzContext, course, attempt_id: uuid.UUID) -> Attempt:

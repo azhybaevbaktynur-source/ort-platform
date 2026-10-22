@@ -352,3 +352,28 @@ async def test_gradebook_single_checkout(db, api):
             assert checkouts["n"] == 1, path
     finally:
         event.remove(db_session.engine, "checkout", on_checkout)
+
+
+async def test_staff_attempt_list_grade_and_statement_count(db, api):
+    """The staff list route returns each row's `grade` (G3 `results.staff_summaries`) with a page-size independent
+    statement count: attempt_grades + submissions are two queries for the whole page."""
+    counts = {}
+    for name, n in (("small", 2), ("big", 30)):
+        w = gb_world(db, students=0)
+        a, v = graded_assessment(db, w.course, w.teacher)
+        for i in range(n):
+            u = make_user(db, display_name=f"L{i}")
+            grade_row(db, a, v, enroll(db, w.course, u), u, i % 11, released=i % 2 == 0)
+        path = f"/courses/{w.cid}/assessments/{a.id}/attempts"
+        await api.call(w.teacher, "GET", path)  # warm the scheme cache
+        with Counter() as c:
+            r = await api.call(w.teacher, "GET", path, params={"limit": 50})
+        assert r.status_code == 200, r.text
+        items = r.json()["items"]
+        assert len(items) == n and all(i["grade"] is not None for i in items)
+        assert all(i["grade"]["is_kept"] is True for i in items)
+        assert {i["grade"]["released"] for i in items} == {True, False}
+        by_name = {i["student_name"]: i for i in items}
+        assert D(str(by_name["L1"]["grade"]["display_value"])) == D("10.00")
+        counts[name] = c.n
+    assert counts["small"] == counts["big"], counts

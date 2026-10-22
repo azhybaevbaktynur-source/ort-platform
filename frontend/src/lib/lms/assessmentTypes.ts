@@ -2,7 +2,7 @@
 // Builder and lobby DTOs only; attempt/player types live in attemptTypes.ts (F2).
 import type { Lang, LocalizedText } from "./types";
 import type { Difficulty, QuestionType } from "./contentTypes";
-import type { AssessmentGradingFields, AssessmentGradingUpdate } from "./gradingTypes";
+import type { AssessmentGradingFields, AssessmentGradingUpdate, SchemeStudentRef } from "./gradingTypes";
 
 export type AssessmentPreset = "none" | "ort_main" | "ort_subject";
 export const ASSESSMENT_PRESETS: AssessmentPreset[] = ["none", "ort_main", "ort_subject"];
@@ -114,6 +114,9 @@ export interface AssessmentStudentSummaryOut {
   attempts_used: number;
   in_progress_attempt_id: string | null;
   last_result?: LastResult | null;
+  /** Phase 4 */
+  due_at?: string | null;
+  scheme?: SchemeStudentRef | null;
 }
 
 export type AssessmentSummaryOut = AssessmentStaffSummaryOut | AssessmentStudentSummaryOut;
@@ -178,6 +181,9 @@ export interface AssessmentLobbyOut {
   in_progress_attempt_id: string | null;
   can_start: boolean;
   reason?: LobbyReason | (string & {}) | null;
+  /** Phase 4 */
+  due_at?: string | null;
+  scheme?: SchemeStudentRef | null;
 }
 
 /** GET /assessments/{a} returns the staff or lobby shape depending on the caller's role. */
