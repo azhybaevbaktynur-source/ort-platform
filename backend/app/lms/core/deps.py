@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 from typing import Optional
 
 from fastapi import Depends, Request
@@ -29,14 +30,24 @@ def require_platform_admin(user: User = Depends(get_lms_user)) -> User:
     return user
 
 
+def _valid_ip(value: str) -> Optional[str]:
+    try:
+        return str(ipaddress.ip_address(value.strip()))
+    except ValueError:
+        return None
+
+
 def client_ip(request: Request) -> Optional[str]:
     hops = settings.RATE_LIMIT_PROXY_HOPS
     xff = request.headers.get("x-forwarded-for")
     if xff and hops >= 1:
         parts = [p.strip() for p in xff.split(",") if p.strip()]
         if len(parts) >= hops:
-            return parts[-hops]
-    return request.client.host if request.client else None
+            ip = _valid_ip(parts[-hops])
+            if ip:
+                return ip
+    host = request.client.host if request.client else None
+    return _valid_ip(host) if host else None
 
 
 def hash_ip(ip: str) -> str:

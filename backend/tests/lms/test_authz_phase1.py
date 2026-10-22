@@ -70,3 +70,14 @@ def test_admin_flag_without_opt_in_grants_nothing():
 def test_old_role_admin_grants_nothing():
     old = SimpleNamespace(role="admin")
     assert AuthzContext(old, db=None, allow_platform_admin=True).is_platform_admin is False
+
+
+def test_cache_normalizes_string_course_ids():
+    import uuid
+
+    calls = []
+    ctx = AuthzContext(SimpleNamespace(id="u"), None, lambda cid: calls.append(cid) or None)
+    cid = uuid.uuid4()
+    assert ctx.role_for(str(cid)) is None
+    assert ctx.role_for(cid) is None  # None cached, same key for str and UUID
+    assert len(calls) == 1

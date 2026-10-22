@@ -20,10 +20,12 @@ def _visible_predicate(user_id: str):
 
 
 def my_courses(user_id: str, *, as_: Literal["teaching", "learning", "all"] = "all") -> Select:
-    """Rows of (Course, my_role, owner_display_name, owner_email)."""
+    """Rows of (Course, my_role, owner_display_name[, owner_email only when as_ == "teaching"])."""
+    cols = [Course, Enrollment.role.label("my_role"), User.display_name.label("owner_display_name")]
+    if as_ == "teaching":
+        cols.append(User.email.label("owner_email"))
     stmt = (
-        select(Course, Enrollment.role.label("my_role"), User.display_name.label("owner_display_name"),
-               User.email.label("owner_email"))
+        select(*cols)
         .join(Enrollment, and_(Enrollment.course_id == Course.id))
         .join(User, User.id == Course.owner_id)
         .where(_visible_predicate(user_id))

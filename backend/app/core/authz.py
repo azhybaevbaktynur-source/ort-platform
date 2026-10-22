@@ -1,6 +1,8 @@
 """Authorization scaffolding. Phase 1 plugs in role resolution from enrollments."""
 from __future__ import annotations
 
+import uuid
+
 from typing import Callable, Iterable, Optional
 
 from fastapi import Depends
@@ -91,6 +93,14 @@ def enrollment_role_resolver(db: Session, user_id: str) -> Callable:
     return resolve
 
 
+def _norm(course_id):
+    """Cache key: UUID where possible so str and UUID ids hit the same entry."""
+    try:
+        return uuid.UUID(str(course_id))
+    except ValueError:
+        return course_id
+
+
 class AuthzContext:
     def __init__(self, user, db: Session, role_resolver: Callable = _no_role, allow_platform_admin: bool = False):
         self.user = user
@@ -104,6 +114,7 @@ class AuthzContext:
         return bool(self.allow_platform_admin and getattr(self.user, "is_platform_admin", False))
 
     def role_for(self, course_id) -> Optional[str]:
+        course_id = _norm(course_id)
         if course_id not in self.enrollment_cache:
             self.enrollment_cache[course_id] = self.role_resolver(course_id)
         return self.enrollment_cache[course_id]
@@ -112,7 +123,8 @@ class AuthzContext:
         """Fill the role cache for several courses with one IN query."""
         from app.lms.enrollments.models import Enrollment
 
-        ids = [c for c in course_ids if c not in self.enrollment_cache]
+        ids = list(dict.fromkeys(_norm(c) for c in course_ids))
+        ids = [c for c in ids if c not in self.enrollment_cache]
         if not ids:
             return
         rows = self.db.execute(
