@@ -257,7 +257,7 @@ export type IssueCode =
   | "required" | "percentRange" | "decimalsRange" | "sdPositive" | "minMax" | "scaleOrder" | "tooMany" | "empty"
   | "keyRequired" | "keyTooLong" | "keyDuplicate" | "labelRequired" | "labelTooLong" | "bandsOrder" | "bandsLastZero"
   | "segmentsStart" | "segmentsEnd" | "segmentsGap" | "segmentRange" | "exponentPositive" | "rowsStart" | "rowRange"
-  | "rowsOverlap" | "rowsGap" | "rowsCoverage" | "negative";
+  | "rowsOverlap" | "rowsGap" | "rowsCoverage" | "negative" | "positive";
 
 export interface ParamIssue {
   block: IssueBlock;
@@ -352,7 +352,8 @@ function checkRows(p: LookupTableParams, out: ParamIssue[]) {
   const rows = p.rows ?? [];
   if (p.expected_possible !== null && p.expected_possible !== undefined) {
     if (!isNum(p.expected_possible)) out.push({ block: "expected_possible", code: "required" });
-    else if (p.expected_possible < 0) out.push({ block: "expected_possible", code: "negative" });
+    // the server rejects 0 (it would divide by zero when rescaling raw points)
+    else if (p.expected_possible <= 0) out.push({ block: "expected_possible", code: "positive" });
   }
   if (!rows.length) { out.push({ block: "rows", code: "empty" }); return; }
   if (rows.length > CAPS.rows) out.push({ block: "rows", code: "tooMany", max: CAPS.rows });

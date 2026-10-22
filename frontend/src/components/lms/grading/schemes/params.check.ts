@@ -106,6 +106,9 @@ ok(has(validateParams("lookup_table", lt([{ raw_from: 0, raw_to: 9, value: 60 },
 ok(has(validateParams("lookup_table", lt([{ raw_from: 0, raw_to: 5, value: 60 }, { raw_from: 9, raw_to: 20, value: 1 }])), "rows#2:rowsGap"), "lookup gap");
 ok(has(validateParams("lookup_table", lt([{ raw_from: 0, raw_to: 5, value: 60 }], 10)), "rows#1:rowsCoverage"), "lookup coverage");
 ok(has(validateParams("lookup_table", lt([{ raw_from: 0, raw_to: -1, value: 60 }])), "rows#1:rowRange"), "lookup from <= to");
+ok(has(validateParams("lookup_table", lt([{ raw_from: 0, raw_to: 9, value: 60 }], 0)), "expected_possible:positive"), "lookup expected_possible 0 rejected");
+ok(has(validateParams("lookup_table", lt([{ raw_from: 0, raw_to: 9, value: 60 }], -3)), "expected_possible:positive"), "lookup expected_possible negative rejected");
+ok(!validateParams("lookup_table", lt([{ raw_from: 0, raw_to: 9, value: 60 }], 9)).some((x) => x.block === "expected_possible"), "lookup expected_possible > 0 ok");
 
 // CSV
 const csv = parseLookupCsv("raw_from,raw_to,value,label\n0,9,60\n10;20;100;top\n\nx,1,2\n21\t30\t150\n");

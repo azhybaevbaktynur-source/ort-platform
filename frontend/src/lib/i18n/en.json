@@ -1957,7 +1957,8 @@
       "rowsOverlap": "overlaps the previous row or is out of order",
       "rowsGap": "leaves a gap after the previous row",
       "rowsCoverage": "the rows must reach the expected maximum",
-      "negative": "must not be negative"
+      "negative": "must not be negative",
+      "positive": "must be greater than 0"
     }
   }
 }
