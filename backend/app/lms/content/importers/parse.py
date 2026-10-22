@@ -13,11 +13,19 @@ from .schemas import ImportOptions
 
 
 def _parse_plain_csv(raw: bytes, filename: str, opts: ImportOptions, issues: Issues) -> list[ParsedBundle]:
+    if len(raw) > settings.IMPORT_MAX_CSV_BYTES:
+        mb = settings.IMPORT_MAX_CSV_BYTES // (1024 * 1024)
+        issues.error("csv_too_large", f"The CSV is larger than {mb} MB.", file=filename, params={"limit_mb": mb})
+        return []
     text = decode_bytes(raw, lenient=True)
     try:
-        rows, header = read_plain_csv(text or "")
+        rows, header, truncated = read_plain_csv(text or "", settings.IMPORT_MAX_ROWS)
     except Exception as e:  # csv.Error and friends
         issues.error("csv_unreadable", f"CSV file parsing failed: {e}", file=filename)
+        return []
+    del text
+    if truncated:
+        issues.too_many_rows()
         return []
     if opts.allowed_languages is not None and opts.language not in opts.allowed_languages:
         issues.error("language_not_in_course", f"Language '{opts.language}' is not enabled for this course.",
@@ -30,7 +38,7 @@ def _parse_plain_csv(raw: bytes, filename: str, opts: ImportOptions, issues: Iss
     for n, rec in enumerate(rows, start=1):
         item, errs, image_value = parse_row(rec, n, opts.language, opts.ort)
         for e in errs:
-            issues.errors.append(e.model_copy(update={"file": bundle.questions_path}))
+            issues.add_error(e.model_copy(update={"file": bundle.questions_path}))
         if image_value:
             if is_external_image(image_value):
                 issues.error("image_external_url",
@@ -76,4 +84,5 @@ def parse_upload(raw: bytes, filename: str, opts: Optional[ImportOptions] = None
     if opts.target_bank_id and not (len(bundles) == 1 and not bundles[0].has_manifest):
         issues.error("target_bank_not_allowed",
                      "target_bank_id is allowed only for a plain CSV or a zip with exactly one manifest-less bundle.")
+    issues.finalize()
     return up

@@ -93,6 +93,12 @@ class Settings(BaseSettings):
     IMPORT_MAX_ZIP_ENTRIES: int = 5000
     IMPORT_MAX_ROWS: int = 5000
     IMPORT_MAX_IMAGES: int = 1000
+    IMPORT_MAX_CSV_BYTES: int = 32 * 1024 * 1024
+    IMPORT_MAX_MANIFEST_BYTES: int = 5 * 1024 * 1024
+    IMPORT_MAX_ISSUES: int = 200
+    IMPORT_MAX_CONCURRENT: int = 1
+    ASSET_ORPHAN_MIN_AGE_SECONDS: int = 3600
+    ASSET_ORPHAN_SWEEP_INTERVAL_SECONDS: int = 3600
     CONTENT_IMPORT_RATE_PER_HOUR: int = 60
 
     # Password hashing cost (bcrypt). 10 is OWASP's minimum and ~4x faster than 12 on small servers.

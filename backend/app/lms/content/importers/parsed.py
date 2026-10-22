@@ -4,23 +4,55 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from app.core.config import settings
+
 from .schemas import ImportIssue
 
 
 class Issues:
+    """Collected issues, capped (settings.IMPORT_MAX_ISSUES each for errors and warnings).
+
+    `n_errors` / `n_warnings` are the true counts; `finalize()` adds one `too_many_issues` entry with them."""
+
     def __init__(self) -> None:
         self.errors: list[ImportIssue] = []
         self.warnings: list[ImportIssue] = []
+        self.n_errors = 0
+        self.n_warnings = 0
+
+    def add_error(self, issue: ImportIssue) -> ImportIssue:
+        self.n_errors += 1
+        if len(self.errors) < settings.IMPORT_MAX_ISSUES:
+            self.errors.append(issue)
+        return issue
+
+    def add_warning(self, issue: ImportIssue) -> ImportIssue:
+        self.n_warnings += 1
+        if len(self.warnings) < settings.IMPORT_MAX_ISSUES:
+            self.warnings.append(issue)
+        return issue
 
     def error(self, code: str, message: str, **kw: Any) -> ImportIssue:
-        issue = ImportIssue(severity="error", code=code, message=message, **kw)
-        self.errors.append(issue)
-        return issue
+        return self.add_error(ImportIssue(severity="error", code=code, message=message, **kw))
 
     def warning(self, code: str, message: str, **kw: Any) -> ImportIssue:
-        issue = ImportIssue(severity="warning", code=code, message=message, **kw)
-        self.warnings.append(issue)
-        return issue
+        return self.add_warning(ImportIssue(severity="warning", code=code, message=message, **kw))
+
+    def too_many_rows(self, **kw: Any) -> ImportIssue:
+        cap = settings.IMPORT_MAX_ROWS
+        return self.error("too_many_rows", f"The upload has more than {cap} rows; the limit is {cap}.",
+                          params={"limit": cap, "got": cap + 1, "truncated": True}, **kw)
+
+    def finalize(self) -> None:
+        """Add (or refresh) the single `too_many_issues` marker when something was dropped."""
+        cap = settings.IMPORT_MAX_ISSUES
+        for lst, total, sev in ((self.errors, self.n_errors, "error"), (self.warnings, self.n_warnings, "warning")):
+            lst[:] = [i for i in lst if i.code != "too_many_issues"]
+            if total > cap:
+                lst.append(ImportIssue(
+                    severity=sev, code="too_many_issues",
+                    message=f"Only the first {cap} {sev}s are shown ({total} in total).",
+                    params={"shown": cap, "errors_total": self.n_errors, "warnings_total": self.n_warnings}))
 
 
 @dataclass

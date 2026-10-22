@@ -311,8 +311,7 @@ def test_language_not_in_course_and_target_bank():
 
 
 def test_pixel_cap(monkeypatch):
-    from app.lms.content.importers import bundle
-    monkeypatch.setattr(bundle, "MAX_IMAGE_PIXELS", 100)
+    monkeypatch.setattr(settings, "ASSET_MAX_PIXELS", 100)
     files = fixture_files()
     del files["manifest.json"]
     up = parse(files)

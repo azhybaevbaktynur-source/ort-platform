@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
+import threading
+import time
 import uuid
 from typing import Iterable, Optional
 
@@ -18,6 +21,9 @@ from app.lms.files.images import EncodedImage, encode_image
 from app.lms.files.models import Asset, AssetBlob
 from app.lms.files.storage import blob_key, get_blob_storage
 from app.models.user import User
+
+
+log = logging.getLogger(__name__)
 
 
 class ImageInvalid(LMSError):
@@ -79,6 +85,81 @@ def _check_global_db_cap(db: Session, key: str, add: int) -> None:
         raise StorageFull("Server image storage is full")
 
 
+def check_import_caps(db: Session, owner_id: str, new_blobs: dict[str, int], new_assets_bytes: int) -> None:
+    """Summed cap check for an import, BEFORE any blob is written (two aggregate queries in total).
+
+    `new_blobs`: storage key -> size of every blob the import would add; `new_assets_bytes`: bytes of all assets
+    it would create (counts against the owner's quota)."""
+    if new_assets_bytes <= 0:
+        return
+    if _used_bytes(db, owner_id) + new_assets_bytes > settings.ASSET_QUOTA_BYTES_PER_USER:
+        raise Conflict("Storage quota exceeded", code="storage_quota_exceeded")
+    if settings.LMS_STORAGE_DRIVER.lower() != "db" or not new_blobs:
+        return
+    keys = list(new_blobs)
+    present: set[str] = set()
+    for i in range(0, len(keys), 500):
+        present.update(db.scalars(select(AssetBlob.key).where(AssetBlob.key.in_(keys[i:i + 500]))))
+    add = sum(size for k, size in new_blobs.items() if k not in present)
+    total = int(db.scalar(select(func.coalesce(func.sum(AssetBlob.size), 0))) or 0)
+    if total + add > settings.ASSET_DB_MAX_TOTAL_BYTES:
+        raise StorageFull("Server image storage is full")
+
+
+def delete_unreferenced_blobs(db: Session, keys: Iterable[str]) -> int:
+    """Best effort: delete blobs (written by a failed import) that no asset row references. Never raises."""
+    keys = list(dict.fromkeys(keys))
+    removed = 0
+    try:
+        storage = get_blob_storage()
+        for i in range(0, len(keys), 500):
+            chunk = keys[i:i + 500]
+            used = set(db.scalars(select(Asset.storage_key).where(Asset.storage_key.in_(chunk))))
+            for k in chunk:
+                if k not in used:
+                    storage.delete(k)
+                    removed += 1
+    except Exception:
+        log.exception("could not clean up blobs of a failed import")
+    return removed
+
+
+_sweep_lock = threading.Lock()
+_last_sweep = 0.0
+_SWEEP_BATCH = 20000
+
+
+def sweep_orphan_blobs(db: Session, *, min_age_seconds: Optional[int] = None) -> int:
+    """Delete stored blobs older than the age limit that no `assets` row references (db and local drivers;
+    r2 is skipped). Returns the number removed."""
+    age = settings.ASSET_ORPHAN_MIN_AGE_SECONDS if min_age_seconds is None else min_age_seconds
+    storage = get_blob_storage()
+    removed = 0
+    keys = list(storage.old_keys(time.time() - age, _SWEEP_BATCH))
+    for i in range(0, len(keys), 500):
+        chunk = keys[i:i + 500]
+        used = set(db.scalars(select(Asset.storage_key).where(Asset.storage_key.in_(chunk))))
+        for k in chunk:
+            if k not in used:
+                storage.delete(k)
+                removed += 1
+    return removed
+
+
+def maybe_sweep_orphans(db: Session) -> None:
+    """At most once per interval per process; called lazily from upload/import paths. Never raises."""
+    global _last_sweep
+    now = time.monotonic()
+    with _sweep_lock:
+        if _last_sweep and now - _last_sweep < settings.ASSET_ORPHAN_SWEEP_INTERVAL_SECONDS:
+            return
+        _last_sweep = now
+    try:
+        sweep_orphan_blobs(db)
+    except Exception:
+        log.exception("orphan blob sweep failed")
+
+
 def _find(db: Session, owner_id: str, source_sha: str, visibility: str) -> Optional[Asset]:
     return db.execute(
         select(Asset).where(Asset.owner_id == owner_id, Asset.source_sha256 == source_sha,
@@ -88,18 +169,21 @@ def _find(db: Session, owner_id: str, source_sha: str, visibility: str) -> Optio
 
 def ingest_image(db: Session, actor: User, raw: bytes, *, course_id, visibility: str = "public",
                  filename: Optional[str] = None, max_bytes: Optional[int] = None,
-                 encoded: Optional[EncodedImage] = None) -> tuple[Asset, bool]:
+                 encoded: Optional[EncodedImage] = None, precheck_done: bool = False) -> tuple[Asset, bool]:
     """Returns (asset, deduplicated). Does NOT commit.
 
     The blob is written (own connection) before the first session write. When `encoded` is given the
-    caller has already stored the blob."""
+    caller has already stored the blob. `precheck_done`: the caller already checked quota / caps for a whole
+    batch and knows no asset exists for this source (importer); skips the per-image queries."""
     if visibility not in ("public", "private"):
         raise ValidationFailed("visibility must be public or private")
     if max_bytes is None:
         max_bytes = settings.ASSET_MAX_UPLOAD_BYTES
     source_sha = encoded.source_sha256 if encoded is not None else hashlib.sha256(raw).hexdigest()
 
-    existing = _find(db, actor.id, source_sha, visibility)
+    if not precheck_done:
+        maybe_sweep_orphans(db)
+    existing = None if precheck_done else _find(db, actor.id, source_sha, visibility)
     if existing is not None:
         if existing.deleted_at is not None:
             existing.restore()  # its bytes were never released from the quota
@@ -108,7 +192,7 @@ def ingest_image(db: Session, actor: User, raw: bytes, *, course_id, visibility:
 
     if visibility == "private" and settings.LMS_STORAGE_DRIVER.lower() == "r2" and not settings.R2_PRIVATE_BUCKET:
         raise Conflict("Private storage is not configured", code="private_storage_unavailable")
-    if _used_bytes(db, actor.id) >= settings.ASSET_QUOTA_BYTES_PER_USER:
+    if not precheck_done and _used_bytes(db, actor.id) >= settings.ASSET_QUOTA_BYTES_PER_USER:
         raise Conflict("Storage quota exceeded", code="storage_quota_exceeded")
     caller_stored = encoded is not None
     if encoded is None:
@@ -117,7 +201,8 @@ def ingest_image(db: Session, actor: User, raw: bytes, *, course_id, visibility:
         except ValueError as e:
             raise_for_encode_error(e)
     key = blob_key(encoded.sha256, visibility)
-    _check_user_quota(db, actor.id, len(encoded.data))
+    if not precheck_done:
+        _check_user_quota(db, actor.id, len(encoded.data))
     if not caller_stored:
         _check_global_db_cap(db, key, len(encoded.data))
         get_blob_storage().put(key, encoded.data, "image/webp")

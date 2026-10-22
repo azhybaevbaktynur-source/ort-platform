@@ -12,9 +12,10 @@ import posixpath
 import re
 from typing import Any, Optional
 
+from app.core.config import settings
 from app.lms.core.types import SUPPORTED_LANGUAGES
 
-from .ort_csv import BUNDLE_COLUMNS, decode_bytes, parse_row
+from .ort_csv import BUNDLE_COLUMNS, decode_bytes, parse_row, read_records
 from .parsed import Issues, ParsedBundle, ParsedImage, ParsedPassage
 from .schemas import ImportOptions
 from .zipsafe import BundleError, SafeZip
@@ -22,7 +23,6 @@ from .zipsafe import BundleError, SafeZip
 BUNDLE_FORMAT = "ort-question-bundle"
 BUNDLE_FORMAT_VERSION = 1
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
-MAX_IMAGE_PIXELS = 40_000_000
 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp", ".gif")
 ACCEPTED_FORMATS = {"PNG", "JPEG", "WEBP", "GIF"}
 
@@ -40,8 +40,10 @@ def display_root(root: str) -> str:
 
 
 def csv_header(data: bytes) -> Optional[list[str]]:
-    text = decode_bytes(data, lenient=False)
-    if text is None:
+    """Header of a (possibly truncated) CSV prefix; only the first record is read."""
+    try:
+        text = data.decode("utf-8-sig", errors="ignore")
+    except Exception:
         return None
     try:
         return next(csv.reader(io.StringIO(text, newline="")), None)
@@ -65,11 +67,17 @@ def find_bundles(zf: SafeZip, issues: Issues, opts: ImportOptions) -> list[tuple
     for path in sorted(p for p in zf.entries if posixpath.basename(p) == "manifest.json"):
         root = posixpath.dirname(path)
         bd = display_root(root)
+        if zf.entries[path].file_size > settings.IMPORT_MAX_MANIFEST_BYTES:
+            issues.error("manifest_invalid", "manifest.json is too large.", bundle=bd, file=path,
+                         params={"limit_mb": settings.IMPORT_MAX_MANIFEST_BYTES // (1024 * 1024)})
+            continue
         try:
             manifest = json.loads(decode_bytes(zf.read(path), lenient=False) or "")
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, RecursionError):
             issues.error("manifest_invalid_json", "manifest.json is not valid JSON.", bundle=bd, file=path)
             continue
+        finally:
+            zf.drop(path)
         if not isinstance(manifest, dict) or manifest.get("format") != BUNDLE_FORMAT:
             continue
         version = manifest.get("format_version")
@@ -81,6 +89,9 @@ def find_bundles(zf: SafeZip, issues: Issues, opts: ImportOptions) -> list[tuple
                          f"Bundle format_version {version} is newer than this platform supports "
                          f"(max {BUNDLE_FORMAT_VERSION}). Update the platform or re-export the bundle.",
                          bundle=bd, file=path, params={"version": version, "supported": BUNDLE_FORMAT_VERSION})
+            continue
+        if isinstance(manifest.get("questions"), list) and len(manifest["questions"]) > settings.IMPORT_MAX_ROWS:
+            issues.too_many_rows(bundle=bd, file=path)
             continue
         source_id = manifest.get("source_id")
         if not isinstance(source_id, str) or not source_id.strip():
@@ -121,7 +132,7 @@ def find_bundles(zf: SafeZip, issues: Issues, opts: ImportOptions) -> list[tuple
     # Fallback: every folder with a CSV whose header is exactly the 15 columns.
     by_folder: dict[str, list[str]] = {}
     for path in sorted(zf.entries):
-        if path.lower().endswith(".csv") and csv_header(zf.read(path)) == BUNDLE_COLUMNS:
+        if path.lower().endswith(".csv") and csv_header(zf.read_prefix(path, 64 * 1024)) == BUNDLE_COLUMNS:
             by_folder.setdefault(posixpath.dirname(path), []).append(path)
     for root, paths in by_folder.items():
         if len(paths) > 1:
@@ -155,6 +166,7 @@ def check_image(zf: SafeZip, path: str, manifest_images: dict[str, dict], issues
                      file=path, params={"limit_mb": MAX_IMAGE_BYTES // (1024 * 1024)}, **ctx)
     else:
         content = zf.read(path)
+        zf.drop(path)
         sha = hashlib.sha256(content).hexdigest()
         expected = (manifest_images.get(posixpath.basename(path)) or {}).get("sha256")
         if expected and str(expected).lower() != sha:
@@ -167,14 +179,14 @@ def check_image(zf: SafeZip, path: str, manifest_images: dict[str, dict], issues
                 from PIL import Image
                 with Image.open(io.BytesIO(content)) as img:
                     fmt, (w, h) = img.format, img.size
-                    if fmt in ACCEPTED_FORMATS and w * h <= MAX_IMAGE_PIXELS:
+                    if fmt in ACCEPTED_FORMATS and w * h <= settings.ASSET_MAX_PIXELS:
                         img.verify()
             except Exception:
                 fmt = None
             if fmt not in ACCEPTED_FORMATS:
                 issues.error("image_invalid", f"'{path}' is not a readable PNG, JPEG, GIF or WebP image.", file=path, **ctx)
-            elif w * h > MAX_IMAGE_PIXELS:
-                issues.error("image_too_many_pixels", f"Image '{path}' has more than {MAX_IMAGE_PIXELS // 1_000_000} megapixels.",
+            elif w * h > settings.ASSET_MAX_PIXELS:
+                issues.error("image_too_many_pixels", f"Image '{path}' has more than {settings.ASSET_MAX_PIXELS // 1_000_000} megapixels.",
                              file=path, params={"width": w, "height": h}, **ctx)
             else:
                 result = ParsedImage(path=path, source_sha256=sha, content=content, format=fmt, width=w, height=h)
@@ -205,7 +217,11 @@ def resolve_image(zf: SafeZip, root: str, images_dir: Optional[str], base: str, 
                      column="image_url", params={"image": base}, **ctx)
         return None
     if len(matches) > 1:
-        digests = {hashlib.sha256(zf.read(m)).hexdigest() for m in matches if zf.entries[m].file_size <= MAX_IMAGE_BYTES}
+        digests = set()
+        for m in matches:
+            if zf.entries[m].file_size <= MAX_IMAGE_BYTES:
+                digests.add(hashlib.sha256(zf.read(m)).hexdigest())
+                zf.drop(m)
         if len(digests) > 1:
             issues.error("image_ambiguous", f"Several different files are named '{base}' ({', '.join(matches)}).",
                          column="image_url", params={"image": base, "files": matches}, **ctx)
@@ -216,23 +232,35 @@ def resolve_image(zf: SafeZip, root: str, images_dir: Optional[str], base: str, 
 # ----- parsing --------------------------------------------------------------------------------
 
 def parse_bundle(zf: SafeZip, bundle: ParsedBundle, manifest: Optional[dict], issues: Issues, opts: ImportOptions,
-                 used_images: set[str], image_cache: dict[str, Optional[ParsedImage]]) -> None:
+                 used_images: set[str], image_cache: dict[str, Optional[ParsedImage]], row_limit: Optional[int] = None) -> bool:
+    """Returns False when the upload-wide row limit was hit (the caller stops)."""
     broot = display_root(bundle.root)
     qfile = bundle.questions_path
+    if zf.entries[qfile].file_size > settings.IMPORT_MAX_CSV_BYTES:
+        mb = settings.IMPORT_MAX_CSV_BYTES // (1024 * 1024)
+        issues.error("csv_too_large", f"The questions CSV is larger than {mb} MB.", bundle=broot, file=qfile,
+                     params={"limit_mb": mb})
+        return True
     text = decode_bytes(zf.read(qfile), lenient=False)
+    zf.drop(qfile)
     if text is None:
         issues.error("csv_not_utf8", "The questions CSV is not UTF-8 text.", bundle=broot, file=qfile)
-        return
+        return True
+    limit = settings.IMPORT_MAX_ROWS if row_limit is None else row_limit
     try:
-        records = list(csv.reader(io.StringIO(text, newline="")))
+        header, data_rows, truncated = read_records(text, limit, plain=False)
     except csv.Error as e:
         issues.error("csv_unreadable", f"The questions CSV could not be parsed ({e}).", bundle=broot, file=qfile)
-        return
-    if not records or records[0] != BUNDLE_COLUMNS:
+        return True
+    del text
+    if header != BUNDLE_COLUMNS:
+        got = [str(c)[:40] for c in (header or [])[:20]]
         issues.error("csv_header_mismatch", "The questions CSV header must be exactly: " + ",".join(BUNDLE_COLUMNS),
-                     bundle=broot, file=qfile, params={"expected": BUNDLE_COLUMNS, "got": records[0] if records else []})
-        return
-    data_rows = [r for r in records[1:] if r]
+                     bundle=broot, file=qfile, params={"expected": BUNDLE_COLUMNS, "got": got})
+        return True
+    if truncated:
+        issues.too_many_rows(bundle=broot, file=qfile)
+        return False
 
     m_questions: dict[int, dict] = {}
     m_images: dict[str, dict] = {}
@@ -261,7 +289,7 @@ def parse_bundle(zf: SafeZip, bundle: ParsedBundle, manifest: Optional[dict], is
         raw = dict(zip(BUNDLE_COLUMNS, record))
         item, row_errors, image_value = parse_row(raw, n, bundle.language, opts.ort)
         for err in row_errors:
-            issues.errors.append(err.model_copy(update={"bundle": broot, "file": qfile}))
+            issues.add_error(err.model_copy(update={"bundle": broot, "file": qfile}))
 
         ext_id: Optional[str] = None
         if manifest is not None:
@@ -324,6 +352,7 @@ def parse_bundle(zf: SafeZip, bundle: ParsedBundle, manifest: Optional[dict], is
                     passage_index[key] = p
                     bundle.passages.append(p)
             bundle.items.append(item)
+    return True
 
 
 def parse_zip(data: bytes, opts: ImportOptions, issues: Issues) -> list[ParsedBundle]:
@@ -332,8 +361,12 @@ def parse_zip(data: bytes, opts: ImportOptions, issues: Issues) -> list[ParsedBu
         found = find_bundles(zf, issues, opts)
         used: set[str] = set()
         cache: dict[str, Optional[ParsedImage]] = {}
+        rows_left = settings.IMPORT_MAX_ROWS
         for bundle, manifest in found:
-            parse_bundle(zf, bundle, manifest, issues, opts, used, cache)
+            ok = parse_bundle(zf, bundle, manifest, issues, opts, used, cache, rows_left)
+            rows_left -= len(bundle.items)
+            if not ok:
+                break
     except BundleError as e:
         issues.error(e.code, e.message, params=e.params)
         return []

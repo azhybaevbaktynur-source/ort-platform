@@ -89,20 +89,55 @@ def decode_bytes(data: bytes, *, lenient: bool) -> Optional[str]:
         return data.decode("latin-1") if lenient else None
 
 
-def read_plain_csv(text: str) -> tuple[list[dict], list[str]]:
-    """Header-normalised dict rows. Returns (rows, normalised header). Blank lines skipped, ragged rows padded/truncated."""
-    records = list(csv.reader(io.StringIO(text, newline="")))
-    if not records:
-        return [], []
-    header = [str(c).strip().lower().replace(" ", "_").replace("-", "_") for c in records[0]]
+def read_records(text: str, cap: int, *, plain: bool) -> tuple[list[list[str]], list[str], bool]:
+    """Lazily read CSV records. Returns (header, data records without blank ones, truncated).
+
+    Stops (truncated=True) at cap+1 non-blank data rows or when more than 2*cap+1 records were scanned, so a
+    file of millions of blank lines or junk rows never gets materialised. `plain` treats whitespace-only
+    records as blank too."""
+    reader = csv.reader(io.StringIO(text, newline=""))
+    header = next(reader, None)
+    if header is None:
+        return [], [], False
+    out: list[list[str]] = []
+    scanned = 0
+    for rec in reader:
+        scanned += 1
+        if scanned > 2 * cap + 1:
+            return header, out, True
+        if not rec or (plain and all(not c.strip() for c in rec)):
+            continue
+        out.append(rec)
+        if len(out) > cap:
+            return header, out, True
+    return header, out, False
+
+
+def read_plain_csv(text: str, cap: int) -> tuple[list[dict], list[str], bool]:
+    """Header-normalised dict rows. Returns (rows, normalised header, truncated). Blank lines skipped,
+    ragged rows padded/truncated; stops after cap+1 rows."""
+    raw_header, records, truncated = read_records(text, cap, plain=True)
+    if not raw_header:
+        return [], [], False
+    header = [str(c).strip().lower().replace(" ", "_").replace("-", "_") for c in raw_header]
     drop = {"id", "question_id", "questionid", "question_no", "no", "language", "lang", "usage_type", "usagetype"}
     rows: list[dict] = []
-    for rec in records[1:]:
-        if not rec or all(not c.strip() for c in rec):
-            continue
+    for rec in records:
         rec = (rec + [""] * len(header))[: len(header)]
         rows.append({h: v for h, v in zip(header, rec) if h not in drop})
-    return rows, header
+    return rows, header, truncated
+
+
+def _clean_import_tags(value: str) -> list[str]:
+    """Same cleaning as the content service (40 chars each, at most 20); extra tags are dropped, never an error."""
+    from app.lms.content.service import _clean_tags
+
+    parts = [t.strip() for t in value.split(",") if t.strip()][:200]
+    try:
+        cleaned = _clean_tags(parts[:20])
+    except Exception:
+        cleaned = []
+    return cleaned
 
 
 def _issue(code: str, message: str, row: int, column: Optional[str] = None, **kw: Any) -> ImportIssue:
@@ -183,7 +218,7 @@ def parse_row(raw: dict, row: int, language: str, ort: bool) -> tuple[Optional[P
     passage = g("passage_text") or None
     explanation = g("explanation") or None
     topic = g("topic") or ("Салыштыруу" if is_comparison else "General")
-    tags = [t.strip() for t in g("tags").split(",") if t.strip()]
+    tags = _clean_import_tags(g("tags"))
 
     try:
         stem = clean_text(stem, STEM_MAX)

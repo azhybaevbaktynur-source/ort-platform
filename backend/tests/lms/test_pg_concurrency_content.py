@@ -306,6 +306,7 @@ def test_import_parallel_commits_of_same_bundle_one_bank_no_duplicates(pg, monke
 
     monkeypatch.setattr(settings, "LMS_STORAGE_DRIVER", "local")
     monkeypatch.setattr(settings, "LMS_LOCAL_STORAGE_DIR", str(tmp_path / "blobs"))
+    monkeypatch.setattr(settings, "IMPORT_MAX_CONCURRENT", 4)   # exercise the DB-level race, not the process slot
     storage.reset_blob_storage()
     media.reset_media_cache()
     Session, User, ids = _c4_world(pg)
@@ -333,5 +334,130 @@ def test_import_parallel_commits_of_same_bundle_one_bank_no_duplicates(pg, monke
     # a clean second pass after the race changes nothing
     again = _c4_call(Session, User, ids, lambda s, ctx, c: import_svc.commit(s, ctx, c, raw, "t.zip", opts))
     assert again[0] == "ok" and sum(again[1].banks[0].unchanged.values()) == 150
+    storage.reset_blob_storage()
+    media.reset_media_cache()
+
+
+# ---------------------------------------------------------------- C5 review fixes
+
+def _fixture_zip_with_changed_row(index: int) -> tuple[bytes, bytes]:
+    import csv as _csv
+    import io as _io
+    import zipfile as _zip
+
+    path = os.path.join(os.path.dirname(__file__), "..", "fixtures", "bundles", "tsoomo19.zip")
+    raw = open(path, "rb").read()
+    with _zip.ZipFile(_io.BytesIO(raw)) as zf:
+        files = {i.filename: zf.read(i) for i in zf.infolist() if not i.is_dir()}
+    rows = list(_csv.DictReader(_io.StringIO(files["questions.csv"].decode("utf-8"), newline="")))
+    rows[index]["stem"] += " (source fix)"
+    out = _io.StringIO()
+    w = _csv.DictWriter(out, fieldnames=list(rows[0].keys()), lineterminator="\n")
+    w.writeheader()
+    w.writerows(rows)
+    files["questions.csv"] = out.getvalue().encode("utf-8")
+    buf = _io.BytesIO()
+    with _zip.ZipFile(buf, "w", _zip.ZIP_DEFLATED) as zf:
+        for n, d in files.items():
+            zf.writestr(n, d)
+    return raw, buf.getvalue()
+
+
+def test_import_racing_a_teacher_edit_never_overwrites_it(pg, monkeypatch, tmp_path):
+    import time
+
+    from app.lms.content.importers import ImportOptions
+    from app.lms.content.importers import service as import_svc
+    from app.lms.files import media
+
+    monkeypatch.setattr(settings, "LMS_STORAGE_DRIVER", "local")
+    monkeypatch.setattr(settings, "LMS_LOCAL_STORAGE_DIR", str(tmp_path / "blobs"))
+    storage.reset_blob_storage()
+    media.reset_media_cache()
+    Session, User, ids = _c4_world(pg)
+    original, fixed = _fixture_zip_with_changed_row(34)   # row 35 (math_2, single choice)
+    opts = ImportOptions(exam_type="full_main", language="ru", allowed_languages=["en", "ru", "ky"])
+    first = _c4_call(Session, User, ids, lambda s, ctx, c: import_svc.commit(s, ctx, c, original, "t.zip", opts))
+    assert first[0] == "ok" and first[1].ok
+    with Session() as s:
+        from app.lms.content.models import QuestionBank
+
+        q = s.scalars(select(BankQuestion).join(QuestionBank, QuestionBank.id == BankQuestion.bank_id).where(
+            QuestionBank.course_id == ids["course"], QuestionBank.source_id == "tsoomo19",
+            BankQuestion.position == 35)).one()
+        qid, v1 = q.id, q.current_version_id
+        data = s.get(QuestionVersion, v1).data
+
+    from app.lms.courses.models import Course
+
+    # teacher session: edit flushed (row lock held), not yet committed
+    t = Session()
+    user = t.get(User, ids["owner"])
+    ctx = AuthzContext(user, t, enrollment_role_resolver(t, user.id))
+    course = t.get(Course, ids["course"])
+    t.commit = lambda: None   # update_question commits at its end; keep the transaction (and the lock) open
+    content_svc.update_question(t, ctx, course, qid, QuestionUpdateIn(
+        base_version_id=v1, content=QuestionContentIn(type="single_choice", stem="Teacher edit", data=data)))
+
+    result = {}
+
+    def importer():
+        result["r"] = _c4_call(Session, User, ids, lambda s, ctx, c: import_svc.commit(s, ctx, c, fixed, "t.zip", opts))
+
+    th = threading.Thread(target=importer)
+    th.start()
+    time.sleep(1.5)
+    assert th.is_alive(), ("the import must wait for the teacher row lock", result)
+    del t.commit
+    t.commit()
+    t.close()
+    th.join(timeout=60)
+    kind, rep = result["r"]
+    assert kind == "ok" and rep.ok
+    assert sum(rep.banks[0].conflicts.values()) == 1
+    assert any(w.code == "question_edited_locally" for w in rep.warnings)
+    with Session() as s:
+        q = s.get(BankQuestion, qid)
+        cur = s.get(QuestionVersion, q.current_version_id)
+        assert cur.stem == "Teacher edit" and cur.version_no == 2 and cur.origin == "edit"
+    storage.reset_blob_storage()
+    media.reset_media_cache()
+
+
+def test_import_failure_leaves_zero_blobs_and_assets(pg, monkeypatch, tmp_path):
+    from app.lms.content.importers import ImportOptions
+    from app.lms.content.importers import service as import_svc
+    from app.lms.files import media
+
+    blobs = tmp_path / "blobs"
+    monkeypatch.setattr(settings, "LMS_STORAGE_DRIVER", "local")
+    monkeypatch.setattr(settings, "LMS_LOCAL_STORAGE_DIR", str(blobs))
+    storage.reset_blob_storage()
+    media.reset_media_cache()
+    Session, User, ids = _c4_world(pg)
+    raw = open(os.path.join(os.path.dirname(__file__), "..", "fixtures", "bundles", "tsoomo19.zip"), "rb").read()
+    opts = ImportOptions(exam_type="full_main", language="ru", allowed_languages=["en", "ru", "ky"])
+
+    def n_blobs():
+        return sum(len([f for f in fs if f.endswith(".webp")]) for _, _, fs in os.walk(blobs))
+
+    # quota failure: decided before any put
+    quota = settings.ASSET_QUOTA_BYTES_PER_USER
+    monkeypatch.setattr(settings, "ASSET_QUOTA_BYTES_PER_USER", 2000)
+    kind, rep = _c4_call(Session, User, ids, lambda s, ctx, c: import_svc.commit(s, ctx, c, raw, "t.zip", opts))
+    assert kind == "ok" and not rep.ok and [e.code for e in rep.errors] == ["storage_quota_exceeded"]
+    assert n_blobs() == 0
+    monkeypatch.setattr(settings, "ASSET_QUOTA_BYTES_PER_USER", quota)
+
+    # transaction failure after the puts: the new blobs are removed again
+    def boom(*a, **k):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(import_svc, "_process_bundle", boom)
+    with pytest.raises(RuntimeError):
+        _c4_call(Session, User, ids, lambda s, ctx, c: import_svc.commit(s, ctx, c, raw, "t.zip", opts))
+    assert n_blobs() == 0
+    with Session() as s:
+        assert s.scalar(select(func.count()).select_from(Asset).where(Asset.owner_id == ids["owner"])) == 0
     storage.reset_blob_storage()
     media.reset_media_cache()

@@ -13,11 +13,16 @@ from app.core.config import settings
 from app.lms.content.importers import ImportOptions, ImportReport
 from app.lms.content.importers import service as isvc
 from app.lms.core import ratelimit
-from app.lms.core.errors import ValidationFailed
+from app.lms.core.errors import LMSError, ValidationFailed
 from app.lms.core.types import SUPPORTED_LANGUAGES
 from app.lms.courses import service as course_svc
 
 router = APIRouter()
+
+
+class LengthRequired(LMSError):
+    status_code = 411
+    code = "length_required"
 
 _FORM_OPENAPI = {
     "requestBody": {"content": {"multipart/form-data": {"schema": {
@@ -75,10 +80,12 @@ def _options(form, commit: bool) -> ImportOptions:
 async def _handle(course_id: uuid.UUID, request: Request, ctx: AuthzContext, commit: bool) -> ImportReport:
     cap = settings.IMPORT_MAX_UPLOAD_BYTES
     cl = request.headers.get("content-length")
-    if cl and cl.isdigit() and int(cl) > cap + 64 * 1024:
+    if not cl or not cl.isdigit():
+        raise LengthRequired("Content-Length is required")
+    if int(cl) > cap + 64 * 1024:
         raise _too_large()
     course = await run_in_threadpool(_prepare, ctx, course_id)
-    form = await request.form()
+    form = await request.form(max_files=1, max_fields=8, max_part_size=1024)
     try:
         file = form.get("file")
         if not isinstance(file, UploadFile):
@@ -94,12 +101,13 @@ async def _handle(course_id: uuid.UUID, request: Request, ctx: AuthzContext, com
             if total > cap:
                 raise _too_large()
             chunks.append(chunk)
-        raw = b"".join(chunks)
+        holder = [b"".join(chunks)]   # the service pops it, so no reference outlives parsing
+        del chunks
         filename = file.filename or ""
     finally:
         await form.close()
     fn = isvc.commit if commit else isvc.preview
-    return await run_in_threadpool(fn, ctx.db, ctx, course, raw, filename, opts)
+    return await run_in_threadpool(fn, ctx.db, ctx, course, holder, filename, opts)
 
 
 @router.post("/{course_id}/imports/preview", response_model=ImportReport, openapi_extra=_FORM_OPENAPI)

@@ -7,9 +7,9 @@ import re
 import tempfile
 import threading
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Iterable, Optional
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
@@ -51,6 +51,13 @@ class BlobStorage(ABC):
     @abstractmethod
     def get(self, key: str) -> Optional[bytes]: ...
 
+    def delete(self, key: str) -> None:
+        """Remove a blob (orphan cleanup only). Drivers that cannot do it safely leave it (r2)."""
+
+    def old_keys(self, cutoff_ts: float, limit: int) -> Iterable[str]:
+        """Keys last written before `cutoff_ts` (epoch seconds), at most `limit`. Empty when unsupported (r2)."""
+        return ()
+
     def public_url(self, key: str) -> Optional[str]:
         """None => the backend serves it through /media."""
         return None
@@ -81,6 +88,10 @@ class LocalBlobStorage(BlobStorage):
     def put(self, key: str, data: bytes, mime: str) -> None:
         path = self._path(key)
         if os.path.exists(path):
+            try:
+                os.utime(path)  # a re-put refreshes the age so the orphan sweep leaves it alone
+            except OSError:
+                pass
             return
         os.makedirs(os.path.dirname(path), exist_ok=True)
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".tmp")
@@ -97,6 +108,40 @@ class LocalBlobStorage(BlobStorage):
 
     def exists(self, key: str) -> bool:
         return os.path.isfile(self._path(key))
+
+    def delete(self, key: str) -> None:
+        try:
+            os.unlink(self._path(key))
+        except FileNotFoundError:
+            pass
+
+    def old_keys(self, cutoff_ts: float, limit: int) -> Iterable[str]:
+        out: list[str] = []
+        for sub in ("img", "priv"):
+            d = os.path.join(self.root, sub)
+            try:
+                names = os.listdir(d)
+            except OSError:
+                continue
+            for name in names:
+                path = os.path.join(d, name)
+                try:
+                    old = os.path.getmtime(path) < cutoff_ts
+                except OSError:
+                    continue
+                if not old:
+                    continue
+                if name.endswith(".tmp"):  # abandoned partial write
+                    try:
+                        os.unlink(path)
+                    except OSError:
+                        pass
+                    continue
+                if _KEY_RE.match(f"{sub}/{name}"):
+                    out.append(f"{sub}/{name}")
+                    if len(out) >= limit:
+                        return out
+        return out
 
     def get(self, key: str) -> Optional[bytes]:
         try:
@@ -122,9 +167,21 @@ class DbBlobStorage(BlobStorage):
         ins = (pg_insert if engine.dialect.name == "postgresql" else sqlite_insert)(AssetBlob.__table__).values(
             key=key, sha256=key.rsplit("/", 1)[1][:-5], mime=mime, size=len(data), data=data,
             created_at=utcnow(),
-        ).on_conflict_do_nothing(index_elements=[AssetBlob.__table__.c.key])
+        ).on_conflict_do_update(index_elements=[AssetBlob.__table__.c.key], set_={"created_at": utcnow()})
         with engine.begin() as conn:
             conn.execute(ins)
+
+    def delete(self, key: str) -> None:
+        with self._engine().begin() as conn:
+            conn.execute(delete(AssetBlob.__table__).where(AssetBlob.__table__.c.key == _check_key(key)))
+
+    def old_keys(self, cutoff_ts: float, limit: int) -> Iterable[str]:
+        from datetime import datetime, timezone
+
+        t = AssetBlob.__table__
+        cutoff = datetime.fromtimestamp(cutoff_ts, tz=timezone.utc)
+        with self._engine().connect() as conn:
+            return [r[0] for r in conn.execute(select(t.c.key).where(t.c.created_at < cutoff).limit(limit))]
 
     def exists(self, key: str) -> bool:
         t = AssetBlob.__table__

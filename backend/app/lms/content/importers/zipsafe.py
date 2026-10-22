@@ -4,6 +4,7 @@ from __future__ import annotations
 import io
 import posixpath
 import re
+import struct
 import zipfile
 from typing import Any
 
@@ -26,6 +27,18 @@ def _mb(n: int) -> int:
     return n // (1024 * 1024)
 
 
+def _check_end_record(data: bytes, max_entries: int) -> None:
+    """Read the end-of-central-directory record BEFORE zipfile parses the directory, so a zip with millions of
+    entries is rejected without building them. Same lookup rule as zipfile (last EOCD signature in the tail)."""
+    tail_start = max(0, len(data) - (65535 + 22))
+    pos = data.rfind(b"PK\x05\x06", tail_start)
+    if pos < 0 or pos + 22 > len(data):
+        return  # let zipfile report the invalid archive
+    _, _, _, _, total, cd_size, _, _ = struct.unpack("<4s4H2LH", data[pos:pos + 22])
+    if total == 0xFFFF or cd_size == 0xFFFFFFFF or total > max_entries or cd_size > max_entries * 400:
+        raise BundleError("zip_too_many_files", f"The zip contains more than {max_entries} files.", limit=max_entries)
+
+
 class SafeZip:
     def __init__(self, data: bytes):
         max_up = settings.IMPORT_MAX_UPLOAD_BYTES
@@ -33,6 +46,7 @@ class SafeZip:
         max_entries = settings.IMPORT_MAX_ZIP_ENTRIES
         if len(data) > max_up:
             raise BundleError("zip_too_large", f"The zip is larger than {_mb(max_up)} MB.", limit_mb=_mb(max_up))
+        _check_end_record(data, max_entries)
         try:
             self._zf = zipfile.ZipFile(io.BytesIO(data))
             infos = self._zf.infolist()
@@ -73,6 +87,15 @@ class SafeZip:
                 raise BundleError("zip_invalid", f"Size mismatch for '{path}' in zip.", path=path)
             self._cache[path] = data
         return self._cache[path]
+
+    def read_prefix(self, path: str, n: int) -> bytes:
+        """First n bytes of an entry without caching it."""
+        info = self.entries[path]
+        try:
+            with self._zf.open(info) as f:
+                return f.read(n)
+        except (zipfile.BadZipFile, RuntimeError, OSError, NotImplementedError):
+            return b""
 
     def drop(self, path: str) -> None:
         self._cache.pop(path, None)
