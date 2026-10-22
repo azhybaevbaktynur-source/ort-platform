@@ -54,6 +54,8 @@ app = FastAPI(
 
 # Set CORS origins from environment variable list
 cors_origins = settings.ALLOWED_ORIGINS or settings.BACKEND_CORS_ORIGINS or ["*"]
+from app.lms.attempts.bodycap import BodyCapMiddleware
+app.add_middleware(BodyCapMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(
     CORSMiddleware,

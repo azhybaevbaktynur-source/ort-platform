@@ -20,7 +20,7 @@ from typing import Any, Optional
 from sqlalchemy import insert, select, update
 from sqlalchemy import null as sql_null
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from app.core.authz import A, AuthzContext, decide
 from app.core.config import settings
@@ -292,8 +292,8 @@ def results_available(assessment, attempt, now: datetime, *, staff: bool) -> boo
     if policy == "never":
         return False
     if policy == "after_close":
-        until = timing.as_utc(assessment.available_until)
-        return until is not None and now >= until
+        from app.lms.attempts import results as _results
+        return _results.after_close_open(object_session(attempt), assessment, now)
     return True
 
 
@@ -428,9 +428,16 @@ def submit(db: Session, user, attempt_id, data: SubmitIn, *, now: datetime) -> S
     plan = plan_for(db, attempt)
     sections = load_sections(db, attempt.id, refresh=True)
     lz = apply_lazy(db, attempt, sections, plan, now=now, env=env, commit=False)
+    if not can_access(attempt, env, A.ATTEMPT_READ_OWN):  # enrollment removed meanwhile (P3-30)
+        db.rollback()
+        raise attempt_not_found()
     already = False
     if not lz.finalized and attempt.status == "in_progress":
-        if data.answers and can_access(attempt, env, A.ATTEMPT_READ_OWN):
+        # Lock every item row once, ascending, before any item write: a concurrent autosave holds at most a lower
+        # item while waiting for nothing we hold, so the finalize pass below cannot form a lock cycle with it.
+        db.execute(select(AttemptItem.position).where(AttemptItem.attempt_id == attempt.id)
+                   .order_by(AttemptItem.position).with_for_update())
+        if data.answers:
             autosave.apply_entries_lenient(db, attempt, user.id, data.answers, now=now)
         reason = "manual" if timing.writable(attempt.deadline_at, now, settings.ATTEMPT_GRACE_S) else "timeout"
         outcome = grading_api().finalize(db, attempt.id, reason=reason, now=now)
@@ -542,8 +549,6 @@ def start_attempt(db: Session, ctx: AuthzContext, course: Course, aid, data: Sta
     Staff always get a preview attempt (P3-18). `version`/`fresh` serve the preview route of the builder."""
     user = ctx.user
     staff = ctx.role_for(course.id) in STAFF_ROLES
-    ratelimit.enforce(user.id, ratelimit.attempt_start_limit())
-
     assessment = _load_assessment(db, course, aid)
     if assessment is None or (not staff and (assessment.status != "published" or not assessment.published_version_id)):
         raise NotFound("Assessment not found", code="assessment_not_found")
@@ -561,13 +566,17 @@ def start_attempt(db: Session, ctx: AuthzContext, course: Course, aid, data: Sta
 
     rows = _attempt_rows(db, assessment.id, user.id)
     open_ = _existing_open(db, rows, staff)
+    if open_ is None:  # only creating an attempt counts against the start limit; resumes are free
+        ratelimit.enforce(user.id, ratelimit.attempt_start_limit())
     if open_ is not None:
         if not staff or (open_.assessment_version_id == version_id and not fresh):
             state = _resume(db, user, open_.id, now)
             if state is not None:
                 return state, False
             rows = _attempt_rows(db, assessment.id, user.id)  # lazily finalized: fall through to a fresh start
+            ratelimit.enforce(user.id, ratelimit.attempt_start_limit())
         else:
+            ratelimit.enforce(user.id, ratelimit.attempt_start_limit())
             db.execute(update(Attempt.__table__).where(Attempt.__table__.c.id == open_.id,
                                                        Attempt.__table__.c.status == "in_progress")
                        .values(status="void"))

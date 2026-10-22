@@ -712,13 +712,9 @@ def list_versions(db: Session, a: Assessment, *, cursor: Optional[str], limit: O
 
 # =========================================================================== student read model
 
-def _results_visible(a: Assessment, now: datetime) -> bool:
-    if a.results_policy == "after_submit":
-        return True
-    if a.results_policy == "after_close":
-        until = utc(a.available_until)
-        return until is not None and now >= until
-    return False
+def _results_visible(a: Assessment, now: datetime, db: Optional[Session] = None) -> bool:
+    from app.lms.attempts import results as attempt_results
+    return attempt_results.assessment_results_visible(db, a, now)
 
 
 def _total_limit(snapshot: dict) -> Optional[int]:
@@ -779,7 +775,7 @@ def list_student(db: Session, ctx: AuthzContext, course: Course, *, cursor: Opti
         used = sum(1 for r in atts if r[3] != "void")
         open_id = next((r[1] for r in atts if r[3] == "in_progress"), None)
         last = None
-        if _results_visible(a, now):
+        if _results_visible(a, now, db):
             done = [r for r in atts if r[3] in ("graded", "needs_review") and r[4] is not None]
             if done:
                 last = sch.LastResultOut(raw_score=float(done[-1][4]), points_possible=float(done[-1][5]))

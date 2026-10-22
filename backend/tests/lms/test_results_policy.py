@@ -1,5 +1,7 @@
 """Results policy matrix, key hiding (sentinels) and exact key sets of the student result/review routes."""
 import uuid
+
+from app.core.config import settings
 from datetime import timedelta
 
 import pytest
@@ -64,13 +66,16 @@ async def test_after_close_requires_window_end(db, api, monkeypatch):
     _submit(db, att)
     for what in ("result", "review"):
         assert (await _get(api, w.student, att, what)).status_code == 403
-    monkeypatch.setattr("app.lms.core.clock.now", lambda: until + timedelta(seconds=1))
+    grace = timedelta(seconds=settings.ATTEMPT_GRACE_S)
+    monkeypatch.setattr("app.lms.core.clock.now", lambda: until + timedelta(seconds=1))  # closed, inside grace
+    assert (await _get(api, w.student, att, "result")).status_code == 403
+    monkeypatch.setattr("app.lms.core.clock.now", lambda: until + grace + timedelta(seconds=1))
     for what in ("result", "review"):
         assert (await _get(api, w.student, att, what)).status_code == 200
-    # exactly at the close instant is visible, one second before is not
-    monkeypatch.setattr("app.lms.core.clock.now", lambda: until - timedelta(seconds=1))
+    # visible from close + grace, one second before is not
+    monkeypatch.setattr("app.lms.core.clock.now", lambda: until + grace - timedelta(seconds=1))
     assert (await _get(api, w.student, att, "result")).status_code == 403
-    monkeypatch.setattr("app.lms.core.clock.now", lambda: until)
+    monkeypatch.setattr("app.lms.core.clock.now", lambda: until + grace)
     assert (await _get(api, w.student, att, "result")).status_code == 200
 
 

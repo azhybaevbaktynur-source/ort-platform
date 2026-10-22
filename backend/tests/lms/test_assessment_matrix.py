@@ -1,6 +1,8 @@
 """Role x course-status matrix, tenant isolation and student-facing contracts of the assessment routes
 (design 7.8 assessment part, 7.3 lobby/list part)."""
 import json
+
+from app.core.config import settings
 import uuid
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -267,5 +269,5 @@ async def test_last_result_after_close(db, api, monkeypatch):
     make_attempt(db, a, v, w.S, items=0, status="graded", raw_score=2, points_possible=4)
     url = f"/courses/{w.cid}/assessments"
     assert (await api.call(w.S, "GET", url)).json()["items"][0]["last_result"] is None
-    monkeypatch.setattr(clock, "now", lambda: now + timedelta(hours=1, seconds=1))
+    monkeypatch.setattr(clock, "now", lambda: now + timedelta(hours=1, seconds=settings.ATTEMPT_GRACE_S + 1))
     assert (await api.call(w.S, "GET", url)).json()["items"][0]["last_result"] == {"raw_score": 2.0, "points_possible": 4.0}

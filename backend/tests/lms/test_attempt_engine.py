@@ -411,6 +411,6 @@ def test_submit_and_state_budgets_and_single_checkout(client, db):
             checkouts["n"] = 0
             r = client.post(f"/api/v1/attempts/{aid}/submit", json={"answers": [answer(2, "B", 2)]}, headers=h)
         assert r.status_code == 200 and checkouts["n"] == 1
-        assert c.n <= 12, "\n".join(s[:90] for s in c.statements)
+        assert c.n <= 13, "\n".join(s[:90] for s in c.statements)
     finally:
         event.remove(db_session.engine, "checkout", on_checkout)

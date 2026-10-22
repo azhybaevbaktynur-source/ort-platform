@@ -30,13 +30,13 @@ class AnswerIn(BaseModel):
 
 class AnswersIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    # The 20-entry cap is enforced by the service (422 too_many_answers), not here.
-    answers: list[AnswerIn]
+    # The 20-entry cap is enforced by the service (422 too_many_answers); max_length here only bounds parsing work.
+    answers: list[AnswerIn] = Field(max_length=200)
 
 
 class SubmitIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    answers: Optional[list[AnswerIn]] = None
+    answers: Optional[list[AnswerIn]] = Field(default=None, max_length=200)
 
 
 class AttemptSectionStateOut(BaseModel):

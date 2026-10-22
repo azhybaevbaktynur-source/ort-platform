@@ -170,9 +170,13 @@ def grade_items(plan, lang: str, rows: Iterable[Any]) -> GradeOutcome:
         if is_blank(qtype, r.response):
             corr, score = "unanswered", ZERO
         else:
-            sr = qtype.score(data, r.response, max_points)
-            corr = _correctness(sr, max_points)
-            score = None if corr == "pending" else _q2(sr.points if sr.points is not None else ZERO)
+            try:
+                sr = qtype.score(data, r.response, max_points)
+                corr = _correctness(sr, max_points)
+                score = None if corr == "pending" else _q2(sr.points if sr.points is not None else ZERO)
+            except (ArithmeticError, ValueError, KeyError, TypeError):
+                logger.warning("score() failed for attempt item position=%s slot=%s", r.position, r.slot)
+                corr, score = "incorrect", ZERO
         items.append(ItemGrade(int(r.position), corr, score, max_points, spos))
         entries.append((spos, max_points, corr, score))
     sections, raw, possible, pending = aggregate(plan, entries)

@@ -302,3 +302,51 @@ def test_parallel_lazy_advance_and_expiry_are_consistent(setup_db, Session, froz
     assert set(out) <= {"graded", "needs_review"}
     setup_db.expire_all()
     assert setup_db.get(Attempt, uuid.UUID(attempt_id)).submit_reason == "timeout"
+
+
+def test_submit_vs_autosave_no_deadlock(setup_db, Session):
+    """Review fix 1: submit locks every item ascending before writing, so an autosave holding a lower item and
+    wanting a higher one cannot form a cycle with the submit's final-answer writes."""
+    import time
+
+    q = make_quiz(setup_db, sections=[("a", 10, None)])
+    uid, cid, aid = q.student.id, q.course.id, q.assessment.id
+    attempt_id, _ = start_as(Session, uid, cid, aid)
+    att = uuid.UUID(attempt_id)
+    res = {}
+    locked7 = threading.Event()
+
+    def autosaver():
+        s = Session()
+        try:
+            now = clock.now()
+            autosave._fast(s, att, uid, [AnswerIn(position=7, response={"choice_id": "A"}, client_ts=10)], now)
+            locked7.set()
+            time.sleep(1.0)  # submit is now waiting on item 7 (or already holds 1..10 behind it)
+            autosave._fast(s, att, uid, [AnswerIn(position=9, response={"choice_id": "A"}, client_ts=10)], now)
+            s.commit()
+            res["A"] = "ok"
+        except Exception as e:  # noqa: BLE001
+            s.rollback()
+            res["A"] = repr(e)
+        finally:
+            s.close()
+
+    def submitter():
+        locked7.wait()
+        try:
+            out = submit_as(Session, uid, attempt_id, [
+                AnswerIn(position=5, response={"choice_id": "B"}, client_ts=11),
+                AnswerIn(position=9, response={"choice_id": "B"}, client_ts=11)])
+            res["B"] = out.status
+        except Exception as e:  # noqa: BLE001
+            res["B"] = repr(e)
+
+    ts = [threading.Thread(target=autosaver), threading.Thread(target=submitter)]
+    for t in ts:
+        t.start()
+    for t in ts:
+        t.join(30)
+    assert res.get("A") == "ok", res
+    assert res.get("B") in ("graded", "needs_review"), res
+    assert "Deadlock" not in repr(res)

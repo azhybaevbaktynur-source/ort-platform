@@ -44,7 +44,7 @@ def list_attempts(course_id: uuid.UUID, assessment_id: uuid.UUID, status: Option
     if status and status not in _STATUSES:
         raise ValidationFailed("Invalid status filter", code="validation_failed",
                                details=[{"loc": ["query", "status"], "msg": "invalid status"}])
-    grading.finalize_expired_for(db, assessment.id, now=clock.now())
+    grading.finalize_expired_for(db, assessment.id, now=clock.now(), limit=20)  # the sweep does the rest
     stmt = select(Attempt).where(Attempt.assessment_id == assessment.id, Attempt.course_id == course.id)
     if not preview:
         stmt = stmt.where(Attempt.is_preview.is_(False))
@@ -75,7 +75,7 @@ def get_attempt(course_id: uuid.UUID, attempt_id: uuid.UUID, ctx: AuthzContext =
     attempt = _course_attempt(ctx, course, attempt_id)
     now = clock.now()
     if grading.is_expired(attempt, now):
-        grading.finalize_expired_for(ctx.db, attempt.assessment_id, now=now)
+        grading.finalize_expired_for(ctx.db, attempt.assessment_id, now=now, limit=20)
         ctx.db.refresh(attempt)
     return results.staff_attempt_out(ctx.db, attempt)
 

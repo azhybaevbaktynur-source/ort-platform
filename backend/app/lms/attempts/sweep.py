@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from typing import Optional
 
 from fastapi import BackgroundTasks
@@ -29,12 +30,31 @@ SWEEP_LOCK_KEY = 3_000_001
 _state_lock = threading.Lock()
 _last_scheduled: Optional[float] = None
 _engines: dict = {}
+_FAIL_TTL_S = 600.0
+_FAIL_MAX = 1000
+_failed: dict = {}  # attempt id -> monotonic time of the last failed finalize (bounded, in-process)
+
+
+def _recent_failed() -> set:
+    cutoff = time.monotonic() - _FAIL_TTL_S
+    with _state_lock:
+        for k in [k for k, t in _failed.items() if t < cutoff]:
+            del _failed[k]
+        return set(_failed)
+
+
+def _remember_failed(attempt_id) -> None:
+    with _state_lock:
+        if len(_failed) >= _FAIL_MAX:
+            _failed.pop(min(_failed, key=_failed.get), None)
+        _failed[attempt_id] = time.monotonic()
 
 
 def reset_sweep_state() -> None:
     global _last_scheduled
     with _state_lock:
         _last_scheduled = None
+        _failed.clear()
 
 
 def _engine():
@@ -65,13 +85,13 @@ def maybe_schedule_sweep(background: BackgroundTasks) -> bool:
     return True
 
 
-def expired_ids(db: Session, now, limit: int) -> list:
+def expired_ids(db: Session, now, limit: int, skip: Optional[set] = None) -> list:
     cutoff = now - timedelta(seconds=settings.ATTEMPT_GRACE_S)
-    return list(db.execute(
-        select(Attempt.id).where(Attempt.status == "in_progress", Attempt.deadline_at.isnot(None),
-                                 Attempt.deadline_at < cutoff)
-        .order_by(Attempt.deadline_at, Attempt.id).limit(limit)
-    ).scalars())
+    stmt = select(Attempt.id).where(Attempt.status == "in_progress", Attempt.deadline_at.isnot(None),
+                                    Attempt.deadline_at < cutoff)
+    if skip:
+        stmt = stmt.where(Attempt.id.notin_(skip))
+    return list(db.execute(stmt.order_by(Attempt.deadline_at, Attempt.id).limit(limit)).scalars())
 
 
 def run_sweep(limit: Optional[int] = None) -> int:
@@ -85,7 +105,7 @@ def run_sweep(limit: Optional[int] = None) -> int:
             if eng.dialect.name == "postgresql":
                 if not s.execute(text("SELECT pg_try_advisory_xact_lock(:k)"), {"k": SWEEP_LOCK_KEY}).scalar():
                     return 0
-            ids = expired_ids(s, now, limit)
+            ids = expired_ids(s, now, limit, _recent_failed())
             s.commit()
     except Exception:
         logger.warning("attempt sweep: scan failed", exc_info=True)
@@ -99,5 +119,6 @@ def run_sweep(limit: Optional[int] = None) -> int:
             if attempt_engine._won(outcome, True):
                 done += 1
         except Exception:
+            _remember_failed(attempt_id)
             logger.warning("attempt sweep: finalize failed for %s", attempt_id, exc_info=True)
     return done

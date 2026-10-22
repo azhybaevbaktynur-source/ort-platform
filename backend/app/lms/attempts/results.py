@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, object_session
 
+from app.core.config import settings
 from app.lms.assessments.models import Assessment
 from app.lms.attempts import grading, serializers as ser
 from app.lms.attempts.models import Attempt, AttemptItem
@@ -17,6 +18,28 @@ from app.lms.courses.service import _aware
 from app.models.user import User
 
 FINAL_STATUSES = ("needs_review", "graded")
+
+
+def after_close_open(db: Optional[Session], assessment: Assessment, now: datetime) -> bool:
+    """`after_close` gate: the window (plus grace) is over AND no non-preview attempt is still in progress."""
+    until = _aware(assessment.available_until)
+    if until is None or now < until + timedelta(seconds=settings.ATTEMPT_GRACE_S):
+        return False
+    if db is None:
+        return True
+    open_ = db.execute(select(Attempt.id).where(
+        Attempt.assessment_id == assessment.id, Attempt.status == "in_progress",
+        Attempt.is_preview.is_(False)).limit(1)).first()
+    return open_ is None
+
+
+def assessment_results_visible(db: Optional[Session], assessment: Assessment, now: datetime) -> bool:
+    """Policy part of visibility, independent of a particular attempt (lobby / list `last_result`)."""
+    if assessment.results_policy == "after_submit":
+        return True
+    if assessment.results_policy == "after_close":
+        return after_close_open(db, assessment, now)
+    return False
 
 
 def results_visible(assessment: Assessment, attempt: Attempt, now: datetime, *, staff: bool = False) -> bool:
@@ -30,8 +53,7 @@ def results_visible(assessment: Assessment, attempt: Attempt, now: datetime, *, 
     if policy == "after_submit":
         return True
     if policy == "after_close":
-        until = _aware(assessment.available_until)
-        return until is not None and now >= until
+        return after_close_open(object_session(attempt), assessment, now)
     return False  # never (or unknown)
 
 
