@@ -101,6 +101,31 @@ class Settings(BaseSettings):
     ASSET_ORPHAN_SWEEP_INTERVAL_SECONDS: int = 3600
     CONTENT_IMPORT_RATE_PER_HOUR: int = 60
 
+    # --- Phase 3: assessments and attempts (docs/phases/PHASE_3_DESIGN.md) ---
+    # Grace after a deadline during which writes are still accepted (D8, P3-14)
+    ATTEMPT_GRACE_S: int = 45
+    # Opportunistic sweep of expired attempts (P3-26); token empty = internal sweep route returns 404
+    ATTEMPT_SWEEP_INTERVAL_S: int = 60
+    ATTEMPT_SWEEP_BATCH: int = 100
+    ATTEMPT_SWEEP_TOKEN: str = ""
+    # anyio worker-thread limit per process; keep equal to DB_POOL_SIZE + DB_MAX_OVERFLOW (L5). 0 = leave default.
+    LMS_THREADPOOL_TOKENS: int = 20
+    # Rate limits (P3-28): DB-backed start/manual scoring; in-process autosave token bucket per (worker, user)
+    ATTEMPT_START_RATE_PER_10M: int = 20
+    GRADE_ITEM_RATE_PER_HOUR: int = 600
+    AUTOSAVE_BUCKET_REQUESTS: int = 30
+    AUTOSAVE_BUCKET_WINDOW_S: int = 30
+    AUTOSAVE_BUCKET_MAX_USERS: int = 20000
+    # Caps (P3-29)
+    ASSESSMENT_MAX_ITEMS: int = 500
+    ASSESSMENT_MAX_SECTIONS: int = 20
+    ASSESSMENT_PICK_POOL_MAX: int = 1000
+    ASSESSMENT_PICK_COUNT_MAX: int = 200
+    ASSESSMENT_ITEM_POINTS_MAX: int = 1000
+    AUTOSAVE_MAX_ENTRIES: int = 20
+    AUTOSAVE_MAX_BODY_BYTES: int = 256 * 1024
+    PAYLOAD_CACHE_BYTES: int = 48 * 1024 * 1024
+
     # Password hashing cost (bcrypt). 10 is OWASP's minimum and ~4x faster than 12 on small servers.
     BCRYPT_ROUNDS: int = 10
 

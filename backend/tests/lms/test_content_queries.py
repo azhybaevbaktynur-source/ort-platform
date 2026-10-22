@@ -119,5 +119,5 @@ async def test_versions_list_is_one_query_regardless_of_size(db, api):
     with count_statements() as s:
         res = await api.call(w.O, "GET", url, params={"limit": 100})
     assert res.status_code == 200 and len(res.json()["items"]) == 31
-    # 2 user lookups, course, role, question, versions (with authors joined): constant in the number of versions
-    assert len(s) == 6 and len([x for x in s if "FROM question_versions" in x]) == 1
+    # 1 user lookup (P3-27), course, role, question, versions (with authors joined): constant in the number of versions
+    assert len(s) == 5 and len([x for x in s if "FROM question_versions" in x]) == 1

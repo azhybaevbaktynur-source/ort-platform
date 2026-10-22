@@ -143,3 +143,34 @@ def test_0003_up_down_up(alembic_engine):
             assert not phase2 & set(inspect(conn).get_table_names())
         command.upgrade(cfg, "head")
         conn.commit()
+
+
+def test_0004_up_down_up(alembic_engine):
+    """Phase 3 tables (with the assessments <-> versions FK) create and drop cleanly, twice."""
+    from alembic import command
+
+    from app.db.migrate import _config
+
+    phase3 = {"assessments", "assessment_sections", "assessment_items", "assessment_versions", "attempts",
+              "attempt_sections", "attempt_items"}
+    cfg = _config(TEST_URL)
+    with alembic_engine.connect() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "0003_phase2_content")
+        conn.commit()
+        assert not phase3 & set(inspect(conn).get_table_names())
+        for _ in range(2):
+            command.upgrade(cfg, "head")
+            conn.commit()
+            assert phase3 <= set(inspect(conn).get_table_names())
+            fks = {fk["name"] for fk in inspect(conn).get_foreign_keys("assessments")}
+            assert "fk_assessments_published_version_id" in fks
+            assert conn.execute(text(
+                "SELECT reloptions FROM pg_class WHERE relname = 'attempt_items'")).scalar() == ["fillfactor=85"]
+            idx = {i["name"] for i in inspect(conn).get_indexes("attempts")}
+            assert {"uq_attempts_open", "uq_attempts_open_preview", "ix_attempts_open_deadline"} <= idx
+            command.downgrade(cfg, "0003_phase2_content")
+            conn.commit()
+            assert not phase3 & set(inspect(conn).get_table_names())
+        command.upgrade(cfg, "head")
+        conn.commit()

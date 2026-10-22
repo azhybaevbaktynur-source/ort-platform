@@ -15,6 +15,15 @@ from app.lms.core.errors import register_error_handlers
 logger = logging.getLogger(__name__)
 
 
+async def _configure_thread_limiter() -> None:
+    """Cap sync-route worker threads at the DB pool size so threads never queue on the pool (L5)."""
+    tokens = settings.LMS_THREADPOOL_TOKENS
+    if tokens > 0:
+        from anyio import to_thread
+
+        to_thread.current_default_thread_limiter().total_tokens = tokens
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """FastAPI modern lifespan handler (replaces deprecated on_event)."""
@@ -32,6 +41,7 @@ async def lifespan(app: FastAPI):
             logger.critical("SECRET_KEY is the public default from the repository: anyone can forge login tokens. Set SECRET_KEY.")
         if settings.ALLOW_MOCK_TOKENS:
             logger.critical("ALLOW_MOCK_TOKENS is enabled in production: 'mock_admin_token' grants admin access. Disable it.")
+    await _configure_thread_limiter()
     yield
 
 

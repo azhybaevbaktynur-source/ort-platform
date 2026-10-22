@@ -39,3 +39,14 @@ api_router.include_router(_content_router, prefix="/courses", tags=["Question Ba
 api_router.include_router(_import_router, prefix="/courses", tags=["Content Import"])
 api_router.include_router(_files_router, tags=["Files"])
 api_router.include_router(_media_router, prefix="/media", tags=["Media"])
+
+# Phase 3 (assessments and attempts): stub routers filled by later slices
+from app.lms.assessments.router import router as _assessments_router  # noqa: E402
+from app.lms.attempts.router import router as _attempts_router  # noqa: E402
+from app.lms.attempts.staff_router import router as _attempts_staff_router  # noqa: E402
+from app.lms.attempts.internal_router import router as _internal_router  # noqa: E402
+
+api_router.include_router(_assessments_router, prefix="/courses", tags=["Assessments"])
+api_router.include_router(_attempts_router, tags=["Attempts"])
+api_router.include_router(_attempts_staff_router, tags=["Attempts (staff)"])
+api_router.include_router(_internal_router, prefix="/internal", tags=["Internal"])

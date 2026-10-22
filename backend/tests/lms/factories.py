@@ -195,3 +195,149 @@ def make_asset(db: Session, owner: User, course: Optional[Course] = None, **over
     db.add(asset)
     db.commit()
     return asset
+
+
+# --- Phase 3: assessments, sections, items, versions, attempts ---------------------------------
+
+import hashlib as _hashlib  # noqa: E402
+import json as _json  # noqa: E402
+
+from app.lms.assessments.models import (  # noqa: E402
+    Assessment, AssessmentItem, AssessmentSection, AssessmentVersion,
+)
+from app.lms.attempts.models import Attempt, AttemptItem, AttemptSection  # noqa: E402
+
+
+def make_assessment(db: Session, course: Course, actor: User, **overrides) -> Assessment:
+    """Draft assessment row (no sections). Pass `sections=[{...}]` to also create sections, and
+    `items=[question, ...]` (BankQuestion rows) to add them to the first section."""
+    sections = overrides.pop("sections", None)
+    items = overrides.pop("items", None)
+    from sqlalchemy import func, select
+
+    position = (db.execute(select(func.max(Assessment.position)).where(Assessment.course_id == course.id)).scalar()
+                or 0) + 1
+    fields = dict(
+        course_id=course.id, created_by_id=actor.id, title={"en": "Test assessment"},
+        languages=list(course.languages or ["en"]), position=position, navigation="free",
+        results_policy="after_submit",
+    )
+    fields.update(overrides)
+    a = Assessment(**fields)
+    db.add(a)
+    db.flush()
+    if sections is None and items:
+        sections = [{}]
+    first = None
+    for i, sec in enumerate(sections or [], start=1):
+        s = make_section(db, a, position=i, commit=False, **sec)
+        first = first or s
+    if items:
+        for pos, q in enumerate(items, start=1):
+            make_item(db, a, first, question=q, position=pos, commit=False)
+    db.commit()
+    return a
+
+
+def make_section(db: Session, assessment: Assessment, *, position: Optional[int] = None, commit: bool = True,
+                 **overrides) -> AssessmentSection:
+    if position is None:
+        from sqlalchemy import func, select
+
+        position = (db.execute(select(func.max(AssessmentSection.position)).where(
+            AssessmentSection.assessment_id == assessment.id)).scalar() or 0) + 1
+    fields = dict(assessment_id=assessment.id, position=position, rules={})
+    fields.update(overrides)
+    s = AssessmentSection(**fields)
+    db.add(s)
+    db.flush()
+    if commit:
+        db.commit()
+    return s
+
+
+def make_item(db: Session, assessment: Assessment, section: AssessmentSection, *, question=None, passage=None,
+              parent: Optional[AssessmentItem] = None, position: Optional[int] = None, commit: bool = True,
+              **overrides) -> AssessmentItem:
+    kind = overrides.pop("kind", "passage" if passage is not None and question is None else
+                         ("question" if question is not None else "pick"))
+    if position is None:
+        from sqlalchemy import func, select
+
+        position = (db.execute(select(func.max(AssessmentItem.position)).where(
+            AssessmentItem.section_id == section.id)).scalar() or 0) + 1
+    fields = dict(
+        assessment_id=assessment.id, section_id=section.id, parent_item_id=parent.id if parent else None,
+        position=position, kind=kind, question_id=question.id if question is not None else None,
+        passage_id=passage.id if passage is not None else None,
+        points=None if kind == "passage" else Decimal("1"),
+    )
+    fields.update(overrides)
+    item = AssessmentItem(**fields)
+    db.add(item)
+    db.flush()
+    if commit:
+        db.commit()
+    return item
+
+
+def make_assessment_version(db: Session, assessment: Assessment, actor: User, *, kind: str = "published",
+                            snapshot: Optional[dict] = None, publish: bool = True) -> AssessmentVersion:
+    """Direct insert of an immutable version (the A2 publish service replaces this for real flows)."""
+    snapshot = snapshot or {"schema": 1, "languages": list(assessment.languages), "sections": [], "slots": {}}
+    version_no = None
+    if kind == "published":
+        assessment.last_version_no += 1
+        version_no = assessment.last_version_no
+    v = AssessmentVersion(
+        assessment_id=assessment.id, kind=kind, version_no=version_no, snapshot=snapshot,
+        content_hash=_hashlib.sha256(_json.dumps(snapshot, sort_keys=True).encode()).hexdigest(),
+        draft_rev=assessment.draft_rev, item_count=0, points_possible=Decimal("0"), created_by_id=actor.id,
+    )
+    db.add(v)
+    db.flush()
+    if publish and kind == "published":
+        assessment.published_version_id = v.id
+        assessment.status = "published"
+        assessment.published_draft_rev = assessment.draft_rev
+        assessment.published_at = utcnow()
+    db.commit()
+    return v
+
+
+def make_attempt(db: Session, assessment: Assessment, version: AssessmentVersion, user: User, *,
+                 enrollment: Optional[Enrollment] = None, items: int = 0, question_version=None,
+                 **overrides) -> Attempt:
+    """Direct attempt insert with `items` attempt_items rows (needs `question_version` when items > 0)."""
+    from sqlalchemy import select
+
+    if enrollment is None:
+        enrollment = db.execute(select(Enrollment).where(
+            Enrollment.course_id == assessment.course_id, Enrollment.user_id == user.id)).scalars().first()
+        if enrollment is None:
+            enrollment = enroll(db, db.get(Course, assessment.course_id), user)
+    is_preview = overrides.get("is_preview", False)
+    fields = dict(
+        assessment_id=assessment.id, assessment_version_id=version.id, course_id=assessment.course_id,
+        enrollment_id=enrollment.id, user_id=user.id, attempt_no=None if is_preview else 1,
+        language=assessment.languages[0], status="in_progress", started_at=utcnow(), item_count=items,
+        points_possible=Decimal(items),
+    )
+    fields.update(overrides)
+    att = Attempt(**fields)
+    db.add(att)
+    db.flush()
+    for pos in range(1, items + 1):
+        db.add(AttemptItem(attempt_id=att.id, position=pos, section_pos=1, slot=pos,
+                           question_version_id=question_version.id))
+    db.commit()
+    return att
+
+
+def make_attempt_section(db: Session, attempt: Attempt, section_pos: int = 1, **overrides) -> AttemptSection:
+    fields = dict(attempt_id=attempt.id, section_pos=section_pos, started_at=attempt.started_at)
+    fields.update(overrides)
+    s = AttemptSection(**fields)
+    db.add(s)
+    db.commit()
+    return s

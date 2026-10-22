@@ -51,6 +51,16 @@ JOIN_IP_FAIL_10M = Limit("join_ip_fail_10m", 60, 600, is_ip_rule=True)
 TEACHER_REQUEST_24H = Limit("teacher_request_24h", 3, 86400)
 STAFF_ADD_1H = Limit("staff_add_1h", 30, 3600)
 
+
+def attempt_start_limit() -> Limit:
+    """Phase 3 (P3-28): attempt starts, per user. Built per call so settings overrides apply."""
+    return Limit("attempt_start_10m", settings.ATTEMPT_START_RATE_PER_10M, 600)
+
+
+def grade_item_limit() -> Limit:
+    """Phase 3 (P3-28): manual item scoring, per user."""
+    return Limit("grade_item_1h", settings.GRADE_ITEM_RATE_PER_HOUR, 3600)
+
 _CLEANUP_PROBABILITY = 1 / 200
 _CLEANUP_BATCH = 1000
 
