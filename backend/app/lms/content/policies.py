@@ -1,2 +1,34 @@
-"""Route policies for /courses/{id}/banks, questions, passages (filled by slice C4)."""
-CONTENT_POLICIES: dict[tuple[str, str], str] = {}
+"""Route policies for /courses/{id}/banks, questions, passages, translations."""
+_B = "/api/v1/courses"
+CONTENT_POLICIES: dict[tuple[str, str], str] = {
+    ("GET", f"{_B}/{{course_id}}/banks"): "course:content.read_admin",
+    ("POST", f"{_B}/{{course_id}}/banks"): "course:content.manage",
+    ("GET", f"{_B}/{{course_id}}/banks/{{bank_id}}"): "course:content.read_admin",
+    ("PATCH", f"{_B}/{{course_id}}/banks/{{bank_id}}"): "course:content.manage",
+    ("DELETE", f"{_B}/{{course_id}}/banks/{{bank_id}}"): "course:content.manage",
+    ("POST", f"{_B}/{{course_id}}/banks/{{bank_id}}/restore"): "course:content.manage",
+    ("GET", f"{_B}/{{course_id}}/banks/{{bank_id}}/questions"): "course:content.read_admin",
+    ("POST", f"{_B}/{{course_id}}/banks/{{bank_id}}/questions"): "course:content.manage",
+    ("GET", f"{_B}/{{course_id}}/questions/{{question_id}}"): "course:content.read_admin",
+    ("PATCH", f"{_B}/{{course_id}}/questions/{{question_id}}"): "course:content.manage",
+    ("DELETE", f"{_B}/{{course_id}}/questions/{{question_id}}"): "course:content.manage",
+    ("POST", f"{_B}/{{course_id}}/questions/{{question_id}}/restore"): "course:content.manage",
+    ("POST", f"{_B}/{{course_id}}/questions/{{question_id}}/move"): "course:content.manage",
+    ("GET", f"{_B}/{{course_id}}/questions/{{question_id}}/versions"): "course:content.read_admin",
+    ("GET", f"{_B}/{{course_id}}/questions/{{question_id}}/versions/{{version_id}}"): "course:content.read_admin",
+    ("POST", f"{_B}/{{course_id}}/questions/{{question_id}}/versions/{{version_id}}/revert"): "course:content.manage",
+    ("GET", f"{_B}/{{course_id}}/questions/{{question_id}}/preview"): "course:content.read_admin",
+    ("GET", f"{_B}/{{course_id}}/questions/{{question_id}}/translations"): "course:content.read_admin",
+    ("POST", f"{_B}/{{course_id}}/questions/{{question_id}}/translations"): "course:content.manage",
+    ("POST", f"{_B}/{{course_id}}/questions/{{question_id}}/translation-link"): "course:content.manage",
+    ("DELETE", f"{_B}/{{course_id}}/questions/{{question_id}}/translation-link"): "course:content.manage",
+    ("GET", f"{_B}/{{course_id}}/banks/{{bank_id}}/passages"): "course:content.read_admin",
+    ("POST", f"{_B}/{{course_id}}/banks/{{bank_id}}/passages"): "course:content.manage",
+    ("GET", f"{_B}/{{course_id}}/passages/{{passage_id}}"): "course:content.read_admin",
+    ("PATCH", f"{_B}/{{course_id}}/passages/{{passage_id}}"): "course:content.manage",
+    ("DELETE", f"{_B}/{{course_id}}/passages/{{passage_id}}"): "course:content.manage",
+    ("POST", f"{_B}/{{course_id}}/passages/{{passage_id}}/restore"): "course:content.manage",
+    ("GET", f"{_B}/{{course_id}}/passages/{{passage_id}}/versions"): "course:content.read_admin",
+    ("GET", f"{_B}/{{course_id}}/passages/{{passage_id}}/versions/{{version_id}}"): "course:content.read_admin",
+    ("POST", f"{_B}/{{course_id}}/passages/{{passage_id}}/versions/{{version_id}}/revert"): "course:content.manage",
+}
