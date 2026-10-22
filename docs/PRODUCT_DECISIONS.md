@@ -64,3 +64,20 @@ Source: answers to the 15 open questions in `PROJECT_UNDERSTANDING.md` §8. The 
 | Postgres driver | URLs are pinned to `postgresql+psycopg2://` (SQLAlchemy 2.1 defaults to psycopg 3). |
 | English in old pages | Old pages keep their inline ky/ru strings; English shows the non-ky branch until the cutover deletes them. Language buttons show endonyms (Кыргызча, Русский, English). |
 | Upload limits | Images only (PNG/JPEG/GIF/WEBP by content), 5 MiB cap, 400 for invalid content, 413 for oversize. |
+
+## Decisions 2026-10-22 (Phase 1, agent defaults)
+
+The full list is P1-1 … P1-23 in `docs/phases/PHASE_1_DESIGN.md` §1. Highlights:
+
+| Topic | Decision |
+|---|---|
+| Join code | 8 characters, no look-alikes (31-symbol alphabet), shown as `ABCD-EFGH`; works only while published, mode `invite_code`, not deleted. Every join failure returns the same 404. |
+| Enrollment modes | Phase 1 supports `invite_code` and `closed`; `open` and form modes come with the catalog (Phase 7). |
+| Class limit | Counts active students only. |
+| Roster privacy | Students see only staff names; never other students or emails. |
+| Owner powers | Only the owner deletes, restores, transfers ownership, or adds/removes/demotes teachers. Owner restores only courses they deleted themselves; an admin takedown is restored only by an admin (security review). |
+| Teacher revoke | Blocks new courses and receiving ownership; existing courses stay manageable (P1-10). Admin can moderate them. |
+| Platform admin | Script-only grant (`make_admin.py`); all admin power goes through audited `/api/v1/platform/*`; no bypass inside `/courses`. |
+| Rate limits | DB-backed fixed windows, own small connection pool. Per-user join limits enforced; the per-IP rule is **log-only** (`RATE_LIMIT_IP_ENFORCE=False`) until the real Vercel→Render `X-Forwarded-For` chain is verified. |
+| Add staff | Every miss returns the same `user_not_found` (no email enumeration). Invite-accept for staff is a Phase 7 candidate. |
+| Errors | New endpoints (incl. request validation) use `{"error":{code,message,details}}`; old endpoints keep `detail`. |

@@ -53,6 +53,7 @@ def build(db, status):
     db.add_all(rows)
     if status == "deleted":
         course.deleted_at = utcnow()
+        course.deleted_by_id = u["O"].id
     db.commit()
     return course, {r.user_id: r for r in rows}
 

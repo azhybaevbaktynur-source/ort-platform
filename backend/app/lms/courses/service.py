@@ -248,6 +248,8 @@ def restore_course(db: Session, actor: User, course: Course, *, by_admin: bool =
                    reason: Optional[str] = None, request: Optional[Request] = None) -> Course:
     if not by_admin and course.owner_id != actor.id:
         raise not_found_course()
+    if not by_admin and course.deleted_at is not None and course.deleted_by_id != actor.id:
+        raise not_found_course()  # owner cannot undo an admin moderation delete
     if course.deleted_at is None:
         raise Conflict("Course is not deleted", code="not_deleted")
     course.deleted_at = None
@@ -272,7 +274,9 @@ def transfer_ownership(db: Session, actor: User, course: Course, new_owner_id: s
     if target is None or target.id == course.owner_id or not _teacher_ok(target):
         raise ValidationFailed("Invalid new owner", code="invalid_new_owner")
     old_owner_id = course.owner_id
-    target_enr = get_enrollment(db, course.id, target.id)
+    target_enr = db.execute(
+        select(Enrollment).where(Enrollment.course_id == course.id, Enrollment.user_id == target.id).with_for_update()
+    ).scalar_one_or_none()
     if not by_admin:
         if target_enr is None or target_enr.state != "active" or target_enr.role != "teacher":
             raise ValidationFailed("Invalid new owner", code="invalid_new_owner")

@@ -47,7 +47,10 @@ def join_by_code(db: Session, user: User, raw_code: str, ip_hash: Optional[str])
     if course is None:
         raise _join_failure(db, ip_hash)
     if course.enrollment_limit is not None:
-        lock_course(db, course)  # unlimited courses never serialize on the course row
+        lock_course(db, course)
+    else:
+        # FOR SHARE: concurrent joins don't serialize, but unpublish/limit changes (FOR UPDATE) wait for them.
+        db.refresh(course, with_for_update={"read": True})
     if course.deleted_at is not None or course.status != "published" or course.enrollment_mode != "invite_code":
         raise _join_failure(db, ip_hash)
 
@@ -109,6 +112,7 @@ def _approved_teacher(user: User) -> bool:
 
 def leave(db: Session, ctx: AuthzContext, course: Course) -> None:
     require_course(ctx, A.COURSE_LEAVE, course)
+    lock_course(db, course)
     if course.owner_id == ctx.user.id:
         raise Conflict("The owner cannot leave the course", code="owner_cannot_leave")
     enr = get_enrollment(db, course.id, ctx.user.id)
@@ -130,14 +134,20 @@ def add_staff(db: Session, ctx: AuthzContext, course: Course, email: str, role: 
     target = db.execute(
         select(User).where(func.lower(User.email) == (email or "").strip().lower(), User.email_verified.is_(True))
     ).scalar_one_or_none()
-    if target is None or target.disabled_at is not None:
-        raise NotFound("User not found", code="user_not_found")
-    if role == "teacher" and not _approved_teacher(target):
-        raise ValidationFailed("User is not an approved teacher", code="not_approved_teacher")
+    if target is None or target.disabled_at is not None or (role == "teacher" and not _approved_teacher(target)):
+        raise NotFound("User not found", code="user_not_found")  # one answer for every miss (no enumeration)
     now = utcnow()
     existing = get_enrollment(db, course.id, target.id)
     if existing is not None and existing.state == "active":
         raise Conflict("Already enrolled", code="already_enrolled")
+    try:
+        return _add_staff_write(db, actor, course, target, role, existing, now)
+    except IntegrityError:
+        db.rollback()
+        raise Conflict("Already enrolled", code="already_enrolled") from None
+
+
+def _add_staff_write(db, actor, course, target, role, existing, now) -> Enrollment:
     if existing is None:
         enr = Enrollment(course_id=course.id, user_id=target.id, role=role, state="active", source="staff_add",
                          activated_at=now)
@@ -157,6 +167,7 @@ def add_staff(db: Session, ctx: AuthzContext, course: Course, email: str, role: 
 
 def change_role(db: Session, ctx: AuthzContext, course: Course, enrollment_id: uuid.UUID, role: str) -> Enrollment:
     require_course(ctx, A.ROSTER_MANAGE, course)
+    lock_course(db, course)
     enr = load_enrollment_in_course(db, course.id, enrollment_id, for_update=True)
     if enr.user_id == course.owner_id:
         raise Conflict("The owner cannot be changed", code="owner_immutable")
@@ -180,6 +191,7 @@ def change_role(db: Session, ctx: AuthzContext, course: Course, enrollment_id: u
 
 def remove(db: Session, ctx: AuthzContext, course: Course, enrollment_id: uuid.UUID) -> None:
     require_course(ctx, A.ROSTER_MANAGE, course)
+    lock_course(db, course)
     enr = load_enrollment_in_course(db, course.id, enrollment_id, for_update=True)
     if enr.user_id == course.owner_id:
         raise Conflict("The owner cannot be removed", code="owner_immutable")

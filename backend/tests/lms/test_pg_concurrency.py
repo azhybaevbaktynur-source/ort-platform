@@ -198,3 +198,53 @@ def test_joins_racing_with_limit_change_respect_stored_limit(pg):
         n = s.scalar(select(func.count()).select_from(Enrollment).where(
             Enrollment.course_id == cid, Enrollment.role == "student", Enrollment.state == "active"))
     assert n <= course.enrollment_limit
+
+
+# ---------------------------------------------------------------- security-fix races
+
+def _ctx(s, uid):
+    return AuthzContext(s.get(User, uid), s, enrollment_role_resolver(s, uid))
+
+
+def test_transfer_racing_with_new_owner_leave_stays_consistent(pg):
+    for _ in range(3):
+        cid, _code, owner = _mk_course(pg, None)
+        with Session(pg) as s:
+            b = _mk_user(s, 1, teacher=True)
+            s.add(Enrollment(course_id=cid, user_id=b, role="teacher", state="active", source="staff_add"))
+            s.commit()
+
+        def transfer(s):
+            return course_svc.transfer_ownership(s, s.get(User, owner), s.get(Course, cid), b).owner_id
+
+        def leave(s):
+            return enr_svc.leave(s, _ctx(s, b), s.get(Course, cid))
+
+        out = _run_parallel(pg, [transfer, leave])
+        assert not [o for o in out if o[0] == "exc"], out
+        with Session(pg) as s:
+            c = s.get(Course, cid)
+            enr = s.scalars(select(Enrollment).where(Enrollment.course_id == cid,
+                                                     Enrollment.user_id == c.owner_id)).one()
+            assert enr.state == "active" and enr.role == "teacher"
+
+
+def test_unpublish_racing_with_joins_never_leaves_draft_with_students(pg):
+    for _ in range(3):
+        cid, code, owner = _mk_course(pg, None)
+        with Session(pg) as s:
+            uids = [_mk_user(s, i) for i in range(5)]
+
+        def join(uid):
+            return lambda s: enr_svc.join_by_code(s, s.get(User, uid), code, None)[2]
+
+        def unpublish(s):
+            return course_svc.set_status(s, _ctx(s, owner), s.get(Course, cid), "unpublish").status
+
+        out = _run_parallel(pg, [join(u) for u in uids] + [unpublish])
+        assert not [o for o in out if o[0] == "exc"], out
+        with Session(pg) as s:
+            c = s.get(Course, cid)
+            n = s.scalar(select(func.count()).select_from(Enrollment).where(
+                Enrollment.course_id == cid, Enrollment.role == "student", Enrollment.state == "active"))
+        assert not (c.status == "draft" and n > 0), (c.status, n)

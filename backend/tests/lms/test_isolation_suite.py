@@ -60,7 +60,7 @@ async def test_anti_idor_and_ownership_guards(db, api):
     r = await api.call(ta, "POST", f"/courses/{ca.id}/transfer-ownership", json={"new_owner_user_id": s1.id})
     assert r.status_code == 422
     r = await api.call(ta, "POST", f"/courses/{ca.id}/staff", json={"email": s3.email, "role": "teacher"})
-    assert r.status_code == 422
+    assert r.status_code == 404
     r = await api.call(ta, "POST", f"/courses/{ca.id}/transfer-ownership", json={"new_owner_user_id": tb.id})
     assert r.status_code == 422  # tb is approved but not a teacher in CA
     assert (await api.call(s1, "GET", f"/courses/{cb.id}")).status_code == 404

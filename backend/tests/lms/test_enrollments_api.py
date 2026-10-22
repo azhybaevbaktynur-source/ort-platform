@@ -181,7 +181,7 @@ async def test_add_staff(db, api):
     r = await api.call(o, "POST", f"/courses/{c.id}/staff", json={"email": appr.email, "role": "assistant"})
     assert r.status_code == 409 and r.json()["error"]["code"] == "already_enrolled"
     r = await api.call(o, "POST", f"/courses/{c.id}/staff", json={"email": plain.email, "role": "teacher"})
-    assert r.status_code == 422 and r.json()["error"]["code"] == "not_approved_teacher"
+    assert r.status_code == 404 and r.json()["error"]["code"] == "user_not_found"
     r = await api.call(o, "POST", f"/courses/{c.id}/staff", json={"email": plain.email, "role": "assistant"})
     assert r.status_code == 201
     for email in ("nobody@test.example", unverified.email):

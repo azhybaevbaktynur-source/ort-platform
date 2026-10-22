@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { useAuth, RegisterResult } from "@/lib/auth-context";
+import { safeRedirect } from "@/lib/safeRedirect";
 import { useBackendWarmup, useSlowHint } from "@/lib/useBackendWarmup";
 import { VerifyEmailStep, authErrorMessage } from "@/components/auth/VerifyEmailStep";
 import { Mail, Lock, User, Phone, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
@@ -15,7 +16,9 @@ function RegisterForm() {
   const { lang, setLang, t } = useTranslation();
   const { signUp } = useAuth();
 
-  const redirectParam = searchParams.get("redirect");
+  const rawRedirect = searchParams.get("redirect");
+  const safeParam = safeRedirect(rawRedirect, "");
+  const redirectParam = safeParam || null;
 
   const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState("");

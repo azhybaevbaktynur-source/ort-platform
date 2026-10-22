@@ -70,13 +70,24 @@ def _coerce(col, raw):
         return raw
     if raw is None:
         return None
+    bad = ValidationFailed("Invalid cursor", code="invalid_cursor")
     try:
         if py is uuid.UUID:
+            if not isinstance(raw, str):
+                raise bad
             return uuid.UUID(raw)
         if py is datetime:
+            if not isinstance(raw, str):
+                raise bad
             return datetime.fromisoformat(raw)
     except (ValueError, TypeError, AttributeError):
-        raise ValidationFailed("Invalid cursor", code="invalid_cursor")
+        raise bad
+    if isinstance(raw, bool) or not isinstance(raw, (str, int, float)):
+        raise bad
+    if py is str and not isinstance(raw, str):
+        raise bad
+    if py is int and not isinstance(raw, int):
+        raise bad
     return raw
 
 

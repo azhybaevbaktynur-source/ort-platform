@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { AuthError, useAuth, UserRole } from "@/lib/auth-context";
+import { safeRedirect } from "@/lib/safeRedirect";
 import { useBackendWarmup, useSlowHint } from "@/lib/useBackendWarmup";
 import { VerifyEmailStep, authErrorMessage } from "@/components/auth/VerifyEmailStep";
 import { Mail, Lock, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
@@ -15,7 +16,9 @@ function LoginForm() {
   const { lang, setLang, t } = useTranslation();
   const { signIn } = useAuth();
 
-  const redirectParam = searchParams.get("redirect");
+  const rawRedirect = searchParams.get("redirect");
+  const safeParam = safeRedirect(rawRedirect, "");
+  const redirectParam = safeParam || null;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

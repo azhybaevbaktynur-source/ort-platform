@@ -49,5 +49,6 @@ def my_deleted_courses(user_id: str) -> Select:
     return (
         select(Course, User.display_name.label("owner_display_name"), User.email.label("owner_email"))
         .join(User, User.id == Course.owner_id)
-        .where(Course.owner_id == user_id, Course.deleted_at.is_not(None))
+        .where(Course.owner_id == user_id, Course.deleted_at.is_not(None),
+               Course.deleted_by_id == user_id)
     )
