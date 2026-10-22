@@ -15,6 +15,7 @@ import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { JoinCodeDisplay } from "@/components/lms/JoinCodeDisplay";
 import { LanguagePicker } from "@/components/lms/LanguagePicker";
 import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
+import { CourseGradingSection } from "@/components/lms/grading/settings/CourseGradingSection";
 
 const card = "rounded-2xl border border-slate-200 bg-white p-6";
 const primaryBtn = "rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50";
@@ -168,6 +169,8 @@ function Settings({ course }: { course: CourseStaffOut }) {
           </div>
         </form>
       </section>
+
+      <CourseGradingSection courseId={course.id} languages={course.languages} defaultLanguage={course.default_language} />
 
       <section className={`${card} space-y-4`}>
         <h2 className="text-lg font-bold text-slate-900">{t("courses.settings.lifecycle")}</h2>

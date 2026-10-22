@@ -238,7 +238,8 @@
       "create": "Create course",
       "becomeTeacher": "Become a teacher",
       "platformAdmin": "Platform admin",
-      "oldPortal": "Exam portal"
+      "oldPortal": "Exam portal",
+      "gradingSchemes": "Grading schemes"
     },
     "common": {
       "save": "Save",
@@ -1413,7 +1414,70 @@
     "student": "Student",
     "submitted": "Submitted",
     "unnamed": "Unnamed student",
-    "gradedBy": "Graded by {name} on {date}"
+    "gradedBy": "Graded by {name} on {date}",
+    "settings": {
+      "title": "Grading",
+      "noScheme": "No scheme (points only)",
+      "systemSchemes": "System schemes",
+      "mySchemes": "My schemes",
+      "totalMode": "Course total",
+      "totalModes": {
+        "points": "Points",
+        "weighted": "Weighted by category"
+      },
+      "totalModeHint": {
+        "points": "The total is all earned points divided by all possible points.",
+        "weighted": "Each category contributes by its weight. Assessments without a category are left out of the total."
+      },
+      "courseScheme": "Course grade scheme",
+      "courseSchemeHint": "Converts the course total percentage into a grade. Optional.",
+      "latePolicy": "Late submissions",
+      "lateEnable": "Deduct points for late submissions",
+      "latePerDay": "Deduction per day (%)",
+      "lateMax": "Maximum deduction (%)",
+      "lateGrace": "Grace period (minutes)",
+      "lateInvalid": "Enter percentages from 0 to 100 and a grace period from 0 to 1440 minutes.",
+      "lateHint": "Applies only to assessments that have a due date. Changing it does not alter existing grades until you regrade.",
+      "warnings": {
+        "uncategorized_excluded": "Some assessments have no category and are excluded from the weighted total.",
+        "weights_all_zero": "All category weights are zero, so the weighted total cannot be calculated.",
+        "points_possible_mismatch": "Some assessments have different maximum points between versions."
+      },
+      "categories": "Categories",
+      "categoriesHint": "Group assessments (for example tests, homework). Weights are relative and need not add up to 100.",
+      "noCategories": "No categories yet.",
+      "addCategory": "Add category",
+      "categoryTitle": "Category name",
+      "weight": "Weight",
+      "weightValue": "Weight {weight}",
+      "assessmentCount": "{count} assessment(s)",
+      "weightsSum": "Weights add up to {sum}.",
+      "normalization": "In weighted mode the weights are normalized over the categories that have grades, so any sum works.",
+      "edit": "Edit",
+      "delete": "Delete",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "assessmentGroup": "Grading",
+      "scheme": "Grading scheme",
+      "schemeHint": "Changing the scheme does not alter existing grades until you regrade.",
+      "category": "Category",
+      "noCategory": "No category",
+      "dueAt": "Due date",
+      "dueAtHint": "Used for the late policy. Leave empty for no due date.",
+      "release": "Grade release",
+      "releaseModes": {
+        "auto": "Automatic",
+        "manual": "Manual"
+      },
+      "releaseHint": {
+        "auto": "Grades are visible to students as soon as they are calculated.",
+        "manual": "Grades stay hidden until you release them in the gradebook."
+      },
+      "omit": "Omit from course total",
+      "regrade": "Regrade existing attempts",
+      "regradeHint": "Recalculate grades of already graded attempts with the current scheme, due date and late policy.",
+      "regradeDone": "Regraded {count} submission(s)."
+    }
   },
   "results": {
     "acceptedAnswers": "Accepted answers",

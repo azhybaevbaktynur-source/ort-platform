@@ -2,6 +2,7 @@
 // Builder and lobby DTOs only; attempt/player types live in attemptTypes.ts (F2).
 import type { Lang, LocalizedText } from "./types";
 import type { Difficulty, QuestionType } from "./contentTypes";
+import type { AssessmentGradingFields, AssessmentGradingUpdate } from "./gradingTypes";
 
 export type AssessmentPreset = "none" | "ort_main" | "ort_subject";
 export const ASSESSMENT_PRESETS: AssessmentPreset[] = ["none", "ort_main", "ort_subject"];
@@ -139,7 +140,7 @@ export interface DraftConflictDetails {
 export const LOBBY_REASONS = ["not_open_yet", "closed", "attempts_exhausted", "unpublished"] as const;
 export type LobbyReason = (typeof LOBBY_REASONS)[number];
 
-export interface AssessmentStaffOut extends AssessmentStaffSummaryOut {
+export interface AssessmentStaffOut extends AssessmentStaffSummaryOut, AssessmentGradingFields {
   description: LocalizedText | null;
   draft_rev: number;
   time_limit_s: number | null;
@@ -193,7 +194,7 @@ export interface AssessmentCreateIn {
   subject_key?: string;
 }
 
-export interface AssessmentUpdateIn {
+export interface AssessmentUpdateIn extends AssessmentGradingUpdate {
   draft_rev: number;
   title?: LocalizedText;
   description?: LocalizedText | null;

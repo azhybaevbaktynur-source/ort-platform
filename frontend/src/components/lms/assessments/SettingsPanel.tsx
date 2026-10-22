@@ -11,7 +11,18 @@ import { LMS_LANGS, type Lang, type LocalizedText } from "@/lib/lms/types";
 import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
 import { btnPrimary, inputCls, labelCls } from "@/components/lms/content/ui";
 import { AssessmentError } from "./AssessmentError";
+import { SettingsPanelGrading, type GradingFormValue } from "./SettingsPanelGrading";
 import { fromLocalInput, minToSec, secToMin, toLocalInput } from "./format";
+
+function gradingOf(a: AssessmentStaffOut): GradingFormValue {
+  return {
+    schemeVersionId: a.grading_scheme_version_id,
+    categoryId: a.grade_category_id,
+    dueAt: toLocalInput(a.due_at),
+    release: a.grade_release,
+    omit: a.omit_from_total,
+  };
+}
 
 /** Assessment settings form. Saves with the current draft_rev; 409 draft_conflict asks the parent to reload. */
 export function SettingsPanel({
@@ -41,6 +52,7 @@ export function SettingsPanel({
   const [shuffleChoices, setShuffleChoices] = useState(a.shuffle_choices);
   const [from, setFrom] = useState(toLocalInput(a.available_from));
   const [until, setUntil] = useState(toLocalInput(a.available_until));
+  const [grading, setGrading] = useState<GradingFormValue>(() => gradingOf(a));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [saved, setSaved] = useState(false);
@@ -52,6 +64,7 @@ export function SettingsPanel({
     setLimit(secToMin(a.time_limit_s)); setNavigation(a.navigation); setResults(a.results_policy);
     setShowCorrect(a.show_correct_answers); setScorePolicy(a.score_policy); setShuffleItems(a.shuffle_items);
     setShuffleChoices(a.shuffle_choices); setFrom(toLocalInput(a.available_from)); setUntil(toLocalInput(a.available_until));
+    setGrading(gradingOf(a));
   }, [a]);
 
   const toggleLang = (l: Lang) =>
@@ -78,6 +91,11 @@ export function SettingsPanel({
         show_correct_answers: showCorrect,
         available_from: fromLocalInput(from),
         available_until: fromLocalInput(until),
+        grading_scheme_version_id: grading.schemeVersionId,
+        grade_category_id: grading.categoryId,
+        due_at: fromLocalInput(grading.dueAt),
+        grade_release: grading.release,
+        omit_from_total: grading.omit,
       });
       setSaved(true);
       await onSaved();
@@ -156,6 +174,8 @@ export function SettingsPanel({
         {check("as-shuf-i", t("assessments.settings.shuffleItems"), shuffleItems, setShuffleItems)}
         {check("as-shuf-c", t("assessments.settings.shuffleChoices"), shuffleChoices, setShuffleChoices)}
       </div>
+      <SettingsPanelGrading courseId={courseId} assessmentId={a.id} value={grading} onChange={setGrading}
+        currentScheme={a.scheme} defaultLanguage={defaultLanguage} disabled={disabled} />
       <AssessmentError error={error} />
       <div className="flex items-center gap-3">
         <button type="submit" className={btnPrimary} disabled={disabled || busy}>{busy ? t("lms.common.loading") : t("lms.common.save")}</button>

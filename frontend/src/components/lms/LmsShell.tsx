@@ -3,7 +3,7 @@
 import React, { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { GraduationCap, KeyRound, LayoutDashboard, Plus, ShieldCheck, UserPlus } from "lucide-react";
+import { GraduationCap, KeyRound, LayoutDashboard, Plus, Scale, ShieldCheck, UserPlus } from "lucide-react";
 import { useTranslation, type Language } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
 import { LmsMeProvider, useLmsMeLoader } from "@/lib/lms/useLmsMe";
@@ -61,6 +61,9 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
               )}
               {me && !me.can_create_courses && (me.teacher_status === "none" || me.teacher_status === "revoked") && (
                 <Link href={`/${lang}/courses/become-teacher`} className={linkCls}><UserPlus className="h-4 w-4" aria-hidden="true" />{t("lms.nav.becomeTeacher")}</Link>
+              )}
+              {(me?.can_create_courses || me?.is_platform_admin) && (
+                <Link href={`/${lang}/grading-schemes`} className={linkCls}><Scale className="h-4 w-4" aria-hidden="true" />{t("lms.nav.gradingSchemes")}</Link>
               )}
               {me?.is_platform_admin && (
                 <Link href={`/${lang}/admin`} className={linkCls}><ShieldCheck className="h-4 w-4" aria-hidden="true" />{t("lms.nav.platformAdmin")}</Link>
