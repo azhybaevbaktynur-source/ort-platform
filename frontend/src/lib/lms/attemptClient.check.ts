@@ -1,0 +1,143 @@
+/**
+ * Dependency-free check of the clock and autosave-queue logic.
+ * Run (from repo root):
+ *   cd frontend && npx tsc --outDir /tmp/agy_f2_check --module commonjs --target es2020 --skipLibCheck \
+ *     src/lib/lms/attemptClient.ts src/lib/lms/attemptClient.check.ts && node /tmp/agy_f2_check/attemptClient.check.js
+ */
+import {
+  AutosaveQueue, ServerClock, backoffMs, classifyFailure, remainingMs, storageKey, type QueueEnv,
+} from "./attemptClient";
+import type { AnswerIn, SaveOut } from "./attemptTypes";
+
+let failed = 0;
+function ok(cond: boolean, msg: string) {
+  if (!cond) { failed++; console.error("FAIL", msg); } else console.log("ok  ", msg);
+}
+const flush = () => new Promise((r) => setImmediate(r));
+
+// fake timers
+function makeEnv(saveImpl: (a: AnswerIn[]) => Promise<SaveOut>, store: Record<string, string>) {
+  let t = 1_000_000;
+  const timers = new Map<number, { at: number; fn: () => void }>();
+  let id = 0;
+  const env: QueueEnv = {
+    save: saveImpl,
+    setTimer: (fn, ms) => { timers.set(++id, { at: t + ms, fn }); return id; },
+    clearTimer: (h) => { timers.delete(h as number); },
+    now: () => t,
+    rand: () => 0.5,
+    storage: {
+      getItem: (k) => (k in store ? store[k] : null),
+      setItem: (k, v) => { store[k] = v; },
+      removeItem: (k) => { delete store[k]; },
+    },
+  };
+  const advance = async (ms: number) => {
+    const end = t + ms;
+    for (;;) {
+      const due = [...timers.entries()].filter(([, x]) => x.at <= end).sort((a, b) => a[1].at - b[1].at)[0];
+      if (!due) break;
+      timers.delete(due[0]);
+      t = Math.max(t, due[1].at);
+      due[1].fn();
+      await flush();
+    }
+    t = end;
+  };
+  return { env, advance, timers };
+}
+const out = (): SaveOut => ({ saved: [], stale: [], server_now: new Date().toISOString(), status: "in_progress", current_section_pos: 0 });
+
+(async () => {
+  // clock: lowest-RTT sample wins
+  const c = new ServerClock();
+  c.sample(new Date(10_000).toISOString(), 0, 2000); // rtt 2000 -> offset 10000-1000 = 9000
+  c.sample(new Date(20_050).toISOString(), 10_000, 10_100); // rtt 100 -> offset 20050-10050 = 10000
+  c.sample(new Date(99_999).toISOString(), 30_000, 36_000); // worse rtt ignored
+  ok(c.offset === 10_000, "clock keeps lowest-RTT sample");
+  const st = { sections: [{ pos: 0, started_at: null, deadline_at: new Date(50_000).toISOString(), closed_at: null }], current_section_pos: 0, deadline_at: new Date(80_000).toISOString(), navigation: "section_forward_only" as const };
+  ok(remainingMs(st, c, 30_000) === 10_000, "remaining uses min(section, attempt) and server offset");
+  ok(remainingMs({ ...st, deadline_at: null, navigation: "free" }, c, 0) === null, "no limit -> null");
+
+  // backoff
+  ok([0, 1, 2, 3, 4, 5, 9].map((n) => backoffMs(n, () => 0.5)).join() === "1000,2000,4000,8000,16000,30000,30000", "backoff steps");
+  ok(classifyFailure({ status: 409, code: "section_closed" }).kind === "closed", "409 -> closed");
+  ok(classifyFailure({ status: 0, code: "network" }).kind === "transient", "network -> transient");
+  ok(classifyFailure({ status: 401, code: "unknown" }).kind === "auth", "401 -> auth");
+
+  // coalescing + batching + persistence
+  const store: Record<string, string> = {};
+  const calls: AnswerIn[][] = [];
+  const m = makeEnv(async (a) => { calls.push(a); return out(); }, store);
+  const q = new AutosaveQueue("A1", m.env);
+  q.set(1, { response: { choice_id: "a" } });
+  q.set(1, { response: { choice_id: "b" } });
+  q.set(1, { flagged: true });
+  ok(q.pending === 1, "coalesced per position");
+  const e = q.peek()[0];
+  ok(JSON.stringify(e.response) === '{"choice_id":"b"}' && e.flagged === true, "latest response kept, flag merged");
+  ok(!!store[storageKey("A1")], "mirrored to storage");
+  await m.advance(1400);
+  ok(calls.length === 0, "no flush before idle 1.5 s");
+  await m.advance(200);
+  ok(calls.length === 1 && q.pending === 0, "flush after idle; queue empty");
+  ok(!(storageKey("A1") in store), "storage cleared when empty");
+  for (let i = 0; i < 45; i++) q.set(i, { response: { value: String(i) } });
+  await q.flushNow();
+  ok(calls.slice(1).map((c2) => c2.length).join() === "20,20,5", "batches of <= 20");
+
+  // retry with backoff, replay keeps client_ts
+  let fail = 2;
+  const seen: AnswerIn[][] = [];
+  const m2 = makeEnv(async (a) => { seen.push(a); if (fail-- > 0) throw { status: 0, code: "network" }; return out(); }, {});
+  const q2 = new AutosaveQueue("A2", m2.env);
+  q2.set(3, { response: { text: "x" } });
+  const ts = q2.peek()[0].client_ts;
+  await m2.advance(1600);
+  ok(seen.length === 1 && q2.snapshot().status === "offline", "first failure -> offline, queue kept");
+  await m2.advance(1000); // backoff 1s (rand .5 -> exactly 1000)
+  ok(seen.length === 2, "retry after backoff 1 s");
+  await m2.advance(2000);
+  ok(seen.length === 3 && q2.pending === 0, "third attempt succeeds");
+  ok(seen.every((b) => b[0].client_ts === ts), "replays carry the original client_ts");
+
+  // entry changed while in flight survives ack
+  let release: () => void = () => {};
+  const m3 = makeEnv(() => new Promise<SaveOut>((r) => { release = () => r(out()); }), {});
+  const q3 = new AutosaveQueue("A3", m3.env);
+  q3.set(1, { response: { text: "a" } });
+  void q3.flushNow();
+  await flush();
+  q3.set(1, { response: { text: "ab" } });
+  release();
+  await flush(); await flush();
+  ok(q3.pending === 1, "newer edit made during flight is not dropped by the ack");
+
+  // beyond grace -> closed, queue cleared, handler fired
+  let closed = "";
+  const m4 = makeEnv(async () => { throw { status: 409, code: "attempt_closed", details: {} }; }, { [storageKey("A4")]: JSON.stringify([{ position: 7, client_ts: 5, response: { text: "late" } }]) });
+  const q4 = new AutosaveQueue("A4", m4.env, { onClosed: (i) => { closed = i.code; } });
+  ok(q4.pending === 1, "restored from storage");
+  q4.kick();
+  await flush(); await flush();
+  ok(closed === "attempt_closed" && q4.pending === 0, "409 attempt_closed clears queue and notifies");
+
+  // invalid -> drop those positions only
+  let rej: number[] = [];
+  const m5 = makeEnv(async () => { throw { status: 422, code: "invalid_response", details: { positions: [2] } }; }, {});
+  const q5 = new AutosaveQueue("A5", m5.env, { onRejected: (p2) => { rej = p2; } });
+  q5.set(1, { response: { text: "a" } }); q5.set(2, { response: { text: "b" } });
+  await q5.flushNow();
+  ok(rej.join() === "2" && q5.pending === 1, "422 drops only reported positions");
+
+  // 401 keeps queue and stops retrying
+  let n6 = 0;
+  const m6 = makeEnv(async () => { n6++; throw { status: 401, code: "unknown" }; }, {});
+  const q6 = new AutosaveQueue("A6", m6.env);
+  q6.set(1, { response: { text: "a" } });
+  await q6.flushNow(); await m6.advance(60_000);
+  ok(n6 === 1 && q6.pending === 1 && q6.snapshot().status === "auth", "401 keeps queue, no retry storm");
+
+  if (failed) { console.error(failed + " check(s) failed"); process.exit(1); }
+  console.log("all checks passed");
+})();

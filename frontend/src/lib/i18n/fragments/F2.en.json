@@ -1,0 +1,94 @@
+{
+  "player": {
+    "answers": "Answers",
+    "backToCourse": "Back to the course",
+    "closed": {
+      "continue": "Continue",
+      "finishedBody": "The time for this attempt is over or it was finished elsewhere. Your saved answers were submitted.",
+      "finishedTitle": "Attempt finished",
+      "sectionBody": "This section is already closed. You continue with the current section; you cannot return to the closed one.",
+      "sectionTitle": "Section closed",
+      "toResult": "Go to result"
+    },
+    "comparison": {
+      "columnA": "Column A",
+      "columnB": "Column B"
+    },
+    "counts": {
+      "flagged": "Flagged for review: {n}",
+      "unanswered": "Unanswered questions: {n}"
+    },
+    "dismiss": "Dismiss",
+    "essay": {
+      "label": "Your essay",
+      "words": "{n} words",
+      "wordsLimit": "{n} of {limit} words"
+    },
+    "false": "False",
+    "finishSection": "Finish section",
+    "finishTest": "Finish test",
+    "flag": "Flag",
+    "imageAlt": "Question illustration",
+    "instructions": "Section instructions",
+    "loading": "Loading the test...",
+    "multipleHint": "Select all correct answers.",
+    "next": "Next",
+    "noQuestion": "There are no questions to show.",
+    "numeric": {
+      "label": "Enter a number"
+    },
+    "otherTab": "This attempt is open in another tab. Use only one tab, or your answers may conflict.",
+    "palette": {
+      "answered": "Answered",
+      "current": "Current",
+      "flagged": "Flagged",
+      "title": "Questions",
+      "unanswered": "Unanswered"
+    },
+    "prev": "Previous",
+    "previewBanner": "Preview mode: this attempt is not counted for students.",
+    "progress": "{answered} of {total} answered",
+    "progressBar": "Answering progress",
+    "question": "Question",
+    "questionOf": "Question {n} of {total}",
+    "rejected": "The server rejected the answers to questions: {list}. Please answer them again.",
+    "save": {
+      "auth": "Sign in again, {n} answers not saved",
+      "error": "Save error, {n} pending",
+      "offline": "Offline, {n} pending",
+      "saved": "Saved",
+      "saving": "Saving..."
+    },
+    "section": "Section",
+    "sectionEnd": {
+      "confirm": "Close section",
+      "noReturn": "You will not be able to return to this section.",
+      "stay": "Stay in section",
+      "title": "Finish \"{section}\"?"
+    },
+    "sectionOf": "Section {n} of {total}",
+    "shortText": {
+      "label": "Type your answer"
+    },
+    "shortcuts": "Shortcuts: left and right arrows move between questions, F flags, 1-5 or A-E choose an answer.",
+    "submit": {
+      "back": "Back to the test",
+      "body": "After you finish, you cannot change your answers.",
+      "confirm": "Finish and submit",
+      "title": "Finish the test?"
+    },
+    "timeUp": {
+      "body": "Your answers are being saved and submitted. Please do not close this page.",
+      "title": "Time is up"
+    },
+    "timer": {
+      "fiveMinutes": "Five minutes left",
+      "label": "Time remaining",
+      "oneMinute": "One minute left",
+      "unlimited": "No time limit"
+    },
+    "true": "True",
+    "unflag": "Remove flag",
+    "working": "Working..."
+  }
+}
