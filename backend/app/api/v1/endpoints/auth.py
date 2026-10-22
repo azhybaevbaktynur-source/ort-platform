@@ -252,6 +252,9 @@ def login_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    if user.disabled_at is not None:
+        raise _error(403, "account_disabled", "This account is disabled.")
+
     if password_needs_rehash(user.password_hash):
         # Upgrade old hashes to the current (faster) cost once we know the password
         user.password_hash = hash_password(req.password)

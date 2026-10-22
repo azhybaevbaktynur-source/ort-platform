@@ -6,3 +6,5 @@ from app.models.exam_access import ExamAccess
 from app.models.question_source import QuestionSource
 
 __all__ = ["User", "ExamSet", "Question", "TestAttempt", "ExamAccess", "QuestionSource"]
+
+import app.lms.models  # noqa: F401,E402

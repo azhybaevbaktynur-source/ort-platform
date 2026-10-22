@@ -49,10 +49,15 @@ def test_run_migrations_stamps_existing_unversioned_db(alembic_engine):
     from alembic.script import ScriptDirectory
 
     from app.db.migrate import _config, run_migrations
-    from app.db.session import Base
-    import app.models  # noqa: F401
+    from alembic import command
 
-    Base.metadata.create_all(bind=alembic_engine)
+    # Production state: the baseline schema created without Alembic (no alembic_version table)
+    cfg = _config(TEST_URL)
+    with alembic_engine.connect() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "0001_baseline")
+        conn.execute(text("DROP TABLE alembic_version"))
+        conn.commit()
     assert "alembic_version" not in inspect(alembic_engine).get_table_names()
 
     assert run_migrations(alembic_engine) is True
@@ -77,3 +82,37 @@ def test_run_migrations_skips_sqlite_by_default(monkeypatch, tmp_path):
     monkeypatch.delenv("RUN_MIGRATIONS", raising=False)
     eng = create_engine(f"sqlite:///{tmp_path}/x.db")
     assert run_migrations(eng) is False
+
+
+def test_0002_data_migration_promotes_admins(alembic_engine):
+    """role='admin' users become platform admins and approved teachers; students stay untouched."""
+    from alembic import command
+
+    from app.db.migrate import _config
+
+    cfg = _config(TEST_URL)
+    with alembic_engine.connect() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "0001_baseline")
+        conn.commit()
+        for uid, role in (("usr_mig_admin", "admin"), ("usr_mig_student", "student")):
+            conn.execute(text(
+                "INSERT INTO users (id, email, password_hash, role, email_verified, email_code_attempts, "
+                "created_at, exams_taken, current_score, starting_score) "
+                "VALUES (:id, :email, 'x', :role, true, 0, now(), 0, 0, 0)"
+            ), {"id": uid, "email": f"{uid}@test.example", "role": role})
+        conn.commit()
+        command.upgrade(cfg, "head")
+        conn.commit()
+        rows = dict(
+            (r[0], (r[1], r[2])) for r in conn.execute(text(
+                "SELECT id, is_platform_admin, teacher_status FROM users WHERE id LIKE 'usr_mig_%'"))
+        )
+        assert rows["usr_mig_admin"] == (True, "approved")
+        assert rows["usr_mig_student"] == (False, "none")
+        command.downgrade(cfg, "0001_baseline")
+        conn.commit()
+        assert "courses" not in inspect(conn).get_table_names()
+        command.upgrade(cfg, "head")
+        conn.commit()
+        assert "courses" in inspect(conn).get_table_names()

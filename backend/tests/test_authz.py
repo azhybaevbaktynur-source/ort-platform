@@ -16,6 +16,7 @@ T, AS, S = "teacher", "assistant", "student"
     (AS, "draft", A.CONTENT_MANAGE, True),
     (AS, "draft", A.COURSE_PUBLISH, False),
     (S, "draft", A.COURSE_READ, False),
+    (S, "draft", A.COURSE_LEAVE, True),
     (S, "published", A.COURSE_READ, True),
     (S, "published", A.ASSESSMENT_TAKE, True),
     (S, "published", A.CONTENT_READ_ADMIN, False),
@@ -55,7 +56,7 @@ def test_teacher_has_all():
 
 
 def _ctx(role, user=None):
-    ctx = AuthzContext(user or SimpleNamespace(role="student"), db=None)
+    ctx = AuthzContext(user or SimpleNamespace(role="student"), db=None, allow_platform_admin=True)
     ctx.role_resolver = lambda cid: role
     return ctx
 
@@ -78,11 +79,16 @@ def test_require_outcomes():
 
 
 def test_require_platform_admin():
-    admin = SimpleNamespace(role="admin")
+    admin = SimpleNamespace(role="student", is_platform_admin=True)
     require(_ctx(None, admin), A.COURSE_READ, _course("draft"))
     with pytest.raises(NotFound):
         require(_ctx(None, admin), A.CONTENT_MANAGE, _course())
-    assert _ctx(None, SimpleNamespace(is_platform_admin=True)).is_platform_admin
+    assert _ctx(None, admin).is_platform_admin
+    # the old role column grants nothing, and the context must opt in to admin power
+    assert not _ctx(None, SimpleNamespace(role="admin")).is_platform_admin
+    with pytest.raises(NotFound):
+        require(_ctx(None, SimpleNamespace(role="admin")), A.COURSE_READ, _course("draft"))
+    assert not AuthzContext(admin, db=None).is_platform_admin
 
 
 def test_enrollment_cache():
