@@ -1,6 +1,8 @@
 # ORT / ЖРТ Test-Prep & Learning Management Platform
 # Developer & Autonomous Agent Guide (Ground Truth)
 
+> **Old-platform reference; current plan and rules: docs/HANDOFF_NEXT_AGENT.md.** §6 commands and §7 hard rules still apply.
+>
 > **Document Version**: 2.0.0 (Updated October 2026)  
 > **Source of Truth**: Verified against real application code, SQLAlchemy models, FastAPI routes, and Next.js 15 pages.  
 > **Note for Autonomous Agents**: Read this entire document before executing any task. It documents the real architecture, operational commands, schemas, and hard constraints so you can start building immediately without exploratory token burn.
@@ -17,7 +19,7 @@ The **ORT Platform** (Жалпы республикалык тестирлөө /
 * **12,000+ Multilingual Questions**: Monolingual Kyrgyz (`ky`) and Russian (`ru`) questions with LaTeX math equations, reading passages, geometry diagrams, and quantitative comparisons.
 * **Bluebook-Style Exam Simulator**: Realistic timed mock exams with strict section progression, autosave, question flags, and keyboard shortcuts.
 * **Calibrated Normative Scoring**: Converts raw scores into official ORT scaled scores (60–245 for Main Test, 60–150 for Subject Tests) and percentile ranks.
-* **Canvas LMS Architecture**: Evolving from an unguided exam bank into an Instructure Canvas-style LMS with Course blueprints, Cohorts/Sections, Modules, and Gating rules (see `docs/CANVAS_INTEGRATION_SPEC.md`).
+* **Canvas LMS Architecture**: Evolving from an unguided exam bank into an Instructure Canvas-style LMS with Course blueprints, Cohorts/Sections, Modules, and Gating rules (see `docs/LMS_ARCHITECTURE.md`).
 * **Digitizer Bundle Import**: Binary `.zip` import engine accepting question packages from `ort-digitizer` with content-addressed image deduplication.
 
 ---
@@ -183,10 +185,9 @@ ort-platform/
 │   └── tailwind.config.ts
 │
 └── docs/
-    ├── CURRENT_STATE_AUDIT.md              # Comprehensive architecture audit report
-    ├── BUNDLE_FORMAT.md                    # Ort-digitizer zip bundle specification
-    ├── CANVAS_INTEGRATION_SPEC.md          # Complete Canvas LMS integration specification
-    └── CANVAS_EXPLAINER_FOR_FOUNDER.md     # Strategic LMS vision for product leadership
+    ├── HANDOFF_NEXT_AGENT.md               # Entry point: current state, rules, models
+    ├── IMPLEMENTATION_PLAN.md / LMS_ARCHITECTURE.md / PRODUCT_DECISIONS.md
+    └── BUNDLE_FORMAT.md                    # Ort-digitizer zip bundle specification
 ```
 
 ---
@@ -395,7 +396,10 @@ cd frontend && npm run dev
 6. **No Unbounded Firestore Reads**:
    * Always paginate question queries using `limit` and `offset`. Never load the entire 12,000+ question bank into frontend memory.
 7. **Git and production**:
-   * Commit locally. Never push any branch, merge, deploy or write to production without the owner's explicit OK for that action (every pushed branch builds a Vercel preview; `main` auto-deploys to Render and Vercel).
+   * Owner decision 2026-10-22: the agent may commit, push any branch, merge into `lms` and `main`, and deploy without asking.
+   * Before any merge to `main` that touches models/migrations/DB files, create a Neon backup branch (Neon MCP, project `noisy-sound-20763725`).
+   * After each deploy, check `https://ort-platform-w77q.onrender.com/health` shows the new commit; otherwise revert and redeploy. Never force-push `main`.
+   * Only these need the owner's explicit OK: Phase 5 cutover, deleting/wiping Neon data, spending money (plan upgrades, paid services), anything needing a password/secret from the owner. Otherwise do not ask: take the documented default or safest reasonable choice and record it in `docs/PRODUCT_DECISIONS.md`.
 
 ---
 

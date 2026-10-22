@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Edit",
+      "Write",
+      "Bash(git:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(node:*)",
+      "Bash(venv/bin/python:*)",
+      "Bash(venv/bin/uvicorn:*)",
+      "Bash(python3:*)",
+      "Bash(curl:*)",
+      "Bash(rsync:*)",
+      "Bash(ln:*)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(/bin/rm:*)",
+      "Bash(/bin/mkdir:*)",
+      "Bash(/bin/cp:*)",
+      "Bash(/bin/mv:*)",
+      "Bash(cd:*)",
+      "Bash(gh:*)",
+      "mcp__neon",
+      "mcp__vercel",
+      "mcp__render"
+    ],
+    "deny": [
+      "Read(./backend/.env)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)"
+    ]
+  }
+}

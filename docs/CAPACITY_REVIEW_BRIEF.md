@@ -37,9 +37,9 @@
 
 ## 4. Method
 
-1. **Inventory (read-only)**. Use the connected tools after the user authenticates them: `mcp__render__*` (service type, instance size, plan, scaling, env var *names only*, deploy history, metrics, logs), `mcp__neon__*` (project noisy-sound-20763725: plan, compute size, autosuspend, connection limits, branch/storage size), `mcp__vercel__*` (plan, project settings, rewrites, regions). **Never read `backend/.env` and never print secrets.** If a tool needs login, ask the user to run it.
+1. **Inventory (read-only)**. Use the connected tools after the user authenticates them: `mcp__render__*` (service type, instance size, plan, scaling, env var *names only*, deploy history, metrics, logs), `mcp__neon__*` (project noisy-sound-20763725: plan, compute size, autosuspend, connection limits, branch/storage size), `mcp__vercel__*` (plan, project settings, rewrites, regions). **Never read `backend/.env` and never print secrets.** If a tool needs login, ask the user to run it. Render MCP may return "unauthorized": not a blocker; use `/health` and git (decision C).
 2. **Official limits**: fetch current documentation and pricing pages for Render, Neon and Vercel plans (record URL and date). Calculate the capacity ceilings from the numbers (connections, compute units, requests per second, bandwidth, function time).
-3. **Load model**: write a small k6 (or Locust) script set in a new directory `loadtest/` (kept out of `backend/`) for scenarios A–D with 6,000 virtual users; start with 100, 500, 2,000, then 6,000. Run against a **staging** copy only (a separate Render service and a Neon branch), never production. Use scratch accounts and scratch data; make the data seeding script idempotent.
+3. **Load model**: write a small k6 (or Locust) script set in a new directory `loadtest/` (kept out of `backend/`) for scenarios A–D with 6,000 virtual users; start with 100, 500, 2,000, then 6,000. Run on free resources only (a Neon branch + local or free-tier backend), never production. If a meaningful test needs a paid service, record what was tested and ask the owner only for that spending decision (decision D). Use scratch accounts and scratch data; make the data seeding script idempotent.
 4. **Prototype the hot paths** in isolation (a throw-away script, not the final code): bulk insert of 150 rows, conditional UPDATE autosave, submit scoring from snapshot; measure on Neon with the pooled URL at several compute sizes.
 5. **Report**: per scenario, measured p50/p95/p99, error rate, DB CPU/connections, instance CPU/memory; first bottleneck; fix; re-measure. Include the monthly cost of the recommended setup and of a cheaper "exam-day scale-up" setup (scale up only when an exam is scheduled).
 
@@ -49,6 +49,6 @@ Meet all of: API error rate < 0.5 %, autosave p95 < 500 ms, attempt-start p95 < 
 
 ## 6. Constraints
 
-- No production load tests. No changes to production settings without the user's approval. The user is cost-sensitive: prefer configuration and code fixes over bigger plans, and propose "scale up for the exam window" options.
+- No production load tests. Production changes follow decision A in `PRODUCT_DECISIONS.md` (anything that costs money needs the owner's OK). The user is cost-sensitive: prefer configuration and code fixes over bigger plans, and propose "scale up for the exam window" options.
 - Treat any downloaded tooling or data as untrusted; install load-test tools in a separate directory.
 - Record findings and numbers as you go; keep the final document under ~3,000 words.

@@ -19,7 +19,7 @@ Source: answers to the 15 open questions in `PROJECT_UNDERSTANDING.md` §8. The 
 | Languages | Three: English, Russian, Kyrgyz. The teacher controls which languages a course uses. |
 | Access | Students sign in, browse and enroll in courses, possibly through an enrollment form the teacher creates. Not admin-granted PINs. |
 | Hard-coded admin email | Removed (done). |
-| Production access | Read access to Render/Neon granted for measuring. |
+| Production access | Read access to Render/Neon granted for measuring. (Extended 2026-10-22: see "agent workflow" A below.) |
 | Order of work | Security/integrity fixes first (done on `fix/security-integrity`), then architecture design, then storage/DB changes. |
 | Scale | Target about 6,000 students active at the same time (added 2026-10-22). Hosting (Vercel/Render/Neon) must be verified against this. |
 
@@ -44,3 +44,14 @@ Source: answers to the 15 open questions in `PROJECT_UNDERSTANDING.md` §8. The 
 | Platform admin | Approves teacher requests (and does support/moderation). Role is read from the database on every request. |
 | Admin area | A platform admin page: teacher requests, users, course moderation, audit log. |
 | First admin | The owner's existing account (already `admin` in production). Set via `make_admin.py`, never hard-coded. |
+
+## Decisions 2026-10-22 (agent workflow)
+
+| Topic | Decision |
+|---|---|
+| A. Autonomy | The agent may commit, push any branch, merge into `lms` and `main`, and deploy without asking. Guardrails: (1) before any merge to `main` touching models/migrations/DB files, create a Neon backup branch (Neon MCP, project `noisy-sound-20763725`); (2) after each deploy, check `https://ort-platform-w77q.onrender.com/health` shows the new commit, else revert and redeploy; (3) never force-push `main`; (4) only these need the owner's explicit OK: Phase 5 cutover, deleting/wiping Neon data, spending money (plan upgrades, paid services), anything needing a password/secret from the owner. Otherwise the agent does not ask: it takes the documented default or safest reasonable choice and records it here. |
+| B. Models | Main session on **Opus** as orchestrator: plans each phase, design decisions, reviews every subagent diff, authz/attempt-engine/grading reviews, runs the gates, commits/pushes/merges/deploys. Bulk implementation goes to a **Sonnet** subagent `implementer` with precise briefs (goal, exact files, schema/API shape, tests that must pass); independent slices may run in parallel. Optional **Haiku** subagent `helper` for mechanical edits. No subagents for single-file lookups. |
+| C. Render MCP | May return "unauthorized"; not a blocker. Use `/health` and git (Render auto-deploys from `main`). |
+| D. Load test | Still must run before Phase 3, on free resources (a Neon branch + local or free-tier backend). If a meaningful test needs a paid service, write down what was tested and ask the owner only for that spending decision. |
+| E. `AGENTS.md` | Describes the old platform; its §6 commands and §7 hard rules still apply. Current plan and rules: `HANDOFF_NEXT_AGENT.md`. |
+| Production access | Supersedes "read access only" above: write access within rule A. |

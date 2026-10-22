@@ -18,7 +18,8 @@
    - Soft delete only; attempts and submissions never cascade.
    - A short `docs/phases/PHASE_N.md` note: what changed, how to verify, what was deferred.
    - Code review pass (`/code-review`) before merge; security review (`/security-review`) at phases 1, 3, 7, 9.
-5. **Models for the work** (cost control): design-heavy phases (1, 3, 4, 6) and reviews run on **Opus**; CRUD/UI-heavy work on **Sonnet**. Subagents are used for independent, parallelizable slices (e.g., UI page vs. API) and always get this plan and the architecture doc as context. Nothing is run against production without your say-so.
+5. **Models for the work** (owner decision B, 2026-10-22): the main session runs on **Opus** as orchestrator (phase plans, design decisions, briefs, review of every subagent diff, authz/attempt-engine/grading reviews, gates, commit/push/merge/deploy). Bulk implementation goes to the **Sonnet** `implementer` subagent with a precise brief (goal, exact files, schema/API shape, tests that must pass); independent slices may run in parallel. Optional **Haiku** `helper` for mechanical edits. No subagents for single-file lookups.
+6. **Git and production** (owner decision A, 2026-10-22): the agent pushes, merges into `lms`/`main` and deploys without asking, with a Neon backup branch before `main` merges that touch models/migrations/DB files and a `/health` commit check after each deploy. Owner OK only for Phase 5, Neon data deletion/wipes, spending money, and owner secrets. No load tests against production.
 
 ## Non-functional targets (added 2026-10-22)
 
@@ -117,7 +118,7 @@ Phases 6, 7, 8 are independent of each other after the cutover and may run in an
 - Teacher: quiz builder (sections, drag-reorder items, points, time limits, settings, publish/unpublish, preview as student).
 - Student: **adapt the existing 1,778-line exam player** to the new API instead of rewriting it: split it into components (palette, timer, question card, passage, comparison card are already separate); timer driven by server `deadline_at`; section-forward-only navigation; offline-tolerant autosave queue with clear errors.
 **Tests**: table-driven integrity suite — resubmit (two parallel submits: exactly one wins), answer after deadline (rejected beyond grace), answer after section close, tab race on autosave, attempt limit under concurrency, edits after publish don't change in-flight attempts, key never in any student payload, student cannot read another's attempt; question-type scoring unit tests; ported `test_mock_test_service` behaviors that still apply (resume, save/exit).
-**Scale check**: a load test (k6 or Locust) with 6,000 virtual students on a staging copy meets the budgets above before merge; results saved in `docs/phases/PHASE_3.md`.
+**Scale check**: a load test (k6 or Locust) with 6,000 virtual students meets the budgets above before merge; results saved in `docs/phases/PHASE_3.md`. A first load test runs before Phase 3 starts. Both use free resources (a Neon branch + local or free-tier backend); if a meaningful test needs a paid service, record what was tested and ask the owner only for that spending decision (decision D, 2026-10-22).
 **Exit criteria**: a 150-question five-section ORT-style quiz imported in Phase 2 is built, published, taken, timed out, resumed and submitted in an automated end-to-end test; the review shows correct answers only after submit.
 **Risks**: player refactor regressions → keep the old player in place until cutover and compare behavior with Playwright smoke tests; timer drift handling (client shows server time offset).
 

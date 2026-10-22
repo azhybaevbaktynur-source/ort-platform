@@ -154,7 +154,7 @@ Cloudflare R2 (verified 2026-10-21: $0.015/GB-month, 10 GB free, zero egress; Ne
 
 ## 10. Platform
 
-- **Database**: wipe Neon (testers only) and adopt **Alembic** from a reviewed baseline on empty Postgres, then delete the runtime `ALTER` helpers. Naming convention, batch mode for SQLite dev, CI runs `alembic upgrade head`, `alembic check`, pytest-alembic on Postgres 16; migrations run as a pre-deploy step, not at import.
+- **Database**: wipe Neon (testers only) and adopt **Alembic** from a reviewed baseline on empty Postgres, then delete the runtime `ALTER` helpers. Naming convention, batch mode for SQLite dev, CI runs `alembic upgrade head`, `alembic check`, pytest-alembic on Postgres 18 (matches Neon); migrations run as a pre-deploy step, not at import.
 - **Remove the in-memory Firestore** entirely (all reads and writes), including the sample-question seeding and `firebase.py`; tests stop depending on `mock_firestore_db.reset()`.
 - **API**: stay on `/api/v1`; cursor pagination in the response body; consistent error shape.
 - **Ops**: stop `print()`-ing payloads; structured logs without PII; Render paid plan for pre-deploy migrations and no spin-down (D4); confirm Vercel Hobby's non-commercial clause fits.

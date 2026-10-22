@@ -1,7 +1,7 @@
 # Capacity review (interim, 2026-10-22)
 
 **Question**: can Vercel + Render + Neon run the LMS for ~6,000 concurrent students on about $30/month?
-**Status**: interim. Inventory and database CPU costs are measured; HTTP-level load tests against a staging copy are NOT done yet. Prices are from memory and unverified.
+**Status**: interim. Inventory and database CPU costs are measured; HTTP-level load tests (free resources, decision D) are NOT done yet. Prices are from memory and unverified.
 
 ## 1. Inventory (measured / reported)
 
@@ -30,8 +30,8 @@ Reading: statement CPU is not the bottleneck. 300 autosaves/s and 20 starts/s ne
 | # | Finding | Verdict |
 |---|---|---|
 | 1 | Render Free: sleeps, ~0.1 CPU, 1 worker | **No-go.** Must be a paid plan before any real use. Starter ($7) removes sleeping; exam windows need Standard/Pro, billed per second. |
-| 2 | All API traffic proxied through Vercel | Fix: set `NEXT_PUBLIC_API_URL` to the Render URL (CORS already configurable). Removes a hop and Vercel request/bandwidth load. Needs owner approval (env var change). |
-| 3 | Vercel in US, backend in Frankfurt | Fixed on branch `perf/capacity-prep` (`frontend/vercel.json`, `fra1`). Not merged. |
+| 2 | All API traffic proxied through Vercel | Fix: set `NEXT_PUBLIC_API_URL` to the Render URL (CORS already configurable). Removes a hop and Vercel request/bandwidth load. Postponed by the owner (2026-10-22); when resumed, no approval needed (decision A in `PRODUCT_DECISIONS.md`). |
+| 3 | Vercel in US, backend in Frankfurt | Fixed on branch `perf/capacity-prep` (`frontend/vercel.json`, `fra1`); merged to `main` 2026-10-22. |
 | 4 | Default DB pool, no timeouts | Configurable on the branch (`DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_RECYCLE`, `DB_POOL_TIMEOUT`). Statement timeout is opt-in because pooled (PgBouncer) URLs reject startup options. |
 | 5 | Large question payloads | gzip added on the branch. Design rule: exam content is identical for all students, so cache it at the CDN instead of rebuilding per start. |
 | 6 | Neon free (max 2 CU) | Unverified for bursts; likely needs Launch for exam periods. Use the pooled connection string. |
@@ -45,7 +45,7 @@ Reading: statement CPU is not the bottleneck. 300 autosaves/s and 20 starts/s ne
 
 ## 5. Next steps
 
-1. Merge `perf/capacity-prep` (owner OK), set `NEXT_PUBLIC_API_URL` (owner OK), upgrade Render to Starter (owner action).
-2. Build a staging copy (second Render service + a Neon branch) and run `k6` against the **old** endpoints for connection and CPU limits; then re-run against LMS endpoints as they appear (Phase 3 attempt engine).
+1. ~~Merge `perf/capacity-prep`~~ (done). `NEXT_PUBLIC_API_URL` postponed by the owner. Upgrading Render to Starter costs money: owner OK required (decision A).
+2. Before Phase 3, on free resources (a Neon branch + local or free-tier backend; decision D), run `k6` against the **old** endpoints for connection and CPU limits; then re-run against LMS endpoints as they appear (Phase 3 attempt engine).
 3. Reduce load by design: cached exam payload, client-side autosave batching, in-memory scoring from the snapshot.
 4. Decide D4 with the measured numbers, and delete scratch branch `scratch-loadtest-2026-10-22`.
