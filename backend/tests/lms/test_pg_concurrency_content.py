@@ -434,6 +434,10 @@ def test_import_failure_leaves_zero_blobs_and_assets(pg, monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "LMS_LOCAL_STORAGE_DIR", str(blobs))
     storage.reset_blob_storage()
     media.reset_media_cache()
+    # earlier tests of this module leave assets with the same content-addressed keys behind; the cleanup under
+    # test only deletes blobs no asset row references, so start from empty tables
+    with pg.begin() as conn:
+        conn.exec_driver_sql("TRUNCATE " + ", ".join(f'"{t.name}"' for t in Base.metadata.sorted_tables) + " CASCADE")
     Session, User, ids = _c4_world(pg)
     raw = open(os.path.join(os.path.dirname(__file__), "..", "fixtures", "bundles", "tsoomo19.zip"), "rb").read()
     opts = ImportOptions(exam_type="full_main", language="ru", allowed_languages=["en", "ru", "ky"])

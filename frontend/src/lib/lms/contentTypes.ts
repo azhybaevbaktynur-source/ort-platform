@@ -329,6 +329,6 @@ export const CONTENT_ERROR_CODES = [
   "image_too_large", "image_too_many_pixels", "storage_quota_exceeded", "storage_full",
   "language_not_in_course", "translation_language_taken", "translation_scope_mismatch",
   "translation_type_mismatch", "source_conflict", "bank_deleted", "passage_in_use", "invalid_move",
-  "import_busy", "file_too_large",
+  "import_busy", "file_too_large", "length_required", "private_storage_unavailable", "passage_deleted",
 ] as const;
 export type ContentErrorCode = (typeof CONTENT_ERROR_CODES)[number];

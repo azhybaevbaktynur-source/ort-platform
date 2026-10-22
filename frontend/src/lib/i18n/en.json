@@ -309,6 +309,9 @@
       "passage_in_use": "This passage is still used by questions, so it cannot be deleted.",
       "invalid_move": "The question cannot be moved further.",
       "import_busy": "Another import is running. Please try again in a minute.",
+      "length_required": "The request must include its size. Please try again.",
+      "private_storage_unavailable": "Private file storage is not available right now. Please contact the administrator.",
+      "passage_deleted": "This passage has been deleted.",
       "file_too_large": "The file is too large."
     }
   },
@@ -964,6 +967,7 @@
         "duplicate_external_id": "external_id \"{external_id}\" is repeated",
         "csv_not_utf8": "The CSV file is not UTF-8 encoded",
         "csv_unreadable": "The CSV file could not be read",
+        "csv_too_large": "The CSV file is larger than {limit_mb} MB",
         "csv_header_mismatch": "The CSV header must consist of exactly the 15 platform columns",
         "csv_field_count": "The row has {got} fields instead of 15",
         "row_invalid": "The row is invalid",
@@ -985,7 +989,8 @@
         "question_deleted_skipped": "The question was deleted in the bank, so it was skipped",
         "questions_missing_from_bundle": "{count} previously imported questions from source \"{source_id}\" are not in this file and were left unchanged",
         "storage_error": "The images could not be saved to storage",
-        "database_error": "The questions could not be saved, nothing was imported"
+        "database_error": "The questions could not be saved, nothing was imported",
+        "too_many_issues": "Showing {shown} issues. In total: {errors_total} errors and {warnings_total} warnings."
       }
     }
   }
