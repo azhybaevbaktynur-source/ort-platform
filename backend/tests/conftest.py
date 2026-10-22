@@ -4,6 +4,9 @@ import os
 os.environ.setdefault("ALLOW_MOCK_TOKENS", "true")
 # Environment variables win over backend/.env: never send real email or run in production mode from tests
 os.environ.setdefault("ENVIRONMENT", "development")
+# DEBUG + ALLOW_MOCK_TOKENS makes header-less requests act as a mock student (local dev shortcut);
+# DEBUG defaults to True when no backend/.env exists (CI), so pin it off: tests must see real 401s
+os.environ.setdefault("DEBUG", "false")
 os.environ.setdefault("EMAIL_PROVIDER", "console")
 
 import pytest

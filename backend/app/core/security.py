@@ -5,9 +5,14 @@ import jwt
 import bcrypt
 from app.core.exceptions import UnauthorizedException, ForbiddenException
 from app.schemas.user import UserProfile, UserRole
-from app.core.config import settings
+from app.core.config import settings, is_production
 from app.db.session import SessionLocal
 from app.models.user import User
+
+
+def _mock_tokens_allowed() -> bool:
+    # Test/dev only; never honoured in production even if the flag is set by mistake.
+    return settings.ALLOW_MOCK_TOKENS and not is_production()
 
 # Test / Mock users for development and automated testing
 MOCK_USERS = {
@@ -88,7 +93,7 @@ def get_current_user(
     does not stall every other request on the server.
     """
     if not authorization:
-        if settings.ALLOW_MOCK_TOKENS and settings.DEBUG:
+        if _mock_tokens_allowed() and settings.DEBUG:
             return MOCK_USERS["mock_student_token"]
         raise UnauthorizedException("Authorization header missing")
 
@@ -99,7 +104,7 @@ def get_current_user(
     token = parts[1]
 
     # 1. Handle mock tokens (tests / local development only)
-    if settings.ALLOW_MOCK_TOKENS and token in MOCK_USERS:
+    if _mock_tokens_allowed() and token in MOCK_USERS:
         return MOCK_USERS[token]
 
     # 2. Try decoding as JWT token
@@ -132,7 +137,7 @@ def get_current_user(
         pass
 
     # 3. Fallback for mock mode dynamic tokens (tests / local development only)
-    if settings.ALLOW_MOCK_TOKENS and settings.FIREBASE_MOCK_MODE:
+    if _mock_tokens_allowed() and settings.FIREBASE_MOCK_MODE:
         role = UserRole.ADMIN if ("admin" in token or "instructor" in token) else UserRole.STUDENT
         return UserProfile(
             id=f"usr_{token[:12]}",
