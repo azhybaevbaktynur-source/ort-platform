@@ -5,6 +5,7 @@ from app.services.mock_test_service import MockTestService
 from app.services.question_service import QuestionService
 from app.db.session import SessionLocal
 from app.models.exam_access import ExamAccess
+from app.models.user import User
 from app.schemas.mock_test import (
     AnswerSubmission,
     ExamStatus,
@@ -156,6 +157,9 @@ class TestMockTestService:
         )
 
         db = SessionLocal()
+        if db.get(User, "usr_bio_student") is None:
+            db.add(User(id="usr_bio_student", email="bio_student@example.test", password_hash="x", role="student"))
+            db.flush()
         db.add(ExamAccess(
             id=f"acc_{uuid.uuid4().hex[:12]}",
             user_id="usr_bio_student",
@@ -206,6 +210,9 @@ class TestMockTestService:
 
         # Grant access to student std_99 so they can reach PIN validation
         db = SessionLocal()
+        if db.get(User, "std_99") is None:
+            db.add(User(id="std_99", email="std_99@example.test", password_hash="x", role="student"))
+            db.flush()
         db.add(ExamAccess(
             id=f"acc_{uuid.uuid4().hex[:12]}",
             user_id="std_99",

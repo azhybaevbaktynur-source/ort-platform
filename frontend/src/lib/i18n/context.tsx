@@ -3,8 +3,9 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import kyDict from "./ky.json";
 import ruDict from "./ru.json";
+import enDict from "./en.json";
 
-export type Language = "ky" | "ru";
+export type Language = "en" | "ky" | "ru";
 
 interface LanguageContextType {
   lang: Language;
@@ -15,6 +16,7 @@ interface LanguageContextType {
 const dictionaries: Record<Language, any> = {
   ky: kyDict,
   ru: ruDict,
+  en: enDict,
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
@@ -30,7 +32,7 @@ export function LanguageProvider({
 
   useEffect(() => {
     const saved = localStorage.getItem("ort_preferred_language") as Language;
-    if (saved && (saved === "ky" || saved === "ru")) {
+    if (saved && (saved === "ky" || saved === "ru" || saved === "en")) {
       setLangState(saved);
     }
   }, []);

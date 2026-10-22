@@ -92,7 +92,9 @@ def _send_smtp(to_email: str, subject: str, text: str, html: str) -> None:
 def send_email(to_email: str, subject: str, text: str, html: str) -> bool:
     provider = active_provider()
     if provider == "console":
-        print(f"\n{'=' * 80}\n[EMAIL] To: {to_email}\nSubject: {subject}\n\n{text}\n{'=' * 80}\n", flush=True)
+        if not is_production():
+            # Dev-only console delivery: the code must be visible to the developer.
+            logger.warning("[EMAIL console] To: %s Subject: %s\n%s", to_email, subject, text)
         if is_production():
             logger.error("No email provider configured (set RESEND_API_KEY or BREVO_API_KEY); email to %s NOT sent", to_email)
             return False

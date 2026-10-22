@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, MetaData
 from sqlalchemy.orm import sessionmaker, declarative_base
 from app.core.config import settings
 
@@ -8,6 +8,9 @@ raw_db_url = os.getenv("DATABASE_URL") or settings.DATABASE_URL or "sqlite:///./
 # Render, Heroku, Supabase, Neon use postgres:// which SQLAlchemy 2.0 requires as postgresql://
 if raw_db_url.startswith("postgres://"):
     raw_db_url = raw_db_url.replace("postgres://", "postgresql://", 1)
+# SQLAlchemy 2.1 maps bare postgresql:// to psycopg 3, which is not installed; pin psycopg2.
+if raw_db_url.startswith("postgresql://"):
+    raw_db_url = raw_db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
 
 # For SQLite relative paths, ensure absolute path and directory exists
 if raw_db_url.startswith("sqlite:///./"):
@@ -38,7 +41,14 @@ if not db_url.startswith("sqlite"):
 engine = create_engine(db_url, **engine_kwargs)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+NAMING_CONVENTION = {
+    "ix": "ix_%(column_0_label)s",
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s",
+}
+Base = declarative_base(metadata=MetaData(naming_convention=NAMING_CONVENTION))
 
 
 def get_db():

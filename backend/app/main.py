@@ -8,7 +8,9 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings, is_production, DEFAULT_SECRET_KEY
 from app.db.init_db import init_db
+from app.db.migrate import run_migrations
 from app.api.v1.router import api_router
+from app.lms.core.errors import register_error_handlers
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +18,11 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """FastAPI modern lifespan handler (replaces deprecated on_event)."""
+    try:
+        run_migrations()
+    except Exception:
+        logger.exception("Database migration failed; refusing to start")
+        raise
     try:
         init_db()
     except Exception as e:
@@ -53,6 +60,7 @@ app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 # Include API v1 router
 app.include_router(api_router, prefix=settings.API_V1_STR)
+register_error_handlers(app)
 
 
 @app.get("/health", tags=["Health"])

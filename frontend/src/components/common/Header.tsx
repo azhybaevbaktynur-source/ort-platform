@@ -36,26 +36,25 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle, onMenuClick }) 
         {/* Language Switcher Button */}
         <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200">
           <Globe className="w-3.5 h-3.5 text-slate-500 ml-1.5 mr-1" />
-          <button
-            onClick={() => setLang("ky")}
-            className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
-              lang === "ky"
-                ? "bg-white text-brand-600 shadow-sm"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            Кыргызча
-          </button>
-          <button
-            onClick={() => setLang("ru")}
-            className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
-              lang === "ru"
-                ? "bg-white text-brand-600 shadow-sm"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            Русский
-          </button>
+          {(
+            [
+              ["ky", "Кыргызча"],
+              ["ru", "Русский"],
+              ["en", "English"],
+            ] as const
+          ).map(([code, label]) => (
+            <button
+              key={code}
+              onClick={() => setLang(code)}
+              className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+                lang === code
+                  ? "bg-white text-brand-600 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
     </header>

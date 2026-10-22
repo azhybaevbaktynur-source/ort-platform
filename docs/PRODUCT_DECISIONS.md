@@ -55,3 +55,12 @@ Source: answers to the 15 open questions in `PROJECT_UNDERSTANDING.md` §8. The 
 | D. Load test | Still must run before Phase 3, on free resources (a Neon branch + local or free-tier backend). If a meaningful test needs a paid service, write down what was tested and ask the owner only for that spending decision. |
 | E. `AGENTS.md` | Describes the old platform; its §6 commands and §7 hard rules still apply. Current plan and rules: `HANDOFF_NEXT_AGENT.md`. |
 | Production access | Supersedes "read access only" above: write access within rule A. |
+## Decisions 2026-10-22 (Phase 0, agent defaults)
+
+| Topic | Decision |
+|---|---|
+| Migrations on the Free plan | Render Free has no pre-deploy hook, so Alembic runs at app startup (Postgres only), in one transaction under `pg_advisory_xact_lock`. Production Neon is stamped `0001_baseline` on first start. Move to a pre-deploy command when Render is upgraded (D4). |
+| Phase 0 to `main` | Phase 0 has no user-visible LMS features but contains hardening and the Alembic stamp, so it is merged to `main` too (after a Neon backup branch). Phases 1–4 stay on `lms` until the Phase 5 cutover, per the plan's strangler strategy. |
+| Postgres driver | URLs are pinned to `postgresql+psycopg2://` (SQLAlchemy 2.1 defaults to psycopg 3). |
+| English in old pages | Old pages keep their inline ky/ru strings; English shows the non-ky branch until the cutover deletes them. Language buttons show endonyms (Кыргызча, Русский, English). |
+| Upload limits | Images only (PNG/JPEG/GIF/WEBP by content), 5 MiB cap, 400 for invalid content, 413 for oversize. |
