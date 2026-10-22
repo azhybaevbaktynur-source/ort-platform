@@ -48,7 +48,7 @@ Turn the ORT/ЖРТ exam bank (one global admin, one question bank) into a flexi
 
 **Owner decisions 2026-10-22 (agent workflow, A–D; also in `PRODUCT_DECISIONS.md`)**
 - **A. Autonomy**: the agent commits, pushes any branch, merges into `lms` and `main`, and deploys without asking. Guardrails: (1) before any merge to `main` touching models/migrations/DB files, create a Neon backup branch (Neon MCP, project `noisy-sound-20763725`); (2) after each deploy, check `https://ort-platform-w77q.onrender.com/health` shows the new commit, else revert and redeploy; (3) never force-push `main`; (4) only these need the owner's explicit OK: Phase 5 cutover, deleting/wiping Neon data, spending money (plan upgrades, paid services), anything needing a password/secret from the owner. Otherwise do not ask: take the documented default or safest reasonable choice and record it in `PRODUCT_DECISIONS.md`.
-- **B. Models**: see §6 (Fable orchestrator, or Opus if Fable is unavailable; subagents `architect` = Opus, `implementer` = Sonnet, `helper` = Haiku).
+- **B. Models**: see §6 (Fable orchestrator, or Opus if Fable is unavailable; subagents `architect` = Fable, `implementer` = Opus by default, Sonnet for simple tasks; no Haiku — revised 2026-10-22).
 - **C. Render MCP** may return "unauthorized": not a blocker. Use `/health` and git (Render auto-deploys from `main`).
 - **D. Load test** still runs before Phase 3, on free resources (a Neon branch + local or free-tier backend). If a meaningful test needs a paid service, write down what was tested and ask the owner only for that spending decision.
 - **E.** `AGENTS.md` describes the old platform; its §6 commands and §7 hard rules still apply.
@@ -62,14 +62,15 @@ Turn the ORT/ЖРТ exam bank (one global admin, one question bank) into a flexi
 
 Subscription usage is a shared allowance that resets in rolling windows, and bigger models consume it faster. Check the remaining allowance with `/usage` (or `/status`) at the start of a session and before any big task; do not assume limits. Principles:
 
-Owner decision B (2026-10-22, revised the same day):
+Owner decision B (2026-10-22, revised twice the same day; latest: no Haiku, per-task model choice):
 
 | Who | Model | Does |
 |---|---|---|
 | Main session (orchestrator) | **Fable** (if Fable is not available in `/model`: **Opus**, same rules) | Orchestrator only: plans each phase, splits it into slices, writes precise briefs, reviews every diff, runs the full gates, commits/pushes/merges/deploys. Keeps its own reading and typing minimal (most expensive model). |
-| `architect` subagent (`.claude/agents/architect.md`) | **Opus** | Hard design and review: authz, attempt engine, grading, gating, concurrency, security reviews, phase design drafts. |
-| `implementer` subagent (`.claude/agents/implementer.md`) | **Sonnet** | Bulk implementation of one designed slice from a precise brief: goal, exact files, schema/API shape, tests that must pass. Independent slices may run in parallel. |
-| `helper` subagent (`.claude/agents/helper.md`) | **Haiku** | Mechanical edits: renames, i18n key sync, formatting. |
+| `architect` subagent (`.claude/agents/architect.md`) | **Fable** (default) | Hard design and review: authz, attempt engine, grading, gating, concurrency, security reviews, phase design drafts. |
+| `implementer` subagent (`.claude/agents/implementer.md`) | **Opus** (default; **Sonnet** via `model: sonnet` for simple, well-specified work) | Implementation of one designed slice from a precise brief: goal, exact files, schema/API shape, tests that must pass. Also mechanical edits (renames, i18n keys). Independent slices may run in parallel. |
+
+Per-task model via the Agent tool's `model` parameter: **sonnet** for simple, well-specified work (straightforward CRUD, tests from a clear spec, UI following an existing pattern, i18n keys, renames); **opus** (default for real code: services, endpoints, migrations, attempt engine, grading, gating, concurrency); **fable** only for the hardest problems (architect design/review of authz, attempt engine, grading and concurrency; the final security review of each phase; any task where opus failed or got stuck once). Escalate on failure sonnet → opus → fable; never retry a failed task on the same model. No Haiku.
 
 No subagents for single-file lookups. A *new* session only has files, so keep `task-progress.md` and `docs/phases/PHASE_N.md` current.
 
@@ -77,7 +78,7 @@ No subagents for single-file lookups. A *new* session only has files, so keep `t
 1. Work in short sessions, one phase slice per session. `/clear` between unrelated tasks; `/compact` when a task runs long. Do not carry a finished phase's context into the next.
 2. Never re-explore. Use this file, `codebase-map.md` (memory) and the docs. Read only the file ranges you need (`Read` with offset/limit, `grep -n`), never whole large files (the exam player is 1,778 lines; the old mock-test service is 1,293).
 3. Do not open `docs/research/*` or `PROJECT_UNDERSTANDING.md` in full; they total ~25k tokens. Use the section pointers above.
-4. Hard design/review goes to the Opus `architect`; bulk implementation to the Sonnet `implementer` with a precise brief (goal, exact files, schema/API shape, tests that must pass), independent slices in parallel; mechanical edits to the Haiku `helper`. The orchestrator reviews every diff. Never use a subagent for a single-file lookup.
+4. Hard design/review goes to the `architect` (Fable); implementation to the `implementer` (Opus by default, Sonnet for simple well-specified work) with a precise brief (goal, exact files, schema/API shape, tests that must pass), independent slices in parallel; mechanical edits also to the `implementer` on Sonnet. Escalate on failure sonnet → opus → fable. The orchestrator reviews every diff. Never use a subagent for a single-file lookup.
 5. Batch independent tool calls in one turn; avoid read-after-edit verification (the tools report errors).
 6. Run only the tests you need while developing (`pytest path::test -q`), the full suite once before commit. Keep command output short (`| tail -20`, `-q`).
 7. Keep `AGENTS.md`/`CLAUDE.md` short: it is sent every turn. Move detail into docs that are read on demand.

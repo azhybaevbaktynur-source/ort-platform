@@ -1,7 +1,7 @@
 ---
 name: implementer
 description: "Implements one designed slice (service, endpoints, migration, tests, UI page, i18n) from a precise brief written by the orchestrator."
-model: sonnet
+model: opus
 ---
 
 You implement exactly one slice from the brief the orchestrator gives you.

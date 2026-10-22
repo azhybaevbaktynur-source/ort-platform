@@ -18,7 +18,7 @@
    - Soft delete only; attempts and submissions never cascade.
    - A short `docs/phases/PHASE_N.md` note: what changed, how to verify, what was deferred.
    - Code review pass (`/code-review`) before merge; security review (`/security-review`) at phases 1, 3, 7, 9.
-5. **Models for the work** (owner decision B, 2026-10-22): the main session runs on **Fable** (Opus if Fable is unavailable) as orchestrator only: phase plans, slicing, briefs, review of every diff, full gates, commit/push/merge/deploy, minimal own reading and typing. Subagents: `architect` (**Opus**) designs and reviews the hard parts (authz, attempt engine, grading, gating, concurrency, security); `implementer` (**Sonnet**) does bulk implementation from precise briefs (goal, exact files, schema/API shape, tests that must pass), independent slices in parallel; `helper` (**Haiku**) does mechanical edits. No subagents for single-file lookups.
+5. **Models for the work** (owner decision B, 2026-10-22): the main session runs on **Fable** (Opus if Fable is unavailable) as orchestrator only: phase plans, slicing, briefs, review of every diff, full gates, commit/push/merge/deploy, minimal own reading and typing. Subagents (revised 2026-10-22): `architect` (**Fable**) designs and reviews the hard parts (authz, attempt engine, grading, gating, concurrency, security); `implementer` (**Opus** by default, **Sonnet** for simple well-specified work incl. mechanical edits) implements from precise briefs (goal, exact files, schema/API shape, tests that must pass), independent slices in parallel; escalate on failure sonnet → opus → fable; no Haiku. No subagents for single-file lookups.
 6. **Git and production** (owner decision A, 2026-10-22): the agent pushes, merges into `lms`/`main` and deploys without asking, with a Neon backup branch before `main` merges that touch models/migrations/DB files and a `/health` commit check after each deploy. Owner OK only for Phase 5, Neon data deletion/wipes, spending money, and owner secrets. No load tests against production.
 
 ## Non-functional targets (added 2026-10-22)
@@ -65,7 +65,7 @@ Phases 6, 7, 8 are independent of each other after the cutover and may run in an
 
 ---
 
-## Phase 1 — Courses, enrollment, authorization (L) · *`architect` (Opus) for design/review*
+## Phase 1 — Courses, enrollment, authorization (L) · *`architect` (Fable) for design/review*
 
 **Goal**: a teacher signs up, creates a course, shares a code; students join. The permission layer is real.
 
@@ -104,7 +104,7 @@ Phases 6, 7, 8 are independent of each other after the cutover and may run in an
 
 ---
 
-## Phase 3 — Assessments and attempts (L) · *`architect` (Opus) for design/review*
+## Phase 3 — Assessments and attempts (L) · *`architect` (Fable) for design/review*
 
 **Goal**: a teacher assembles and publishes a quiz; students take it with server-enforced integrity. ORT-style multi-section timed exams work.
 
@@ -124,7 +124,7 @@ Phases 6, 7, 8 are independent of each other after the cutover and may run in an
 
 ---
 
-## Phase 4 — Grading and results (L) · *`architect` (Opus) for design/review*
+## Phase 4 — Grading and results (L) · *`architect` (Fable) for design/review*
 
 **Goal**: flexible grading per assessment/course; ORT scoring reproduced as *data*; teachers see a gradebook; students see real reviews.
 
@@ -156,7 +156,7 @@ Phases 6, 7, 8 are independent of each other after the cutover and may run in an
 
 ---
 
-## Phase 6 — Pages, modules, gating (L) · *`architect` (Opus) for design/review*
+## Phase 6 — Pages, modules, gating (L) · *`architect` (Fable) for design/review*
 
 **Schema**: `pages`, `course_modules`, `module_prerequisites`, `module_items`, `item_completion_requirements`, `item_progress`, `module_progress`, `item_requirement_status` (architecture §7).
 **Backend**: page CRUD (language variants, sanitize on write), modules/items CRUD with reorder in one transaction (deferrable unique positions), prerequisite validation (earlier module, same course, 422 on violation — never silently dropped), the 7-step gating evaluator with `rules_version` cache invalidation, fact recording (view / mark done / submit / scored from Phase 4), "re-apply rules" teacher action, computed visibility.
