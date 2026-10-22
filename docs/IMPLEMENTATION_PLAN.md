@@ -76,7 +76,8 @@ Phases 6, 7, 8 are independent of each other after the cutover and may run in an
 - Registration: every sign-up is a student. Teacher access is requested by the user and approved by a platform admin (`users.teacher_status`, `teacher_requests`; endpoints: request, list pending, approve/reject, revoke). Only `approved` users can create courses. Email verification unchanged.
 - Endpoints (all under `/api/v1/courses…`), each listed in the permission matrix.
 **Frontend**
-- "Become a teacher" request form for students, and a platform-admin screen listing pending teacher requests with approve / reject / revoke.
+- "Become a teacher" request form for students.
+- **Platform admin area** `/[lang]/admin` (new; the old `(admin)` pages stay until cutover): teacher requests (pending list, approve / reject with reason, revoke), users (search, paginated, teacher status, disable account), courses (search, unlist from catalog, soft-delete/restore), and an audit log of every admin action. Every endpoint checks `is_platform_admin` from the database.
 - Route group `/[lang]/courses`: "My courses" (teaching / learning), create-course form (title, languages ⊆ en/ru/ky, default language, enrollment mode: closed/open/code), course shell with role-aware tabs (Home, People, Settings), join-by-code page and dialog, roster management, course settings incl. conclude/delete/restore.
 - Navigation no longer depends on a global admin role; the old `(admin)`/`(student)` groups stay untouched until cutover.
 **Tests**: matrix tests (action × role × course status); two teachers / three students isolation suite; join concurrency (limit never exceeded with parallel joins); code-guessing rate limit; re-join revives the row and its history; owner cannot be removed; soft-deleted course returns 404 to everyone except owner restore.

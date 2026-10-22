@@ -42,3 +42,5 @@ Source: answers to the 15 open questions in `PROJECT_UNDERSTANDING.md` §8. The 
 | Age (D5) | Not a problem for course creation, because an admin verifies every teacher first. Student minimum age and consent wording are deferred. |
 | D2 (domain/CDN) and D5 (age/consent) | Postponed until the overall build is finished and a domain exists. |
 | Platform admin | Approves teacher requests (and does support/moderation). Role is read from the database on every request. |
+| Admin area | A platform admin page: teacher requests, users, course moderation, audit log. |
+| First admin | The owner's existing account (already `admin` in production). Set via `make_admin.py`, never hard-coded. |
