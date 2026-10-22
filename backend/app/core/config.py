@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     # anyone who knows the token string would get that role.
     ALLOW_MOCK_TOKENS: bool = False
 
+    # Number of trusted proxies appending to X-Forwarded-For (Vercel rewrite -> Render = 2); 0 = ignore the header
+    RATE_LIMIT_PROXY_HOPS: int = 2
+
     # Password hashing cost (bcrypt). 10 is OWASP's minimum and ~4x faster than 12 on small servers.
     BCRYPT_ROUNDS: int = 10
 

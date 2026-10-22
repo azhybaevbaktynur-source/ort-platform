@@ -112,6 +112,8 @@ def get_current_user(
         try:
             sql_user = db.query(User).filter(User.id == user_id).first()
             if sql_user:
+                if sql_user.disabled_at is not None:
+                    raise UnauthorizedException("Account disabled")
                 return UserProfile(
                     id=sql_user.id,
                     email=sql_user.email,

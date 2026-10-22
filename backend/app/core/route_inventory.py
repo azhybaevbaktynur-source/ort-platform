@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi.routing import APIRoute
 
-ROUTE_POLICIES: dict[tuple[str, str], str] = {
+LEGACY_POLICIES: dict[tuple[str, str], str] = {
     ("DELETE", "/api/v1/exam-sets/{exam_set_id}"): "legacy",
     ("DELETE", "/api/v1/exams/{exam_set_id}"): "legacy",
     ("DELETE", "/api/v1/mock-tests/exam-sets/{exam_set_id}"): "legacy",
@@ -66,6 +66,23 @@ ROUTE_POLICIES: dict[tuple[str, str], str] = {
     ("PUT", "/api/v1/mock-tests/exam-sets/{exam_set_id}"): "legacy",
     ("PUT", "/api/v1/questions/{question_id}"): "legacy",
     ("PUT", "/api/v1/users/me/target-score"): "legacy",
+}
+
+
+from app.lms.courses.policies import COURSE_POLICIES  # noqa: E402
+from app.lms.enrollments.policies import ENROLLMENT_POLICIES  # noqa: E402
+from app.lms.platform_admin.courses_policies import PLATFORM_COURSE_POLICIES  # noqa: E402
+from app.lms.platform_admin.policies import PLATFORM_POLICIES  # noqa: E402
+from app.lms.teachers.policies import ME_POLICIES  # noqa: E402
+
+# Policy names allowed as values (design section 5). 'course:<action>' variants are validated by prefix.
+POLICY_NAMES = frozenset({
+    "authenticated", "authenticated+ratelimit", "teacher_approved", "course:owner_restore",
+    "platform_admin", "legacy",
+})
+
+ROUTE_POLICIES: dict[tuple[str, str], str] = {
+    **LEGACY_POLICIES, **ME_POLICIES, **COURSE_POLICIES, **ENROLLMENT_POLICIES, **PLATFORM_POLICIES, **PLATFORM_COURSE_POLICIES,
 }
 
 

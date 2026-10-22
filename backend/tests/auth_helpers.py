@@ -6,7 +6,8 @@ from unittest.mock import patch
 # The app no longer seeds accounts with known passwords. Tests create the two accounts behind the
 # dev mock tokens (same ids as app.core.security.MOCK_USERS) with passwords random to each test run.
 TEST_ACCOUNTS = {
-    "admin@ort.kg": {"id": "usr_admin_01", "role": "admin", "display_name": "Нурлан Админ", "target_score": 240},
+    "admin@ort.kg": {"id": "usr_admin_01", "role": "admin", "display_name": "Нурлан Админ", "target_score": 240,
+                       "is_platform_admin": True, "teacher_status": "approved"},
     "student@ort.kg": {"id": "usr_student_01", "role": "student", "display_name": "Айбек Жумабеков", "target_score": 200},
 }
 _refreshed: set = set()

@@ -17,3 +17,14 @@ api_router.include_router(practice.router, prefix="/practice", tags=["Practice b
 api_router.include_router(admin.router, prefix="/admin", tags=["Admin & Access Management"])
 
 
+
+# Phase 1 (LMS): stub routers filled by later slices
+from app.lms.teachers.router import router as _me_router  # noqa: E402
+from app.lms.courses.router import router as _courses_router  # noqa: E402
+from app.lms.platform_admin.router import router as _platform_router  # noqa: E402
+from app.lms.platform_admin.courses_router import router as _platform_courses_router  # noqa: E402
+
+api_router.include_router(_me_router, prefix="/me", tags=["Me"])
+api_router.include_router(_courses_router, prefix="/courses", tags=["Courses"])
+api_router.include_router(_platform_router, prefix="/platform", tags=["Platform Admin"])
+api_router.include_router(_platform_courses_router, prefix="/platform", tags=["Platform Admin"])

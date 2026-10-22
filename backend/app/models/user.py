@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, DateTime, Boolean
+import sqlalchemy as sa
+from sqlalchemy import Column, String, Integer, DateTime, Boolean, ForeignKey, CheckConstraint, Index
 from app.db.session import Base
 
 
@@ -27,6 +28,24 @@ class User(Base):
     exams_taken = Column(Integer, default=0, nullable=False)
     current_score = Column(Integer, default=0, nullable=False)
     starting_score = Column(Integer, default=0, nullable=False)
+
+    # Phase 1 (LMS): platform admin flag, teacher approval, UI locale, account disable
+    is_platform_admin = Column(Boolean, default=False, nullable=False, server_default=sa.false())
+    teacher_status = Column(String(16), default="none", nullable=False, server_default="none")
+    locale = Column(String(2), nullable=True)
+    age_band = Column(String(16), nullable=True)  # reserved
+    disabled_at = Column(DateTime(timezone=True), nullable=True)
+    disabled_by_id = Column(String(64), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    disabled_reason = Column(String(500), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("teacher_status IN ('none','pending','approved','revoked')", name="teacher_status_valid"),
+        CheckConstraint("locale IS NULL OR locale IN ('en','ru','ky')", name="locale_valid"),
+        CheckConstraint(
+            "age_band IS NULL OR age_band IN ('under_14','14_17','18_plus')", name="age_band_valid"
+        ),
+        Index("ix_users_teacher_status", "teacher_status"),
+    )
 
     def to_dict(self):
         return {
