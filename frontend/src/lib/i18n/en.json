@@ -30,7 +30,8 @@
       "bulkUpload": "Bulk CSV upload",
       "studentAnalytics": "Student analytics",
       "students": "Students (access)"
-    }
+    },
+    "courses": "Courses"
   },
   "sections": {
     "math_1": "Math I (Comparison)",
@@ -225,5 +226,204 @@
     "banner": "Student mode (preview)",
     "hint": "You can see all published exams. Your attempts are not counted in statistics.",
     "back": "Back to admin panel"
+  },
+  "lms": {
+    "nav": {
+      "label": "Courses navigation",
+      "myCourses": "My courses",
+      "join": "Join a course",
+      "create": "Create course",
+      "becomeTeacher": "Become a teacher",
+      "platformAdmin": "Platform admin",
+      "oldPortal": "Exam portal"
+    },
+    "common": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "confirm": "Confirm",
+      "loading": "Loading...",
+      "empty": "Nothing here yet",
+      "retry": "Retry",
+      "retryAfter": "Try again in {seconds} seconds.",
+      "copy": "Copy",
+      "copied": "Copied",
+      "loadMore": "Load more",
+      "search": "Search"
+    },
+    "errors": {
+      "not_found": "Not found.",
+      "course_not_found": "Course not found.",
+      "forbidden": "You do not have permission to do this.",
+      "owner_only": "Only the course owner can do this.",
+      "owner_immutable": "The course owner cannot be changed or removed this way.",
+      "owner_cannot_leave": "The owner cannot leave the course. Transfer ownership first.",
+      "use_leave": "To remove yourself, use the Leave action.",
+      "not_active": "This person is not an active member of the course.",
+      "teacher_not_approved": "Your teacher status is not approved yet.",
+      "not_approved_teacher": "This user is not an approved teacher.",
+      "invalid_new_owner": "This person cannot become the owner. Choose an approved teacher of this course.",
+      "join_code_invalid": "This code did not work. Check it and try again, or ask your teacher.",
+      "join_code_exhausted": "Could not generate a new code. Please try again.",
+      "rate_limited": "Too many attempts. Please wait a bit and try again.",
+      "already_enrolled": "This person is already in the course.",
+      "user_not_found": "No user with this email was found.",
+      "limit_below_current": "The limit cannot be lower than the number of current students.",
+      "unlisted_by_admin": "An administrator removed this course from the catalog.",
+      "invalid_transition": "This action is not possible in the current course status.",
+      "has_students": "The course has active students, so it cannot be unpublished.",
+      "not_deleted": "This course is not deleted.",
+      "already_deleted": "This course is already deleted.",
+      "title_required": "Enter a title in the default language.",
+      "already_teacher": "You are already an approved teacher.",
+      "request_pending": "You already have a request waiting for review.",
+      "not_pending": "This request has already been processed.",
+      "cannot_disable_self": "You cannot disable your own account.",
+      "cannot_disable_admin": "A platform administrator cannot be disabled.",
+      "platform_admin_required": "This page is for platform administrators.",
+      "validation_failed": "Some fields are invalid. Check the form and try again.",
+      "invalid_cursor": "The list expired. Reload the page.",
+      "account_disabled": "Your account is disabled.",
+      "network": "Cannot reach the server. Check your connection.",
+      "unknown": "Something went wrong. Please try again."
+    }
+  },
+  "courses": {
+    "list": {
+      "title": "My courses",
+      "teaching": "Teaching",
+      "learning": "Learning",
+      "join": "Join with code",
+      "create": "Create course",
+      "trash": "Deleted courses",
+      "becomeTeacher": "Become a teacher",
+      "becomeTeacherText": "Want to run your own courses? Ask for teacher access.",
+      "requestPending": "Teacher request under review",
+      "emptyTeaching": "You are not teaching any courses yet.",
+      "emptyLearning": "You have not joined any courses yet. Use a code from your teacher.",
+      "untitled": "Untitled course",
+      "owner": "Teacher: {name}"
+    },
+    "create": {
+      "title": "Create a course",
+      "languages": "Course languages",
+      "defaultLanguage": "Default language",
+      "courseTitle": "Title",
+      "description": "Description",
+      "empty": "empty",
+      "enrollmentMode": "Enrollment",
+      "modeInviteCode": "With a join code",
+      "modeClosed": "Closed (nobody can join)",
+      "limit": "Student limit (optional)",
+      "limitPlaceholder": "No limit",
+      "submit": "Create course"
+    },
+    "join": {
+      "title": "Join a course",
+      "hint": "Enter the code your teacher gave you.",
+      "codeLabel": "Join code",
+      "submit": "Join"
+    },
+    "home": {
+      "tab": "Home",
+      "tabsLabel": "Course sections",
+      "backToList": "Back to my courses",
+      "draftNotice": "This course is a draft. Students cannot join until you publish it.",
+      "concludedNotice": "This course is concluded.",
+      "about": "About this course",
+      "noDescription": "No description yet.",
+      "owner": "Teacher",
+      "myRole": "My role",
+      "languages": "Languages",
+      "activeStudents": "Active students",
+      "contentSoon": "Lessons and assignments will appear here in a future update.",
+      "leave": "Leave course",
+      "leaveTitle": "Leave this course?",
+      "leaveBody": "You will lose access. You can join again with a valid code."
+    },
+    "people": {
+      "tab": "People",
+      "staffTitle": "Teachers and assistants",
+      "tableCaption": "Course members",
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "state": "Status",
+      "since": "Date",
+      "actions": "Actions",
+      "changeRole": "Change role",
+      "allRoles": "All roles",
+      "states": {
+        "active": "Active",
+        "removed": "Removed"
+      },
+      "remove": "Remove",
+      "removeTitle": "Remove from course?",
+      "removeBody": "{name} will lose access to this course.",
+      "addStaff": "Add a teacher or assistant",
+      "add": "Add",
+      "empty": "No people found."
+    },
+    "settings": {
+      "tab": "Settings",
+      "general": "General",
+      "saved": "Saved",
+      "enrollment": "Enrollment",
+      "joinCode": "Join code",
+      "joinCodeHint": "Share this code with your students. It works only while the course is published and enrollment is by code.",
+      "joinCodeInactive": "The code is not active right now: publish the course and set enrollment to a join code.",
+      "regenerate": "Generate a new code",
+      "regenerateTitle": "Generate a new code?",
+      "regenerateBody": "The old code stops working immediately. Students already in the course are not affected.",
+      "activeStudents": "Active students now: {count}",
+      "lifecycle": "Course status",
+      "lifecycleHint": {
+        "draft": "The course is a draft and hidden from students.",
+        "published": "The course is published. Students can join with the code.",
+        "concluded": "The course is concluded. Nobody can join."
+      },
+      "publish": "Publish",
+      "unpublish": "Unpublish",
+      "unpublishTitle": "Unpublish this course?",
+      "unpublishBody": "The course returns to draft. This only works when there are no active students.",
+      "conclude": "Conclude",
+      "concludeTitle": "Conclude this course?",
+      "concludeBody": "Nobody will be able to join. You can reopen the course later.",
+      "reopen": "Reopen",
+      "danger": "Danger zone",
+      "newOwner": "New owner",
+      "chooseTeacher": "Choose a teacher",
+      "noOtherTeachers": "No other teachers in this course",
+      "transfer": "Transfer ownership",
+      "transferTitle": "Transfer ownership?",
+      "transferBody": "The new owner gets full control of the course. You stay a teacher.",
+      "transferHint": "Only a teacher already in this course can become the owner.",
+      "delete": "Delete course",
+      "deleteTitle": "Delete this course?",
+      "deleteBody": "The course disappears for everyone. You can restore it from deleted courses.",
+      "deleteHint": "Only the owner can delete or restore a course."
+    },
+    "status": {
+      "draft": "Draft",
+      "published": "Published",
+      "concluded": "Concluded"
+    },
+    "roles": {
+      "owner": "Owner",
+      "teacher": "Teacher",
+      "assistant": "Assistant",
+      "student": "Student"
+    },
+    "languages": {
+      "en": "English",
+      "ru": "Russian",
+      "ky": "Kyrgyz"
+    },
+    "trash": {
+      "title": "Deleted courses",
+      "back": "Back to my courses",
+      "hint": "Courses you own that you deleted. Restoring returns a course as a draft.",
+      "empty": "No deleted courses.",
+      "restore": "Restore"
+    }
   }
 }

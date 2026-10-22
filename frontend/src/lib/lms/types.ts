@@ -1,0 +1,235 @@
+// TypeScript mirrors of the Phase 1 API schemas (docs/phases/PHASE_1_DESIGN.md section 5).
+// Single source of truth for S4 and S5.
+
+export type Lang = "en" | "ru" | "ky";
+export const LMS_LANGS: Lang[] = ["en", "ru", "ky"];
+
+export type LocalizedText = Partial<Record<Lang, string>>;
+
+export type TeacherStatus = "none" | "pending" | "approved" | "revoked";
+export type CourseStatus = "draft" | "published" | "concluded";
+export type CourseRole = "teacher" | "assistant" | "student";
+export type EnrollmentState = "active" | "removed" | "invited" | "completed" | string;
+export type EnrollmentMode = "invite_code" | "closed" | "open" | "form_auto" | "form_review";
+export type Visibility = "private" | "catalog";
+export type TeacherRequestStatus = "pending" | "approved" | "rejected" | "cancelled";
+
+export interface PageOut<T> {
+  items: T[];
+  next_cursor: string | null;
+}
+
+// 5.1 Me and teacher requests
+export interface MeOut {
+  id: string;
+  email: string;
+  display_name: string | null;
+  locale: Lang;
+  is_platform_admin: boolean;
+  teacher_status: TeacherStatus;
+  can_create_courses: boolean;
+}
+export interface MePatchIn {
+  locale: Lang;
+}
+export interface TeacherRequestIn {
+  message?: string;
+}
+export interface MyTeacherRequestOut {
+  id: string;
+  message: string | null;
+  status: TeacherRequestStatus;
+  reason: string | null;
+  created_at: string;
+  decided_at: string | null;
+}
+
+// 5.2 Courses
+export interface UserBrief {
+  id: string;
+  display_name: string | null;
+  email: string;
+}
+
+export interface CourseCard {
+  id: string;
+  title: LocalizedText;
+  languages: Lang[];
+  default_language: Lang;
+  status: CourseStatus;
+  my_role: CourseRole | null;
+  owner_display_name: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  deleted_at?: string | null;
+}
+
+export interface MyEnrollmentOut {
+  id: string;
+  course_id: string;
+  role: CourseRole;
+  state: EnrollmentState;
+  activated_at: string | null;
+}
+
+export interface CourseStudentOut {
+  id: string;
+  title: LocalizedText;
+  description: LocalizedText | null;
+  languages: Lang[];
+  default_language: Lang;
+  status: CourseStatus;
+  starts_at: string | null;
+  ends_at: string | null;
+  owner_display_name: string | null;
+  my_enrollment: MyEnrollmentOut;
+}
+
+export interface CourseStaffOut extends CourseStudentOut {
+  join_code: string;
+  enrollment_mode: EnrollmentMode;
+  enrollment_limit: number | null;
+  visibility: Visibility;
+  unlisted_by_admin: boolean;
+  active_student_count: number;
+  owner: UserBrief;
+  is_owner: boolean;
+  created_at: string;
+  updated_at: string;
+  published_at: string | null;
+  concluded_at: string | null;
+}
+
+/** Either serializer; discriminate with `isStaffCourse`. */
+export type CourseOut = CourseStaffOut | CourseStudentOut;
+
+export function isStaffCourse(c: CourseOut): c is CourseStaffOut {
+  return "join_code" in c;
+}
+
+export interface CourseCreateIn {
+  title: LocalizedText;
+  description?: LocalizedText;
+  languages: Lang[];
+  default_language: Lang;
+  enrollment_mode?: "invite_code" | "closed";
+  enrollment_limit?: number | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
+}
+
+export interface CourseUpdateIn {
+  title?: LocalizedText;
+  description?: LocalizedText;
+  languages?: Lang[];
+  default_language?: Lang;
+  enrollment_mode?: "invite_code" | "closed";
+  enrollment_limit?: number | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  visibility?: Visibility;
+}
+
+export interface JoinIn {
+  code: string;
+}
+export interface JoinOut {
+  course: CourseCard;
+  enrollment: MyEnrollmentOut;
+  already_enrolled: boolean;
+}
+export interface TransferIn {
+  new_owner_user_id: string;
+}
+export interface JoinCodeOut {
+  join_code: string;
+}
+
+export interface RosterEntryOut {
+  enrollment_id: string;
+  user: UserBrief;
+  role: CourseRole;
+  state: EnrollmentState;
+  source: string;
+  activated_at: string | null;
+  removed_at: string | null;
+  is_owner: boolean;
+}
+export interface StaffPublicOut {
+  display_name: string;
+  role: CourseRole;
+}
+export interface AddStaffIn {
+  email: string;
+  role: "teacher" | "assistant";
+}
+export interface RoleChangeIn {
+  role: CourseRole;
+}
+
+// 5.3 Platform admin (used by S5)
+export interface TeacherRequestAdminOut {
+  id: string;
+  user: UserBrief;
+  user_teacher_status: TeacherStatus;
+  message: string | null;
+  status: TeacherRequestStatus;
+  reason: string | null;
+  created_at: string;
+  decided_at: string | null;
+  decided_by: UserBrief | null;
+}
+export interface AdminUserOut {
+  id: string;
+  email: string;
+  display_name: string | null;
+  created_at: string;
+  email_verified: boolean;
+  is_platform_admin: boolean;
+  teacher_status: TeacherStatus;
+  disabled_at: string | null;
+  disabled_reason: string | null;
+}
+export interface AdminUserDetailOut extends AdminUserOut {
+  owned_courses: CourseCard[];
+  active_enrollment_count: number;
+  teacher_requests: TeacherRequestAdminOut[];
+}
+export interface AdminCourseOut {
+  id: string;
+  title: LocalizedText;
+  owner: UserBrief;
+  status: CourseStatus;
+  visibility: Visibility;
+  enrollment_mode: EnrollmentMode;
+  unlisted_by_admin_at: string | null;
+  active_student_count: number;
+  created_at: string;
+  deleted_at: string | null;
+  deleted_by_id: string | null;
+}
+export interface AuditEntryOut {
+  id: string;
+  created_at: string;
+  actor: UserBrief;
+  action: string;
+  target_type: string;
+  target_id: string;
+  reason: string | null;
+  details: Record<string, unknown>;
+}
+export interface PlatformSummaryOut {
+  pending_teacher_requests: number;
+}
+
+// Error codes (5.4); frontend keys are lms.errors.<code>
+export const LMS_ERROR_CODES = [
+  "not_found", "course_not_found", "forbidden", "owner_only", "owner_immutable", "owner_cannot_leave",
+  "use_leave", "not_active", "teacher_not_approved", "not_approved_teacher", "invalid_new_owner",
+  "join_code_invalid", "join_code_exhausted", "rate_limited", "already_enrolled", "user_not_found",
+  "limit_below_current", "unlisted_by_admin", "invalid_transition", "has_students", "not_deleted",
+  "already_deleted", "title_required", "already_teacher", "request_pending", "not_pending",
+  "cannot_disable_self", "cannot_disable_admin", "platform_admin_required", "validation_failed",
+  "invalid_cursor", "account_disabled", "network", "unknown",
+] as const;
+export type LmsErrorCode = (typeof LMS_ERROR_CODES)[number];

@@ -14,6 +14,7 @@ import {
   Flame,
   LogOut,
   X,
+  GraduationCap,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -52,6 +53,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
       name: t("nav.analytics"),
       href: `/${lang}/progress`,
       icon: BarChart3,
+    },
+    {
+      name: t("nav.courses"),
+      href: `/${lang}/courses`,
+      icon: GraduationCap,
     },
   ];
 
