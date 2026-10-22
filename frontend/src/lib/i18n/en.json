@@ -285,7 +285,31 @@
       "invalid_cursor": "The list expired. Reload the page.",
       "account_disabled": "Your account is disabled.",
       "network": "Cannot reach the server. Check your connection.",
-      "unknown": "Something went wrong. Please try again."
+      "unknown": "Something went wrong. Please try again.",
+      "bank_not_found": "Question bank not found.",
+      "question_not_found": "Question not found.",
+      "passage_not_found": "Passage not found.",
+      "version_not_found": "Version not found.",
+      "asset_not_found": "Image not found.",
+      "version_conflict": "Someone else saved a newer version. Reload and try again.",
+      "invalid_question_data": "The question content is invalid. Check the answers and try again.",
+      "unsupported_type": "This question type is not supported.",
+      "asset_not_usable": "This image cannot be used. Upload it again.",
+      "image_invalid": "The file is not a supported image. Use PNG, JPEG, GIF or WEBP.",
+      "image_too_large": "The image is too large (maximum 5 MB).",
+      "image_too_many_pixels": "The image has too many pixels. Use a smaller one.",
+      "storage_quota_exceeded": "Your image storage is full. Delete unused images first.",
+      "storage_full": "The server storage is full. Please contact the administrator.",
+      "language_not_in_course": "This language is not enabled for the course.",
+      "translation_language_taken": "This question already has a translation in that language.",
+      "translation_scope_mismatch": "Only questions from the same course can be linked.",
+      "translation_type_mismatch": "Only questions of the same type can be linked.",
+      "source_conflict": "A bank with the same source already exists in this course.",
+      "bank_deleted": "The bank of this question is deleted. Restore the bank first.",
+      "passage_in_use": "This passage is still used by questions, so it cannot be deleted.",
+      "invalid_move": "The question cannot be moved further.",
+      "import_busy": "Another import is running. Please try again in a minute.",
+      "file_too_large": "The file is too large."
     }
   },
   "courses": {
@@ -607,6 +631,255 @@
       "course_relist": "Relisted course",
       "course_transfer_ownership": "Transferred course ownership",
       "course_roster_view": "Viewed course roster"
+    }
+  },
+  "bank": {
+    "tab": "Question bank",
+    "notAuthorized": "The question bank is available only to the teachers and assistants of this course.",
+    "backToBanks": "Back to question banks",
+    "backToQuestions": "Back to questions",
+    "concluded": "This course is concluded, so content is read-only.",
+    "list": {
+      "title": "Question banks",
+      "create": "New bank",
+      "createTitle": "Create a question bank",
+      "renameTitle": "Edit question bank",
+      "titleLabel": "Title",
+      "descriptionLabel": "Description (optional)",
+      "defaultLanguage": "Default language",
+      "empty": "No question banks yet. Create the first one or import questions.",
+      "emptyTrash": "The trash is empty.",
+      "counts": "{questions} questions, {passages} passages",
+      "source": "source {id}",
+      "updated": "Updated {date}",
+      "rename": "Edit",
+      "delete": "Delete",
+      "deleteTitle": "Delete this bank?",
+      "deleteBody": "The bank and its questions are hidden. You can restore it from the trash. Quizzes that already use these questions keep working.",
+      "restore": "Restore",
+      "showTrash": "Show trash",
+      "hideTrash": "Hide trash",
+      "import": "Import",
+      "deletedBadge": "Deleted"
+    },
+    "filters": {
+      "search": "Search questions...",
+      "type": "Type",
+      "language": "Language",
+      "section": "Section",
+      "topic": "Topic",
+      "difficulty": "Difficulty",
+      "tag": "Tag",
+      "all": "All",
+      "deleted": "Show deleted",
+      "reset": "Reset filters"
+    },
+    "difficulty": {
+      "easy": "Easy",
+      "medium": "Medium",
+      "hard": "Hard"
+    },
+    "questions": {
+      "tab": "Questions ({n})",
+      "new": "New question",
+      "pickType": "Choose a type...",
+      "newTitle": "New question",
+      "empty": "No questions found.",
+      "noStem": "(no text)",
+      "position": "Number",
+      "hasImage": "Has an image",
+      "hasTranslations": "Has translations",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "delete": "Delete",
+      "restore": "Restore",
+      "deleteTitle": "Delete this question?",
+      "deleteBody": "The question is hidden and can be restored. Quizzes and attempts that already use it are not affected."
+    },
+    "types": {
+      "single_choice": {
+        "name": "Single choice",
+        "hint": "One correct answer among 2 to 10 choices."
+      },
+      "multiple_answers": {
+        "name": "Multiple answers",
+        "hint": "Several correct answers among the choices."
+      },
+      "true_false": {
+        "name": "True / false",
+        "hint": "The student decides whether the statement is true."
+      },
+      "comparison": {
+        "name": "Comparison (Column A vs B)",
+        "hint": "Quantitative comparison with fixed answer choices.",
+        "labels": {
+          "A": "Column A is greater",
+          "B": "Column B is greater",
+          "C": "The two quantities are equal",
+          "D": "Not enough information"
+        }
+      },
+      "numeric": {
+        "name": "Numeric answer",
+        "hint": "The student types a number. Exact values with a margin or ranges are accepted."
+      },
+      "short_text": {
+        "name": "Short text",
+        "hint": "The student types a short answer that is compared with accepted answers."
+      },
+      "essay": {
+        "name": "Essay",
+        "hint": "Free-form answer that a teacher reviews manually."
+      }
+    },
+    "editor": {
+      "title": "Question (version {n})",
+      "tabsLabel": "Question sections",
+      "tabs": {
+        "edit": "Edit",
+        "preview": "Preview",
+        "history": "History",
+        "translations": "Translations"
+      },
+      "type": "Type",
+      "language": "Language",
+      "points": "Points",
+      "stem": "Question text",
+      "image": "Image",
+      "explanation": "Explanation (shown after the quiz)",
+      "section": "Section",
+      "topic": "Topic",
+      "difficulty": "Difficulty",
+      "none": "Not set",
+      "tags": "Tags",
+      "tagsHint": "Separate tags with commas (up to 20).",
+      "passage": "Reading passage",
+      "noPassage": "No passage",
+      "choices": "Choices",
+      "addChoice": "Add a choice",
+      "removeChoice": "Remove this choice",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "correct": "Correct",
+      "shuffle": "Shuffle choices for each student",
+      "scoring": "Scoring",
+      "scoringAll": "All or nothing",
+      "scoringPartial": "Partial credit",
+      "true": "True",
+      "false": "False",
+      "columnA": "Column A",
+      "columnB": "Column B",
+      "acceptedAnswers": "Accepted answers",
+      "answerKind": "Answer kind",
+      "kindExact": "Exact value",
+      "kindRange": "Range",
+      "value": "Value",
+      "margin": "Margin (±)",
+      "min": "From",
+      "max": "To",
+      "addAnswer": "Add an answer",
+      "removeAnswer": "Remove this answer",
+      "numericHint": "Use a dot or a comma as the decimal separator. Any matching answer gets full points.",
+      "shortHint": "One accepted answer per line. Spaces and letter case are normalized.",
+      "caseSensitive": "Case sensitive",
+      "wordLimit": "Word limit (optional)",
+      "rubric": "Grading notes (only staff see this)",
+      "rubricHint": "Essays are graded by hand after the quiz.",
+      "create": "Create question",
+      "saving": "Saving...",
+      "saved": "Saved as a new version.",
+      "unchanged": "No changes to save.",
+      "errStem": "Enter the question text.",
+      "errPoints": "Enter the points as a number, zero or more.",
+      "errChoices": "Add at least two choices.",
+      "errChoiceEmpty": "Every choice needs text or an image.",
+      "errCorrect": "Mark at least one correct choice.",
+      "errColumns": "Fill in both columns.",
+      "errAnswers": "Add at least one accepted answer."
+    },
+    "rich": {
+      "math": "Formula $...$",
+      "mathBlock": "Block formula $$...$$",
+      "underline": "Underline",
+      "bold": "Bold",
+      "preview": "Preview"
+    },
+    "image": {
+      "upload": "Upload an image",
+      "replace": "Replace image",
+      "uploading": "Uploading...",
+      "remove": "Remove image",
+      "hint": "Choose a file, drop it here or paste from the clipboard. PNG, JPEG, GIF or WEBP, up to 5 MB.",
+      "alreadyUploaded": "This image was already uploaded, so the existing copy is used.",
+      "mine": "My images",
+      "noImages": "You have no uploaded images yet.",
+      "choose": "Use this image",
+      "deleteFromLibrary": "Remove from my images"
+    },
+    "preview": {
+      "answerField": "Student answer field",
+      "essayField": "Student essay field",
+      "wordLimit": "Word limit: {n}",
+      "points": "Points: {n}"
+    },
+    "history": {
+      "version": "Version {n}",
+      "current": "current",
+      "origin": {
+        "create": "Created",
+        "edit": "Edited",
+        "import": "Imported",
+        "revert": "Reverted"
+      },
+      "pick": "Pick a version on the left to compare it with the current one.",
+      "selected": "Version {n}",
+      "currentTitle": "Current (version {n})",
+      "revert": "Revert to this version",
+      "revertTitle": "Revert to version {n}?",
+      "revertBody": "A new version is created with this content. Older versions stay in the history.",
+      "reverted": "Reverted. A new version was created."
+    },
+    "conflict": {
+      "title": "Someone else changed this",
+      "body": "This item was saved by another person since you opened it. Reload to see the latest version. Your unsaved edits will be lost.",
+      "reload": "Reload"
+    },
+    "translations": {
+      "variants": "Language variants",
+      "thisOne": "this question",
+      "open": "Open",
+      "none": "This question has no linked translations yet.",
+      "unlink": "Unlink",
+      "unlinkTitle": "Unlink from the translation group?",
+      "unlinkBody": "The question stays as it is but is no longer a translation of the others.",
+      "addTitle": "Add a translation",
+      "addHint": "Creates a copy of this question in another language of the course. Translate the copy afterwards.",
+      "addIn": "Add in {language}",
+      "linkTitle": "Or link an existing question",
+      "pickLanguage": "Choose a language...",
+      "noResults": "No matching questions of the same type without a translation group.",
+      "link": "Link"
+    },
+    "passages": {
+      "tab": "Passages ({n})",
+      "tabs": {
+        "edit": "Edit",
+        "questions": "Questions",
+        "history": "History"
+      },
+      "new": "New passage",
+      "back": "Back to passages",
+      "empty": "No passages yet.",
+      "untitled": "Untitled passage",
+      "questionCount": "{n} questions",
+      "title": "Title (optional)",
+      "body": "Passage text",
+      "lineHelp": "Start a line with [5], [10] and so on to show a line number there. Without markers every fifth line is numbered. Formulas use $...$.",
+      "errBody": "Enter the passage text.",
+      "noQuestions": "No questions use this passage yet.",
+      "delete": "Delete",
+      "deleteTitle": "Delete this passage?",
+      "deleteBody": "A passage that questions still use cannot be deleted."
     }
   }
 }
