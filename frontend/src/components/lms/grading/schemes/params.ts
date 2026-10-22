@@ -178,15 +178,19 @@ export function cleanParams(type: SchemeType, params: SchemeParams): SchemeParam
           key: b.key.trim(), min_percent: b.min_percent, label: cleanLabel(b.label), passed: !!b.passed,
         })),
       } as BandsParams;
-    case "piecewise_curve":
-      return {
+    case "piecewise_curve": {
+      const curve: CurveParams = {
         ...common,
         scale_min: any.scale_min as number,
         scale_max: any.scale_max as number,
         segments: ((any.segments as CurveSegment[]) ?? []).map((s) => ({
           from_ratio: s.from_ratio, to_ratio: s.to_ratio, from_value: s.from_value, to_value: s.to_value, exponent: s.exponent,
         })),
-      } as CurveParams;
+      };
+      const pt = optNum(any.pass_threshold_percent as number | null);
+      if (pt !== undefined) curve.pass_threshold_percent = pt;
+      return curve;
+    }
     case "lookup_table": {
       const out: LookupTableParams = {
         ...common,
@@ -197,10 +201,9 @@ export function cleanParams(type: SchemeType, params: SchemeParams): SchemeParam
       };
       const ep = optNum(any.expected_possible as number | null);
       if (ep !== undefined) out.expected_possible = ep;
-      const smin = optNum(any.scale_min as number | null);
-      const smax = optNum(any.scale_max as number | null);
-      if (smin !== undefined) out.scale_min = smin;
-      if (smax !== undefined) out.scale_max = smax;
+      // no scale_min/scale_max: the server derives the scale from the rows and rejects unknown keys
+      const pt = optNum(any.pass_threshold_percent as number | null);
+      if (pt !== undefined) out.pass_threshold_percent = pt;
       return out;
     }
   }
@@ -351,7 +354,6 @@ function checkRows(p: LookupTableParams, out: ParamIssue[]) {
     if (!isNum(p.expected_possible)) out.push({ block: "expected_possible", code: "required" });
     else if (p.expected_possible < 0) out.push({ block: "expected_possible", code: "negative" });
   }
-  if (isNum(p.scale_min) && isNum(p.scale_max) && !(p.scale_min < p.scale_max)) out.push({ block: "scale", code: "scaleOrder" });
   if (!rows.length) { out.push({ block: "rows", code: "empty" }); return; }
   if (rows.length > CAPS.rows) out.push({ block: "rows", code: "tooMany", max: CAPS.rows });
   rows.forEach((r, i) => {

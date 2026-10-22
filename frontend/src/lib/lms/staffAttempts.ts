@@ -1,7 +1,7 @@
 /** Staff attempt API (docs/phases/PHASE_3_DESIGN.md section 5, staff table). snake_case as on the wire. */
 import { lmsFetch } from "./client";
 import type { Lang, PageOut } from "./types";
-import type { AttemptResultOut, AttemptStatus, ReviewItemOut, SubmitReason } from "./attemptTypes";
+import type { AttemptGradeOut, AttemptResultOut, AttemptStatus, ReviewItemOut, SubmitReason } from "./attemptTypes";
 
 const e = encodeURIComponent;
 
@@ -19,6 +19,8 @@ export interface AttemptStaffSummaryOut {
   points_possible: number | string | null;
   pending_review: number;
   is_preview: boolean;
+  /** Phase 4: this attempt's grade (attempt_grades row; previews computed inline); null when ungraded/void. */
+  grade?: AttemptGradeOut | null;
 }
 
 /** One reviewed item for staff: the student review item plus scoring fields. */
@@ -32,6 +34,8 @@ export interface StaffReviewItem extends ReviewItemOut {
 
 export interface AttemptStaffOut extends AttemptStaffSummaryOut {
   assessment_id?: string;
+  /** Phase 4: the submission this (non-preview) attempt counts toward. */
+  submission_id?: string | null;
   result?: AttemptResultOut | null;
   items: StaffReviewItem[];
 }

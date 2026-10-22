@@ -1787,9 +1787,7 @@
       "passThresholdOptional": "Pass threshold, % (optional)",
       "passThresholdHint": "Students at or above this percent pass.",
       "scaleMin": "Scale minimum",
-      "scaleMax": "Scale maximum",
-      "scaleMinOptional": "Scale minimum (optional)",
-      "scaleMaxOptional": "Scale maximum (optional)"
+      "scaleMax": "Scale maximum"
     },
     "bands": {
       "row": "Band {n}",
