@@ -60,7 +60,16 @@ class TestQuestionService:
         practice_q.exam_set_id = "exam_practice_bank_ky"
         created_practice = QuestionService.create_question(practice_q, user_id="inst_01")
 
-        # Create mock exam question
+        # Create mock exam question (the referenced exam set must exist: PostgreSQL enforces the FK)
+        from app.db.session import SessionLocal
+        from app.models.exam_set import ExamSet
+        db = SessionLocal()
+        try:
+            if db.get(ExamSet, "exam_full_main_01") is None:
+                db.add(ExamSet(id="exam_full_main_01", title="Full main 01", exam_type="full_main"))
+                db.commit()
+        finally:
+            db.close()
         mock_q = sample_kyrgyz_math_question.model_copy()
         mock_q.exam_set_id = "exam_full_main_01"
         created_mock = QuestionService.create_question(mock_q, user_id="inst_01")

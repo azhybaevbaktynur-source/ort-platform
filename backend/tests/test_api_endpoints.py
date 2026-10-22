@@ -415,7 +415,10 @@ async def test_upload_and_section_sequencing_workflow():
         student_headers = {"Authorization": "Bearer mock_student_token"}
 
         # 1. Test image upload endpoint
-        file_content = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4"
+        from PIL import Image
+        png_buf = io.BytesIO()
+        Image.new("RGB", (1, 1)).save(png_buf, "PNG")
+        file_content = png_buf.getvalue()
         files = {"file": ("test_diagram.png", file_content, "image/png")}
         res_upload = await client.post("/api/v1/upload", headers=instructor_headers, files=files)
         assert res_upload.status_code == 200

@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Path, Query, Body
@@ -19,6 +20,7 @@ from app.schemas.mock_test import (
 from app.services.mock_test_service import MockTestService
 from app.core.exceptions import EntityNotFoundException, ValidationException
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -204,11 +206,9 @@ async def save_session_progress(
     If is_final is True, completes, scores, and locks the exam.
     If is_final is False, preserves status as in_progress without grading.
     """
-    request_data = progress.model_dump()
-    print("Received submission request:", request_data)
     is_final = progress.final_flag
     if is_final:
-        print(f"save_session_progress: final flag is True for attempt {attempt_id}")
+        logger.info("save_session_progress: final submit for attempt %s", attempt_id)
         MockTestService.submit_and_score_test(
             attempt_id=attempt_id,
             user_id=current_user.id,
@@ -221,9 +221,9 @@ async def save_session_progress(
                 sql_att.status = ExamStatus.COMPLETED.value
                 sql_att.completed_at = datetime.now(timezone.utc)
                 db.commit()
-                print(f"Explicitly set status = 'completed' and committed SQL TestAttempt {attempt_id}")
+                logger.info("Marked SQL TestAttempt %s completed", attempt_id)
         except Exception as e:
-            print(f"Error committing SQL TestAttempt in save_session_progress: {e}")
+            logger.warning("Error committing SQL TestAttempt in save_session_progress (%s)", type(e).__name__)
             db.rollback()
 
         return {"success": True, "attemptId": attempt_id, "status": "completed"}
@@ -250,8 +250,6 @@ async def submit_mock_test(
     Submits final test answers, verifies keys, computes ORT normative scaled scores (60-245),
     percentiles, and section breakdowns, and returns complete review with explanations.
     """
-    request_data = progress.model_dump()
-    print("Received submission request:", request_data)
     res = MockTestService.submit_and_score_test(
         attempt_id=attempt_id,
         user_id=current_user.id,
@@ -264,9 +262,9 @@ async def submit_mock_test(
             sql_att.status = ExamStatus.COMPLETED.value
             sql_att.completed_at = datetime.now(timezone.utc)
             db.commit()
-            print(f"Explicitly set status = 'completed' and committed SQL TestAttempt {attempt_id}")
+            logger.info("Marked SQL TestAttempt %s completed", attempt_id)
     except Exception as e:
-        print(f"Error committing SQL TestAttempt in submit_mock_test: {e}")
+        logger.warning("Error committing SQL TestAttempt in submit_mock_test (%s)", type(e).__name__)
         db.rollback()
 
     return res

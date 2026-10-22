@@ -9,6 +9,7 @@ TEST_ACCOUNTS = {
     "admin@ort.kg": {"id": "usr_admin_01", "role": "admin", "display_name": "Нурлан Админ", "target_score": 240},
     "student@ort.kg": {"id": "usr_student_01", "role": "student", "display_name": "Айбек Жумабеков", "target_score": 200},
 }
+_refreshed: set = set()
 TEST_PASSWORDS = {email: secrets.token_urlsafe(16) for email in TEST_ACCOUNTS}
 
 
@@ -21,8 +22,14 @@ def ensure_test_accounts() -> None:
     session = SessionLocal()
     try:
         for email, fields in TEST_ACCOUNTS.items():
-            if session.query(User).filter(User.email == email).first() is None:
+            existing = session.query(User).filter(User.email == email).first()
+            if existing is None:
                 session.add(User(email=email, password_hash=hash_password(TEST_PASSWORDS[email]), **fields))
+                _refreshed.add(email)
+            elif email not in _refreshed:
+                # A persistent database (Postgres) keeps the account from an earlier run: refresh its password once.
+                existing.password_hash = hash_password(TEST_PASSWORDS[email])
+                _refreshed.add(email)
         session.commit()
     finally:
         session.close()

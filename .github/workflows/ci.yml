@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend-sqlite:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Run tests on scratch SQLite
+        env:
+          DATABASE_URL: sqlite:////tmp/ci/test.db
+          LOCAL_UPLOAD_DIR: /tmp/ci/up
+        run: |
+          mkdir -p /tmp/ci/up
+          python -m pytest -q -p no:cacheprovider -W ignore
+
+  backend-postgres:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGTZ: UTC
+      PG_BASE: postgresql+psycopg2://postgres:postgres@localhost:5432
+      LOCAL_UPLOAD_DIR: /tmp/ci/up
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Create databases
+        run: |
+          mkdir -p /tmp/ci/up
+          for d in ci_migrate ci_suite ci_alembic; do psql -d postgres -c "CREATE DATABASE $d"; done
+      - name: alembic upgrade head
+        env:
+          DATABASE_URL: ${{ env.PG_BASE }}/ci_migrate
+        run: alembic upgrade head
+      - name: alembic check (models match migrations)
+        env:
+          DATABASE_URL: ${{ env.PG_BASE }}/ci_migrate
+        run: alembic check
+      - name: Migration tests (blocking)
+        env:
+          DATABASE_URL: ${{ env.PG_BASE }}/ci_suite
+          ALEMBIC_TEST_DATABASE_URL: ${{ env.PG_BASE }}/ci_alembic
+        run: python -m pytest tests/test_migrations.py -q -p no:cacheprovider -W ignore
+      - name: Old suite on Postgres
+        env:
+          DATABASE_URL: ${{ env.PG_BASE }}/ci_suite
+        # Tables come from init_db()'s create_all (autouse fixture); migrations are covered above.
+        run: python -m pytest -q -p no:cacheprovider -W ignore --ignore=tests/test_migrations.py
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - name: Build
+        env:
+          # All NEXT_PUBLIC_* values have in-code defaults; dummy values keep the build hermetic
+          NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+          NEXT_PUBLIC_FIREBASE_API_KEY: dummy
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: dummy.firebaseapp.com
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: dummy
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: dummy.appspot.com
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "0"
+          NEXT_PUBLIC_FIREBASE_APP_ID: dummy
+        run: npx next build
+
+  i18n:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python scripts/check_i18n_parity.py

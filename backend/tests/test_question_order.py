@@ -132,8 +132,11 @@ def test_csv_import_saves_questions_when_foreign_keys_are_enforced():
     def fk_on(dbapi_conn, _):
         dbapi_conn.execute("PRAGMA foreign_keys=ON")
 
-    event.listen(engine, "connect", fk_on)
-    engine.dispose()
+    # PostgreSQL always enforces foreign keys; only SQLite needs the pragma switched on.
+    is_sqlite = engine.dialect.name == "sqlite"
+    if is_sqlite:
+        event.listen(engine, "connect", fk_on)
+        engine.dispose()
     try:
         csv = "section,topic,difficulty,stem,option_a,option_b,option_c,option_d,correct_option\nmath_2,t,easy,q,1,2,3,4,B\n"
         res = CsvService.ingest_csv(csv.encode(), mock_test_title="FK check", language="ru")
@@ -144,8 +147,9 @@ def test_csv_import_saves_questions_when_foreign_keys_are_enforced():
         finally:
             session.close()
     finally:
-        event.remove(engine, "connect", fk_on)
-        engine.dispose()
+        if is_sqlite:
+            event.remove(engine, "connect", fk_on)
+            engine.dispose()
 
 
 # ---------------------------------------------------------------------------
