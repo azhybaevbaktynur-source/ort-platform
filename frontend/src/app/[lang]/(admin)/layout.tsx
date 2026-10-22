@@ -76,6 +76,11 @@ export default function AdminLayout({
       href: `/${lang}/analytics`,
       icon: BarChart3,
     },
+    {
+      name: t("nav.platformAdmin"),
+      href: `/${lang}/admin`,
+      icon: ShieldCheck,
+    },
   ];
 
   const renderAdminNav = () => (

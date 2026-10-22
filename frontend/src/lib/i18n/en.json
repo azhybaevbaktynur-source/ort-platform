@@ -31,7 +31,8 @@
       "studentAnalytics": "Student analytics",
       "students": "Students (access)"
     },
-    "courses": "Courses"
+    "courses": "Courses",
+    "platformAdmin": "Platform admin"
   },
   "sections": {
     "math_1": "Math I (Comparison)",
@@ -424,6 +425,188 @@
       "hint": "Courses you own that you deleted. Restoring returns a course as a draft.",
       "empty": "No deleted courses.",
       "restore": "Restore"
+    }
+  },
+  "teacherRequest": {
+    "back": "Back to my courses",
+    "title": "Become a teacher",
+    "intro": "Teachers can create courses and invite students. Send a request and a platform administrator will review it.",
+    "currentStatus": "Your teacher status",
+    "status": {
+      "none": "Not a teacher",
+      "pending": "Request pending",
+      "approved": "Approved teacher",
+      "revoked": "Access revoked"
+    },
+    "approvedBody": "You are an approved teacher and can create courses.",
+    "createCourse": "Create a course",
+    "pendingBody": "Your request is waiting for review. You will see the result here.",
+    "revokedBody": "Your teacher access was revoked. Your existing courses stay available. You may send a new request.",
+    "rejectedBody": "Your last request was rejected. You may send a new one.",
+    "reason": "Reason",
+    "messageLabel": "Tell us about yourself (optional)",
+    "messagePlaceholder": "Where you teach, which subjects, why you need courses.",
+    "submit": "Send request",
+    "history": "Your requests",
+    "noHistory": "No requests yet.",
+    "requestStatus": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "cancelled": "Cancelled"
+    }
+  },
+  "platformAdmin": {
+    "nav": {
+      "label": "Platform admin navigation",
+      "overview": "Overview",
+      "teacherRequests": "Teacher requests",
+      "users": "Users",
+      "courses": "Courses",
+      "auditLog": "Audit log"
+    },
+    "notAuthorized": {
+      "title": "Not authorized",
+      "body": "This area is only for platform administrators.",
+      "back": "Back to my courses"
+    },
+    "overview": {
+      "title": "Platform administration",
+      "pendingRequests": "Teacher requests waiting for review",
+      "usersHint": "Search accounts, change teacher status, disable accounts.",
+      "coursesHint": "Moderate courses: unlist, delete, restore, transfer.",
+      "auditHint": "Every administrator action is recorded here."
+    },
+    "reasonRequired": "Reason (required)",
+    "reasonOptional": "Reason (optional)",
+    "reasonMissing": "Please enter a reason.",
+    "yes": "Yes",
+    "no": "No",
+    "teacherStatus": {
+      "none": "None",
+      "pending": "Pending",
+      "approved": "Approved",
+      "revoked": "Revoked"
+    },
+    "accountStatus": {
+      "disabled": "Disabled",
+      "admin": "Admin"
+    },
+    "requests": {
+      "title": "Teacher requests",
+      "filter": "Filter by status",
+      "filters": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "all": "All"
+      },
+      "empty": "No requests here.",
+      "noMessage": "No message.",
+      "decidedBy": "Decided by {name} on {date}",
+      "approve": "Approve",
+      "reject": "Reject",
+      "revoke": "Revoke teacher access",
+      "rejectTitle": "Reject this request?",
+      "rejectBody": "The user will see your reason and can apply again later.",
+      "revokeTitle": "Revoke teacher access?",
+      "revokeBody": "The person can no longer create courses or become a teacher in other courses. Existing courses stay unchanged."
+    },
+    "users": {
+      "title": "Users",
+      "searchPlaceholder": "Email or name",
+      "teacherStatus": "Teacher status",
+      "anyStatus": "Any",
+      "disabledOnly": "Disabled accounts only",
+      "empty": "No users found.",
+      "user": "User",
+      "account": "Account",
+      "created": "Created",
+      "disable": "Disable",
+      "enable": "Enable",
+      "disableTitle": "Disable this account?",
+      "disableBody": "The user is signed out immediately and cannot log in. Their courses and enrollments are kept.",
+      "back": "Back to users",
+      "emailVerified": "Email verified",
+      "activeEnrollments": "Active enrollments",
+      "disabledReason": "Reason for disabling",
+      "grantTeacher": "Approve as teacher",
+      "grantTitle": "Approve as teacher?",
+      "revokeTeacher": "Revoke teacher access",
+      "revokeTitle": "Revoke teacher access?",
+      "ownedCourses": "Owned courses",
+      "noCourses": "No courses.",
+      "requestHistory": "Teacher requests"
+    },
+    "courses": {
+      "title": "Courses",
+      "searchPlaceholder": "Course title",
+      "deletedOnly": "Deleted only",
+      "empty": "No courses found.",
+      "course": "Course",
+      "owner": "Owner",
+      "status": "Status",
+      "students": "Active students",
+      "flags": "Flags",
+      "deleted": "Deleted",
+      "unlisted": "Unlisted by admin",
+      "back": "Back to courses",
+      "visibility": "Visibility",
+      "visibilityValues": {
+        "private": "Private",
+        "catalog": "Catalog"
+      },
+      "delete": "Delete",
+      "restore": "Restore",
+      "unlist": "Unlist",
+      "relist": "Relist",
+      "transfer": "Transfer ownership",
+      "deleteTitle": "Delete this course?",
+      "restoreTitle": "Restore this course?",
+      "unlistTitle": "Unlist this course?",
+      "relistTitle": "Relist this course?",
+      "transferTitle": "Transfer ownership?",
+      "transferHeading": "Ownership",
+      "transferHint": "The new owner must be an approved, enabled teacher. Paste their user ID from the users page.",
+      "newOwnerId": "New owner user ID",
+      "roster": "Roster",
+      "rosterAudited": "Viewing the roster is recorded in the audit log.",
+      "showRoster": "Show roster",
+      "role": "Role",
+      "ownerTag": "owner"
+    },
+    "audit": {
+      "title": "Audit log",
+      "when": "When",
+      "actor": "Actor",
+      "action": "Action",
+      "target": "Target",
+      "reason": "Reason",
+      "details": "Details",
+      "actorId": "Actor user ID",
+      "targetType": "Target type",
+      "anyType": "Any",
+      "targetTypes": {
+        "user": "User",
+        "course": "Course",
+        "teacher_request": "Teacher request",
+        "enrollment": "Enrollment"
+      },
+      "apply": "Apply filters",
+      "empty": "No entries."
+    },
+    "auditActions": {
+      "teacher_request_approve": "Approved teacher request",
+      "teacher_request_reject": "Rejected teacher request",
+      "user_teacher_status_set": "Changed teacher status",
+      "user_disable": "Disabled account",
+      "user_enable": "Enabled account",
+      "course_delete": "Deleted course",
+      "course_restore": "Restored course",
+      "course_unlist": "Unlisted course",
+      "course_relist": "Relisted course",
+      "course_transfer_ownership": "Transferred course ownership",
+      "course_roster_view": "Viewed course roster"
     }
   }
 }
