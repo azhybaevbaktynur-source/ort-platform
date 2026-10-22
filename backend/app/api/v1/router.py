@@ -59,3 +59,7 @@ api_router.include_router(_grading_router, tags=["Grading"])
 from app.lms.grading.gradebook_router import router as _gradebook_router  # noqa: E402
 
 api_router.include_router(_gradebook_router, tags=["Gradebook"])
+# Phase 4 (grading): scheme library
+from app.lms.grading.schemes_router import router as _schemes_router  # noqa: E402
+
+api_router.include_router(_schemes_router, prefix="/grading-schemes", tags=["Grading Schemes"])
