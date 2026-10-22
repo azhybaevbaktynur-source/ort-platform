@@ -26,7 +26,7 @@ T0 = clock.now()
 NAMES = ["sc", "tf"]  # 3 points, auto-graded only -> status graded
 RESULT_KEYS = {"raw_score", "points_possible", "sections", "pending_review", "submitted_at", "grade"}
 GRADE_KEYS = {"scheme_type", "scale_min", "scale_max", "display_value", "label", "percentile", "passed", "thresholds",
-              "sections", "is_kept", "released"}
+              "sections", "is_kept", "released", "labels"}
 GRADED_KEYS = {"assessment_id", "title", "state", "display_value", "label", "percentile", "passed", "thresholds",
                "effective_points", "points_possible", "late_deduction", "released_at", "kept_attempt_id", "due_at"}
 NO_NUMBER_KEYS = {"assessment_id", "title", "state", "due_at"}
@@ -205,7 +205,7 @@ async def test_course_scheme_student_ref_has_no_params(db, api):
     w.course.grading_scheme_version_id = ORT_MAIN_V1_ID
     db.commit()
     r = await get(api, w.student, f"/courses/{w.course.id}/grades/mine")
-    assert set(r.json()["scheme"]) == {"type", "scale_min", "scale_max", "title"}
+    assert set(r.json()["scheme"]) == {"type", "scale_min", "scale_max", "title", "labels"}
     assert_clean(r.text)
     g = await get(api, w.student, f"/courses/{w.course.id}/grading")
     assert g.status_code == 200 and set(g.json()) <= {"total_mode", "scheme"}

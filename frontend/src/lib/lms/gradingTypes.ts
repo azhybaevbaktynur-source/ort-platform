@@ -230,6 +230,8 @@ export interface SchemeVersionRef {
   version_no: number;
   scale_min: Num | null;
   scale_max: Num | null;
+  /** the version's label map (band key -> localized text, lookup label -> text); absent on older payloads */
+  labels?: Record<string, SchemeLabelValue> | null;
 }
 
 /** Scheme brief on student payloads (lobby, course grading GET for students, my grades). */
@@ -238,6 +240,8 @@ export interface SchemeStudentRef {
   scale_min: Num | null;
   scale_max: Num | null;
   title: LocalizedText;
+  /** the version's label map (band key -> localized text, lookup label -> text); absent on older payloads */
+  labels?: Record<string, SchemeLabelValue> | null;
 }
 
 export type GradeRelease = "auto" | "manual";
@@ -412,6 +416,8 @@ export interface AttemptGradeOut {
   sections: AttemptGradeSectionOut[] | null;
   is_kept: boolean;
   released: boolean;
+  /** `{label: text}` when the scheme version defines a text for `label` (band / lookup label), else {} */
+  labels?: Record<string, SchemeLabelValue> | null;
 }
 
 export interface SubmissionAttemptOut {
@@ -508,6 +514,8 @@ export interface MyGradeOut {
   released_at?: string | null;
   kept_attempt_id?: string | null;
   due_at?: string | null;
+  /** graded rows only: `{label: text}` of the grade's scheme version */
+  labels?: Record<string, SchemeLabelValue> | null;
 }
 
 export interface MyGradesTotalOut {

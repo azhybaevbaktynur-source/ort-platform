@@ -37,7 +37,7 @@ from app.lms.grading import repository as repo
 from app.lms.grading import serializers as ser
 from app.lms.grading.models import AttemptGrade, CourseGrade, GradeEvent, GradingScheme, GradingSchemeVersion, Submission
 from app.lms.grading.registry import SchemeVersionData, apply, apply_sections
-from app.lms.grading.schemes import get_version_data, version_data_from_row
+from app.lms.grading.schemes import get_version_data, label_subset, version_data_from_row, version_labels, versions_data
 from app.lms.grading.submissions import stale_predicate
 from app.lms.grading.totals import UNCATEGORIZED_EXCLUDED, compute_totals, map_total
 from app.models.user import User
@@ -186,13 +186,13 @@ def _column_warnings(db: Session, a, *, weighted: bool, live_category_ids: set) 
     return warnings
 
 
-def _gb_assessment_out(a, warnings: list[str]) -> ser.GbAssessmentOut:
+def _gb_assessment_out(a, warnings: list[str], labels: dict) -> ser.GbAssessmentOut:
     scheme = None
     if a.grading_scheme_version_id is not None and a.scheme_id is not None:
         scheme = SchemeRefOut(
             id=a.grading_scheme_version_id, scheme_id=a.scheme_id, title=a.scheme_title, type=a.scheme_type,
             version_no=a.version_no, scale_min=None if a.scale_min is None else float(a.scale_min),
-            scale_max=None if a.scale_max is None else float(a.scale_max),
+            scale_max=None if a.scale_max is None else float(a.scale_max), labels=labels,
         )
     return ser.GbAssessmentOut(
         id=a.id, title=a.title, points_possible=a.points_possible, category_id=a.category_id,
@@ -250,9 +250,12 @@ def gradebook_page(db: Session, ctx: AuthzContext, course: Course, *, cursor: Op
             ))
             cache_rows.append(_course_grade_row(course.id, enr.id, t, released[enr.id], mapped, now))
         write_course_grades(db, cache_rows)
+    # column label maps from the immutable version cache (misses: one statement, then cached)
+    col_versions = versions_data(db, [a.grading_scheme_version_id for a in columns])
     out = ser.GradebookPageOut(
         assessments=[_gb_assessment_out(a, _column_warnings(db, a, weighted=weighted,
-                                                            live_category_ids=live_category_ids))
+                                                            live_category_ids=live_category_ids),
+                                        version_labels(col_versions.get(a.grading_scheme_version_id)))
                      for a in columns],
         rows=rows_out, next_cursor=next_cursor,
     )
@@ -300,7 +303,8 @@ def my_grades(db: Session, ctx: AuthzContext, course: Course, *, now: datetime) 
             scheme_ref = SchemeStudentRefOut(
                 type=course_v.type, title=row[1],
                 scale_min=None if course_v.scale_min is None else float(course_v.scale_min),
-                scale_max=None if course_v.scale_max is None else float(course_v.scale_max))
+                scale_max=None if course_v.scale_max is None else float(course_v.scale_max),
+                labels=version_labels(course_v))
 
     all_t = compute_totals(course, categories, assessments, {enr.id: subs}, released_only=False)[enr.id]
     rel_t = compute_totals(course, categories, assessments,
@@ -309,10 +313,16 @@ def my_grades(db: Session, ctx: AuthzContext, course: Course, *, now: datetime) 
         write_course_grades(db, [_course_grade_row(course.id, enr.id, all_t, rel_t,
                                                    map_total(course_v, all_t.current_percent), now)])
     by_assessment = {s.assessment_id: s for s in subs}
+    states = {a.id: _student_state(a, by_assessment.get(a.id), visible) for a in assessments}
+    # label texts of graded rows from the immutable version cache (misses: one statement, then cached)
+    graded_versions = versions_data(db, [by_assessment[a.id].scheme_version_id for a in assessments
+                                         if states[a.id] == "graded" and by_assessment[a.id].label])
     items = []
     for a in assessments:
         sub = by_assessment.get(a.id)
-        items.append(ser.my_grade_out(a, _student_state(a, sub, visible), sub))
+        labels = label_subset(graded_versions.get(sub.scheme_version_id), sub.label) \
+            if states[a.id] == "graded" else None
+        items.append(ser.my_grade_out(a, states[a.id], sub, labels=labels))
     out = ser.MyGradesOut(total=ser.my_total_out(rel_t.current_percent, map_total(course_v, rel_t.current_percent)),
                           scheme=scheme_ref, items=items)
     db.commit()

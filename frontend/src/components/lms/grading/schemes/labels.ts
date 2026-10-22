@@ -16,16 +16,20 @@ export function labelText(value: SchemeLabelValue | null | undefined, lang: Lang
 }
 
 /**
- * Text for a grade label or threshold key: `pass`/`fail` and known thresholds are translated; a key found in
- * `labels` (a version's `labels` map or band labels) is rendered with `labelText`; anything else is shown as stored.
+ * Text for a grade label or threshold key: a key found in `labels` (a scheme ref's / grade's `labels` map, or band
+ * labels) is rendered with `labelText`; otherwise `pass`/`fail` and known thresholds are translated; anything else
+ * is shown as stored.
  */
 export function useSchemeLabel(): (key: string, labels?: Record<string, SchemeLabelValue> | null) => string {
   const { lang, t } = useTranslation();
   return useCallback(
     (key: string, labels?: Record<string, SchemeLabelValue> | null) => {
+      if (labels && Object.prototype.hasOwnProperty.call(labels, key)) {
+        const text = labelText(labels[key], lang as Lang);
+        if (text) return text;
+      }
       if (key === "pass" || key === "fail") return t(`schemes.labels.${key}`);
       if (THRESHOLDS.has(key)) return t(`schemes.thresholdKeys.${key}`);
-      if (labels && Object.prototype.hasOwnProperty.call(labels, key)) return labelText(labels[key], lang as Lang) || key;
       return key;
     },
     [lang, t],

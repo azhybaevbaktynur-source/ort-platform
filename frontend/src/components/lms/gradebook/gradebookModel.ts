@@ -4,7 +4,8 @@
  * gradebookModel.check.ts. Relative imports only so the check compiles without the `@/` path alias.
  */
 import type {
-  CellOut, GbAssessmentOut, GbRowOut, GradeEventOut, Num, RegradeOut, SubmissionAttemptOut, SubmissionStaffOut,
+  CellOut, GbAssessmentOut, GbRowOut, GradeEventOut, Num, RegradeOut, SchemeLabelValue, SubmissionAttemptOut,
+  SubmissionStaffOut,
 } from "../../../lib/lms/gradingTypes";
 import { fmtNum, fmtPercentile, toNum } from "../grading/schemes/params";
 
@@ -39,7 +40,12 @@ export interface CellView {
   percentile: string;
   /** threshold keys that were reached (e.g. `golden_certificate`) */
   thresholds: string[];
+  /** the column scheme's label map (resolves `label` to localized text), null when unknown */
+  labels: Record<string, SchemeLabelValue> | null;
 }
+
+/** What `cellView` needs from a column: its due date and, optionally, its scheme's label map. */
+export type CellColumn = Pick<GbAssessmentOut, "due_at"> & { scheme?: { labels?: Record<string, SchemeLabelValue> | null } | null };
 
 /** Due date in the past (unparseable dates count as not due). */
 export function isPastDue(dueAt: string | null | undefined, now: number): boolean {
@@ -61,12 +67,13 @@ export function reachedThresholds(t: Record<string, boolean> | null | undefined)
   return Object.keys(t).filter((k) => t[k] === true).sort();
 }
 
-export function cellView(cell: CellOut | null | undefined, assessment: Pick<GbAssessmentOut, "due_at">, now: number): CellView {
+export function cellView(cell: CellOut | null | undefined, assessment: CellColumn, now: number): CellView {
+  const labels = assessment.scheme?.labels ?? null;
   if (!cell) {
     return {
       kind: isPastDue(assessment.due_at, now) ? "missing" : "none",
       late: false, overridden: false, released: false, unreleased: false,
-      value: "", label: null, points: "", percentile: "", thresholds: [],
+      value: "", label: null, points: "", percentile: "", thresholds: [], labels,
     };
   }
   const kind: CellKind = cell.state === "excused" ? "excused"
@@ -90,6 +97,7 @@ export function cellView(cell: CellOut | null | undefined, assessment: Pick<GbAs
     points: blank ? "" : points,
     percentile: blank ? "" : fmtPercentile(cell.percentile),
     thresholds: blank ? [] : reachedThresholds(cell.thresholds),
+    labels,
   };
 }
 

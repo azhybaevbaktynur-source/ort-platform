@@ -51,7 +51,7 @@ function Row({ item, courseId, schemeType }: { item: MyGradeOut; courseId: strin
           )}
           <div className="flex flex-wrap gap-2">
             {pct && <span className="rounded-full bg-slate-100 px-2.5 py-0.5 font-medium text-slate-800">{t("results.grade.percentile", { value: pct })}</span>}
-            {flags.map((k) => <span key={k} className="rounded-full bg-amber-100 px-2.5 py-0.5 font-semibold text-amber-900">{label(k)}</span>)}
+            {flags.map((k) => <span key={k} className="rounded-full bg-amber-100 px-2.5 py-0.5 font-semibold text-amber-900">{label(k, item.labels)}</span>)}
             {item.passed !== null && item.passed !== undefined && schemeType !== "pass_fail" && (
               <span className={`rounded-full px-2.5 py-0.5 font-semibold ${item.passed ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}>{label(item.passed ? "pass" : "fail")}</span>
             )}
@@ -89,7 +89,8 @@ export function StudentGrades({ courseId }: { courseId: string }) {
 
   const schemeType = data.scheme?.type;
   const total = data.total;
-  const totalText = total ? text(total, schemeType) : "";
+  // the total's label is a key of the course scheme: resolve it through the course scheme ref's labels
+  const totalText = total ? text(total, schemeType, data.scheme?.labels) : "";
   const percent = total ? fmtNum(total.percent, 1) : "";
   return (
     <div className="space-y-5">

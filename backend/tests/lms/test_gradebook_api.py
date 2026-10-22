@@ -250,7 +250,7 @@ async def test_submission_detail(db, api):
     assert a1["grade"]["is_kept"] is True and a1["grade"]["released"] is True and a2["grade"]["is_kept"] is False
     assert a3["status"] == "void" and a3["grade"] is None
     assert set(a1["grade"]) == {"scheme_type", "scale_min", "scale_max", "display_value", "label", "percentile",
-                                "passed", "thresholds", "sections", "is_kept", "released"}
+                                "passed", "thresholds", "sections", "is_kept", "released", "labels"}
     ev = body["events"][0]
     assert ev["actor_name"] == "Teacher" and ev["event"] == "override" and ev["reason"] == SENTINEL_EVENT
 
@@ -377,3 +377,75 @@ async def test_staff_attempt_list_grade_and_statement_count(db, api):
         assert D(str(by_name["L1"]["grade"]["display_value"])) == D("10.00")
         counts[name] = c.n
     assert counts["small"] == counts["big"], counts
+
+
+# ------------------------------------------------------------------ localized band labels (polish item 2)
+
+BANDS = {"schema": 1, "bands": [
+    {"key": "top", "min_percent": 80, "label": {"en": "Top", "ru": "Высший", "ky": "Жогорку"}, "passed": True},
+    {"key": "low", "min_percent": 0, "label": {"en": "Low", "ru": "Низкий", "ky": "Төмөн"}, "passed": False},
+]}
+TOP = {"en": "Top", "ru": "Высший", "ky": "Жогорку"}
+
+
+def _bands_world(db, n_assessments=1):
+    from tests.lms.factories import make_scheme
+
+    w = gb_world(db, students=1)
+    vid = make_scheme(db, w.teacher, "bands", BANDS).current_version_id
+    rows = []
+    for _ in range(n_assessments):
+        a, v = graded_assessment(db, w.course, w.teacher, scheme_version_id=vid)
+        att, _sub = grade_row(db, a, v, w.enrollments[0], w.students[0], 9, label="top", passed=True,
+                              scheme_version_id=vid)
+        rows.append((a, att))
+    return w, vid, rows
+
+
+async def test_band_labels_reach_students_and_staff(db, api):
+    """Grade payloads carry only the band key as `label`; the scheme refs carry the version's label map and the
+    grade payloads the text of their own label, so students (who cannot read the scheme) see localized text."""
+    w, vid, [(a, att)] = _bands_world(db)
+    student = w.students[0]
+
+    res = (await api.call(student, "GET", f"/attempts/{att.id}/result")).json()
+    assert res["grade"]["label"] == "top" and res["grade"]["labels"] == {"top": TOP}
+
+    mine = (await api.call(student, "GET", f"/courses/{w.cid}/grades/mine")).json()
+    item = mine["items"][0]
+    assert item["label"] == "top" and item["labels"] == {"top": TOP}
+
+    lobby = (await api.call(student, "GET", f"/courses/{w.cid}/assessments/{a.id}")).json()
+    assert lobby["scheme"]["labels"] == {"top": TOP, "low": BANDS["bands"][1]["label"]}
+    # still no params, ids or band thresholds for students
+    assert "params" not in str(lobby) and "min_percent" not in str(lobby) and str(vid) not in str(lobby)
+    assert "min_percent" not in str(mine) and "min_percent" not in str(res)
+
+    gb = (await api.call(w.teacher, "GET", f"/courses/{w.cid}/gradebook")).json()
+    assert gb["assessments"][0]["scheme"]["labels"]["top"] == TOP
+    staff = (await api.call(w.teacher, "GET", f"/courses/{w.cid}/assessments/{a.id}/attempts")).json()
+    assert staff["items"][0]["grade"]["labels"] == {"top": TOP}
+
+
+async def test_band_labels_add_no_statements(db, api):
+    """Labels come from the immutable version cache: warm reads cost what they cost before (my grades <= 6, as in
+    `test_my_grades_statement_count`), and a cold cache adds no statement to scheme-ref reads (the params column
+    rides on the version-brief query)."""
+    from app.lms.grading.schemes import reset_version_cache
+
+    w, _vid, rows = _bands_world(db, n_assessments=10)
+    path = f"/courses/{w.cid}/grades/mine"
+    await api.call(w.students[0], "GET", path)  # warm
+    with Counter() as c:
+        r = await api.call(w.students[0], "GET", path)
+    assert r.status_code == 200 and all(i["labels"] == {"top": TOP} for i in r.json()["items"])
+    assert c.n <= 6, "\n".join(s[:100] for s in c.statements)
+
+    lobby = f"/courses/{w.cid}/assessments/{rows[0][0].id}"
+    reset_version_cache()
+    with Counter() as cold:
+        r1 = await api.call(w.students[0], "GET", lobby)
+    with Counter() as warm:
+        r2 = await api.call(w.students[0], "GET", lobby)
+    assert r1.json()["scheme"]["labels"]["top"] == TOP and r2.json()["scheme"] == r1.json()["scheme"]
+    assert cold.n == warm.n, ("\n".join(s[:100] for s in cold.statements), warm.n)

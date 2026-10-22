@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
-import type { CellOut, GradeRelease, SubmissionAttemptOut, SubmissionStaffOut } from "@/lib/lms/gradingTypes";
+import type { CellOut, GradeRelease, SchemeLabelValue, SubmissionAttemptOut, SubmissionStaffOut } from "@/lib/lms/gradingTypes";
 import { excuseSubmission, getSubmission, overrideSubmission, releaseGrades, unreleaseGrades } from "@/lib/lms/grading";
 import { voidAttempt } from "@/lib/lms/staffAttempts";
 import { useSchemeLabel } from "@/components/lms/grading/schemes/labels";
@@ -25,6 +25,8 @@ export interface PanelTarget {
   studentName: string;
   assessmentTitle: string;
   dueAt: string | null;
+  /** the column scheme's label map (band key -> localized text) */
+  labels?: Record<string, SchemeLabelValue> | null;
   /** the assessment's grade release mode: with "auto" a grade cannot be hidden (server 409 grade_release_auto) */
   gradeRelease?: GradeRelease;
 }
@@ -142,7 +144,7 @@ export function SubmissionPanel({
     }, true);
 
   const attemptHref = (id: string) => `/${lang}/courses/${courseId}/assessments/${assessmentId}/attempts/${id}`;
-  const v = sub ? cellView(sub, { due_at: target.dueAt }, Date.now()) : null;
+  const v = sub ? cellView(sub, { due_at: target.dueAt, scheme: { labels: target.labels } }, Date.now()) : null;
   const excused = sub?.state === "excused";
 
   return (
@@ -183,12 +185,12 @@ export function SubmissionPanel({
                 </div>
                 {!excused && (v.value || v.label) && (
                   <p className="text-3xl font-bold text-slate-900">
-                    {v.value}{v.value && v.label ? " · " : ""}{v.label ? labelText(v.label) : ""}
+                    {v.value}{v.value && v.label ? " · " : ""}{v.label ? labelText(v.label, v.labels) : ""}
                   </p>
                 )}
                 {v.thresholds.length > 0 && (
                   <p className="flex flex-wrap gap-1">
-                    {v.thresholds.map((k) => <span key={k} className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">{labelText(k)}</span>)}
+                    {v.thresholds.map((k) => <span key={k} className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">{labelText(k, v.labels)}</span>)}
                   </p>
                 )}
                 <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1 text-sm text-slate-700">
@@ -250,7 +252,7 @@ export function SubmissionPanel({
 
               <section aria-labelledby={`${titleId}-at`} className="space-y-2 border-t border-slate-100 pt-4">
                 <h3 id={`${titleId}-at`} className="text-sm font-bold text-slate-900">{t("gradebook.panel.attempts")}</h3>
-                <SubmissionAttempts attempts={sub.attempts} keptAttemptId={sub.kept_attempt_id} attemptHref={attemptHref} canManage={canManage}
+                <SubmissionAttempts attempts={sub.attempts} labels={target.labels} keptAttemptId={sub.kept_attempt_id} attemptHref={attemptHref} canManage={canManage}
                   onVoid={(a) => { setDialogError(null); setDialog({ kind: "void", attempt: a }); }} />
               </section>
 

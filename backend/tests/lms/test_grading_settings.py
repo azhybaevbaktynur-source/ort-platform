@@ -29,7 +29,7 @@ async def test_presets_attach_system_versions(db, api):
     assert main["grading_scheme_version_id"] == str(seeds.ORT_MAIN_V1_ID)
     assert main["scheme"] == {"id": str(seeds.ORT_MAIN_V1_ID), "scheme_id": str(seeds.ORT_MAIN_SCHEME_ID),
                               "title": main["scheme"]["title"], "type": "piecewise_curve", "version_no": 1,
-                              "scale_min": 60.0, "scale_max": 245.0}
+                              "scale_min": 60.0, "scale_max": 245.0, "labels": {}}
     assert subj["scheme"]["id"] == str(seeds.ORT_SUBJECT_V1_ID) and subj["scheme"]["scale_max"] == 150.0
     assert none["scheme"] is None and none["grading_scheme_version_id"] is None
     assert (none["grade_release"], none["omit_from_total"], none["due_at"], none["grade_category_id"]) == \
@@ -105,7 +105,7 @@ async def test_student_views_expose_scheme_brief_and_due_at(db, api):
     assert r.status_code == 200, r.text
     lobby = (await api.call(w.S, "GET", f"/courses/{w.cid}/assessments/{a['id']}")).json()
     assert lobby["scheme"] == {"type": "piecewise_curve", "scale_min": 60.0, "scale_max": 150.0,
-                               "title": lobby["scheme"]["title"]}
+                               "title": lobby["scheme"]["title"], "labels": {}}
     assert lobby["due_at"] is not None
     item = (await api.call(w.S, "GET", f"/courses/{w.cid}/assessments")).json()["items"][0]
     assert item["scheme"] == lobby["scheme"] and item["due_at"] == lobby["due_at"]
@@ -131,7 +131,7 @@ async def test_course_grading_get_put(db, api):
     stu = await api.call(w.S, "GET", f"/courses/{w.cid}/grading")
     assert stu.status_code == 200
     assert set(stu.json()) == {"total_mode", "scheme"}
-    assert set(stu.json()["scheme"]) == {"type", "scale_min", "scale_max", "title"}
+    assert set(stu.json()["scheme"]) == {"type", "scale_min", "scale_max", "title", "labels"}
     # PUT is a full replace: omitted scheme / late policy are cleared
     r = await api.call(w.O, "PUT", f"/courses/{w.cid}/grading", json={"total_mode": "points"})
     assert r.json()["scheme"] is None and r.json()["late_policy"] is None

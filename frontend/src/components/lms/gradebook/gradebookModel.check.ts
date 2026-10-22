@@ -77,6 +77,12 @@ async function main() {
   ok(na.kind === "no_attempts" && na.value === "" && na.points === "" && na.percentile === "" && na.label === null
     && na.thresholds.length === 0 && !na.late && !na.unreleased, "no attempts (all voided): own kind, no numbers, no markers");
 
+  const top = { en: "Top", ru: "Высший" };
+  const bl = cellView(cell({ display_value: null, label: "top" }), { due_at: null, scheme: { labels: { top } } }, NOW);
+  ok(bl.label === "top" && eq(bl.labels, { top }), "cell carries the column scheme's label map");
+  ok(cellView(cell(), { due_at: null }, NOW).labels === null, "no scheme ref -> no label map");
+  ok(eq(cellView(undefined, { due_at: null, scheme: { labels: { top } } }, NOW).labels, { top }), "empty cell keeps the map");
+
   const pf = cellView(cell({ display_value: null, label: "pass", passed: true }), { due_at: null }, NOW);
   ok(pf.value === "" && pf.label === "pass", "pass/fail: label without value");
 

@@ -13,12 +13,12 @@ export function useCellDescription(): (v: CellView) => string {
   return (v: CellView) => {
     const parts = [t(`gradebook.states.${v.kind}`)];
     if (v.value) parts.push(v.value);
-    if (v.label) parts.push(labelText(v.label));
+    if (v.label) parts.push(labelText(v.label, v.labels));
     if (v.points) parts.push(t("gradebook.cell.points", { points: v.points }));
     if (v.late) parts.push(t("gradebook.flags.late"));
     if (v.overridden) parts.push(t("gradebook.flags.overridden"));
     if (v.unreleased) parts.push(t("gradebook.flags.unreleased"));
-    for (const k of v.thresholds) parts.push(labelText(k));
+    for (const k of v.thresholds) parts.push(labelText(k, v.labels));
     return parts.join(", ");
   };
 }
@@ -49,8 +49,8 @@ export function CellBody({ v }: { v: CellView }) {
   if (v.kind === "no_attempts") {
     return <Ban className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />;
   }
-  const main = v.value || (v.label ? labelText(v.label) : "") || v.points || "—";
-  const sub = v.value ? (v.label ? labelText(v.label) : v.points) : v.label ? v.points : "";
+  const main = v.value || (v.label ? labelText(v.label, v.labels) : "") || v.points || "—";
+  const sub = v.value ? (v.label ? labelText(v.label, v.labels) : v.points) : v.label ? v.points : "";
   return (
     <span className="flex flex-col items-start leading-tight">
       <span className="flex items-center gap-1">

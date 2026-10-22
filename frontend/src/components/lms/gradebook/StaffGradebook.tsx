@@ -210,7 +210,7 @@ export function StaffGradebook() {
                                 onClick={() => setPanel({
                                   submissionId: cell.submission_id, enrollmentId: r.enrollment_id, assessmentId: a.id,
                                   studentName: student, assessmentTitle: title(a), dueAt: a.due_at,
-                                  gradeRelease: a.grade_release,
+                                  gradeRelease: a.grade_release, labels: a.scheme?.labels ?? null,
                                 })}
                                 className="block h-full w-full px-3 py-2 text-left hover:bg-brand-50 focus:bg-brand-50 focus:outline-none">
                                 <CellBody v={v} />

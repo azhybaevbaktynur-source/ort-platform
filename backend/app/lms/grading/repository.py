@@ -75,24 +75,36 @@ def load_usable_version_row(db: Session, user_id: str, course_id: uuid.UUID,
 
 
 def version_briefs(db: Session, version_ids: Iterable[Optional[uuid.UUID]]) -> dict[uuid.UUID, dict]:
-    """version id -> {id, scheme_id, title, type, version_no, scale_min, scale_max} in one query (any owner:
-    a reference that already exists keeps rendering even if the scheme was deleted or transferred, P4-4)."""
+    """version id -> {id, scheme_id, title, type, version_no, scale_min, scale_max, labels} in one query (any
+    owner: a reference that already exists keeps rendering even if the scheme was deleted or transferred, P4-4).
+    `labels` (the version's client label map) comes from the immutable version cache; the params column is only
+    selected (in the same statement) when some version is not cached yet, and those versions are cached."""
+    from app.lms.grading import schemes  # schemes imports this module
+
     ids = list({i for i in version_ids if i is not None})
     if not ids:
         return {}
+    cached = schemes.peek_versions(ids)
+    cols = [GradingSchemeVersion.id, GradingSchemeVersion.scheme_id, GradingScheme.title,
+            GradingSchemeVersion.type, GradingSchemeVersion.version_no, GradingSchemeVersion.scale_min,
+            GradingSchemeVersion.scale_max]
+    need_params = len(cached) < len(ids)
+    if need_params:
+        cols.append(GradingSchemeVersion.params)
     rows = db.execute(
-        select(GradingSchemeVersion.id, GradingSchemeVersion.scheme_id, GradingScheme.title,
-               GradingSchemeVersion.type, GradingSchemeVersion.version_no, GradingSchemeVersion.scale_min,
-               GradingSchemeVersion.scale_max)
-        .join(GradingScheme, GradingScheme.id == GradingSchemeVersion.scheme_id)
+        select(*cols).join(GradingScheme, GradingScheme.id == GradingSchemeVersion.scheme_id)
         .where(GradingSchemeVersion.id.in_(ids))
     ).all()
-    return {
-        r[0]: {"id": r[0], "scheme_id": r[1], "title": r[2], "type": r[3], "version_no": r[4],
-               "scale_min": None if r[5] is None else float(r[5]),
-               "scale_max": None if r[6] is None else float(r[6])}
-        for r in rows
-    }
+    out: dict[uuid.UUID, dict] = {}
+    for r in rows:
+        v = cached.get(r[0])
+        if v is None:
+            v = schemes.cache_version_row(r[0], r[1], r[3], r[5], r[6], r[7])
+        out[r[0]] = {"id": r[0], "scheme_id": r[1], "title": r[2], "type": r[3], "version_no": r[4],
+                     "scale_min": None if r[5] is None else float(r[5]),
+                     "scale_max": None if r[6] is None else float(r[6]),
+                     "labels": schemes.version_labels(v)}
+    return out
 
 
 def load_category(db: Session, course_id: uuid.UUID, category_id: uuid.UUID, *,

@@ -234,14 +234,17 @@ class SchemeRefOut(BaseModel):
     version_no: int
     scale_min: Optional[float] = None
     scale_max: Optional[float] = None
+    # client label map of the version (`params.labels_for`): band key -> LocalizedText, lookup label -> text
+    labels: dict = {}
 
 
 class SchemeStudentRefOut(BaseModel):
-    """Student view: no ids, no params (PHASE_4_DESIGN 3.3 / 4)."""
+    """Student view: no ids, no params (PHASE_4_DESIGN 3.3 / 4); `labels` only renders grade label keys."""
     type: str
     scale_min: Optional[float] = None
     scale_max: Optional[float] = None
     title: dict
+    labels: dict = {}
 
 
 def scheme_ref(brief: Optional[dict]) -> Optional[SchemeRefOut]:
@@ -252,7 +255,7 @@ def scheme_student_ref(brief: Optional[dict]) -> Optional[SchemeStudentRefOut]:
     if not brief:
         return None
     return SchemeStudentRefOut(type=brief["type"], scale_min=brief["scale_min"], scale_max=brief["scale_max"],
-                               title=brief["title"])
+                               title=brief["title"], labels=brief.get("labels") or {})
 
 
 # --------------------------------------------------------------------------- staff outputs

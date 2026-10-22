@@ -15,6 +15,7 @@ from decimal import Decimal
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.authz import AuthzContext
@@ -26,7 +27,7 @@ from app.lms.core.types import localized_text
 from app.lms.courses.models import Course
 from app.lms.grading import repository as repo
 from app.lms.grading.models import GradingScheme, GradingSchemeVersion
-from app.lms.grading.params import SchemeType, scale_bounds, validate_params
+from app.lms.grading.params import SchemeType, labels_for, scale_bounds, validate_params
 from app.lms.grading.registry import SchemeVersionData
 
 SchemeTitle = localized_text(200)
@@ -191,14 +192,67 @@ def get_version_data(db: Session, version_id: uuid.UUID) -> SchemeVersionData:
     if row is None:
         raise repo.version_not_found()
     data = version_data_from_row(row)
-    with _cache_lock:
-        _cache[version_id] = data
-        _cache.move_to_end(version_id)
-        while len(_cache) > max(1, settings.GRADING_VERSION_CACHE_SIZE):
-            _cache.popitem(last=False)
+    _cache_put(data)
     return data
 
 
 def reset_version_cache() -> None:
     with _cache_lock:
         _cache.clear()
+
+
+def _cache_put(data: SchemeVersionData) -> None:
+    with _cache_lock:
+        _cache[data.id] = data
+        _cache.move_to_end(data.id)
+        while len(_cache) > max(1, settings.GRADING_VERSION_CACHE_SIZE):
+            _cache.popitem(last=False)
+
+
+def peek_versions(version_ids) -> dict:
+    """Cached versions among `version_ids` (no statement)."""
+    out: dict = {}
+    with _cache_lock:
+        for vid in version_ids:
+            hit = _cache.get(vid)
+            if hit is not None:
+                _cache.move_to_end(vid)
+                out[vid] = hit
+    return out
+
+
+def cache_version_row(id, scheme_id, type: str, scale_min, scale_max, params: dict) -> SchemeVersionData:
+    """Cache a version loaded by another query (column values, not an ORM row)."""
+    data = SchemeVersionData(id=id, scheme_id=scheme_id, type=type, scale_min=scale_min, scale_max=scale_max,
+                             params=params)
+    _cache_put(data)
+    return data
+
+
+def versions_data(db: Session, version_ids) -> dict:
+    """version id -> SchemeVersionData for every existing id: cache hits plus at most one statement for the
+    misses (cached afterwards). Unknown ids are left out."""
+    ids = {i for i in version_ids if i is not None}
+    out = peek_versions(ids)
+    missing = ids - out.keys()
+    if missing:
+        for row in db.execute(select(GradingSchemeVersion).where(GradingSchemeVersion.id.in_(missing))).scalars():
+            data = version_data_from_row(row)
+            _cache_put(data)
+            out[row.id] = data
+    return out
+
+
+def version_labels(v: Optional[SchemeVersionData]) -> dict:
+    """The version's client label map (`params.labels_for`): band key -> LocalizedText, lookup label -> text."""
+    if v is None:
+        return {}
+    return labels_for(v.type, v.params)
+
+
+def label_subset(v: Optional[SchemeVersionData], label: Optional[str]) -> dict:
+    """`{label: text}` when the version defines a text for `label`, else {} (pass/fail and thresholds are i18n)."""
+    if v is None or not label:
+        return {}
+    labels = version_labels(v)
+    return {label: labels[label]} if label in labels else {}

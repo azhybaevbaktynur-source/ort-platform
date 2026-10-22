@@ -21,7 +21,7 @@ export function OrtResultView({ grade, sections }: { grade: AttemptGradeOut; sec
       {flags.length > 0 && (
         <div role="status" className="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
           <Award className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
-          <span>{flags.map((k) => label(k)).join(", ")}</span>
+          <span>{flags.map((k) => label(k, grade.labels)).join(", ")}</span>
         </div>
       )}
       <GradeBadge grade={grade} />

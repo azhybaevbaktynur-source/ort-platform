@@ -3,17 +3,21 @@
 import React from "react";
 import { Award } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
-import type { AttemptGradeOut, Num } from "@/lib/lms/gradingTypes";
+import type { AttemptGradeOut, Num, SchemeLabelValue } from "@/lib/lms/gradingTypes";
 import { fmtNum, fmtPercentile } from "@/components/lms/grading/schemes/params";
 import { ScaleText } from "@/components/lms/grading/schemes/SchemeBadges";
 import { useSchemeLabel } from "@/components/lms/grading/schemes/labels";
 
-/** Display text for a grade value as sent by the server (never computed here); percent schemes get a % sign. */
+/**
+ * Display text for a grade value as sent by the server (never computed here); percent schemes get a % sign.
+ * The label is resolved through the grade's own `labels`, else `fallbackLabels` (e.g. the scheme ref's map).
+ */
 export function useGradeText() {
   const label = useSchemeLabel();
-  return (g: { display_value?: Num | null; label?: string | null }, schemeType?: string): string => {
+  return (g: { display_value?: Num | null; label?: string | null; labels?: Record<string, SchemeLabelValue> | null },
+    schemeType?: string, fallbackLabels?: Record<string, SchemeLabelValue> | null): string => {
     const v = fmtNum(g.display_value);
-    const l = g.label ? label(g.label) : "";
+    const l = g.label ? label(g.label, { ...(fallbackLabels ?? {}), ...(g.labels ?? {}) }) : "";
     if (v && schemeType === "percent") return `${v}%`;
     if (v && l) return `${v} · ${l}`;
     return v || l;
@@ -44,7 +48,7 @@ export function GradeBadge({ grade, showKept = true }: { grade: AttemptGradeOut;
         )}
         {flags.map((k) => (
           <span key={k} className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 font-semibold text-amber-900">
-            <Award className="h-3.5 w-3.5" aria-hidden="true" />{label(k)}
+            <Award className="h-3.5 w-3.5" aria-hidden="true" />{label(k, grade.labels)}
           </span>
         ))}
         {showKept && grade.is_kept && <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 font-medium text-indigo-800">{t("results.grade.kept")}</span>}

@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from app.lms.assessments.schemas import SchemeRefOut, SchemeStudentRefOut
 from app.lms.grading.registry import GradeValue, SchemeVersionData
+from app.lms.grading.schemes import label_subset
 
 
 # ------------------------------------------------------------------ attempt grade (result pages, staff)
@@ -34,6 +35,8 @@ class AttemptGradeOut(BaseModel):
     sections: Optional[list[AttemptGradeSectionOut]] = None
     is_kept: bool
     released: bool
+    # `{label: text}` when the version defines a text for `label` (band label, lookup label), else {}
+    labels: dict = {}
 
 
 def _sections(raw: Optional[list]) -> Optional[list[AttemptGradeSectionOut]]:
@@ -50,7 +53,7 @@ def attempt_grade(v: SchemeVersionData, *, display_value, label, percentile, pas
     return AttemptGradeOut(
         scheme_type=v.type, scale_min=v.scale_min, scale_max=v.scale_max, display_value=display_value, label=label,
         percentile=percentile, passed=passed, thresholds=dict(thresholds) if thresholds is not None else None,
-        sections=_sections(sections), is_kept=is_kept, released=released,
+        sections=_sections(sections), is_kept=is_kept, released=released, labels=label_subset(v, label),
     )
 
 
@@ -196,6 +199,7 @@ class MyGradeOut(BaseModel):
     released_at: Optional[datetime] = None
     kept_attempt_id: Optional[uuid.UUID] = None
     due_at: Optional[datetime] = None
+    labels: Optional[dict] = None
 
 
 class MyGradesTotalOut(BaseModel):
@@ -214,11 +218,13 @@ class MyGradesOut(BaseModel):
 MY_GRADE_STATES = ("graded", "pending", "missing", "excused", "hidden")
 
 
-def my_grade_out(a: Any, state: str, sub: Any = None) -> MyGradeOut:
-    """`a`: assessment row (id, title, due_at). Numbers only for `graded`."""
+def my_grade_out(a: Any, state: str, sub: Any = None, *, labels: Optional[dict] = None) -> MyGradeOut:
+    """`a`: assessment row (id, title, due_at). Numbers only for `graded`; `labels` = `{label: text}` of the
+    grade's scheme version (set only on graded rows whose label has a text)."""
     if state != "graded":
         return MyGradeOut(assessment_id=a.id, title=a.title, state=state, due_at=a.due_at)
-    return MyGradeOut(
+    extra = {"labels": labels} if labels else {}
+    return MyGradeOut(**extra,
         assessment_id=a.id, title=a.title, state=state, display_value=sub.display_value, label=sub.label,
         percentile=sub.percentile, passed=sub.passed, thresholds=sub.thresholds,
         effective_points=sub.effective_points, points_possible=sub.points_possible,

@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/context";
-import type { SubmissionAttemptOut } from "@/lib/lms/gradingTypes";
+import type { SchemeLabelValue, SubmissionAttemptOut } from "@/lib/lms/gradingTypes";
 import { useSchemeLabel } from "@/components/lms/grading/schemes/labels";
 import { fmtNum, fmtPercentile } from "@/components/lms/grading/schemes/params";
 import { fmtDateTime } from "@/components/lms/assessments/format";
@@ -12,9 +12,11 @@ import { canVoid, fmtPointsOf, lateParts } from "./gradebookModel";
 
 /** Counted attempts of a submission with their own grade, the kept marker and a Void action. */
 export function SubmissionAttempts({
-  attempts, keptAttemptId, attemptHref, canManage, onVoid,
+  attempts, labels, keptAttemptId, attemptHref, canManage, onVoid,
 }: {
   attempts: SubmissionAttemptOut[];
+  /** the column scheme's label map; each grade's own `labels` wins */
+  labels?: Record<string, SchemeLabelValue> | null;
   keptAttemptId: string | null;
   attemptHref: (attemptId: string) => string;
   canManage: boolean;
@@ -29,7 +31,7 @@ export function SubmissionAttempts({
         const kept = a.id === keptAttemptId || !!a.grade?.is_kept;
         const late = lateParts(a.late_seconds);
         const g = a.grade;
-        const gradeText = g ? [fmtNum(g.display_value), g.label ? labelText(g.label) : ""].filter(Boolean).join(" · ") : "";
+        const gradeText = g ? [fmtNum(g.display_value), g.label ? labelText(g.label, { ...(labels ?? {}), ...(g.labels ?? {}) }) : ""].filter(Boolean).join(" · ") : "";
         const pct = g ? fmtPercentile(g.percentile) : "";
         return (
           <li key={a.id} className={`rounded-xl border p-3 text-sm ${kept ? "border-brand-500 bg-brand-50" : "border-slate-200"}`}>
