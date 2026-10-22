@@ -50,3 +50,8 @@ api_router.include_router(_assessments_router, prefix="/courses", tags=["Assessm
 api_router.include_router(_attempts_router, tags=["Attempts"])
 api_router.include_router(_attempts_staff_router, tags=["Attempts (staff)"])
 api_router.include_router(_internal_router, prefix="/internal", tags=["Internal"])
+
+# Phase 4 (grading): grade mutation routes (slice G2)
+from app.lms.grading.router import router as _grading_router  # noqa: E402
+
+api_router.include_router(_grading_router, tags=["Grading"])

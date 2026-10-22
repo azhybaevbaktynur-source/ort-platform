@@ -1,4 +1,4 @@
-"""Staff attempt routes: list, detail, manual scoring (design section 5). Policies: staff_policies.py.
+"""Staff attempt routes: list, detail, manual scoring (design section 5), void (Phase 4, P4-20). Policies: staff_policies.py.
 The student result/review routes belong to the attempts router (slice A3) and call results.py."""
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from app.lms.core import clock, ratelimit
 from app.lms.core.errors import NotFound, ValidationFailed
 from app.lms.core.pagination import PageOut, paginate
 from app.lms.courses import service as course_svc
+from app.lms.grading.schemas import VoidIn
 from app.models.user import User
 
 router = APIRouter()
@@ -87,4 +88,14 @@ def score_item(course_id: uuid.UUID, attempt_id: uuid.UUID, position: int, body:
     course = _course(ctx, course_id, A.GRADES_MANAGE)
     ratelimit.enforce(ctx.user.id, ratelimit.grade_item_limit())
     attempt = grading.manual_score(ctx.db, ctx, course, attempt_id, position, body)
+    return results.staff_attempt_out(ctx.db, attempt)
+
+
+@router.post("/courses/{course_id}/attempts/{attempt_id}/void", response_model=ser.AttemptStaffOut)
+def void_attempt(course_id: uuid.UUID, attempt_id: uuid.UUID, body: VoidIn, ctx: AuthzContext = Depends(get_authz)):
+    """P4-20: GRADES_MANAGE + rate limit (checked by the service), then the attempt scoped by course."""
+    from app.lms.grading import actions as grade_actions
+
+    course = course_svc.load_course(ctx.db, course_id)
+    attempt = grade_actions.void_attempt(ctx.db, ctx, course, attempt_id, body.reason)
     return results.staff_attempt_out(ctx.db, attempt)
