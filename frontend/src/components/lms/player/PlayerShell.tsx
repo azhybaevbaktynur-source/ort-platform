@@ -11,7 +11,7 @@ import {
 } from "@/lib/lms/attempts";
 import type { AttemptContent, AttemptItemState, AttemptState } from "@/lib/lms/attemptTypes";
 import {
-  AutosaveQueue, ServerClock, browserQueueEnv, classifyFailure, backoffMs, effectiveDeadlineMs,
+  AutosaveQueue, ServerClock, browserQueueEnv, classifyCloseFailure, classifyFailure, backoffMs, effectiveDeadlineMs,
   timeUpSubmitDelayMs, watchOtherTabs, type QueueSnapshot,
 } from "@/lib/lms/attemptClient";
 import { DeadlineTimer } from "./DeadlineTimer";
@@ -335,13 +335,13 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
           applyState(next, { resetPos: true });
           return;
         } catch (e) {
-          const info = classifyFailure(e);
-          if (info.code === "use_submit") {
+          const failure = classifyCloseFailure(e);
+          if (failure === "use_submit") {
             busyRef.current.sectionTimeout = false;
             void runTimeUpSubmit();
             return;
           }
-          if (info.code === "section_not_current" || info.kind === "closed") {
+          if (failure === "not_current" || failure === "closed") {
             await refresh();
             return;
           }
@@ -378,12 +378,12 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
       setDialog(null);
       applyState(next, { resetPos: true });
     } catch (e) {
-      const info = classifyFailure(e);
-      if (info.kind === "closed" || info.code === "section_not_current") {
+      const failure = classifyCloseFailure(e);
+      if (failure === "use_submit") {
+        setDialog("submit");
+      } else if (failure === "not_current" || failure === "closed") {
         setDialog(null);
         await refresh(true);
-      } else if (info.code === "use_submit") {
-        setDialog("submit");
       } else {
         setDialogError(e);
       }

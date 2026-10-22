@@ -21,7 +21,7 @@ export type MoveDirection = "up" | "down";
 /** Known ORT section codes (labels: i18n `sections.*`). Sections are free labels in general mode. */
 export const ORT_SECTIONS = [
   "math_1", "math_2", "analogies", "reading", "grammar",
-  "chemistry", "biology", "physics", "history", "english",
+  "chemistry", "biology", "physics", "history", "english", "advanced_math", "native_language",
 ] as const;
 
 /** Image as the staff API returns it: expanded with a ready URL. */

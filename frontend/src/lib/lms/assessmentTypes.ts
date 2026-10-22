@@ -14,7 +14,9 @@ export const RESULTS_POLICIES: ResultsPolicy[] = ["never", "after_submit", "afte
 export type ItemKind = "question" | "passage" | "pick";
 
 /** Subject keys accepted by the ort_subject preset (section keys, labels `sections.*`). */
-export const ORT_SUBJECT_KEYS = ["chemistry", "biology", "physics", "history", "english"] as const;
+export const ORT_SUBJECT_KEYS = [
+  "chemistry", "biology", "physics", "history", "english", "advanced_math", "native_language",
+] as const;
 
 export interface SectionRules {
   allowed_types?: QuestionType[];
@@ -115,10 +117,27 @@ export interface AssessmentStudentSummaryOut {
 
 export type AssessmentSummaryOut = AssessmentStaffSummaryOut | AssessmentStudentSummaryOut;
 
+/** Staff `warnings` of GET /assessments/{a}: advisory, never block publishing (labels `assessments.issues.<code>`). */
 export interface AssessmentWarning {
-  code: string;
-  [k: string]: unknown;
+  code: "newer_version" | "unresolved_language" | (string & {});
+  item_id?: string | null;
+  language?: Lang | null;
 }
+
+/** Details of the 409 `confirm_required` publish error. */
+export interface ConfirmRequiredDetails {
+  in_progress: number;
+  submitted: number;
+}
+
+/** Details of the 409 `draft_conflict` error: the current revision to reload. */
+export interface DraftConflictDetails {
+  draft_rev: number;
+}
+
+/** Student lobby `reason` when `can_start` is false (anything else falls back to the generic message). */
+export const LOBBY_REASONS = ["not_open_yet", "closed", "attempts_exhausted", "unpublished"] as const;
+export type LobbyReason = (typeof LOBBY_REASONS)[number];
 
 export interface AssessmentStaffOut extends AssessmentStaffSummaryOut {
   description: LocalizedText | null;
@@ -157,7 +176,7 @@ export interface AssessmentLobbyOut {
   available_until: string | null;
   in_progress_attempt_id: string | null;
   can_start: boolean;
-  reason?: string | null;
+  reason?: LobbyReason | (string & {}) | null;
 }
 
 /** GET /assessments/{a} returns the staff or lobby shape depending on the caller's role. */
@@ -285,7 +304,8 @@ export const ASSESSMENT_ERROR_CODES = [
   "too_many_sections", "too_many_items", "section_not_empty", "order_mismatch", "preset_rule_locked",
   "item_type_not_allowed", "item_language_mismatch", "item_duplicate", "passage_mismatch", "publish_invalid",
   "confirm_required", "not_published", "attempts_in_progress", "assessment_not_available", "attempts_exhausted",
-  "language_not_available",
+  "language_not_available", "question_not_found", "bank_not_found", "passage_not_found", "not_deleted",
+  "not_implemented", "validation_failed", "unsupported_type",
 ] as const;
 export type AssessmentErrorCode = (typeof ASSESSMENT_ERROR_CODES)[number];
 
@@ -293,5 +313,5 @@ export type AssessmentErrorCode = (typeof ASSESSMENT_ERROR_CODES)[number];
 export const ISSUE_CODES = [
   "no_sections", "empty_section", "unresolved_language", "question_deleted", "type_not_allowed", "passage_mismatch",
   "pick_pool_too_small", "section_limit_in_free_navigation", "section_limits_exceed_total", "after_close_needs_until",
-  "too_many_items", "languages_not_in_course",
+  "too_many_items", "languages_not_in_course", "empty_passage", "newer_version",
 ] as const;

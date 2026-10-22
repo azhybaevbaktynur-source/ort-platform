@@ -78,6 +78,12 @@ jobs:
           ALEMBIC_TEST_DATABASE_URL: ${{ env.PG_BASE }}/ci_alembic
           LMS_PG_TEST_DATABASE_URL: ${{ env.PG_BASE }}/ci_lms
         run: python -m pytest tests/test_migrations.py tests/lms/test_pg_concurrency.py tests/lms/test_pg_concurrency_content.py -q -p no:cacheprovider -W ignore
+      - name: Phase 3 PG concurrency (attempts, grading, assessments)
+        env:
+          # these files also drive the app through get_db, so DATABASE_URL must be the same database
+          DATABASE_URL: ${{ env.PG_BASE }}/ci_lms
+          LMS_PG_TEST_DATABASE_URL: ${{ env.PG_BASE }}/ci_lms
+        run: python -m pytest tests/lms/test_pg_concurrency_attempts.py tests/lms/test_grading_pg_concurrency.py tests/lms/test_assessment_pg_concurrency.py -q -p no:cacheprovider -W ignore
       - name: Old suite on Postgres
         env:
           DATABASE_URL: ${{ env.PG_BASE }}/ci_suite

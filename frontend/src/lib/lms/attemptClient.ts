@@ -111,6 +111,8 @@ export function classifyFailure(err: unknown): ClassifiedFailure {
   const ra = e.details?.retry_after_seconds;
   const retryAfterMs = typeof ra === "number" ? ra * 1000 : null;
   const base = { code, status, positions, retryAfterMs };
+  // too_many_answers (422): the batch was larger than the server cap; the queue halves it and retries (never dropped)
+  if (code === "too_many_answers") return { kind: "too_large", ...base };
   if (code === "attempt_closed" || code === "section_closed" || code === "attempt_not_found") return { kind: "closed", ...base };
   if (status === 410) return { kind: "closed", ...base };
   if (status === 409 && code !== "rate_limited") return { kind: "closed", ...base };
@@ -118,6 +120,19 @@ export function classifyFailure(err: unknown): ClassifiedFailure {
   if (status === 413 || code === "payload_too_large") return { kind: "too_large", ...base };
   if (code === "invalid_response" || code === "item_not_found" || status === 422) return { kind: "invalid", ...base };
   return { kind: "transient", ...base };
+}
+
+/**
+ * Failures of the section-close call. `use_submit` (last section) and `section_not_current` (409) are expected
+ * outcomes of that call, not "attempt closed": handle them explicitly, never through `classifyFailure`'s closed path.
+ */
+export type CloseFailure = "use_submit" | "not_current" | "closed" | "other";
+
+export function classifyCloseFailure(err: unknown): CloseFailure {
+  const code = (err as { code?: string } | null | undefined)?.code;
+  if (code === "use_submit") return "use_submit";
+  if (code === "section_not_current") return "not_current";
+  return classifyFailure(err).kind === "closed" ? "closed" : "other";
 }
 
 // ---------- backoff ----------

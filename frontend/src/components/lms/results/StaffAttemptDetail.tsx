@@ -73,6 +73,11 @@ export function StaffAttemptDetail({ courseId, assessmentId, attemptId }: { cour
           const maxNum = max === null || max === undefined ? null : Number(max);
           return (
             <ReviewItemCard key={it.position} item={it} number={n} maxPoints={max}>
+              {it.graded_at && (
+                <p className="text-xs text-slate-500">
+                  {t("grading.gradedBy", { name: it.graded_by_name || t("grading.unnamed"), date: fmtDateTime(it.graded_at) })}
+                </p>
+              )}
               {canGrade && submitted && (
                 <GradeForm courseId={courseId} attemptId={attemptId} item={it}
                   max={maxNum !== null && Number.isFinite(maxNum) ? maxNum : null} onSaved={setData} />

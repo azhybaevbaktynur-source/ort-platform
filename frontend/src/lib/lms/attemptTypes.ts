@@ -171,6 +171,8 @@ export interface ReviewItemOut {
   flagged: boolean;
   correctness: Correctness | null;
   score: number | string | null;
+  /** maximum points of the slot */
+  points?: number | string | null;
   feedback?: string | null;
   key?: Record<string, unknown> | null;
   explanation?: string | null;

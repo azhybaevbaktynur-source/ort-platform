@@ -4,7 +4,7 @@ import React, { useCallback, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { isLmsApiError } from "@/lib/lms/client";
 import { publishAssessment, unpublishAssessment } from "@/lib/lms/assessments";
-import type { Issue } from "@/lib/lms/assessmentTypes";
+import type { ConfirmRequiredDetails, Issue } from "@/lib/lms/assessmentTypes";
 import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
 import { issuesFromDetails } from "./IssueList";
 
@@ -33,7 +33,7 @@ export function usePublishFlow(courseId: string, onChanged: () => void | Promise
       await onChanged();
     } catch (e) {
       if (isLmsApiError(e) && e.code === "confirm_required") {
-        const d = e.details as { in_progress?: number; submitted?: number };
+        const d = (e.details ?? {}) as Partial<ConfirmRequiredDetails>;
         setConfirm({ id, inProgress: Number(d.in_progress ?? 0), submitted: Number(d.submitted ?? 0) });
       } else if (isLmsApiError(e) && e.code === "publish_invalid") {
         setConfirm(null);

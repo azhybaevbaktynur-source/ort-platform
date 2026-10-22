@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { startAssessmentAttempt } from "@/lib/lms/assessments";
-import { previewAttemptId, type AssessmentLobbyOut } from "@/lib/lms/assessmentTypes";
+import { LOBBY_REASONS, previewAttemptId, type AssessmentLobbyOut } from "@/lib/lms/assessmentTypes";
 import { pickLocalized } from "@/lib/lms/localized";
 import type { Lang } from "@/lib/lms/types";
 import { useCourse } from "@/components/lms/CourseContext";
@@ -12,7 +12,7 @@ import { btnPrimary, inputCls, labelCls } from "@/components/lms/content/ui";
 import { AssessmentError } from "./AssessmentError";
 import { fmtDateTime } from "./format";
 
-const KNOWN_REASONS = new Set(["not_open_yet", "not_open", "closed", "attempts_exhausted", "not_available", "course_not_active", "unpublished"]);
+const KNOWN_REASONS = new Set<string>(LOBBY_REASONS);
 
 /** Student lobby: rules, sections and times, language choice, attempts left, Start / Resume (player route is built by F2). */
 export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {

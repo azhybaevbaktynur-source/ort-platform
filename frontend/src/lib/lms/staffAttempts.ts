@@ -18,15 +18,16 @@ export interface AttemptStaffSummaryOut {
   raw_score: number | string | null;
   points_possible: number | string | null;
   pending_review: number;
-  is_preview?: boolean;
+  is_preview: boolean;
 }
 
 /** One reviewed item for staff: the student review item plus scoring fields. */
 export interface StaffReviewItem extends ReviewItemOut {
-  /** maximum points of the slot (falls back to `question.points`) */
-  points?: number | string | null;
   auto_score?: number | string | null;
   manual_score?: number | string | null;
+  graded_by_id?: string | null;
+  graded_by_name?: string | null;
+  graded_at?: string | null;
 }
 
 export interface AttemptStaffOut extends AttemptStaffSummaryOut {

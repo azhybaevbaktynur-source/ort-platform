@@ -44,7 +44,9 @@
     "biology": "Biology",
     "physics": "Physics",
     "history": "History",
-    "english": "English"
+    "english": "English",
+    "advanced_math": "Advanced mathematics",
+    "native_language": "Native language"
   },
   "student": {
     "welcome": "Welcome",
@@ -343,7 +345,8 @@
       "payload_too_large": "The data is too large.",
       "results_not_available": "Results are not available yet.",
       "attempt_not_submitted": "The attempt is not submitted yet.",
-      "points_out_of_range": "Points are out of range."
+      "points_out_of_range": "Points are out of range.",
+      "not_implemented": "This feature is not available yet."
     }
   },
   "courses": {
@@ -1256,7 +1259,9 @@
       "section_limits_exceed_total": "Section time limits add up to more than the total time limit.",
       "after_close_needs_until": "Showing results after closing needs an \"available until\" date.",
       "too_many_items": "The assessment has too many questions.",
-      "languages_not_in_course": "A language of the assessment is not a course language."
+      "languages_not_in_course": "A language of the assessment is not a course language.",
+      "empty_passage": "A reading passage has no questions.",
+      "newer_version": "A question has a newer version in the bank. Publish again to use it."
     }
   },
   "player": {
@@ -1386,7 +1391,8 @@
     "status": "Status",
     "student": "Student",
     "submitted": "Submitted",
-    "unnamed": "Unnamed student"
+    "unnamed": "Unnamed student",
+    "gradedBy": "Graded by {name} on {date}"
   },
   "results": {
     "acceptedAnswers": "Accepted answers",

@@ -5,7 +5,7 @@
  *     src/lib/lms/attemptClient.ts src/lib/lms/attemptClient.check.ts && node /tmp/agy_f2_check/attemptClient.check.js
  */
 import {
-  AutosaveQueue, ServerClock, backoffMs, classifyFailure, remainingMs, storageKey, type QueueEnv,
+  AutosaveQueue, ServerClock, backoffMs, classifyCloseFailure, classifyFailure, remainingMs, storageKey, type QueueEnv,
 } from "./attemptClient";
 import type { AnswerIn, SaveOut } from "./attemptTypes";
 
@@ -137,6 +137,27 @@ const out = (): SaveOut => ({ saved: [], stale: [], server_now: new Date().toISO
   q6.set(1, { response: { text: "a" } });
   await q6.flushNow(); await m6.advance(60_000);
   ok(n6 === 1 && q6.pending === 1 && q6.snapshot().status === "auth", "401 keeps queue, no retry storm");
+
+  // too_many_answers (422): batch is split, nothing is dropped
+  const sizes: number[] = [];
+  const saved7: number[] = [];
+  const m7 = makeEnv(async (b) => {
+    sizes.push(b.length);
+    if (b.length > 3) throw { status: 422, code: "too_many_answers" };
+    saved7.push(...b.map((x) => x.position));
+    return out();
+  }, {});
+  const q7 = new AutosaveQueue("A7", m7.env);
+  for (let i = 1; i <= 10; i++) q7.set(i, { response: { text: "x" } });
+  await q7.flushNow(); await m7.advance(60_000);
+  ok(classifyFailure({ status: 422, code: "too_many_answers" }).kind === "too_large", "too_many_answers -> too_large (split)");
+  ok(saved7.length === 10 && new Set(saved7).size === 10 && q7.pending === 0, "split batches deliver every entry");
+
+  // close-section outcomes are explicit, not "closed"
+  ok(classifyCloseFailure({ status: 409, code: "use_submit" }) === "use_submit", "close: use_submit");
+  ok(classifyCloseFailure({ status: 409, code: "section_not_current" }) === "not_current", "close: section_not_current");
+  ok(classifyCloseFailure({ status: 409, code: "attempt_closed" }) === "closed", "close: attempt_closed");
+  ok(classifyCloseFailure({ status: 0, code: "network" }) === "other", "close: network -> other");
 
   if (failed) { console.error(failed + " check(s) failed"); process.exit(1); }
   console.log("all checks passed");
