@@ -77,7 +77,7 @@ def get_content(attempt_id: str, request: Request, section: Optional[int] = None
         if pos < 1 or pos > current:
             raise Conflict("Section is not available yet", code="section_not_current")
     etag = f'"{engine.content_etag(attempt, plan, pos)}"'
-    headers = {"ETag": etag, "Cache-Control": "private, max-age=86400, immutable", "Vary": "Accept-Encoding"}
+    headers = {"ETag": etag, "Cache-Control": "private, no-cache", "Vary": "Accept-Encoding, Authorization"}
     if _etag_matches(request.headers.get("if-none-match"), etag):
         return Response(status_code=304, headers=headers)
     cache = engine.cache_api()

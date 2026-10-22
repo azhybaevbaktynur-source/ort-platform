@@ -206,3 +206,35 @@ def test_staff_list_finalizes_at_most_20(client, db, frozen_clock):
     db.expire_all()
     left = db.scalars(select(Attempt).where(Attempt.status == "in_progress")).all()
     assert len(left) == 3
+
+
+# ------------------------------------------------------------------ global body cap
+
+def test_global_body_cap_default_413_old_shape(client, monkeypatch):
+    monkeypatch.setattr(settings, "API_MAX_BODY_BYTES", 1024 * 1024)
+    r = client.post("/api/v1/auth/login", content=b"x" * (2 * 1024 * 1024),
+                    headers={"content-type": "application/json"})
+    assert r.status_code == 413 and "detail" in r.json()
+
+
+def test_global_body_cap_chunked_413(client):
+    def gen():
+        for _ in range(3):
+            yield b"x" * (512 * 1024)
+
+    r = client.post("/api/v1/auth/login", content=gen(), headers={"content-type": "application/json"})
+    assert r.status_code == 413
+
+
+def test_global_body_cap_lms_shape_and_exemptions(client, monkeypatch):
+    from app.lms.attempts.bodycap import _EXEMPT
+    monkeypatch.setattr(settings, "API_MAX_BODY_BYTES", 100)
+    r = client.post("/api/v1/courses/00000000-0000-0000-0000-000000000000/banks", content=b"x" * 500,
+                    headers={"content-type": "application/json"})
+    assert r.status_code == 413 and r.json()["error"]["code"] == "payload_too_large"
+    for p in ("/api/v1/upload", "/api/v1/upload/image", "/api/v1/bulk/import-bundle", "/api/v1/bulk/upload-csv",
+              "/api/v1/courses/abc/assets", "/api/v1/courses/abc/imports", "/api/v1/courses/abc/imports/preview"):
+        assert _EXEMPT.match(p), p
+    r = client.post("/api/v1/upload/image", files={"file": ("a.txt", b"x" * 500)})
+    assert r.status_code != 413 or "detail" in r.json()
+    assert r.status_code in (401, 403, 422)

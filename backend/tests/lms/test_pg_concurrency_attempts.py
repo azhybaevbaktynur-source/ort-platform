@@ -350,3 +350,23 @@ def test_submit_vs_autosave_no_deadlock(setup_db, Session):
     assert res.get("A") == "ok", res
     assert res.get("B") in ("graded", "needs_review"), res
     assert "Deadlock" not in repr(res)
+
+
+def test_second_sweep_returns_immediately_while_first_holds_lock(setup_db, Session, frozen_clock):
+    q = make_quiz(setup_db, sections=[("a", 2, None)], time_limit_s=600, student=False)
+    for _ in range(3):
+        u = make_user(setup_db)
+        enroll(setup_db, q.course, u)
+        start_as(Session, u.id, q.course.id, q.assessment.id)
+    frozen_clock.advance(2000)
+    from sqlalchemy import text
+    holder = sweep._engine().connect()
+    assert holder.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": sweep.SWEEP_LOCK_KEY}).scalar()
+    holder.commit()
+    try:
+        assert sweep.run_sweep() == 0          # lock held elsewhere: returns at once, no work
+    finally:
+        holder.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": sweep.SWEEP_LOCK_KEY})
+        holder.commit()
+        holder.close()
+    assert sweep.run_sweep() == 3              # lock released after a sweep, so the next one works

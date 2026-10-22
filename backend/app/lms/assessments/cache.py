@@ -97,6 +97,8 @@ class _Locks:
 
 
 _plans: "OrderedDict[uuid.UUID, VersionPlan]" = OrderedDict()
+_plan_sizes: dict = {}
+_plan_bytes = 0
 _plan_lock = threading.Lock()
 _plan_build = _Locks()
 
@@ -111,9 +113,11 @@ _qtype_lock = threading.Lock()
 
 def reset_cache() -> None:
     """Test hook (A1 conftest): drop every cache."""
-    global _payload_bytes
+    global _payload_bytes, _plan_bytes
     with _plan_lock:
         _plans.clear()
+        _plan_sizes.clear()
+        _plan_bytes = 0
     with _payload_lock:
         _payloads.clear()
         _payload_bytes = 0
@@ -126,7 +130,7 @@ reset_caches = reset_cache
 
 def cache_stats() -> dict:
     with _payload_lock:
-        return {"plans": len(_plans), "payloads": len(_payloads), "payload_bytes": _payload_bytes,
+        return {"plans": len(_plans), "plan_bytes": _plan_bytes, "payloads": len(_payloads), "payload_bytes": _payload_bytes,
                 "qtypes": len(_qtypes)}
 
 
@@ -162,6 +166,30 @@ def _build_plan(db: Session, version_id: uuid.UUID) -> VersionPlan:
     )
 
 
+def _plan_size(plan: VersionPlan) -> int:
+    """Cheap size estimate: length of a compact JSON dump of the slots and question data."""
+    try:
+        return len(json.dumps([plan.slots, {str(k): (v[0], v[1]) for k, v in plan.qmeta.items()}],
+                              default=str, separators=(",", ":")))
+    except Exception:
+        return 1024 * 1024
+
+
+def _store_plan(version_id, plan: VersionPlan) -> None:
+    global _plan_bytes
+    size = _plan_size(plan)
+    cap = settings.PLAN_CACHE_BYTES
+    with _plan_lock:
+        _plan_bytes -= _plan_sizes.pop(version_id, 0)
+        _plans[version_id] = plan
+        _plans.move_to_end(version_id)
+        _plan_sizes[version_id] = size
+        _plan_bytes += size
+        while len(_plans) > 1 and (len(_plans) > PLAN_CACHE_ENTRIES or _plan_bytes > cap):
+            k, _ = _plans.popitem(last=False)
+            _plan_bytes -= _plan_sizes.pop(k, 0)
+
+
 def get_plan(db: Session, version_id: uuid.UUID) -> VersionPlan:
     version_id = _uuid(version_id)
     with _plan_lock:
@@ -175,11 +203,7 @@ def get_plan(db: Session, version_id: uuid.UUID) -> VersionPlan:
             if plan is not None:
                 return plan
         plan = _build_plan(db, version_id)
-        with _plan_lock:
-            _plans[version_id] = plan
-            _plans.move_to_end(version_id)
-            while len(_plans) > PLAN_CACHE_ENTRIES:
-                _plans.popitem(last=False)
+        _store_plan(version_id, plan)
     _plan_build.drop(version_id)
     return plan
 

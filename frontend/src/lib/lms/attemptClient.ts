@@ -180,7 +180,10 @@ export const MAX_BATCH = 20;
 export const IDLE_FLUSH_MS = 1500;
 export const MAX_DIRTY_MS = 5000;
 export const CONTINUOUS_FLUSH_MS = 1000;
-export const storageKey = (attemptId: string) => `lms_attempt_q_${attemptId}`;
+/** Queue mirror key. Keyed by user too (when known) so a different account on the same browser never sees it. */
+export const storageKey = (attemptId: string, userId?: string | null) =>
+  userId ? `lms_attempt_q_${userId}_${attemptId}` : `lms_attempt_q_${attemptId}`;
+const legacyStorageKey = (attemptId: string) => `lms_attempt_q_${attemptId}`;
 
 export class AutosaveQueue {
   private entries = new Map<number, AnswerIn>();
@@ -201,6 +204,7 @@ export class AutosaveQueue {
     private readonly attemptId: string,
     private readonly env: QueueEnv,
     private readonly handlers: QueueHandlers = {},
+    private readonly userId: string | null = null,
   ) {
     this.restore();
   }
@@ -408,8 +412,9 @@ export class AutosaveQueue {
     const st = this.env.storage;
     if (!st) return;
     try {
-      if (this.entries.size === 0) st.removeItem(storageKey(this.attemptId));
-      else st.setItem(storageKey(this.attemptId), JSON.stringify(this.sorted()));
+      const key = storageKey(this.attemptId, this.userId);
+      if (this.entries.size === 0) st.removeItem(key);
+      else st.setItem(key, JSON.stringify(this.sorted()));
     } catch { /* private mode / quota: the in-memory queue still works */ }
   }
 
@@ -417,7 +422,13 @@ export class AutosaveQueue {
     const st = this.env.storage;
     if (!st) return;
     try {
-      const raw = st.getItem(storageKey(this.attemptId));
+      let raw = st.getItem(storageKey(this.attemptId, this.userId));
+      if (!raw && this.userId) {
+        // one-time migration of the pre-user key
+        const legacy = legacyStorageKey(this.attemptId);
+        raw = st.getItem(legacy);
+        if (raw) st.removeItem(legacy);
+      }
       if (!raw) return;
       const arr = JSON.parse(raw) as unknown;
       if (!Array.isArray(arr)) return;

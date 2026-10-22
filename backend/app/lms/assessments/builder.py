@@ -97,6 +97,12 @@ def update_assessment(db: Session, ctx: AuthzContext, course: Course, aid: uuid.
     if frm is not None and until is not None and until <= frm:
         raise ValidationFailed("available_until must be after available_from",
                                details=[{"loc": ["available_until"], "msg": "must be after available_from"}])
+    if a.published_version_id is not None or a.status == "published":
+        policy = data.results_policy if "results_policy" in fields else a.results_policy
+        if policy == "after_close" and until is None:
+            raise ValidationFailed("results_policy after_close needs available_until",
+                                   code="after_close_needs_until",
+                                   details=[{"loc": ["available_until"], "msg": "required for after_close"}])
     for f in fields:
         value = getattr(data, f)
         if f in ("available_from", "available_until"):

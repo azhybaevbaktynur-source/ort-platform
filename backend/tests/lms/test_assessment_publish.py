@@ -382,3 +382,20 @@ async def test_preview_route_starts_preview_attempt(db, api):
     empty = await mk(api, w.O, w.cid)
     res = await api.call(w.O, "POST", f"/courses/{w.cid}/assessments/{empty['id']}/preview", json={})
     assert res.status_code == 422 and err(res) == "publish_invalid"
+
+
+async def test_published_assessment_rejects_after_close_without_until(db, api):
+    w = world(db)
+    out, _ = await simple_published(api, db, w, 1)
+    aid = out["assessment"]["id"]
+    base = f"/courses/{w.cid}/assessments"
+    rev = (await get(api, w.O, w.cid, aid))["draft_rev"]
+    r = await api.call(w.O, "PATCH", f"{base}/{aid}", json={"draft_rev": rev, "results_policy": "after_close"})
+    assert r.status_code == 422 and err(r) == "after_close_needs_until"
+    until = "2099-01-01T00:00:00Z"
+    r = await api.call(w.O, "PATCH", f"{base}/{aid}", json={"draft_rev": rev, "results_policy": "after_close",
+                                                           "available_until": until})
+    assert r.status_code == 200, r.text
+    rev = r.json()["draft_rev"]
+    r = await api.call(w.O, "PATCH", f"{base}/{aid}", json={"draft_rev": rev, "available_until": None})
+    assert r.status_code == 422 and err(r) == "after_close_needs_until"

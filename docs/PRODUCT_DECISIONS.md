@@ -100,3 +100,18 @@ Full list: P2-* in `docs/phases/PHASE_2_DESIGN.md` §1. Highlights and review ou
 | External images (P2-21) | Import rejects `http(s)` and `/uploads` image URLs (no hotlinking/SSRF). |
 | Import conflicts | A question edited by a teacher since its last import is skipped with a warning unless "overwrite" is chosen; deleted matches are skipped; questions missing from a new bundle are kept. Re-import never changes tags. |
 | Import safety | One import at a time per process (409 `import_busy`); a failed import stores no images; orphan blobs older than 1 h are swept; uploads need `Content-Length`. |
+
+## Decisions 2026-10-22 (Phase 3, agent defaults)
+
+Full list: P3-1 … P3-30 in `docs/phases/PHASE_3_DESIGN.md` §1. Highlights and review outcomes:
+
+| Topic | Decision |
+|---|---|
+| Publishing | Publish freezes every item to question/passage version ids per language (immutable snapshot). Republish makes a new version only if the snapshot changed; in-flight attempts keep their version; publishing over existing attempts needs a confirm (D9). |
+| Timing | Server-owned deadlines with per-section deadlines and a 45 s grace (D8). Forward-only sections: the next section starts at the old deadline. |
+| Exam integrity | Forward-only exams (ORT) deliver content one section at a time; students cannot read later sections early. Content responses are revalidated on every load (`no-cache` + ETag), never replayed from the browser cache. |
+| Autosave | One conditional single-row UPDATE per answer, up to 20 answers per request, ordered by client time; nothing is saved after grading. Pending answers in the browser are keyed per user and cleared on logout. |
+| Submit | One-shot: exactly one request grades. Submit locks the attempt and then all items in order (prevents a deadlock with autosave found in review). |
+| Results policy | `never` / `after_submit` / `after_close`. `after_close` releases answers only after the end time plus grace and when no student is still writing; it requires an end date. |
+| Robustness | Malformed answers score 0 instead of failing grading; the expiry sweep skips attempts that failed recently; request bodies are size-capped (256 KiB attempts, 1 MiB elsewhere, uploads/imports their own limits). |
+| Capacity | One database connection per request (fixed the load-test pool starvation). Load-test findings and plan sizing: `docs/LOAD_TEST_PRE_PHASE3.md`, `docs/phases/PHASE_3_LOADTEST.md`. A national exam needs a paid Render plan for the exam window and more Neon storage (owner decision; nothing bought). |

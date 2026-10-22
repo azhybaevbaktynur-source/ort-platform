@@ -132,6 +132,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem("ort_token");
       localStorage.removeItem("ort_role");
       localStorage.removeItem(PROFILE_KEY);
+      try {
+        // pending autosave queues belong to the signed-out user
+        for (const k of Object.keys(localStorage)) {
+          if (k.startsWith("lms_attempt_q_")) localStorage.removeItem(k);
+        }
+      } catch { /* storage unavailable */ }
     }
     setUser(null);
     setUserProfile(null);

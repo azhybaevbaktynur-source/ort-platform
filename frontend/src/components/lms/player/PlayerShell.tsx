@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Eye, TriangleAlert } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
+import { useLmsMe } from "@/lib/lms/useLmsMe";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import {
   closeSection, getAttempt, getAttemptContent, saveAnswers, saveAnswersKeepalive, submitAttempt,
@@ -55,6 +56,9 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
   const [sectionError, setSectionError] = useState<unknown>(null);
   const [sectionRetry, setSectionRetry] = useState(0);
 
+  const { me } = useLmsMe();
+  const meIdRef = useRef<string | null>(null);
+  meIdRef.current = me?.id ?? null;
   answersRef.current = answers;
   const resultHref = `/${lang}/courses/${courseId}/attempts/${attemptId}/result`;
   const goResult = useCallback(() => router.replace(resultHref), [router, resultHref]);
@@ -121,6 +125,7 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
           },
           onClosed: () => { void refresh(true); },
         },
+        meIdRef.current,
       );
       // Entries that survived a reload are newer than the server copy.
       for (const e of q.peek(1_000_000)) {

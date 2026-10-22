@@ -245,6 +245,6 @@ export const LMS_ERROR_CODES = [
   "attempts_in_progress", "assessment_not_available", "attempts_exhausted",
   "language_not_available", "attempt_closed", "section_closed", "section_not_current",
   "use_submit", "invalid_response", "payload_too_large", "results_not_available",
-  "attempt_not_submitted", "points_out_of_range",
+  "attempt_not_submitted", "points_out_of_range", "after_close_needs_until",
 ] as const;
 export type LmsErrorCode = (typeof LMS_ERROR_CODES)[number];

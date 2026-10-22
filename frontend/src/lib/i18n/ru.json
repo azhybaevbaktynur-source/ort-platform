@@ -346,7 +346,8 @@
       "results_not_available": "Результаты пока недоступны.",
       "attempt_not_submitted": "Попытка ещё не сдана.",
       "points_out_of_range": "Баллы вне допустимого диапазона.",
-      "not_implemented": "Эта функция пока недоступна."
+      "not_implemented": "Эта функция пока недоступна.",
+      "after_close_needs_until": "Для показа результатов «после закрытия» нужна дата окончания теста."
     }
   },
   "courses": {

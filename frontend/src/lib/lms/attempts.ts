@@ -23,7 +23,7 @@ export const getAttemptResult = (attemptId: string) => lmsFetch<AttemptResultOut
 export const getAttemptReview = (attemptId: string) => lmsFetch<ReviewOut>(`/attempts/${e(attemptId)}/review`);
 
 /**
- * Shared content payload. Immutable per (version, language[, section]), so the browser HTTP cache (ETag) is used.
+ * Shared content payload. Immutable per (version, language[, section]), so the browser revalidates by ETag (no-cache, 304) and never replays it without auth.
  * Forward-only attempts point `content_url` at the current section; refetch when it changes.
  * `content_url` may be absolute, start with `/api/`, or be relative to the API base; all three work.
  */
@@ -33,7 +33,7 @@ export async function getAttemptContent(state: Pick<AttemptState, "content_url">
   const url = /^https?:\/\//.test(u) || u.startsWith("/api/") ? u : `${base}${u.startsWith("/") ? "" : "/"}${u}`;
   let res: Response;
   try {
-    res = await fetch(url, { headers: { ...(await getAuthHeader()) }, cache: "default", signal });
+    res = await fetch(url, { headers: { ...(await getAuthHeader()) }, cache: "no-cache", signal });
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") throw err;
     throw new LmsApiError(0, "network", "Network error");

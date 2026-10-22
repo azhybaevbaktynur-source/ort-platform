@@ -2,7 +2,7 @@
 
 `maybe_schedule_sweep` runs from student attempt routes (after the response, through BackgroundTasks) at most every
 ATTEMPT_SWEEP_INTERVAL_S per process; `run_sweep` finalizes up to `limit` attempts whose deadline + grace has passed.
-It uses its own one-connection engine on Postgres (like ratelimit) so it never competes with request sessions.
+It uses its own two-connection engine on Postgres (like ratelimit) so it never competes with request sessions.
 Finalizing is one-shot (A4), so concurrent sweeps and lazy finalizers are harmless."""
 from __future__ import annotations
 
@@ -67,7 +67,7 @@ def _engine():
         with _state_lock:
             eng = _engines.get(url)
             if eng is None:
-                eng = create_engine(url, connect_args=dict(db_session.connect_args), pool_size=1, max_overflow=0,
+                eng = create_engine(url, connect_args=dict(db_session.connect_args), pool_size=2, max_overflow=0,
                                     pool_timeout=10, pool_pre_ping=True, pool_recycle=300)
                 _engines[url] = eng
     return eng
@@ -99,12 +99,42 @@ def run_sweep(limit: Optional[int] = None) -> int:
     this call finalized."""
     limit = limit or settings.ATTEMPT_SWEEP_BATCH
     now = clock.now()
+    lock_conn = None
     try:
         eng = _engine()
+        if eng.dialect.name == "postgresql":
+            # Session-level advisory lock on a dedicated connection, held for the whole sweep (one sweep at a time).
+            lock_conn = eng.connect()
+            if not lock_conn.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": SWEEP_LOCK_KEY}).scalar():
+                lock_conn.rollback()
+                lock_conn.close()
+                return 0
+            lock_conn.commit()
+    except Exception:
+        logger.warning("attempt sweep: lock failed", exc_info=True)
+        if lock_conn is not None:
+            try:
+                lock_conn.close()
+            except Exception:
+                pass
+        return 0
+    try:
+        return _sweep(eng, now, limit)
+    finally:
+        if lock_conn is not None:
+            try:
+                lock_conn.rollback()
+                lock_conn.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": SWEEP_LOCK_KEY})
+                lock_conn.commit()
+            except Exception:
+                logger.warning("attempt sweep: unlock failed", exc_info=True)
+            finally:
+                lock_conn.close()   # closing the connection also drops a session lock if unlock failed
+
+
+def _sweep(eng, now, limit: int) -> int:
+    try:
         with Session(bind=eng) as s:
-            if eng.dialect.name == "postgresql":
-                if not s.execute(text("SELECT pg_try_advisory_xact_lock(:k)"), {"k": SWEEP_LOCK_KEY}).scalar():
-                    return 0
             ids = expired_ids(s, now, limit, _recent_failed())
             s.commit()
     except Exception:

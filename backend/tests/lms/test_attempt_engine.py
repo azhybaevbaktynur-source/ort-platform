@@ -303,7 +303,7 @@ def test_content_etag_304_and_gzip(client, db):
     h = auth(q.student)
     r = client.get(f"/api/v1/attempts/{aid}/content", headers=h)
     etag = r.headers["etag"]
-    assert "immutable" in r.headers["cache-control"] and r.headers["cache-control"].startswith("private")
+    assert "no-cache" in r.headers["cache-control"] and r.headers["cache-control"].startswith("private")
     r2 = client.get(f"/api/v1/attempts/{aid}/content", headers={**h, "If-None-Match": etag})
     assert r2.status_code == 304
     r3 = client.get(f"/api/v1/attempts/{aid}/content", headers={**h, "Accept-Encoding": "gzip"})

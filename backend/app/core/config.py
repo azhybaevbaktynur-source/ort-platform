@@ -124,7 +124,9 @@ class Settings(BaseSettings):
     ASSESSMENT_ITEM_POINTS_MAX: int = 1000
     AUTOSAVE_MAX_ENTRIES: int = 20
     AUTOSAVE_MAX_BODY_BYTES: int = 256 * 1024
+    API_MAX_BODY_BYTES: int = 1024 * 1024
     PAYLOAD_CACHE_BYTES: int = 48 * 1024 * 1024
+    PLAN_CACHE_BYTES: int = 16 * 1024 * 1024
 
     # Password hashing cost (bcrypt). 10 is OWASP's minimum and ~4x faster than 12 on small servers.
     BCRYPT_ROUNDS: int = 10

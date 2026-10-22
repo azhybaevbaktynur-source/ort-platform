@@ -123,7 +123,7 @@ def test_etag_304_per_section(client, db):
     aid = _start(client, q)["id"]
     r1 = _content(client, q, aid, 1)
     e1 = r1.headers["etag"]
-    assert e1 == f'"{q.version.id}.en.s1.{cache.PAYLOAD_SCHEMA}"' and "immutable" in r1.headers["cache-control"]
+    assert e1 == f'"{q.version.id}.en.s1.{cache.PAYLOAD_SCHEMA}"' and "no-cache" in r1.headers["cache-control"]
     assert _content(client, q, aid, 1, **{"If-None-Match": e1}).status_code == 304
     # a cached section-1 ETag never unlocks section 2
     assert _content(client, q, aid, 2, **{"If-None-Match": e1}).status_code == 409
@@ -200,3 +200,21 @@ def test_forward_only_content_budget_and_single_checkout(client, db):
         event.remove(db_session.engine, "checkout", on_checkout)
     assert r.status_code == 200 and c.n <= 3, c.statements
     assert checkouts["n"] == 1
+
+
+def test_plan_cache_bounded_by_bytes(monkeypatch):
+    import uuid as _uuid
+    from app.core.config import settings
+    cache.reset_cache()
+    monkeypatch.setattr(settings, "PLAN_CACHE_BYTES", 5000)
+    plans = []
+    for _ in range(5):
+        vid = _uuid.uuid4()
+        plan = cache.VersionPlan(version_id=vid, snapshot={}, languages=("en",),
+                                 slots={"en": [{"pad": "x" * 1500}]}, qmeta={})
+        cache._store_plan(vid, plan)
+        plans.append(vid)
+    st = cache.cache_stats()
+    assert st["plan_bytes"] <= 5000 and 1 <= st["plans"] < 5
+    assert plans[-1] in cache._plans and plans[0] not in cache._plans
+    cache.reset_cache()
