@@ -131,3 +131,11 @@ Full list: P4-1 … in `docs/phases/PHASE_4_DESIGN.md` §1. Resolved during the 
 | Course grading | `grading_changed_at` moves only when a grading value really changes. Course grading PUT is a full replace. Category delete is soft and refused while a live assessment uses it. GET warns about uncategorized assessments and all-zero weights (weighted mode). |
 | Body caps | 64 KiB on course grading settings, categories and submission edits; scheme versions (lookup tables up to 1,000 rows) and grade release (up to 5,000 ids) keep the global 1 MiB cap. |
 | Seeding | System schemes are seeded idempotently at startup; a seeding failure is logged, not fatal. |
+| Assistants | Assistants can override, excuse, void, release and regrade (they inherit grade management; only roster, publish, delete and transfer stay teacher-only). |
+| Removed students | Their submissions and totals are kept but hidden from the gradebook (active roster only); re-adding the student shows them again. |
+| Unrelease | Refused (409 `grade_release_auto`) when the assessment releases grades automatically; switch it to manual first. |
+| Late policy | Changing the course late policy marks late submissions for regrade; scheme and total-mode edits do not (totals are computed on read). |
+| Stale grades | One definition shared by the gradebook "out of date" count and regrade: other scheme version, grading settings changed after computing, late policy changed (late ones only), or an attempt grade missing/old. |
+| Everything voided | A submission whose attempts are all voided has state `no_attempts` (shown as pending to the student, ignored in totals). |
+| Deleted assessments | Grade detail stays readable for staff; grade changes on a deleted assessment return 404. |
+| Integrity | Grade events are append-only and scheme versions immutable, enforced by the ORM and by PostgreSQL triggers. Existing graded attempts get submissions when 0005 runs. |
