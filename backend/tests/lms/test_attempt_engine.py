@@ -413,7 +413,6 @@ def test_submit_and_state_budgets_and_single_checkout(client, db):
         assert r.status_code == 200 and checkouts["n"] == 1
         # Phase 3: 13; Phase 4 (P4-13) adds the grading hook's fixed 5 statements (4 here: no scheme attached),
         # +1 (G3): the result carries `grade` (attempt_grades + submission release, one statement)
-        assert c.n <= 19, "
-".join(s[:90] for s in c.statements)
+        assert c.n <= 19, "\n".join(s[:90] for s in c.statements)
     finally:
         event.remove(db_session.engine, "checkout", on_checkout)
