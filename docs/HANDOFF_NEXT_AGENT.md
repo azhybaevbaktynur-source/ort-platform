@@ -38,6 +38,13 @@ Ask these first, in this order, and record the answers in `docs/PRODUCT_DECISION
 4. Confirm the 6,000-concurrent-students target and the budget ceiling per month (not yet known).
 5. Authenticate the Render, Neon and Vercel tools so the capacity review can read the real plans and sizes.
 
+## 4b. Decisions since this file was written (2026-10-22)
+
+- Merged and deployed the security branch (main `ca48b1f`, later `1a91244`); `perf/capacity-prep` merged (DB pool env vars, gzip, Vercel `fra1`).
+- Budget about $30/month max; keep Vercel + Render + Neon. Render is on the **Free** plan; upgrade to Starter at launch and scale up for exams only. Payment, staging load test and the frontend single-API-base change are postponed. See `docs/CAPACITY_REVIEW.md` (interim).
+- **Teachers are admin-approved** (replaces "every sign-up is a teacher" and D10): students sign up, request teacher access, a platform admin approves. D2 (domain/CDN) and D5 (age/consent) wait until the build is finished and a domain exists. Other D1-D18 defaults stand.
+- Render MCP returns "unauthorized" even after re-auth; Neon and Vercel MCP work. Owner reads Render settings from the dashboard.
+
 ## 5. What to do, in order
 
 1. **Capacity review** (`CAPACITY_REVIEW_BRIEF.md`, plan Phase 0 task 0.0): can Vercel + Render + Neon handle 6,000 concurrent students? Produce `docs/CAPACITY_REVIEW.md` *before* schema work; it may change D4 and parts of the attempt engine.

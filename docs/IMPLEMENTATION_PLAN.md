@@ -32,7 +32,7 @@
 | # | Phase | Size | Depends on | Result you can see |
 |---|---|---|---|---|
 | 0 | Foundations | M | – | CI, Alembic, hardened uploads, authz scaffolding |
-| 1 | Courses, enrollment, authorization | L | 0 | Teachers create courses; students join by code |
+| 1 | Courses, enrollment, authorization | L | 0 | Admin-approved teachers create courses; students join by code |
 | 2 | Files and content library | L | 1 | Persistent images; teachers build banks/questions; imports work |
 | 3 | Assessments and attempts | L | 2 | Teacher builds and publishes a quiz; students take it safely |
 | 4 | Grading and results | L | 3 | Flexible grading schemes; ORT scoring as data; gradebook; real review |
@@ -73,14 +73,15 @@ Phases 6, 7, 8 are independent of each other after the cutover and may run in an
 - `app/lms/courses/`: create/update/publish/conclude/soft-delete/restore, transfer ownership, regenerate join code. Owner's `teacher/active` enrollment inserted in the same transaction; owner invariants.
 - `app/lms/enrollments/`: join by code (single transaction, `FOR UPDATE`, limit, identical failure messages, rate limiting by user and IP), leave, teacher removes student, roster, role change (teacher ↔ assistant), events log.
 - `authz.py` completed: role grants, status gates, request-scoped enrollment cache, SQL scopes (`courses_visible_to`, `my_courses`).
-- Registration: every sign-up can create courses (D10). Email verification unchanged.
+- Registration: every sign-up is a student. Teacher access is requested by the user and approved by a platform admin (`users.teacher_status`, `teacher_requests`; endpoints: request, list pending, approve/reject, revoke). Only `approved` users can create courses. Email verification unchanged.
 - Endpoints (all under `/api/v1/courses…`), each listed in the permission matrix.
 **Frontend**
+- "Become a teacher" request form for students, and a platform-admin screen listing pending teacher requests with approve / reject / revoke.
 - Route group `/[lang]/courses`: "My courses" (teaching / learning), create-course form (title, languages ⊆ en/ru/ky, default language, enrollment mode: closed/open/code), course shell with role-aware tabs (Home, People, Settings), join-by-code page and dialog, roster management, course settings incl. conclude/delete/restore.
 - Navigation no longer depends on a global admin role; the old `(admin)`/`(student)` groups stay untouched until cutover.
 **Tests**: matrix tests (action × role × course status); two teachers / three students isolation suite; join concurrency (limit never exceeded with parallel joins); code-guessing rate limit; re-join revives the row and its history; owner cannot be removed; soft-deleted course returns 404 to everyone except owner restore.
 **Exit criteria**: scripted flow passes end to end (teacher creates → student joins → teacher removes → student re-joins); security review done; isolation suite green.
-**Risks**: authorization gaps → merge gate + review. Minors creating courses (D10).
+**Risks**: authorization gaps → merge gate + review. Teacher approval queue must not be bypassable (check `teacher_status` on the server for every course-creation call).
 
 ---
 
@@ -216,7 +217,7 @@ Phases 6, 7, 8 are independent of each other after the cutover and may run in an
 | D7 | Application-answer retention | 30 days after rejection/withdrawal/unenroll. |
 | D8 | Server timer grace | 45 seconds (Canvas uses 1–5 minutes). |
 | D9 | Editing a published quiz | Allowed; creates a draft; republish bumps the version; in-flight attempts keep the old version; teacher is warned if attempts exist. |
-| D10 | Who can create courses | Any verified user 14+ (aligned with D5). |
+| D10 | Who can create courses | **Decided 2026-10-22**: only teachers approved by a platform admin. |
 | D11 | Which score counts for retakes (ORT) | Highest (teacher-configurable per assessment). |
 | D12 | "ORT visible to everyone" | A catalog-listed course students join with one click; no anonymous reading in v1. |
 | D13 | Re-lock after a regrade | No (Canvas behavior) plus a teacher "re-apply rules" action. |

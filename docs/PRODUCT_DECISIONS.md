@@ -6,7 +6,7 @@ Source: answers to the 15 open questions in `PROJECT_UNDERSTANDING.md` §8. The 
 
 | Topic | Decision |
 |---|---|
-| Teachers | Self sign-up. A sign-up is a teacher. Students come in through the portal and enroll in courses. Roles are per enrollment. |
+| Teachers | **Superseded 2026-10-22**: see "Decisions 2026-10-22 (teachers)" below. Originally: self sign-up, a sign-up is a teacher. Roles stay per enrollment. |
 | The 12k questions | Not important. ORT becomes a course a teacher creates (upload ORT questions) and can make visible to everyone. No platform-owned bank required. |
 | Sharing questions between teachers | Later. Not now. |
 | Sections / cohorts | None. One course = one group of students. |
@@ -33,3 +33,12 @@ Source: answers to the 15 open questions in `PROJECT_UNDERSTANDING.md` §8. The 
 | Hosting | Keep Vercel + Render + Neon for now. Render is on the **Free** plan (sleeps, ~0.1 CPU, 1 worker) and must be upgraded before launch. Scale Render up only for exam windows (billed per second). A VPS for the API is the fallback if the load test shows daily heavy load. |
 | Domain | None yet; added after the LMS is finished. |
 | Scale | 6,000 concurrent target and "plan for more later" confirmed. |
+
+## Decisions 2026-10-22 (teachers)
+
+| Topic | Decision |
+|---|---|
+| Who can create courses | Only **admin-approved teachers**. Everyone who signs up is a student. A user may request teacher access; a platform admin approves or rejects it. Revocable. (Replaces self sign-up as teacher and D10.) |
+| Age (D5) | Not a problem for course creation, because an admin verifies every teacher first. Student minimum age and consent wording are deferred. |
+| D2 (domain/CDN) and D5 (age/consent) | Postponed until the overall build is finished and a domain exists. |
+| Platform admin | Approves teacher requests (and does support/moderation). Role is read from the database on every request. |

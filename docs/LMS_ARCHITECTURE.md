@@ -36,7 +36,7 @@ User ──< Enrollment >── Course ──< Module ──< ModuleItem ──>
 
 (Research: `canvas-core-domain.md`.)
 
-**users**: drop global `role`. Add `is_platform_admin` (support/moderation only, read from DB, never silent), `locale` (`en|ru|ky`), `birth_year`/`age_band` (nullable, for consent). Every sign-up is a user who can create courses (teacher capability comes from owning/being teacher in a course). Who may create courses (including minors): decision D10.
+**users**: drop global `role`. Add `is_platform_admin` (support/moderation only, read from DB, never silent), `locale` (`en|ru|ky`), `birth_year`/`age_band` (nullable, for consent). Add `teacher_status` (`none|pending|approved|revoked`, default `none`) plus a `teacher_requests` table (user, message, status, decided_by, decided_at, reason). Every sign-up is a student; only `approved` users may create courses, and a platform admin decides requests (owner decision 2026-10-22, replaces D10). Per-course powers still come from the enrollment role. Revoking teacher status blocks new courses but does not delete existing ones.
 
 **courses**: `id uuid, owner_id, title(LocalizedText), description, languages text[] (⊆ en|ru|ky), default_language, status draft|published|concluded, visibility private|catalog, enrollment_mode closed|open|invite_code|form_auto|form_review, join_code (generated 6–8 chars, partial unique, regenerable), enrollment_limit, starts_at, ends_at, default_grading_scheme_version_id, settings, copied_from_id, created_at, updated_at, deleted_at, deleted_by_id`. Soft delete is separate from `status`; restore returns to `draft`.
 
