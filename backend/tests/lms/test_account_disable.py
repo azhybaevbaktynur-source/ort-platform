@@ -2,11 +2,10 @@ import pytest
 from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 
-from app.core.security import hash_password
+from app.core.security import create_access_token, hash_password
 from app.db.session import SessionLocal
 from app.lms.core.deps import get_lms_user
 from app.main import app
-from app.schemas.user import UserProfile, UserRole
 from tests.lms.factories import auth, make_user
 
 
@@ -34,14 +33,13 @@ def test_get_lms_user_rejects_disabled_and_unknown():
         ok = make_user(db)
         bad = make_user(db, disabled=True)
 
-        def profile(u_id):
-            return UserProfile(id=u_id, email="x@test.example", displayName="x", role=UserRole.STUDENT,
-                               preferredLanguage="ky")
+        def header(u_id):
+            return "Bearer " + create_access_token({"sub": u_id})
 
-        assert get_lms_user(profile(ok.id), db).id == ok.id
+        assert get_lms_user(header(ok.id), db).id == ok.id
         for uid in (bad.id, "usr_missing"):
             with pytest.raises(HTTPException) as ei:
-                get_lms_user(profile(uid), db)
+                get_lms_user(header(uid), db)
             assert ei.value.status_code == 401
     finally:
         db.close()

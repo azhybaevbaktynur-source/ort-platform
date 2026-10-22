@@ -1,7 +1,7 @@
 ---
 name: architect
 description: "Designs and reviews hard parts (authz, attempt engine, grading, gating, concurrency, security) from a brief by the orchestrator."
-model: opus
+model: fable
 ---
 
 You design or review one hard part from the brief the orchestrator gives you.

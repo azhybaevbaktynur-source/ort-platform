@@ -17,6 +17,7 @@ export function CourseTabs({ courseId, showSettings }: { courseId: string; showS
   const tabs = [
     { href: base, label: t("courses.home.tab"), exact: true },
     { href: `${base}/people`, label: t("courses.people.tab") },
+    { href: `${base}/assessments`, label: t("assessments.tab") },
     ...(showBank ? [{ href: `${base}/bank`, label: t("bank.tab") }] : []),
     ...(showSettings ? [{ href: `${base}/settings`, label: t("courses.settings.tab") }] : []),
   ];

@@ -1,0 +1,63 @@
+{
+ "scenario": "mix",
+ "users": 50,
+ "wall_s": 32.7,
+ "endpoints": {
+  "me_lms": {
+   "n": 694,
+   "rps": 21.2,
+   "p50_ms": 3.7,
+   "p95_ms": 34.7,
+   "p99_ms": 101.4,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "question_list": {
+   "n": 42,
+   "rps": 1.3,
+   "p50_ms": 9.9,
+   "p95_ms": 597.6,
+   "p99_ms": 712.8,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "join": {
+   "n": 47,
+   "rps": 1.4,
+   "p50_ms": 10.0,
+   "p95_ms": 14.8,
+   "p99_ms": 35.4,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "course_list": {
+   "n": 644,
+   "rps": 19.7,
+   "p50_ms": 5.4,
+   "p95_ms": 78.4,
+   "p99_ms": 541.1,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "course_get": {
+   "n": 644,
+   "rps": 19.7,
+   "p50_ms": 5.4,
+   "p95_ms": 65.2,
+   "p99_ms": 167.0,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "media": {
+   "n": 644,
+   "rps": 19.7,
+   "p50_ms": 2.6,
+   "p95_ms": 36.5,
+   "p99_ms": 236.2,
+   "err_pct": 0.0,
+   "codes": {}
+  }
+ },
+ "total_rps": 83.0,
+ "total_err_pct": 0.0
+}

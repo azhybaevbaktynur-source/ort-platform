@@ -22,6 +22,8 @@ def parse_decimal(raw) -> Decimal:
         raise ValueError("not a number") from None
     if not d.is_finite():
         raise ValueError("must be finite")
+    if abs(d.adjusted()) > 50:
+        raise ValueError("out of range")
     return d
 
 

@@ -69,6 +69,9 @@ LEGACY_POLICIES: dict[tuple[str, str], str] = {
 }
 
 
+from app.lms.assessments.policies import ASSESSMENT_POLICIES  # noqa: E402
+from app.lms.attempts.policies import ATTEMPT_POLICIES  # noqa: E402
+from app.lms.attempts.staff_policies import ATTEMPT_STAFF_POLICIES, INTERNAL_POLICIES  # noqa: E402
 from app.lms.content.import_policies import IMPORT_POLICIES  # noqa: E402
 from app.lms.content.policies import CONTENT_POLICIES  # noqa: E402
 from app.lms.courses.policies import COURSE_POLICIES  # noqa: E402
@@ -81,12 +84,13 @@ from app.lms.teachers.policies import ME_POLICIES  # noqa: E402
 # Policy names allowed as values (design section 5). 'course:<action>' variants are validated by prefix.
 POLICY_NAMES = frozenset({
     "authenticated", "authenticated+ratelimit", "teacher_approved", "course:owner_restore",
-    "platform_admin", "legacy", "public",
+    "platform_admin", "legacy", "public", "attempt_owner", "internal_token",
 })
 
 ROUTE_POLICIES: dict[tuple[str, str], str] = {
     **LEGACY_POLICIES, **ME_POLICIES, **COURSE_POLICIES, **ENROLLMENT_POLICIES, **PLATFORM_POLICIES, **PLATFORM_COURSE_POLICIES,
     **CONTENT_POLICIES, **IMPORT_POLICIES, **ASSET_POLICIES, **MEDIA_POLICIES,
+    **ASSESSMENT_POLICIES, **ATTEMPT_POLICIES, **ATTEMPT_STAFF_POLICIES, **INTERNAL_POLICIES,
 }
 
 

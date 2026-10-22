@@ -5,22 +5,50 @@ import hashlib
 import ipaddress
 from typing import Optional
 
-from fastapi import Depends, Request
+import jwt
+from fastapi import Depends, Header, Request
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.exceptions import UnauthorizedException
-from app.core.security import get_current_user
+from app.core.security import MOCK_USERS, _mock_tokens_allowed
 from app.db.session import get_db
 from app.lms.core.errors import Forbidden
 from app.models.user import User
-from app.schemas.user import UserProfile
 
 
-def get_lms_user(profile: UserProfile = Depends(get_current_user), db: Session = Depends(get_db)) -> User:
-    user = db.get(User, profile.id)
-    if user is None or user.disabled_at is not None:
-        raise UnauthorizedException("Could not validate credentials")
+def _user_id_from_authorization(authorization: Optional[str]) -> Optional[str]:
+    """Same token rules as security.get_current_user, minus the database lookup and minus live Firebase.
+
+    Returns the user id to load, or raises UnauthorizedException."""
+    if not authorization:
+        if _mock_tokens_allowed() and settings.DEBUG:
+            return MOCK_USERS["mock_student_token"].id
+        raise UnauthorizedException("Authorization header missing")
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise UnauthorizedException("Invalid authorization header format. Expected 'Bearer <token>'")
+    token = parts[1]
+    if _mock_tokens_allowed() and token in MOCK_USERS:
+        return MOCK_USERS[token].id
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        return payload.get("sub")
+    except jwt.PyJWTError:
+        pass
+    if _mock_tokens_allowed() and settings.FIREBASE_MOCK_MODE:
+        return f"usr_{token[:12]}"
+    raise UnauthorizedException("Invalid or expired token")
+
+
+def get_lms_user(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)) -> User:
+    """P3-27: authenticate with the request's own session (one pool checkout per request)."""
+    user_id = _user_id_from_authorization(authorization)
+    user = db.get(User, user_id) if user_id else None
+    if user is None:
+        raise UnauthorizedException("User account not found")
+    if user.disabled_at is not None:
+        raise UnauthorizedException("Account disabled")
     return user
 
 

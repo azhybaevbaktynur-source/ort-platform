@@ -1,0 +1,46 @@
+{
+ "label": "r4_w4_p10_t20_admit20",
+ "assessment_id": "c827a509-09fd-4da0-8690-00eeff47cfe4",
+ "attempts": 6000,
+ "attempts_per_user_max": 1,
+ "status": {
+  "graded": 6000
+ },
+ "submit_reason": {
+  "timeout": 3646,
+  "sweep": 141,
+  "manual": 2213
+ },
+ "in_progress_left": 0,
+ "graded_at_missing": 0,
+ "hook_calls": 6000,
+ "hook_double": 0,
+ "hook_missing": 0,
+ "hook_on_unfinalized": 0,
+ "items_total": 900000,
+ "attempts_with_ungraded_items": 0,
+ "raw_score_mismatch": 0,
+ "answers_after_grading": 0,
+ "open_sections_on_finalized": 0,
+ "key_mismatch": 0,
+ "acked_positions_checked": 385672,
+ "acked_exact": 383608,
+ "acked_superseded": 2,
+ "submit_body_rejected_late": 2062,
+ "lost_answers": 0,
+ "lost_by_src": {},
+ "lost_examples": [],
+ "acked_entries_total": 508808,
+ "started_ok": 6000,
+ "5xx_or_transport": {
+  "autosave:ReadError": 133,
+  "content:ReadError": 14,
+  "content_304:ReadError": 1,
+  "section_close:ReadError": 18,
+  "state_lazy:ReadError": 1,
+  "state_post:ReadError": 1,
+  "state_reload:ReadError": 2,
+  "submit:ReadError": 10
+ },
+ "ok": false
+}

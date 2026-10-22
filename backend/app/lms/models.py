@@ -8,3 +8,7 @@ from app.lms.content.models import (  # noqa: F401,E402
     BankQuestion, Passage, PassageVersion, QuestionBank, QuestionVersion, TranslationGroup,
 )
 from app.lms.files.models import Asset, AssetBlob  # noqa: F401,E402
+from app.lms.assessments.models import (  # noqa: F401,E402
+    Assessment, AssessmentItem, AssessmentSection, AssessmentVersion,
+)
+from app.lms.attempts.models import Attempt, AttemptItem, AttemptSection  # noqa: F401,E402

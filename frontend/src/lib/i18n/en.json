@@ -44,7 +44,9 @@
     "biology": "Biology",
     "physics": "Physics",
     "history": "History",
-    "english": "English"
+    "english": "English",
+    "advanced_math": "Advanced mathematics",
+    "native_language": "Native language"
   },
   "student": {
     "welcome": "Welcome",
@@ -312,7 +314,40 @@
       "length_required": "The request must include its size. Please try again.",
       "private_storage_unavailable": "Private file storage is not available right now. Please contact the administrator.",
       "passage_deleted": "This passage has been deleted.",
-      "file_too_large": "The file is too large."
+      "file_too_large": "The file is too large.",
+      "assessment_not_found": "Assessment not found.",
+      "section_not_found": "Section not found.",
+      "item_not_found": "Item not found.",
+      "attempt_not_found": "Attempt not found.",
+      "draft_conflict": "Someone else changed this assessment. It was reloaded; apply your change again.",
+      "languages_not_in_course": "Assessment languages must be languages of the course.",
+      "too_many_sections": "Too many sections.",
+      "too_many_items": "Too many questions in this assessment.",
+      "section_not_empty": "Remove the questions from the section first.",
+      "order_mismatch": "The list changed meanwhile. Reload and try again.",
+      "preset_rule_locked": "This rule is fixed for ORT sections.",
+      "item_type_not_allowed": "This question type is not allowed in this section.",
+      "item_language_mismatch": "The question has no version in the assessment languages.",
+      "item_duplicate": "This question is already in the assessment.",
+      "passage_mismatch": "Questions of a passage must belong to the same passage.",
+      "publish_invalid": "The assessment cannot be published yet. See the problems below.",
+      "confirm_required": "Students have already started this assessment. Confirm to publish.",
+      "not_published": "The assessment is not published.",
+      "attempts_in_progress": "Students are taking this assessment right now.",
+      "assessment_not_available": "This assessment is not available.",
+      "attempts_exhausted": "You have no attempts left.",
+      "language_not_available": "This language is not available for the assessment.",
+      "attempt_closed": "This attempt is already closed.",
+      "section_closed": "This section is already closed.",
+      "section_not_current": "This is not the current section.",
+      "use_submit": "This was the last section. Submit the attempt.",
+      "invalid_response": "The answer is not valid for this question.",
+      "payload_too_large": "The data is too large.",
+      "results_not_available": "Results are not available yet.",
+      "attempt_not_submitted": "The attempt is not submitted yet.",
+      "points_out_of_range": "Points are out of range.",
+      "not_implemented": "This feature is not available yet.",
+      "after_close_needs_until": "Results \"after close\" need an end date for the assessment."
     }
   },
   "courses": {
@@ -993,5 +1028,424 @@
         "too_many_issues": "Showing {shown} issues. In total: {errors_total} errors and {warnings_total} warnings."
       }
     }
+  },
+  "assessments": {
+    "tab": "Assessments",
+    "untitled": "Untitled",
+    "backToList": "Back to assessments",
+    "status": {
+      "draft": "Draft",
+      "published": "Published"
+    },
+    "presets": {
+      "none": {
+        "name": "Blank",
+        "hint": "Start empty and build sections yourself."
+      },
+      "ort_main": {
+        "name": "ORT main test",
+        "hint": "Five timed sections (Math I, Math II, analogies, reading, grammar), forward-only, one attempt."
+      },
+      "ort_subject": {
+        "name": "ORT subject test",
+        "hint": "One timed section for a chosen subject."
+      }
+    },
+    "navigation": {
+      "free": "Free: all sections open, no section time limits",
+      "section_forward_only": "Section by section: no going back"
+    },
+    "results": {
+      "never": "Never show results",
+      "after_submit": "Right after submitting",
+      "after_close": "After the availability window closes"
+    },
+    "scorePolicy": {
+      "highest": "Highest attempt",
+      "latest": "Latest attempt",
+      "first": "First attempt",
+      "average": "Average of attempts"
+    },
+    "create": {
+      "title": "New assessment",
+      "titleLabel": "Title",
+      "preset": "Start from",
+      "subject": "Subject",
+      "languages": "Languages of the assessment",
+      "languagesHint": "Every question must exist in each selected language. ORT exams are normally one language each.",
+      "submit": "Create"
+    },
+    "list": {
+      "title": "Assessments",
+      "create": "New assessment",
+      "empty": "No assessments yet.",
+      "emptyTrash": "The trash is empty.",
+      "showTrash": "Show trash",
+      "hideTrash": "Hide trash",
+      "edit": "Edit",
+      "delete": "Delete",
+      "restore": "Restore",
+      "deleteTitle": "Delete this assessment?",
+      "deleteBody": "It is hidden from students. Attempts already made are kept. You can restore it from the trash.",
+      "version": "Version {n}",
+      "unpublishedChanges": "Unpublished changes",
+      "counts": "{items} questions, {points} points",
+      "attempts": "{inProgress} in progress, {submitted} submitted",
+      "from": "Opens {date}",
+      "until": "Closes {date}"
+    },
+    "student": {
+      "title": "Assessments",
+      "empty": "No assessments are available yet.",
+      "open": "Open",
+      "resume": "Resume",
+      "items": "{n} questions",
+      "minutes": "{n} min",
+      "attemptsOf": "Attempts {used} of {total}",
+      "attemptsUnlimited": "Attempts used: {used}",
+      "lastResult": "Last result: {score} of {total}"
+    },
+    "overview": {
+      "attempts": "Attempts",
+      "items": "Questions",
+      "points": "{n} points",
+      "versions": "Published versions",
+      "noVersions": "Not published yet."
+    },
+    "lobby": {
+      "timeLimit": "Time limit",
+      "noLimit": "No time limit",
+      "attemptsLeft": "Attempts",
+      "anytime": "Any time",
+      "noEnd": "No end date",
+      "forwardOnly": "Sections go in order. When you finish a section you cannot return to it.",
+      "freeNav": "You can move between questions freely.",
+      "sections": "Sections",
+      "language": "Language",
+      "start": "Start",
+      "cannotStart": "You cannot start this assessment right now.",
+      "reasons": {
+        "not_open_yet": "This assessment has not opened yet.",
+        "not_open": "This assessment has not opened yet.",
+        "closed": "This assessment is closed.",
+        "attempts_exhausted": "You have used all your attempts.",
+        "not_available": "This assessment is not available.",
+        "course_not_active": "The course is not active.",
+        "unpublished": "This assessment is not published."
+      }
+    },
+    "builder": {
+      "back": "Overview",
+      "title": "Edit: {title}",
+      "readOnly": "This course is concluded, so the assessment is read-only.",
+      "settings": "Settings",
+      "sections": "Sections",
+      "noSections": "No sections yet. Add the first one."
+    },
+    "settings": {
+      "title": "Title",
+      "description": "Description",
+      "languages": "Languages",
+      "languagesHint": "Publishing requires every question to be available in each selected language.",
+      "attempts": "Attempts allowed",
+      "unlimited": "Unlimited",
+      "timeLimit": "Total time limit (minutes)",
+      "timeLimitHint": "Leave empty to use the sum of the section limits, or no limit.",
+      "availableFrom": "Available from",
+      "availableUntil": "Available until",
+      "navigation": "Navigation",
+      "resultsPolicy": "Show results",
+      "scorePolicy": "Score counted",
+      "showCorrect": "Show correct answers and explanations with the results",
+      "shuffleItems": "Shuffle question order",
+      "shuffleChoices": "Shuffle answer choices",
+      "saved": "Saved"
+    },
+    "section": {
+      "add": "Add section",
+      "addTitle": "Add section",
+      "editTitle": "Edit section",
+      "edit": "Edit",
+      "delete": "Delete",
+      "deleteTitle": "Delete this section?",
+      "deleteBody": "Section \"{name}\" will be removed. A section must be empty to be deleted.",
+      "n": "Section {n}",
+      "key": "Subject key (optional)",
+      "titleLabel": "Title",
+      "instructions": "Instructions",
+      "timeLimit": "Time limit (minutes)",
+      "timeLimitHint": "Empty means the section is not timed.",
+      "timeLimitFreeHint": "Section time limits are not allowed with free navigation.",
+      "allowedTypes": "Allowed question types",
+      "allowedTypesHint": "Leave all unchecked to allow every type.",
+      "rulesLocked": "The question types of an ORT section are fixed.",
+      "allowPassages": "Allow reading passages",
+      "empty": "No questions in this section yet.",
+      "itemCount": "{n} questions",
+      "untimed": "not timed",
+      "up": "Move section up",
+      "down": "Move section down",
+      "addItems": "Add questions"
+    },
+    "item": {
+      "points": "Points",
+      "up": "Move up",
+      "down": "Move down",
+      "remove": "Remove",
+      "edit": "Edit",
+      "moveTo": "Move to section",
+      "passage": "Passage",
+      "children": "{n} questions",
+      "collapse": "Collapse",
+      "expand": "Expand",
+      "deleted": "Deleted in bank",
+      "newerVersion": "Newer version available",
+      "pick": "Random {n} from the bank",
+      "noFilter": "any question",
+      "pool": "pool"
+    },
+    "add": {
+      "title": "Add to section",
+      "tabQuestions": "Questions",
+      "tabPassage": "Passage group",
+      "tabPick": "Random from bank",
+      "bank": "Question bank",
+      "chooseBank": "Choose a bank",
+      "noQuestions": "No questions match.",
+      "noStem": "(no text)",
+      "hasPassage": "has passage",
+      "translationHint": "A question also covers its translations: in other languages of this assessment the linked translation is used.",
+      "addSelected": "Add selected ({n})",
+      "addAllFiltered": "Add all filtered",
+      "close": "Close",
+      "report": "Added {added}, skipped {skipped}.",
+      "passage": "Reading passage",
+      "choosePassage": "Choose a passage",
+      "passageHint": "The passage and all of its questions are added as one block that stays together.",
+      "addPassage": "Add passage"
+    },
+    "pick": {
+      "count": "How many questions",
+      "hint": "Each student gets this many random questions from the bank that match the filter. The pool is fixed when you publish.",
+      "tagsHint": "Up to 5 tags, separated by commas.",
+      "add": "Add random pick",
+      "editTitle": "Edit random pick"
+    },
+    "publish": {
+      "publish": "Publish",
+      "republish": "Publish changes",
+      "unpublish": "Unpublish",
+      "validate": "Check",
+      "preview": "Preview as student",
+      "previewLanguage": "Preview language",
+      "valid": "No problems found. Ready to publish.",
+      "errors": "Fix these before publishing",
+      "warnings": "Warnings",
+      "unchanged": "Nothing changed since the last published version.",
+      "confirmTitle": "Students have already started this assessment",
+      "confirmBody": "{inProgress} students are taking it and {submitted} have submitted. They keep the version they started; new attempts use the new version. Publish anyway?",
+      "confirmAction": "Publish anyway"
+    },
+    "issues": {
+      "section": "section {n}",
+      "unknown": "Problem: {code}",
+      "no_sections": "The assessment has no sections.",
+      "empty_section": "A section has no questions.",
+      "unresolved_language": "A question has no version in one of the assessment languages.",
+      "question_deleted": "A question was deleted from the bank.",
+      "type_not_allowed": "A question type is not allowed in its section.",
+      "passage_mismatch": "Questions of a passage belong to different passages.",
+      "pick_pool_too_small": "A random pick asks for more questions than the bank has.",
+      "section_limit_in_free_navigation": "Section time limits cannot be used with free navigation.",
+      "section_limits_exceed_total": "Section time limits add up to more than the total time limit.",
+      "after_close_needs_until": "Showing results after closing needs an \"available until\" date.",
+      "too_many_items": "The assessment has too many questions.",
+      "languages_not_in_course": "A language of the assessment is not a course language.",
+      "empty_passage": "A reading passage has no questions.",
+      "newer_version": "A question has a newer version in the bank. Publish again to use it."
+    }
+  },
+  "player": {
+    "answers": "Answers",
+    "backToCourse": "Back to the course",
+    "closed": {
+      "continue": "Continue",
+      "finishedBody": "The time for this attempt is over or it was finished elsewhere. Your saved answers were submitted.",
+      "finishedTitle": "Attempt finished",
+      "sectionBody": "This section is already closed. You continue with the current section; you cannot return to the closed one.",
+      "sectionTitle": "Section closed",
+      "toResult": "Go to result"
+    },
+    "comparison": {
+      "columnA": "Column A",
+      "columnB": "Column B"
+    },
+    "counts": {
+      "flagged": "Flagged for review: {n}",
+      "unanswered": "Unanswered questions: {n}"
+    },
+    "dismiss": "Dismiss",
+    "essay": {
+      "label": "Your essay",
+      "words": "{n} words",
+      "wordsLimit": "{n} of {limit} words"
+    },
+    "false": "False",
+    "finishSection": "Finish section",
+    "finishTest": "Finish test",
+    "flag": "Flag",
+    "imageAlt": "Question illustration",
+    "instructions": "Section instructions",
+    "loading": "Loading the test...",
+    "multipleHint": "Select all correct answers.",
+    "next": "Next",
+    "noQuestion": "There are no questions to show.",
+    "numeric": {
+      "label": "Enter a number"
+    },
+    "otherTab": "This attempt is open in another tab. Use only one tab, or your answers may conflict.",
+    "palette": {
+      "answered": "Answered",
+      "current": "Current",
+      "flagged": "Flagged",
+      "title": "Questions",
+      "unanswered": "Unanswered"
+    },
+    "prev": "Previous",
+    "previewBanner": "Preview mode: this attempt is not counted for students.",
+    "progress": "{answered} of {total} answered",
+    "progressBar": "Answering progress",
+    "question": "Question",
+    "questionOf": "Question {n} of {total}",
+    "rejected": "The server rejected the answers to questions: {list}. Please answer them again.",
+    "save": {
+      "auth": "Sign in again, {n} answers not saved",
+      "error": "Save error, {n} pending",
+      "offline": "Offline, {n} pending",
+      "saved": "Saved",
+      "saving": "Saving..."
+    },
+    "section": "Section",
+    "sectionEnd": {
+      "confirm": "Close section",
+      "noReturn": "You will not be able to return to this section.",
+      "stay": "Stay in section",
+      "title": "Finish \"{section}\"?"
+    },
+    "sectionOf": "Section {n} of {total}",
+    "shortText": {
+      "label": "Type your answer"
+    },
+    "shortcuts": "Shortcuts: left and right arrows move between questions, F flags, 1-5 or A-E choose an answer.",
+    "submit": {
+      "back": "Back to the test",
+      "body": "After you finish, you cannot change your answers.",
+      "confirm": "Finish and submit",
+      "title": "Finish the test?"
+    },
+    "timeUp": {
+      "body": "Your answers are being saved and submitted. Please do not close this page.",
+      "title": "Time is up"
+    },
+    "timer": {
+      "fiveMinutes": "Five minutes left",
+      "label": "Time remaining",
+      "oneMinute": "One minute left",
+      "unlimited": "No time limit"
+    },
+    "true": "True",
+    "unflag": "Remove flag",
+    "unsaved": {
+      "deadline": "Answers not saved because time ran out: {n}",
+      "already_submitted": "Answers not saved because the attempt had already been submitted: {n}",
+      "section_closed": "Answers not saved because their section was already closed: {n}",
+      "other": "Answers the server could not save: {n}"
+    },
+    "working": "Working..."
+  },
+  "grading": {
+    "allStatuses": "All statuses",
+    "attemptN": "attempt {n}",
+    "attemptNo": "Attempt",
+    "attemptsTitle": "Attempts",
+    "autoScore": "Automatic score: {score}",
+    "backToAssessment": "Back to the assessment",
+    "backToAttempts": "Back to attempts",
+    "empty": "No attempts yet.",
+    "feedback": "Feedback for the student",
+    "filterStatus": "Status",
+    "manualScore": "Manual score",
+    "needsReviewBanner": "{n} answer(s) need manual grading. Enter points below; this notice disappears once all are graded.",
+    "needsReviewOnly": "Needs review",
+    "notSubmitted": "This attempt has not been submitted yet, so it cannot be graded.",
+    "onlyPending": "Show only answers to grade",
+    "open": "Open",
+    "pendingBadge": "{n} to grade",
+    "points": "Points",
+    "pointsInvalid": "Enter a number between 0 and the maximum.",
+    "pointsMax": "Points (0 to {max})",
+    "reason": {
+      "closed": "closed by course settings",
+      "manual": "submitted by the student",
+      "sweep": "finalized automatically",
+      "timeout": "time ran out"
+    },
+    "save": "Save score",
+    "saved": "Saved",
+    "saving": "Saving...",
+    "score": "Score",
+    "showPreviews": "Show preview attempts",
+    "status": "Status",
+    "student": "Student",
+    "submitted": "Submitted",
+    "unnamed": "Unnamed student",
+    "gradedBy": "Graded by {name} on {date}"
+  },
+  "results": {
+    "acceptedAnswers": "Accepted answers",
+    "answered": "Answered",
+    "back": "Back to the assessment",
+    "columnA": "Column A",
+    "columnB": "Column B",
+    "correct": "Correct",
+    "correctAnswer": "Correct answer",
+    "correctness": {
+      "correct": "Correct",
+      "incorrect": "Incorrect",
+      "partial": "Partially correct",
+      "pending": "Awaiting review",
+      "unanswered": "Not answered"
+    },
+    "explanation": "Explanation",
+    "false": "False",
+    "imageAlt": "Question illustration",
+    "inProgress": "This attempt is still in progress.",
+    "noAnswer": "No answer",
+    "noReview": "No answer review is available for this attempt.",
+    "notAvailable": "Your answers are saved. The result will be available later, according to the teacher's settings (after the teacher releases it or after the assessment closes).",
+    "passage": "Reading passage",
+    "pendingReview": "{n} answer(s) are waiting for your teacher to grade them. The score will change after grading.",
+    "points": "Points",
+    "preview": "Preview attempt",
+    "questionN": "Question {n}",
+    "rawScore": "Score",
+    "resume": "Resume attempt",
+    "reviewTitle": "Review of your answers",
+    "scoreOf": "{score} of {max} points",
+    "section": "Section",
+    "sectionN": "Section {n}",
+    "status": {
+      "graded": "Graded",
+      "in_progress": "In progress",
+      "needs_review": "Needs review",
+      "submitted": "Submitted",
+      "void": "Void"
+    },
+    "submittedAt": "Submitted {date}",
+    "submittedTitle": "Attempt submitted",
+    "teacherFeedback": "Teacher feedback",
+    "title": "Result",
+    "true": "True",
+    "yourAnswer": "Your answer"
   }
 }

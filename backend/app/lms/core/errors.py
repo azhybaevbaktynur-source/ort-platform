@@ -9,7 +9,8 @@ from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.responses import JSONResponse
 
 
-LMS_PATH_PREFIXES = ("/api/v1/me", "/api/v1/courses", "/api/v1/platform", "/api/v1/assets", "/api/v1/media")
+LMS_PATH_PREFIXES = ("/api/v1/me", "/api/v1/courses", "/api/v1/platform", "/api/v1/assets", "/api/v1/media",
+                     "/api/v1/attempts", "/api/v1/internal")
 
 
 class LMSError(Exception):
@@ -47,6 +48,16 @@ class ValidationFailed(LMSError):
 class RateLimited(LMSError):
     status_code = 429
     code = "rate_limited"
+
+
+class PayloadTooLarge(LMSError):
+    status_code = 413
+    code = "payload_too_large"
+
+
+class ServerBusy(LMSError):
+    status_code = 503
+    code = "server_busy"
 
 
 def error_body(exc: LMSError) -> dict:

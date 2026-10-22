@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 from decimal import Decimal
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional
 
 from pydantic import Field, StrictBool, field_validator, model_validator
 
@@ -74,7 +74,7 @@ class SingleChoiceData(StrictModel):
 
 
 class SingleChoiceResponse(StrictModel):
-    choice_id: Optional[str] = None
+    choice_id: Optional[str] = Field(default=None, max_length=64)
 
 
 class SingleChoice(QuestionType):
@@ -123,7 +123,7 @@ class MultipleAnswersData(StrictModel):
 
 
 class MultipleAnswersResponse(StrictModel):
-    choice_ids: list[str] = Field(default_factory=list, max_length=10)
+    choice_ids: list[Annotated[str, Field(max_length=64)]] = Field(default_factory=list, max_length=26)
 
 
 class MultipleAnswers(QuestionType):
