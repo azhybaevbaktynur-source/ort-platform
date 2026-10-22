@@ -4,16 +4,18 @@ import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/context";
 import { getStaffAttempt, type AttemptStaffOut } from "@/lib/lms/staffAttempts";
+import type { AttemptGradeOut } from "@/lib/lms/gradingTypes";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { fmtDateTime, fmtPoints } from "@/components/lms/assessments/format";
 import { ReviewItemCard } from "./ReviewItemCard";
 import { GradeForm } from "./GradeForm";
 import { ResultSummary } from "./ResultSummary";
+import { GradeBadge } from "./GradeBadge";
 
 export function StaffAttemptDetail({ courseId, assessmentId, attemptId }: { courseId: string; assessmentId: string; attemptId: string }) {
   const { lang, t } = useTranslation();
   const canGrade = true; // StaffGate already limits the page to teachers/assistants; the server enforces grades.manage
-  const [data, setData] = useState<AttemptStaffOut | null>(null);
+  const [data, setData] = useState<(AttemptStaffOut & { grade?: AttemptGradeOut | null }) | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [onlyPending, setOnlyPending] = useState(false);
 
@@ -57,10 +59,14 @@ export function StaffAttemptDetail({ courseId, assessmentId, attemptId }: { cour
       {data.status === "needs_review" && (
         <p role="status" className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900">{t("grading.needsReviewBanner", { n: data.pending_review })}</p>
       )}
-      {data.result ? <ResultSummary result={data.result} /> : data.raw_score !== null && data.raw_score !== undefined ? (
+      {data.status === "void" && (
+        <p role="status" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">{t("results.grade.voidedStaff")}</p>
+      )}
+      {data.result ? <ResultSummary result={data.result} grade={data.grade} /> : data.raw_score !== null && data.raw_score !== undefined ? (
         <p className="text-lg font-bold text-slate-900">{fmtPoints(data.raw_score)} / {fmtPoints(data.points_possible)}</p>
       ) : null}
-      {!submitted && <p className="text-sm text-slate-600">{t("grading.notSubmitted")}</p>}
+      {!data.result && data.grade && <GradeBadge grade={data.grade} />}
+      {!submitted && data.status !== "void" && <p className="text-sm text-slate-600">{t("grading.notSubmitted")}</p>}
       {data.pending_review > 0 && (
         <label className="flex items-center gap-2 text-sm text-slate-700">
           <input type="checkbox" checked={onlyPending} onChange={(e) => setOnlyPending(e.target.checked)} />

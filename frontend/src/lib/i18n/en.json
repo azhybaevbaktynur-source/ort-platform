@@ -1496,6 +1496,36 @@
     },
     "explanation": "Explanation",
     "false": "False",
+    "grade": {
+      "title": "Grade",
+      "percentile": "Percentile {value}",
+      "kept": "Counted attempt",
+      "notReleased": "Not released yet",
+      "sectionsTitle": "Scores by section",
+      "raw": "Raw score",
+      "scaled": "Scaled score",
+      "overall": "Overall",
+      "voidedTitle": "Attempt voided",
+      "voided": "Your teacher voided this attempt. It does not count towards your grade.",
+      "voidedStaff": "This attempt is void. It is not counted towards the grade.",
+      "mine": {
+        "title": "My grades",
+        "total": "Course total",
+        "scheme": "Grading scheme: {title}.",
+        "empty": "No graded work yet.",
+        "due": "Due {date}",
+        "late": "Late penalty: {n} points",
+        "pendingHint": "Your result will appear here after it is graded or released by your teacher.",
+        "viewResult": "View result",
+        "state": {
+          "graded": "Graded",
+          "pending": "Pending",
+          "missing": "Not submitted",
+          "excused": "Excused",
+          "hidden": "Not shown"
+        }
+      }
+    },
     "imageAlt": "Question illustration",
     "inProgress": "This attempt is still in progress.",
     "noAnswer": "No answer",

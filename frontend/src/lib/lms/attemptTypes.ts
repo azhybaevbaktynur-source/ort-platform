@@ -1,6 +1,9 @@
 /** Student attempt DTOs (docs/phases/PHASE_3_DESIGN.md sections 3.5-3.9 and 5). snake_case as on the wire. */
 import type { Lang } from "./types";
 import type { QuestionType, StudentChoiceOut } from "./contentTypes";
+import type { AttemptGradeOut } from "./gradingTypes";
+
+export type { AttemptGradeOut };
 
 export type AttemptStatus = "in_progress" | "submitted" | "needs_review" | "graded" | "void";
 export type AttemptNavigation = "free" | "section_forward_only";
@@ -146,6 +149,8 @@ export interface AttemptResultOut {
   sections: AttemptResultSection[];
   pending_review: number;
   submitted_at: string | null;
+  /** Phase 4: server-sent grade, only when visible to the student (previews: computed inline). */
+  grade?: AttemptGradeOut | null;
 }
 
 /** Why a submit-body answer was not stored (B2). Autosave error codes plus `deadline` and `already_submitted`. */
@@ -188,6 +193,7 @@ export interface MyAttemptOut {
   submitted_at: string | null;
   results_available: boolean;
   result?: AttemptResultOut | null;
+  grade?: AttemptGradeOut | null;
 }
 
 /** Review/result DTOs for F3 (shape per section 3.9; fields beyond these may be added by A4). */
