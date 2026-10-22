@@ -9,7 +9,7 @@ Turn the ORT/ЖРТ exam bank (one global admin, one question bank) into a flexi
 ## 2. First 15 minutes checklist
 
 1. Memory loads automatically (`~/.claude/projects/-Users-baktynurazhybaev-ort-platform/memory/`). Read `task-progress.md` first. If it is missing, this file is enough.
-2. `git status` and `git log --oneline -5`. Expected: see §3 for the current branch and commits. Untracked on purpose (owner asked not to commit): `docs/CANVAS_EXPLAINER_FOR_FOUNDER.md`, `docs/CANVAS_INTEGRATION_SPEC.md`, `docs/CURRENT_STATE_AUDIT.md` (superseded drafts).
+2. `git status` and `git log --oneline -5`. Expected: see §3 for the current branch and commits. The old Canvas drafts and audit were deleted on 2026-10-22 (owner decision); the current design is `docs/LMS_ARCHITECTURE.md`.
 3. Read, in this order (about 20k tokens total; do **not** read `docs/research/*` in full):
    1. `AGENTS.md` (project rules; `CLAUDE.md` links to it) — hard rules in §7 are binding.
    2. `docs/PRODUCT_DECISIONS.md` — the owner's decisions.
@@ -32,7 +32,7 @@ Turn the ORT/ЖРТ exam bank (one global admin, one question bank) into a flexi
 
 
 1. Merge `fix/security-integrity` into `main` and deploy to Render/Vercel now? (Recommended yes: it closes real holes in production. Needs the owner's go-ahead for the deploy; verify `/health` shows the new commit afterwards.)
-2. Commit the new docs? (They should be committed on the branch; the three drafts above stay untracked.)
+2. Commit the new docs? (Done.)
 3. Replies to **D1–D18** in `IMPLEMENTATION_PLAN.md` (each has a recommended default). The owner may just say "accept defaults".
 4. Confirm the 6,000-concurrent-students target and the budget ceiling per month (not yet known).
 5. Authenticate the Render, Neon and Vercel tools so the capacity review can read the real plans and sizes.
@@ -48,7 +48,7 @@ Turn the ORT/ЖРТ exam bank (one global admin, one question bank) into a flexi
 
 **Owner decisions 2026-10-22 (agent workflow, A–D; also in `PRODUCT_DECISIONS.md`)**
 - **A. Autonomy**: the agent commits, pushes any branch, merges into `lms` and `main`, and deploys without asking. Guardrails: (1) before any merge to `main` touching models/migrations/DB files, create a Neon backup branch (Neon MCP, project `noisy-sound-20763725`); (2) after each deploy, check `https://ort-platform-w77q.onrender.com/health` shows the new commit, else revert and redeploy; (3) never force-push `main`; (4) only these need the owner's explicit OK: Phase 5 cutover, deleting/wiping Neon data, spending money (plan upgrades, paid services), anything needing a password/secret from the owner. Otherwise do not ask: take the documented default or safest reasonable choice and record it in `PRODUCT_DECISIONS.md`.
-- **B. Models**: see §6 (Opus orchestrator, Sonnet `implementer` subagent, optional Haiku `helper`).
+- **B. Models**: see §6 (Fable orchestrator, or Opus if Fable is unavailable; subagents `architect` = Opus, `implementer` = Sonnet, `helper` = Haiku).
 - **C. Render MCP** may return "unauthorized": not a blocker. Use `/health` and git (Render auto-deploys from `main`).
 - **D. Load test** still runs before Phase 3, on free resources (a Neon branch + local or free-tier backend). If a meaningful test needs a paid service, write down what was tested and ask the owner only for that spending decision.
 - **E.** `AGENTS.md` describes the old platform; its §6 commands and §7 hard rules still apply.
@@ -62,13 +62,14 @@ Turn the ORT/ЖРТ exam bank (one global admin, one question bank) into a flexi
 
 Subscription usage is a shared allowance that resets in rolling windows, and bigger models consume it faster. Check the remaining allowance with `/usage` (or `/status`) at the start of a session and before any big task; do not assume limits. Principles:
 
-Owner decision B (2026-10-22):
+Owner decision B (2026-10-22, revised the same day):
 
 | Who | Model | Does |
 |---|---|---|
-| Main session (orchestrator) | **Opus** | Plans each phase, makes design decisions, writes the briefs, reviews every subagent diff, does the authz / attempt-engine / grading reviews, runs the gates, commits/pushes/merges/deploys. |
+| Main session (orchestrator) | **Fable** (if Fable is not available in `/model`: **Opus**, same rules) | Orchestrator only: plans each phase, splits it into slices, writes precise briefs, reviews every diff, runs the full gates, commits/pushes/merges/deploys. Keeps its own reading and typing minimal (most expensive model). |
+| `architect` subagent (`.claude/agents/architect.md`) | **Opus** | Hard design and review: authz, attempt engine, grading, gating, concurrency, security reviews, phase design drafts. |
 | `implementer` subagent (`.claude/agents/implementer.md`) | **Sonnet** | Bulk implementation of one designed slice from a precise brief: goal, exact files, schema/API shape, tests that must pass. Independent slices may run in parallel. |
-| `helper` subagent (`.claude/agents/helper.md`, optional) | **Haiku** | Mechanical edits: renames, i18n key sync, formatting. |
+| `helper` subagent (`.claude/agents/helper.md`) | **Haiku** | Mechanical edits: renames, i18n key sync, formatting. |
 
 No subagents for single-file lookups. A *new* session only has files, so keep `task-progress.md` and `docs/phases/PHASE_N.md` current.
 
@@ -76,11 +77,11 @@ No subagents for single-file lookups. A *new* session only has files, so keep `t
 1. Work in short sessions, one phase slice per session. `/clear` between unrelated tasks; `/compact` when a task runs long. Do not carry a finished phase's context into the next.
 2. Never re-explore. Use this file, `codebase-map.md` (memory) and the docs. Read only the file ranges you need (`Read` with offset/limit, `grep -n`), never whole large files (the exam player is 1,778 lines; the old mock-test service is 1,293).
 3. Do not open `docs/research/*` or `PROJECT_UNDERSTANDING.md` in full; they total ~25k tokens. Use the section pointers above.
-4. Bulk implementation goes to the Sonnet `implementer` with a precise brief (goal, exact files, schema/API shape, tests that must pass); independent slices may run in parallel; mechanical edits may go to the Haiku `helper`. Opus reviews every diff. Never use a subagent for a single-file lookup.
+4. Hard design/review goes to the Opus `architect`; bulk implementation to the Sonnet `implementer` with a precise brief (goal, exact files, schema/API shape, tests that must pass), independent slices in parallel; mechanical edits to the Haiku `helper`. The orchestrator reviews every diff. Never use a subagent for a single-file lookup.
 5. Batch independent tool calls in one turn; avoid read-after-edit verification (the tools report errors).
 6. Run only the tests you need while developing (`pytest path::test -q`), the full suite once before commit. Keep command output short (`| tail -20`, `-q`).
 7. Keep `AGENTS.md`/`CLAUDE.md` short: it is sent every turn. Move detail into docs that are read on demand.
-8. Plan before coding on Opus (one short plan per phase), then implement on Sonnet. Do not use Opus for bulk typing.
+8. The orchestrator writes one short plan per phase (design drafts from `architect`), then delegates. It never does bulk typing itself.
 9. Write findings to files, not into chat; the chat is what gets re-sent each turn.
 10. Do not ask the owner except for the four §4b A items; otherwise take the documented default or safest reasonable choice and record it in `PRODUCT_DECISIONS.md`.
 
@@ -101,8 +102,8 @@ No subagents for single-file lookups. A *new* session only has files, so keep `t
 - New LMS code goes in `backend/app/lms/…` and `frontend/src/app/[lang]/courses/…` (see the plan).
 - Production version check: `curl https://ort-platform-w77q.onrender.com/health` shows `commit`.
 - Frontend URL: https://ort-platform-nu.vercel.app. Neon cleanup of old backup branches is the owner's job.
-- Useful but stale: `.handoff/` (git-excluded), `docs/CURRENT_STATE_AUDIT.md` (untracked, superseded).
+- Useful but stale: `.handoff/` (git-excluded).
 
 ## 9. If something is unclear
 
-Prefer the latest owner statement over any document; prefer code over documents; prefer `LMS_ARCHITECTURE.md` over the old Canvas drafts. Record any new owner decision in `docs/PRODUCT_DECISIONS.md` the moment it is made.
+Prefer the latest owner statement over any document; prefer code over documents; prefer `LMS_ARCHITECTURE.md` over older design notes. Record any new owner decision in `docs/PRODUCT_DECISIONS.md` the moment it is made.

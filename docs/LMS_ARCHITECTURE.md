@@ -1,6 +1,6 @@
 # LMS Architecture (target design)
 
-**Status**: proposal for owner review, 2026-10-21. Supersedes `CANVAS_INTEGRATION_SPEC.md` and `CANVAS_EXPLAINER_FOR_FOUNDER.md` (drafts, not binding).
+**Status**: proposal for owner review, 2026-10-21. Supersedes the old Canvas drafts (deleted 2026-10-22).
 **Inputs**: `PRODUCT_DECISIONS.md`, `PROJECT_UNDERSTANDING.md`, and four research reports in `docs/research/` that read the real `instructure/canvas-lms` source (commit `1c9f0bb`, 2026-04-30) plus platform research. Canvas facts below were verified in that source by the research agents unless marked *(unverified)*. New Quizzes' backend is not public, so anything about it is unverified.
 
 ---

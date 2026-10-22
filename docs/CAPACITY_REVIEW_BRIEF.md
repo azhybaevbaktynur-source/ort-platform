@@ -2,7 +2,7 @@
 
 **Question to answer**: can the current hosting (**frontend on Vercel, backend on Render (Frankfurt), database on Neon PostgreSQL**) run the planned LMS for **about 6,000 students active at the same time**, and if not, what is the cheapest change that can?
 
-**Deliverable**: `docs/CAPACITY_REVIEW.md` with measured numbers, a go/no-go per component, a recommended setup with monthly cost, and any changes it implies for `LMS_ARCHITECTURE.md` (attempt engine, storage, connection handling). Do this **before** Phase 0 schema work. Model: Opus (analysis), Sonnet for running the scripts.
+**Deliverable**: `docs/CAPACITY_REVIEW.md` with measured numbers, a go/no-go per component, a recommended setup with monthly cost, and any changes it implies for `LMS_ARCHITECTURE.md` (attempt engine, storage, connection handling). Do this **before** Phase 0 schema work. Models: `architect` (Opus) for the analysis, `implementer` (Sonnet) for writing and running the scripts.
 
 ## 1. Scenarios (from `IMPLEMENTATION_PLAN.md`)
 

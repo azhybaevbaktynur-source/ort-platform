@@ -24,7 +24,10 @@
       "Bash(gh:*)",
       "mcp__neon",
       "mcp__vercel",
-      "mcp__render"
+      "mcp__render",
+      "Read(~/.claude/projects/-Users-baktynurazhybaev-ort-platform/memory/**)",
+      "Edit(~/.claude/projects/-Users-baktynurazhybaev-ort-platform/memory/**)",
+      "Write(~/.claude/projects/-Users-baktynurazhybaev-ort-platform/memory/**)"
     ],
     "deny": [
       "Read(./backend/.env)",

@@ -136,7 +136,7 @@ AGENTS.md (v2.0.0, already rewritten) is far closer to reality than the old one 
 | Test count 106 | Matches the audit; I did not re-run the suite for this document. |
 | Roadmap #2 (result page static review) | Taken from the audit; not re-verified by me. |
 
-`docs/CURRENT_STATE_AUDIT.md` is mostly accurate but too generous: it labels analytics and `exam_sets` "100% complete / SQL" and misses all of §0.
+The old `CURRENT_STATE_AUDIT.md` (deleted 2026-10-22) was mostly accurate but too generous: it labels analytics and `exam_sets` "100% complete / SQL" and misses all of §0.
 
 ---
 
@@ -158,6 +158,8 @@ AGENTS.md (v2.0.0, already rewritten) is far closer to reality than the old one 
 ---
 
 ## 6. Critical review of the two Canvas documents
+
+> The reviewed drafts were deleted on 2026-10-22; the current design is `docs/LMS_ARCHITECTURE.md`. Kept as history.
 
 ### 6.1 `CANVAS_INTEGRATION_SPEC.md`
 
