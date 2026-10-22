@@ -200,6 +200,8 @@ export class AutosaveQueue {
   private maxTimer: unknown = null;
   private retryTimer: unknown = null;
   private heartbeat: unknown = null;
+  /** The pending retry was asked for by the server (Retry-After): the heartbeat must not cut it short. */
+  private serverBackoff = false;
   private inflight: Promise<void> | null = null;
   private failures = 0;
   private batchLimit = MAX_BATCH;
@@ -348,6 +350,7 @@ export class AutosaveQueue {
       if (!this.continuous || this.stopped) return;
       this.armHeartbeat();
       if (!this.entries.size || this.inflight || this.authBlocked) return;
+      if (this.retryTimer && this.serverBackoff) return;
       if (this.retryTimer) this.env.clearTimer(this.retryTimer);
       this.retryTimer = null;
       void this.flushNow();
@@ -429,6 +432,7 @@ export class AutosaveQueue {
     }
     // transient: keep the queue, back off
     const wait = Math.max(backoffMs(this.failures, this.env.rand), info.retryAfterMs ?? 0);
+    this.serverBackoff = info.retryAfterMs != null;
     this.failures += 1;
     this.clearTimers();
     if (this.retryTimer) this.env.clearTimer(this.retryTimer);
