@@ -72,6 +72,11 @@ async function main() {
   const ex = cellView(cell({ state: "excused" }), { due_at: "2026-10-01T00:00:00Z" }, NOW);
   ok(ex.kind === "excused" && ex.value === "" && ex.points === "" && ex.label === null, "excused hides numbers");
 
+  const na = cellView(cell({ state: "no_attempts", kept_attempt_id: null, attempts_counted: 0, raw_points: null, effective_points: null,
+    display_value: null, late_deduction: "2.00", released_at: null, thresholds: { golden_certificate: true } }), { due_at: "2026-10-01T00:00:00Z" }, NOW);
+  ok(na.kind === "no_attempts" && na.value === "" && na.points === "" && na.percentile === "" && na.label === null
+    && na.thresholds.length === 0 && !na.late && !na.unreleased, "no attempts (all voided): own kind, no numbers, no markers");
+
   const pf = cellView(cell({ display_value: null, label: "pass", passed: true }), { due_at: null }, NOW);
   ok(pf.value === "" && pf.label === "pass", "pass/fail: label without value");
 

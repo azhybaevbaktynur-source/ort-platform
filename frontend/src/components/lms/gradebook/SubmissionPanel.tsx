@@ -172,7 +172,7 @@ export function SubmissionPanel({
               <section aria-label={t("gradebook.panel.summary")} className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                    v.kind === "needs_review" ? "bg-indigo-100 text-indigo-800" : v.kind === "excused" ? "bg-slate-100 text-slate-700" : "bg-emerald-100 text-emerald-800"}`}>
+                    v.kind === "needs_review" ? "bg-indigo-100 text-indigo-800" : v.kind === "excused" || v.kind === "no_attempts" ? "bg-slate-100 text-slate-700" : "bg-emerald-100 text-emerald-800"}`}>
                     {t(`gradebook.states.${v.kind}`)}
                   </span>
                   {v.overridden && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-800">{t("gradebook.flags.overridden")}</span>}
@@ -228,8 +228,13 @@ export function SubmissionPanel({
               {canManage && (
                 <section aria-labelledby={`${titleId}-ov`} className="space-y-3 border-t border-slate-100 pt-4">
                   <h3 id={`${titleId}-ov`} className="text-sm font-bold text-slate-900">{t("gradebook.override.title")}</h3>
-                  <p className="text-xs text-slate-500">{t("gradebook.override.hint")}</p>
-                  <OverrideForm sub={sub} busy={busy === "override"} onSave={(p, r) => void saveOverride(p, r)} />
+                  {/* the server rejects an override when every attempt is voided (422); excuse stays available */}
+                  {sub.state !== "no_attempts" && (
+                    <>
+                      <p className="text-xs text-slate-500">{t("gradebook.override.hint")}</p>
+                      <OverrideForm sub={sub} busy={busy === "override"} onSave={(p, r) => void saveOverride(p, r)} />
+                    </>
+                  )}
                   <div className="flex flex-wrap gap-2">
                     {sub.has_override && (
                       <button type="button" disabled={!!busy} onClick={() => { setDialogError(null); setDialog({ kind: "clear" }); }} className={btnSecondary}>

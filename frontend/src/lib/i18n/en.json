@@ -1502,7 +1502,8 @@
       "missing": "Missing",
       "needs_review": "Needs review",
       "excused": "Excused",
-      "graded": "Graded"
+      "graded": "Graded",
+      "no_attempts": "No attempts (all voided)"
     },
     "flags": {
       "late": "Late",

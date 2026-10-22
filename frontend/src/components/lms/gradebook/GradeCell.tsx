@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { AlertCircle, Award, Clock, EyeOff, Pencil } from "lucide-react";
+import { AlertCircle, Award, Ban, Clock, EyeOff, Pencil } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useSchemeLabel } from "@/components/lms/grading/schemes/labels";
 import type { CellView } from "./gradebookModel";
@@ -45,6 +45,9 @@ export function CellBody({ v }: { v: CellView }) {
   }
   if (v.kind === "excused") {
     return <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-600">{t("gradebook.cell.excusedShort")}</span>;
+  }
+  if (v.kind === "no_attempts") {
+    return <Ban className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />;
   }
   const main = v.value || (v.label ? labelText(v.label) : "") || v.points || "—";
   const sub = v.value ? (v.label ? labelText(v.label) : v.points) : v.label ? v.points : "";

@@ -322,7 +322,7 @@ export interface CategoryOrderIn {
 // 5. Gradebook, submissions, actions
 // ---------------------------------------------------------------------------
 
-export type SubmissionState = "pending_review" | "graded" | "excused";
+export type SubmissionState = "pending_review" | "graded" | "excused" | "no_attempts";
 
 export type GbAssessmentWarning = "points_possible_mismatch" | "uncategorized_excluded" | (string & {});
 

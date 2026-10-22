@@ -15,9 +15,10 @@ import { fmtNum, fmtPercentile, toNum } from "../grading/schemes/params";
 /**
  * Primary state of a gradebook cell:
  * `none` = no submission and nothing due yet, `missing` = no submission after the due date,
- * `needs_review` = kept attempt has items to grade by hand, `excused`, `graded`.
+ * `needs_review` = kept attempt has items to grade by hand, `excused`, `graded`,
+ * `no_attempts` = a submission exists but every attempt was voided (no numbers to show).
  */
-export type CellKind = "none" | "missing" | "needs_review" | "excused" | "graded";
+export type CellKind = "none" | "missing" | "needs_review" | "excused" | "graded" | "no_attempts";
 
 export interface CellView {
   kind: CellKind;
@@ -68,23 +69,27 @@ export function cellView(cell: CellOut | null | undefined, assessment: Pick<GbAs
       value: "", label: null, points: "", percentile: "", thresholds: [],
     };
   }
-  const kind: CellKind = cell.state === "excused" ? "excused" : cell.state === "pending_review" ? "needs_review" : "graded";
+  const kind: CellKind = cell.state === "excused" ? "excused"
+    : cell.state === "pending_review" ? "needs_review"
+    : cell.state === "no_attempts" ? "no_attempts" : "graded";
   const released = !!cell.released_at;
   const scored = kind === "graded" || (kind === "needs_review" && cell.has_override);
+  /** excused and no-attempt cells carry no numbers */
+  const blank = kind === "excused" || kind === "no_attempts";
   const points = cell.effective_points !== null && cell.effective_points !== undefined
     ? fmtPointsOf(cell.effective_points, cell.points_possible)
     : fmtPointsOf(cell.raw_points, cell.points_possible);
   return {
     kind,
-    late: (toNum(cell.late_deduction) ?? 0) > 0,
-    overridden: !!cell.has_override,
+    late: kind !== "no_attempts" && (toNum(cell.late_deduction) ?? 0) > 0,
+    overridden: kind !== "no_attempts" && !!cell.has_override,
     released,
     unreleased: scored && !released,
-    value: kind === "excused" ? "" : fmtNum(cell.display_value),
-    label: kind === "excused" ? null : cell.label || null,
-    points: kind === "excused" ? "" : points,
-    percentile: kind === "excused" ? "" : fmtPercentile(cell.percentile),
-    thresholds: kind === "excused" ? [] : reachedThresholds(cell.thresholds),
+    value: blank ? "" : fmtNum(cell.display_value),
+    label: blank ? null : cell.label || null,
+    points: blank ? "" : points,
+    percentile: blank ? "" : fmtPercentile(cell.percentile),
+    thresholds: blank ? [] : reachedThresholds(cell.thresholds),
   };
 }
 

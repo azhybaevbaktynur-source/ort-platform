@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { AlertCircle, Award, Clock, EyeOff, Pencil } from "lucide-react";
+import { AlertCircle, Award, Ban, Clock, EyeOff, Pencil } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 
 /** Key for the cell markers. */
@@ -18,6 +18,7 @@ export function GradebookLegend() {
       {item(<EyeOff className="h-3 w-3 text-slate-400" aria-hidden="true" />, t("gradebook.flags.unreleased"))}
       {item(<Award className="h-3 w-3 text-amber-500" aria-hidden="true" />, t("gradebook.flags.threshold"))}
       {item(<span className="rounded bg-slate-100 px-1 text-[10px] font-semibold text-slate-600">{t("gradebook.cell.excusedShort")}</span>, t("gradebook.states.excused"))}
+      {item(<Ban className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />, t("gradebook.states.no_attempts"))}
       {item(<span className="rounded bg-red-50 px-1 text-[10px] font-semibold text-red-700">{t("gradebook.states.missing")}</span>, t("gradebook.legend.missing"))}
     </ul>
   );
