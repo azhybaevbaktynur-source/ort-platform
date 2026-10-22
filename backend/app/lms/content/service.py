@@ -372,6 +372,10 @@ def _passage_for(db: Session, course, bank_id: uuid.UUID, passage_id: uuid.UUID)
     p = repo.load_passage(db, course.id, passage_id)
     if p.bank_id != bank_id:
         raise NotFound("Passage not found", code="passage_not_found")
+    # FOR SHARE: serializes with soft_delete_passage (FOR UPDATE); re-check after the lock
+    db.refresh(p, with_for_update={"read": True})
+    if p.deleted_at is not None:
+        raise NotFound("Passage not found", code="passage_not_found")
     return p
 
 
@@ -543,6 +547,12 @@ def restore_question(db: Session, ctx: AuthzContext, course, question_id: uuid.U
     bank = db.get(QuestionBank, q.bank_id)
     if bank.deleted_at is not None:
         raise Conflict("The bank is deleted", code="bank_deleted")
+    if q.passage_id is not None:
+        pas = db.get(Passage, q.passage_id)
+        if pas is not None:
+            db.refresh(pas, with_for_update={"read": True})
+            if pas.deleted_at is not None:
+                raise Conflict("The passage is deleted", code="passage_deleted")
     q.restore()
     _commit_translating(db)
     return q
@@ -594,12 +604,16 @@ def _group_member_languages(db: Session, group_id: uuid.UUID, exclude: Optional[
 def add_translation(db: Session, ctx: AuthzContext, course, question_id: uuid.UUID,
                     data: TranslationCreateIn) -> BankQuestion:
     actor = ctx.user
+    src = repo.load_question(db, course.id, question_id)
+    target_bank_id = data.bank_id or src.bank_id
+    bank = repo.load_bank(db, course.id, target_bank_id)
+    # lock order: banks (sorted by id), then the question (same as move_question)
+    for bid in sorted({src.bank_id, bank.id}, key=str):
+        _lock_bank(db, bank if bid == bank.id else db.get(QuestionBank, bid))
     src = repo.load_question(db, course.id, question_id, for_update=True)
     _check_language(course, data.language)
     if data.language == src.language:
         raise Conflict("Variant language equals the source language", code="translation_language_taken")
-    target_bank_id = data.bank_id or src.bank_id
-    bank = repo.load_bank(db, course.id, target_bank_id)
     if src.translation_group_id and data.language in _group_member_languages(db, src.translation_group_id):
         raise Conflict("A variant in this language already exists", code="translation_language_taken")
     current = db.get(QuestionVersion, src.current_version_id)
@@ -623,10 +637,10 @@ def add_translation(db: Session, ctx: AuthzContext, course, question_id: uuid.UU
 
 
 def link_translation(db: Session, ctx: AuthzContext, course, question_id: uuid.UUID, other_id: uuid.UUID) -> None:
-    q = repo.load_question(db, course.id, question_id, for_update=True)
-    other = repo.load_question(db, course.id, other_id, for_update=True)
-    if q.id == other.id:
+    if question_id == other_id:
         raise Conflict("Cannot link a question to itself", code="translation_scope_mismatch")
+    loaded = {i: repo.load_question(db, course.id, i, for_update=True) for i in sorted({question_id, other_id}, key=str)}
+    q, other = loaded[question_id], loaded[other_id]
     if q.type != other.type:
         raise Conflict("Variants must have the same type", code="translation_type_mismatch")
     if q.language == other.language:

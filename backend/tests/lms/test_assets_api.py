@@ -206,11 +206,12 @@ async def test_user_quota(db, local_storage, monkeypatch):
     monkeypatch.setattr(settings, "ASSET_QUOTA_BYTES_PER_USER", first["bytes"] * 2)
     r = await upload(t, c.id, noisy_png(40, 40, seed=99))
     assert r.status_code == 409 and r.json()["error"]["code"] == "storage_quota_exceeded"
-    # deleting frees quota
+    # deleting does NOT free quota (blobs are kept)
     from tests.lms.files_support import Api
 
     await Api().call(t, "DELETE", f"/assets/{first['id']}")
-    assert (await upload(t, c.id, noisy_png(12, 12, seed=5))).status_code == 201
+    r = await upload(t, c.id, noisy_png(40, 40, seed=98))
+    assert r.status_code == 409 and r.json()["error"]["code"] == "storage_quota_exceeded"
 
 
 async def test_global_db_cap_returns_507_but_known_blob_is_free(db, db_storage, monkeypatch):
@@ -275,7 +276,7 @@ async def test_r2_driver_private_content_redirects_to_presigned(db, monkeypatch)
     db.add(row)
     db.commit()
     monkeypatch.setattr(settings, "LMS_STORAGE_DRIVER", "r2")
-    monkeypatch.setattr(storage, "_singleton", (storage._signature(), R2StorageService(client=client, bucket="b")))
+    monkeypatch.setattr(storage, "_singleton", (storage._signature(), R2StorageService(client=client, bucket="b", private_bucket="pb")))
     try:
         from httpx import ASGITransport, AsyncClient
 

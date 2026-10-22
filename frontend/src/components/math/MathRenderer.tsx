@@ -27,7 +27,7 @@ function escapeText(text: string): string {
 
 function renderMath(math: string, displayMode: boolean, original: string): string {
   try {
-    return katex.renderToString(math.trim(), { displayMode, throwOnError: false });
+    return katex.renderToString(math.trim(), { displayMode, throwOnError: false, trust: false, maxSize: 20, maxExpand: 200 });
   } catch {
     return escapeText(original);
   }

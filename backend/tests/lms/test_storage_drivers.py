@@ -69,7 +69,7 @@ def test_db_put_survives_session_rollback(db_storage):
 def _r2(**kw):
     client = boto3.client("s3", region_name="auto", aws_access_key_id="k", aws_secret_access_key="s",
                           endpoint_url="https://acct.r2.cloudflarestorage.com")
-    return R2StorageService(client=client, bucket="b"), client
+    return R2StorageService(client=client, bucket="b", private_bucket="pb"), client
 
 
 def test_r2_put_heads_first_then_puts(monkeypatch):

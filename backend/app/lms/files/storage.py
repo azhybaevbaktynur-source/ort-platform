@@ -141,8 +141,9 @@ class DbBlobStorage(BlobStorage):
 class R2StorageService(BlobStorage):
     name = "r2"
 
-    def __init__(self, client=None, bucket: Optional[str] = None):
+    def __init__(self, client=None, bucket: Optional[str] = None, private_bucket: Optional[str] = None):
         self.bucket = bucket or settings.R2_BUCKET
+        self._private_bucket = private_bucket
         if client is None:
             import boto3
             from botocore.config import Config
@@ -159,6 +160,14 @@ class R2StorageService(BlobStorage):
             )
         self.client = client
 
+    def _bucket_for(self, key: str) -> str:
+        if key.startswith("priv/"):
+            priv = self._private_bucket or settings.R2_PRIVATE_BUCKET
+            if not priv:
+                raise RuntimeError("private_storage_unavailable")
+            return priv
+        return self.bucket
+
     @staticmethod
     def _missing(err) -> bool:
         code = str(getattr(err, "response", {}).get("Error", {}).get("Code", ""))
@@ -169,7 +178,7 @@ class R2StorageService(BlobStorage):
         from botocore.exceptions import ClientError
 
         try:
-            self.client.head_object(Bucket=self.bucket, Key=_check_key(key))
+            self.client.head_object(Bucket=self._bucket_for(_check_key(key)), Key=key)
             return True
         except ClientError as e:
             if self._missing(e):
@@ -180,14 +189,14 @@ class R2StorageService(BlobStorage):
         if self.exists(key):
             return
         self.client.put_object(
-            Bucket=self.bucket, Key=key, Body=data, ContentType=mime, CacheControl=IMMUTABLE_CACHE,
+            Bucket=self._bucket_for(_check_key(key)), Key=key, Body=data, ContentType=mime, CacheControl=IMMUTABLE_CACHE,
         )
 
     def get(self, key: str) -> Optional[bytes]:
         from botocore.exceptions import ClientError
 
         try:
-            res = self.client.get_object(Bucket=self.bucket, Key=_check_key(key))
+            res = self.client.get_object(Bucket=self._bucket_for(_check_key(key)), Key=key)
         except ClientError as e:
             if self._missing(e):
                 return None
@@ -204,7 +213,7 @@ class R2StorageService(BlobStorage):
         safe = re.sub(r'[^A-Za-z0-9._-]', "_", filename or "image.webp")[:100] or "image.webp"
         return self.client.generate_presigned_url(
             "get_object",
-            Params={"Bucket": self.bucket, "Key": _check_key(key),
+            Params={"Bucket": self._bucket_for(_check_key(key)), "Key": key,
                     "ResponseContentDisposition": f'inline; filename="{safe}"'},
             ExpiresIn=ttl,
         )

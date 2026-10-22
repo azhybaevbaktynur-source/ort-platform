@@ -311,6 +311,7 @@ export interface PassageUpdateIn {
 export interface AssetOut {
   id: string;
   url?: string | null;
+  visibility?: "public" | "private";
   mime: string;
   bytes: number;
   width: number | null;

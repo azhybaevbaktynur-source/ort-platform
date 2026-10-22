@@ -14,7 +14,7 @@ from app.core.authz import A, AuthzContext, get_authz, require
 from app.core.config import settings
 from app.db.session import get_db
 from app.lms.core import ratelimit
-from app.lms.core.errors import ValidationFailed
+from app.lms.core.errors import LMSError, ValidationFailed
 from app.lms.core.pagination import PageOut
 from app.lms.courses import service as course_svc
 from app.lms.files import service as svc
@@ -24,6 +24,11 @@ from app.lms.core.deps import get_lms_user
 from app.models.user import User
 
 router = APIRouter()
+
+
+class LengthRequired(LMSError):
+    status_code = 411
+    code = "length_required"
 
 _FORM_OPENAPI = {
     "requestBody": {"content": {"multipart/form-data": {"schema": {
@@ -66,10 +71,12 @@ async def upload_asset(course_id: uuid.UUID, request: Request, response: Respons
                        ctx: AuthzContext = Depends(get_authz)):
     cap = settings.ASSET_MAX_UPLOAD_BYTES
     cl = request.headers.get("content-length")
-    if cl and cl.isdigit() and int(cl) > cap + 64 * 1024:
+    if not cl or not cl.isdigit():
+        raise LengthRequired("Content-Length is required")
+    if int(cl) > cap + 64 * 1024:
         raise _too_large()
     cid = await run_in_threadpool(_prepare, ctx, course_id)
-    form = await request.form()
+    form = await request.form(max_files=1, max_fields=4, max_part_size=1024)
     try:
         file = form.get("file")
         if not isinstance(file, UploadFile):

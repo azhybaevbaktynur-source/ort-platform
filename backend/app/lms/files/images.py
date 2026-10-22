@@ -3,12 +3,21 @@ from __future__ import annotations
 
 import hashlib
 import io
+import threading
 from dataclasses import dataclass
 
-from PIL import Image, ImageOps
+from PIL import Image
 
 from app.core.config import settings
 from app.services.image_validation import validate_image_bytes
+
+
+_ENCODE_SLOT = threading.BoundedSemaphore(1)
+_ORIENTATION_OPS = {
+    2: Image.Transpose.FLIP_LEFT_RIGHT, 3: Image.Transpose.ROTATE_180, 4: Image.Transpose.FLIP_TOP_BOTTOM,
+    5: Image.Transpose.TRANSPOSE, 6: Image.Transpose.ROTATE_270, 7: Image.Transpose.TRANSVERSE,
+    8: Image.Transpose.ROTATE_90,
+}
 
 
 @dataclass
@@ -53,27 +62,39 @@ def encode_image(raw: bytes, *, max_bytes: int) -> EncodedImage:
     except ValueError as e:
         raise ValueError("too_many_pixels" if "dimensions" in str(e) else "invalid_image")
     try:
-        with Image.open(io.BytesIO(raw)) as img:
-            fmt = img.format or ""
-            img.seek(0)  # first frame only (GIF / animated WebP)
-            img.load()
-            img = ImageOps.exif_transpose(img) or img
-            has_alpha = img.mode in ("RGBA", "LA", "PA") or (
-                img.mode == "P" and "transparency" in img.info
-            ) or "transparency" in img.info
-            img = img.convert("RGBA" if has_alpha else "RGB")
-            side = settings.ASSET_MAX_SIDE
-            if max(img.size) > side:
-                img.thumbnail((side, side), Image.LANCZOS)
-            img.info.pop("icc_profile", None)
-            img.info.pop("exif", None)
-            lossless = _is_lossless_source(fmt, raw)
-            out = io.BytesIO()
-            if lossless:
-                img.save(out, "WEBP", lossless=True, quality=80, method=4)
-            else:
-                img.save(out, "WEBP", quality=82, method=4)
-            width, height = img.size
+        with _ENCODE_SLOT:  # one decode/encode at a time per process (memory bound)
+            with Image.open(io.BytesIO(raw)) as img:
+                fmt = img.format or ""
+                side = settings.ASSET_MAX_SIDE
+                img.seek(0)  # first frame only (GIF / animated WebP)
+                if fmt == "JPEG":
+                    img.draft("RGB", (side, side))  # decode at reduced scale
+                try:
+                    orientation = int(img.getexif().get(0x0112, 1) or 1)
+                except Exception:
+                    orientation = 1
+                img.load()
+                has_alpha = img.mode in ("RGBA", "LA", "PA") or (
+                    img.mode == "P" and "transparency" in img.info
+                ) or "transparency" in img.info
+                target = "RGBA" if has_alpha else "RGB"
+                if img.mode != target:
+                    img = img.convert(target)
+                if max(img.size) > side:
+                    # square box: the bound is orientation-independent; shrink before transposing
+                    img.thumbnail((side, side), Image.LANCZOS, reducing_gap=3.0)
+                op = _ORIENTATION_OPS.get(orientation)
+                if op is not None:
+                    img = img.transpose(op)
+                img.info.pop("icc_profile", None)
+                img.info.pop("exif", None)
+                lossless = _is_lossless_source(fmt, raw)
+                out = io.BytesIO()
+                if lossless:
+                    img.save(out, "WEBP", lossless=True, quality=80, method=4)
+                else:
+                    img.save(out, "WEBP", quality=82, method=4)
+                width, height = img.size
     except Image.DecompressionBombError:
         raise ValueError("too_many_pixels")
     except ValueError:

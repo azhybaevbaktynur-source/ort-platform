@@ -59,7 +59,7 @@ def _clean_filename(name: Optional[str]) -> Optional[str]:
 
 def _used_bytes(db: Session, owner_id: str) -> int:
     return int(db.scalar(
-        select(func.coalesce(func.sum(Asset.bytes), 0)).where(Asset.owner_id == owner_id, Asset.deleted_at.is_(None))
+        select(func.coalesce(func.sum(Asset.bytes), 0)).where(Asset.owner_id == owner_id)  # deleted assets still count
     ) or 0)
 
 
@@ -102,11 +102,12 @@ def ingest_image(db: Session, actor: User, raw: bytes, *, course_id, visibility:
     existing = _find(db, actor.id, source_sha, visibility)
     if existing is not None:
         if existing.deleted_at is not None:
-            _check_user_quota(db, actor.id, existing.bytes)
-            existing.restore()
+            existing.restore()  # its bytes were never released from the quota
             db.flush()
         return existing, True
 
+    if visibility == "private" and settings.LMS_STORAGE_DRIVER.lower() == "r2" and not settings.R2_PRIVATE_BUCKET:
+        raise Conflict("Private storage is not configured", code="private_storage_unavailable")
     if _used_bytes(db, actor.id) >= settings.ASSET_QUOTA_BYTES_PER_USER:
         raise Conflict("Storage quota exceeded", code="storage_quota_exceeded")
     caller_stored = encoded is not None
@@ -144,7 +145,7 @@ def ingest_image(db: Session, actor: User, raw: bytes, *, course_id, visibility:
 
 def resolve_image_refs(db: Session, actor: User, ids: Iterable[uuid.UUID], *,
                        carried: Optional[set] = None) -> dict[uuid.UUID, dict]:
-    """P2-16: an asset id is usable if it is a live asset owned by `actor`, or already present in the
+    """P2-16: an asset id is usable if it is a live PUBLIC asset owned by `actor`, or already present in the
     base/reverted version (`carried`). One query per 500 ids."""
     carried = {uuid.UUID(str(c)) for c in (carried or ())}
     wanted = list(dict.fromkeys(uuid.UUID(str(i)) for i in ids))
@@ -157,7 +158,7 @@ def resolve_image_refs(db: Session, actor: User, ids: Iterable[uuid.UUID], *,
     for aid in wanted:
         a = rows.get(aid)
         ok = a is not None and a.kind == "image" and (
-            (a.owner_id == actor.id and a.deleted_at is None) or aid in carried
+            (a.owner_id == actor.id and a.deleted_at is None and a.visibility == "public") or aid in carried
         )
         if not ok:
             raise ValidationFailed("Image is not usable", code="asset_not_usable")

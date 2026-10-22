@@ -55,7 +55,7 @@ export function ImagePicker({
   const loadMine = useCallback(async () => {
     setMineLoading(true);
     try {
-      setMine((await listMyAssets({ limit: 24 })).items);
+      setMine((await listMyAssets({ limit: 24 })).items.filter((a) => (a.visibility ?? "public") === "public"));
     } catch (e) {
       setError(e);
     } finally {
