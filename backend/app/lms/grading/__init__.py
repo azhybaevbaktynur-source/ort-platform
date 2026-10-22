@@ -1,7 +1,7 @@
 """Phase 4 grading package (design P4-1): schemes, registry, submissions, gradebook, totals.
 
 Importing this package registers `on_attempt_scored` in `attempts.hooks.ATTEMPT_SCORED_HOOKS` (idempotent).
-`app/main.py` imports it at startup and `tests/lms/conftest.py` in the test fixture.
+`app/main.py` imports it at startup and `tests/lms/isolation.py` in the test fixture.
 
 The hook runs inside the Phase 3 grading transaction for non-preview attempts (P3-25, P4-13) and delegates to
 `app.lms.grading.submissions.on_attempt_scored(db, attempt)` (design 3.4). The hook must never raise `LMSError`."""
