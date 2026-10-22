@@ -191,3 +191,90 @@ def admin_course_out(course, owner, active_student_count: int) -> AdminCourseOut
         unlisted_by_admin_at=course.unlisted_by_admin_at, active_student_count=active_student_count,
         created_at=course.created_at, deleted_at=course.deleted_at, deleted_by_id=course.deleted_by_id,
     )
+
+
+# ---------------------------------------------------------------- Phase 4: course grading settings (design 3.3)
+
+from decimal import Decimal  # noqa: E402
+
+from app.lms.assessments.schemas import SchemeRefOut, SchemeStudentRefOut  # noqa: E402
+
+TotalMode = Literal["points", "weighted"]
+CategoryTitle = localized_text(200)
+
+
+class LatePolicyIn(BaseModel):
+    """P4-10: one optional course-level late policy."""
+    model_config = ConfigDict(extra="forbid")
+    percent_per_day: Decimal = Field(ge=0, le=100, decimal_places=2)
+    max_percent: Decimal = Field(ge=0, le=100, decimal_places=2)
+    grace_minutes: int = Field(default=0, ge=0, le=1440)
+
+    def as_json(self) -> dict:
+        return {"percent_per_day": float(self.percent_per_day), "max_percent": float(self.max_percent),
+                "grace_minutes": self.grace_minutes}
+
+
+class CourseGradingIn(BaseModel):
+    """PUT semantics: an omitted scheme or late policy means none."""
+    model_config = ConfigDict(extra="forbid")
+    total_mode: TotalMode
+    grading_scheme_version_id: Optional[uuid.UUID] = None
+    late_policy: Optional[LatePolicyIn] = None
+
+
+class CategoryIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: CategoryTitle
+    weight: Decimal = Field(ge=0, le=100, decimal_places=2)
+
+
+class CategoryUpdateIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: Optional[CategoryTitle] = None
+    weight: Optional[Decimal] = Field(default=None, ge=0, le=100, decimal_places=2)
+
+    @model_validator(mode="after")
+    def _no_null(self):
+        for f in ("title", "weight"):
+            if f in self.model_fields_set and getattr(self, f) is None:
+                raise ValueError(f"{f} cannot be null")
+        return self
+
+
+class CategoriesOrderIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    category_ids: list[uuid.UUID] = Field(max_length=100)
+
+
+class CategoryOut(BaseModel):
+    id: uuid.UUID
+    title: dict
+    weight: float
+    position: int
+    assessment_count: int
+
+
+class LatePolicyOut(BaseModel):
+    percent_per_day: float
+    max_percent: float
+    grace_minutes: int
+
+
+class CourseGradingOut(BaseModel):
+    total_mode: str
+    grading_scheme_version_id: Optional[uuid.UUID] = None
+    scheme: Optional[SchemeRefOut] = None
+    late_policy: Optional[LatePolicyOut] = None
+    categories: list[CategoryOut]
+    warnings: list[str] = []
+    grading_changed_at: Optional[datetime] = None
+
+
+class CourseGradingStudentOut(BaseModel):
+    """Student allow-list: total mode and the scheme's type/scale/title only."""
+    total_mode: str
+    scheme: Optional[SchemeStudentRefOut] = None
+
+
+COURSE_GRADING_STUDENT_KEYS = frozenset(CourseGradingStudentOut.model_fields)

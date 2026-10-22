@@ -134,6 +134,26 @@ class Settings(BaseSettings):
     PAYLOAD_CACHE_BYTES: int = 48 * 1024 * 1024
     PLAN_CACHE_BYTES: int = 16 * 1024 * 1024
 
+    # --- Phase 4: grading (docs/phases/PHASE_4_DESIGN.md) ---
+    # Caps (P4-22)
+    GRADING_BANDS_MAX: int = 50
+    GRADING_CURVE_SEGMENTS_MAX: int = 20
+    GRADING_TABLE_ROWS_MAX: int = 1000
+    GRADING_THRESHOLDS_MAX: int = 10
+    GRADING_LABEL_MAX_CHARS: int = 60
+    GRADING_PREVIEW_MAX_POINTS: int = 1001
+    GRADE_CATEGORIES_MAX: int = 30
+    GRADES_REGRADE_MAX: int = 2000
+    GRADES_REGRADE_CHUNK: int = 200
+    GRADES_RELEASE_MAX_IDS: int = 5000
+    GRADING_MAX_BODY_BYTES: int = 64 * 1024
+    GRADING_VERSION_CACHE_SIZE: int = 256
+    # Rate limits (P4-21); override/excuse reuse GRADE_ITEM_RATE_PER_HOUR
+    GRADES_RELEASE_RATE_PER_HOUR: int = 60
+    GRADES_REGRADE_RATE_PER_HOUR: int = 30
+    SCHEME_WRITE_RATE_PER_HOUR: int = 100
+    SCHEME_PREVIEW_RATE_PER_MIN: int = 60
+
     # Password hashing cost (bcrypt). 10 is OWASP's minimum and ~4x faster than 12 on small servers.
     BCRYPT_ROUNDS: int = 10
 

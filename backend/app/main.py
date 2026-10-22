@@ -12,6 +12,7 @@ from app.db.migrate import run_migrations
 from app.api.v1.router import api_router
 from app.lms.core import admission
 from app.lms.core.errors import register_error_handlers
+import app.lms.grading  # noqa: F401,E402  (registers the Phase 4 attempt-scored hook, P4-1)
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,21 @@ async def _configure_thread_limiter() -> None:
         from anyio import to_thread
 
         to_thread.current_default_thread_limiter().total_tokens = tokens
+
+
+def _seed_grading_schemes() -> None:
+    """Phase 4 system grading schemes (P4-6), idempotent; a failure is logged, never fatal."""
+    from app.db.session import SessionLocal
+    from app.lms.grading.seeds import ensure_system_schemes
+
+    db = SessionLocal()
+    try:
+        ensure_system_schemes(db)
+    except Exception:
+        db.rollback()
+        logger.exception("Seeding system grading schemes failed")
+    finally:
+        db.close()
 
 
 @asynccontextmanager
@@ -37,6 +53,7 @@ async def lifespan(app: FastAPI):
         init_db()
     except Exception as e:
         logger.warning(f"Database startup initialization notice: {e}")
+    _seed_grading_schemes()
     if is_production():
         if settings.SECRET_KEY == DEFAULT_SECRET_KEY:
             logger.critical("SECRET_KEY is the public default from the repository: anyone can forge login tokens. Set SECRET_KEY.")

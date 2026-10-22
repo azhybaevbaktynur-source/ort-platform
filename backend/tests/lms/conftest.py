@@ -25,12 +25,24 @@ def clean_lms_tables(reset_db):
 
     from app.lms.assessments.models import Assessment, AssessmentItem, AssessmentSection, AssessmentVersion
     from app.lms.attempts.models import Attempt, AttemptItem, AttemptSection
+    from app.lms.grading.models import (
+        AttemptGrade, CourseGrade, GradeCategory, GradeEvent, GradingScheme, GradingSchemeVersion, Submission,
+    )
 
     # FK-safe order: children first, users last. Seed accounts stay.
     phase2 = [QuestionVersion, BankQuestion, PassageVersion, Passage, TranslationGroup, QuestionBank, Asset, AssetBlob]
     tables = phase2 + [EnrollmentEvent, Enrollment, TeacherRequest, AdminAuditLog, RateLimitBucket, Course, ExamAccess, TestAttempt]
     with db_session.engine.begin() as conn:
-        # Phase 3 first (attempts, then assessment rows; child items before parents).
+        # Phase 4 first (design 2.8): grade rows, then the FKs into categories and scheme versions.
+        for model in (GradeEvent, CourseGrade, AttemptGrade, Submission):
+            conn.execute(delete(model.__table__))
+        conn.execute(update(Assessment.__table__).values(grading_scheme_version_id=None, grade_category_id=None))
+        conn.execute(update(Course.__table__).values(grading_scheme_version_id=None))
+        conn.execute(delete(GradeCategory.__table__))
+        conn.execute(update(GradingScheme.__table__).values(current_version_id=None))
+        for model in (GradingSchemeVersion, GradingScheme):
+            conn.execute(delete(model.__table__))
+        # Phase 3 (attempts, then assessment rows; child items before parents).
         for model in (AttemptItem, AttemptSection, Attempt):
             conn.execute(delete(model.__table__))
         conn.execute(update(Assessment.__table__).values(published_version_id=None))
@@ -45,7 +57,24 @@ def clean_lms_tables(reset_db):
         conn.execute(delete(User.__table__).where(User.id.notin_(SEED_USER_IDS)))
     _reset_storage_caches()
     _reset_phase3_caches()
+    _phase4_setup()
     yield
+
+
+def _phase4_setup() -> None:
+    """Re-seed the system grading schemes, reset the version cache and re-register the Phase 4 hook
+    (some Phase 3 tests clear ATTEMPT_SCORED_HOOKS)."""
+    from app.lms.grading import register_hooks
+    from app.lms.grading.schemes import reset_version_cache
+    from app.lms.grading.seeds import ensure_system_schemes
+
+    register_hooks()
+    reset_version_cache()
+    db = db_session.SessionLocal()
+    try:
+        ensure_system_schemes(db)
+    finally:
+        db.close()
 
 
 def _reset_phase3_caches() -> None:

@@ -20,4 +20,11 @@ COURSE_POLICIES: dict[tuple[str, str], str] = {
     ("POST", f"{_B}/{{course_id}}/staff"): "course:roster.manage",
     ("PATCH", f"{_B}/{{course_id}}/enrollments/{{enrollment_id}}"): "course:roster.manage",
     ("DELETE", f"{_B}/{{course_id}}/enrollments/{{enrollment_id}}"): "course:roster.manage",
+    # Phase 4 grading settings and categories (PHASE_4_DESIGN 3.3, 5)
+    ("GET", f"{_B}/{{course_id}}/grading"): "course:content.read",
+    ("PUT", f"{_B}/{{course_id}}/grading"): "course:grades.manage",
+    ("POST", f"{_B}/{{course_id}}/grade-categories"): "course:grades.manage",
+    ("PUT", f"{_B}/{{course_id}}/grade-categories/order"): "course:grades.manage",
+    ("PATCH", f"{_B}/{{course_id}}/grade-categories/{{category_id}}"): "course:grades.manage",
+    ("DELETE", f"{_B}/{{course_id}}/grade-categories/{{category_id}}"): "course:grades.manage",
 }

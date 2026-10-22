@@ -60,9 +60,24 @@ class Assessment(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
     deleted_by_id: Mapped[Optional[str]] = mapped_column(
         String(64), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    # Phase 4 grading settings (PHASE_4_DESIGN 2.3); live settings, not part of the published snapshot.
+    grading_scheme_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("grading_scheme_versions.id", ondelete="RESTRICT", name="fk_assessments_grading_scheme_version_id"),
+        nullable=True,
+    )
+    grade_category_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("grade_categories.id", ondelete="SET NULL"), nullable=True
+    )
+    due_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    grade_release: Mapped[str] = mapped_column(String(8), nullable=False, default="auto", server_default="auto")
+    omit_from_total: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False,
+                                                  server_default=text("false"))
+    grading_changed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint("preset IN ('none','ort_main','ort_subject')", name="preset_valid"),
+        CheckConstraint("grade_release IN ('auto','manual')", name="grade_release_valid"),
         CheckConstraint("status IN ('draft','published')", name="status_valid"),
         CheckConstraint("time_limit_s IS NULL OR (time_limit_s >= 60 AND time_limit_s <= 86400)",
                         name="time_limit_valid"),

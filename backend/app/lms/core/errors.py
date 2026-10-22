@@ -10,7 +10,14 @@ from fastapi.responses import JSONResponse
 
 
 LMS_PATH_PREFIXES = ("/api/v1/me", "/api/v1/courses", "/api/v1/platform", "/api/v1/assets", "/api/v1/media",
-                     "/api/v1/attempts", "/api/v1/internal")
+                     "/api/v1/attempts", "/api/v1/internal", "/api/v1/grading-schemes")
+
+# Phase 4 error codes (design section 5); every one needs an `lms.errors.*` i18n key in en/ky/ru.
+PHASE4_ERROR_CODES = (
+    "grading_scheme_not_found", "scheme_version_not_found", "scheme_params_invalid", "version_unchanged",
+    "submission_not_found", "grade_conflict", "override_reason_required", "category_not_found", "category_in_use",
+    "too_many_categories", "too_many_rows", "value_out_of_range", "attempt_in_progress", "already_void",
+)
 
 
 class LMSError(Exception):

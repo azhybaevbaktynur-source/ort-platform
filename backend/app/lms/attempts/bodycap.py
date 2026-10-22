@@ -14,6 +14,9 @@ from app.lms.core.errors import PayloadTooLarge, error_body
 
 _API = re.compile(r"^/api/v1/")
 _ATTEMPT = re.compile(r"^/api/v1/(attempts/|courses/[^/]+/assessments/[^/]+/attempts/?$)")
+# Small grading edits (settings, categories, override/excuse). Scheme versions (lookup tables up to
+# GRADING_TABLE_ROWS_MAX rows) and grade release (up to GRADES_RELEASE_MAX_IDS ids) exceed 64 KiB: global cap.
+_GRADING = re.compile(r"^/api/v1/courses/[^/]+/(grading|grade-categories|submissions)(/|$)")
 _EXEMPT = re.compile(r"^/api/v1/(upload(/|$)|bulk/|courses/[^/]+/(assets|imports)(/|$))")
 _OLD = re.compile(r"^/api/v1/(auth|users|questions|bulk|mock-tests|mock_tests|exam-sets|exam_sets|upload|planner|"
                   r"analytics|practice|admin)(/|$)")
@@ -34,7 +37,12 @@ class BodyCapMiddleware:
         path = scope["path"]
         if _EXEMPT.match(path):
             return await self.app(scope, receive, send)
-        cap = settings.AUTOSAVE_MAX_BODY_BYTES if _ATTEMPT.match(path) else settings.API_MAX_BODY_BYTES
+        if _ATTEMPT.match(path):
+            cap = settings.AUTOSAVE_MAX_BODY_BYTES
+        elif _GRADING.match(path):
+            cap = settings.GRADING_MAX_BODY_BYTES
+        else:
+            cap = settings.API_MAX_BODY_BYTES
         old = bool(_OLD.match(path))
         for k, v in scope.get("headers", []):
             if k == b"content-length":

@@ -21,6 +21,7 @@ Preset = Literal["none", "ort_main", "ort_subject"]
 ScorePolicy = Literal["highest", "latest", "first", "average"]
 Navigation = Literal["free", "section_forward_only"]
 ResultsPolicy = Literal["never", "after_submit", "after_close"]
+GradeRelease = Literal["auto", "manual"]
 
 
 class _In(BaseModel):
@@ -67,6 +68,12 @@ class AssessmentUpdateIn(_In):
     show_correct_answers: Optional[bool] = None
     available_from: Optional[datetime] = None
     available_until: Optional[datetime] = None
+    # Phase 4 grading settings (PHASE_4_DESIGN 3.3); null clears the scheme / category / due date.
+    grading_scheme_version_id: Optional[uuid.UUID] = None
+    grade_category_id: Optional[uuid.UUID] = None
+    due_at: Optional[datetime] = None
+    grade_release: Optional[GradeRelease] = None
+    omit_from_total: Optional[bool] = None
 
     @model_validator(mode="after")
     def _v(self):
@@ -75,7 +82,7 @@ class AssessmentUpdateIn(_In):
         if self.allowed_attempts == 0:
             raise ValueError("allowed_attempts must be -1 or 1..100")
         for f in ("title", "shuffle_items", "shuffle_choices", "score_policy", "navigation", "results_policy",
-                  "show_correct_answers", "allowed_attempts", "languages"):
+                  "show_correct_answers", "allowed_attempts", "languages", "grade_release", "omit_from_total"):
             if f in self.model_fields_set and getattr(self, f) is None:
                 raise ValueError(f"{f} cannot be null")
         return self
@@ -216,6 +223,38 @@ class PreviewIn(_In):
     language: Optional[Lang] = None
 
 
+# --------------------------------------------------------------------------- grading scheme references
+
+class SchemeRefOut(BaseModel):
+    """Staff view of an attached grading scheme version (PHASE_4_DESIGN 3.3)."""
+    id: uuid.UUID
+    scheme_id: uuid.UUID
+    title: dict
+    type: str
+    version_no: int
+    scale_min: Optional[float] = None
+    scale_max: Optional[float] = None
+
+
+class SchemeStudentRefOut(BaseModel):
+    """Student view: no ids, no params (PHASE_4_DESIGN 3.3 / 4)."""
+    type: str
+    scale_min: Optional[float] = None
+    scale_max: Optional[float] = None
+    title: dict
+
+
+def scheme_ref(brief: Optional[dict]) -> Optional[SchemeRefOut]:
+    return SchemeRefOut(**brief) if brief else None
+
+
+def scheme_student_ref(brief: Optional[dict]) -> Optional[SchemeStudentRefOut]:
+    if not brief:
+        return None
+    return SchemeStudentRefOut(type=brief["type"], scale_min=brief["scale_min"], scale_max=brief["scale_max"],
+                               title=brief["title"])
+
+
 # --------------------------------------------------------------------------- staff outputs
 
 class AttemptCountsOut(BaseModel):
@@ -293,6 +332,12 @@ class AssessmentStaffOut(AssessmentStaffSummaryOut):
     navigation: str
     results_policy: str
     show_correct_answers: bool
+    grading_scheme_version_id: Optional[uuid.UUID] = None
+    grade_category_id: Optional[uuid.UUID] = None
+    due_at: Optional[datetime] = None
+    grade_release: str = "auto"
+    omit_from_total: bool = False
+    scheme: Optional[SchemeRefOut] = None
     sections: list[SectionOut]
     warnings: list[dict] = []
 
@@ -357,6 +402,8 @@ class AssessmentStudentSummaryOut(BaseModel):
     attempts_used: int
     in_progress_attempt_id: Optional[uuid.UUID] = None
     last_result: Optional[LastResultOut] = None
+    due_at: Optional[datetime] = None
+    scheme: Optional[SchemeStudentRefOut] = None
 
 
 class LobbySectionOut(BaseModel):
@@ -382,6 +429,8 @@ class AssessmentLobbyOut(BaseModel):
     in_progress_attempt_id: Optional[uuid.UUID] = None
     can_start: bool
     reason: Optional[str] = None
+    due_at: Optional[datetime] = None
+    scheme: Optional[SchemeStudentRefOut] = None
 
 
 # Exact key sets, asserted by the contract tests.

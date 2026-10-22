@@ -174,3 +174,41 @@ def test_0004_up_down_up(alembic_engine):
             assert not phase3 & set(inspect(conn).get_table_names())
         command.upgrade(cfg, "head")
         conn.commit()
+
+
+def test_0005_up_down_up(alembic_engine):
+    """Phase 4 tables and columns (with the schemes <-> versions FK) create and drop cleanly: 0004 -> 0005 twice."""
+    from alembic import command
+
+    from app.db.migrate import _config
+
+    phase4 = {"grading_schemes", "grading_scheme_versions", "grade_categories", "submissions", "attempt_grades",
+              "grade_events", "course_grades"}
+    added = {"assessments": {"grading_scheme_version_id", "grade_category_id", "due_at", "grade_release",
+                             "omit_from_total", "grading_changed_at"},
+             "courses": {"grading_total_mode", "grading_scheme_version_id", "late_policy", "grading_changed_at"}}
+    cfg = _config(TEST_URL)
+    with alembic_engine.connect() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "0004_phase3_assessments")
+        conn.commit()
+        assert not phase4 & set(inspect(conn).get_table_names())
+        for _ in range(2):
+            command.upgrade(cfg, "0005_phase4_grading")
+            conn.commit()
+            assert phase4 <= set(inspect(conn).get_table_names())
+            for table, cols in added.items():
+                assert cols <= {c["name"] for c in inspect(conn).get_columns(table)}
+            fks = {fk["name"] for fk in inspect(conn).get_foreign_keys("grading_schemes")}
+            assert "fk_grading_schemes_current_version_id" in fks
+            idx = {i["name"] for i in inspect(conn).get_indexes("grading_schemes")}
+            assert "uq_grading_schemes_key" in idx
+            uqs = {u["name"] for u in inspect(conn).get_unique_constraints("submissions")}
+            assert "uq_submissions_enrollment_assessment" in uqs
+            command.downgrade(cfg, "0004_phase3_assessments")
+            conn.commit()
+            assert not phase4 & set(inspect(conn).get_table_names())
+            for table, cols in added.items():
+                assert not cols & {c["name"] for c in inspect(conn).get_columns(table)}
+        command.upgrade(cfg, "head")
+        conn.commit()

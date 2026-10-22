@@ -372,3 +372,136 @@ def paginate_rows(db: Session, stmt: Select, *, sort_col, id_col, entity_of: Cal
 
 def like_escape(q: str) -> str:
     return q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+# ---------------------------------------------------------------- Phase 4: grading settings and categories (3.3)
+
+def _grading_imports():
+    from app.lms.grading import repository as grading_repo
+    from app.lms.grading.models import GradeCategory
+    from app.lms.grading.schemes import load_usable_version
+
+    return grading_repo, GradeCategory, load_usable_version
+
+
+def grading_out(db: Session, ctx: AuthzContext, course: Course):
+    """GET /courses/{c}/grading: staff get settings + categories + warnings; students an allow-list."""
+    from app.lms.courses import schemas as cs
+
+    grading_repo, _, _ = _grading_imports()
+    require_course(ctx, A.CONTENT_READ, course)
+    briefs = grading_repo.version_briefs(db, [course.grading_scheme_version_id])
+    brief = briefs.get(course.grading_scheme_version_id)
+    if ctx.role_for(course.id) not in ("teacher", "assistant"):
+        from app.lms.assessments.schemas import scheme_student_ref
+
+        return cs.CourseGradingStudentOut(total_mode=course.grading_total_mode or "points",
+                                          scheme=scheme_student_ref(brief))
+    categories = grading_repo.live_categories(db, course.id)
+    warnings: list[str] = []
+    if course.grading_total_mode == "weighted":
+        if grading_repo.uncategorized_assessment_count(db, course.id):
+            warnings.append("uncategorized_excluded")
+        if not any(c.weight for c in categories):
+            warnings.append("weights_all_zero")
+    late = course.late_policy
+    return cs.CourseGradingOut(
+        total_mode=course.grading_total_mode or "points", grading_scheme_version_id=course.grading_scheme_version_id,
+        scheme=cs.SchemeRefOut(**brief) if brief else None,
+        late_policy=cs.LatePolicyOut(**late) if late else None,
+        categories=category_outs(db, course, categories), warnings=warnings,
+        grading_changed_at=course.grading_changed_at,
+    )
+
+
+def category_outs(db: Session, course: Course, categories: list) -> list:
+    from app.lms.courses import schemas as cs
+
+    grading_repo, _, _ = _grading_imports()
+    counts = grading_repo.category_assessment_counts(db, course.id) if categories else {}
+    return [cs.CategoryOut(id=c.id, title=c.title, weight=float(c.weight), position=c.position,
+                           assessment_count=counts.get(c.id, 0)) for c in categories]
+
+
+def update_grading_settings(db: Session, ctx: AuthzContext, course: Course, data) -> Course:
+    """PUT /courses/{c}/grading (P4-10, P4-17). Changes never regrade (D14); they set grading_changed_at."""
+    from app.lms.core import clock
+
+    _, _, load_usable_version = _grading_imports()
+    require_course(ctx, A.GRADES_MANAGE, course)
+    vid = data.grading_scheme_version_id
+    if vid is not None and vid != course.grading_scheme_version_id:
+        load_usable_version(db, ctx, course, vid)
+    late = data.late_policy.as_json() if data.late_policy is not None else None
+    lock_course(db, course)
+    before = (course.grading_total_mode, course.grading_scheme_version_id, course.late_policy)
+    course.grading_total_mode = data.total_mode
+    course.grading_scheme_version_id = vid
+    course.late_policy = late
+    if (course.grading_total_mode, course.grading_scheme_version_id, course.late_policy) != before:
+        course.grading_changed_at = clock.now()
+    db.commit()
+    return course
+
+
+def create_category(db: Session, ctx: AuthzContext, course: Course, data):
+    from app.core.config import settings
+
+    _, GradeCategory, _ = _grading_imports()
+    require_course(ctx, A.GRADES_MANAGE, course)
+    lock_course(db, course)  # serializes the cap and position allocation per course
+    live = db.execute(select(func.count(), func.max(GradeCategory.position)).where(
+        GradeCategory.course_id == course.id, GradeCategory.deleted_at.is_(None))).one()
+    if live[0] >= settings.GRADE_CATEGORIES_MAX:
+        raise ValidationFailed(f"At most {settings.GRADE_CATEGORIES_MAX} categories", code="too_many_categories",
+                               details={"max": settings.GRADE_CATEGORIES_MAX})
+    cat = GradeCategory(course_id=course.id, title=dict(data.title), weight=data.weight,
+                        position=(live[1] or 0) + 1)
+    db.add(cat)
+    db.commit()
+    return cat
+
+
+def update_category(db: Session, ctx: AuthzContext, course: Course, category_id: uuid.UUID, data):
+    grading_repo, _, _ = _grading_imports()
+    require_course(ctx, A.GRADES_MANAGE, course)
+    cat = grading_repo.load_category(db, course.id, category_id, for_update=True)
+    if "title" in data.model_fields_set:
+        cat.title = dict(data.title)
+    if "weight" in data.model_fields_set:
+        cat.weight = data.weight
+    db.commit()
+    return cat
+
+
+def delete_category(db: Session, ctx: AuthzContext, course: Course, category_id: uuid.UUID) -> None:
+    """Soft delete; refused while a live assessment references the category (409 category_in_use)."""
+    from app.lms.assessments.models import Assessment
+    from app.lms.core import clock
+
+    grading_repo, _, _ = _grading_imports()
+    require_course(ctx, A.GRADES_MANAGE, course)
+    cat = grading_repo.load_category(db, course.id, category_id, for_update=True)
+    used = db.execute(select(func.count()).select_from(Assessment).where(
+        Assessment.course_id == course.id, Assessment.grade_category_id == cat.id,
+        Assessment.deleted_at.is_(None))).scalar_one()
+    if used:
+        raise Conflict("Assessments use this category", code="category_in_use", details={"assessment_count": used})
+    cat.deleted_at = clock.now()
+    cat.deleted_by_id = ctx.user.id
+    db.commit()
+
+
+def reorder_categories(db: Session, ctx: AuthzContext, course: Course, category_ids: list) -> list:
+    grading_repo, _, _ = _grading_imports()
+    require_course(ctx, A.GRADES_MANAGE, course)
+    lock_course(db, course)
+    cats = grading_repo.live_categories(db, course.id)
+    if len(category_ids) != len(set(category_ids)) or set(category_ids) != {c.id for c in cats}:
+        raise ValidationFailed("category_ids must list every category exactly once", code="order_mismatch")
+    by_id = {c.id: c for c in cats}
+    for i, cid in enumerate(category_ids, start=1):
+        if by_id[cid].position != i:
+            by_id[cid].position = i
+    db.commit()
+    return grading_repo.live_categories(db, course.id)
