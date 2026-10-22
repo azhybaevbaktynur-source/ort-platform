@@ -23,7 +23,8 @@ export const getAttemptResult = (attemptId: string) => lmsFetch<AttemptResultOut
 export const getAttemptReview = (attemptId: string) => lmsFetch<ReviewOut>(`/attempts/${e(attemptId)}/review`);
 
 /**
- * Shared content payload. Immutable per (version, language), so the browser HTTP cache (ETag) is used.
+ * Shared content payload. Immutable per (version, language[, section]), so the browser HTTP cache (ETag) is used.
+ * Forward-only attempts point `content_url` at the current section; refetch when it changes.
  * `content_url` may be absolute, start with `/api/`, or be relative to the API base; all three work.
  */
 export async function getAttemptContent(state: Pick<AttemptState, "content_url">, signal?: AbortSignal): Promise<AttemptContent> {

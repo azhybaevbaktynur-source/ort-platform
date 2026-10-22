@@ -124,12 +124,19 @@ async def test_phase3_flow(db, api, frozen_clock):
     t1 = state["id"]
     assert state["version_id"] == v1_id and state["navigation"] == "section_forward_only"
     assert state["current_section_pos"] == 1 and len(state["items"]) == 150
-    content = await student(api, s1, "GET", f"/attempts/{t1}/content")
+    # forward-only: content is served one section at a time (review finding 7)
+    assert state["content_url"] == f"/attempts/{t1}/content?section=1"
+    content = await student(api, s1, "GET", state["content_url"])
     assert content.status_code == 200
     items = {i["position"]: i for i in state["items"]}
     qv_of = {str(v.id): v for v in qvs.values()}
     sec1 = [p for p, i in items.items() if i["section_pos"] == 1]
     assert len(sec1) == 30
+    later_qvs = {i["qv"] for i in state["items"] if i["section_pos"] > 1}
+    assert {items[p]["qv"] for p in sec1} <= set(content.json()["questions"]) | set(state["extra_questions"] or {})
+    assert not later_qvs & set(content.json()["questions"])
+    ahead = await student(api, s1, "GET", f"/attempts/{t1}/content?section=2")
+    assert ahead.status_code == 409 and ahead.json()["error"]["code"] == "section_not_current"
     ts = 1000
     answers = []
     for p in sec1[:10]:
@@ -146,6 +153,9 @@ async def test_phase3_flow(db, api, frozen_clock):
     rj = rs.json()
     assert rj["id"] == t1 and rj["current_section_pos"] == 2 and rj["status"] == "in_progress"
     assert rj["sections"][0]["closed_at"] is not None and rj["sections"][1]["started_at"] == sec1_deadline
+    assert rj["content_url"] == f"/attempts/{t1}/content?section=2"
+    c2 = await student(api, s1, "GET", rj["content_url"])
+    assert c2.status_code == 200 and c2.json()["section_pos"] == 2
     saved = {i["position"]: i["response"] for i in rj["items"] if i["response"]}
     assert saved == {p: a_["response"] for p, a_ in zip(sec1[:10], answers)}
     # answering the closed section 1 is refused

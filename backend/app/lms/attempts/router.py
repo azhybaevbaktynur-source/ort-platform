@@ -16,7 +16,7 @@ from app.lms.attempts.schemas import (
 )
 from app.lms.core import clock
 from app.lms.core.deps import get_lms_user
-from app.lms.core.errors import Forbidden, RateLimited, error_body
+from app.lms.core.errors import Conflict, Forbidden, RateLimited, error_body
 from app.lms.courses.service import load_course, require_course
 from app.models.user import User
 
@@ -60,16 +60,31 @@ def _etag_matches(header: Optional[str], etag: str) -> bool:
 
 
 @router.get("/attempts/{attempt_id}/content")
-def get_content(attempt_id: str, request: Request, user: User = Depends(get_lms_user),
-                db: Session = Depends(get_db)):
+def get_content(attempt_id: str, request: Request, section: Optional[int] = None,
+                user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
+    """Free navigation and previews: the whole-exam payload (`section` is ignored). Forward-only: one section's
+    payload, `?section=<pos>` (default: the current section); only sections up to the current one (after lazy
+    advance) are served, later ones are 409 `section_not_current` (review finding 7)."""
     attempt, env = engine.load_attempt_bundle(db, user, attempt_id)
     if not engine.can_access(attempt, env):
         raise engine.attempt_not_found()
-    etag = f'"{engine.content_etag(attempt)}"'
+    plan = engine.plan_for(db, attempt)
+    pos: Optional[int] = None
+    if engine.sectioned_content(attempt, plan):
+        engine.apply_lazy(db, attempt, engine.load_sections(db, attempt.id), plan, now=clock.now(), env=env)
+        current = int(attempt.current_section_pos or 1)
+        pos = current if section is None else section
+        if pos < 1 or pos > current:
+            raise Conflict("Section is not available yet", code="section_not_current")
+    etag = f'"{engine.content_etag(attempt, plan, pos)}"'
     headers = {"ETag": etag, "Cache-Control": "private, max-age=86400, immutable", "Vary": "Accept-Encoding"}
     if _etag_matches(request.headers.get("if-none-match"), etag):
         return Response(status_code=304, headers=headers)
-    payload = engine.cache_api().get_student_payload(db, attempt.assessment_version_id, attempt.language)
+    cache = engine.cache_api()
+    if pos is None:
+        payload = cache.get_student_payload(db, attempt.assessment_version_id, attempt.language)
+    else:
+        payload = cache.get_student_payload(db, attempt.assessment_version_id, attempt.language, pos)
     raw = _first(payload, "raw", "raw_bytes")
     gz = _first(payload, "gzipped", "gzip_bytes")
     if gz is not None and "gzip" in request.headers.get("accept-encoding", "").lower():

@@ -1,8 +1,9 @@
 """Immutable in-process caches (design 3.4, L3). Published versions never change, so there is no invalidation.
 
 - `get_plan`: everything the engine needs per version (LRU 64, per-key build lock, no stampede).
-- `get_student_payload`: shared student JSON per (version, language) with pre-gzipped bytes and an ETag;
-  LRU bounded by bytes (`settings.PAYLOAD_CACHE_BYTES`).
+- `get_student_payload`: shared student JSON per (version, language[, section]) with pre-gzipped bytes and an ETag;
+  LRU bounded by bytes (`settings.PAYLOAD_CACHE_BYTES`). Forward-only attempts get one payload per section so a
+  student never receives later sections ahead of time (review finding 7); `section_pos=None` is the whole exam.
 - `qtype`: question-version id -> type (LRU 50k) for autosave response validation.
 Keys never leave the server: the payload is built only from `student_question`/`student_passage`.
 """
@@ -201,13 +202,22 @@ def _dumps(obj: Any) -> bytes:
     return json.dumps(obj, default=str, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
-def _build_payload(db: Session, plan: VersionPlan, lang: str) -> CachedPayload:
+def payload_etag(version_id: Any, lang: str, section_pos: Optional[int] = None) -> str:
+    """Quoted ETag of a student payload: whole exam, or one section of a forward-only exam."""
+    if section_pos is None:
+        return f'"{version_id}.{lang}.{PAYLOAD_SCHEMA}"'
+    return f'"{version_id}.{lang}.s{int(section_pos)}.{PAYLOAD_SCHEMA}"'
+
+
+def _build_payload(db: Session, plan: VersionPlan, lang: str, section_pos: Optional[int] = None) -> CachedPayload:
     slots = plan.slots.get(lang) or []
     qids: dict[uuid.UUID, None] = {}
     pids: dict[uuid.UUID, None] = {}
     counts: dict[int, int] = {}
     for s in slots:
         counts[s["section_pos"]] = counts.get(s["section_pos"], 0) + (s["count"] if s["kind"] == "pick" else 1)
+        if section_pos is not None and int(s["section_pos"]) != section_pos:
+            continue                     # forward-only: only this section's content
         if s["kind"] == "question":      # pick pools stay out of the shared payload (drawn per attempt)
             qids[_uuid(s["qv"])] = None
             if s.get("pv"):
@@ -230,9 +240,11 @@ def _build_payload(db: Session, plan: VersionPlan, lang: str) -> CachedPayload:
         ],
         "questions": questions, "passages": passages, "image_urls": list(images),
     }
+    if section_pos is not None:
+        payload["section_pos"] = section_pos
     raw = _dumps(payload)
     return CachedPayload(
-        etag=f'"{plan.version_id}.{lang}.{PAYLOAD_SCHEMA}"', raw=raw, gzipped=gzip.compress(raw, 6, mtime=0))
+        etag=payload_etag(plan.version_id, lang, section_pos), raw=raw, gzipped=gzip.compress(raw, 6, mtime=0))
 
 
 def _store_payload(key: tuple, payload: CachedPayload) -> None:
@@ -251,9 +263,13 @@ def _store_payload(key: tuple, payload: CachedPayload) -> None:
             _payload_bytes -= ev.size
 
 
-def get_student_payload(db: Session, version_id: uuid.UUID, lang: str) -> CachedPayload:
+def get_student_payload(db: Session, version_id: uuid.UUID, lang: str,
+                        section_pos: Optional[int] = None) -> CachedPayload:
+    """Whole-exam payload (`section_pos=None`) or one section's payload (forward-only navigation)."""
     version_id = _uuid(version_id)
-    key = (version_id, lang, PAYLOAD_SCHEMA)
+    if section_pos is not None:
+        section_pos = int(section_pos)
+    key = (version_id, lang, section_pos, PAYLOAD_SCHEMA)
     with _payload_lock:
         hit = _payloads.get(key)
         if hit is not None:
@@ -262,12 +278,14 @@ def get_student_payload(db: Session, version_id: uuid.UUID, lang: str) -> Cached
     plan = get_plan(db, version_id)
     if lang not in plan.languages:
         raise ValidationFailed("Language not available", code="language_not_available")
+    if section_pos is not None and section_pos not in {int(s["pos"]) for s in plan.snapshot.get("sections", [])}:
+        raise ValidationFailed("Section not available", code="section_not_current")
     with _payload_build.get(key):
         with _payload_lock:
             hit = _payloads.get(key)
             if hit is not None:
                 return hit
-        payload = _build_payload(db, plan, lang)
+        payload = _build_payload(db, plan, lang, section_pos)
         _store_payload(key, payload)
     _payload_build.drop(key)
     return payload

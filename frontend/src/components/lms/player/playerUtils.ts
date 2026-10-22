@@ -25,6 +25,20 @@ export function itemQuestion(state: AttemptState, content: AttemptContent, item:
   return content.questions[item.qv] ?? state.extra_questions?.[item.qv];
 }
 
+/**
+ * Forward-only attempts load content one section at a time; keep what earlier sections already delivered
+ * (display only) and add the new section's questions, passages and images.
+ */
+export function mergeContent(prev: AttemptContent | null, next: AttemptContent): AttemptContent {
+  if (!prev || prev.version_id !== next.version_id || prev.language !== next.language) return next;
+  return {
+    ...next,
+    questions: { ...prev.questions, ...next.questions },
+    passages: { ...prev.passages, ...next.passages },
+    image_urls: Array.from(new Set([...prev.image_urls, ...next.image_urls])),
+  };
+}
+
 export function itemPassage(content: AttemptContent, item: AttemptItemState, q: StudentQuestion | undefined): StudentPassage | null {
   if (item.pv && content.passages[item.pv]) return content.passages[item.pv];
   return q?.passage ?? null;

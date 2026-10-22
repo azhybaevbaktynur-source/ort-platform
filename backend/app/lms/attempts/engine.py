@@ -302,9 +302,28 @@ def _slot_maps(plan, lang: str) -> dict[int, dict]:
     return {int(s["slot"]): s for s in slots}
 
 
-def content_etag(attempt, plan=None) -> str:
+def sectioned_content(attempt, plan) -> bool:
+    """Review finding 7: a real forward-only attempt only receives content up to its current section; free
+    navigation and staff previews get the whole-exam payload."""
+    return _navigation(plan) == timing.FORWARD_ONLY and not attempt.is_preview
+
+
+def content_section(attempt, plan) -> Optional[int]:
+    """Section whose payload the state points at (None = whole exam)."""
+    return int(attempt.current_section_pos or 1) if sectioned_content(attempt, plan) else None
+
+
+def content_etag(attempt, plan=None, section_pos: Optional[int] = None) -> str:
+    """Unquoted payload ETag; matches `cache.payload_etag` (whole exam, or one section)."""
     schema = getattr(cache_api(), "PAYLOAD_SCHEMA", 1)
-    return f"{attempt.assessment_version_id}.{attempt.language}.{schema}"
+    if section_pos is None:
+        return f"{attempt.assessment_version_id}.{attempt.language}.{schema}"
+    return f"{attempt.assessment_version_id}.{attempt.language}.s{int(section_pos)}.{schema}"
+
+
+def content_url(attempt, section_pos: Optional[int] = None) -> str:
+    base = f"/attempts/{attempt.id}/content"
+    return base if section_pos is None else f"{base}?section={int(section_pos)}"
 
 
 def build_state(db: Session, attempt, assessment, sections, items, plan, now: datetime) -> AttemptStateOut:
@@ -315,6 +334,7 @@ def build_state(db: Session, attempt, assessment, sections, items, plan, now: da
     out_items: list[AttemptItemStateOut] = []
     extra: dict[str, Any] = {}
     cache = cache_api()
+    section_pos = content_section(attempt, plan)
     for r in items:
         slot = slot_map.get(int(r.slot), {})
         qv = str(r.question_version_id) if r.question_version_id is not None else None
@@ -323,7 +343,9 @@ def build_state(db: Session, attempt, assessment, sections, items, plan, now: da
             if pool is None:
                 pool = pools[int(r.slot)] = {str(p["qv"]): p.get("pv") for p in slot.get("pool", [])}
             pv = pool.get(qv)
-            if qv is not None and qv not in extra:
+            # forward-only: drawn questions of later sections are not delivered ahead of time
+            visible = section_pos is None or int(r.section_pos) <= section_pos
+            if qv is not None and visible and qv not in extra:
                 extra[qv] = cache.question_fragment(db, plan, r.question_version_id)
         else:
             pv = slot.get("pv")
@@ -340,7 +362,8 @@ def build_state(db: Session, attempt, assessment, sections, items, plan, now: da
         sections=[AttemptSectionStateOut(
             pos=s.section_pos, started_at=timing.as_utc(s.started_at), deadline_at=timing.as_utc(s.deadline_at),
             closed_at=timing.as_utc(s.closed_at)) for s in sorted(sections, key=lambda s: s.section_pos)],
-        items=out_items, content_url=f"/attempts/{attempt.id}/content", content_etag=content_etag(attempt, plan),
+        items=out_items, content_url=content_url(attempt, section_pos),
+        content_etag=content_etag(attempt, plan, section_pos),
         extra_questions=extra or None,
         results_available=results_available(assessment, attempt, now, staff=bool(attempt.is_preview)),
     )

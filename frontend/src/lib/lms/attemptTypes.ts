@@ -77,9 +77,13 @@ export interface AttemptState {
   navigation: AttemptNavigation;
   sections: AttemptSectionState[];
   items: AttemptItemState[];
+  /**
+   * Free navigation and previews: the whole-exam payload. Forward-only: the CURRENT section's payload
+   * (`/attempts/{t}/content?section={pos}`); it changes when the section advances (review finding 7).
+   */
   content_url: string;
   content_etag: string;
-  /** pick items: fragments not present in the shared payload, keyed by qv */
+  /** pick items: fragments not present in the shared payload, keyed by qv (forward-only: sections up to the current one) */
   extra_questions?: Record<string, StudentQuestion>;
   results_available: boolean;
 }
@@ -93,10 +97,15 @@ export interface ContentSection {
   item_count: number;
 }
 
-/** Shared payload from GET /attempts/{t}/content (same for every student of a version+language). */
+/**
+ * Shared payload from GET /attempts/{t}/content (same for every student of a version+language[+section]).
+ * `sections` always lists every section; `questions`/`passages` are one section's when `section_pos` is set.
+ */
 export interface AttemptContent {
   version_id: string;
   language: Lang;
+  /** set when the payload holds one section only (forward-only navigation) */
+  section_pos?: number;
   sections: ContentSection[];
   questions: Record<string, StudentQuestion>;
   passages: Record<string, StudentPassage>;

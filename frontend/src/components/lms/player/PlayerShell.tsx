@@ -20,7 +20,7 @@ import { PassagePane } from "./PassagePane";
 import { Palette, type PaletteGroup } from "./Palette";
 import { SaveStatus } from "./SaveStatus";
 import { ClosedDialog, SectionEndDialog, SubmitDialog, TimeUpDialog } from "./PlayerDialogs";
-import { isAnswered, isTypingTarget, itemPassage, itemQuestion, type ResponseObj } from "./playerUtils";
+import { isAnswered, isTypingTarget, itemPassage, itemQuestion, mergeContent, type ResponseObj } from "./playerUtils";
 
 type LocalAnswer = { response: ResponseObj; flagged: boolean };
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -49,6 +49,11 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
   const [closedInfo, setClosedInfo] = useState<{ finished: boolean } | null>(null);
   const [rejected, setRejected] = useState<number[]>([]);
   const [otherTab, setOtherTab] = useState(false);
+  // Forward-only: content arrives one section at a time (state.content_url names the current section).
+  const loadedUrlsRef = useRef<Set<string>>(new Set());
+  const [sectionLoading, setSectionLoading] = useState(false);
+  const [sectionError, setSectionError] = useState<unknown>(null);
+  const [sectionRetry, setSectionRetry] = useState(0);
 
   answersRef.current = answers;
   const resultHref = `/${lang}/courses/${courseId}/attempts/${attemptId}/result`;
@@ -89,6 +94,9 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
         return;
       }
       const c = await getAttemptContent(s);
+      loadedUrlsRef.current = new Set([s.content_url]);
+      setSectionError(null);
+      setSectionLoading(false);
       const local: Record<number, LocalAnswer> = {};
       for (const it of s.items) local[it.position] = { response: it.response, flagged: it.flagged };
 
@@ -187,6 +195,28 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
     };
   }, [attemptId]);
 
+  // Forward-only: after the section advances (close, lazy advance, another tab) fetch the new section's content.
+  // Free navigation keeps one content_url, so this never refetches.
+  const contentUrl = state?.content_url;
+  useEffect(() => {
+    if (!contentUrl || loadedUrlsRef.current.has(contentUrl)) return;
+    const ctrl = new AbortController();
+    setSectionLoading(true);
+    setSectionError(null);
+    getAttemptContent({ content_url: contentUrl }, ctrl.signal)
+      .then((c) => {
+        loadedUrlsRef.current.add(contentUrl);
+        setContent((prev) => mergeContent(prev, c));
+        setSectionLoading(false);
+      })
+      .catch((e) => {
+        if (ctrl.signal.aborted) return;
+        setSectionError(e);
+        setSectionLoading(false);
+      });
+    return () => ctrl.abort();
+  }, [contentUrl, sectionRetry]);
+
   // Preload images named by the payload (lobby may already have warmed the HTTP cache).
   useEffect(() => {
     if (!content) return;
@@ -216,7 +246,7 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
       const label = t(`sections.${s.key}`);
       if (label !== `sections.${s.key}`) return label;
     }
-    return `${t("player.section")} ${pos + 1}`;
+    return `${t("player.section")} ${pos}`;
   }, [content, t]);
 
   const answeredOf = useCallback((it: AttemptItemState): boolean => {
@@ -484,7 +514,7 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
             <p className="truncate text-sm font-bold text-slate-900">{sectionTitle(curItem?.section_pos ?? state.current_section_pos)}</p>
             <p className="text-xs text-slate-500">
               {t("player.progress", { answered: counts.answered, total: visibleItems.length })}
-              {forwardOnly ? ` · ${t("player.sectionOf", { n: state.current_section_pos + 1, total: lastSectionPos + 1 })}` : ""}
+              {forwardOnly ? ` · ${t("player.sectionOf", { n: state.current_section_pos, total: lastSectionPos })}` : ""}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -527,7 +557,11 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
             </details>
           ) : null}
 
-          {curItem && q ? (
+          {sectionError ? (
+            <ErrorMessage error={sectionError} onRetry={() => setSectionRetry((n) => n + 1)} />
+          ) : sectionLoading ? (
+            <p role="status" className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">{t("player.loading")}</p>
+          ) : curItem && q ? (
             <div className={passage ? "grid grid-cols-1 gap-4 xl:grid-cols-2" : ""}>
               {passage ? <PassagePane passage={passage} /> : null}
               <ItemView

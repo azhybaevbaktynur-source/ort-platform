@@ -76,14 +76,14 @@ class _StubCache:
                                slots=snap["slots"], qmeta=qmeta)
 
     @staticmethod
-    def get_student_payload(db, version_id, lang):
+    def get_student_payload(db, version_id, lang, section_pos=None):
         import gzip
         import json
 
         plan = _StubCache.get_plan(db, version_id)
         qs = {}
         for s in plan.slots[lang]:
-            if s["kind"] == "question":
+            if s["kind"] == "question" and (section_pos is None or s["section_pos"] == section_pos):
                 v = db.get(QuestionVersion, uuid.UUID(s["qv"]))
                 qs[s["qv"]] = student_question(v)
         body = json.dumps({"version_id": str(version_id), "language": lang, "sections": [], "questions": qs,
