@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field, SerializeAsAny
 
 from app.lms.content import repository as content_repo
 from app.lms.content.types import get_type
+from app.lms.grading.serializers import AttemptGradeOut
 
 
 class StudentPassageOut(BaseModel):
@@ -47,6 +48,13 @@ class AttemptResultOut(BaseModel):
     sections: list[AttemptResultSectionOut]
     pending_review: int
     submitted_at: Optional[datetime] = None
+    # Phase 4 (design 5): students only once released (P4-11); previews inline; staff always.
+    grade: Optional[AttemptGradeOut] = None
+
+
+class VoidResultOut(BaseModel):
+    """Result of a voided attempt for its owner (P4-20): the status only, no numbers."""
+    status: str = "void"
 
 
 class ReviewItemOut(BaseModel):
@@ -95,10 +103,12 @@ class AttemptStaffSummaryOut(BaseModel):
     raw_score: Optional[Decimal] = None
     points_possible: Optional[Decimal] = None
     pending_review: int = 0
+    grade: Optional[AttemptGradeOut] = None
 
 
 class AttemptStaffOut(AttemptStaffSummaryOut):
     assessment_id: uuid.UUID
+    submission_id: Optional[uuid.UUID] = None
     result: Optional[AttemptResultOut] = None
     items: list[StaffReviewItem]
 
@@ -164,10 +174,12 @@ def review_item(item, qv, pv, points: Decimal, *, with_keys: bool, staff: bool =
     return ReviewItemOut(**fields)
 
 
-def staff_summary(attempt, student_name: Optional[str]) -> AttemptStaffSummaryOut:
+def staff_summary(attempt, student_name: Optional[str], grade: Optional[AttemptGradeOut] = None
+                  ) -> AttemptStaffSummaryOut:
     return AttemptStaffSummaryOut(
         id=attempt.id, user_id=attempt.user_id, student_name=student_name, attempt_no=attempt.attempt_no,
         status=attempt.status, language=attempt.language, is_preview=attempt.is_preview,
         started_at=attempt.started_at, submitted_at=attempt.submitted_at, submit_reason=attempt.submit_reason,
         raw_score=attempt.raw_score, points_possible=attempt.points_possible, pending_review=pending_count(attempt),
+        grade=grade,
     )

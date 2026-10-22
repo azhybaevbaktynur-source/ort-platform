@@ -78,6 +78,7 @@ from app.lms.courses.policies import COURSE_POLICIES  # noqa: E402
 from app.lms.enrollments.policies import ENROLLMENT_POLICIES  # noqa: E402
 from app.lms.files.policies import ASSET_POLICIES, MEDIA_POLICIES  # noqa: E402
 from app.lms.grading.policies import GRADING_POLICIES  # noqa: E402
+from app.lms.grading.gradebook_policies import GRADEBOOK_POLICIES  # noqa: E402
 from app.lms.platform_admin.courses_policies import PLATFORM_COURSE_POLICIES  # noqa: E402
 from app.lms.platform_admin.policies import PLATFORM_POLICIES  # noqa: E402
 from app.lms.teachers.policies import ME_POLICIES  # noqa: E402
@@ -93,6 +94,7 @@ ROUTE_POLICIES: dict[tuple[str, str], str] = {
     **CONTENT_POLICIES, **IMPORT_POLICIES, **ASSET_POLICIES, **MEDIA_POLICIES,
     **ASSESSMENT_POLICIES, **ATTEMPT_POLICIES, **ATTEMPT_STAFF_POLICIES, **INTERNAL_POLICIES,
     **GRADING_POLICIES,
+    **GRADEBOOK_POLICIES,
 }
 
 

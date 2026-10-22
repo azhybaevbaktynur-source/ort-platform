@@ -55,3 +55,7 @@ api_router.include_router(_internal_router, prefix="/internal", tags=["Internal"
 from app.lms.grading.router import router as _grading_router  # noqa: E402
 
 api_router.include_router(_grading_router, tags=["Grading"])
+# Phase 4 (grading): gradebook and student grade reads (slice G3)
+from app.lms.grading.gradebook_router import router as _gradebook_router  # noqa: E402
+
+api_router.include_router(_gradebook_router, tags=["Gradebook"])

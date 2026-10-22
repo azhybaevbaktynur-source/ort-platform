@@ -17,7 +17,7 @@ pytestmark = pytest.mark.usefixtures("grading_plan")
 WRONG = {"sc": {"choice_id": "A"}, "num": {"value": "1"}, "st": {"text": "x"}, "es": {"text": "essay words"}}
 T0 = clock.now()
 
-RESULT_KEYS = {"raw_score", "points_possible", "sections", "pending_review", "submitted_at"}
+RESULT_KEYS = {"raw_score", "points_possible", "sections", "pending_review", "submitted_at", "grade"}
 SECTION_KEYS = {"pos", "key", "raw", "possible", "answered", "correct"}
 ITEM_KEYS = {"position", "section_pos", "question", "passage", "response", "flagged", "correctness", "score",
              "points", "feedback"}

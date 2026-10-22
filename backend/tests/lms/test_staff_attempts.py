@@ -52,7 +52,7 @@ async def test_list_excludes_previews_by_default(db, api):
     item = r.json()["items"][0]
     assert set(item) == {"id", "user_id", "student_name", "attempt_no", "status", "language", "is_preview",
                          "started_at", "submitted_at", "submit_reason", "raw_score", "points_possible",
-                         "pending_review"}
+                         "pending_review", "grade"}
     assert item["student_name"] == "Stu One" and item["pending_review"] == 1 and item["status"] == "needs_review"
     r2 = await api.call(w.teacher, "GET", _list(w), params={"preview": "true"})
     assert {i["id"] for i in r2.json()["items"]} == {str(real.id), str(prev.id)}
