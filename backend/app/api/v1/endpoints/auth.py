@@ -21,9 +21,6 @@ from app.db.session import get_db
 from app.models.user import User
 from app.schemas.user import (
     UserProfile,
-    UserRole,
-    TargetScoreUpdate,
-    TargetScore,
     UserRegisterRequest,
     RegisterResponse,
     VerifyEmailRequest,
@@ -89,23 +86,22 @@ def _issue_email_code(user: User, db: Session, lang: str) -> bool:
     return sent
 
 
-def _token_response(user: User) -> TokenResponse:
-    token = create_access_token({"sub": user.id, "email": user.email, "role": user.role})
-    user_role = UserRole.ADMIN if user.role == "admin" else UserRole.STUDENT
-    return TokenResponse(
-        access_token=token,
-        token_type="bearer",
-        role=user.role,
-        user=UserProfile(
-            id=user.id,
-            email=user.email,
-            displayName=user.display_name or user.email.split("@")[0],
-            phone=user.phone,
-            role=user_role,
-            target_score=user.target_score or 200,
-            preferredLanguage="ky",
-        ),
+def _profile(user: User) -> UserProfile:
+    return UserProfile(
+        id=user.id,
+        email=user.email,
+        displayName=user.display_name or user.email.split("@")[0],
+        phone=user.phone,
+        preferredLanguage="ky",
+        is_platform_admin=bool(user.is_platform_admin),
+        teacher_status=user.teacher_status or "none",
+        locale=user.locale,
     )
+
+
+def _token_response(user: User) -> TokenResponse:
+    token = create_access_token({"sub": user.id})
+    return TokenResponse(access_token=token, token_type="bearer", user=_profile(user))
 
 
 @router.get("/ping")
@@ -144,8 +140,6 @@ def register_user(
         user = User(
             id=f"usr_{uuid.uuid4().hex[:12]}",
             email=clean_email,
-            role="student",  # self-registration is always a student
-            target_score=200,
             created_at=_now(),
             email_verified=False,
         )
@@ -239,7 +233,7 @@ def login_user(
 ):
     """
     Universal user authentication:
-    Verifies credentials against SQL database and returns role ('student' or 'admin').
+    Verifies credentials against the SQL database and returns a token and the profile.
     Accounts whose email is not verified yet get a fresh code instead of a token.
     """
     clean_email = req.email.strip().lower()
@@ -271,36 +265,9 @@ def login_user(
 
 
 @router.get("/me", response_model=UserProfile)
-def get_current_user_profile(
-    current_user: UserProfile = Depends(get_current_user),
-):
-    """
-    Returns the authenticated user's profile, including role ('student' or 'admin') and target score.
-    """
-    return current_user
-
-
-@router.put("/target-score", response_model=TargetScore)
-def update_target_score(
-    target_in: TargetScoreUpdate,
-    current_user: UserProfile = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """
-    Updates the student's target ORT score in the SQL database.
-    """
-    current_target = current_user.targetScore.model_dump()
-    update_data = {k: v for k, v in target_in.model_dump().items() if v is not None}
-    current_target.update(update_data)
-    current_user.targetScore = TargetScore(**current_target)
-
-    # Persist target score to SQL database
-    user = db.query(User).filter(User.id == current_user.id).first()
-    if user and target_in.overall is not None:
-        user.target_score = target_in.overall
-        db.commit()
-
-    return current_user.targetScore
+def get_current_user_profile(current_user: User = Depends(get_current_user)):
+    """Returns the authenticated user's profile (platform-admin flag and teacher status, no global role)."""
+    return _profile(current_user)
 
 
 @router.post("/forgot-password")
