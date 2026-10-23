@@ -52,7 +52,7 @@ def seed_base(n: int) -> dict:
     users, enrs = [], []
     for _ in range(n):
         uid = f"usr_{uuid.uuid4().hex[:12]}"
-        users.append(dict(id=uid, email=f"lt3_{uid}@loadtest.example", password_hash="!unusable", role="student",
+        users.append(dict(id=uid, email=f"lt3_{uid}@loadtest.example", password_hash="!unusable",
                           email_verified=True, teacher_status="none", is_platform_admin=False))
         enrs.append(dict(id=uuid.uuid4(), course_id=course.id, user_id=uid, role="student", state="active",
                          source="staff_add", activated_at=now, created_at=now, updated_at=now))

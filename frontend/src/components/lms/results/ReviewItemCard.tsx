@@ -4,7 +4,7 @@ import React from "react";
 import { Check, X } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { MathRenderer } from "@/components/math/MathRenderer";
-import { NumberedPassage } from "@/components/exam/NumberedPassage";
+import { NumberedPassage } from "@/components/lms/NumberedPassage";
 import type { Correctness, ReviewItemOut, StudentQuestion } from "@/lib/lms/attemptTypes";
 import { fmtPoints } from "@/components/lms/assessments/format";
 

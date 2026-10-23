@@ -68,7 +68,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
               {me?.is_platform_admin && (
                 <Link href={`/${lang}/admin`} className={linkCls}><ShieldCheck className="h-4 w-4" aria-hidden="true" />{t("lms.nav.platformAdmin")}</Link>
               )}
-              <Link href={`/${lang}/dashboard`} className={linkCls}><LayoutDashboard className="h-4 w-4" aria-hidden="true" />{t("lms.nav.oldPortal")}</Link>
+              <Link href={`/${lang}/courses#catalog`} className={linkCls}><LayoutDashboard className="h-4 w-4" aria-hidden="true" />{t("lms.nav.catalog")}</Link>
             </nav>
             <div role="group" aria-label={t("common.language")} className="flex gap-1">
               {LANGS.map((l) => (

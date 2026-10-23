@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
-import { NumberedPassage } from "@/components/exam/NumberedPassage";
+import { NumberedPassage } from "@/components/lms/NumberedPassage";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import { createPassage, getPassageVersion, listPassageVersions, revertPassage, updatePassage } from "@/lib/lms/content";
 import type { PassageOut, PassageVersionOut, PassageVersionSummaryOut } from "@/lib/lms/contentTypes";

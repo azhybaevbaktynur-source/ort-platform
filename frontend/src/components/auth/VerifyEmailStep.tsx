@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { ArrowRight, AlertCircle, CheckCircle2, KeyRound, Loader2 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
-import { AuthError, UserRole, useAuth } from "@/lib/auth-context";
+import { AuthError, useAuth } from "@/lib/auth-context";
 
 type Translate = (key: string, params?: Record<string, string | number>) => string;
 
@@ -29,7 +29,7 @@ interface VerifyEmailStepProps {
   codeTtlMinutes?: number;
   /** "registered": just signed up; "notVerified": tried to log in with an unverified account */
   reason: "registered" | "notVerified";
-  onVerified: (role: UserRole) => void;
+  onVerified: () => void;
   onChangeEmail: () => void;
 }
 
@@ -63,8 +63,8 @@ export const VerifyEmailStep: React.FC<VerifyEmailStepProps> = ({
     setInfo(null);
     setVerifying(true);
     try {
-      const res = await verifyEmail(email, password, code);
-      onVerified(res.role);
+      await verifyEmail(email, password, code);
+      onVerified();
     } catch (err) {
       setError(authErrorMessage(err, t, "auth.registerError"));
     } finally {

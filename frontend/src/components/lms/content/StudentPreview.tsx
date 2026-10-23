@@ -3,7 +3,7 @@
 import React from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { MathRenderer } from "@/components/math/MathRenderer";
-import { NumberedPassage } from "@/components/exam/NumberedPassage";
+import { NumberedPassage } from "@/components/lms/NumberedPassage";
 import type { StudentQuestionOut } from "@/lib/lms/contentTypes";
 
 /** Read-only render of the student view (no key). */
