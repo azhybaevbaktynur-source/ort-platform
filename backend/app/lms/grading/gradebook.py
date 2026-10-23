@@ -314,15 +314,15 @@ def my_grades(db: Session, ctx: AuthzContext, course: Course, *, now: datetime) 
                                                    map_total(course_v, all_t.current_percent), now)])
     by_assessment = {s.assessment_id: s for s in subs}
     states = {a.id: _student_state(a, by_assessment.get(a.id), visible) for a in assessments}
-    # label texts of graded rows from the immutable version cache (misses: one statement, then cached)
+    # scheme type and label texts of graded rows from the immutable version cache (misses: one statement, then cached)
     graded_versions = versions_data(db, [by_assessment[a.id].scheme_version_id for a in assessments
-                                         if states[a.id] == "graded" and by_assessment[a.id].label])
+                                         if states[a.id] == "graded" and by_assessment[a.id].scheme_version_id])
     items = []
     for a in assessments:
         sub = by_assessment.get(a.id)
-        labels = label_subset(graded_versions.get(sub.scheme_version_id), sub.label) \
-            if states[a.id] == "graded" else None
-        items.append(ser.my_grade_out(a, states[a.id], sub, labels=labels))
+        v = graded_versions.get(sub.scheme_version_id) if states[a.id] == "graded" else None
+        labels = label_subset(v, sub.label) if v is not None and sub.label else None
+        items.append(ser.my_grade_out(a, states[a.id], sub, labels=labels, scheme_type=v.type if v else None))
     out = ser.MyGradesOut(total=ser.my_total_out(rel_t.current_percent, map_total(course_v, rel_t.current_percent)),
                           scheme=scheme_ref, items=items)
     db.commit()

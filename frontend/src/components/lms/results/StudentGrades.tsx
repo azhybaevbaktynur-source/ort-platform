@@ -21,14 +21,14 @@ const STATE_STYLE: Record<string, string> = {
   hidden: "bg-slate-200 text-slate-700",
 };
 
-function Row({ item, courseId, schemeType }: { item: MyGradeOut; courseId: string; schemeType?: string }) {
+function Row({ item, courseId }: { item: MyGradeOut; courseId: string }) {
   const { lang, t } = useTranslation();
   const label = useSchemeLabel();
   const text = useGradeText();
   const flags = Object.entries(item.thresholds ?? {}).filter(([, on]) => on).map(([k]) => k);
   const pct = fmtPercentile(item.percentile);
   const graded = item.state === "graded";
-  const main = graded ? text(item, schemeType) : "";
+  const main = graded ? text(item, item.scheme_type ?? undefined) : "";
   return (
     <li className="rounded-2xl border border-slate-200 bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -52,7 +52,7 @@ function Row({ item, courseId, schemeType }: { item: MyGradeOut; courseId: strin
           <div className="flex flex-wrap gap-2">
             {pct && <span className="rounded-full bg-slate-100 px-2.5 py-0.5 font-medium text-slate-800">{t("results.grade.percentile", { value: pct })}</span>}
             {flags.map((k) => <span key={k} className="rounded-full bg-amber-100 px-2.5 py-0.5 font-semibold text-amber-900">{label(k, item.labels)}</span>)}
-            {item.passed !== null && item.passed !== undefined && schemeType !== "pass_fail" && (
+            {item.passed !== null && item.passed !== undefined && item.scheme_type !== "pass_fail" && (
               <span className={`rounded-full px-2.5 py-0.5 font-semibold ${item.passed ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}>{label(item.passed ? "pass" : "fail")}</span>
             )}
           </div>
@@ -116,7 +116,7 @@ export function StudentGrades({ courseId }: { courseId: string }) {
         <p className="text-sm text-slate-500">{t("results.grade.mine.empty")}</p>
       ) : (
         <ul className="space-y-3">
-          {data.items.map((it) => <Row key={it.assessment_id} item={it} courseId={courseId} schemeType={schemeType} />)}
+          {data.items.map((it) => <Row key={it.assessment_id} item={it} courseId={courseId} />)}
         </ul>
       )}
     </div>

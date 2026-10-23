@@ -516,6 +516,8 @@ export interface MyGradeOut {
   due_at?: string | null;
   /** graded rows only: `{label: text}` of the grade's scheme version */
   labels?: Record<string, SchemeLabelValue> | null;
+  /** graded rows only: type of the grade's own scheme version (the course scheme may differ) */
+  scheme_type?: SchemeType | null;
 }
 
 export interface MyGradesTotalOut {

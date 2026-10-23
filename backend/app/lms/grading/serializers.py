@@ -200,6 +200,8 @@ class MyGradeOut(BaseModel):
     kept_attempt_id: Optional[uuid.UUID] = None
     due_at: Optional[datetime] = None
     labels: Optional[dict] = None
+    # graded rows: type of the grade's own scheme version (formatting; the course scheme may differ)
+    scheme_type: Optional[str] = None
 
 
 class MyGradesTotalOut(BaseModel):
@@ -218,12 +220,15 @@ class MyGradesOut(BaseModel):
 MY_GRADE_STATES = ("graded", "pending", "missing", "excused", "hidden")
 
 
-def my_grade_out(a: Any, state: str, sub: Any = None, *, labels: Optional[dict] = None) -> MyGradeOut:
+def my_grade_out(a: Any, state: str, sub: Any = None, *, labels: Optional[dict] = None,
+                 scheme_type: Optional[str] = None) -> MyGradeOut:
     """`a`: assessment row (id, title, due_at). Numbers only for `graded`; `labels` = `{label: text}` of the
     grade's scheme version (set only on graded rows whose label has a text)."""
     if state != "graded":
         return MyGradeOut(assessment_id=a.id, title=a.title, state=state, due_at=a.due_at)
     extra = {"labels": labels} if labels else {}
+    if scheme_type:
+        extra["scheme_type"] = scheme_type
     return MyGradeOut(**extra,
         assessment_id=a.id, title=a.title, state=state, display_value=sub.display_value, label=sub.label,
         percentile=sub.percentile, passed=sub.passed, thresholds=sub.thresholds,
