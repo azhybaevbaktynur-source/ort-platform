@@ -21,6 +21,7 @@ def reset_lms_state() -> None:
     from app.models.exam_access import ExamAccess
     from app.models.test_attempt import TestAttempt
     from app.models.user import User
+    from app.lms.ort.models import LegacyOrtExport
 
     from app.lms.content.models import (
         BankQuestion, Passage, PassageVersion, QuestionBank, QuestionVersion, TranslationGroup,
@@ -35,7 +36,8 @@ def reset_lms_state() -> None:
 
     # FK-safe order: children first, users last. Seed accounts stay.
     phase2 = [QuestionVersion, BankQuestion, PassageVersion, Passage, TranslationGroup, QuestionBank, Asset, AssetBlob]
-    tables = phase2 + [EnrollmentEvent, Enrollment, TeacherRequest, AdminAuditLog, RateLimitBucket, Course, ExamAccess, TestAttempt]
+    tables = phase2 + [EnrollmentEvent, Enrollment, TeacherRequest, AdminAuditLog, RateLimitBucket, Course, ExamAccess, TestAttempt,
+                       LegacyOrtExport]
     with db_session.engine.begin() as conn:
         if conn.dialect.name == "postgresql":  # teardown may purge the append-only grade_events (S7 guard)
             from sqlalchemy import text

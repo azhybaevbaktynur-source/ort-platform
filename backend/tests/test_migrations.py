@@ -8,12 +8,14 @@ TEST_URL = os.getenv("ALEMBIC_TEST_DATABASE_URL")
 if not TEST_URL:
     pytest.skip("ALEMBIC_TEST_DATABASE_URL not set", allow_module_level=True)
 
+# test_up_down_consistency is not imported: 0006_phase5_cutover is one-way (P5-8); see test_up_down_up_to_0005
 from pytest_alembic.tests import (  # noqa: E402,F401
     test_model_definitions_match_ddl,
     test_single_head_revision,
-    test_up_down_consistency,
     test_upgrade,
 )
+
+LAST_REVERSIBLE = "0005_phase4_grading"
 
 
 @pytest.fixture
@@ -102,7 +104,7 @@ def test_0002_data_migration_promotes_admins(alembic_engine):
                 "VALUES (:id, :email, 'x', :role, true, 0, now(), 0, 0, 0)"
             ), {"id": uid, "email": f"{uid}@test.example", "role": role})
         conn.commit()
-        command.upgrade(cfg, "head")
+        command.upgrade(cfg, LAST_REVERSIBLE)
         conn.commit()
         rows = dict(
             (r[0], (r[1], r[2])) for r in conn.execute(text(
@@ -116,6 +118,9 @@ def test_0002_data_migration_promotes_admins(alembic_engine):
         command.upgrade(cfg, "head")
         conn.commit()
         assert "courses" in inspect(conn).get_table_names()
+        rows = dict((r[0], (r[1], r[2])) for r in conn.execute(text(
+            "SELECT id, is_platform_admin, teacher_status FROM users WHERE id LIKE 'usr_mig_%'")))
+        assert rows["usr_mig_admin"] == (True, "approved")
 
 
 def test_0003_up_down_up(alembic_engine):
@@ -133,7 +138,7 @@ def test_0003_up_down_up(alembic_engine):
         conn.commit()
         assert not phase2 & set(inspect(conn).get_table_names())
         for _ in range(2):
-            command.upgrade(cfg, "head")
+            command.upgrade(cfg, LAST_REVERSIBLE)
             conn.commit()
             assert phase2 <= set(inspect(conn).get_table_names())
             fks = {fk["name"] for fk in inspect(conn).get_foreign_keys("bank_questions")}
@@ -160,7 +165,7 @@ def test_0004_up_down_up(alembic_engine):
         conn.commit()
         assert not phase3 & set(inspect(conn).get_table_names())
         for _ in range(2):
-            command.upgrade(cfg, "head")
+            command.upgrade(cfg, LAST_REVERSIBLE)
             conn.commit()
             assert phase3 <= set(inspect(conn).get_table_names())
             fks = {fk["name"] for fk in inspect(conn).get_foreign_keys("assessments")}
@@ -250,3 +255,72 @@ def test_0005_backfill_and_guards_on_pg(alembic_engine):
         check_backfill(conn, seeded)
         conn.execute(text("SET session_replication_role = DEFAULT"))
         conn.commit()
+
+
+def test_up_down_up_to_0005(alembic_engine):
+    """Replaces pytest-alembic's test_up_down_consistency (it would downgrade through the one-way 0006):
+    0001 -> 0005 -> 0001 -> head."""
+    from alembic import command
+
+    from app.db.migrate import _config
+
+    cfg = _config(TEST_URL)
+    with alembic_engine.connect() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "0001_baseline")
+        conn.commit()
+        command.upgrade(cfg, LAST_REVERSIBLE)
+        conn.commit()
+        assert {"courses", "assessments", "submissions"} <= set(inspect(conn).get_table_names())
+        command.downgrade(cfg, "0001_baseline")
+        conn.commit()
+        assert "courses" not in set(inspect(conn).get_table_names())
+        command.upgrade(cfg, "head")
+        conn.commit()
+        names = set(inspect(conn).get_table_names())
+        assert "legacy_ort_export" in names and "exam_sets" not in names
+
+
+def test_0006_export_and_drop_on_pg(alembic_engine):
+    """P5-1/P5-2 on PostgreSQL: the export (payload order, sources, images), the admin promote, the drops and the
+    users column drops; legacy_ort_export columns are JSONB."""
+    from alembic import command
+
+    from app.db.migrate import _config
+    from tests.test_migration_0006_data import check_0006, seed_0005
+
+    cfg = _config(TEST_URL)
+    with alembic_engine.connect() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, LAST_REVERSIBLE)
+        conn.commit()
+        seed_0005(conn)
+        conn.commit()
+        command.upgrade(cfg, "0006_phase5_cutover")
+        conn.commit()
+        check_0006(conn)
+        types = dict(conn.execute(text(
+            "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'legacy_ort_export'")).all())
+        assert types["payload"] == "jsonb" and types["result"] == "jsonb" and types["sections"] == "jsonb"
+        assert types["exported_at"] == "timestamp with time zone"
+        fks = {fk["name"] for fk in inspect(conn).get_foreign_keys("users")}
+        assert "fk_users_disabled_by_id_users" in fks
+        command.upgrade(cfg, "head")
+        conn.commit()
+
+
+def test_0006_downgrade_refused(alembic_engine):
+    from alembic import command
+
+    from app.db.migrate import _config
+
+    cfg = _config(TEST_URL)
+    with alembic_engine.connect() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "0006_phase5_cutover")
+        conn.commit()
+        with pytest.raises(NotImplementedError, match="one-way"):
+            command.downgrade(cfg, LAST_REVERSIBLE)
+        conn.rollback()
+        assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0006_phase5_cutover"
+        assert "legacy_ort_export" in inspect(conn).get_table_names()
