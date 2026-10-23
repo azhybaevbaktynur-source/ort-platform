@@ -1,5 +1,5 @@
 /** Student attempt DTOs (docs/phases/PHASE_3_DESIGN.md sections 3.5-3.9 and 5). snake_case as on the wire. */
-import type { Lang } from "./types";
+import type { Lang, LocalizedText } from "./types";
 import type { QuestionType, StudentChoiceOut } from "./contentTypes";
 import type { AttemptGradeOut } from "./gradingTypes";
 
@@ -94,8 +94,9 @@ export interface AttemptState {
 export interface ContentSection {
   pos: number;
   key: string | null;
-  title: string | null;
-  instructions: string | null;
+  /** Teacher-set section texts arrive as LocalizedText ({ru, ky}); older payloads may hold a plain string. */
+  title: string | LocalizedText | null;
+  instructions: string | LocalizedText | null;
   time_limit_s: number | null;
   item_count: number;
 }
