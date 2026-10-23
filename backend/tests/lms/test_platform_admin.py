@@ -57,7 +57,7 @@ async def test_non_admin_forbidden(client, db, method, path, body):
     # forged token: platform-admin claims for a plain student (claims must be ignored)
     forged = {"Authorization": "Bearer " + create_access_token(
         {"sub": student.id, "role": "admin", "is_platform_admin": True})}
-    legacy_admin = make_user(db, role="admin", teacher_status="approved")  # old role only
+    legacy_admin = make_user(db, teacher_status="approved")  # no platform flag (users.role dropped in 0006)
     for headers in (auth(student), auth(teacher), forged, auth(legacy_admin)):
         r = await client.request(method, path, json=body, headers=headers)
         assert r.status_code == 403, (method, path, r.text)
@@ -80,10 +80,9 @@ async def test_disable_enable_flow_and_audit(client, db):
 
     r = await client.post(f"{P}/users/{target.id}/disable", json={"reason": "abuse"}, headers=auth(admin))
     assert r.status_code == 200 and r.json()["disabled_reason"] == "abuse" and r.json()["disabled_at"]
-    # disabled everywhere: old api and new api
+    # disabled everywhere: auth api and LMS api
     assert (await client.get("/api/v1/auth/me", headers=headers)).status_code == 401
     assert (await client.get("/api/v1/me/lms", headers=headers)).status_code == 401
-    assert (await client.get("/api/v1/users/me", headers=headers)).status_code == 401
 
     r = await client.post(f"{P}/users/{target.id}/enable", headers=auth(admin))
     assert r.status_code == 200 and r.json()["disabled_at"] is None

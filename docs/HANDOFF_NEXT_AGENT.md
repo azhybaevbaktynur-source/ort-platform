@@ -18,41 +18,24 @@ Turn the ORT/ЖРТ exam bank (one global admin, one question bank) into a flexi
    5. `docs/CAPACITY_REVIEW_BRIEF.md` — the first task.
    6. `docs/PROJECT_UNDERSTANDING.md` — only §0 (known defects), §2 (where one-admin is hard-coded) and §3 (what tests protect) when you touch old code.
    - `docs/research/*.md` are evidence. Open one section only when you need the detail: `canvas-core-domain.md` (courses/enrollment/authz), `canvas-assessments.md` (quizzes/attempts), `canvas-modules-grading.md` (gating/grading), `platform-concerns.md` (storage/Alembic/i18n/privacy).
-4. Run the backend tests once to confirm the baseline: 112 should pass (command in `AGENTS.md` §6.1, scratch DB only).
+4. Run the backend tests once to confirm the baseline: 2497 pass, 21 skipped (command in `AGENTS.md` §5, scratch DB only).
 5. The open questions of §4 are answered (see §4b). Continue with §5.
 
-## 3. Current state
+## 3. Current state (updated 2026-10-23)
 
-- **Done**: full code review (`PROJECT_UNDERSTANDING.md`); owner's 15 answers saved (`PRODUCT_DECISIONS.md`); defects fixed and committed in `9df5a3d`: answer-key leak on `/questions`, PIN exposure (students now get `has_pin`), resubmission lock, exam update without the in-memory store, SQL-based attempt limit, hard-coded admin email removed, `.svg` upload rejected; 6 regression tests (112 total). Four Opus research agents read the real `instructure/canvas-lms` source and wrote `docs/research/`. Architecture and a 10-phase plan are written.
-- **Not done**: no LMS code exists yet. (Updated 2026-10-22: the security fixes are merged and deployed; production runs `main`, check `/health`.)
-- **Production stack**: Vercel (frontend) + Render Frankfurt (backend) + Neon PostgreSQL (project `noisy-sound-20763725`) + local-disk uploads (ephemeral). Read access to Render/Neon/Vercel via MCP tools is granted by the owner, but those tools need the owner to authenticate in the new session.
-- **Known remaining defects in old code** (do not fix; the cutover deletes them): analytics and completion counts read the in-memory Firestore mock; deleting an exam cascades to attempts; plain-text PINs without rate limit; 7-day JWT with no revocation.
+- **Done**: Phases 0-4 on `lms`; **Phase 5 (ORT cutover) built** on `phase-5/cutover` (old exam system, Firebase mock and mock tokens removed; ORT = two platform courses; catalog + join; R2 free-tier guard). Details: `docs/phases/PHASE_5.md`. Tests: SQLite 2497 passed / 21 skipped, PG ~2552, i18n 1586 keys, Alembic head `0007_phase5_storage`.
+- **Cutover deploy: pending deploy.** <!-- orchestrator: update with commit and date once /health shows it -->
+- **Next**: Phases 6 (pages, modules, gating), 7 (enrollment forms, invitations), 8 (practice, analytics, student tools; the old practice/mistakes/progress pages are gone until then), 9 (privacy, hardening, launch).
+- **Production stack**: Vercel + Render Frankfurt (service `ort-platform`) + Neon (project `noisy-sound-20763725`) + Cloudflare R2 (`LMS_STORAGE_DRIVER=r2`). Render MCP may return "unauthorized"; use `/health`.
 
 ## 3b. Owner items (updated 2026-10-23)
 
-**Phase 5 (ORT cutover) is APPROVED by the owner (2026-10-23).** Neon backup branch first; then follow `IMPLEMENTATION_PLAN.md` Phase 5.
-
-Resolved 2026-10-23:
-- R2: owner set all 7 vars in Render and `backend/.env` (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET=ort-uploads`, `R2_PUBLIC_BASE_URL`, `R2_PRIVATE_BUCKET=ort-private`, `LMS_STORAGE_DRIVER=r2`). Not verified by the agent: check a real R2 upload/read during the cutover before relying on it. Tests force `LMS_STORAGE_DRIVER=db` and blank R2 keys (`tests/conftest.py`).
-- Render MCP: owner's workspace is "My Workspace" (service `ort-platform`, `srv-dauthnk1nsns73flhq4g`), but the MCP still returns "unauthorized"; continue without it (use `/health`).
-- `backend/test.db` reseeded from the two sample CSVs (25 ky + 25 ru questions; 56 users kept). Tests now refuse `backend/test.db`, `backend/data/` and non-local databases (`tests/dev_data_guard.py`, exit code 4).
-- Neon `loadtest-2026-10-22` deleted.
-- Brevo key: never committed (git log -S over all refs: 0 hits); the real key in the untracked `backend/.env.example` replaced with a placeholder.
-
-**R2 free-tier guard (owner requirement 8, 2026-10-23) — build in Phase 5:** R2 must stay in the free tier (10 GB storage, 1M Class A writes/lists and 10M Class B reads per month, Standard class only; Cloudflare has no spending cap, so the app enforces it).
-- Track total stored R2 bytes in the DB; warn admins at 8 GB; refuse new uploads at 9.5 GB with a clear trilingual message.
-- Upload limits: images max 2 MB (today 5 MB), other files max 10 MB (new upload type; today images only). Keep WebP conversion and SHA-256 dedup (already built).
-- Public images: content-addressed names, `Cache-Control: public, max-age=31536000, immutable` (already on `/api/v1/media`); serve them from `R2_PUBLIC_BASE_URL`, not through the backend.
-- Never list objects in request paths; never use Infrequent Access or lifecycle rules (none today; keep it so).
-- Admin area: monthly usage estimate (objects written, approx. reads). `docs/CAPACITY_REVIEW.md`: how many 6,000-student exams fit in the free tier.
-- Any design that would exceed the free tier: stop and ask the owner (costs money).
-- Public URL: owner buys no domain now (will after the platform is live), so `R2_PUBLIC_BASE_URL` is the r2.dev address for now. r2.dev is rate-limited and not meant for production: before the first large exam, move to a custom domain (owner's purchase) — remind together with the Render plan.
-
-Still open (owner):
-1. **Rotate the Brevo API key** (owner will do it later).
-2. **Delete Neon `backup-2026-10-22-before-phase0-alembic`** one week after a stable Phase 5 (agent may delete it then; owner approved).
-3. **Render plan for exam windows**: decide before the first real exam; do not raise earlier.
-4. **Custom domain for R2 public images** (replaces r2.dev): owner buys it after the platform is live; needed before the first large exam.
+- R2 vars are set (Render and `backend/.env`). After the cutover deploy: one click on "Run R2 check" in `/admin/storage`; check the Render start command and R2 vars in the dashboard.
+- Production has no Kyrgyz questions: import a ky bundle into "ORT (Kyrgyz)" (published, empty).
+- Delete Neon branches `rehearsal-2026-10-23-phase5` and `backup-2026-10-22-before-phase0-alembic` one week after a stable cutover (owner approved).
+- Rotate the Brevo API key (owner, later).
+- Before the first real exam: choose the Render plan; move public images from r2.dev to a custom domain (owner buys it after launch).
+- R2 must stay in the free tier (guard built: warn 8,000,000,000 bytes, refuse 9,500,000,000); anything that would cost money needs the owner's OK.
 
 ## 4. Decisions asked in the first session (all answered, see §4b)
 
@@ -116,7 +99,7 @@ No subagents for single-file lookups. A *new* session only has files, so keep `t
 
 - **Never read, print or modify `backend/.env`** (live credentials).
 - Backend tests only against a scratch DB: `cd backend && /bin/rm -rf /tmp/agy_t && /bin/mkdir -p /tmp/agy_t/up && DATABASE_URL="sqlite:////tmp/agy_t/test.db" LOCAL_UPLOAD_DIR="/tmp/agy_t/up" venv/bin/python -m pytest -q -p no:cacheprovider -W ignore`. Never touch `backend/test.db` or `backend/data/`.
-- Frontend checks: `cd frontend && npx tsc --noEmit`; full build in an rsync'd copy (see `AGENTS.md` §6.2), not inside `frontend/` if a dev server runs.
+- Frontend checks: `cd frontend && npx tsc --noEmit`; full build in an rsync'd copy (see `AGENTS.md` §5), not inside `frontend/` if a dev server runs.
 - Use `/bin/rm -f`, `/bin/cp -f`, `/bin/mv -f` (interactive aliases). On macOS `sed -i` needs `-i ''`; prefer small Python scripts for edits.
 - Bilingual rule is now **trilingual**: every user-facing string in `en.json`, `ky.json`, `ru.json`.
 - Server-side authorization only; roles from the DB. No secrets or passwords in code (the repo is public).
@@ -125,7 +108,7 @@ No subagents for single-file lookups. A *new* session only has files, so keep `t
 
 ## 8. Where things are
 
-- Old (ORT) code map: memory `codebase-map.md`. Old code is frozen until Phase 5 except security fixes.
+- Code map: `AGENTS.md` §3. The old exam system no longer exists.
 - New LMS code goes in `backend/app/lms/…` and `frontend/src/app/[lang]/courses/…` (see the plan).
 - Production version check: `curl https://ort-platform-w77q.onrender.com/health` shows `commit`.
 - Frontend URL: https://ort-platform-nu.vercel.app. Neon cleanup of old backup branches is the owner's job.

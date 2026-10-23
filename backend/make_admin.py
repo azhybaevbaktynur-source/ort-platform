@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Standalone script to promote any registered user to 'admin' role.
+Standalone script to make a registered user a platform admin (and an approved teacher).
 
 Usage:
-    python make_admin.py [email]            # grant (role=admin and is_platform_admin=true)
-    python make_admin.py [email] --revoke   # revoke both
+    python make_admin.py [email]            # grant (is_platform_admin=true, teacher_status=approved)
+    python make_admin.py [email] --revoke   # revoke the platform-admin flag
 """
 
 import sys
@@ -18,7 +18,7 @@ from app.models.user import User
 
 
 def promote_user(email: str, revoke: bool = False) -> bool:
-    """Grant (or with revoke=True remove) platform admin: sets role and is_platform_admin together."""
+    """Grant (or with revoke=True remove) platform admin. Grant also approves the user as a teacher."""
     clean_email = email.strip().lower()
     if not clean_email:
         print("Error: Email cannot be empty.")
@@ -32,18 +32,17 @@ def promote_user(email: str, revoke: bool = False) -> bool:
             return False
 
         if revoke:
-            user.role = "student"
             user.is_platform_admin = False
             session.commit()
             print(f"Revoked admin rights from '{clean_email}' (ID: {user.id}).")
             return True
 
-        if user.role == "admin" and user.is_platform_admin:
+        if user.is_platform_admin and user.teacher_status == "approved":
             print(f"User '{clean_email}' is already an admin.")
             return True
 
-        user.role = "admin"
         user.is_platform_admin = True
+        user.teacher_status = "approved"
         session.commit()
         print(f"Success! '{clean_email}' (ID: {user.id}) is now an admin.")
         return True

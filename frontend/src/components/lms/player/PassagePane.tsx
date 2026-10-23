@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { NumberedPassage } from "@/components/exam/NumberedPassage";
+import { NumberedPassage } from "@/components/lms/NumberedPassage";
 import type { StudentPassage } from "@/lib/lms/attemptTypes";
 
 export function PassagePane({ passage }: { passage: StudentPassage }) {

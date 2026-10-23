@@ -1,17 +1,24 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/context";
 import { useAdminSummary } from "@/components/lms/admin/AdminShell";
+import { StorageLevelBanner } from "@/components/lms/admin/StorageLevelBanner";
+import { getStorageSummary, type StorageLevel } from "@/lib/lms/storage";
 
 export default function AdminOverviewPage() {
   const { lang, t } = useTranslation();
   const { pending } = useAdminSummary();
+  const [storageLevel, setStorageLevel] = useState<StorageLevel>("ok");
+  useEffect(() => { getStorageSummary().then((s) => setStorageLevel(s.level)).catch(() => setStorageLevel("ok")); }, []);
   const card = "rounded-2xl border border-slate-200 bg-white p-5 hover:border-brand-400";
   return (
     <div>
       <h1 className="mb-6 text-2xl font-bold text-slate-900">{t("platformAdmin.overview.title")}</h1>
+      <StorageLevelBanner level={storageLevel} className="mb-6">
+        <Link href={`/${lang}/admin/storage`} className="mt-2 inline-block font-medium underline">{t("storage.banner.open")}</Link>
+      </StorageLevelBanner>
       <div className="grid gap-4 sm:grid-cols-2">
         <Link href={`/${lang}/admin/teacher-requests`} className={card}>
           <p className="text-3xl font-bold text-slate-900">{pending ?? "—"}</p>

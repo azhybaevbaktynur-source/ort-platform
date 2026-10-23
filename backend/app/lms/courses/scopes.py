@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from typing import Literal
 
-from sqlalchemy import Select, and_, or_, select
+from sqlalchemy import Select, and_, func, or_, select
+from sqlalchemy.orm import aliased
 
 from app.lms.courses.models import Course
 from app.lms.enrollments.models import Enrollment
@@ -51,4 +52,31 @@ def my_deleted_courses(user_id: str) -> Select:
         .join(User, User.id == Course.owner_id)
         .where(Course.owner_id == user_id, Course.deleted_at.is_not(None),
                Course.deleted_by_id == user_id)
+    )
+
+
+# ---------------------------------------------------------------- Phase 5 S3: catalog (PHASE_5_DESIGN 5)
+
+def catalog_courses(user_id: str) -> Select:
+    """Rows of (Course, my_role, my_state): published, catalog-visible, not deleted, not unlisted by an admin.
+
+    published_at IS NOT NULL keeps the keyset cursor well defined (the publish transition always sets it)."""
+    mine = aliased(Enrollment)
+    return (
+        select(Course, mine.role.label("my_role"), mine.state.label("my_state"))
+        .outerjoin(mine, and_(mine.course_id == Course.id, mine.user_id == user_id))
+        .where(
+            Course.status == "published", Course.visibility == "catalog", Course.deleted_at.is_(None),
+            Course.unlisted_by_admin_at.is_(None), Course.published_at.is_not(None),
+        )
+    )
+
+
+def active_student_counts(course_ids) -> Select:
+    """One grouped query for a whole page: rows of (course_id, n)."""
+    return (
+        select(Enrollment.course_id, func.count())
+        .where(Enrollment.course_id.in_(list(course_ids)), Enrollment.role == "student",
+               Enrollment.state == "active")
+        .group_by(Enrollment.course_id)
     )

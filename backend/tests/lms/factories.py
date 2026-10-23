@@ -30,11 +30,11 @@ def new_join_code() -> str:
 
 def make_user(
     db: Session, *, teacher_status: str = "none", platform_admin: bool = False, disabled: bool = False,
-    role: str = "student", email: Optional[str] = None, display_name: Optional[str] = None,
+    email: Optional[str] = None, display_name: Optional[str] = None,
 ) -> User:
     uid = f"usr_{uuid.uuid4().hex[:12]}"
     user = User(
-        id=uid, email=email or f"{uid}@test.example", password_hash=_hash(), role=role,
+        id=uid, email=email or f"{uid}@test.example", password_hash=_hash(),
         display_name=display_name, email_verified=True, teacher_status=teacher_status,
         is_platform_admin=platform_admin, disabled_at=utcnow() if disabled else None,
     )

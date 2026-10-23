@@ -17,7 +17,7 @@ _ATTEMPT = re.compile(r"^/api/v1/(attempts/|courses/[^/]+/assessments/[^/]+/atte
 # Small grading edits (settings, categories, override/excuse). Scheme versions (lookup tables up to
 # GRADING_TABLE_ROWS_MAX rows) and grade release (up to GRADES_RELEASE_MAX_IDS ids) exceed 64 KiB: global cap.
 _GRADING = re.compile(r"^/api/v1/courses/[^/]+/(grading|grade-categories|submissions)(/|$)")
-_EXEMPT = re.compile(r"^/api/v1/(upload(/|$)|bulk/|courses/[^/]+/(assets|imports)(/|$))")
+_EXEMPT = re.compile(r"^/api/v1/(upload(/|$)|bulk/|courses/[^/]+/(assets|imports|files)(/|$))")  # files: Phase 5 S4 (own streaming cap)
 _OLD = re.compile(r"^/api/v1/(auth|users|questions|bulk|mock-tests|mock_tests|exam-sets|exam_sets|upload|planner|"
                   r"analytics|practice|admin)(/|$)")
 _METHODS = {"POST", "PUT", "PATCH"}

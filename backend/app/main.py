@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings, is_production, DEFAULT_SECRET_KEY
 from app.db.init_db import init_db
@@ -41,6 +40,22 @@ def _seed_grading_schemes() -> None:
         db.close()
 
 
+def _seed_ort_courses() -> None:
+    """Phase 5 ORT courses and the conversion of legacy_ort_export (P5-2); never fatal (ensure_ort_courses logs
+    and stores every failure itself)."""
+    from app.db.session import SessionLocal
+    from app.lms.ort.seed import ensure_ort_courses
+
+    db = SessionLocal()
+    try:
+        ensure_ort_courses(db)
+    except Exception:
+        db.rollback()
+        logger.exception("Seeding the ORT courses failed")
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """FastAPI modern lifespan handler (replaces deprecated on_event)."""
@@ -54,11 +69,10 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Database startup initialization notice: {e}")
     _seed_grading_schemes()
+    _seed_ort_courses()
     if is_production():
         if settings.SECRET_KEY == DEFAULT_SECRET_KEY:
             logger.critical("SECRET_KEY is the public default from the repository: anyone can forge login tokens. Set SECRET_KEY.")
-        if settings.ALLOW_MOCK_TOKENS:
-            logger.critical("ALLOW_MOCK_TOKENS is enabled in production: 'mock_admin_token' grants admin access. Disable it.")
     await _configure_thread_limiter()
     admission.logger.info("admission gate configured", extra=admission.describe())
     yield
@@ -86,11 +100,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Ensure local uploads directory exists and mount static handler if local
-uploads_dir = settings.LOCAL_UPLOAD_DIR or os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/uploads"))
-os.makedirs(uploads_dir, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
-
 # Include API v1 router
 app.include_router(api_router, prefix=settings.API_V1_STR)
 register_error_handlers(app)
@@ -102,9 +111,7 @@ async def health_check():
         "status": "healthy",
         "service": settings.PROJECT_NAME,
         "environment": settings.ENVIRONMENT,
-        "firebase_mock_mode": settings.FIREBASE_MOCK_MODE,
         "database": "connected",
-        "storage": settings.STORAGE_ENV,
         # Deployed commit (Render sets RENDER_GIT_COMMIT), to confirm which code is live
         "commit": os.getenv("RENDER_GIT_COMMIT", "")[:7] or None,
     }

@@ -3,69 +3,16 @@ from __future__ import annotations
 
 from fastapi.routing import APIRoute
 
-LEGACY_POLICIES: dict[tuple[str, str], str] = {
-    ("DELETE", "/api/v1/exam-sets/{exam_set_id}"): "legacy",
-    ("DELETE", "/api/v1/exams/{exam_set_id}"): "legacy",
-    ("DELETE", "/api/v1/mock-tests/exam-sets/{exam_set_id}"): "legacy",
-    ("DELETE", "/api/v1/questions/{question_id}"): "legacy",
-    ("GET", "/api/v1/admin/exams"): "legacy",
-    ("GET", "/api/v1/admin/students"): "legacy",
-    ("GET", "/api/v1/admin/students/{user_id}/access"): "legacy",
-    ("GET", "/api/v1/analytics/instructor"): "legacy",
-    ("GET", "/api/v1/analytics/student"): "legacy",
-    ("GET", "/api/v1/auth/me"): "legacy",
-    ("GET", "/api/v1/auth/ping"): "legacy",
-    ("GET", "/api/v1/exam-sets"): "legacy",
-    ("GET", "/api/v1/exam-sets/student"): "legacy",
-    ("GET", "/api/v1/exam-sets/{exam_set_id}"): "legacy",
-    ("GET", "/api/v1/exams"): "legacy",
-    ("GET", "/api/v1/exams/student"): "legacy",
-    ("GET", "/api/v1/exams/{exam_set_id}"): "legacy",
-    ("GET", "/api/v1/mock-tests/attempts"): "legacy",
-    ("GET", "/api/v1/mock-tests/exam-sets"): "legacy",
-    ("GET", "/api/v1/mock-tests/exam-sets/{exam_set_id}"): "legacy",
-    ("GET", "/api/v1/mock-tests/in-progress"): "legacy",
-    ("GET", "/api/v1/mock-tests/templates"): "legacy",
-    ("GET", "/api/v1/mock-tests/templates/{template_id}"): "legacy",
-    ("GET", "/api/v1/planner/daily"): "legacy",
-    ("GET", "/api/v1/practice/questions"): "legacy",
-    ("GET", "/api/v1/practice/topics"): "legacy",
-    ("GET", "/api/v1/questions"): "legacy",
-    ("GET", "/api/v1/questions/practice/{section}"): "legacy",
-    ("GET", "/api/v1/questions/{question_id}"): "legacy",
-    ("GET", "/api/v1/users/me"): "legacy",
-    ("GET", "/health"): "legacy",
-    ("PATCH", "/api/v1/users/me/target-score"): "legacy",
-    ("POST", "/api/v1/admin/students/{user_id}/access"): "legacy",
-    ("POST", "/api/v1/auth/forgot-password"): "legacy",
-    ("POST", "/api/v1/auth/login"): "legacy",
-    ("POST", "/api/v1/auth/register"): "legacy",
-    ("POST", "/api/v1/auth/resend-code"): "legacy",
-    ("POST", "/api/v1/auth/reset-password"): "legacy",
-    ("POST", "/api/v1/auth/verify-email"): "legacy",
-    ("POST", "/api/v1/bulk/import-bundle"): "legacy",
-    ("POST", "/api/v1/bulk/upload-csv"): "legacy",
-    ("POST", "/api/v1/bulk/validate-bundle"): "legacy",
-    ("POST", "/api/v1/bulk/validate-csv"): "legacy",
-    ("POST", "/api/v1/exam-sets"): "legacy",
-    ("POST", "/api/v1/exams"): "legacy",
-    ("POST", "/api/v1/mock-tests/exam-sets"): "legacy",
-    ("POST", "/api/v1/mock-tests/start"): "legacy",
-    ("POST", "/api/v1/mock-tests/{attempt_id}/save"): "legacy",
-    ("POST", "/api/v1/mock-tests/{attempt_id}/submit"): "legacy",
-    ("POST", "/api/v1/mock-tests/{test_id}/start"): "legacy",
-    ("POST", "/api/v1/planner/toggle-task"): "legacy",
-    ("POST", "/api/v1/practice/submit-set"): "legacy",
-    ("POST", "/api/v1/questions"): "legacy",
-    ("POST", "/api/v1/questions/{question_id}/move"): "legacy",
-    ("POST", "/api/v1/upload"): "legacy",
-    ("POST", "/api/v1/upload/image"): "legacy",
-    ("PUT", "/api/v1/auth/target-score"): "legacy",
-    ("PUT", "/api/v1/exam-sets/{exam_set_id}"): "legacy",
-    ("PUT", "/api/v1/exams/{exam_set_id}"): "legacy",
-    ("PUT", "/api/v1/mock-tests/exam-sets/{exam_set_id}"): "legacy",
-    ("PUT", "/api/v1/questions/{question_id}"): "legacy",
-    ("PUT", "/api/v1/users/me/target-score"): "legacy",
+AUTH_POLICIES: dict[tuple[str, str], str] = {
+    ("GET", "/api/v1/auth/me"): "authenticated",
+    ("GET", "/api/v1/auth/ping"): "public",
+    ("GET", "/health"): "public",
+    ("POST", "/api/v1/auth/forgot-password"): "public",
+    ("POST", "/api/v1/auth/login"): "public",
+    ("POST", "/api/v1/auth/register"): "public",
+    ("POST", "/api/v1/auth/resend-code"): "public",
+    ("POST", "/api/v1/auth/reset-password"): "public",
+    ("POST", "/api/v1/auth/verify-email"): "public",
 }
 
 
@@ -88,17 +35,25 @@ from app.lms.teachers.policies import ME_POLICIES  # noqa: E402
 POLICY_NAMES = frozenset({
     "authenticated", "authenticated+ratelimit", "teacher_approved", "course:owner_restore",
     "teacher_approved+ratelimit",
-    "platform_admin", "legacy", "public", "attempt_owner", "internal_token",
+    "platform_admin", "public", "attempt_owner", "internal_token",
 })
 
 ROUTE_POLICIES: dict[tuple[str, str], str] = {
-    **LEGACY_POLICIES, **ME_POLICIES, **COURSE_POLICIES, **ENROLLMENT_POLICIES, **PLATFORM_POLICIES, **PLATFORM_COURSE_POLICIES,
+    **AUTH_POLICIES, **ME_POLICIES, **COURSE_POLICIES, **ENROLLMENT_POLICIES, **PLATFORM_POLICIES, **PLATFORM_COURSE_POLICIES,
     **CONTENT_POLICIES, **IMPORT_POLICIES, **ASSET_POLICIES, **MEDIA_POLICIES,
     **ASSESSMENT_POLICIES, **ATTEMPT_POLICIES, **ATTEMPT_STAFF_POLICIES, **INTERNAL_POLICIES,
     **GRADING_POLICIES,
     **GRADEBOOK_POLICIES,
     **SCHEME_POLICIES,
 }
+
+# --- Phase 5 S4 begin --- (R2 free-tier guard: PDF files, storage summary and smoke check)
+ROUTE_POLICIES.update({
+    ("POST", "/api/v1/courses/{course_id}/files"): "course:content.manage+ratelimit",
+    ("GET", "/api/v1/platform/storage"): "platform_admin",
+    ("POST", "/api/v1/platform/storage/smoke"): "platform_admin",  # + rate limit 5/h, audited
+})
+# --- Phase 5 S4 end ---
 
 
 def iter_routes(app):

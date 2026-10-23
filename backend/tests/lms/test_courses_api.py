@@ -51,7 +51,7 @@ async def test_teacher_status_bypass_attempts(db, api, kind):
     if kind == "disabled":
         u = make_user(db, teacher_status="approved", disabled=True)
     elif kind == "old_admin":
-        u = make_user(db, role="admin")
+        u = make_user(db)  # the old users.role column is gone (0006): nothing grants teacher rights
     else:
         u = make_user(db, teacher_status=kind)
     r = await api.call(u, "POST", "/courses", json=BODY)
@@ -224,7 +224,7 @@ def test_policies_are_declared_and_known():
 
 
 async def test_platform_routes_need_db_flag_not_old_role(db, api):
-    old_admin = make_user(db, role="admin")
+    old_admin = make_user(db)  # users.role dropped in 0006; only the DB flag counts
     t = teacher(db)
     c = make_course(db, t)
     for m, p, body in [("GET", "/platform/courses", None), ("GET", f"/platform/courses/{c.id}", None),
