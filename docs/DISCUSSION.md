@@ -1,6 +1,8 @@
 # Discussion: accounts, course structure, and the plan after Phase 5
 
-**Status**: for discussion with the owner, 2026-10-23. Nothing in this document has been built or changed. After we agree, the decisions move into `PRODUCT_DECISIONS.md` and the phases into `IMPLEMENTATION_PLAN.md`.
+**Answered by the owner 2026-10-24; decisions in `PRODUCT_DECISIONS.md` ("Owner decisions 2026-10-24"). The plan below is superseded by `IMPLEMENTATION_PLAN.md` Phases 6–11 (organizations moved into Phase 6; ORT becomes a locked course template, not generic data). Kept as the record of the proposal.**
+
+**Original status**: for discussion with the owner, 2026-10-23. Nothing in this document has been built or changed. After we agree, the decisions move into `PRODUCT_DECISIONS.md` and the phases into `IMPLEMENTATION_PLAN.md`.
 
 **Sources**:
 - the current code: a full inventory of ORT-specific code, with spot checks;
