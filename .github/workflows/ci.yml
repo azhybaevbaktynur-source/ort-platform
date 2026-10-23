@@ -110,12 +110,6 @@ jobs:
         env:
           # All NEXT_PUBLIC_* values have in-code defaults; dummy values keep the build hermetic
           NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
-          NEXT_PUBLIC_FIREBASE_API_KEY: dummy
-          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: dummy.firebaseapp.com
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: dummy
-          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: dummy.appspot.com
-          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "0"
-          NEXT_PUBLIC_FIREBASE_APP_ID: dummy
         run: npx next build
 
   i18n:
