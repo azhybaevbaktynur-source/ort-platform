@@ -62,7 +62,15 @@ def keys_allowed(assessment: Assessment) -> bool:
 
 
 def result_out(attempt: Attempt, plan=None):
-    return ser.result_out(attempt, plan)
+    """Student/preview result with the Phase 4 `grade` (None until released; previews inline). Callers have
+    already enforced `results_visible`. One extra statement for real attempts."""
+    out = ser.result_out(attempt, plan)
+    db = object_session(attempt)
+    if out is not None and db is not None:
+        from app.lms.grading import gradebook
+
+        out.grade = gradebook.attempt_grade_out(db, attempt, staff=False)
+    return out
 
 
 def _pv_for(plan, lang: str, slot_no: int, qv_id) -> Optional[uuid.UUID]:
@@ -120,8 +128,21 @@ def staff_attempt_out(db: Session, attempt: Attempt) -> ser.AttemptStaffOut:
     plan = grading.get_plan_for(db, attempt.assessment_version_id)
     items = load_items(db, attempt.id)
     user = db.get(User, attempt.user_id)
-    summary = ser.staff_summary(attempt, (user.display_name or user.email) if user else None)
+    from app.lms.grading import gradebook
+
+    grade = gradebook.attempt_grade_out(db, attempt, staff=True)
+    summary = ser.staff_summary(attempt, (user.display_name or user.email) if user else None, grade)
     return ser.AttemptStaffOut(
-        **summary.model_dump(), assessment_id=attempt.assessment_id, result=ser.result_out(attempt),
+        **summary.model_dump(), assessment_id=attempt.assessment_id,
+        submission_id=gradebook.submission_id_for(db, attempt), result=ser.result_out(attempt),
         items=build_review(db, attempt, items, plan, with_keys=True, staff=True),
     )
+
+
+def staff_summaries(db: Session, attempts: list[Attempt], names: dict) -> list[ser.AttemptStaffSummaryOut]:
+    """Staff list rows with their `grade` (Phase 4): one attempt_grades query and one submissions query for the
+    whole page (no N+1). For the staff list route."""
+    from app.lms.grading import gradebook
+
+    grades = gradebook.attempt_grades_for(db, attempts)
+    return [ser.staff_summary(a, names.get(a.user_id), grades.get(a.id)) for a in attempts]

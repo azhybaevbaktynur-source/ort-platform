@@ -238,7 +238,8 @@
       "create": "Create course",
       "becomeTeacher": "Become a teacher",
       "platformAdmin": "Platform admin",
-      "oldPortal": "Exam portal"
+      "oldPortal": "Exam portal",
+      "gradingSchemes": "Grading schemes"
     },
     "common": {
       "save": "Save",
@@ -347,7 +348,22 @@
       "attempt_not_submitted": "The attempt is not submitted yet.",
       "points_out_of_range": "Points are out of range.",
       "not_implemented": "This feature is not available yet.",
-      "after_close_needs_until": "Results \"after close\" need an end date for the assessment."
+      "after_close_needs_until": "Results \"after close\" need an end date for the assessment.",
+      "grading_scheme_not_found": "Grading scheme not found.",
+      "scheme_version_not_found": "This grading scheme version is not available here.",
+      "scheme_params_invalid": "The scheme settings are invalid. Check the fields and try again.",
+      "version_unchanged": "Nothing changed: this version is the same as the current one.",
+      "submission_not_found": "Grade record not found.",
+      "grade_conflict": "Someone changed this grade in the meantime. Reload and try again.",
+      "override_reason_required": "Enter a reason for the manual grade.",
+      "category_not_found": "Grade category not found.",
+      "category_in_use": "Assessments use this category. Move them to another category first.",
+      "too_many_categories": "Too many grade categories (at most 30).",
+      "too_many_rows": "Too many rows in one request.",
+      "value_out_of_range": "A value is outside the allowed range.",
+      "attempt_in_progress": "The attempt is still in progress.",
+      "already_void": "This attempt is already voided.",
+      "grade_release_auto": "Grades of this assessment are released automatically, so they cannot be hidden. Switch grade release to manual first."
     }
   },
   "courses": {
@@ -1399,7 +1415,259 @@
     "student": "Student",
     "submitted": "Submitted",
     "unnamed": "Unnamed student",
-    "gradedBy": "Graded by {name} on {date}"
+    "gradedBy": "Graded by {name} on {date}",
+    "settings": {
+      "title": "Grading",
+      "noScheme": "No scheme (points only)",
+      "systemSchemes": "System schemes",
+      "mySchemes": "My schemes",
+      "totalMode": "Course total",
+      "totalModes": {
+        "points": "Points",
+        "weighted": "Weighted by category"
+      },
+      "totalModeHint": {
+        "points": "The total is all earned points divided by all possible points.",
+        "weighted": "Each category contributes by its weight. Assessments without a category are left out of the total."
+      },
+      "courseScheme": "Course grade scheme",
+      "courseSchemeHint": "Converts the course total percentage into a grade. Optional.",
+      "latePolicy": "Late submissions",
+      "lateEnable": "Deduct points for late submissions",
+      "latePerDay": "Deduction per day (%)",
+      "lateMax": "Maximum deduction (%)",
+      "lateGrace": "Grace period (minutes)",
+      "lateInvalid": "Enter percentages from 0 to 100 and a grace period from 0 to 1440 minutes.",
+      "lateHint": "Applies only to assessments that have a due date. Changing it does not alter existing grades until you regrade.",
+      "warnings": {
+        "uncategorized_excluded": "Some assessments have no category and are excluded from the weighted total.",
+        "weights_all_zero": "All category weights are zero, so the weighted total cannot be calculated.",
+        "points_possible_mismatch": "Some assessments have different maximum points between versions."
+      },
+      "categories": "Categories",
+      "categoriesHint": "Group assessments (for example tests, homework). Weights are relative and need not add up to 100.",
+      "noCategories": "No categories yet.",
+      "addCategory": "Add category",
+      "categoryTitle": "Category name",
+      "weight": "Weight",
+      "weightValue": "Weight {weight}",
+      "assessmentCount": "{count} assessment(s)",
+      "weightsSum": "Weights add up to {sum}.",
+      "normalization": "In weighted mode the weights are normalized over the categories that have grades, so any sum works.",
+      "edit": "Edit",
+      "delete": "Delete",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "assessmentGroup": "Grading",
+      "scheme": "Grading scheme",
+      "schemeHint": "Changing the scheme does not alter existing grades until you regrade.",
+      "category": "Category",
+      "noCategory": "No category",
+      "dueAt": "Due date",
+      "dueAtHint": "Used for the late policy. Leave empty for no due date.",
+      "release": "Grade release",
+      "releaseModes": {
+        "auto": "Automatic",
+        "manual": "Manual"
+      },
+      "releaseHint": {
+        "auto": "Grades are visible to students as soon as they are calculated.",
+        "manual": "Grades stay hidden until you release them in the gradebook."
+      },
+      "omit": "Omit from course total",
+      "regrade": "Regrade existing attempts",
+      "regradeHint": "Recalculate grades of already graded attempts with the current scheme, due date and late policy.",
+      "regradeDone": "Regraded {count} submission(s)."
+    }
+  },
+  "gradebook": {
+    "tab": "Grades",
+    "title": "Gradebook",
+    "subtitle": "The kept result of every student for each published assessment. Select a cell for details, a column header for release and regrade.",
+    "student": "Student",
+    "unnamed": "Unnamed student",
+    "untitled": "Untitled assessment",
+    "refresh": "Refresh",
+    "close": "Close",
+    "noAssessments": "No published assessments yet. Grades appear here once an assessment is published.",
+    "noStudents": "No active students in this course yet.",
+    "readOnlyConcluded": "This course is concluded: grades are read-only.",
+    "totalsStale": "Totals may be out of date after your changes.",
+    "legend": {
+      "title": "Legend",
+      "missing": "No submission after the due date"
+    },
+    "states": {
+      "none": "Not submitted",
+      "missing": "Missing",
+      "needs_review": "Needs review",
+      "excused": "Excused",
+      "graded": "Graded",
+      "no_attempts": "No attempts (all voided)"
+    },
+    "flags": {
+      "late": "Late",
+      "overridden": "Overridden",
+      "released": "Released",
+      "unreleased": "Not released",
+      "threshold": "Threshold reached"
+    },
+    "cell": {
+      "excusedShort": "EX",
+      "points": "{points} points",
+      "open": "{student}, {title}: {state}. Open details"
+    },
+    "header": {
+      "actionsFor": "Grade actions for {title}",
+      "outOf": "out of {n}",
+      "releasedN": "{n}/{total} released",
+      "staleN": "{n} to regrade",
+      "omitted": "Not in total"
+    },
+    "total": {
+      "title": "Total",
+      "hint": "current",
+      "final": "final {value}"
+    },
+    "warnings": {
+      "points_possible_mismatch": "Attempts were taken on versions with different maximum points; grades compare by percent.",
+      "uncategorized_excluded": "Assessments without a category are left out of the weighted total.",
+      "unknown": "Check this assessment's grading settings."
+    },
+    "columns": {
+      "button": "Columns",
+      "countOf": "Columns: {shown} of {total}",
+      "title": "Choose columns",
+      "all": "Select all",
+      "none": "Clear",
+      "apply": "Apply",
+      "hint": "Selecting nothing shows every column."
+    },
+    "releaseMode": {
+      "auto": "Automatic (when graded)",
+      "manual": "Manual (teacher releases)"
+    },
+    "actions": {
+      "submissions": "Submissions",
+      "releasedOf": "{released} of {total} released",
+      "releaseMode": "Release",
+      "keptRule": "Kept attempt",
+      "scheme": "Scheme",
+      "noScheme": "None (points only)",
+      "due": "Due",
+      "total": "Total",
+      "staleN": "{n} grades were computed with older settings. Regrade to apply the current scheme, kept-attempt rule and late policy.",
+      "releaseAll": "Release all grades",
+      "unreleaseAll": "Hide all grades",
+      "unreleaseAutoHint": "Grades of this assessment are released automatically. To hide grades, switch grade release to manual in the assessment settings.",
+      "unreleaseConfirm": "Hide every grade of this assessment from students? You can release them again later.",
+      "releasedN": "{n} grades released.",
+      "unreleasedN": "{n} grades hidden.",
+      "releaseHint": "Students see a released grade only when the results policy of the assessment also allows it.",
+      "regrade": "Regrade",
+      "regrading": "Regrading...",
+      "regradeHint": "Regrade recomputes out-of-date grades. Large courses are processed in several rounds automatically.",
+      "regradeProgress": "Regrading: {done} done, {pending} remaining",
+      "regradeDone": "Regrade finished: {n} grades recomputed.",
+      "regradeStalled": "Regrade stopped making progress with {pending} remaining. Try again later.",
+      "regradePaused": "Regrade paused with {pending} remaining. Run it again to continue.",
+      "stop": "Stop",
+      "openAttempts": "All attempts"
+    },
+    "panel": {
+      "summary": "Kept result",
+      "rawPoints": "Raw points",
+      "override": "Override",
+      "lateDeduction": "Late deduction",
+      "effective": "Counted points",
+      "percentile": "Percentile",
+      "attemptsCounted": "Attempts counted",
+      "releasedAt": "Released",
+      "release": "Release to student",
+      "unrelease": "Hide from student",
+      "unreleaseAutoHint": "Released automatically: to hide this grade, switch the assessment to manual grade release.",
+      "openKept": "Open kept attempt",
+      "attempts": "Attempts",
+      "attempt": "Attempt",
+      "attemptN": "Attempt {n}",
+      "kept": "Kept",
+      "lateBy": "Late {days} d {hours} h",
+      "points": "Points",
+      "grade": "Grade",
+      "submitted": "Submitted",
+      "openAttempt": "Open attempt",
+      "noAttempts": "No counted attempts.",
+      "gone": "This submission no longer exists (all its attempts may have been voided)."
+    },
+    "override": {
+      "title": "Override and excuse",
+      "hint": "An override replaces the earned points; the late deduction and the scheme still apply. The reason is kept in the history.",
+      "points": "Points",
+      "pointsMax": "Points (0–{max})",
+      "save": "Save override",
+      "clear": "Clear override",
+      "clearTitle": "Clear the override?",
+      "clearBody": "The grade goes back to the points earned in the kept attempt.",
+      "issues": {
+        "points_required": "Enter the points.",
+        "points_invalid": "Enter a number.",
+        "points_range": "Points must be between 0 and {max}.",
+        "reason_required": "Give a reason for the override.",
+        "reason_too_long": "The reason is too long (500 characters at most)."
+      }
+    },
+    "excuse": {
+      "excuse": "Excuse",
+      "unexcuse": "Remove excuse",
+      "excuseTitle": "Excuse this student?",
+      "excuseBody": "An excused assessment does not count toward the student's total.",
+      "unexcuseTitle": "Remove the excuse?",
+      "unexcuseBody": "The assessment counts toward the student's total again."
+    },
+    "void": {
+      "action": "Void",
+      "title": "Void this attempt?",
+      "body": "The attempt stops counting and the kept grade is recomputed. The student sees it as voided. This cannot be undone.",
+      "bodyN": "Attempt {n} stops counting and the kept grade is recomputed. The student sees it as voided. This cannot be undone.",
+      "confirm": "Void attempt"
+    },
+    "reason": {
+      "required": "Reason (required)",
+      "optional": "Reason (optional)",
+      "missing": "Enter a reason."
+    },
+    "events": {
+      "title": "History",
+      "empty": "No changes yet.",
+      "system": "System",
+      "reason": "Reason",
+      "types": {
+        "override": "Grade overridden",
+        "override_cleared": "Override cleared",
+        "excused": "Excused",
+        "unexcused": "Excuse removed",
+        "released": "Released to student",
+        "unreleased": "Hidden from student",
+        "regraded": "Regraded",
+        "attempt_voided": "Attempt voided"
+      }
+    },
+    "fields": {
+      "override_points": "Override",
+      "released_at": "Released",
+      "excused": "Excused",
+      "state": "State",
+      "display_value": "Grade",
+      "effective_points": "Counted points",
+      "raw_points": "Raw points",
+      "kept_attempt_id": "Kept attempt",
+      "scheme_version_id": "Scheme version",
+      "status": "Status",
+      "label": "Label",
+      "late_deduction": "Late deduction",
+      "yes": "yes",
+      "no": "no"
+    }
   },
   "results": {
     "acceptedAnswers": "Accepted answers",
@@ -1418,6 +1686,36 @@
     },
     "explanation": "Explanation",
     "false": "False",
+    "grade": {
+      "title": "Grade",
+      "percentile": "Percentile {value}",
+      "kept": "Counted attempt",
+      "notReleased": "Not released yet",
+      "sectionsTitle": "Scores by section",
+      "raw": "Raw score",
+      "scaled": "Scaled score",
+      "overall": "Overall",
+      "voidedTitle": "Attempt voided",
+      "voided": "Your teacher voided this attempt. It does not count towards your grade.",
+      "voidedStaff": "This attempt is void. It is not counted towards the grade.",
+      "mine": {
+        "title": "My grades",
+        "total": "Course total",
+        "scheme": "Grading scheme: {title}.",
+        "empty": "No graded work yet.",
+        "due": "Due {date}",
+        "late": "Late penalty: {n} points",
+        "pendingHint": "Your result will appear here after it is graded or released by your teacher.",
+        "viewResult": "View result",
+        "state": {
+          "graded": "Graded",
+          "pending": "Pending",
+          "missing": "Not submitted",
+          "excused": "Excused",
+          "hidden": "Not shown"
+        }
+      }
+    },
     "imageAlt": "Question illustration",
     "inProgress": "This attempt is still in progress.",
     "noAnswer": "No answer",
@@ -1447,5 +1745,220 @@
     "title": "Result",
     "true": "True",
     "yourAnswer": "Your answer"
+  },
+  "schemes": {
+    "library": {
+      "title": "Grading schemes",
+      "intro": "A scheme turns points into the grade students see: a percent, a band, pass/fail or a scaled ORT score. Built-in schemes are shared; your own schemes can be used in all your courses.",
+      "new": "New scheme",
+      "system": "Built-in",
+      "mine": "Mine",
+      "deleted": "Deleted",
+      "systemTitle": "Built-in schemes",
+      "mineTitle": "My schemes",
+      "emptyMine": "You have no schemes of your own yet. Create one, or duplicate a built-in scheme.",
+      "version": "Version {n}",
+      "noVersion": "No version yet",
+      "scale": "Scale {min}–{max}",
+      "untitled": "Untitled scheme"
+    },
+    "types": {
+      "points": "Points",
+      "percent": "Percent",
+      "bands": "Bands",
+      "pass_fail": "Pass / fail",
+      "piecewise_curve": "Curve",
+      "lookup_table": "Lookup table"
+    },
+    "typeSummaries": {
+      "points": "Shows the points earned.",
+      "percent": "Shows the share of points as a percent.",
+      "bands": "Maps the percent to named bands, such as 5, 4, 3, 2.",
+      "pass_fail": "Pass at or above a threshold percent.",
+      "piecewise_curve": "Converts the share of points to a scale, like the ORT 60–245.",
+      "lookup_table": "Looks up each raw score in a table you paste."
+    },
+    "typeHints": {
+      "points": "The grade is the number of points earned (after any late deduction or manual grade). You can add a pass threshold.",
+      "percent": "The grade is points earned ÷ points possible × 100. You can add a pass threshold.",
+      "bands": "Each band starts at a minimum percent. List bands from the highest down; the last band must start at 0 %.",
+      "pass_fail": "The student passes when the percent is at or above the threshold.",
+      "piecewise_curve": "The share of points r = raw ÷ possible is converted segment by segment. The segments must run from r = 0 to r = 1 without gaps.",
+      "lookup_table": "Each row maps a range of raw points to a value. Rows must start at 0, go up without overlaps or gaps, and reach the expected maximum."
+    },
+    "fields": {
+      "passThreshold": "Pass threshold, %",
+      "passThresholdOptional": "Pass threshold, % (optional)",
+      "passThresholdHint": "Students at or above this percent pass.",
+      "scaleMin": "Scale minimum",
+      "scaleMax": "Scale maximum"
+    },
+    "bands": {
+      "row": "Band {n}",
+      "key": "Key",
+      "minPercent": "From, %",
+      "label": "Label",
+      "passed": "Counts as passed",
+      "add": "Add band",
+      "sort": "Sort by percent",
+      "hint": "The key is stored with each grade; the label is what students see in their language."
+    },
+    "curve": {
+      "segments": "Curve segments",
+      "from_ratio": "From r",
+      "to_ratio": "To r",
+      "from_value": "From value",
+      "to_value": "To value",
+      "exponent": "Exponent k",
+      "add": "Split last segment",
+      "formulaHint": "Inside a segment from r₀ to r₁ the value goes from v₀ to v₁; k = 1 is a straight line, k > 1 bends down, k < 1 bends up.",
+      "hint": "A full score always gets the scale maximum."
+    },
+    "lookup": {
+      "rows": "Table rows",
+      "rawFrom": "Raw from",
+      "rawTo": "Raw to",
+      "value": "Value",
+      "label": "Label",
+      "add": "Add row",
+      "csv": "Paste CSV",
+      "csvHint": "One row per line: raw_from,raw_to,value,label (label optional). Commas, semicolons or tabs work; a header line is skipped.",
+      "csvApply": "Replace rows",
+      "csvBadLines": "These lines could not be read: {lines}",
+      "expectedPossible": "Expected maximum points",
+      "expectedPossibleHint": "If an assessment has a different maximum, the table is still used and the gradebook shows a warning."
+    },
+    "common": {
+      "advanced": "Advanced options",
+      "rounding": "Rounding",
+      "roundingDefault": "Off: values are rounded half up to 2 decimals.",
+      "roundingMode": "Mode",
+      "decimals": "Decimals",
+      "modes": {
+        "half_up": "Half up (2.5 → 3)",
+        "half_even": "Half to even (2.5 → 2)",
+        "floor": "Down",
+        "ceil": "Up"
+      },
+      "percentile": "Percentile",
+      "percentileHint": "Estimates the share of students below this value from a normal distribution with the given mean and standard deviation.",
+      "mean": "Mean",
+      "sd": "Std. deviation",
+      "pctMin": "Lowest, %",
+      "pctMax": "Highest, %",
+      "thresholds": "Thresholds",
+      "thresholdsHint": "Flags such as a golden certificate: set when the value reaches the minimum.",
+      "thresholdKey": "Key",
+      "thresholdMin": "Minimum value",
+      "addThreshold": "Add threshold",
+      "zeroRaw": "Special result for zero points",
+      "zeroRawHint": "When a student scores 0 points, show this value and percentile instead of the scheme's result (the ORT shows 0).",
+      "zeroValue": "Value",
+      "zeroPercentile": "Percentile",
+      "applyToSections": "Also grade each section",
+      "applyToSectionsHint": "Applies the scheme to every section's own points, like the ORT section scores."
+    },
+    "labels": {
+      "pass": "Pass",
+      "fail": "Fail"
+    },
+    "thresholdKeys": {
+      "golden_certificate": "Golden certificate"
+    },
+    "preview": {
+      "title": "Preview",
+      "possible": "Max points",
+      "rows": "Rows",
+      "everyPoint": "Every point",
+      "withStep": "With a step",
+      "step": "Step",
+      "raw": "Points",
+      "value": "Grade",
+      "label": "Label",
+      "percentile": "Percentile",
+      "passed": "Passed",
+      "yes": "Yes",
+      "no": "No",
+      "blocked": "Fix the problems in the settings to see the preview.",
+      "needPossible": "Enter the maximum points to see the preview."
+    },
+    "editor": {
+      "newTitle": "New grading scheme",
+      "title": "Scheme name",
+      "type": "Type",
+      "create": "Create scheme",
+      "creating": "Creating...",
+      "createHint": "The type cannot be changed later; settings can, as new versions.",
+      "back": "Back to grading schemes",
+      "copyOf": "Copy of {title}",
+      "teacherOnly": "Only approved teachers can create grading schemes.",
+      "duplicate": "Duplicate to my library",
+      "delete": "Delete",
+      "deleteTitle": "Delete “{name}”?",
+      "deleteBody": "The scheme disappears from the pickers. Assessments and courses that already use it keep working, and you can restore it.",
+      "deletedBanner": "This scheme is deleted. It is hidden from the pickers.",
+      "restore": "Restore",
+      "systemReadOnly": "This is a built-in scheme and cannot be edited. Duplicate it to your library to make your own version.",
+      "saveTitle": "Save name",
+      "titleSaved": "Name saved.",
+      "versions": "Versions ({n})",
+      "current": "Current",
+      "shown": "Shown",
+      "inUse": "Used by {n}",
+      "loadVersion": "Edit from this version",
+      "showVersion": "Show",
+      "versionNotice": "Saving creates version {next}. Students already graded keep version {current} until you regrade.",
+      "saveVersion": "Save as new version",
+      "saving": "Saving...",
+      "versionSaved": "Version {n} saved.",
+      "unchanged": "No changes to save.",
+      "fixIssues": "Fix these problems first:",
+      "rowN": "(row {n})",
+      "actions": "Actions",
+      "moveUp": "Move row {n} up",
+      "moveDown": "Move row {n} down",
+      "removeRow": "Remove row {n}"
+    },
+    "blocks": {
+      "pass": "Pass threshold",
+      "bands": "Bands",
+      "segments": "Curve segments",
+      "scale": "Scale",
+      "rows": "Table rows",
+      "expected_possible": "Expected maximum points",
+      "rounding": "Rounding",
+      "percentile": "Percentile",
+      "thresholds": "Thresholds",
+      "zero_raw": "Result for zero points"
+    },
+    "validation": {
+      "required": "enter a number",
+      "percentRange": "use a percent from 0 to 100",
+      "decimalsRange": "decimals must be 0, 1 or 2",
+      "sdPositive": "the standard deviation must be greater than 0",
+      "minMax": "the lowest value must not be above the highest",
+      "scaleOrder": "the scale minimum must be below the maximum",
+      "tooMany": "too many rows (at most {max})",
+      "empty": "add at least one row",
+      "keyRequired": "enter a key",
+      "keyTooLong": "the key is too long (at most 32 characters)",
+      "keyDuplicate": "this key is already used",
+      "labelRequired": "enter a label in at least one language",
+      "labelTooLong": "the label is too long (at most 60 characters)",
+      "bandsOrder": "the percent must be lower than in the band above",
+      "bandsLastZero": "the last band must start at 0 %",
+      "segmentsStart": "the first segment must start at r = 0",
+      "segmentsEnd": "the last segment must end at r = 1",
+      "segmentsGap": "must start where the previous segment ends",
+      "segmentRange": "need 0 ≤ from < to ≤ 1",
+      "exponentPositive": "the exponent must be greater than 0",
+      "rowsStart": "the first row must start at 0",
+      "rowRange": "“from” must not be above “to”",
+      "rowsOverlap": "overlaps the previous row or is out of order",
+      "rowsGap": "leaves a gap after the previous row",
+      "rowsCoverage": "the rows must reach the expected maximum",
+      "negative": "must not be negative",
+      "positive": "must be greater than 0"
+    }
   }
 }

@@ -9,6 +9,8 @@ os.environ.setdefault("ENVIRONMENT", "development")
 os.environ.setdefault("DEBUG", "false")
 os.environ.setdefault("EMAIL_PROVIDER", "console")
 
+from pathlib import Path
+
 import pytest
 from app.db.firebase import mock_firestore_db
 from app.schemas.question import (
@@ -49,6 +51,24 @@ def reset_db():
         session.close()
     yield
     mock_firestore_db.reset()
+
+
+_LMS_TESTS_DIR = Path(__file__).resolve().parent / "lms"
+
+
+@pytest.fixture(autouse=True)
+def clean_lms_tables(request, reset_db):
+    """LMS tests (tests/lms/**) start from a clean LMS state (`tests.lms.isolation.reset_lms_state`).
+
+    Defined here, not in tests/lms/conftest.py: with interleaved command-line paths
+    (`tests/lms/a.py tests/b.py tests/lms/c.py`) pytest creates a second `tests/lms` package node that does not
+    see the fixtures of the already-imported tests/lms conftest, so `c.py` used to run without this fixture
+    (no table cleanup, no system grading schemes after a drop/create, stale version cache)."""
+    if _LMS_TESTS_DIR in Path(str(request.node.path)).resolve().parents:
+        from tests.lms.isolation import reset_lms_state
+
+        reset_lms_state()
+    yield
 
 
 @pytest.fixture

@@ -38,8 +38,19 @@ class Course(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
     deleted_by_id: Mapped[Optional[str]] = mapped_column(
         String(64), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    # Phase 4 grading settings (PHASE_4_DESIGN 2.3, P4-10, P4-17)
+    grading_total_mode: Mapped[str] = mapped_column(String(8), nullable=False, default="points",
+                                                    server_default="points")
+    grading_scheme_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("grading_scheme_versions.id", ondelete="RESTRICT"), nullable=True
+    )
+    late_policy: Mapped[Optional[dict]] = mapped_column(JSONType, nullable=True)
+    grading_changed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # set only when the late policy itself changes: late submissions computed before it are regrade targets
+    late_policy_changed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
+        CheckConstraint("grading_total_mode IN ('points','weighted')", name="grading_total_mode_valid"),
         UniqueConstraint("join_code", name="uq_courses_join_code"),
         CheckConstraint("default_language IN ('en','ru','ky')", name="default_language_valid"),
         CheckConstraint("status IN ('draft','published','concluded')", name="status_valid"),

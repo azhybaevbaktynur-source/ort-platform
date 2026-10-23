@@ -117,3 +117,25 @@ Full list: P3-1 … P3-30 in `docs/phases/PHASE_3_DESIGN.md` §1. Highlights and
 | Robustness | Malformed answers score 0 instead of failing grading; the expiry sweep skips attempts that failed recently; request bodies are size-capped (256 KiB attempts, 1 MiB elsewhere, uploads/imports their own limits). |
 | Capacity | One database connection per request (fixed the load-test pool starvation). Load-test findings and plan sizing: `docs/LOAD_TEST_PRE_PHASE3.md`, `docs/phases/PHASE_3_LOADTEST.md`. A national exam needs a paid Render plan for the exam window and more Neon storage (owner decision; nothing bought). |
 | Admission cap (B1) | Each API process admits at most N requests at a time (`LMS_ADMISSION_LIMIT`, 0 = auto: min(thread tokens, `DB_POOL_SIZE` + `DB_MAX_OVERFLOW`), minus 1 off Postgres where the sweep shares the app pool). The rest wait in the event loop without a thread or connection; after `LMS_ADMISSION_WAIT_SECONDS` (default 20) they get 503 `server_busy` with `Retry-After: 2` and `details.retry_after_seconds`, which the attempt client retries. `/health`, `/uploads`, CORS preflights are not gated. N is logged at startup. Fixes the pool/threadpool deadlock under overload. |
+| Exam-window plan (owner, 2026-10-23) | Deferred: the owner has the Render plan estimates (`PHASE_3_LOADTEST.md` §7; 6,000 students ≈ 4 CPUs) and will choose the plan before the first large exam. Until then Render stays on Free. |
+
+## Decisions 2026-10-23 (Phase 4, agent defaults)
+
+Full list: P4-1 … in `docs/phases/PHASE_4_DESIGN.md` §1. Resolved during the build:
+
+| Topic | Decision |
+|---|---|
+| ORT parity | System ORT schemes reproduce the old scoring exactly (every N 1–200, every raw): scaled score, percentile, golden certificate. Percentile at/below the scale minimum gets the block minimum, at/above the maximum gets the block maximum; clamp before rounding. |
+| Scheme rules | Bands, pass/fail and pass thresholds compare the percent rounded like the displayed value. Points never show more than `possible`. Lookup: fractional raw maps to the row with the largest `raw_from` ≤ raw; gaps up to 1 point allowed, overlaps refused. Param numbers within ±100,000; curve exponents in (0, 10]; percentile decimals 0 or 1; preview ≤ 1,001 raws. |
+| Scheme library | Deleted schemes are hidden (restore only by the owner); a teacher check and a write rate limit apply to every scheme write. |
+| Course grading | `grading_changed_at` moves only when a grading value really changes. Course grading PUT is a full replace. Category delete is soft and refused while a live assessment uses it. GET warns about uncategorized assessments and all-zero weights (weighted mode). |
+| Body caps | 64 KiB on course grading settings, categories and submission edits; scheme versions (lookup tables up to 1,000 rows) and grade release (up to 5,000 ids) keep the global 1 MiB cap. |
+| Seeding | System schemes are seeded idempotently at startup; a seeding failure is logged, not fatal. |
+| Assistants | Assistants can override, excuse, void, release and regrade (they inherit grade management; only roster, publish, delete and transfer stay teacher-only). |
+| Removed students | Their submissions and totals are kept but hidden from the gradebook (active roster only); re-adding the student shows them again. |
+| Unrelease | Refused (409 `grade_release_auto`) when the assessment releases grades automatically; switch it to manual first. |
+| Late policy | Changing the course late policy marks late submissions for regrade; scheme and total-mode edits do not (totals are computed on read). |
+| Stale grades | One definition shared by the gradebook "out of date" count and regrade: other scheme version, grading settings changed after computing, late policy changed (late ones only), or an attempt grade missing/old. |
+| Everything voided | A submission whose attempts are all voided has state `no_attempts` (shown as pending to the student, ignored in totals). |
+| Deleted assessments | Grade detail stays readable for staff; grade changes on a deleted assessment return 404. |
+| Integrity | Grade events are append-only and scheme versions immutable, enforced by the ORM and by PostgreSQL triggers. Existing graded attempts get submissions when 0005 runs. |

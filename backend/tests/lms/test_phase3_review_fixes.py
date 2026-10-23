@@ -238,3 +238,14 @@ def test_global_body_cap_lms_shape_and_exemptions(client, monkeypatch):
     r = client.post("/api/v1/upload/image", files={"file": ("a.txt", b"x" * 500)})
     assert r.status_code != 413 or "detail" in r.json()
     assert r.status_code in (401, 403, 422)
+
+
+def test_grading_edit_body_cap_64k(client):
+    from app.lms.attempts.bodycap import _GRADING
+    assert _GRADING.match("/api/v1/courses/c1/grading")
+    assert _GRADING.match("/api/v1/courses/c1/submissions/s1/override")
+    assert not _GRADING.match("/api/v1/grading-schemes/x/versions")
+    assert not _GRADING.match("/api/v1/courses/c1/assessments/a1/grades/release")
+    r = client.put("/api/v1/courses/c1/grading", content=b"x" * (64 * 1024 + 1),
+                   headers={"content-type": "application/json"})
+    assert r.status_code == 413

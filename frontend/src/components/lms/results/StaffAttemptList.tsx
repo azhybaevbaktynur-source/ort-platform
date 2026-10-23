@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { EyeOff } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { listStaffAttempts, type AttemptStaffSummaryOut } from "@/lib/lms/staffAttempts";
 import type { AttemptStatus } from "@/lib/lms/attemptTypes";
@@ -9,12 +10,14 @@ import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { Pager } from "@/components/lms/Pager";
 import { inputCls } from "@/components/lms/content/ui";
 import { fmtDateTime, fmtPoints } from "@/components/lms/assessments/format";
+import { useGradeText } from "./GradeBadge";
 
 const STATUSES: AttemptStatus[] = ["in_progress", "needs_review", "graded", "void"];
 const LIMIT = 50;
 
 export function StaffAttemptList({ courseId, assessmentId }: { courseId: string; assessmentId: string }) {
   const { lang, t } = useTranslation();
+  const gradeText = useGradeText();
   const [status, setStatus] = useState<AttemptStatus | "">("");
   const [previews, setPreviews] = useState(false);
   const [rows, setRows] = useState<AttemptStaffSummaryOut[]>([]);
@@ -96,6 +99,7 @@ export function StaffAttemptList({ courseId, assessmentId }: { courseId: string;
                 <th className="px-4 py-2 font-medium">{t("grading.status")}</th>
                 <th className="px-4 py-2 font-medium">{t("grading.submitted")}</th>
                 <th className="px-4 py-2 font-medium">{t("grading.score")}</th>
+                <th className="px-4 py-2 font-medium">{t("results.grade.title")}</th>
                 <th className="px-4 py-2 font-medium"><span className="sr-only">{t("grading.open")}</span></th>
               </tr>
             </thead>
@@ -113,6 +117,19 @@ export function StaffAttemptList({ courseId, assessmentId }: { courseId: string;
                   </td>
                   <td className="px-4 py-2 text-slate-600">{fmtDateTime(r.submitted_at) || "—"}</td>
                   <td className="px-4 py-2">{r.raw_score !== null && r.raw_score !== undefined ? `${fmtPoints(r.raw_score)} / ${fmtPoints(r.points_possible)}` : "—"}</td>
+                  <td className="px-4 py-2">
+                    {r.grade && gradeText(r.grade, r.grade.scheme_type) ? (
+                      <span className="inline-flex max-w-[12rem] items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-800">
+                        <span className="truncate">{gradeText(r.grade, r.grade.scheme_type)}</span>
+                        {!r.grade.released && (
+                          <span title={t("results.grade.notReleased")} className="inline-flex">
+                            <EyeOff className="h-3 w-3 flex-shrink-0 text-slate-500" aria-hidden="true" />
+                            <span className="sr-only">{t("results.grade.notReleased")}</span>
+                          </span>
+                        )}
+                      </span>
+                    ) : "—"}
+                  </td>
                   <td className="px-4 py-2 text-right">
                     <Link href={`${base}/attempts/${r.id}`} className="font-medium text-brand-700 hover:underline">{t("grading.open")}</Link>
                   </td>

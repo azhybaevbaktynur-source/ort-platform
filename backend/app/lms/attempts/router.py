@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Optional
+from typing import Optional, Union
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, Request, Response
 from fastapi.responses import JSONResponse
@@ -66,6 +66,7 @@ def get_content(attempt_id: str, request: Request, section: Optional[int] = None
     payload, `?section=<pos>` (default: the current section); only sections up to the current one (after lazy
     advance) are served, later ones are 409 `section_not_current` (review finding 7)."""
     attempt, env = engine.load_attempt_bundle(db, user, attempt_id)
+    engine.hide_void(attempt)
     if not engine.can_access(attempt, env):
         raise engine.attempt_not_found()
     plan = engine.plan_for(db, attempt)
@@ -131,10 +132,16 @@ def submit_attempt(attempt_id: str, background: BackgroundTasks, data: Optional[
     return out
 
 
-def _open_for_results(db: Session, user: User, attempt_id: str):
-    """Own attempt with lazy expiry applied; results are only served when the policy allows it."""
+def _open_for_results(db: Session, user: User, attempt_id: str, *, allow_void: bool = False):
+    """Own attempt with lazy expiry applied; results are only served when the policy allows it.
+    `allow_void`: a voided attempt (P4-20) returns `(attempt, env, None)` instead of 403."""
     now = clock.now()
     attempt, env = engine.load_attempt_bundle(db, user, attempt_id)
+    if allow_void and attempt.status == "void":
+        if not engine.can_access(attempt, env):
+            raise engine.attempt_not_found()
+        return attempt, env, None
+    engine.hide_void(attempt)
     plan = engine.plan_for(db, attempt)
     engine.apply_lazy(db, attempt, engine.load_sections(db, attempt.id), plan, now=now, env=env)
     if not engine.can_access(attempt, env):
@@ -144,9 +151,11 @@ def _open_for_results(db: Session, user: User, attempt_id: str):
     return attempt, env, plan
 
 
-@router.get("/attempts/{attempt_id}/result", response_model=ser.AttemptResultOut)
+@router.get("/attempts/{attempt_id}/result", response_model=Union[ser.AttemptResultOut, ser.VoidResultOut])
 def get_result(attempt_id: str, user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
-    attempt, _env, plan = _open_for_results(db, user, attempt_id)
+    attempt, _env, plan = _open_for_results(db, user, attempt_id, allow_void=True)
+    if attempt.status == "void":
+        return ser.VoidResultOut()
     return results.result_out(attempt, plan)
 
 

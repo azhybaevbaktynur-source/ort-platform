@@ -174,3 +174,79 @@ def test_0004_up_down_up(alembic_engine):
             assert not phase3 & set(inspect(conn).get_table_names())
         command.upgrade(cfg, "head")
         conn.commit()
+
+
+def test_0005_up_down_up(alembic_engine):
+    """Phase 4 tables and columns (with the schemes <-> versions FK) create and drop cleanly: 0004 -> 0005 twice."""
+    from alembic import command
+
+    from app.db.migrate import _config
+
+    phase4 = {"grading_schemes", "grading_scheme_versions", "grade_categories", "submissions", "attempt_grades",
+              "grade_events", "course_grades"}
+    added = {"assessments": {"grading_scheme_version_id", "grade_category_id", "due_at", "grade_release",
+                             "omit_from_total", "grading_changed_at"},
+             "courses": {"grading_total_mode", "grading_scheme_version_id", "late_policy", "grading_changed_at"}}
+    cfg = _config(TEST_URL)
+    with alembic_engine.connect() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "0004_phase3_assessments")
+        conn.commit()
+        assert not phase4 & set(inspect(conn).get_table_names())
+        for _ in range(2):
+            command.upgrade(cfg, "0005_phase4_grading")
+            conn.commit()
+            assert phase4 <= set(inspect(conn).get_table_names())
+            for table, cols in added.items():
+                assert cols <= {c["name"] for c in inspect(conn).get_columns(table)}
+            fks = {fk["name"] for fk in inspect(conn).get_foreign_keys("grading_schemes")}
+            assert "fk_grading_schemes_current_version_id" in fks
+            idx = {i["name"] for i in inspect(conn).get_indexes("grading_schemes")}
+            assert "uq_grading_schemes_key" in idx
+            uqs = {u["name"] for u in inspect(conn).get_unique_constraints("submissions")}
+            assert "uq_submissions_enrollment_assessment" in uqs
+            command.downgrade(cfg, "0004_phase3_assessments")
+            conn.commit()
+            assert not phase4 & set(inspect(conn).get_table_names())
+            for table, cols in added.items():
+                assert not cols & {c["name"] for c in inspect(conn).get_columns(table)}
+        command.upgrade(cfg, "head")
+        conn.commit()
+
+
+def test_0005_backfill_and_guards_on_pg(alembic_engine):
+    """S2: pre-Phase-4 counted attempts get a stale placeholder submission; S7: the append-only / immutable
+    triggers exist after upgrade and are gone after downgrade; Q1: courses.late_policy_changed_at."""
+    from alembic import command
+
+    from app.db.migrate import _config
+    from tests.test_migration_0005_data import check_backfill, seed_0004
+
+    def triggers(conn):
+        return set(conn.execute(text(
+            "SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgname LIKE 'trg_grad%'")).scalars())
+
+    cfg = _config(TEST_URL)
+    with alembic_engine.connect() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "0004_phase3_assessments")
+        conn.commit()
+        # FK checks off (session-wide) for the minimal seed: its parents (courses, users, ...) do not exist
+        conn.execute(text("SET session_replication_role = replica"))
+        conn.commit()
+        seeded = seed_0004(conn)
+        conn.commit()
+        command.upgrade(cfg, "0005_phase4_grading")
+        conn.commit()
+        check_backfill(conn, seeded)
+        assert triggers(conn) == {"trg_grade_events_append_only", "trg_grading_scheme_versions_immutable"}
+        assert "late_policy_changed_at" in {c["name"] for c in inspect(conn).get_columns("courses")}
+        command.downgrade(cfg, "0004_phase3_assessments")
+        conn.commit()
+        assert triggers(conn) == set()
+        assert conn.execute(text("SELECT count(*) FROM pg_proc WHERE proname = 'lms_grading_immutable'")).scalar() == 0
+        command.upgrade(cfg, "head")
+        conn.commit()
+        check_backfill(conn, seeded)
+        conn.execute(text("SET session_replication_role = DEFAULT"))
+        conn.commit()

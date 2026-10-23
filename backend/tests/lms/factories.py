@@ -341,3 +341,81 @@ def make_attempt_section(db: Session, attempt: Attempt, section_pos: int = 1, **
     db.add(s)
     db.commit()
     return s
+
+
+# --- Phase 4: grading schemes, categories, submissions ---------------------------------------------
+
+from app.lms.grading.models import GradeCategory, GradingScheme, GradingSchemeVersion, Submission  # noqa: E402
+
+
+def make_scheme(db: Session, owner: Optional[User], type: str = "percent", params: Optional[dict] = None,
+                **overrides) -> GradingScheme:
+    """Scheme plus version 1 (params validated like the service). `owner=None` makes a system scheme
+    (pass `key=`). The version is `scheme.current_version_id` / `db.get(GradingSchemeVersion, ...)`."""
+    from app.lms.grading.params import validate_params
+    from app.lms.grading.schemes import new_version_row
+
+    normalized = validate_params(type, params if params is not None else {})
+    fields = dict(owner_user_id=owner.id if owner else None, title={"en": "Test scheme"}, type=type,
+                  last_version_no=1)
+    fields.update(overrides)
+    scheme = GradingScheme(**fields)
+    db.add(scheme)
+    db.flush()
+    v = new_version_row(scheme, normalized, version_no=1, created_by_id=owner.id if owner else None)
+    db.add(v)
+    db.flush()
+    scheme.current_version_id = v.id
+    db.commit()
+    return scheme
+
+
+def scheme_version(db: Session, scheme: GradingScheme) -> GradingSchemeVersion:
+    return db.get(GradingSchemeVersion, scheme.current_version_id)
+
+
+def make_category(db: Session, course: Course, *, weight=Decimal("0"), position: Optional[int] = None,
+                  **overrides) -> GradeCategory:
+    if position is None:
+        from sqlalchemy import func, select
+
+        position = (db.execute(select(func.max(GradeCategory.position)).where(
+            GradeCategory.course_id == course.id)).scalar() or 0) + 1
+    fields = dict(course_id=course.id, title={"en": "Category"}, weight=Decimal(str(weight)), position=position)
+    fields.update(overrides)
+    cat = GradeCategory(**fields)
+    db.add(cat)
+    db.commit()
+    return cat
+
+
+def grade_attempt(db: Session, attempt: Attempt, raw, *, status: str = "graded", run_hooks: bool = True,
+                  submitted_at=None) -> Attempt:
+    """Mark an attempt scored with `raw` points (no item grading) and run the scored hooks like the engine."""
+    from app.lms.attempts.hooks import run_scored_hooks
+
+    now = utcnow()
+    attempt.status = status
+    attempt.raw_score = Decimal(str(raw))
+    attempt.submitted_at = submitted_at or attempt.submitted_at or now
+    attempt.submit_reason = attempt.submit_reason or "manual"
+    attempt.graded_at = now if status == "graded" else None
+    db.flush()
+    if run_hooks:
+        run_scored_hooks(db, attempt)
+    db.commit()
+    return attempt
+
+
+def make_submission(db: Session, assessment: Assessment, enrollment: Enrollment, **overrides) -> Submission:
+    """Direct submission insert (the G2 services compute real ones)."""
+    fields = dict(
+        course_id=assessment.course_id, assessment_id=assessment.id, enrollment_id=enrollment.id,
+        user_id=enrollment.user_id, state="graded", kept_policy=assessment.score_policy or "highest",
+        computed_at=utcnow(),
+    )
+    fields.update(overrides)
+    sub = Submission(**fields)
+    db.add(sub)
+    db.commit()
+    return sub

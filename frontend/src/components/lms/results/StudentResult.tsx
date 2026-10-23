@@ -74,6 +74,18 @@ export function StudentResult({ courseId, attemptId }: { courseId: string; attem
     );
   }
 
+  if (state.status === "void") {
+    return (
+      <div className="space-y-3">
+        {backLink}
+        <div role="status" className="rounded-2xl border border-red-200 bg-red-50 p-5">
+          <h2 className="mb-1 text-lg font-bold text-red-900">{t("results.grade.voidedTitle")}</h2>
+          <p className="text-sm text-red-800">{t("results.grade.voided")}</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!state.results_available) {
     return (
       <div className="space-y-3">

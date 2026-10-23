@@ -197,3 +197,52 @@ def remove_enrollment(course_id: uuid.UUID, enrollment_id: uuid.UUID, ctx: Authz
     course = svc.load_course(ctx.db, course_id)
     enr_svc.remove(ctx.db, ctx, course, enrollment_id)
     return Response(status_code=204)
+
+
+# ------------------------------------------------------------ grading settings and categories (Phase 4, 3.3)
+
+from app.lms.courses.schemas import (  # noqa: E402
+    CategoriesOrderIn, CategoryIn, CategoryOut, CategoryUpdateIn, CourseGradingIn, CourseGradingOut,
+)
+
+
+@router.get("/{course_id}/grading", response_model=None)
+def get_grading(course_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
+    course = svc.load_course(ctx.db, course_id)
+    return svc.grading_out(ctx.db, ctx, course)
+
+
+@router.put("/{course_id}/grading", response_model=CourseGradingOut)
+def put_grading(course_id: uuid.UUID, data: CourseGradingIn, ctx: AuthzContext = Depends(get_authz)):
+    course = svc.load_course(ctx.db, course_id)
+    svc.update_grading_settings(ctx.db, ctx, course, data)
+    return svc.grading_out(ctx.db, ctx, course)
+
+
+@router.post("/{course_id}/grade-categories", status_code=201, response_model=CategoryOut)
+def create_category(course_id: uuid.UUID, data: CategoryIn, ctx: AuthzContext = Depends(get_authz)):
+    course = svc.load_course(ctx.db, course_id)
+    cat = svc.create_category(ctx.db, ctx, course, data)
+    return svc.category_outs(ctx.db, course, [cat])[0]
+
+
+@router.put("/{course_id}/grade-categories/order", response_model=list[CategoryOut])
+def reorder_categories(course_id: uuid.UUID, data: CategoriesOrderIn, ctx: AuthzContext = Depends(get_authz)):
+    course = svc.load_course(ctx.db, course_id)
+    cats = svc.reorder_categories(ctx.db, ctx, course, data.category_ids)
+    return svc.category_outs(ctx.db, course, cats)
+
+
+@router.patch("/{course_id}/grade-categories/{category_id}", response_model=CategoryOut)
+def update_category(course_id: uuid.UUID, category_id: uuid.UUID, data: CategoryUpdateIn,
+                    ctx: AuthzContext = Depends(get_authz)):
+    course = svc.load_course(ctx.db, course_id)
+    cat = svc.update_category(ctx.db, ctx, course, category_id, data)
+    return svc.category_outs(ctx.db, course, [cat])[0]
+
+
+@router.delete("/{course_id}/grade-categories/{category_id}", status_code=204, response_class=Response)
+def delete_category(course_id: uuid.UUID, category_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
+    course = svc.load_course(ctx.db, course_id)
+    svc.delete_category(ctx.db, ctx, course, category_id)
+    return Response(status_code=204)

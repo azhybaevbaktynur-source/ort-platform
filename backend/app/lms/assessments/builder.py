@@ -33,6 +33,9 @@ from app.lms.core import clock
 from app.lms.core.errors import Conflict, NotFound, ValidationFailed
 from app.lms.courses.models import Course
 from app.lms.courses.service import require_course
+from app.lms.grading import repository as grading_repo
+from app.lms.grading.schemes import load_usable_version
+from app.lms.grading.seeds import PRESET_SCHEME_VERSIONS
 from app.models.user import User
 
 _ZERO = Decimal("0")
@@ -68,6 +71,7 @@ def create_assessment(db: Session, ctx: AuthzContext, course: Course, data: sch.
         preset=data.preset, languages=list(data.languages), status="draft", position=position,
         navigation="section_forward_only" if ort else "free", results_policy="after_submit",
         show_correct_answers=ort, allowed_attempts=1, score_policy="highest",
+        grading_scheme_version_id=PRESET_SCHEME_VERSIONS.get(data.preset),
     )
     db.add(a)
     db.flush()
@@ -103,15 +107,30 @@ def update_assessment(db: Session, ctx: AuthzContext, course: Course, aid: uuid.
             raise ValidationFailed("results_policy after_close needs available_until",
                                    code="after_close_needs_until",
                                    details=[{"loc": ["available_until"], "msg": "required for after_close"}])
+    _check_grading_refs(db, ctx, course, a, data, fields)
+    before = (a.grading_scheme_version_id, a.score_policy, utc(a.due_at))
     for f in fields:
         value = getattr(data, f)
-        if f in ("available_from", "available_until"):
+        if f in ("available_from", "available_until", "due_at"):
             value = utc(value)
         elif f == "languages":
             value = list(value)
         setattr(a, f, value)
+    if (a.grading_scheme_version_id, a.score_policy, utc(a.due_at)) != before:
+        a.grading_changed_at = clock.now()  # drives the gradebook's stale_count (P4-12, P4-15)
     _commit(db, a)
     return a
+
+
+def _check_grading_refs(db: Session, ctx: AuthzContext, course: Course, a: Assessment,
+                        data: sch.AssessmentUpdateIn, fields: set) -> None:
+    """PHASE_4_DESIGN 3.3: only a changed, non-null reference is validated (P4-4 usability, live category)."""
+    vid = data.grading_scheme_version_id
+    if "grading_scheme_version_id" in fields and vid is not None and vid != a.grading_scheme_version_id:
+        load_usable_version(db, ctx, course, vid)
+    cid = data.grade_category_id
+    if "grade_category_id" in fields and cid is not None and cid != a.grade_category_id:
+        grading_repo.load_category(db, course.id, cid)
 
 
 def soft_delete_assessment(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID) -> None:
@@ -681,11 +700,15 @@ def staff_out(db: Session, a: Assessment) -> sch.AssessmentStaffOut:
     totals = {a.id: (n, float(pts))}
     counts = repo.attempt_counts(db, [a.id])
     vnos = _version_nos(db, [a])
+    briefs = grading_repo.version_briefs(db, [a.grading_scheme_version_id])
     return sch.AssessmentStaffOut(
         **_summary_fields(a, totals, counts, vnos), description=a.description, draft_rev=a.draft_rev,
         time_limit_s=a.time_limit_s, allowed_attempts=a.allowed_attempts, score_policy=a.score_policy,
         shuffle_items=bool(a.shuffle_items), shuffle_choices=bool(a.shuffle_choices), navigation=a.navigation,
-        results_policy=a.results_policy, show_correct_answers=bool(a.show_correct_answers), sections=sec_outs,
+        results_policy=a.results_policy, show_correct_answers=bool(a.show_correct_answers),
+        grading_scheme_version_id=a.grading_scheme_version_id, grade_category_id=a.grade_category_id,
+        due_at=utc(a.due_at), grade_release=a.grade_release or "auto", omit_from_total=bool(a.omit_from_total),
+        scheme=sch.scheme_ref(briefs.get(a.grading_scheme_version_id)), sections=sec_outs,
         warnings=warnings,
     )
 
@@ -774,6 +797,7 @@ def list_student(db: Session, ctx: AuthzContext, course: Course, *, cursor: Opti
                               entity_of=lambda r: r[0], cursor=cursor, limit=limit, descending=False)
     assessments = [r[0] for r in rows]
     mine = _student_attempts(db, ctx.user.id, [a.id for a in assessments])
+    briefs = grading_repo.version_briefs(db, [a.grading_scheme_version_id for a in assessments])
     now = clock.now()
     out = []
     for a, snap, item_count in rows:
@@ -789,7 +813,8 @@ def list_student(db: Session, ctx: AuthzContext, course: Course, *, cursor: Opti
             id=a.id, title=a.title, languages=list(a.languages or []), time_limit_s=_total_limit(snap),
             item_count=item_count, available_from=a.available_from, available_until=a.available_until,
             allowed_attempts=a.allowed_attempts, attempts_used=used, in_progress_attempt_id=open_id,
-            last_result=last))
+            last_result=last, due_at=utc(a.due_at),
+            scheme=sch.scheme_student_ref(briefs.get(a.grading_scheme_version_id))))
     return out, nxt
 
 
@@ -807,6 +832,7 @@ def lobby(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID) -> sch
     used = sum(1 for r in atts if r[3] != "void")
     open_id = next((r[1] for r in atts if r[3] == "in_progress"), None)
     can_start, reason = _start_state(a, used, open_id, clock.now())
+    briefs = grading_repo.version_briefs(db, [a.grading_scheme_version_id])
     return sch.AssessmentLobbyOut(
         id=a.id, title=a.title, description=a.description, languages=list(snap.get("languages") or []),
         sections=[sch.LobbySectionOut(pos=s["pos"], key=s.get("key"), title=s.get("title"),
@@ -814,4 +840,5 @@ def lobby(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID) -> sch
                   for s in snap.get("sections", [])],
         time_limit_s=_total_limit(snap), navigation=snap.get("navigation", "free"),
         allowed_attempts=a.allowed_attempts, attempts_used=used, available_from=a.available_from,
-        available_until=a.available_until, in_progress_attempt_id=open_id, can_start=can_start, reason=reason)
+        available_until=a.available_until, in_progress_attempt_id=open_id, can_start=can_start, reason=reason,
+        due_at=utc(a.due_at), scheme=sch.scheme_student_ref(briefs.get(a.grading_scheme_version_id)))

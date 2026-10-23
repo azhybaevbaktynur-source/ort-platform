@@ -1,7 +1,7 @@
 /** Staff attempt API (docs/phases/PHASE_3_DESIGN.md section 5, staff table). snake_case as on the wire. */
 import { lmsFetch } from "./client";
 import type { Lang, PageOut } from "./types";
-import type { AttemptResultOut, AttemptStatus, ReviewItemOut, SubmitReason } from "./attemptTypes";
+import type { AttemptGradeOut, AttemptResultOut, AttemptStatus, ReviewItemOut, SubmitReason } from "./attemptTypes";
 
 const e = encodeURIComponent;
 
@@ -19,6 +19,8 @@ export interface AttemptStaffSummaryOut {
   points_possible: number | string | null;
   pending_review: number;
   is_preview: boolean;
+  /** Phase 4: this attempt's grade (attempt_grades row; previews computed inline); null when ungraded/void. */
+  grade?: AttemptGradeOut | null;
 }
 
 /** One reviewed item for staff: the student review item plus scoring fields. */
@@ -32,6 +34,8 @@ export interface StaffReviewItem extends ReviewItemOut {
 
 export interface AttemptStaffOut extends AttemptStaffSummaryOut {
   assessment_id?: string;
+  /** Phase 4: the submission this (non-preview) attempt counts toward. */
+  submission_id?: string | null;
   result?: AttemptResultOut | null;
   items: StaffReviewItem[];
 }
@@ -51,3 +55,6 @@ export const getStaffAttempt = (courseId: string, attemptId: string) =>
   lmsFetch<AttemptStaffOut>(`/courses/${e(courseId)}/attempts/${e(attemptId)}`);
 export const scoreAttemptItem = (courseId: string, attemptId: string, position: number, body: ScoreIn) =>
   lmsFetch<AttemptStaffOut>(`/courses/${e(courseId)}/attempts/${e(attemptId)}/items/${position}/score`, { method: "PUT", body });
+/** Phase 4 (P4-20): void a graded or needs-review attempt; the kept result is recomputed server-side. Reason <= 500. */
+export const voidAttempt = (courseId: string, attemptId: string, reason: string) =>
+  lmsFetch<AttemptStaffOut>(`/courses/${e(courseId)}/attempts/${e(attemptId)}/void`, { method: "POST", body: { reason } });

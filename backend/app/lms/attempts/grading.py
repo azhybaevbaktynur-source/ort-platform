@@ -333,8 +333,12 @@ def manual_score(db: Session, ctx: AuthzContext, course, attempt_id: uuid.UUID, 
     from app.lms.courses.service import require_course
 
     require_course(ctx, A.GRADES_MANAGE, course)
+    # FOR NO KEY UPDATE (Phase 4, P4-14): still excludes every other attempt writer, but lets the FK checks of a
+    # concurrent grade writer (FOR KEY SHARE on this graded attempt, e.g. a submission's kept_attempt_id) pass while
+    # this transaction waits for that writer's submission row in the hook; FOR UPDATE would deadlock there.
     attempt = db.execute(
-        select(Attempt).where(Attempt.id == attempt_id, Attempt.course_id == course.id).with_for_update()
+        select(Attempt).where(Attempt.id == attempt_id, Attempt.course_id == course.id)
+        .with_for_update(key_share=True)
         .execution_options(populate_existing=True)
     ).scalar_one_or_none()
     if attempt is None:

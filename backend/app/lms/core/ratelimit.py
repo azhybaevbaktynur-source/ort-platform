@@ -61,6 +61,26 @@ def grade_item_limit() -> Limit:
     """Phase 3 (P3-28): manual item scoring, per user."""
     return Limit("grade_item_1h", settings.GRADE_ITEM_RATE_PER_HOUR, 3600)
 
+
+def grades_release_limit() -> Limit:
+    """Phase 4 (P4-21): release/unrelease grades, per user."""
+    return Limit("grades_release_1h", settings.GRADES_RELEASE_RATE_PER_HOUR, 3600)
+
+
+def grades_regrade_limit() -> Limit:
+    """Phase 4 (P4-21): regrade requests, per user."""
+    return Limit("grades_regrade_1h", settings.GRADES_REGRADE_RATE_PER_HOUR, 3600)
+
+
+def scheme_write_limit() -> Limit:
+    """Phase 4 (P4-21): grading scheme create/version/title/delete/restore, per user."""
+    return Limit("scheme_write_1h", settings.SCHEME_WRITE_RATE_PER_HOUR, 3600)
+
+
+def scheme_preview_limit() -> Limit:
+    """Phase 4 (P4-21): scheme preview, per user."""
+    return Limit("scheme_preview_1m", settings.SCHEME_PREVIEW_RATE_PER_MIN, 60)
+
 _CLEANUP_PROBABILITY = 1 / 200
 _CLEANUP_BATCH = 1000
 
