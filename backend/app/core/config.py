@@ -174,6 +174,12 @@ class Settings(BaseSettings):
     SMTP_FROM_EMAIL: str = "noreply@ort.kg"
     FRONTEND_URL: str = "http://localhost:3000"
 
+    # --- Phase 5 S1 begin ---
+    # Seed the ORT courses from sample_ort_questions{,_ru}.csv when they have no bank (P5-4).
+    # None: follows the environment (on unless ENVIRONMENT=production). Never seeds in production.
+    ORT_SEED_SAMPLES: bool | None = None
+    # --- Phase 5 S1 end ---
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 

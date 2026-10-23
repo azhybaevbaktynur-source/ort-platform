@@ -1,4 +1,4 @@
-"""Imports every LMS model (Phases 1-4) so Base.metadata (create_all, Alembic) sees them."""
+"""Imports every LMS model (Phases 1-5) so Base.metadata (create_all, Alembic) sees them."""
 from app.lms.audit.models import AdminAuditLog  # noqa: F401
 from app.lms.core.ratelimit import RateLimitBucket  # noqa: F401
 from app.lms.courses.models import Course  # noqa: F401
@@ -15,3 +15,4 @@ from app.lms.attempts.models import Attempt, AttemptItem, AttemptSection  # noqa
 from app.lms.grading.models import (  # noqa: F401,E402
     AttemptGrade, CourseGrade, GradeCategory, GradeEvent, GradingScheme, GradingSchemeVersion, Submission,
 )
+from app.lms.ort.models import LegacyOrtExport  # noqa: F401,E402
