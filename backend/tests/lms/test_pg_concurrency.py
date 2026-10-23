@@ -106,7 +106,7 @@ from app.models.user import User  # noqa: E402
 def _mk_user(s: Session, n: int, teacher=False) -> str:
     import uuid as _u
     uid = f"usr_{_u.uuid4().hex[:12]}"
-    s.add(User(id=uid, email=f"{uid}@test.example", password_hash="x", role="student", email_verified=True,
+    s.add(User(id=uid, email=f"{uid}@test.example", password_hash="x", email_verified=True,
                teacher_status="approved" if teacher else "none"))
     s.commit()
     return uid

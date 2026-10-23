@@ -283,7 +283,8 @@ def forgot_password(
     clean_email = req.email.strip().lower()
     user = db.query(User).filter(User.email == clean_email).first()
 
-    if user and not _cooldown_left(user.reset_requested_at):
+    # Disabled accounts (incl. the ORT system teacher) get no token and no email; the answer stays the same
+    if user and user.disabled_at is None and not _cooldown_left(user.reset_requested_at):
         token = secrets.token_urlsafe(32)
         user.reset_token = _secret_hash(token)
         user.reset_token_expires = _now() + timedelta(minutes=settings.PASSWORD_RESET_TTL_MINUTES)
@@ -316,6 +317,12 @@ def reset_password(
 
     user = db.query(User).filter(User.reset_token == _secret_hash(token_str)).first()
 
+    if user is not None and user.disabled_at is not None:
+        # A disabled account never gets a password through a reset: same answer as an unknown token
+        user.reset_token = None
+        user.reset_token_expires = None
+        db.commit()
+        user = None
     if not user or not user.reset_token_expires:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

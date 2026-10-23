@@ -179,8 +179,6 @@ def test_0006_on_fresh_db_exports_nothing(tmp_path):
     engine.dispose()
 
 
-@pytest.mark.skipif(hasattr(__import__("app.models.user", fromlist=["User"]).User, "role"),
-                    reason="Phase A: the old User columns are still mapped (removed in Phase B)")
 def test_0006_export_feeds_the_seed(tmp_path):
     """The migrated export converts through the real importer/builder into a published ORT exam."""
     from sqlalchemy.orm import Session

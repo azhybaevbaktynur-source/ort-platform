@@ -40,6 +40,22 @@ def _seed_grading_schemes() -> None:
         db.close()
 
 
+def _seed_ort_courses() -> None:
+    """Phase 5 ORT courses and the conversion of legacy_ort_export (P5-2); never fatal (ensure_ort_courses logs
+    and stores every failure itself)."""
+    from app.db.session import SessionLocal
+    from app.lms.ort.seed import ensure_ort_courses
+
+    db = SessionLocal()
+    try:
+        ensure_ort_courses(db)
+    except Exception:
+        db.rollback()
+        logger.exception("Seeding the ORT courses failed")
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """FastAPI modern lifespan handler (replaces deprecated on_event)."""
@@ -53,6 +69,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Database startup initialization notice: {e}")
     _seed_grading_schemes()
+    _seed_ort_courses()
     if is_production():
         if settings.SECRET_KEY == DEFAULT_SECRET_KEY:
             logger.critical("SECRET_KEY is the public default from the repository: anyone can forge login tokens. Set SECRET_KEY.")
