@@ -1,6 +1,6 @@
 # Phase 6 design: organizations, course templates (ORT first), invitations, design system, student home
 
-**Status**: draft for the owner's review (2026-10-24). No code is written until the owner approves. Source of truth for the decisions: `docs/PRODUCT_DECISIONS.md` "Owner decisions 2026-10-24"; plan: `docs/IMPLEMENTATION_PLAN.md` Phase 6; architecture: `docs/LMS_ARCHITECTURE.md` §2b, §3. Where this document differs from the owner's brief, the point is listed in §10 and the owner decides.
+**Status**: second draft for the owner's review (2026-10-24, after the owner's second-round answers). The owner's answers to the first draft are applied throughout and recorded in §10 "Decided"; `docs/PRODUCT_DECISIONS.md` "Owner decisions 2026-10-24 (second round)" is the source of truth. H1 (the hotfix) is the only code released before this review. The exam template constructor the owner proposed is evaluated in `docs/phases/EXAM_TEMPLATES_DESIGN.md` (summary in §12); it is **not** part of Phase 6. Plan: `docs/IMPLEMENTATION_PLAN.md` Phase 6; architecture: `docs/LMS_ARCHITECTURE.md` §2b, §3.
 
 Conventions: tables are PostgreSQL + SQLite (no runtime ALTERs); ids are uuid unless noted; `users.id` is a string. All names below are proposals the implementers must use as written so slices merge cleanly.
 
@@ -12,13 +12,13 @@ Conventions: tables are PostgreSQL + SQLite (no runtime ALTERs); ids are uuid un
 
 | Part | What ships |
 |---|---|
-| H1 hotfix (first) | General-assessment player crash when a section has a teacher-set title (React #31). Fix: `attemptTypes.ts` types `title`/`instructions` as `string \| Localized \| null`; `PlayerShell.sectionTitle()` and `Palette.tsx:38` resolve with `pickLocalized(...)`; add `app/[lang]/courses/[courseId]/attempts/[attemptId]/error.tsx` (friendly message, Retry, back to course); test that publishes a titled section and opens the attempt. ORT is unaffected (titles `null`). Deployed alone, before everything else. |
-| 6a Foundation | Organizations, memberships, org admins, template registry with the ORT template wrapping existing ORT code, template grants, locked templates, invitations, sign-up without a teacher choice, migration 0008, platform admin and org admin pages (on the current UI components), authorization extension, ORT parity gate. |
+| H1 hotfix (first) | General-assessment player crash when a section has a teacher-set title (React #31). Fix: `attemptTypes.ts` types `title`/`instructions` as `string \| Localized \| null`; `PlayerShell.sectionTitle()` and `Palette.tsx:38` resolve with `pickLocalized(...)`; add `app/[lang]/courses/[courseId]/attempts/[attemptId]/error.tsx` (friendly message, Retry, back to course); test that publishes a titled section and opens the attempt. ORT is unaffected (titles `null`). Released alone, before everything else (owner decision H1; done). |
+| 6a Foundation | Organizations, memberships, org admins, template registry with the ORT template wrapping existing ORT code, template grants, locked templates, invitations, sign-up without a teacher choice, migration 0008 (personal organizations), platform admin and org admin pages (on the current UI components), authorization extension, ORT review (§6). |
 | 6b Experience | Design system (`frontend/src/components/ui/`), app header with area switcher, student home + `GET /me/home`, UX audit fixes marked "6b" in §8, ORT player part-1 improvements with baselines, UX gate. |
 
-Recommendation: ship 6a and 6b as two deploys with their own gates (Alternatives A4). Both parts are designed here; if the owner prefers one phase, the slices in §9 simply merge into one release.
+**Decided**: 6a and 6b are released separately, each with its own gates and deploy (owner, A4).
 
-**Non-goals (later phases)**: departments/tree logic (9), roster CSV import (9), org settings beyond `teachers_can_create_courses` (9), shared org banks (9), student invitations and enrollment forms (9), assignments/accommodations/access codes (7), modules and pages (8), quiz statistics and org analytics (10), observer accounts and privacy (11). No `users.role` column, ever.
+**Non-goals (later phases)**: departments/tree logic (9), roster CSV import (9), org settings beyond `teachers_can_create_courses` (9), shared org banks (9), student invitations and enrollment forms (9), assignments/accommodations/access codes (7a), **exam templates and the constructor (7b data model, 8b builder; `EXAM_TEMPLATES_DESIGN.md`)**, general import format (7b), modules and pages (8a), quiz statistics and org analytics (10), observer accounts and privacy (11). No `users.role` column, ever.
 
 ---
 
@@ -49,7 +49,7 @@ Recommendation: ship 6a and 6b as two deploys with their own gates (Alternatives
 | id | uuid PK |
 | organization_id | uuid NOT NULL FK organizations.id RESTRICT |
 | user_id | varchar(64) NOT NULL FK users.id RESTRICT |
-| role | varchar(16) NOT NULL CHECK IN (`org_admin`,`teacher`); an org admin has every teacher power in the organization (one row per user per org) |
+| role | varchar(16) NOT NULL CHECK IN (`org_admin`,`teacher`); one row per user per org. An org admin manages the organization (members, courses, owners) and has **read-only** access inside its courses plus roster management; full teacher powers in a course only through a `teacher` enrollment they add themselves to (§2.2, owner decision A13) |
 | state | varchar(16) NOT NULL CHECK IN (`active`,`removed`) |
 | invited_by_id, invitation_id | FK users.id SET NULL; FK invitations.id SET NULL |
 | created_at, updated_at, removed_at, removed_by_id | timestamps; FK users.id SET NULL |
@@ -110,7 +110,7 @@ Order, evaluated per request (`app/core/authz.py`, extended; roles always from t
 
 1. Resource → course (one hop) → 404 if deleted.
 2. **Platform admin** (`users.is_platform_admin`): `/platform/*` routes and today's `PLATFORM_ADMIN_ACTIONS` inside course routes. Unchanged.
-3. **Org admin** of `course.organization_id` (active membership, role `org_admin`, organization not deleted): course actions `course.read`, `roster.read`, `roster.manage`, `course.transfer`, `content.read` (no answer keys, no attempts, no grades in Phase 6; Alternatives A13). Cached per request like the enrollment role (`AuthzContext.org_admin_for(organization_id)`).
+3. **Org admin** of `course.organization_id` (active membership, role `org_admin`, organization not deleted): course actions `course.read`, `roster.read`, `roster.manage`, `course.transfer`, `content.read` (no answer keys, no attempts, no grades; owner decision A13). Cached per request like the enrollment role (`AuthzContext.org_admin_for(organization_id)`). **Full teacher powers** only by adding themselves as a teacher: `POST /org/{organization_id}/courses/{course_id}/join-as-teacher` writes a `teacher/active` enrollment with `source = org_admin_self` and an `enrollment_events` row, plus an `admin_audit_log` row (`org_admin_joined_course`, `details.organization_id`, `course_id`); the roster and the People tab show the badge "Joined as organization admin" on that row, and the course owner sees it in the course's activity. Leaving the course again is the normal teacher removal (also logged). An org admin who is already staff of the course simply has that enrollment's powers.
 4. **Enrollment role** (`teacher`/`assistant`/`student`) → `ROLE_GRANTS`, unchanged.
 5. **Status gates**: draft (staff only), concluded (read-only) as today; **suspended organization** → read-only for everyone except the platform admin (`READ_ONLY_ACTIONS` only: no attempt start, no edits, no joins); the course disappears from `catalog_courses` and join by code answers with the same generic error as a wrong code.
 
@@ -130,6 +130,7 @@ Route inventory (`app/core/route_inventory.py`): new `POLICY_NAMES` `org_admin` 
 | GET `/platform/templates` (registry listing) | platform_admin |
 | GET `/org/{organization_id}`; GET `/org/{organization_id}/members`; POST `.../invitations`; DELETE `.../members/{user_id}` | org_admin |
 | GET `/org/{organization_id}/courses`; POST `/org/{organization_id}/courses` (create + assign owner; same service as `POST /courses`) | org_admin |
+| POST `/org/{organization_id}/courses/{course_id}/join-as-teacher` (A13; audited, visible in the roster) | org_admin |
 | GET `/org/{organization_id}/invitations`; POST `.../invitations/{id}/revoke`, `.../resend` | org_admin |
 | GET `/invitations/{token}` (org name, role, masked email, expiry; 404 for unknown/expired/revoked) | public+ratelimit |
 | POST `/invitations/{token}/accept` | authenticated+ratelimit (email must match the account's email) |
@@ -158,7 +159,7 @@ Four **areas** are navigation only (A8). The header shows an area switcher with 
 | Overview | Org name; tiles teachers / courses / students; pending invitations list; primary "Invite teacher". Suspended org: amber banner, write actions disabled. |
 | Teachers | Table: name, email, status badge (active / invited / blocked), courses count. "Invite teacher" → dialog (email, optional message). Row actions: "Revoke invitation", "Remove from organization" (reason dialog: "{name} keeps their courses; assign another owner if needed"). |
 | Courses | Table: title, owner, status, students. Primary "Create course" → page (title ky/ru/en, languages, template from the org's granted templates or general, owner = picker of org teachers). |
-| Course summary | Description list, staff list, "Assign owner" (picker, confirm), "Open course" (read-only staff view per §2.2). |
+| Course summary | Description list, staff list, "Assign owner" (picker, confirm), "Open course" (read-only staff view per §2.2), secondary "Join as teacher" (confirm dialog naming the effect: "You will appear in the course roster as a teacher; this is recorded in the organization log"). |
 
 **Teaching** and **Student** areas: unchanged in 6a except the removed teacher sign-up texts and the "Become a teacher" link (§7). 6b: student home (§8.4), header, design-system migration of touched screens.
 
@@ -168,26 +169,30 @@ Four **areas** are navigation only (A8). The header shows an area switcher with 
 
 Schema first, then data in the same revision (raw SQL, deterministic), then NOT NULL. The same steps live in `app/lms/organizations/bootstrap.py::ensure_organizations(db)`, idempotent, run in the lifespan **after** grading schemes and **before** `ensure_ort_courses` (SQLite dev/tests have no Alembic; production gets the migration, then the lifespan finds nothing to do). A test asserts both paths yield the same rows.
 
-| Step | Owner's version (default) | A1 variant (personal organizations) |
-|---|---|---|
-| 1 | Insert `organizations` **platform**: id `uuid5(NS, "org:platform")`, slug `platform`, name from an env/config value (`PLATFORM_ORG_NAME`, default "Platform"), settings `{"teachers_can_create_courses": true}`. | Same. |
-| 2 | Insert **independent**: id `uuid5(NS, "org:independent")`, slug `independent`, settings `{"teachers_can_create_courses": true}` (existing approved independents keep creating courses; A14). | No shared org. For every user with `teacher_status = approved` (not disabled, not the demo teacher): insert org `uuid5(NS, f"org:personal:{user_id}")`, slug `t-{short id}`, name = display name, setting true; membership `org_admin`. |
-| 3 | All `is_platform_admin` users → `organization_members(platform, org_admin)`. | Same. |
-| 4 | Both ORT courses (`course_id_for("ky")`, `course_id_for("ru")`) and their banks (`question_banks.course_id` in those) → `platform`; `template_key = 'ort'`, `template_version = 1`, `template_settings = {"language": <lang>}`, `template_locked = true`. Grant `(platform, 'ort')`. | Same. |
-| 5 | **ORT ownership (A11)**: `courses.owner_id` → the earliest-created active platform admin; its enrollment becomes the owner (`teacher/active`, source `admin_restored` event); the demo teacher `usr_ort_demo_teacher` keeps a `teacher/active` enrollment but is shown as "System account" (admin M5) and `ensure_ort_courses` stops re-adding it when `owner_id != DEMO_TEACHER_ID` (one guard line in `_ensure_course`; the seed's content logic is untouched). If no platform admin exists (fresh dev DB), nothing changes. | Same. |
-| 6 | Every other course → `independent`; its owner → member `teacher` of `independent` (if not already). Every other approved teacher → member `teacher`. | Every other course → its owner's personal org; disabled or unapproved owners get a personal org too (suspended if the user is disabled). |
-| 7 | Banks: `course_id` set → the course's org; else the owner's membership org; else `independent`. | Same with personal orgs. |
-| 8 | `courses.organization_id`, `question_banks.organization_id` → NOT NULL. Courses outside the two ORT courses that contain `ort_*` preset assessments: counted in the migration log, left as general courses (A15). | Same. |
+Decided variant: **personal organizations** (owner, A1). There is no shared "independent" organization.
 
-Idempotency: fixed uuid5 ids and "insert where missing"; re-running `ensure_organizations` changes nothing. `make_admin.py` also inserts the `platform` org admin membership. New platform admins promoted later get it from `make_admin.py`, not from the seed.
+| Step | What happens |
+|---|---|
+| 1 | Insert `organizations` **platform**: id `uuid5(NS, "org:platform")`, slug from `PLATFORM_ORG_SLUG` (default `platform`), name from `PLATFORM_ORG_NAME` (default "Platform"), settings `{"teachers_can_create_courses": true}`. Both are **placeholders**: the owner renames them later with `PATCH /platform/organizations/{id}` (name and slug editable; slug uniqueness checked); nothing references the slug except URLs. |
+| 2 | For every user with `teacher_status = approved` (not the demo teacher): insert the **personal organization** `uuid5(NS, f"org:personal:{user_id}")`, slug `t-{first 8 chars of a sha256 of the user id}`, name = the user's display name, settings `{"teachers_can_create_courses": true}` (A14: independents keep creating courses, inside their personal org), membership `org_admin` (the teacher administers their own org). A disabled user's personal org is created `suspended`. Platform admins get no personal org (they create courses in `platform` or in any org they administer). |
+| 3 | All `is_platform_admin` users → `organization_members(platform, org_admin)`. |
+| 4 | Both ORT courses (`course_id_for("ky")`, `course_id_for("ru")`) and their banks (`question_banks.course_id` in those) → `platform`; `template_key = 'ort'`, `template_version = 1`, `template_settings = {"language": <lang>}`, `template_locked = true`. Grant `(platform, 'ort')`. The ORT template is granted only by platform admins (never automatically to other orgs). |
+| 5 | **ORT ownership (A11, decided)**: `courses.owner_id` → the owner's account = the earliest-created active platform admin; its enrollment becomes the owner (`teacher/active`, source `admin_restored` event); the demo teacher `usr_ort_demo_teacher` keeps a `teacher/active` enrollment but is shown as "System account" (admin M5) and `ensure_ort_courses` stops re-adding it when `owner_id != DEMO_TEACHER_ID` (one guard line in `_ensure_course`; the seed's content logic is untouched). If no platform admin exists (fresh dev DB), nothing changes. |
+| 6 | Every other course → its owner's personal organization (created in step 2; an owner without `approved` status gets one here too, suspended if the user is disabled). In production this is exactly one row: the tester's private draft course moves to **that tester's personal organization** (owner decision). |
+| 7 | Banks: `course_id` set → the course's org; else the owner's personal org (created if missing). |
+| 8 | `courses.organization_id`, `question_banks.organization_id` → NOT NULL. Courses outside the two ORT courses that contain `ort_*` preset assessments: counted in the migration log, left as general courses (A15). |
 
-**Rehearsal (before merging to `main`)**: Neon branch from production → `create_postgres_role` on that branch only → `pg_dump -Fc` → local PG 18 (`/tmp/agy_pg`, port 55432) → `alembic upgrade head` + `alembic check` → run the lifespan via `TestClient` with `env -i`, cwd outside `backend/`, `ENVIRONMENT=production`, `LMS_STORAGE_DRIVER=db` → verification SQL: 0 courses and 0 banks without org; ORT courses in `platform` with `template_key='ort'`; grants = 1; members = platform admins + approved teachers; `ensure_ort_courses` report unchanged (0 new conversions). Then a Neon backup branch and the deploy.
+Idempotency: fixed uuid5 ids and "insert where missing"; re-running `ensure_organizations` changes nothing. `make_admin.py` also inserts the `platform` org admin membership. New platform admins promoted later get it from `make_admin.py`, not from the seed. New independents approved later get their personal org from `teachers/service.approve` (§7). Isolation invariant (tested): no bank, course or template grant is ever visible across two personal organizations; Phase 9 bank sharing is per organization, so independents can never share banks (owner rule).
+
+**Rehearsal (before merging to `main`)**: Neon branch from production → `create_postgres_role` on that branch only → `pg_dump -Fc` → local PG 18 (`/tmp/agy_pg`, port 55432) → `alembic upgrade head` + `alembic check` → run the lifespan via `TestClient` with `env -i`, cwd outside `backend/`, `ENVIRONMENT=production`, `LMS_STORAGE_DRIVER=db` → verification SQL: 0 courses and 0 banks without org; ORT courses in `platform` with `template_key='ort'`; grants = 1; one personal org per approved teacher (production: 2, the owner's account excluded as platform admin → 1 personal org for the tester holding the draft course); `ensure_ort_courses` report unchanged (0 new conversions). Then a Neon backup branch and the deploy.
 
 **Downgrade**: `downgrade()` drops the new columns and tables (memberships and invitations are lost). Policy: never downgrade production; rollback = redeploy the previous commit on the Neon backup branch.
 
 ---
 
 ## 5. Course templates
+
+A **course template** (this section) describes a course kind and is code; an **exam template** (owner's constructor idea, `EXAM_TEMPLATES_DESIGN.md` §2) describes one exam's structure and will be data (Phase 7b). ORT is a course template whose exams are today's `ort_main`/`ort_subject` presets; it never references an exam template. Design choice made now so that the two nest later: `CourseTemplate` gets a reserved field `exam_template_keys: tuple[str, ...] = ()` (empty for `ort` and `GENERAL` in 6a), and `CourseOut.template` exposes `result_view` and `passage_display` as explicit keys, which the exam template spec reuses verbatim.
 
 ### 5.1 Registry (`backend/app/lms/templates/`)
 
@@ -228,11 +233,11 @@ Idempotency: fixed uuid5 ids and "insert where missing"; re-running `ensure_orga
 | `content/import/ImportPanel.tsx:18-32` | `FORMATS` with default `full_main` (T11) | formats from `ui.importerProfiles`; general courses show no format select and send `exam_type = null`. ORT courses see exactly today's three options with `full_main` default. |
 | `lib/lms/contentTypes.ts` `ORT_SECTIONS`, `assessmentTypes.ts` `ORT_SUBJECT_KEYS` | constants used directly | kept and re-exported; consumed only through `templateUi`. |
 
-Teacher screens in an ORT course are unchanged: the same options appear because the ORT template declares exactly today's values.
+Teacher screens in an ORT course are unchanged: the same options appear because the ORT template declares exactly today's values. The ORT bank screens keep today's layout (one bank per imported source, section as a field; no split by section; owner decision A6).
 
 ### 5.4 Locked template (A7)
 
-| Locked (409 `template_locked`; UI shows the control disabled with "Fixed by the ORT template") | Editable |
+| Locked (409 `template_locked`; UI shows the control **greyed out with a short note** "Fixed by the ORT template", owner decision A7) | Editable |
 |---|---|
 | section keys, section order, add/remove sections, section `time_limit_s`, assessment `navigation`, `preset`, section `rules`, `grading_scheme_version_id`, result view, importer profile | questions, passages, pick items and their points; banks; title, description; `available_from/until`, `due_at`; `allowed_attempts`, `score_policy`, `results_policy`, `show_correct_answers`, `shuffle_*`; `grade_release`, `omit_from_total`; course title, description, join code, visibility, enrollment limit; roster |
 
@@ -248,7 +253,15 @@ No template: plain section labels, no ORT suggestions, no line numbers, general 
 
 ---
 
-## 6. ORT parity proof (gate, every phase from now)
+## 6. ORT review (gate, every phase from now): functionality unchanged, look keeps up
+
+Owner rule (second round): "unchanged" means ORT's **functionality and exam behaviour** stay the same; ORT's **design and layout keep up** with the platform so it never looks like an old, separate app. Every phase therefore runs the **ORT review**:
+
+1. **Look**: check the ORT screens (bank, CSV/zip upload, exam builder, exam player, results, student course pages) against the design system, navigation and the rest of the platform, on phones too. Apply visual and layout updates (colors, spacing, components, menus, page arrangement, phone layout) without asking.
+2. **Function**: the parity tests below (same imports, same scores, same exam rules) plus a **real walkthrough**: upload a CSV and a zip, build an ORT exam, take it as a student, see the result.
+3. **ux-reviewer** reviews the ORT screens with the rest; design findings are fixed without asking. Anything that changes **how ORT works** (exam rules, timing, navigation, question layout during the exam, scoring, import formats) is not done: it goes into `docs/ORT_PLAYER_IDEAS.md` part 2 for the owner's decision.
+4. **Report** in `docs/phases/PHASE_N.md`: what changed in ORT's look, with before/after screenshots, and the confirmation (test names + walkthrough) that functionality is unchanged.
+5. **Screenshot check**: the comparison runs against the **approved "after" baselines** in `docs/phases/ORT_BASELINE/`, so allowed polish is never flagged as a regression; every baseline update is reviewed by the orchestrator in the PR (before/after side by side) and the DOM assertions (section order, timer, palette, comparison columns, numbered lines, result cards) must still pass.
 
 | Test | What it proves | Where |
 |---|---|---|
@@ -256,7 +269,7 @@ No template: plain section labels, no ORT suggestions, no line numbers, general 
 | Score parity | Existing `test_ort_parity.py` (frozen tables, live oracle, Hypothesis), `test_ort_seed.py`, `test_ort_cutover_flow.py` unchanged and green. | existing |
 | ORT API e2e | Start `ort_main` → answer with the comparison card → autosave → finish section (forward-only refuses return) → timer boundary → submit → result has scaled score, percentile, five section rows, golden certificate rule. API-level in pytest (exists in part in `test_ort_cutover_flow.py`; extend). | `tests/lms/test_ort_e2e_api.py` |
 | ORT browser e2e | Playwright (new, `frontend/e2e/ort.spec.ts`, scratch backend via `env -i`, built frontend): lobby → start → comparison question → flag → palette states → section-end dialog → passage question with line numbers → submit dialog → result page. DOM assertions: section order and count, timer present, palette count, comparison columns A/B, numbered lines, result cards. | `frontend/e2e/` |
-| Screenshot baselines (A3) | `docs/phases/ORT_BASELINE/<screen>-<viewport>-<lang>.png` for: lobby, comparison, flagged palette, section-end dialog, passage, submit dialog, result, review (phone 375 and desktop 1440, ru + ky). Compared with `pixelmatch` at a 0.5 % pixel tolerance and anti-aliasing ignored, after the DOM assertions. An approved player improvement updates the baseline in the same PR with before/after images; the orchestrator reviews every baseline diff. | `frontend/e2e/ort-visual.spec.ts` |
+| Screenshot baselines (A3, decided) | `docs/phases/ORT_BASELINE/<screen>-<viewport>-<lang>.png` for: lobby, comparison, flagged palette, section-end dialog, passage, submit dialog, result, review (phone 375 and desktop 1440, ru + ky). Compared with `pixelmatch` at a 0.5 % pixel tolerance and anti-aliasing ignored, after the DOM assertions. The baselines are the **approved "after" images**: an allowed visual update replaces them in the same PR with before/after images; the orchestrator reviews every baseline diff. | `frontend/e2e/ort-visual.spec.ts` |
 | ORT teacher screens | Screenshots of the ORT bank list, question editor (comparison), passage editor, import page, ORT builder, publish panel, staff attempts, before and after 6a, in the same baseline folder (`teacher-*`); same comparison. | same |
 | Template guard tests | ORT course: all today's options present; general course: no ORT presets/profiles/datalists; ungranted org: 403 on `template_key='ort'`; locked course: 409 on structure edits, 200 on question edits. | `tests/lms/test_templates.py` |
 
@@ -269,8 +282,8 @@ The gate is a CI job (`ort-parity`) that must be green to merge into `lms` or `m
 | Flow | Steps |
 |---|---|
 | Student self sign-up (unchanged API) | `POST /auth/register` → email code → account. UI: no teacher choice; texts become neutral ("Create an account", no "ORT preparation"); auth pages use the shared `LanguagePicker` (student P2) and the platform-name key. Join by code or catalog as today. |
-| Teacher invited by an org admin or the platform admin | Org admin: "Invite teacher" (email, message) → `invitations` row (role `teacher`, 14 days) → email in the inviter's UI language via `email_service.send_email` (new templates en/ky/ru: "{inviter} invites you to {org} on {appName}", button with `/{lang}/invite/{token}`). Accept page shows org, role, masked email. Existing account: log in → `POST /invitations/{token}/accept` (email must match, else `invitation_email_mismatch`) → membership → redirect to Teaching (or the course if the org admin created one). New account: "Create account" with the email prefilled → verify → the page retries accept automatically. Platform admin uses the same flow for `org_admin` invitations. Expired: 404 and "ask your administrator for a new invitation"; resend issues a new token and revokes the old. Revoke by the inviter, any org admin of that org, or the platform admin. Pending invitations for an email are shown to that user after login (`GET /me/invitations`) so a lost email is not a dead end. |
-| Independent teacher | `POST /me/teacher-requests` stays (only path left for teachers without an organization). Approval (`teachers/service.approve`) also writes `organization_members(independent, teacher)` (A1: creates the personal org). Rejection/revoke unchanged. |
+| Teacher invited by an org admin or the platform admin | Org admin: "Invite teacher" (email, message) → `invitations` row (role `teacher`, 14 days) → email in the inviter's UI language via `email_service.send_email` (new templates en/ky/ru: "{inviter} invites you to {org} on {appName}", button with `/{lang}/invite/{token}`). **Sender (owner decision)**: the From display name is "{inviter display name} via {appName}" (`appName` from the i18n placeholder `common.appName` in the email's language), the From address is the configured sender of the existing Resend/Brevo/SMTP path (nothing new to configure or pay); no Reply-To (the invitee answers inside the app). The inviter's email address never appears in the message. Accept page shows org, role, masked email. Existing account: log in → `POST /invitations/{token}/accept` (email must match, else `invitation_email_mismatch`) → membership → redirect to Teaching (or the course if the org admin created one). New account: "Create account" with the email prefilled → verify → the page retries accept automatically. Platform admin uses the same flow for `org_admin` invitations. Expired: 404 and "ask your administrator for a new invitation"; resend issues a new token and revokes the old. Revoke by the inviter, any org admin of that org, or the platform admin. Pending invitations for an email are shown to that user after login (`GET /me/invitations`) so a lost email is not a dead end. |
+| Independent teacher | `POST /me/teacher-requests` stays (only path left for teachers without an organization). Approval (`teachers/service.approve`) creates the teacher's **personal organization** (same ids and settings as migration step 2) and the `org_admin` membership in the same transaction (A1, decided). Rejection/revoke unchanged (revoke suspends the personal org: its courses become read-only). |
 | Course owner adds staff | Existing `POST /courses/{id}/staff` by email for accounts that exist; new `POST /courses/{id}/staff/invitations` for emails without an account (role `teacher` or `assistant`, `course_id` set) → on accept, the enrollment is created; no org membership. |
 | "Become a teacher" link | Removed from the student navigation. Account menu gets "I am a teacher" → page `/[lang]/teacher-access`: "At a school or center? Ask your administrator for an invitation." + "Independent teacher? Apply" (today's request form). Pending request state shown as today. |
 
@@ -328,8 +341,8 @@ Pattern of `docs/phases/PHASE_5_SLICE_RULES.md`: one worktree and branch per sli
 
 | Slice | Scope | Owns |
 |---|---|---|
-| S0 (first, alone) | H1 hotfix + error boundary + test | `frontend/src/lib/lms/attemptTypes.ts`, `components/lms/player/PlayerShell.tsx`, `Palette.tsx`, `app/[lang]/courses/[courseId]/attempts/[attemptId]/error.tsx`, one test |
-| S1 | Schema + migration 0008 + bootstrap + `organizations` service/routers + authz extension + `can_create_courses` + `POST /courses` changes + `make_admin.py` + isolation tests + rehearsal script | `backend/alembic/versions/0008_*`, `app/lms/organizations/**`, `app/core/authz.py`, `app/lms/courses/{service,schemas,router,scopes}.py`, `app/lms/teachers/service.py`, `app/core/route_inventory.py` (S1 owns the file), `app/lms/platform_admin/organizations_*` |
+| S0 (first, alone; **released**) | H1 hotfix + error boundary + test | `frontend/src/lib/lms/attemptTypes.ts`, `components/lms/player/PlayerShell.tsx`, `Palette.tsx`, `app/[lang]/courses/[courseId]/attempts/[attemptId]/error.tsx`, one test |
+| S1 | Schema + migration 0008 (personal organizations) + bootstrap + `organizations` service/routers (incl. `join-as-teacher`) + authz extension + `can_create_courses` + `POST /courses` changes + `make_admin.py` + isolation tests + rehearsal script | `backend/alembic/versions/0008_*`, `app/lms/organizations/**`, `app/core/authz.py`, `app/lms/courses/{service,schemas,router,scopes}.py`, `app/lms/teachers/service.py`, `app/core/route_inventory.py` (S1 owns the file), `app/lms/platform_admin/organizations_*` |
 | S2 | Templates registry + ORT wrap + guards in builder/importers + `CourseOut.template` + A10 + golden import fixtures + template tests + ORT API e2e | `app/lms/templates/**`, guard blocks in `assessments/builder.py`, `content/importers/service.py`, `content/importers/rules.py` (A10 only), `ort/seed.py` (two additions), `tests/lms/test_templates.py`, `test_ort_import_golden.py`, `test_ort_e2e_api.py` |
 | S3 | Invitations (model is in S1's migration; S3 owns service/router/email templates), accept flow API, course staff invitations, `GET /me/invitations`, `/me/organizations`, teacher request → membership | `app/lms/invitations/**`, `app/services/email_service.py` (one block), `app/lms/teachers/router.py` |
 | S4 | Frontend 6a: admin organization pages, org admin area, invite accept page, teacher-access page, sign-up texts, `templateUi` and the component switches of §5.3, import panel default, scheme library gate, i18n groups `organizations`, `invitations`, `templates` | `frontend/src/app/[lang]/admin/organizations/**`, `app/[lang]/org/**`, `app/[lang]/invite/**`, `app/[lang]/teacher-access/**`, `lib/lms/{organizations,invitations,templates}.ts`, the six components in §5.3 |
@@ -337,42 +350,64 @@ Pattern of `docs/phases/PHASE_5_SLICE_RULES.md`: one worktree and branch per sli
 | S6 (6b) | `GET /me/home` + student home + student findings + `not_started` grade state + datetime serializer (H2) | `app/lms/home/**`, `frontend/src/app/[lang]/courses/page.tsx`, `courses/catalog/**`, `components/lms/home/**`, `grading` state addition |
 | S7 (6b) | ORT player part 1 + Playwright suite + baselines + visual comparison | `frontend/e2e/**`, `docs/phases/ORT_BASELINE/**`, `components/lms/player/**`, `components/lms/results/**`, `LobbyView.tsx` |
 
-**Gates** (all before merging into `lms`; again before `main`): SQLite suite and PG suite (`alembic upgrade head && alembic check`, migrations test, concurrency tests) green; route-inventory test green; org isolation suite (org admin A sees nothing of org B; teacher sees only own org's courses and banks; students unaffected); authorization matrix with `org_admin` and suspended orgs; template tests; invitation tests (expiry, single use, revoke, email mismatch, no enumeration, rate limit); sign-up API has no teacher path; migration test on a fixture DB; **ORT parity gate** (§6); **UX gate** (§8, screenshots saved in `docs/phases/PHASE_6_screens/`); `/security-review` on 6a (new authz paths, token handling, org scoping of every list) and on 6b (home endpoint scoping); i18n parity; `tsc --noEmit` and `next build` in an rsync'd copy; Neon backup branch + rehearsal (§4) before `main`; `/health` shows the new commit after deploy.
+**Gates** (all before merging into `lms`; again before `main`): SQLite suite and PG suite (`alembic upgrade head && alembic check`, migrations test, concurrency tests) green; route-inventory test green; org isolation suite (org admin A sees nothing of org B; two personal organizations see nothing of each other; teacher sees only own org's courses and banks; students unaffected); authorization matrix with `org_admin` (read-only inside courses; `join-as-teacher` audited) and suspended orgs; template tests; invitation tests (expiry, single use, revoke, email mismatch, no enumeration, rate limit, sender name "{inviter} via {appName}"); sign-up API has no teacher path; migration test on a fixture DB; **ORT review** (§6: parity tests, walkthrough, look, report); **UX gate** (§8, screenshots saved in `docs/phases/PHASE_6_screens/`); `/security-review` on 6a (new authz paths, token handling, org scoping of every list) and on 6b (home endpoint scoping); i18n parity; `tsc --noEmit` and `next build` in an rsync'd copy; Neon backup branch + rehearsal (§4) before `main`; `/health` shows the new commit after deploy.
 
 ---
 
-## 10. Alternatives to discuss (owner decides)
+## 10. Decided (owner answers 2026-10-24, second round)
 
-Short form; A1–A12 are explained in `docs/IMPLEMENTATION_PLAN.md` "Alternatives to discuss".
+The alternatives of the first draft are closed. Source: `docs/PRODUCT_DECISIONS.md` "Owner decisions 2026-10-24 (second round)". Nothing here is open any more; the remaining alternatives concern the exam template constructor only (`EXAM_TEMPLATES_DESIGN.md` §10).
 
-| # | Topic | Owner's version | Alternative | Recommendation |
-|---|---|---|---|---|
-| A1 | Independent teachers | One shared default organization; grants to orgs or teachers | One personal organization per independent (auto-created on approval; the teacher is its org admin); grants to organizations only | Personal organizations: one permission model, no cross-independent bank leaks in Phase 9, same org admin pages for everyone. Both migration variants are in §4. |
-| A2 | Course creation off by default | Org setting | Plus org admins and platform admins create courses and assign the owner (needed for the first course) | Adopt (built into §2.3, §3). |
-| A3 | Screenshot comparison | Every phase | Versioned baselines in `docs/phases/ORT_BASELINE/`, 0.5 % tolerance + DOM assertions, baseline changes reviewed | Adopt (§6). |
-| A4 | Phase size | One phase | 6a foundation, 6b experience, own gates and deploys | Split. |
-| A6 | Default banks per ORT section | Template provides per-section banks | Keep today's bank layout (one bank per imported source, section as a field) | Keep today's layout (rule A). |
-| A7 | Lock scope | "cannot change the exam structure" | The exact list in §5.4; disabled controls with a tooltip are a small visible change on ORT builder screens | Adopt the list; accept the disabled controls. |
-| A8 | Four areas | Four areas | Navigation only; powers stay on enrollment roles, org membership and the admin flag | Adopt. |
-| A9 | Screenshots in git | All screenshots committed | Curated compressed set + CI artifacts; ORT baselines always committed | Curated set. |
-| A10 | Importer subject keys | Do not touch ORT code | One alias fix inside the ORT importer with golden-fixture proof (§5.2) | Fix in 6a with the owner's OK. |
-| A11 | ORT course owner | Disabled demo teacher | Transfer to the owner's account; demo teacher stays as a system co-teacher; seed guarded | Transfer (§4 step 5). |
-| A12 | General import format | Not placed | Phase 9 (with shared banks) | Phase 9. |
-| A13 (new) | Org admin inside courses | "see each organization's teachers, courses and usage" | Read-only staff view + roster management + owner transfer (§2.2) versus full teacher powers in every course of the org | Read-only + roster in Phase 6; grades/attempts roll-ups come with Phase 10 analytics. Full teacher powers would let an admin see every student's answers without being on the course. |
-| A14 (new) | Setting for the independent organization | Off by default everywhere | On for the `independent` (or personal) organization, since every independent was individually approved and would otherwise lose course creation at the migration | On for independents; off for new school organizations. |
-| A15 (new) | ORT presets in courses without the ORT template | Not specified | Refuse new `ort_*` assessments outside ORT-template courses; existing ones keep working (grandfathered, counted in the migration log) | Adopt; the alternative (migrate such courses to the ORT template automatically) would grant ORT to teachers who never had a grant. |
-| A16 (new) | Course staff invitation and membership | "every course and bank belongs to an organization" | A co-teacher invited to a course gets the enrollment only, no org membership (§2.1) versus automatic membership in the course's organization | Enrollment only: membership means "the organization's teacher" and should be an org admin's decision. |
-| A17 (new) | Invitation acceptance | Not specified | Accept only when the logged-in email matches the invitation versus any logged-in account may accept | Email must match (prevents forwarding a teacher invitation to another account). |
-| A18 (new) | H2 datetime serialization | Not specified | Fix in 6a (backend `Z` for naive UTC + frontend guard) versus 6b | 6a: it affects audit log and admin screens the owner will use first. |
+| # | Topic | Decision | Where applied |
+|---|---|---|---|
+| H1 | Player crash hotfix | Fixed and released alone first; then the rest. | §1, §9 S0 |
+| A1 | Independent teachers | **Personal organization per independent teacher** (auto-created on approval; the teacher is its org admin). Banks are never shared between independent teachers. Grants go to organizations only. | §2.1, §4, §7 |
+| A2 | Course creation off by default | Org admins and platform admins create courses and assign the owner. | §2.3, §3 |
+| A3 | Screenshot comparison | Versioned baselines = the **approved "after" images**; allowed polish is never a regression; DOM assertions stay. | §6 |
+| A4 | Phase size | 6a and 6b released separately. | §1, §9 |
+| A6 | ORT banks | Keep today's bank screens and layout (no split by section). | §5.3 |
+| A7 | Lock scope and UI | The exact list of §5.4; locked settings **greyed out with a short note**. | §5.4 |
+| A8 | Four areas | Navigation only; powers stay on enrollment roles, membership and the admin flag. | §3 |
+| A9 | Screenshots in git | Curated compressed set + CI artifacts; ORT baselines always committed. | §8 |
+| A10 | Importer subject keys | Fix the alias bug inside the ORT importer; **prove ORT imports come out identical** (golden fixtures). | §5.2, §6 |
+| A11 | ORT course owner | The owner's account owns both ORT courses; demo teacher = system co-teacher; seed guarded. | §4 step 5 |
+| A12 | General import format | Moves to **Phase 7b** with the exam templates (`EXAM_TEMPLATES_DESIGN.md` §5); shared banks stay in Phase 9. | plan |
+| A13 | Org admin inside courses | **Read-only** + roster management + reassigning the teacher. Full teacher powers only by adding themselves as a teacher (visible in the roster, audited). | §2.1, §2.2, §2.3, §3 |
+| A14 | Course creation for independents | Stays **on**, inside the personal organization. Off by default for new school organizations. | §4 step 2 |
+| A15 | ORT presets outside ORT courses | Refuse new ones; existing ones grandfathered and counted. | §2.2 |
+| A16 | Course staff invitation | Enrollment only, no org membership. | §2.1 |
+| A17 | Invitation acceptance | Logged-in email must match the invitation. | §7 |
+| A18 | H2 datetime serialization | Fix in 6a. | §8.2 |
+| Org name | Owner's organization | Placeholders `PLATFORM_ORG_NAME` / `PLATFORM_ORG_SLUG` (defaults "Platform" / `platform`), renameable later by the owner in the admin UI. | §4 step 1 |
+| Tester course | The one private draft course in production | Moves to that tester's personal organization. | §4 step 6 |
+| Emails | Invitation sender | "{Inviter's name} via {appName}" as the From display name; address = the configured sender; `appName` from the i18n placeholder. | §7 |
+| ORT | Stance | One special, fixed template exactly as today: code, CSV/zip import, exam rules and scoring unchanged; owned by the owner; granted only by platform admins; **not rebuilt on the constructor now**. | §5, §6, `EXAM_TEMPLATES_DESIGN.md` §8 |
+| ORT review | Every phase | Functionality and exam behaviour unchanged (parity tests + real walkthrough); design and layout keep up with the platform (visual updates applied without asking); ux-reviewer covers ORT screens; behaviour ideas only in `docs/ORT_PLAYER_IDEAS.md`; report with before/after screenshots in `PHASE_N.md`. | §6, plan §0.4 |
 
 ---
 
-## 11. Open questions for the owner
+## 11. Open questions for the owner (second round)
 
-1. Name and slug of your organization in the migration (`PLATFORM_ORG_NAME`; default "Platform").
-2. A1: shared `independent` organization or personal organizations? (Changes §4 steps 2, 6, 7 only.)
-3. A10 and A11: OK to apply the one-line importer alias fix and to transfer ORT course ownership to your account?
-4. A13: org admin powers inside courses: read-only + roster (proposed) or full teacher?
-5. Production holds one tester course outside ORT (a private draft; checked read-only on Neon 2026-10-24) and 2 approved teachers (you and one tester): move the draft course to the independent organization (default) or delete it before the migration?
-6. Invitation emails: sender name/address to use (same Resend/Brevo configuration as the code emails; nothing new to pay for).
-7. 6a/6b split (A4) or one release?
+Phase 6 itself has no open questions left. The remaining ones concern the exam template constructor and are listed with the pros and cons in `EXAM_TEMPLATES_DESIGN.md` §10–§11:
+
+1. Placement: data model, "save as template" and the general import format in **Phase 7b**, the visual constructor and the scrolling display mode in **Phase 8b** (lettered sub-phases, no renumbering)?
+2. "Save this assessment as a template" as the first authoring path, before the visual constructor (B2)?
+3. One general import format with template validation and a downloadable header/example per template, instead of a generated file format per template (B3)?
+4. Platform exam templates visible to every organization without grants (B4/B11)?
+5. Who may lock an exam template: the template's owner scope (org admins lock org templates, platform admins lock platform templates)?
+6. Run the ORT expressibility dry-run test from 7b on (proves the constructor can express ORT without switching ORT; B9)?
+
+Minor, decide any time: should the invitation email carry a Reply-To to the inviter (default: no, the inviter's address is not exposed)?
+
+---
+
+## 12. Exam template constructor: evaluation (summary)
+
+Full text: `docs/phases/EXAM_TEMPLATES_DESIGN.md`. In short:
+
+- **Verdict**: the idea holds up. Sections with rules and timers, navigation, type restrictions, passage rules, scoring scheme versions and immutable snapshots already exist on assessments; the constructor adds a **reusable, versioned exam structure** (`exam_templates` + immutable `exam_template_versions` holding a validated JSON spec), **assessment creation from a template version** (`assessments.exam_template_version_id`; running exams keep their version because attempts read only the assessment snapshot), a **general import format validated against a template version**, a **block catalog** (question types, scheme versions, result views, passage renderers, display modes, importer profiles; backend registry + frontend map), and two new player features (**scrolling display mode**, explicit **result view** key).
+- **Terms**: a *course template* (Phase 6a, code) describes a course kind; an *exam template* (7b, data) describes one exam. A course template may offer exam templates; ORT offers today's presets and no exam template. `preset` and `exam_template_version_id` are mutually exclusive on an assessment, so the ORT path and the template path never mix.
+- **ORT**: stays on the preset path, unchanged. §8 of the design lists every ORT fact and how the spec could express it later (comparison-only sections, order and timings, forward-only per-section timers, numbered passages in reading only, the `piecewise_curve` version with the `zero_raw` quirk and section scoring, golden certificate threshold, the ORT result view, the subject exam through a template parameter). The one thing a generated format cannot do is accept today's CSV/zip files byte-compatibly; therefore the ORT importer stays a code **building block** (`importer_profile = "ort"`) that a template references. A dry-run parity test (B9) can prove expressibility without switching.
+- **Cost**: M (data model, API, save-as-template, general import format) + M (scrolling mode, result-view registry) + L (visual constructor).
+- **Placement**: 7b (after assignments, so "create from template" creates the assignment too) and 8b (after the design system). Not 6a.
+- **Alternatives** (B1–B12 in the design): evolve presets into data (not now), save-as-template first (yes), one general format with template validation (yes), platform templates without grants (yes), teacher scope from day one (yes), JSON spec not rows (yes), min/max counts (yes), scrolling split 7b column / 8b UI (yes), ORT expressibility test (yes), lettered sub-phases (yes), templates shareable while banks are not (yes), ORT exactly as today (keep).

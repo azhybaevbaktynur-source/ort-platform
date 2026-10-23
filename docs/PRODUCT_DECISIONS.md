@@ -235,3 +235,51 @@ Source: the owner's written answers of 2026-10-24 (verbatim copy kept by the orc
 |---|---|
 | E. Plan review | Done 2026-10-24 by the architect on Fable: `IMPLEMENTATION_PLAN.md` Phases 6–11, `LMS_ARCHITECTURE.md`, this file and the handoff updated for organizations, course templates, assignments, modules, enrollment, privacy and UX gates. |
 | F. Phase 6 design | `docs/phases/PHASE_6_DESIGN.md`: organization and permission tables, platform admin and org admin pages; migration of existing users and the two ORT courses; the course template design and exactly which ORT code becomes the ORT template, with the tests that prove nothing changed; sign-up and invite flows; UX audit results and the student home plan; "Alternatives to discuss". The agent stops there for the owner's review. |
+
+## Owner decisions 2026-10-24 (second round: answers to `phases/PHASE_6_DESIGN.md` §10/§11, ORT reviews, exam template constructor)
+
+Source: the owner's written answers of 2026-10-24 #2 (verbatim copy kept by the orchestrator). Applied to `phases/PHASE_6_DESIGN.md` (§10 "Decided"), `IMPLEMENTATION_PLAN.md` (§0.4, overview, Phases 6–9, D10, D19, D23, D24) and `LMS_ARCHITECTURE.md` §2b. Only the H1 hotfix is implemented before the owner's next review.
+
+### A. Answers to the Phase 6 alternatives and questions
+
+| # | Topic | Decision |
+|---|---|---|
+| H1 | Player crash hotfix | Fix today, release it alone, then continue. (Done.) |
+| A1 | Independent teachers | A **personal organization** for each independent teacher (auto-created on approval; the teacher is its org admin). **Banks must never be shared between independent teachers.** Template grants go to organizations only. |
+| A10 | Importer subject keys | Yes: fix the subject-key alias bug inside the ORT importer; **prove ORT imports come out identical** (golden fixtures). |
+| A11 | ORT course owner | Yes: the owner's account owns both ORT courses (demo teacher = system co-teacher). |
+| A13 | Org admin inside courses | **Read-only** access inside courses plus roster management and reassigning the teacher. Full teacher powers only by adding themselves as a teacher (visible in the roster, logged). |
+| A14 | Course creation for independents | Stays **on**, within the personal organization. (Off by default for new school organizations.) |
+| A7 | Locked ORT settings | Greyed out with a short note. |
+| Org name | The owner's organization | Placeholder name and short id (`PLATFORM_ORG_NAME` / `PLATFORM_ORG_SLUG`, defaults "Platform" / `platform`), renameable by the owner later. |
+| Tester course | The private draft course in production | Moves to that tester's personal organization. |
+| Emails | Invitation sender | "{Inviter's name} via {Platform name}" (platform name from the i18n placeholder `common.appName`); address = the configured sender. |
+| A4 | Release | 6a and 6b are released separately. |
+| A6 | ORT bank screens | Keep today's screens (no split by section). |
+| A3 | Screenshot check | Compare against the **approved "after" images**, so allowed polish is not flagged as a regression. |
+| A2, A8, A9, A15–A18 | Agent proposals | Accepted as written in the Phase 6 design. |
+
+### B. ORT: one special, fixed template, exactly as today
+
+ORT keeps its current code, CSV/zip import, exam rules and scoring unchanged; it is owned by the owner and granted only by platform admins; it is **not rebuilt on the constructor now**. Later decision (not now): once the constructor works and is proven on other exams, the owner and the agents decide together whether ORT moves onto it. `phases/EXAM_TEMPLATES_DESIGN.md` §8 records what the constructor would need to express ORT exactly, and the constructor is designed so that this move stays possible without changing ORT's behaviour or import files (the ORT importer stays a code building block; `preset` and exam templates are mutually exclusive; a dry-run expressibility test is proposed).
+
+### C. ORT review in every phase (refines rule A of the first round)
+
+"Unchanged" means ORT's **functionality and exam behaviour** stay the same. Its **design and layout keep up** with the platform. In each phase:
+
+1. Check ORT's screens (bank, CSV/zip upload, exam builder, exam player, results, the student course pages) for design and arrangement: do they match the new design system, navigation and the rest of the platform, and do they work well on phones? Apply visual and layout updates (colors, spacing, components, menus, page arrangement, phone layout) so ORT does not look like an old, separate app.
+2. Check ORT's functionality with the parity tests (same imports, same scores, same exam rules) and a **real walkthrough**: upload a CSV and a zip, build an ORT exam, take it as a student, see the result.
+3. ux-reviewer reviews the ORT screens with the rest. Fix design findings without asking. Anything that changes how ORT works (exam rules, timing, navigation, question layout during the exam, scoring, import formats) goes into `docs/ORT_PLAYER_IDEAS.md` for the owner's decision.
+4. Report in `docs/phases/PHASE_N.md` what changed in ORT's look, with before/after screenshots, and confirm its functionality is unchanged.
+
+Written into `IMPLEMENTATION_PLAN.md` §0.4 as the **ORT review** (replaces the "ORT parity gate" wording; the parity tests are part of it) and into `phases/PHASE_6_DESIGN.md` §6.
+
+### D. Exam template constructor (owner's new feature; architect evaluation for review)
+
+The owner asks for a builder in which an exam template is designed and saved: sections in order (name, question count, time limit), navigation (free or forward-only), display mode (one question per page or scrolling), allowed question types per section, passage options (e.g. line numbers), scoring (points, percent, lookup scale), result view, and an import format generated from the template's sections and question types that validates uploads; new question types and special scoring rules are pluggable building blocks that appear in the constructor; templates are versioned and running exams keep their version; owners are the platform, an organization (shared inside it) and maybe a teacher; templates can be locked; staging: data model first, then the visual builder.
+
+Architect evaluation (`phases/EXAM_TEMPLATES_DESIGN.md`): the design **holds up**; most blocks exist (section rules and timers, navigation, question-type registry, grading scheme versions, immutable assessment snapshots); new are the stored, versioned exam structure, assessment creation from a template version, a general import format validated against a template, a block catalog, a scrolling display mode and an explicit result-view key. Cost about M (data model, API, general import format) + M (scrolling mode, result views) + L (visual constructor). Proposed placement: **Phase 7b** (data model, "save assessment as template", general import format; after assignments) and **Phase 8b** (visual constructor, scrolling mode; after the design system). Not Phase 6a. Course template (code, Phase 6) and exam template (data, 7b) are distinct terms; ORT uses the former only. Alternatives B1–B12 and open questions are in that document; **the owner decides before any constructor code**.
+
+### E. Status
+
+H1 released. Phase 6 design (second draft) and the constructor evaluation wait for the owner's review. No other code until then.
