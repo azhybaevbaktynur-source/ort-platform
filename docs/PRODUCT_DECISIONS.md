@@ -139,3 +139,14 @@ Full list: P4-1 … in `docs/phases/PHASE_4_DESIGN.md` §1. Resolved during the 
 | Everything voided | A submission whose attempts are all voided has state `no_attempts` (shown as pending to the student, ignored in totals). |
 | Deleted assessments | Grade detail stays readable for staff; grade changes on a deleted assessment return 404. |
 | Integrity | Grade events are append-only and scheme versions immutable, enforced by the ORM and by PostgreSQL triggers. Existing graded attempts get submissions when 0005 runs. |
+
+## Owner decisions 2026-10-23 (after Phase 4)
+
+| Topic | Decision |
+|---|---|
+| Phase 5 cutover | Approved by the owner. Neon backup branch first. |
+| R2 storage | Owner set the R2 vars in Render and `backend/.env` (buckets `ort-uploads` public, `ort-private` private; `LMS_STORAGE_DRIVER=r2`). Verify a real upload/read at cutover. Tests never use R2 (forced `db` driver, blank keys). |
+| Test safety | Tests refuse `backend/test.db`, `backend/data/` and non-local databases (`tests/dev_data_guard.py`). Dev `test.db` reseeded from the sample CSVs. |
+| Neon branches | `loadtest-2026-10-22` deleted. `backup-2026-10-22-before-phase0-alembic` kept until one week after a stable Phase 5, then deleted. |
+| Brevo key | Never committed (checked all refs). Owner rotates it later; `.env.example` holds a placeholder. |
+| Render plan | Chosen by the owner before the first real exam. |

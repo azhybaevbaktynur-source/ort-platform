@@ -8,6 +8,17 @@ os.environ.setdefault("ENVIRONMENT", "development")
 # DEBUG defaults to True when no backend/.env exists (CI), so pin it off: tests must see real 401s
 os.environ.setdefault("DEBUG", "false")
 os.environ.setdefault("EMAIL_PROVIDER", "console")
+# backend/.env may hold real R2 credentials and LMS_STORAGE_DRIVER=r2: tests never talk to the real bucket
+# (driver tests monkeypatch settings or stub boto3)
+os.environ["LMS_STORAGE_DRIVER"] = "db"
+for _r2_var in ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_PUBLIC_BASE_URL", "R2_PRIVATE_BUCKET"):
+    os.environ[_r2_var] = ""
+
+from app.core.config import settings as _settings
+from tests.dev_data_guard import check_or_exit
+
+# Never run against backend/test.db, backend/data/ or a remote database: the fixtures below delete rows
+check_or_exit({"LOCAL_UPLOAD_DIR": _settings.LOCAL_UPLOAD_DIR, "LMS_LOCAL_STORAGE_DIR": _settings.LMS_LOCAL_STORAGE_DIR})
 
 from pathlib import Path
 

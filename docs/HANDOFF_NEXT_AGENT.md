@@ -28,15 +28,21 @@ Turn the ORT/ЖРТ exam bank (one global admin, one question bank) into a flexi
 - **Production stack**: Vercel (frontend) + Render Frankfurt (backend) + Neon PostgreSQL (project `noisy-sound-20763725`) + local-disk uploads (ephemeral). Read access to Render/Neon/Vercel via MCP tools is granted by the owner, but those tools need the owner to authenticate in the new session.
 - **Known remaining defects in old code** (do not fix; the cutover deletes them): analytics and completion counts read the in-memory Firestore mock; deleting an exam cascades to attempts; plain-text PINs without rate limit; 7-day JWT with no revocation.
 
-## 3b. Waiting on the owner (2026-10-23; Phases 0–4 done, Phase 1–4 code on `lms`)
+## 3b. Owner items (updated 2026-10-23)
 
-1. **OK to start Phase 5 (ORT cutover).** Hard rule: do not start without it. Neon backup branch first.
-2. **Confirm the R2 env vars in Render** (owner says they are set; the agent could not verify: Render MCP has no workspace selected and reading `backend/.env` is blocked). Names: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_BASE_URL`, `R2_PRIVATE_BUCKET`, plus `LMS_STORAGE_DRIVER=r2`. The old app on `main` ignores them; at cutover the agent checks an R2 upload/read before relying on it.
-3. **Optional: pick the Render workspace for the Render MCP** so the agent can read service settings and deploys itself.
-4. **Rotate the Brevo API key** (it is in the untracked `backend/.env.example` and appeared in an agent log).
-5. **Local `backend/test.db`**: an agent's pytest run emptied questions/attempts (56 users left, no backup). Decide: reseed or leave. Not blocking.
-6. **Neon branches** `backup-2026-10-22-before-phase0-alembic` and `loadtest-2026-10-22`: keep or delete (deletion is the owner's call).
-7. **Render plan for exam windows**: owner decides later; do not raise again unless asked.
+**Phase 5 (ORT cutover) is APPROVED by the owner (2026-10-23).** Neon backup branch first; then follow `IMPLEMENTATION_PLAN.md` Phase 5.
+
+Resolved 2026-10-23:
+- R2: owner set all 7 vars in Render and `backend/.env` (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET=ort-uploads`, `R2_PUBLIC_BASE_URL`, `R2_PRIVATE_BUCKET=ort-private`, `LMS_STORAGE_DRIVER=r2`). Not verified by the agent: check a real R2 upload/read during the cutover before relying on it. Tests force `LMS_STORAGE_DRIVER=db` and blank R2 keys (`tests/conftest.py`).
+- Render MCP: owner's workspace is "My Workspace" (service `ort-platform`, `srv-dauthnk1nsns73flhq4g`), but the MCP still returns "unauthorized"; continue without it (use `/health`).
+- `backend/test.db` reseeded from the two sample CSVs (25 ky + 25 ru questions; 56 users kept). Tests now refuse `backend/test.db`, `backend/data/` and non-local databases (`tests/dev_data_guard.py`, exit code 4).
+- Neon `loadtest-2026-10-22` deleted.
+- Brevo key: never committed (git log -S over all refs: 0 hits); the real key in the untracked `backend/.env.example` replaced with a placeholder.
+
+Still open (owner):
+1. **Rotate the Brevo API key** (owner will do it later).
+2. **Delete Neon `backup-2026-10-22-before-phase0-alembic`** one week after a stable Phase 5 (agent may delete it then; owner approved).
+3. **Render plan for exam windows**: decide before the first real exam; do not raise earlier.
 
 ## 4. Decisions asked in the first session (all answered, see §4b)
 
