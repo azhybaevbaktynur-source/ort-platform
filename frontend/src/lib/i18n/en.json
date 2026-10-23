@@ -1249,7 +1249,12 @@
       "section_closed": "Answers not saved because their section was already closed: {n}",
       "other": "Answers the server could not save: {n}"
     },
-    "working": "Working..."
+    "working": "Working...",
+    "crash": {
+      "title": "The exam page could not be shown",
+      "body": "Your saved answers are safe. Reload the page to continue; if it happens again, tell your teacher.",
+      "reload": "Reload"
+    }
   },
   "grading": {
     "allStatuses": "All statuses",

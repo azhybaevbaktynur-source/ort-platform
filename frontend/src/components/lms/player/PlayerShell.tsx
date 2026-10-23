@@ -7,10 +7,18 @@ import { ChevronLeft, ChevronRight, Eye, TriangleAlert } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
+import { pickLocalized } from "@/lib/lms/localized";
 import {
   closeSection, getAttempt, getAttemptContent, saveAnswers, saveAnswersKeepalive, submitAttempt,
 } from "@/lib/lms/attempts";
 import type { AttemptContent, AttemptItemState, AttemptState, SubmitOut } from "@/lib/lms/attemptTypes";
+import type { Lang, LocalizedText } from "@/lib/lms/types";
+
+/** Section title/instructions: plain string, or LocalizedText resolved to the attempt language. */
+function sectionText(v: string | LocalizedText | null | undefined, lang: Lang): string {
+  if (!v) return "";
+  return typeof v === "string" ? v : pickLocalized(v, lang);
+}
 import {
   AutosaveQueue, LAST_MINUTE_MS, ServerClock, browserQueueEnv, classifyCloseFailure, classifyFailure, backoffMs,
   effectiveDeadlineMs, timeUpSubmitDelayMs, unsavedParam, watchOtherTabs, type QueueSnapshot,
@@ -250,13 +258,14 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
 
   const sectionTitle = useCallback((pos: number): string => {
     const s = content?.sections.find((x) => x.pos === pos);
-    if (s?.title) return s.title;
+    const title = sectionText(s?.title, content?.language ?? lang);
+    if (title) return title;
     if (s?.key) {
       const label = t(`sections.${s.key}`);
       if (label !== `sections.${s.key}`) return label;
     }
     return `${t("player.section")} ${pos}`;
-  }, [content, t]);
+  }, [content, lang, t]);
 
   const answeredOf = useCallback((it: AttemptItemState): boolean => {
     if (!state || !content) return false;
@@ -511,6 +520,7 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
   const passage = curItem ? itemPassage(content, curItem, q) : null;
   const deadline = effectiveDeadlineMs(state);
   const curSection = content.sections.find((s) => s.pos === (curItem?.section_pos ?? state.current_section_pos));
+  const curInstructions = sectionText(curSection?.instructions, content.language ?? lang);
   const lastInSection = curIndex >= visibleItems.length - 1;
   const progressPct = visibleItems.length ? Math.round((counts.answered / visibleItems.length) * 100) : 0;
   const finishLabel = forwardOnly && !isLastSection ? t("player.finishSection") : t("player.finishTest");
@@ -559,10 +569,10 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
 
       <main className="mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 gap-5 px-4 py-5 lg:grid-cols-[minmax(0,1fr)_17rem]">
         <div className="space-y-4">
-          {curSection?.instructions ? (
+          {curInstructions ? (
             <details className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700" open={curIndex === 0}>
               <summary className="cursor-pointer font-semibold text-slate-800">{t("player.instructions")}</summary>
-              <p className="mt-2 whitespace-pre-line">{curSection.instructions}</p>
+              <p className="mt-2 whitespace-pre-line">{curInstructions}</p>
             </details>
           ) : null}
 
