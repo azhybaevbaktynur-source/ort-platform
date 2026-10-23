@@ -1843,6 +1843,16 @@
     "f4Title": "Three languages",
     "f4Text": "English, Kyrgyz and Russian everywhere."
   },
+  "catalog": {
+    "title": "Course catalog",
+    "subtitle": "Courses open to every student on the platform.",
+    "students": "Students: {count}",
+    "join": "Join",
+    "joining": "Joining…",
+    "open": "Open",
+    "needsCode": "Join with a code from the teacher",
+    "closed": "Enrollment is closed"
+  },
   "storage": {
     "nav": "Storage",
     "title": "File storage",

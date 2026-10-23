@@ -52,6 +52,12 @@ api_router.include_router(_gradebook_router, tags=["Gradebook"])
 from app.lms.grading.schemes_router import router as _schemes_router  # noqa: E402
 
 api_router.include_router(_schemes_router, prefix="/grading-schemes", tags=["Grading Schemes"])
+
+# --- Phase 5 S3 begin ---
+from app.lms.courses.catalog_router import router as _catalog_router  # noqa: E402
+
+api_router.include_router(_catalog_router, prefix="/catalog", tags=["Catalog"])
+# --- Phase 5 S3 end ---
 # --- Phase 5 S4 begin --- (R2 free-tier guard: storage summary + smoke check)
 from app.lms.platform_admin.storage_router import router as _storage_router  # noqa: E402
 
