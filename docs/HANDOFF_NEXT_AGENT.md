@@ -99,7 +99,7 @@ No subagents for single-file lookups. A *new* session only has files, so keep `t
 
 - **Never read, print or modify `backend/.env`** (live credentials).
 - Backend tests only against a scratch DB: `cd backend && /bin/rm -rf /tmp/agy_t && /bin/mkdir -p /tmp/agy_t/up && DATABASE_URL="sqlite:////tmp/agy_t/test.db" LOCAL_UPLOAD_DIR="/tmp/agy_t/up" venv/bin/python -m pytest -q -p no:cacheprovider -W ignore`. Never touch `backend/test.db` or `backend/data/`.
-- Frontend checks: `cd frontend && npx tsc --noEmit`; full build in an rsync'd copy (see `AGENTS.md` §6.2), not inside `frontend/` if a dev server runs.
+- Frontend checks: `cd frontend && npx tsc --noEmit`; full build in an rsync'd copy (see `AGENTS.md` §5), not inside `frontend/` if a dev server runs.
 - Use `/bin/rm -f`, `/bin/cp -f`, `/bin/mv -f` (interactive aliases). On macOS `sed -i` needs `-i ''`; prefer small Python scripts for edits.
 - Bilingual rule is now **trilingual**: every user-facing string in `en.json`, `ky.json`, `ru.json`.
 - Server-side authorization only; roles from the DB. No secrets or passwords in code (the repo is public).
