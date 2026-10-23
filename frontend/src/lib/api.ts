@@ -1,6 +1,4 @@
-// When running in the browser, relative "/api/v1" is proxied by Next.js rewrites to FastAPI (http://127.0.0.1:8000/api/v1).
-// Alternatively, if NEXT_PUBLIC_API_URL is explicitly set, use that.
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
+import { API_BASE_URL } from "@/lib/apiBase";
 
 interface RequestOptions extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>;

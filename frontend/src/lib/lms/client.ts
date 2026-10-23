@@ -1,6 +1,5 @@
 import { getAuthHeader } from "@/lib/api";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
+import { API_BASE_URL } from "@/lib/apiBase";
 
 /** Error from LMS endpoints. `code` maps to the i18n key `lms.errors.<code>`. */
 export class LmsApiError extends Error {

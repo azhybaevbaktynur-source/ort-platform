@@ -1,4 +1,5 @@
 import { getAuthHeader } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/apiBase";
 import { LmsApiError, lmsFetch } from "./client";
 import type { PageOut } from "./types";
 import type {
@@ -8,7 +9,6 @@ import type {
   StudentQuestionOut, TranslationCreateIn, VersionOut, VersionSummaryOut,
 } from "./contentTypes";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 const e = encodeURIComponent;
 const c = (courseId: string) => `/courses/${e(courseId)}`;
 

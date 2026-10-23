@@ -1,4 +1,5 @@
 import { getAuthHeader } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/apiBase";
 import { LmsApiError, lmsFetch } from "./client";
 import type {
   AnswerIn, AttemptContent, AttemptResultOut, AttemptState, MyAttemptOut, ReviewOut, SaveOut, StartIn,
@@ -28,7 +29,7 @@ export const getAttemptReview = (attemptId: string) => lmsFetch<ReviewOut>(`/att
  * `content_url` may be absolute, start with `/api/`, or be relative to the API base; all three work.
  */
 export async function getAttemptContent(state: Pick<AttemptState, "content_url">, signal?: AbortSignal): Promise<AttemptContent> {
-  const base = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
+  const base = API_BASE_URL;
   const u = state.content_url;
   const url = /^https?:\/\//.test(u) || u.startsWith("/api/") ? u : `${base}${u.startsWith("/") ? "" : "/"}${u}`;
   let res: Response;
@@ -54,7 +55,7 @@ export async function getAttemptContent(state: Pick<AttemptState, "content_url">
  * Browsers cap keepalive bodies at 64 KiB; callers skip it for bigger batches.
  */
 export async function saveAnswersKeepalive(attemptId: string, answers: AnswerIn[]): Promise<void> {
-  const base = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
+  const base = API_BASE_URL;
   const body = JSON.stringify({ answers });
   if (body.length > 60_000) return;
   try {

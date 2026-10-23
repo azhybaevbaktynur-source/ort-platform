@@ -33,6 +33,20 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
     void reload();
   }, [reload]);
 
+  const missing = (error as { status?: number } | null)?.status === 404;
+  if (missing && !course) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
+        <h1 className="text-xl font-bold text-slate-900">{t("courses.notFound.title")}</h1>
+        <p className="mt-2 text-sm text-slate-600">{t("courses.notFound.body")}</p>
+        <div className="mt-5 flex flex-wrap justify-center gap-3 text-sm font-medium">
+          <Link href={`/${lang}/courses`} className="rounded-xl bg-brand-600 px-4 py-2 text-white hover:bg-brand-700">{t("courses.home.backToList")}</Link>
+          <Link href={`/${lang}/courses/join`} className="rounded-xl border border-slate-200 px-4 py-2 text-slate-700 hover:bg-slate-50">{t("courses.notFound.join")}</Link>
+          <Link href={`/${lang}/courses#catalog`} className="rounded-xl border border-slate-200 px-4 py-2 text-slate-700 hover:bg-slate-50">{t("lms.nav.catalog")}</Link>
+        </div>
+      </div>
+    );
+  }
   if (error && !course) {
     return (
       <div className="space-y-4">

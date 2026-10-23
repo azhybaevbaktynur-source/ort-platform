@@ -105,7 +105,8 @@
       "becomeTeacher": "Become a teacher",
       "platformAdmin": "Platform admin",
       "gradingSchemes": "Grading schemes",
-      "catalog": "Catalog"
+      "catalog": "Catalog",
+      "account": "Account"
     },
     "common": {
       "save": "Save",
@@ -369,6 +370,11 @@
       "hint": "Courses you own that you deleted. Restoring returns a course as a draft.",
       "empty": "No deleted courses.",
       "restore": "Restore"
+    },
+    "notFound": {
+      "title": "Course not found",
+      "body": "This course doesn't exist, was removed, or you are not enrolled in it. Ask your teacher for a join code or find it in the catalog.",
+      "join": "Join with a code"
     }
   },
   "teacherRequest": {

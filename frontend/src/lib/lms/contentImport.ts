@@ -1,8 +1,8 @@
 import { getAuthHeader } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/apiBase";
 import { LmsApiError } from "./client";
 import type { Lang } from "./types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 /** Limits shown in the UI; the server enforces them (design P2-22). */
 export const IMPORT_LIMITS = { uploadMb: 50, rows: 5000, images: 1000 } as const;

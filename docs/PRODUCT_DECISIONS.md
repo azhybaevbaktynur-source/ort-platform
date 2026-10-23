@@ -180,3 +180,4 @@ Accepted deviations from the design:
 - Storage limits are decimal: warn 8,000,000,000 bytes, refuse 9,500,000,000 bytes (9.5 GiB would be about 10.2 GB, above the free tier).
 - `image_validation.py` moved into `app/lms/files/`; `attempts/bodycap.py` exempts the `files` upload route (it streams its own 10 MiB cap); the smoke audit row uses `target_type='user'`.
 - Production has no Kyrgyz questions: "ORT (Kyrgyz)" stays empty until a ky bundle is imported (owner informed).
+- Post-cutover fix: `NEXT_PUBLIC_API_URL` on Vercel is the bare Render origin, so every client now normalizes it once (`frontend/src/lib/apiBase.ts`, appends `/api/v1` like `next.config.ts`). A 401 on `/me/lms` (expired or pre-cutover token) signs out and goes to login. The LMS header shows role-aware links (admin, create course, grading schemes, become teacher), the account name and sign out; a missing course shows a friendly "course not found" page.
