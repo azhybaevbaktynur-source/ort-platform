@@ -40,6 +40,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     { href: `/${lang}/admin/users`, label: t("platformAdmin.nav.users") },
     { href: `/${lang}/admin/courses`, label: t("platformAdmin.nav.courses") },
     { href: `/${lang}/admin/audit-log`, label: t("platformAdmin.nav.auditLog") },
+    { href: `/${lang}/admin/storage`, label: t("storage.nav") },
   ];
   return (
     <SummaryContext.Provider value={{ pending, refresh }}>

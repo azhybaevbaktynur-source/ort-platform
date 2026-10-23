@@ -47,6 +47,14 @@ ROUTE_POLICIES: dict[tuple[str, str], str] = {
     **SCHEME_POLICIES,
 }
 
+# --- Phase 5 S4 begin --- (R2 free-tier guard: PDF files, storage summary and smoke check)
+ROUTE_POLICIES.update({
+    ("POST", "/api/v1/courses/{course_id}/files"): "course:content.manage+ratelimit",
+    ("GET", "/api/v1/platform/storage"): "platform_admin",
+    ("POST", "/api/v1/platform/storage/smoke"): "platform_admin",  # + rate limit 5/h, audited
+})
+# --- Phase 5 S4 end ---
+
 
 def iter_routes(app):
     """Yield (METHOD, path) for every HTTP route, flattening included routers.

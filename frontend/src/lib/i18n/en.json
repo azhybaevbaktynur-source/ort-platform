@@ -1842,5 +1842,73 @@
     "f3Text": "Transparent gradebook and detailed result reviews.",
     "f4Title": "Three languages",
     "f4Text": "English, Kyrgyz and Russian everywhere."
+  },
+  "storage": {
+    "nav": "Storage",
+    "title": "File storage",
+    "intro": "Cloudflare R2 must stay in the free tier (10 GB stored, 1 million Class A and 10 million Class B operations per month). The platform counts every file it writes and refuses new uploads before the limit.",
+    "r2devWarning": "Public images are served from an r2.dev address. r2.dev is rate-limited and not meant for production: switch to a custom domain before the first large exam.",
+    "units": {
+      "b": "B",
+      "kb": "KB",
+      "mb": "MB",
+      "gb": "GB"
+    },
+    "level": {
+      "ok": "OK",
+      "warn": "Warning",
+      "full": "Full"
+    },
+    "banner": {
+      "warnTitle": "File storage is almost full",
+      "warnBody": "Stored files have passed the warning level. New uploads are refused at the hard limit. Remove unused content or plan the next step with the owner.",
+      "fullTitle": "File storage is full",
+      "open": "Open storage details"
+    },
+    "totals": {
+      "title": "Stored files",
+      "driver": "Storage driver",
+      "stored": "Stored",
+      "objects": "Objects",
+      "level": "Level",
+      "limits": "Warning at {warn}, new uploads refused at {hard}.",
+      "everWritten": "On R2 this counts every byte ever written (nothing is deleted there), so it never goes down."
+    },
+    "month": {
+      "title": "This month ({month})",
+      "objectsWritten": "Objects written",
+      "bytesWritten": "Bytes written",
+      "classA": "Class A operations (writes)",
+      "classBBackend": "Class B operations by the server",
+      "classBEstimated": "Class B operations, estimated (image views)",
+      "ofFree": "{n} of {free}",
+      "estimateNote": "The estimate is attempts started this month times the images in each exam version (an upper bound; the browser cache keeps repeat views out)."
+    },
+    "smoke": {
+      "title": "R2 check",
+      "hint": "Writes a tiny test image to R2, reads it back from the public address, then deletes it. Limited to 5 runs per hour.",
+      "run": "Run R2 check",
+      "running": "Checking…",
+      "allOk": "All checks passed.",
+      "someFailed": "Some checks failed.",
+      "passed": "passed",
+      "failed": "failed",
+      "put": "Upload to the bucket",
+      "head": "Read back the object details",
+      "publicRead": "Read from the public address over HTTPS",
+      "deleted": "Test object deleted",
+      "publicUrl": "Public address",
+      "statusCode": "HTTP status",
+      "latency": "Time",
+      "ms": "{n} ms",
+      "error": "Details",
+      "notR2": "The server does not use R2 storage (LMS_STORAGE_DRIVER is not r2), so there is nothing to check.",
+      "rateLimited": "The check was run too often. Wait a while and try again."
+    }
+  },
+  "files": {
+    "errors": {
+      "storage_full": "File storage is full. New uploads are refused until space is freed. Contact the platform administrator."
+    }
   }
 }
