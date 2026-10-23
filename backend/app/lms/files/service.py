@@ -1,4 +1,4 @@
-"""Asset service: ingest (dedupe, quota, encode, store), image-ref resolution, list, soft delete."""
+"""Asset service: ingest (dedupe, quota, encode, store; images and PDF files), image-ref resolution, list, soft delete."""
 from __future__ import annotations
 
 import hashlib
@@ -16,10 +16,11 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.lms.core.errors import Conflict, LMSError, NotFound, ValidationFailed
 from app.lms.core.pagination import Page, paginate
-from app.lms.files import scopes
+from app.lms.files import scopes, usage
 from app.lms.files.images import EncodedImage, encode_image
 from app.lms.files.models import Asset, AssetBlob
 from app.lms.files.storage import blob_key, get_blob_storage
+from app.lms.files.usage import StorageFull  # noqa: F401  (re-exported: svc.StorageFull)
 from app.models.user import User
 
 
@@ -41,9 +42,14 @@ class ImageTooLarge(LMSError):
     code = "image_too_large"
 
 
-class StorageFull(LMSError):
-    status_code = 507
-    code = "storage_full"
+class FileInvalid(LMSError):
+    status_code = 400
+    code = "file_invalid"
+
+
+class FileTooLarge(LMSError):
+    status_code = 413
+    code = "file_too_large"
 
 
 def raise_for_encode_error(exc: ValueError) -> None:
@@ -82,7 +88,8 @@ def _check_global_db_cap(db: Session, key: str, add: int) -> None:
         return  # blob already stored; nothing new is added
     total = int(db.scalar(select(func.coalesce(func.sum(AssetBlob.size), 0))) or 0)
     if total + add > settings.ASSET_DB_MAX_TOTAL_BYTES:
-        raise StorageFull("Server image storage is full")
+        raise StorageFull("Server image storage is full",
+                          details={"stored_bytes": total, "limit_bytes": settings.ASSET_DB_MAX_TOTAL_BYTES})
 
 
 def check_import_caps(db: Session, owner_id: str, new_blobs: dict[str, int], new_assets_bytes: int) -> None:
@@ -94,22 +101,28 @@ def check_import_caps(db: Session, owner_id: str, new_blobs: dict[str, int], new
         return
     if _used_bytes(db, owner_id) + new_assets_bytes > settings.ASSET_QUOTA_BYTES_PER_USER:
         raise Conflict("Storage quota exceeded", code="storage_quota_exceeded")
-    if settings.LMS_STORAGE_DRIVER.lower() != "db" or not new_blobs:
+    if not new_blobs:
+        return
+    if settings.LMS_STORAGE_DRIVER.lower() != "db":
+        # r2/local: no listing; every blob counts as new (conservative: a shared blob adds nothing)
+        usage.check_capacity(db, sum(new_blobs.values()))
         return
     keys = list(new_blobs)
     present: set[str] = set()
     for i in range(0, len(keys), 500):
         present.update(db.scalars(select(AssetBlob.key).where(AssetBlob.key.in_(keys[i:i + 500]))))
     add = sum(size for k, size in new_blobs.items() if k not in present)
+    usage.check_capacity(db, add)
     total = int(db.scalar(select(func.coalesce(func.sum(AssetBlob.size), 0))) or 0)
     if total + add > settings.ASSET_DB_MAX_TOTAL_BYTES:
-        raise StorageFull("Server image storage is full")
+        raise StorageFull("Server image storage is full",
+                          details={"stored_bytes": total, "limit_bytes": settings.ASSET_DB_MAX_TOTAL_BYTES})
 
 
 def delete_unreferenced_blobs(db: Session, keys: Iterable[str]) -> int:
     """Best effort: delete blobs (written by a failed import) that no asset row references. Never raises."""
     keys = list(dict.fromkeys(keys))
-    removed = 0
+    removed = freed = deleted = 0
     try:
         storage = get_blob_storage()
         for i in range(0, len(keys), 500):
@@ -117,10 +130,16 @@ def delete_unreferenced_blobs(db: Session, keys: Iterable[str]) -> int:
             used = set(db.scalars(select(Asset.storage_key).where(Asset.storage_key.in_(chunk))))
             for k in chunk:
                 if k not in used:
-                    storage.delete(k)
+                    n = storage.delete(k)
                     removed += 1
+                    if n:
+                        freed, deleted = freed + n, deleted + 1
     except Exception:
         log.exception("could not clean up blobs of a failed import")
+    try:
+        usage.record_removed(freed, deleted)  # only what the driver really deleted (never on r2)
+    except Exception:
+        log.exception("could not update the storage counter")
     return removed
 
 
@@ -134,15 +153,20 @@ def sweep_orphan_blobs(db: Session, *, min_age_seconds: Optional[int] = None) ->
     r2 is skipped). Returns the number removed."""
     age = settings.ASSET_ORPHAN_MIN_AGE_SECONDS if min_age_seconds is None else min_age_seconds
     storage = get_blob_storage()
-    removed = 0
+    removed = freed = deleted = 0
     keys = list(storage.old_keys(time.time() - age, _SWEEP_BATCH))
-    for i in range(0, len(keys), 500):
-        chunk = keys[i:i + 500]
-        used = set(db.scalars(select(Asset.storage_key).where(Asset.storage_key.in_(chunk))))
-        for k in chunk:
-            if k not in used:
-                storage.delete(k)
-                removed += 1
+    try:
+        for i in range(0, len(keys), 500):
+            chunk = keys[i:i + 500]
+            used = set(db.scalars(select(Asset.storage_key).where(Asset.storage_key.in_(chunk))))
+            for k in chunk:
+                if k not in used:
+                    n = storage.delete(k)
+                    removed += 1
+                    if n:
+                        freed, deleted = freed + n, deleted + 1
+    finally:
+        usage.record_removed(freed, deleted)  # only what the driver really deleted (never on r2)
     return removed
 
 
@@ -205,20 +229,25 @@ def ingest_image(db: Session, actor: User, raw: bytes, *, course_id, visibility:
         _check_user_quota(db, actor.id, len(encoded.data))
     if not caller_stored:
         _check_global_db_cap(db, key, len(encoded.data))
-        get_blob_storage().put(key, encoded.data, "image/webp")
+        usage.check_capacity(db, len(encoded.data))
+        usage.store_blob(db, key, encoded.data, "image/webp")
 
     asset = Asset(
         owner_id=actor.id, course_id=course_id, kind="image", visibility=visibility,
         source_sha256=encoded.source_sha256, sha256=encoded.sha256, storage_key=key, mime="image/webp",
-        bytes=len(encoded.data), source_bytes=encoded.source_bytes, width=encoded.width,
+        extension="webp", bytes=len(encoded.data), source_bytes=encoded.source_bytes, width=encoded.width,
         height=encoded.height, original_filename=_clean_filename(filename),
     )
+    return _add_asset(db, asset, actor.id, source_sha, visibility)
+
+
+def _add_asset(db: Session, asset: Asset, owner_id: str, source_sha: str, visibility: str) -> tuple[Asset, bool]:
     try:
         with db.begin_nested():
             db.add(asset)
             db.flush()
     except IntegrityError:
-        winner = _find(db, actor.id, source_sha, visibility)
+        winner = _find(db, owner_id, source_sha, visibility)
         if winner is None:
             raise
         if winner.deleted_at is not None:
@@ -226,6 +255,41 @@ def ingest_image(db: Session, actor: User, raw: bytes, *, course_id, visibility:
             db.flush()
         return winner, True
     return asset, False
+
+
+PDF_MAGIC = b"%PDF-"
+
+
+def ingest_file(db: Session, actor: User, raw: bytes, *, course_id, filename: Optional[str] = None,
+                max_bytes: Optional[int] = None) -> tuple[Asset, bool]:
+    """PDF upload (P5-11): private only, stored as-is under `priv/{sha}.pdf`. Returns (asset, deduplicated).
+    The client's Content-Type is ignored; the bytes must start with `%PDF-`. Does NOT commit."""
+    cap = settings.FILE_MAX_UPLOAD_BYTES if max_bytes is None else max_bytes
+    if len(raw) > cap:
+        raise FileTooLarge("File is too large", details={"max_bytes": cap})
+    if not raw.startswith(PDF_MAGIC) or "application/pdf" not in settings.FILE_ALLOWED_MIMES:
+        raise FileInvalid("Only PDF files are accepted")
+    sha = hashlib.sha256(raw).hexdigest()
+    maybe_sweep_orphans(db)
+    existing = _find(db, actor.id, sha, "private")
+    if existing is not None:
+        if existing.deleted_at is not None:
+            existing.restore()
+            db.flush()
+        return existing, True
+    if settings.LMS_STORAGE_DRIVER.lower() == "r2" and not settings.R2_PRIVATE_BUCKET:
+        raise Conflict("Private storage is not configured", code="private_storage_unavailable")
+    _check_user_quota(db, actor.id, len(raw))
+    key = blob_key(sha, "private", "pdf")
+    _check_global_db_cap(db, key, len(raw))
+    usage.check_capacity(db, len(raw))
+    usage.store_blob(db, key, raw, "application/pdf")
+    asset = Asset(
+        owner_id=actor.id, course_id=course_id, kind="file", visibility="private", source_sha256=sha, sha256=sha,
+        storage_key=key, mime="application/pdf", extension="pdf", bytes=len(raw), source_bytes=len(raw),
+        original_filename=_clean_filename(filename),
+    )
+    return _add_asset(db, asset, actor.id, sha, "private")
 
 
 def resolve_image_refs(db: Session, actor: User, ids: Iterable[uuid.UUID], *,

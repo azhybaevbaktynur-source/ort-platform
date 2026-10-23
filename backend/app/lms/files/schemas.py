@@ -12,6 +12,7 @@ from app.lms.files.storage import media_url
 
 class AssetOut(BaseModel):
     id: uuid.UUID
+    kind: str = "image"  # image | file (PDF, Phase 5)
     url: Optional[str] = None
     visibility: str
     mime: str
@@ -26,7 +27,7 @@ class AssetOut(BaseModel):
 
 def asset_out(a: Asset, deduplicated: bool = False) -> AssetOut:
     return AssetOut(
-        id=a.id, url=media_url(a.sha256) if a.visibility == "public" else None, visibility=a.visibility,
+        id=a.id, kind=a.kind, url=media_url(a.sha256) if a.visibility == "public" else None, visibility=a.visibility,
         mime=a.mime, bytes=a.bytes, width=a.width, height=a.height, sha256=a.sha256,
         original_filename=a.original_filename, created_at=a.created_at, deduplicated=deduplicated,
     )

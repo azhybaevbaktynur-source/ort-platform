@@ -209,3 +209,60 @@ def test_copy_blobs_between_drivers_idempotent(monkeypatch, tmp_path, db, db_sto
     assert (rep2.copied, rep2.skipped) == (0, 1)
     dry = mod.copy_blobs(db_storage, LocalBlobStorage(str(tmp_path / "dst2")), [blob_key(sha)], dry_run=True)
     assert dry.copied == 1 and not LocalBlobStorage(str(tmp_path / "dst2")).exists(blob_key(sha))
+
+
+# --- Phase 5 S4: put reports new objects, delete reports freed bytes, PDF keys, smoke-only delete ---------------
+
+PDF_KEY = blob_key(SHA, "private", "pdf")
+
+
+def test_local_put_reports_new_and_delete_reports_bytes(local_storage):
+    s = local_storage
+    assert s.put(KEY, DATA, "image/webp") is True
+    assert s.put(KEY, DATA, "image/webp") is False
+    assert s.put(PDF_KEY, b"%PDF-1", "application/pdf") is True and s.get(PDF_KEY) == b"%PDF-1"
+    assert sorted(s.old_keys(9e18, 10)) == sorted([KEY, PDF_KEY])
+    assert s.delete(KEY) == len(DATA) and s.delete(KEY) == 0
+    assert [f for _, _, fs in os.walk(s.root) for f in fs if f.endswith(".tmp")] == []
+
+
+def test_db_put_reports_new_and_delete_reports_bytes(db_storage):
+    s = db_storage
+    assert s.put(PDF_KEY, b"%PDF-1", "application/pdf") is True
+    assert s.put(PDF_KEY, b"%PDF-1", "application/pdf") is False
+    with db_session.engine.connect() as c:
+        assert c.execute(select(AssetBlob.sha256, AssetBlob.mime)).one() == (SHA, "application/pdf")
+    assert s.delete(PDF_KEY) == 6 and s.delete(PDF_KEY) == 0
+
+
+def test_r2_put_reports_new_and_never_deletes():
+    s, client = _r2()
+    with Stubber(client) as st:
+        st.add_client_error("head_object", service_error_code="404", http_status_code=404)
+        st.add_response("put_object", {})
+        assert s.put(KEY, DATA, "image/webp") is True
+        st.add_response("head_object", {})
+        assert s.put(KEY, DATA, "image/webp") is False
+        assert s.delete(KEY) == 0  # no S3 call queued: the base no-op
+        assert list(s.old_keys(9e18, 10)) == []  # never lists
+        st.assert_no_pending_responses()
+
+
+def test_r2_pdf_goes_to_private_bucket_with_immutable_cache():
+    s, client = _r2()
+    with Stubber(client) as st:
+        st.add_client_error("head_object", service_error_code="404", http_status_code=404,
+                            expected_params={"Bucket": "pb", "Key": PDF_KEY})
+        st.add_response("put_object", {}, {"Bucket": "pb", "Key": PDF_KEY, "Body": b"%PDF-1",
+                                           "ContentType": "application/pdf",
+                                           "CacheControl": "public, max-age=31536000, immutable"})
+        assert s.put(PDF_KEY, b"%PDF-1", "application/pdf") is True
+        st.add_response("delete_object", {}, {"Bucket": "b", "Key": KEY})
+        s.delete_object_unsafe(KEY)
+        st.assert_no_pending_responses()
+
+
+def test_r2_presigned_pdf_content_type_and_attachment():
+    s, _ = _r2()
+    url = s.presigned_get(PDF_KEY, 300, "notes.pdf", content_type="application/pdf", attachment=True)
+    assert "response-content-type=application%2Fpdf" in url and "attachment" in url and "pb" in url

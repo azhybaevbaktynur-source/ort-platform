@@ -58,3 +58,8 @@ from app.lms.courses.catalog_router import router as _catalog_router  # noqa: E4
 
 api_router.include_router(_catalog_router, prefix="/catalog", tags=["Catalog"])
 # --- Phase 5 S3 end ---
+# --- Phase 5 S4 begin --- (R2 free-tier guard: storage summary + smoke check)
+from app.lms.platform_admin.storage_router import router as _storage_router  # noqa: E402
+
+api_router.include_router(_storage_router, prefix="/platform", tags=["Platform Admin"])
+# --- Phase 5 S4 end ---

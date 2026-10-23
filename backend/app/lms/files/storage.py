@@ -21,13 +21,13 @@ from app.lms.files.models import AssetBlob
 logger = logging.getLogger(__name__)
 
 IMMUTABLE_CACHE = "public, max-age=31536000, immutable"
-_KEY_RE = re.compile(r"^(img|priv)/[0-9a-f]{64}\.webp$")
+_KEY_RE = re.compile(r"^(img|priv)/([0-9a-f]{64})\.(webp|pdf)$")
 SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
-def blob_key(sha256: str, visibility: str = "public") -> str:
-    """Storage key of a stored (WebP) blob: public `img/{sha}.webp`, private `priv/{sha}.webp`."""
-    return f"{'priv' if visibility == 'private' else 'img'}/{sha256}.webp"
+def blob_key(sha256: str, visibility: str = "public", extension: str = "webp") -> str:
+    """Storage key of a stored blob: public `img/{sha}.webp`, private `priv/{sha}.webp`, PDF files `priv/{sha}.pdf`."""
+    return f"{'priv' if visibility == 'private' else 'img'}/{sha256}.{extension}"
 
 
 def _check_key(key: str) -> str:
@@ -42,8 +42,8 @@ class BlobStorage(ABC):
     name = "base"
 
     @abstractmethod
-    def put(self, key: str, data: bytes, mime: str) -> None:
-        """Idempotent; never overwrites an existing key."""
+    def put(self, key: str, data: bytes, mime: str) -> bool:
+        """Idempotent; never overwrites an existing key. True when this call wrote a new object."""
 
     @abstractmethod
     def exists(self, key: str) -> bool: ...
@@ -51,8 +51,10 @@ class BlobStorage(ABC):
     @abstractmethod
     def get(self, key: str) -> Optional[bytes]: ...
 
-    def delete(self, key: str) -> None:
-        """Remove a blob (orphan cleanup only). Drivers that cannot do it safely leave it (r2)."""
+    def delete(self, key: str) -> int:
+        """Remove a blob (orphan cleanup only); returns the bytes really removed (0: nothing deleted). Drivers that
+        cannot do it safely leave it (r2)."""
+        return 0
 
     def old_keys(self, cutoff_ts: float, limit: int) -> Iterable[str]:
         """Keys last written before `cutoff_ts` (epoch seconds), at most `limit`. Empty when unsupported (r2)."""
@@ -62,7 +64,8 @@ class BlobStorage(ABC):
         """None => the backend serves it through /media."""
         return None
 
-    def presigned_get(self, key: str, ttl: int, filename: str) -> Optional[str]:
+    def presigned_get(self, key: str, ttl: int, filename: str, content_type: Optional[str] = None,
+                      attachment: bool = False) -> Optional[str]:
         """None => the backend streams it."""
         return None
 
@@ -85,20 +88,28 @@ class LocalBlobStorage(BlobStorage):
     def _path(self, key: str) -> str:
         return os.path.join(self.root, *_check_key(key).split("/"))
 
-    def put(self, key: str, data: bytes, mime: str) -> None:
+    def put(self, key: str, data: bytes, mime: str) -> bool:
         path = self._path(key)
         if os.path.exists(path):
-            try:
-                os.utime(path)  # a re-put refreshes the age so the orphan sweep leaves it alone
-            except OSError:
-                pass
-            return
+            self._touch(path)
+            return False
         os.makedirs(os.path.dirname(path), exist_ok=True)
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".tmp")
         try:
             with os.fdopen(fd, "wb") as fh:
                 fh.write(data)
-            os.replace(tmp, path)
+            try:
+                os.link(tmp, path)  # atomic and exclusive: exactly one concurrent writer reports a new blob
+                created = True
+            except FileExistsError:
+                self._touch(path)
+                created = False
+            except OSError:  # filesystem without hard links
+                created = not os.path.exists(path)
+                os.replace(tmp, path)
+                return created
+            os.unlink(tmp)
+            return created
         except BaseException:
             try:
                 os.unlink(tmp)
@@ -106,14 +117,24 @@ class LocalBlobStorage(BlobStorage):
                 pass
             raise
 
+    @staticmethod
+    def _touch(path: str) -> None:
+        try:
+            os.utime(path)  # a re-put refreshes the age so the orphan sweep leaves it alone
+        except OSError:
+            pass
+
     def exists(self, key: str) -> bool:
         return os.path.isfile(self._path(key))
 
-    def delete(self, key: str) -> None:
+    def delete(self, key: str) -> int:
+        path = self._path(key)
         try:
-            os.unlink(self._path(key))
+            size = os.path.getsize(path)
+            os.unlink(path)
         except FileNotFoundError:
-            pass
+            return 0
+        return size
 
     def old_keys(self, cutoff_ts: float, limit: int) -> Iterable[str]:
         out: list[str] = []
@@ -161,19 +182,27 @@ class DbBlobStorage(BlobStorage):
     def _engine():
         return db_session.engine
 
-    def put(self, key: str, data: bytes, mime: str) -> None:
-        _check_key(key)
+    def put(self, key: str, data: bytes, mime: str) -> bool:
+        sha = _KEY_RE.match(_check_key(key)).group(2)
         engine = self._engine()
-        ins = (pg_insert if engine.dialect.name == "postgresql" else sqlite_insert)(AssetBlob.__table__).values(
-            key=key, sha256=key.rsplit("/", 1)[1][:-5], mime=mime, size=len(data), data=data,
-            created_at=utcnow(),
-        ).on_conflict_do_update(index_elements=[AssetBlob.__table__.c.key], set_={"created_at": utcnow()})
+        t = AssetBlob.__table__
+        ins = (pg_insert if engine.dialect.name == "postgresql" else sqlite_insert)(t).values(
+            key=key, sha256=sha, mime=mime, size=len(data), data=data, created_at=utcnow(),
+        ).on_conflict_do_nothing(index_elements=[t.c.key])
         with engine.begin() as conn:
-            conn.execute(ins)
+            created = conn.execute(ins).rowcount == 1
+            if not created:  # a re-put refreshes the age so the orphan sweep leaves it alone
+                conn.execute(t.update().where(t.c.key == key).values(created_at=utcnow()))
+        return created
 
-    def delete(self, key: str) -> None:
+    def delete(self, key: str) -> int:
+        t = AssetBlob.__table__
         with self._engine().begin() as conn:
-            conn.execute(delete(AssetBlob.__table__).where(AssetBlob.__table__.c.key == _check_key(key)))
+            size = conn.scalar(select(t.c.size).where(t.c.key == _check_key(key)))
+            if size is None:
+                return 0
+            res = conn.execute(delete(t).where(t.c.key == key))
+        return int(size) if res.rowcount else 0
 
     def old_keys(self, cutoff_ts: float, limit: int) -> Iterable[str]:
         from datetime import datetime, timezone
@@ -242,12 +271,18 @@ class R2StorageService(BlobStorage):
                 return False
             raise
 
-    def put(self, key: str, data: bytes, mime: str) -> None:
+    def put(self, key: str, data: bytes, mime: str) -> bool:
         if self.exists(key):
-            return
+            return False
         self.client.put_object(
             Bucket=self._bucket_for(_check_key(key)), Key=key, Body=data, ContentType=mime, CacheControl=IMMUTABLE_CACHE,
         )
+        return True
+
+    def delete_object_unsafe(self, key: str) -> None:
+        """Deletes an object. ONLY for the R2 smoke check's own probe object (app.lms.files.smoke): content
+        addressing means any other key may be shared, so orphan cleanup never deletes on r2 (delete() is a no-op)."""
+        self.client.delete_object(Bucket=self._bucket_for(_check_key(key)), Key=key)
 
     def get(self, key: str) -> Optional[bytes]:
         from botocore.exceptions import ClientError
@@ -266,14 +301,14 @@ class R2StorageService(BlobStorage):
             return f"{base}/{key}"
         return None
 
-    def presigned_get(self, key: str, ttl: int, filename: str) -> Optional[str]:
+    def presigned_get(self, key: str, ttl: int, filename: str, content_type: Optional[str] = None,
+                      attachment: bool = False) -> Optional[str]:
         safe = re.sub(r'[^A-Za-z0-9._-]', "_", filename or "image.webp")[:100] or "image.webp"
-        return self.client.generate_presigned_url(
-            "get_object",
-            Params={"Bucket": self._bucket_for(_check_key(key)), "Key": key,
-                    "ResponseContentDisposition": f'inline; filename="{safe}"'},
-            ExpiresIn=ttl,
-        )
+        params = {"Bucket": self._bucket_for(_check_key(key)), "Key": key,
+                  "ResponseContentDisposition": f'{"attachment" if attachment else "inline"}; filename="{safe}"'}
+        if content_type:
+            params["ResponseContentType"] = content_type
+        return self.client.generate_presigned_url("get_object", Params=params, ExpiresIn=ttl)
 
 
 def build_storage(driver: str) -> BlobStorage:
