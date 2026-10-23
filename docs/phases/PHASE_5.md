@@ -1,6 +1,6 @@
 # Phase 5 — ORT cutover
 
-**Status**: built 2026-10-23 on branch `phase-5/cutover` (slices S1-S6). Deploy to `main`: pending deploy (orchestrator updates this line). Design: `PHASE_5_DESIGN.md`; decisions P5-1..P5-13 in `PRODUCT_DECISIONS.md`.
+**Status**: built 2026-10-23 on branch `phase-5/cutover` (slices S1-S6). Deployed to production 2026-10-23 06:02 UTC: `main` 6fc3d38 (/health), Neon migrated 0001→0007 (backup branch `backup-2026-10-23-before-phase5` taken just before); ORT (Russian) has the 150-question exam, ORT (Kyrgyz) is empty, 16 image refs dropped; smoke checks passed. Design: `PHASE_5_DESIGN.md`; decisions P5-1..P5-13 in `PRODUCT_DECISIONS.md`.
 
 ## What changed
 

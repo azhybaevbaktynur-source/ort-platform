@@ -24,7 +24,7 @@ Turn the ORT/ЖРТ exam bank (one global admin, one question bank) into a flexi
 ## 3. Current state (updated 2026-10-23)
 
 - **Done**: Phases 0-4 on `lms`; **Phase 5 (ORT cutover) built** on `phase-5/cutover` (old exam system, Firebase mock and mock tokens removed; ORT = two platform courses; catalog + join; R2 free-tier guard). Details: `docs/phases/PHASE_5.md`. Tests: SQLite 2497 passed / 21 skipped, PG ~2552, i18n 1586 keys, Alembic head `0007_phase5_storage`.
-- **Cutover deploy: pending deploy.** <!-- orchestrator: update with commit and date once /health shows it -->
+- **Cutover deployed 2026-10-23 06:02 UTC** (`main` 6fc3d38, /health OK; Neon at `0007_phase5_storage`; pre-cutover backup branch `backup-2026-10-23-before-phase5`, untouched copy `rehearsal-2026-10-23-phase5`). Rollback = revert `main` + restore Neon from the backup branch (0006 is one-way). Waiting on the owner: one click on "Run R2 check" in `/[lang]/admin/storage`.
 - **Next**: Phases 6 (pages, modules, gating), 7 (enrollment forms, invitations), 8 (practice, analytics, student tools; the old practice/mistakes/progress pages are gone until then), 9 (privacy, hardening, launch).
 - **Production stack**: Vercel + Render Frankfurt (service `ort-platform`) + Neon (project `noisy-sound-20763725`) + Cloudflare R2 (`LMS_STORAGE_DRIVER=r2`). Render MCP may return "unauthorized"; use `/health`.
 
