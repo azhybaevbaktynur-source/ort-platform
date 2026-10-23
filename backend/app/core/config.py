@@ -154,6 +154,15 @@ class Settings(BaseSettings):
     SCHEME_WRITE_RATE_PER_HOUR: int = 100
     SCHEME_PREVIEW_RATE_PER_MIN: int = 60
 
+    # --- Phase 5 S4 begin --- (R2 free-tier guard, docs/phases/PHASE_5_DESIGN.md section 6)
+    STORAGE_WARN_BYTES: int = 8 * 1024 ** 3  # 8 GiB: admin warning
+    STORAGE_HARD_BYTES: int = int(9.5 * 1024 ** 3)  # 9.5 GiB: new blobs refused (storage_full, HTTP 507)
+    ASSET_MAX_UPLOAD_BYTES: int = 2 * 1024 * 1024  # images (also set by S2; identical value)
+    FILE_MAX_UPLOAD_BYTES: int = 10 * 1024 * 1024  # PDF files
+    FILE_ALLOWED_MIMES: list[str] = ["application/pdf"]
+    STORAGE_SMOKE_RATE_PER_HOUR: int = 5
+    # --- Phase 5 S4 end ---
+
     # Password hashing cost (bcrypt). 10 is OWASP's minimum and ~4x faster than 12 on small servers.
     BCRYPT_ROUNDS: int = 10
 

@@ -1,4 +1,4 @@
-"""Asset upload, listing, soft delete and private content (design section 5)."""
+"""Asset upload (images; Phase 5: PDF files), listing, soft delete and private content (design section 5)."""
 from __future__ import annotations
 
 import uuid
@@ -102,6 +102,64 @@ async def upload_asset(course_id: uuid.UUID, request: Request, response: Respons
     return out
 
 
+_FILE_FORM_OPENAPI = {
+    "requestBody": {"content": {"multipart/form-data": {"schema": {
+        "type": "object", "required": ["file"], "properties": {"file": {"type": "string", "format": "binary"}},
+    }}}}
+}
+
+
+def _file_too_large() -> svc.FileTooLarge:
+    return svc.FileTooLarge(
+        f"File is larger than {settings.FILE_MAX_UPLOAD_BYTES // (1024 * 1024) or 1} MB",
+        details={"max_bytes": settings.FILE_MAX_UPLOAD_BYTES},
+    )
+
+
+def _ingest_file(ctx: AuthzContext, course_id: uuid.UUID, raw: bytes, filename: Optional[str]):
+    asset, dup = svc.ingest_file(ctx.db, ctx.user, raw, course_id=course_id, filename=filename)
+    ctx.db.commit()
+    ctx.db.refresh(asset)
+    return asset_out(asset, dup), dup
+
+
+@router.post("/courses/{course_id}/files", response_model=AssetOut, status_code=201,
+             openapi_extra=_FILE_FORM_OPENAPI)
+async def upload_file(course_id: uuid.UUID, request: Request, response: Response,
+                      ctx: AuthzContext = Depends(get_authz)):
+    """PDF upload (Phase 5, P5-11): private, owner-only download via GET /assets/{id}/content."""
+    cap = settings.FILE_MAX_UPLOAD_BYTES
+    cl = request.headers.get("content-length")
+    if not cl or not cl.isdigit():
+        raise LengthRequired("Content-Length is required")
+    if int(cl) > cap + 64 * 1024:
+        raise _file_too_large()
+    cid = await run_in_threadpool(_prepare, ctx, course_id)
+    form = await request.form(max_files=1, max_fields=2, max_part_size=1024)
+    try:
+        file = form.get("file")
+        if not isinstance(file, UploadFile):
+            raise ValidationFailed("file is required")
+        chunks, total = [], 0
+        while True:
+            chunk = await file.read(64 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > cap:
+                raise _file_too_large()
+            chunks.append(chunk)
+        raw = b"".join(chunks)
+        if not raw:
+            raise svc.FileInvalid("Empty file")
+        out, dup = await run_in_threadpool(_ingest_file, ctx, cid, raw, file.filename)
+    finally:
+        await form.close()
+    if dup:
+        response.status_code = 200
+    return out
+
+
 @router.get("/assets", response_model=PageOut[AssetOut])
 def list_assets(q: Optional[str] = Query(None, max_length=100), cursor: Optional[str] = None, limit: int = 25,
                 user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
@@ -119,13 +177,24 @@ def delete_asset(asset_id: uuid.UUID, user: User = Depends(get_lms_user), db: Se
 def asset_content(asset_id: uuid.UUID, user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
     asset = svc.load_my_asset(db, user, asset_id)
     storage = get_blob_storage()
-    url = storage.presigned_get(asset.storage_key, 300, asset.original_filename or "image.webp")
+    is_file = asset.kind == "file"
+    default_name = "file.pdf" if is_file else "image.webp"
+    url = storage.presigned_get(asset.storage_key, 300, asset.original_filename or default_name,
+                                content_type=asset.mime if is_file else None, attachment=is_file)
     if url:
         return RedirectResponse(url, status_code=302, headers={"Cache-Control": "private, no-store"})
     data = storage.get(asset.storage_key)
     if data is None:
         raise svc.NotFound("Asset not found", code="asset_not_found")
-    return Response(content=data, media_type="image/webp", headers={
+    # a PDF is never rendered on the API origin: always a download
+    disposition = f'attachment; filename="{_safe_name(asset.original_filename, default_name)}"' if is_file else "inline"
+    return Response(content=data, media_type=asset.mime, headers={
         "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
-        "Content-Security-Policy": "default-src 'none'", "Content-Disposition": "inline",
+        "Content-Security-Policy": "default-src 'none'", "Content-Disposition": disposition,
     })
+
+
+def _safe_name(name: Optional[str], default: str) -> str:
+    import re
+
+    return re.sub(r"[^A-Za-z0-9._-]", "_", name or default)[:100] or default

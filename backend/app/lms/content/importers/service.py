@@ -25,7 +25,7 @@ from app.lms.content.models import BankQuestion, Passage, PassageVersion, Questi
 from app.lms.core.errors import Conflict, LMSError
 from app.lms.files.images import EncodedImage, encode_image
 from app.lms.files.models import Asset
-from app.lms.files.storage import blob_key, get_blob_storage
+from app.lms.files.storage import blob_key
 
 from .bundle import MAX_IMAGE_BYTES, display_root
 from .parse import parse_upload
@@ -127,13 +127,10 @@ def store_new_blobs(db: Session, actor_id: str, up: ParsedUpload, infos: dict[st
     except LMSError as e:
         up.issues.error(e.code, e.message)
         return []
-    storage = get_blob_storage()
     written: list[str] = []
     try:
         for key, enc in blobs.items():
-            existed = storage.exists(key)
-            storage.put(key, enc.data, "image/webp")
-            if not existed:
+            if fsvc.usage.store_blob(db, key, enc.data, "image/webp"):  # Phase 5 S4: counted when new
                 written.append(key)
     except Exception:
         log.exception("blob put failed")
