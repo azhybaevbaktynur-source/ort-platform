@@ -299,19 +299,19 @@ async def test_demo_teacher_cannot_log_in(db, api):
     assert r.status_code == 401
     r = await api.call(demo, "GET", "/auth/me")
     assert r.status_code in (401, 403)
-    # even a completed password reset (token planted directly) leaves login refused: account_disabled
+    # a planted reset token is refused like an unknown one (disabled account) and sets no password
     token = "reset-token-for-test"
     db.refresh(demo)
     demo.reset_token = auth_ep._secret_hash(token)
     demo.reset_token_expires = datetime.now(timezone.utc).replace(year=2099)
     db.commit()
     r = await api.call(None, "POST", "/auth/reset-password", json={"token": token, "new_password": "Str0ng-pass-123"})
-    assert r.status_code == 200, r.text  # reset-password does not check disabled_at (only reachable by token)
+    assert r.status_code == 400, r.text
     db.expire_all()
-    with pytest.raises(HTTPException) as ei:
-        auth_ep.login_user(UserLoginRequest.model_construct(
-            email=DEMO_TEACHER_EMAIL, password="Str0ng-pass-123", lang="ky"), db)
-    assert ei.value.status_code == 403 and "account_disabled" in str(ei.value.detail)
+    assert db.get(User, DEMO_TEACHER_ID).password_hash == "!"
+    demo = db.get(User, DEMO_TEACHER_ID)
+    demo.reset_token = auth_ep._secret_hash(token)
+    db.commit()
     # the next start re-asserts the unusable hash and drops any reset token
     ensure_ort_courses(db, samples=False)
     db.expire_all()

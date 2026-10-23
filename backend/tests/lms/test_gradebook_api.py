@@ -33,7 +33,7 @@ def _actors(db, w):
     R = make_user(db)
     enroll(db, w.course, R, state="removed")
     X = make_user(db)
-    P = make_user(db, platform_admin=True, role="admin", teacher_status="approved")
+    P = make_user(db, platform_admin=True, teacher_status="approved")
     return {"O": w.teacher, "T": T, "AS": AS, "S": w.students[0], "R": R, "X": X, "P": P}
 
 

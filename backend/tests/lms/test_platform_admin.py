@@ -57,7 +57,7 @@ async def test_non_admin_forbidden(client, db, method, path, body):
     # forged token: platform-admin claims for a plain student (claims must be ignored)
     forged = {"Authorization": "Bearer " + create_access_token(
         {"sub": student.id, "role": "admin", "is_platform_admin": True})}
-    legacy_admin = make_user(db, role="admin", teacher_status="approved")  # old role only
+    legacy_admin = make_user(db, teacher_status="approved")  # no platform flag (users.role dropped in 0006)
     for headers in (auth(student), auth(teacher), forged, auth(legacy_admin)):
         r = await client.request(method, path, json=body, headers=headers)
         assert r.status_code == 403, (method, path, r.text)

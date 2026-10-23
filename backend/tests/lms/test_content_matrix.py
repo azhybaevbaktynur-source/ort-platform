@@ -79,7 +79,7 @@ def users(db):
         _USERS["T"] = make_user(db, teacher_status="approved")
         for k in ("AS", "S", "R", "X"):
             _USERS[k] = make_user(db)
-        _USERS["P"] = make_user(db, platform_admin=True, role="admin", teacher_status="approved")
+        _USERS["P"] = make_user(db, platform_admin=True, teacher_status="approved")
         for k, v in list(_USERS.items()):
             _USERS[k] = SimpleNamespace(id=v.id, email=v.email)
     return _USERS

@@ -219,6 +219,8 @@ def _ensure_course(db: Session, demo: User, lang: str, report: SeedReport) -> Co
     cid = course_id_for(lang)
     course = db.get(Course, cid)
     if course is not None:
+        if course.status == "published" and course.published_at is None:  # the catalog needs it (keyset)
+            course.published_at = utcnow()
         _ensure_enrollment(db, course, demo, "owner")
         return course
     now = utcnow()
