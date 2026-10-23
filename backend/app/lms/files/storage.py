@@ -42,8 +42,9 @@ class BlobStorage(ABC):
     name = "base"
 
     @abstractmethod
-    def put(self, key: str, data: bytes, mime: str) -> bool:
-        """Idempotent; never overwrites an existing key. True when this call wrote a new object."""
+    def put(self, key: str, data: bytes, mime: str, *, checked: bool = False) -> bool:
+        """Idempotent; never overwrites an existing key. True when this call wrote a new object. `checked`: the
+        caller has just seen exists() == False (drivers whose existence test costs an operation may skip it)."""
 
     @abstractmethod
     def exists(self, key: str) -> bool: ...
@@ -88,7 +89,7 @@ class LocalBlobStorage(BlobStorage):
     def _path(self, key: str) -> str:
         return os.path.join(self.root, *_check_key(key).split("/"))
 
-    def put(self, key: str, data: bytes, mime: str) -> bool:
+    def put(self, key: str, data: bytes, mime: str, *, checked: bool = False) -> bool:
         path = self._path(key)
         if os.path.exists(path):
             self._touch(path)
@@ -182,7 +183,7 @@ class DbBlobStorage(BlobStorage):
     def _engine():
         return db_session.engine
 
-    def put(self, key: str, data: bytes, mime: str) -> bool:
+    def put(self, key: str, data: bytes, mime: str, *, checked: bool = False) -> bool:
         sha = _KEY_RE.match(_check_key(key)).group(2)
         engine = self._engine()
         t = AssetBlob.__table__
@@ -271,8 +272,10 @@ class R2StorageService(BlobStorage):
                 return False
             raise
 
-    def put(self, key: str, data: bytes, mime: str) -> bool:
-        if self.exists(key):
+    def put(self, key: str, data: bytes, mime: str, *, checked: bool = False) -> bool:
+        # `checked`: usage.store_blob just made the HEAD; one HEAD per new object, as the monthly counter assumes.
+        # Two writers racing past the HEAD both PUT identical bytes and both count (over-count: conservative).
+        if not checked and self.exists(key):
             return False
         self.client.put_object(
             Bucket=self._bucket_for(_check_key(key)), Key=key, Body=data, ContentType=mime, CacheControl=IMMUTABLE_CACHE,

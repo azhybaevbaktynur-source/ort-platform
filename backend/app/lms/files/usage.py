@@ -1,11 +1,15 @@
 """Storage accounting for the R2 free-tier guard (Phase 5 design section 6, P5-11).
 
 `storage_usage` (one row) counts bytes/objects ever written; `storage_monthly_usage` counts, per UTC month, the R2
-operations the backend itself makes and the bytes/objects written. Both are updated on their OWN connection, right
-after a NEW blob is stored (the blob write is committed on its own too, so the counter follows the blob, not the
-request transaction). Dedup hits write nothing. Never any list call: the counter replaces listing the bucket."""
+operations the backend itself makes and the bytes/objects written. A new blob first RESERVES its bytes in
+`storage_usage` with one conditional UPDATE (atomic: concurrent uploads can never pass the hard limit together), then
+is stored; a failed put or a blob another request wrote first refunds the reservation. Both counters are written on
+their OWN connection (the blob write is committed on its own too, so the counter follows the blob, not the request
+transaction). Dedup hits write nothing and are checked before the reservation, so they never get 507. Never any list
+call: the counter replaces listing the bucket."""
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -21,6 +25,7 @@ from app.lms.core.models import utcnow
 from app.lms.files.models import StorageMonthlyUsage, StorageUsage
 from app.lms.files.storage import get_blob_storage
 
+log = logging.getLogger(__name__)
 
 class StorageFull(LMSError):
     status_code = 507
@@ -71,7 +76,8 @@ def record_written(db: Optional[Session], nbytes: int, objects: int = 1) -> None
 
 
 def record_removed(nbytes: int, objects: int) -> None:
-    """Blobs the driver really deleted (local/db orphan cleanup). Never called on r2 (nothing is deleted there)."""
+    """Blobs the driver really deleted (local/db orphan cleanup), or a reservation refunded. Never called on r2 for
+    deletes (nothing is deleted there)."""
     if nbytes <= 0 and objects <= 0:
         return
     with db_session.engine.begin() as conn:
@@ -114,19 +120,84 @@ def level(stored: int) -> str:
     return "ok"
 
 
+def _full(stored: int) -> StorageFull:
+    return StorageFull("File storage is full", details={"stored_bytes": stored,
+                                                       "limit_bytes": settings.STORAGE_HARD_BYTES})
+
+
 def check_capacity(db: Session, add: int) -> None:
-    """Before storing `add` new bytes: refuse when the total would pass STORAGE_HARD_BYTES (one PK read)."""
+    """Summed pre-check (imports, before any blob is written): refuse when the total would pass STORAGE_HARD_BYTES
+    (one PK read). Not atomic; each blob is still reserved atomically by store_blob."""
     if add <= 0:
         return
     stored, _ = stored_totals(db)
     if stored + add > settings.STORAGE_HARD_BYTES:
-        raise StorageFull("File storage is full", details={"stored_bytes": stored,
-                                                           "limit_bytes": settings.STORAGE_HARD_BYTES})
+        raise _full(stored)
+
+
+def reserve(nbytes: int) -> None:
+    """Atomically add one object of `nbytes` to storage_usage unless the total would pass STORAGE_HARD_BYTES
+    (507 storage_full). Runs and commits on its OWN connection, not the request session: the blob is durable as soon
+    as it is put, so a later rollback of the request must not undo its counter (a refund is explicit)."""
+    hard = settings.STORAGE_HARD_BYTES
+    t = StorageUsage.__table__
+    now = utcnow()
+    upd = t.update().where(t.c.id == 1, t.c.stored_bytes + nbytes <= hard).values(
+        stored_bytes=t.c.stored_bytes + nbytes, object_count=t.c.object_count + 1, updated_at=now)
+    with db_session.engine.begin() as conn:
+        if conn.execute(upd).rowcount == 1:
+            return
+        if nbytes <= hard:  # no row yet (0007 inserts it; create_all databases do not)
+            ins = _insert(conn)(t).values(id=1, stored_bytes=nbytes, object_count=1, updated_at=now)
+            if conn.execute(ins.on_conflict_do_nothing(index_elements=[t.c.id])).rowcount == 1:
+                return
+            if conn.execute(upd).rowcount == 1:  # the row appeared concurrently
+                return
+        stored = conn.execute(select(t.c.stored_bytes).where(t.c.id == 1)).scalar()
+    raise _full(int(stored or 0))
+
+
+def _refund(nbytes: int) -> None:
+    try:
+        record_removed(nbytes, 1)
+    except Exception:  # noqa: BLE001  (the counter then over-counts: conservative)
+        log.exception("storage_usage refund of %d bytes failed", nbytes)
+
+
+def _record_month(nbytes: int) -> None:
+    """Best effort: the blob is already durable and counted in storage_usage; never fail the request here."""
+    r2 = _is_r2()
+    try:
+        with db_session.engine.begin() as conn:
+            _bump(conn, stored=0, objects=0, class_a=1 if r2 else 0, class_b=1 if r2 else 0,
+                  written_bytes=nbytes, written_objects=1)
+    except Exception:  # noqa: BLE001
+        log.exception("storage_monthly_usage update for a new %d-byte blob failed", nbytes)
 
 
 def store_blob(db: Optional[Session], key: str, data: bytes, mime: str) -> bool:
-    """Put a blob and account for it when it is new. Returns True when this call wrote a new object."""
-    created = get_blob_storage().put(key, data, mime)
-    if created:
-        record_written(db, len(data))
-    return created
+    """Put a blob and account for it when it is new. Returns True when this call wrote a new object.
+
+    1. exists? (dedup: nothing is reserved, so a dedup hit never gets 507) 2. reserve the bytes (507 when full)
+    3. put; a put that fails or finds the blob already written by a concurrent request refunds the reservation."""
+    storage = get_blob_storage()
+    nbytes = len(data)
+    if storage.exists(key):
+        if _is_r2():
+            return False  # r2 never deletes; nothing to refresh
+        # local/db: the re-put refreshes the blob's age so the orphan sweep leaves it alone
+        created = storage.put(key, data, mime)
+        if created:  # swept between exists() and put(): written again, count it (at most this one blob over)
+            record_written(db, nbytes)
+        return created
+    reserve(nbytes)
+    try:
+        created = storage.put(key, data, mime, checked=True)
+    except BaseException:
+        _refund(nbytes)
+        raise
+    if not created:
+        _refund(nbytes)  # dedup race: another request stored it first and counted it
+        return False
+    _record_month(nbytes)
+    return True

@@ -298,6 +298,26 @@ async def test_expired_reset_link():
         assert res.status_code == 400
 
 
+async def test_verify_email_refuses_disabled_account():
+    """verify-email never hands a token to a disabled account: not on the already-verified short cut and not with a
+    valid code; a wrong password still answers 401 first (no account-state probe)."""
+    email = new_email()
+    async with client() as c:
+        with capture_email_codes() as codes:
+            await register(c, email, codes)
+        update_user(email, disabled_at=datetime.now(timezone.utc), disabled_reason="test")
+        # Pending account, valid code
+        res = await c.post("/api/v1/auth/verify-email", json={"email": email, "password": PASSWORD, "code": codes[email]})
+        assert res.status_code == 403 and res.json()["detail"]["code"] == "account_disabled"
+        assert "access_token" not in res.json() and db_user(email).email_verified is False
+        # Already verified account
+        update_user(email, email_verified=True)
+        res = await c.post("/api/v1/auth/verify-email", json={"email": email, "password": PASSWORD, "code": "000000"})
+        assert res.status_code == 403 and res.json()["detail"]["code"] == "account_disabled"
+        res = await c.post("/api/v1/auth/verify-email", json={"email": email, "password": "wrongPass999", "code": "000000"})
+        assert res.status_code == 401
+
+
 async def test_disabled_account_gets_no_reset_token_and_reset_is_refused():
     """A disabled account: forgot-password answers exactly like for an unknown address (no token, no email), and a
     token issued before the disable (or planted) is refused like an invalid one; the password never changes."""

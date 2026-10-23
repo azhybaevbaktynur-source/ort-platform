@@ -6,8 +6,9 @@ Create Date: 2026-10-23
 
 Design: docs/phases/PHASE_5_DESIGN.md section 3.1 (P5-1, P5-2, P5-8, P5-10). Core SQL only: the ORM models of the
 old tables are deleted with this phase. Every exam set that has questions is copied into `legacy_ort_export` in the
-same transaction as the drops, so the drop can never lose content; `app.lms.ort.seed.ensure_ort_courses()` turns
-the export rows into course banks and assessments at startup.
+same transaction as the drops, so the drop can never lose content; questions in no exam set are copied too, one
+`legacy_unassigned_<lang>` practice_bank row per language. `app.lms.ort.seed.ensure_ort_courses()` turns the export
+rows into course banks and assessments at startup.
 """
 import logging
 from datetime import datetime, timezone
@@ -34,6 +35,8 @@ SECTION_ORDER = ("math_1", "math_2", "analogies", "reading", "grammar",
 OLD_TABLES = ("question_sources", "test_attempts", "exam_access", "questions", "exam_sets")  # FK order
 OLD_USER_COLUMNS = ("role", "target_score", "exams_taken", "current_score", "starting_score")
 CHUNK = 500
+UNASSIGNED_PREFIX = "legacy_unassigned_"
+UNASSIGNED_TITLE = "ORT question bank (unassigned)"
 
 _exam_sets = sa.table(
     "exam_sets", sa.column("id", sa.String), sa.column("title", sa.String), sa.column("description", sa.Text),
@@ -42,7 +45,7 @@ _exam_sets = sa.table(
     sa.column("available_until", sa.String), sa.column("question_ids", sa.JSON),
 )
 _questions = sa.table(
-    "questions", sa.column("id", sa.String), sa.column("section", sa.String), sa.column("topic", sa.String),
+    "questions", sa.column("id", sa.String), sa.column("language", sa.String), sa.column("section", sa.String), sa.column("topic", sa.String),
     sa.column("difficulty", sa.String), sa.column("stem", sa.Text), sa.column("column_a", sa.Text),
     sa.column("column_b", sa.Text), *(sa.column(f"option_{x}", sa.Text) for x in "abcde"),
     sa.column("correct_option", sa.String), sa.column("passage_text", sa.Text), sa.column("explanation", sa.Text),
@@ -97,8 +100,10 @@ def _load_questions(bind, ids: list[str]) -> list[dict]:
     return rows
 
 
-def _load_sources(bind, ids: list[str]) -> dict[str, dict]:
+def _load_sources(bind, ids: list[str], has_sources: bool) -> dict[str, dict]:
     out: dict[str, dict] = {}
+    if not has_sources:  # databases that never ran a bundle import may have no question_sources table
+        return out
     for k in range(0, len(ids), CHUNK):
         part = ids[k:k + CHUNK]
         for r in bind.execute(sa.select(_sources).where(_sources.c.question_id.in_(part))).mappings():
@@ -119,41 +124,71 @@ def _payload_item(q: dict, src: Optional[dict]) -> dict:
     }
 
 
-def export_exam_sets(bind) -> list[str]:
-    """Copy every exam set with >= 1 question into legacy_ort_export (ON CONFLICT DO NOTHING). Returns the ids."""
-    export = _export_table()
+def _insert_export(bind, *, exam_set_id: str, language: str, exam_type: str, title: str, description,
+                   sections, max_attempts, available_from, available_until, questions: list[dict],
+                   fallback_source: str, used_sources: set, has_sources: bool, now: datetime) -> int:
+    """One legacy_ort_export row (ON CONFLICT DO NOTHING), payload in the frozen order. Returns the question count."""
     insert = postgresql.insert if bind.dialect.name == "postgresql" else sqlite_dialect.insert
+    questions.sort(key=_sort_key)
+    sources = _load_sources(bind, [q["id"] for q in questions], has_sources)
+    distinct = {s["source_id"] for s in sources.values() if s.get("source_id")}
+    source_id = _cut(next(iter(distinct)) if len(distinct) == 1 else fallback_source, 120)
+    if (language, source_id) in used_sources:  # two sets of one source in one course: keep the banks apart
+        source_id = _cut(fallback_source, 120)
+    used_sources.add((language, source_id))
+    payload = [_payload_item(q, sources.get(q["id"])) for q in questions]
+    bind.execute(insert(_export_table()).values(
+        exam_set_id=exam_set_id, language=language, exam_type=exam_type, title=title, description=description,
+        sections=sections, max_attempts=max_attempts, available_from=available_from,
+        available_until=available_until, source_id=source_id, question_count=len(payload), payload=payload,
+        exported_at=now,
+    ).on_conflict_do_nothing(index_elements=["exam_set_id"]))
+    return len(payload)
+
+
+def export_exam_sets(bind, has_sources: bool = True) -> list[str]:
+    """Copy every exam set with >= 1 question into legacy_ort_export, then every question in no exam set
+    (exam_set_id NULL and not in any exam_sets.question_ids, or pointing at a missing set) as one practice_bank row
+    per language, `legacy_unassigned_<lang>` (the seed turns it into a bank only). ON CONFLICT DO NOTHING.
+    Returns the exported ids."""
     now = datetime.now(timezone.utc)
     exported: list[str] = []
     skipped_empty: list[str] = []
     used_sources: set[tuple] = set()
+    covered: set[str] = set()
     for es in bind.execute(sa.select(_exam_sets).order_by(_exam_sets.c.id)).mappings().all():
         ids = _set_question_ids(bind, es["id"], es["question_ids"])
+        covered.update(ids)
         questions = _load_questions(bind, ids) if ids else []
         if not questions:
             skipped_empty.append(es["id"])
             continue
-        questions.sort(key=_sort_key)
-        sources = _load_sources(bind, [q["id"] for q in questions])
-        language = _cut(es["language"] or "ky", 2)
-        distinct = {s["source_id"] for s in sources.values() if s.get("source_id")}
-        source_id = _cut(next(iter(distinct)) if len(distinct) == 1 else f"legacy_{es['id']}", 120)
-        if (language, source_id) in used_sources:  # two sets of one source in one course: keep the banks apart
-            source_id = _cut(f"legacy_{es['id']}", 120)
-        used_sources.add((language, source_id))
-        payload = [_payload_item(q, sources.get(q["id"])) for q in questions]
-        stmt = insert(export).values(
-            exam_set_id=es["id"], language=language, exam_type=_cut(es["exam_type"] or "full_main", 16),
-            title=es["title"] or es["id"], description=es["description"],
-            sections=es["sections"] if isinstance(es["sections"], list) else [],
+        _insert_export(
+            bind, exam_set_id=es["id"], language=_cut(es["language"] or "ky", 2),
+            exam_type=_cut(es["exam_type"] or "full_main", 16), title=es["title"] or es["id"],
+            description=es["description"], sections=es["sections"] if isinstance(es["sections"], list) else [],
             max_attempts=es["max_attempts"], available_from=_cut(es["available_from"], 40),
-            available_until=_cut(es["available_until"], 40), source_id=source_id, question_count=len(payload),
-            payload=payload, exported_at=now,
-        ).on_conflict_do_nothing(index_elements=["exam_set_id"])
-        bind.execute(stmt)
+            available_until=_cut(es["available_until"], 40), questions=questions,
+            fallback_source=f"legacy_{es['id']}", used_sources=used_sources, has_sources=has_sources, now=now)
         exported.append(es["id"])
     log.info("0006: exported %d exam set(s) with questions %s; skipped %d empty exam set(s)",
              len(exported), exported, len(skipped_empty))
+    # questions in no exam set (only id + language are read for the whole table)
+    by_lang: dict[str, list[str]] = {}
+    for qid, qlang in bind.execute(sa.select(_questions.c.id, _questions.c.language).order_by(_questions.c.id)):
+        if qid not in covered:
+            by_lang.setdefault(((qlang or "").strip().lower() or "ky")[:2], []).append(qid)
+    for lang in sorted(by_lang):
+        row_id = f"{UNASSIGNED_PREFIX}{lang}"
+        n = _insert_export(
+            bind, exam_set_id=row_id, language=lang, exam_type="practice_bank", title=UNASSIGNED_TITLE,
+            description=None, sections=[], max_attempts=None, available_from=None, available_until=None,
+            questions=_load_questions(bind, by_lang[lang]), fallback_source=row_id, used_sources=used_sources,
+            has_sources=has_sources, now=now)
+        exported.append(row_id)
+        log.info("0006: exported %d question(s) in no exam set as %s", n, row_id)
+    log.info("0006: %d question(s) in no exam set, %d language row(s)",
+             sum(len(v) for v in by_lang.values()), len(by_lang))
     return exported
 
 
@@ -181,8 +216,8 @@ def upgrade() -> None:
     )
     tables = set(sa.inspect(bind).get_table_names())
     # 2. export (fresh databases reach this point with empty old tables: nothing is exported)
-    if {"exam_sets", "questions", "question_sources"} <= tables:
-        export_exam_sets(bind)
+    if {"exam_sets", "questions"} <= tables:
+        export_exam_sets(bind, has_sources="question_sources" in tables)
     # 3. defensive repeat of 0002: old admins are platform admins and approved teachers before `role` goes
     users = sa.table("users", sa.column("role", sa.String), sa.column("is_platform_admin", sa.Boolean),
                      sa.column("teacher_status", sa.String))

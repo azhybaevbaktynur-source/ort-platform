@@ -66,7 +66,8 @@ def seed_0005(conn) -> None:
     _q(conn, "q_m2_b", s, "math_2", None, later)
     _q(conn, "q_m2_a", s, "math_2", None, NOW)
     _q(conn, "q_listed_only", None, "analogies", 1, NOW)  # in exam_sets.question_ids only
-    _q(conn, "q_orphan", None, "math_2", 1, NOW)  # in no set: not exported
+    _q(conn, "q_orphan", None, "math_2", 1, NOW)  # in no set: exported as legacy_unassigned_ru
+    _q(conn, "q_orphan_ky", None, "math_2", None, NOW, language="ky")  # -> legacy_unassigned_ky
     for qid, num, fixed in (("q_m1_1", "1", False), ("q_m1_2", "2", True), ("q_read_1", "1", False)):
         sec = "math_1" if qid.startswith("q_m1") else "reading"
         conn.execute(text(
@@ -86,17 +87,41 @@ EXPECTED_ORDER = ["q_m1_1", "q_m1_2", "q_m1_nopos", "q_m2_a", "q_m2_b", "q_liste
                   "q_read_1", "q_read_2", "q_read_3", "q_read_4", "q_gram_1"]
 
 
+def _json(value):
+    import json
+
+    return value if isinstance(value, list) else json.loads(value)
+
+
+def _export_rows(conn) -> list:
+    return conn.execute(text(
+        "SELECT exam_set_id, language, exam_type, title, sections, max_attempts, source_id, question_count, payload, "
+        "consumed_at, result FROM legacy_ort_export ORDER BY exam_set_id")).mappings().all()
+
+
+def check_unassigned(rows) -> None:
+    """Questions in no exam set: one practice_bank row per language, nothing dropped silently."""
+    un = {r["exam_set_id"]: r for r in rows if r["exam_set_id"].startswith("legacy_unassigned_")}
+    assert set(un) == {"legacy_unassigned_ky", "legacy_unassigned_ru"}
+    for lang, qid in (("ky", "q_orphan_ky"), ("ru", "q_orphan")):
+        r = un[f"legacy_unassigned_{lang}"]
+        assert (r["language"], r["exam_type"], r["title"], r["source_id"], r["question_count"], r["max_attempts"]) == \
+            (lang, "practice_bank", "ORT question bank (unassigned)", f"legacy_unassigned_{lang}", 1, None)
+        assert _json(r["sections"]) == [] and r["consumed_at"] is None
+        assert [p["legacy_id"] for p in _json(r["payload"])] == [qid]
+
+
 def check_0006(conn) -> None:
     names = set(inspect(conn).get_table_names())
     assert not OLD_TABLES & names and "legacy_ort_export" in names
-    rows = conn.execute(text("SELECT exam_set_id, language, exam_type, title, sections, max_attempts, source_id, "
-                             "question_count, payload, consumed_at, result FROM legacy_ort_export")).mappings().all()
-    assert [r["exam_set_id"] for r in rows] == ["exam_bundle_coomo"]  # empty shells are not exported
+    rows = _export_rows(conn)
+    # empty shells are not exported; questions in no set are
+    assert [r["exam_set_id"] for r in rows] == ["exam_bundle_coomo", "legacy_unassigned_ky", "legacy_unassigned_ru"]
+    check_unassigned(rows)
     r = rows[0]
-    import json
 
-    payload = r["payload"] if isinstance(r["payload"], list) else json.loads(r["payload"])
-    sections = r["sections"] if isinstance(r["sections"], list) else json.loads(r["sections"])
+    payload = _json(r["payload"])
+    sections = _json(r["sections"])
     assert (r["language"], r["exam_type"], r["title"], r["max_attempts"], r["source_id"], r["question_count"]) == \
         ("ru", "full_main", "ОРТ Цоомо", 2, "ort_coomo", 11)
     assert sections[1] == {"section": "reading", "questionCount": 3, "timeLimitMinutes": 45}
@@ -167,6 +192,36 @@ def test_0006_export_and_drop_on_sqlite(tmp_path):
     engine.dispose()
 
 
+def check_without_sources(conn) -> None:
+    """No question_sources table: the export still runs, every payload item has no external_id/fixed, q_num falls
+    back to questions.q_num and the bank source is legacy_<set id>."""
+    rows = _export_rows(conn)
+    assert [r["exam_set_id"] for r in rows] == ["exam_bundle_coomo", "legacy_unassigned_ky", "legacy_unassigned_ru"]
+    check_unassigned(rows)
+    r = rows[0]
+    assert (r["source_id"], r["question_count"]) == ("legacy_exam_bundle_coomo", 11)
+    payload = _json(r["payload"])
+    assert [p["legacy_id"] for p in payload] == EXPECTED_ORDER
+    assert all(p["external_id"] is None and p["fixed"] is False for p in payload)
+    assert {p["legacy_id"]: p["q_num"] for p in payload}["q_m1_2"] == "2"
+
+
+def test_0006_export_without_question_sources_on_sqlite(tmp_path):
+    engine, cfg, command = _upgrade(tmp_path)
+    with engine.connect() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, PREV)
+        conn.commit()
+        seed_0005(conn)
+        conn.execute(text("DROP TABLE question_sources"))
+        conn.commit()
+        command.upgrade(cfg, REV)
+        conn.commit()
+        assert not OLD_TABLES & set(inspect(conn).get_table_names())
+        check_without_sources(conn)
+    engine.dispose()
+
+
 def test_0006_on_fresh_db_exports_nothing(tmp_path):
     engine, cfg, command = _upgrade(tmp_path)
     with engine.connect() as conn:
@@ -184,7 +239,7 @@ def test_0006_export_feeds_the_seed(tmp_path):
     from sqlalchemy.orm import Session
 
     from app.lms.assessments.models import Assessment
-    from app.lms.content.models import BankQuestion, Passage
+    from app.lms.content.models import BankQuestion, Passage, QuestionBank
     from app.lms.grading.seeds import ensure_system_schemes
     from app.lms.ort.seed import course_id_for, ensure_ort_courses
 
@@ -202,8 +257,16 @@ def test_0006_export_feeds_the_seed(tmp_path):
         rep = ensure_ort_courses(db, samples=False)
         assert rep.ok, rep
         assert (rep.exports_converted, rep.questions_created, rep.images_dropped, rep.assessments_published) == \
-            (1, 11, 1, 1)
-        qs = list(db.query(BankQuestion).order_by(BankQuestion.position))
+            (3, 13, 1, 1)
+        # the questions in no exam set land in a bank of their language's course, with no assessment
+        for lang, qid in (("ru", "q_orphan"), ("ky", "q_orphan_ky")):
+            q = db.query(BankQuestion).filter(
+                BankQuestion.source_ref == f"legacy_unassigned_{lang}:legacy:{qid}").one()
+            bank = db.get(QuestionBank, q.bank_id)
+            assert bank.course_id == course_id_for(lang) and bank.source_id == f"legacy_unassigned_{lang}"
+        assert db.query(Assessment).filter(Assessment.course_id == course_id_for("ky")).count() == 0
+        qs = list(db.query(BankQuestion).filter(BankQuestion.source_ref.like("ort_coomo:%"))
+                  .order_by(BankQuestion.position))
         assert [q.source_ref for q in qs][:2] == ["ort_coomo:math_1:1", "ort_coomo:math_1:2"]
         assert qs[2].source_ref == "ort_coomo:legacy:q_m1_nopos"
         assert [q.type for q in qs[:3]] == ["comparison"] * 3

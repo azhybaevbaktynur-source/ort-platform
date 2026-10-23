@@ -247,10 +247,13 @@ def _ensure_course(db: Session, demo: User, lang: str, report: SeedReport) -> Co
     return course
 
 
-def _ensure_enrollment(db: Session, course: Course, user: User, source: str) -> bool:
-    """Active teacher enrollment for `user`; True when something changed."""
+def _ensure_enrollment(db: Session, course: Course, user: User, source: str, *, create_only: bool = False) -> bool:
+    """Active teacher enrollment for `user`; True when something changed. `create_only`: only insert when the user
+    has no enrollment row at all; an existing row (an admin who left or was removed, or changed role) is left as is."""
     enr = db.execute(select(Enrollment).where(Enrollment.course_id == course.id, Enrollment.user_id == user.id)
                      ).scalar_one_or_none()
+    if enr is not None and create_only:
+        return False
     now = utcnow()
     if enr is None:
         enr = Enrollment(course_id=course.id, user_id=user.id, role="teacher", state="active", source=source,
@@ -270,12 +273,14 @@ def _ensure_enrollment(db: Session, course: Course, user: User, source: str) -> 
 
 
 def _ensure_admin_teachers(db: Session, demo: User, courses: list[Course], report: SeedReport) -> None:
-    """P5-6: every enabled platform admin is a co-teacher of every ORT course (new admins on the next start)."""
+    """P5-6 as applied: every enabled platform admin with no enrollment row in an ORT course is added as co-teacher
+    (new admins on the next start). A row that already exists is never revived: an admin who left or was removed
+    stays out."""
     admins = db.execute(select(User).where(User.is_platform_admin.is_(True), User.disabled_at.is_(None),
                                            User.id != demo.id).order_by(User.id)).scalars().all()
     for admin in admins:
         for course in courses:
-            if _ensure_enrollment(db, course, admin, "admin"):
+            if _ensure_enrollment(db, course, admin, "admin", create_only=True):
                 report.admins_enrolled += 1
 
 

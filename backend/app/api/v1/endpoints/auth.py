@@ -180,6 +180,9 @@ def verify_email(
     if not user or not user.password_hash or not verify_password(req.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=INVALID_CREDENTIALS)
 
+    if user.disabled_at is not None:
+        raise _error(403, "account_disabled", "This account is disabled.")
+
     if user.email_verified:
         return _token_response(user)
 

@@ -158,11 +158,11 @@ Full list: P4-1 … in `docs/phases/PHASE_4_DESIGN.md` §1. Resolved during the 
 | Id | Decision as applied |
 |---|---|
 | P5-1 | No wipe: `users` rows kept; one revision drops old tables and columns; the `role='admin'` owner becomes platform admin + approved teacher before `role` is dropped. Old attempts and access rows are dropped. |
-| P5-2 | Conversion = export inside revision 0006 (`legacy_ort_export`), import at startup by `ensure_ort_courses()` through the existing Phase 2 importer and Phase 3 builder; idempotent. |
+| P5-2 | Conversion = export inside revision 0006 (`legacy_ort_export`), import at startup by `ensure_ort_courses()` through the existing Phase 2 importer and Phase 3 builder; idempotent. Questions in no exam set are exported too, one `legacy_unassigned_<lang>` practice_bank row per language (bank only). |
 | P5-3 | Missing `/uploads` images are dropped; the question is kept, tagged `missing_image`, counted and logged. |
 | P5-4 | One platform course per language ("ORT (Kyrgyz)", "ORT (Russian)"), fixed ids, published, catalog, open enrollment. Production ky course starts empty; dev/test seed samples. |
 | P5-5 | Minimal catalog and one-click join now (`GET /catalog/courses`, `POST /courses/{id}/join`); Phase 7 extends. |
-| P5-6 | Demo teacher with unusable password hash and disabled flag; every platform admin is co-teacher of both ORT courses. |
+| P5-6 | Demo teacher with unusable password hash and disabled flag; every platform admin is co-teacher of both ORT courses. As applied: the seed adds the admin enrollment only when the admin has no enrollment row in that course; an existing row is never revived, so an admin who left or was removed stays out. |
 | P5-7 | `exam_set` becomes `ort_main`/`ort_subject` assessment (section times from the old sections, attempts kept, highest score, results after submit); PIN dropped; `practice_bank` sets become banks only. |
 | P5-8 | Revision 0006 downgrade raises; rollback = Neon backup branch + previous `main` commit. |
 | P5-9 | Mock tokens, `MOCK_USERS`, Firebase fallback and header-less dev user removed; tests mint real JWTs. |

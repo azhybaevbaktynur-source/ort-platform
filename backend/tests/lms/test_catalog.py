@@ -232,6 +232,28 @@ async def test_every_open_join_failure_matches_the_bad_code_404(db, api):
     assert db.execute(select(Enrollment).where(Enrollment.source == "open")).first() is None
 
 
+async def test_private_limited_course_is_neither_locked_nor_joinable_by_open_join(db, api, monkeypatch):
+    """The cheap pre-check runs before the row lock: a private (non-catalog) limited course answers the bad-code 404
+    and lock_course is never taken; the same course in the catalog still locks and joins."""
+    from app.lms.enrollments import service as enrollment_service
+
+    locked = []
+    real_lock = enrollment_service.lock_course
+    monkeypatch.setattr(enrollment_service, "lock_course", lambda d, c: (locked.append(c.id), real_lock(d, c)))
+    t = teacher(db)
+    reference = await api.call(make_user(db), "POST", "/courses/join", json={"code": "ZZZZZZZZ"}, ip="6.6.7.250")
+    private = make_course(db, t, status="published", enrollment_mode="open", published_at=utcnow(),
+                          enrollment_limit=5)
+    r = await api.call(make_user(db), "POST", f"/courses/{private.id}/join", ip="6.6.7.1")
+    assert r.status_code == 404 and r.content == reference.content
+    assert locked == []
+    assert db.execute(select(Enrollment).where(Enrollment.course_id == private.id,
+                                               Enrollment.role == "student")).first() is None
+    listed = catalog_course(db, t, enrollment_limit=5)
+    assert (await api.call(make_user(db), "POST", f"/courses/{listed.id}/join")).status_code == 200
+    assert locked == [listed.id]
+
+
 async def test_invite_code_course_still_joins_by_code_only(db, api):
     t, s = teacher(db), make_user(db)
     c = catalog_course(db, t, mode="invite_code")
