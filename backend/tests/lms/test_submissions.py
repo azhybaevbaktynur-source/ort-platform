@@ -110,17 +110,21 @@ def test_hook_creates_submission_and_attempt_grade(db, frozen_clock):
 
 
 def test_hook_ort_sections_and_thresholds(db, frozen_clock):
-    from app.services.scoring_service import ScoringService
+    # frozen oracle table (generator: `python -m tests.lms.test_ort_parity`, see its docstring)
+    import json
+    from pathlib import Path
+
+    table = json.loads((Path(__file__).parent / "fixtures" / "ort_parity_main.json").read_text(encoding="utf-8"))["scaled"]
 
     w = sworld(db, scheme_version_id=ORT_MAIN_V1_ID)
     res = sections_result((1, "math_1", 28, 30), (2, "reading", 110, 120))
     att = new_attempt(db, w, w.student, 1, possible=D("150"), result=res)
     grade_attempt(db, att, 138)
     sub = submission_of(db, w, w.student)
-    assert sub.display_value == D(ScoringService.raw_to_scaled(138, 150, "full_main"))
+    assert sub.display_value == D(table["150"][138])
     assert sub.thresholds == {"golden_certificate": True}
     secs = sub.breakdown["sections"]
-    assert secs[0]["display_value"] == str(D(ScoringService.raw_to_scaled(28, 30, "full_main")))
+    assert secs[0]["display_value"] == str(D(table["30"][28]))
     g = grades_of(db, [att.id])[att.id]
     assert [s["pos"] for s in g.sections] == [1, 2] and g.percentile is not None
 
