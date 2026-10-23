@@ -298,6 +298,74 @@ async def test_expired_reset_link():
         assert res.status_code == 400
 
 
+async def test_disabled_account_gets_no_reset_token_and_reset_is_refused():
+    """A disabled account: forgot-password answers exactly like for an unknown address (no token, no email), and a
+    token issued before the disable (or planted) is refused like an invalid one; the password never changes."""
+    from app.api.v1.endpoints.auth import _secret_hash
+
+    email = new_email()
+    sent = []
+    async with client() as c:
+        with capture_email_codes() as codes:
+            await register(c, email, codes)
+        update_user(email, disabled_at=datetime.now(timezone.utc), disabled_reason="test")
+        with patch("app.api.v1.endpoints.auth.send_password_reset_email",
+                   side_effect=lambda to_email, token, lang="ky": sent.append(token) or True):
+            unknown = await c.post("/api/v1/auth/forgot-password", json={"email": new_email()})
+            res = await c.post("/api/v1/auth/forgot-password", json={"email": email})
+        assert res.status_code == 200 and res.json() == unknown.json() and sent == []
+        assert db_user(email).reset_token is None
+        before = db_user(email).password_hash
+        update_user(email, reset_token=_secret_hash("planted-token"),
+                    reset_token_expires=datetime.now(timezone.utc) + timedelta(hours=1))
+        bad = await c.post("/api/v1/auth/reset-password", json={"token": "no-such-token", "new_password": "newPass456"})
+        res = await c.post("/api/v1/auth/reset-password", json={"token": "planted-token", "new_password": "newPass456"})
+        assert res.status_code == 400 and res.json() == bad.json()
+        u = db_user(email)
+        assert u.password_hash == before and u.reset_token is None
+        res = await c.post("/api/v1/auth/login", json={"email": email, "password": "newPass456"})
+        assert res.status_code == 401
+
+
+async def test_ort_demo_teacher_row_cannot_reset_or_log_in():
+    """The ORT system teacher (app.lms.ort.seed, P5-6): no reset token, a planted token is refused, login fails."""
+    from fastapi import HTTPException
+
+    from app.api.v1.endpoints import auth as auth_ep
+    from app.lms.ort import seed as ort_seed
+    from app.schemas.user import ForgotPasswordRequest, UserLoginRequest
+
+    session = SessionLocal()
+    try:
+        demo = ort_seed._ensure_demo_teacher(session, ort_seed.SeedReport())
+        session.commit()
+        email = demo.email
+        # past EmailStr (HTTP refuses the reserved .invalid address with 422): the service paths themselves
+        with patch("app.api.v1.endpoints.auth.send_password_reset_email") as mail:
+            auth_ep.forgot_password(ForgotPasswordRequest.model_construct(email=email, lang="ky"), session)
+        assert mail.call_count == 0
+        session.refresh(demo)
+        assert demo.reset_token is None
+        for pw in ("!", "", "password"):
+            with pytest.raises(HTTPException) as ei:
+                auth_ep.login_user(UserLoginRequest.model_construct(email=email, password=pw, lang="ky"), session)
+            assert ei.value.status_code == 401
+        demo.reset_token = auth_ep._secret_hash("planted-demo-token")
+        demo.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
+        session.commit()
+        async with client() as c:
+            res = await c.post("/api/v1/auth/reset-password",
+                               json={"token": "planted-demo-token", "new_password": "newPass456"})
+        assert res.status_code == 400
+        session.expire_all()
+        demo = session.get(User, ort_seed.DEMO_TEACHER_ID)
+        assert demo.password_hash == "!" and demo.reset_token is None and demo.disabled_at is not None
+    finally:
+        session.query(User).filter(User.id == ort_seed.DEMO_TEACHER_ID).delete()
+        session.commit()
+        session.close()
+
+
 # ---------------------------------------------------------------------------
 # Email delivery
 # ---------------------------------------------------------------------------
