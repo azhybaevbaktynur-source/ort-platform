@@ -248,3 +248,48 @@ def test_unpublish_racing_with_joins_never_leaves_draft_with_students(pg):
             n = s.scalar(select(func.count()).select_from(Enrollment).where(
                 Enrollment.course_id == cid, Enrollment.role == "student", Enrollment.state == "active"))
         assert not (c.status == "draft" and n > 0), (c.status, n)
+
+
+# ---------------------------------------------------------------- Phase 5 S3: one-click open join races
+
+def _mk_open_course(pg_engine, limit=None):
+    from app.lms.core.models import utcnow
+    from app.lms.courses.schemas import CourseCreateIn
+    with Session(pg_engine) as s:
+        owner = _mk_user(s, 0, teacher=True)
+        c = course_svc.create_course(s, s.get(User, owner), CourseCreateIn(
+            title={"en": "Open"}, languages=["en"], default_language="en", enrollment_limit=limit))
+        c.status, c.visibility, c.enrollment_mode, c.published_at = "published", "catalog", "open", utcnow()
+        s.commit()
+        return c.id
+
+
+def test_parallel_open_joins_by_one_user_create_one_row(pg):
+    cid = _mk_open_course(pg)
+    with Session(pg) as s:
+        uid = _mk_user(s, 0)
+    out = _run_parallel(pg, [lambda s: enr_svc.join_open(s, s.get(User, uid), cid, None)[2]] * 10)
+    assert all(k == "ok" for k, _ in out), out
+    assert sum(1 for _, already in out if already is False) == 1, out
+    with Session(pg) as s:
+        rows = s.scalars(select(Enrollment).where(Enrollment.user_id == uid)).all()
+        evs = s.scalars(select(EnrollmentEvent).where(EnrollmentEvent.course_id == cid,
+                                                      EnrollmentEvent.event == "joined")).all()
+    assert len(rows) == 1 and rows[0].source == "open" and len(evs) == 1
+
+
+def test_parallel_open_joins_never_exceed_limit(pg):
+    cid = _mk_open_course(pg, limit=4)
+    with Session(pg) as s:
+        uids = [_mk_user(s, i) for i in range(12)]
+
+    def job(uid):
+        return lambda s: enr_svc.join_open(s, s.get(User, uid), cid, None)[2]
+
+    out = _run_parallel(pg, [job(u) for u in uids])
+    assert sum(1 for k, _ in out if k == "ok") == 4, out
+    assert [v for k, v in out if k != "ok"] == ["join_code_invalid"] * 8, out
+    with Session(pg) as s:
+        n = s.scalar(select(func.count()).select_from(Enrollment).where(
+            Enrollment.course_id == cid, Enrollment.role == "student", Enrollment.state == "active"))
+    assert n == 4

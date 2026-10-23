@@ -278,3 +278,34 @@ class CourseGradingStudentOut(BaseModel):
 
 
 COURSE_GRADING_STUDENT_KEYS = frozenset(CourseGradingStudentOut.model_fields)
+
+
+# ---------------------------------------------------------------- Phase 5 S3: catalog (PHASE_5_DESIGN 5)
+
+class CatalogEnrollmentOut(BaseModel):
+    role: str
+    state: str
+
+
+class CatalogCourseOut(BaseModel):
+    """Allow-list shown to every signed-in user: never add join code, limits, owner email or roster data."""
+    id: uuid.UUID
+    title: dict
+    description: Optional[dict] = None
+    languages: list[str]
+    default_language: str
+    enrollment_mode: str
+    student_count: int
+    my_enrollment: Optional[CatalogEnrollmentOut] = None
+
+
+CATALOG_COURSE_KEYS = frozenset(CatalogCourseOut.model_fields)
+
+
+def catalog_course_out(course, my_role: Optional[str], my_state: Optional[str], student_count: int) -> CatalogCourseOut:
+    return CatalogCourseOut(
+        id=course.id, title=course.title, description=course.description, languages=list(course.languages),
+        default_language=course.default_language, enrollment_mode=course.enrollment_mode,
+        student_count=student_count,
+        my_enrollment=CatalogEnrollmentOut(role=my_role, state=my_state) if my_role is not None else None,
+    )
