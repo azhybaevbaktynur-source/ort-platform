@@ -4,7 +4,7 @@ import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
-import { AuthError, useAuth, UserRole } from "@/lib/auth-context";
+import { AuthError, useAuth } from "@/lib/auth-context";
 import { safeRedirect } from "@/lib/safeRedirect";
 import { useBackendWarmup, useSlowHint } from "@/lib/useBackendWarmup";
 import { VerifyEmailStep, authErrorMessage } from "@/components/auth/VerifyEmailStep";
@@ -30,14 +30,8 @@ function LoginForm() {
   useBackendWarmup();
   const slow = useSlowHint(loading);
 
-  const handleNavigateAfterAuth = (userRole: UserRole) => {
-    if (redirectParam) {
-      router.push(redirectParam);
-    } else if (userRole === "admin") {
-      router.push(`/${lang}/exams`);
-    } else {
-      router.push(`/${lang}/dashboard`);
-    }
+  const handleNavigateAfterAuth = () => {
+    router.push(redirectParam || `/${lang}/courses`);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -46,8 +40,8 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      const res = await signIn(email, password);
-      handleNavigateAfterAuth(res.role);
+      await signIn(email, password);
+      handleNavigateAfterAuth();
     } catch (err) {
       if (err instanceof AuthError && err.code === "email_not_verified" && err.details.codeSent === false) {
         // Account not verified and the new code could not be emailed: say so instead of waiting for a code

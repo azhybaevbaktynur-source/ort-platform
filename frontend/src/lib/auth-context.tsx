@@ -3,8 +3,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 
-export type UserRole = "student" | "admin";
-
 /** Minimal signed-in user (the app authenticates with its own backend JWT, not Firebase). */
 export interface AuthUser {
   uid: string;
@@ -17,17 +15,10 @@ export interface AuthUserProfile {
   uid: string;
   email: string;
   displayName: string;
-  role: UserRole;
   phone?: string;
-  target_score?: number;
-  currentEstimatedScore?: number;
-  exams_taken?: number;
-  starting_score?: number;
-  streak?: {
-    current: number;
-    longest: number;
-    lastActiveDate: string;
-  };
+  is_platform_admin: boolean;
+  teacher_status: string;
+  locale?: string;
 }
 
 export interface RegisterResult {
@@ -57,40 +48,36 @@ interface AuthContextType {
   user: AuthUser | null;
   userProfile: AuthUserProfile | null;
   loading: boolean;
-  signIn: (email: string, pass: string) => Promise<{ role: UserRole }>;
+  signIn: (email: string, pass: string) => Promise<void>;
   signUp: (email: string, pass: string, displayName: string, phone?: string) => Promise<RegisterResult>;
-  verifyEmail: (email: string, pass: string, code: string) => Promise<{ role: UserRole }>;
+  verifyEmail: (email: string, pass: string, code: string) => Promise<void>;
   resendCode: (email: string) => Promise<{ resendAfterSeconds: number }>;
   signOut: () => Promise<void>;
-  updateTargetScore: (score: number) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   userProfile: null,
   loading: true,
-  signIn: async () => ({ role: "student" }),
+  signIn: async () => {},
   signUp: async () => ({ email: "", resendAfterSeconds: 60, codeTtlMinutes: 10 }),
-  verifyEmail: async () => ({ role: "student" }),
+  verifyEmail: async () => {},
   resendCode: async () => ({ resendAfterSeconds: 60 }),
   signOut: async () => {},
-  updateTargetScore: async () => {},
 });
 
 const PROFILE_KEY = "ort_dev_auth_user";
 
-function setAuthCookies(token: string, role: string) {
-  if (typeof document !== "undefined") {
-    document.cookie = `ort_token=${encodeURIComponent(token)}; path=/; max-age=604800; SameSite=Lax`;
-    document.cookie = `ort_role=${encodeURIComponent(role)}; path=/; max-age=604800; SameSite=Lax`;
-  }
-}
-
-function clearAuthCookies() {
-  if (typeof document !== "undefined") {
-    document.cookie = "ort_token=; path=/; max-age=0; SameSite=Lax";
-    document.cookie = "ort_role=; path=/; max-age=0; SameSite=Lax";
-  }
+function toProfile(u: any): AuthUserProfile {
+  return {
+    uid: u.id,
+    email: u.email,
+    displayName: u.displayName || String(u.email).split("@")[0],
+    phone: u.phone || undefined,
+    is_platform_admin: Boolean(u.is_platform_admin),
+    teacher_status: u.teacher_status || "none",
+    locale: u.locale || undefined,
+  };
 }
 
 function toAuthUser(profile: AuthUserProfile, token: string): AuthUser {
@@ -127,10 +114,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   const clearSession = () => {
-    clearAuthCookies();
     if (typeof window !== "undefined") {
       localStorage.removeItem("ort_token");
-      localStorage.removeItem("ort_role");
       localStorage.removeItem(PROFILE_KEY);
       try {
         // pending autosave queues belong to the signed-out user
@@ -144,9 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const startSession = (token: string, profile: AuthUserProfile) => {
-    setAuthCookies(token, profile.role);
     localStorage.setItem("ort_token", token);
-    localStorage.setItem("ort_role", profile.role);
     localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
     setUserProfile(profile);
     setUser(toAuthUser(profile, token));
@@ -169,7 +152,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem(PROFILE_KEY);
     }
     if (cached) {
-      setAuthCookies(storedToken, cached.role === "admin" ? "admin" : "student");
       setUserProfile(cached);
       setUser(toAuthUser(cached, storedToken));
       setLoading(false);
@@ -186,17 +168,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         if (res.ok) {
           const data = await res.json();
-          const profile: AuthUserProfile = {
-            uid: data.id,
-            email: data.email,
-            displayName: data.displayName || data.email.split("@")[0],
-            role: data.role === "admin" ? "admin" : "student",
-            phone: data.phone,
-            target_score: data.target_score || 200,
-            currentEstimatedScore: data.currentEstimatedScore ?? 0,
-            exams_taken: data.exams_taken ?? 0,
-            starting_score: data.starting_score ?? 0,
-          };
+          const profile = toProfile(data);
           startSession(storedToken, profile);
         }
       } catch (e) {
@@ -209,22 +181,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const finishLogin = (data: any): { role: UserRole } => {
-    const role: UserRole = data.role === "admin" ? "admin" : "student";
-    startSession(data.access_token, {
-      uid: data.user.id,
-      email: data.user.email,
-      displayName: data.user.displayName || data.user.email.split("@")[0],
-      phone: data.user.phone || undefined,
-      role,
-      target_score: data.user.target_score || 200,
-    });
-    return { role };
+  const finishLogin = (data: any): void => {
+    startSession(data.access_token, toProfile(data.user));
   };
 
-  const signIn = async (email: string, pass: string): Promise<{ role: UserRole }> => {
+  const signIn = async (email: string, pass: string): Promise<void> => {
     const data = await postJson("/api/v1/auth/login", { email: email.trim(), password: pass, lang });
-    return finishLogin(data);
+    finishLogin(data);
   };
 
   const signUp = async (email: string, pass: string, displayName: string, phone?: string): Promise<RegisterResult> => {
@@ -237,9 +200,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  const verifyEmail = async (email: string, pass: string, code: string): Promise<{ role: UserRole }> => {
+  const verifyEmail = async (email: string, pass: string, code: string): Promise<void> => {
     const data = await postJson("/api/v1/auth/verify-email", { email: email.trim(), password: pass, code: code.trim() });
-    return finishLogin(data);
+    finishLogin(data);
   };
 
   const resendCode = async (email: string): Promise<{ resendAfterSeconds: number }> => {
@@ -248,32 +211,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     clearSession();
-  };
-
-  const updateTargetScore = async (score: number) => {
-    try {
-      const { getAuthHeader } = await import("./api");
-      const authHeader = await getAuthHeader();
-      await fetch("/api/v1/users/me/target-score", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeader,
-        },
-        body: JSON.stringify({ target_score: score }),
-      });
-    } catch (err) {
-      console.error("Failed to update target score via API:", err);
-    }
-
-    setUserProfile((prev) => {
-      if (!prev) return null;
-      const updated = { ...prev, target_score: score };
-      try {
-        localStorage.setItem(PROFILE_KEY, JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
   };
 
   return (
@@ -287,7 +224,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         verifyEmail,
         resendCode,
         signOut,
-        updateTargetScore,
       }}
     >
       {children}

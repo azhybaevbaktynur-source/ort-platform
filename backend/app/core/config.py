@@ -37,29 +37,13 @@ class Settings(BaseSettings):
     # Relational Database (SQLite for local dev, swappable to PostgreSQL on Render)
     DATABASE_URL: str = "sqlite:///./test.db"
 
-    # Cloud Storage (Ephemeral local storage vs S3 / Cloudinary)
-    STORAGE_ENV: str = "local"  # "local", "s3", "cloudinary"
-    STORAGE_BASE_URL: str = "/uploads"
-    MAX_UPLOAD_BYTES: int = 5 * 1024 * 1024  # Hard cap for image uploads
+    # Local blob directory (tests/dev); LMS_STORAGE_DRIVER below picks the real driver
     LOCAL_UPLOAD_DIR: str = ""  # Overrides backend/data/uploads (used by tests to keep dev uploads clean)
-
-    # Firebase (Legacy compatibility / Auth)
-    FIREBASE_PROJECT_ID: str = "ort-platform-dev"
-    FIREBASE_CREDENTIALS_PATH: str = ""
-    FIREBASE_MOCK_MODE: bool = True
 
     # JWT Authentication
     SECRET_KEY: str = "ort_secret_jwt_key_2026_super_secure_academic_prep"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
-
-    # Test settings
-    GOLDEN_CERTIFICATE_MIN_SCORE: int = 219
-    TOTAL_ORT_QUESTIONS: int = 150
-
-    # Dev/test shortcut tokens ("mock_admin_token" etc.). NEVER enable in production:
-    # anyone who knows the token string would get that role.
-    ALLOW_MOCK_TOKENS: bool = False
 
     # Number of trusted proxies appending to X-Forwarded-For (Vercel rewrite -> Render = 2); 0 = ignore the header
     RATE_LIMIT_PROXY_HOPS: int = 2
@@ -79,7 +63,7 @@ class Settings(BaseSettings):
     MEDIA_BASE_URL: str = "/api/v1/media"
     MEDIA_CACHE_BYTES: int = 64 * 1024 * 1024
     # Images (P2-4, P2-6)
-    ASSET_MAX_UPLOAD_BYTES: int = 5 * 1024 * 1024
+    ASSET_MAX_UPLOAD_BYTES: int = 2 * 1024 * 1024
     ASSET_MAX_BUNDLE_IMAGE_BYTES: int = 10 * 1024 * 1024
     ASSET_MAX_PIXELS: int = 12_000_000
     ASSET_MAX_SIDE: int = 1600
@@ -154,10 +138,11 @@ class Settings(BaseSettings):
     SCHEME_WRITE_RATE_PER_HOUR: int = 100
     SCHEME_PREVIEW_RATE_PER_MIN: int = 60
 
-    # --- Phase 5 S4 begin --- (R2 free-tier guard, docs/phases/PHASE_5_DESIGN.md section 6)
+    # --- Phase 5 S3 ---
+    # --- Phase 5 S4 settings (storage guard) --- (R2 free-tier guard, docs/phases/PHASE_5_DESIGN.md section 6;
+    # ASSET_MAX_UPLOAD_BYTES = 2 MiB is set above by S2)
     STORAGE_WARN_BYTES: int = 8 * 1024 ** 3  # 8 GiB: admin warning
     STORAGE_HARD_BYTES: int = int(9.5 * 1024 ** 3)  # 9.5 GiB: new blobs refused (storage_full, HTTP 507)
-    ASSET_MAX_UPLOAD_BYTES: int = 2 * 1024 * 1024  # images (also set by S2; identical value)
     FILE_MAX_UPLOAD_BYTES: int = 10 * 1024 * 1024  # PDF files
     FILE_ALLOWED_MIMES: list[str] = ["application/pdf"]
     STORAGE_SMOKE_RATE_PER_HOUR: int = 5

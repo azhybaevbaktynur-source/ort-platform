@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from PIL import Image
 
 from app.core.config import settings
-from app.services.image_validation import validate_image_bytes
+from app.lms.files.image_validation import validate_image_bytes
 
 
 _ENCODE_SLOT = threading.BoundedSemaphore(1)

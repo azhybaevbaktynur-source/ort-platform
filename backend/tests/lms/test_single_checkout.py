@@ -1,4 +1,4 @@
-"""P3-27: an LMS request authenticates on the request session (one pool checkout), mock tokens still work."""
+"""P3-27: an LMS request authenticates on the request session (one pool checkout), a real JWT for a seeded account resolves it."""
 import contextlib
 
 import anyio
@@ -8,6 +8,7 @@ from sqlalchemy import event
 
 from app.db import session as db_session
 from app.main import app
+from app.models.user import User
 from tests.lms.factories import auth, make_course, make_user
 from app.db.session import SessionLocal
 
@@ -60,10 +61,13 @@ def test_course_route_checks_out_one_connection(db, checkouts):
     assert checkouts["n"] == 1
 
 
-def test_mock_token_resolves_seeded_account(checkouts):
+def test_real_jwt_resolves_seeded_account(db, checkouts):
+    student = db.query(User).filter(User.id == "usr_student_01").one()
+    headers = auth(student)
+    db.close()
     with _client() as client:
         checkouts["n"] = 0
-        r = client.get("/api/v1/me/lms", headers={"Authorization": "Bearer mock_student_token"})
+        r = client.get("/api/v1/me/lms", headers=headers)
     assert r.status_code == 200, r.text
     assert r.json()["id"] == "usr_student_01"
     assert checkouts["n"] == 1

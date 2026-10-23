@@ -80,10 +80,9 @@ async def test_disable_enable_flow_and_audit(client, db):
 
     r = await client.post(f"{P}/users/{target.id}/disable", json={"reason": "abuse"}, headers=auth(admin))
     assert r.status_code == 200 and r.json()["disabled_reason"] == "abuse" and r.json()["disabled_at"]
-    # disabled everywhere: old api and new api
+    # disabled everywhere: auth api and LMS api
     assert (await client.get("/api/v1/auth/me", headers=headers)).status_code == 401
     assert (await client.get("/api/v1/me/lms", headers=headers)).status_code == 401
-    assert (await client.get("/api/v1/users/me", headers=headers)).status_code == 401
 
     r = await client.post(f"{P}/users/{target.id}/enable", headers=auth(admin))
     assert r.status_code == 200 and r.json()["disabled_at"] is None
