@@ -1,26 +1,17 @@
-# Instructions for the ort-platform agent: importing ORT question bundles (.zip)
+# ORT question bundles (.zip): format and import
 
-You are changing **ort-platform** so it can import question bundles produced by
-**ort-digitizer**. Today the platform imports questions from a CSV only and has no way to
-receive the figures (geometry drawings, graphs, tables) that many questions need. After your
-change, an admin uploads one `.zip`, and the platform creates the questions, uploads their
-images to storage and links every image to the right question. This must work even if the zip
-or the folders inside it have been renamed.
+Format of the question bundles produced by **ort-digitizer** and how **ort-platform** imports them. The platform accepts one `.zip` (or a plain CSV); it creates the questions, stores their images and links every image to the right question. It works even if the zip or the folders inside it have been renamed. The import is implemented (Phases 2 and 5).
 
-Read this whole file before starting. Section 1 is your task list; the rest is the reference.
+## 1. Target model (as built in Phases 2 and 5)
 
-## 1. Your tasks, in order
+This file specifies the bundle format (sections 2-3) and the import behaviour (sections 4-8). The original task list for the old platform is obsolete; the old CSV/`questions` table is gone. Where the text below says "question", "storage" or "transaction", read it with this mapping:
 
-1. **Review the current platform first. Do not change anything yet.** Find and note:
-   - the CSV upload entry point (UI page and/or API endpoint) and the CSV parser;
-   - the question model/table, and what each of the 15 CSV columns maps to;
-   - how `image_url` is stored and rendered today;
-   - how the platform stores files (S3 or similar), builds public URLs, and runs DB transactions;
-   - how math (`$…$` LaTeX), `<u>`/`<b>` tags and multi-line passages are rendered today.
-2. **Write a short plan** of what you will change, based on that review.
-3. **Add zip import** following section 5, reusing the existing CSV row parsing and validation.
-4. **Keep plain CSV upload working** exactly as before (section 6).
-5. **Run the acceptance tests** in section 8 with the sample bundle, and report the results.
+- **Code**: `backend/app/lms/content/importers/` (`bundle.py` zip discovery and manifest, `zipsafe.py` zip-slip and size caps, `ort_csv.py` the 15-column CSV, `parse.py`/`parsed.py`, `rules.py` section rules, `service.py` upsert and image handling, `report.py`). Routes: `POST /courses/{course_id}/imports/preview` (nothing saved) and `POST /courses/{course_id}/imports` (`app/lms/content/import_router.py`).
+- **Where questions go**: a teacher's course **question bank** (`question_banks`). Each row is a `bank_questions` row (stable identity, `position`, `q_num`, `section`, `topic`, `difficulty`, `tags`) with an immutable `question_versions` row holding the content (`stem`; `comparison` with `column_a`/`column_b` for `math_1`, `single_choice` with choices A-D or A-E otherwise; `explanation`; image refs). Reading passages become shared `passages`/`passage_versions` (identical text is stored once).
+- **Idempotency**: the manifest/`external_id` (`<source_id>:<section>:<q_num>`) is stored as `bank_questions.source_ref`; re-importing the same source updates by `source_ref` (a changed question gets a new version) instead of duplicating. Questions missing from a newer bundle are left alone and reported as a warning.
+- **Images**: each image is validated and converted (WebP), de-duplicated by SHA-256 into the `assets` table, and stored through the storage driver (`db`/`local`/`r2`; on R2 under `img/<sha>.webp`, public bucket, served immutably from `R2_PUBLIC_BASE_URL`). Max 2 MiB per image; the R2 free-tier guard can refuse an import with `storage_full`. Identical files share one asset and are written once.
+- **Atomicity**: validation covers all bundles first; nothing is saved on any error. Rows and asset records are written in one DB transaction (blobs are content-addressed, so orphaned blobs are harmless).
+- **Plain CSV** (`ort_csv.py`) still imports into a bank; a non-`http(s)` `image_url` without a zip is reported as a missing image.
 
 ## 2. What ort-digitizer delivers
 
