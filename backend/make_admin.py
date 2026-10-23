@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
-Standalone script to promote any registered user to 'admin' role.
+Standalone script to make a registered user a platform admin (and an approved teacher).
 
 Usage:
-    python make_admin.py [optional_email]
-    or simply:
-    python make_admin.py
+    python make_admin.py [email]            # grant (is_platform_admin=true, teacher_status=approved)
+    python make_admin.py [email] --revoke   # revoke the platform-admin flag
 """
 
 import sys
@@ -18,54 +17,59 @@ from app.db.session import SessionLocal
 from app.models.user import User
 
 
-def promote_user(email: str) -> bool:
+def promote_user(email: str, revoke: bool = False) -> bool:
+    """Grant (or with revoke=True remove) platform admin. Grant also approves the user as a teacher."""
     clean_email = email.strip().lower()
     if not clean_email:
-        print("❌ Error: Email cannot be empty.")
+        print("Error: Email cannot be empty.")
         return False
 
     session = SessionLocal()
     try:
         user = session.query(User).filter(User.email == clean_email).first()
         if not user:
-            print(f"❌ User with email '{clean_email}' not found in database.")
-            print("Registered users currently in database:")
-            all_users = session.query(User).all()
-            for u in all_users:
-                print(f"  - {u.email} (Role: {u.role}, ID: {u.id})")
+            print("User not found.")
             return False
 
-        if user.role == "admin":
-            print(f"ℹ️ User '{clean_email}' is already an admin.")
+        if revoke:
+            user.is_platform_admin = False
+            session.commit()
+            print(f"Revoked admin rights from '{clean_email}' (ID: {user.id}).")
             return True
 
-        old_role = user.role
-        user.role = "admin"
+        if user.is_platform_admin and user.teacher_status == "approved":
+            print(f"User '{clean_email}' is already an admin.")
+            return True
+
+        user.is_platform_admin = True
+        user.teacher_status = "approved"
         session.commit()
-        print(f"✅ Success! Promoted '{clean_email}' (ID: {user.id}) from '{old_role}' to 'admin' role.")
+        print(f"Success! '{clean_email}' (ID: {user.id}) is now an admin.")
         return True
     except Exception as e:
         session.rollback()
-        print(f"❌ Database error: {e}")
+        print(f"Database error: {e}")
         return False
     finally:
         session.close()
 
 
 def main():
-    if len(sys.argv) > 1 and sys.argv[1].strip():
-        target_email = sys.argv[1].strip()
+    args = [a for a in sys.argv[1:] if a.strip()]
+    revoke = "--revoke" in args
+    args = [a for a in args if a != "--revoke"]
+    if args:
+        target_email = args[0].strip()
     else:
         try:
-            target_email = input("Enter email address of user to promote to admin: ").strip()
+            target_email = input("Enter email address of the user: ").strip()
         except (KeyboardInterrupt, EOFError):
             print("\nOperation cancelled.")
             sys.exit(1)
 
-    success = promote_user(target_email)
+    success = promote_user(target_email, revoke=revoke)
     sys.exit(0 if success else 1)
 
 
 if __name__ == "__main__":
     main()
-

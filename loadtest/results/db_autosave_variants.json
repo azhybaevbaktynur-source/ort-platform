@@ -1,0 +1,34 @@
+{
+ "pk_only_autocommit": {
+  "ok": 9000,
+  "errors": 0,
+  "wall_s": 30,
+  "rate_per_s": 300.0,
+  "p50_ms": 227.1,
+  "p95_ms": 319.4,
+  "p99_ms": 698.6,
+  "max_ms": 1297.4,
+  "target_rate": 300,
+  "scheduled": 9000,
+  "workers": 300,
+  "service_p50_ms": 225.9,
+  "service_p95_ms": 318.4,
+  "drain_s": 1.0
+ },
+ "join_conditional_explicit_txn": {
+  "ok": 9000,
+  "errors": 0,
+  "wall_s": 30,
+  "rate_per_s": 300.0,
+  "p50_ms": 696.5,
+  "p95_ms": 1128.7,
+  "p99_ms": 1193.0,
+  "max_ms": 1834.4,
+  "target_rate": 300,
+  "scheduled": 9000,
+  "workers": 300,
+  "service_p50_ms": 695.5,
+  "service_p95_ms": 1127.8,
+  "drain_s": 1.5
+ }
+}

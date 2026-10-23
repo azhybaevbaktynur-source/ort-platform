@@ -1,0 +1,557 @@
+{
+ "label": "r2_w1_p20_t40",
+ "students": 6000,
+ "procs": 4,
+ "exam": {
+  "assessment_id": "1048a084-be5e-4275-92d5-72bcc7e2a6cc",
+  "version_id": "23a296e8-4976-4951-98a9-37585038c455",
+  "t0": 1792681381.634444,
+  "until": 1792681981.634444,
+  "ramp_s": 300,
+  "section_s": 60,
+  "last_min_s": 60
+ },
+ "course_id": "edba35c3-1653-4c4a-b353-a399745781da",
+ "server_env": {
+  "LT_SRV_POOL": "20+20",
+  "LT_SRV_TOKENS": "40"
+ },
+ "wall_s": 797.2,
+ "started_ok": 1319,
+ "acks_total": 6180,
+ "acks_file": "/private/tmp/claude-501/-Users-baktynurazhybaev-ort-platform/d209bb3a-4bd7-4a85-9002-1afc7fad359c/scratchpad/out/acks_r2_w1_p20_t40.jsonl",
+ "counters": {
+  "started_ok": 1319,
+  "acked_entries": 6180,
+  "stale_entries": 0,
+  "close_failed": 1094,
+  "lazy_advance_unexpected": 29,
+  "start_failed": 4681,
+  "loop_lag_p99_ms_w0": 30.0,
+  "loop_lag_max_ms_w0": 578.2,
+  "vu_exception_TimeoutError": 195,
+  "gen_cpu_s_w0": 25.5,
+  "loop_lag_p99_ms_w1": 25.8,
+  "loop_lag_max_ms_w1": 555.4,
+  "gen_cpu_s_w1": 25.8,
+  "loop_lag_p99_ms_w2": 20.8,
+  "loop_lag_max_ms_w2": 494.6,
+  "gen_cpu_s_w2": 25.5,
+  "abandoned": 1,
+  "loop_lag_p99_ms_w3": 15.7,
+  "loop_lag_max_ms_w3": 650.1,
+  "gen_cpu_s_w3": 26.0
+ },
+ "endpoints": {
+  "autosave": {
+   "n": 5154,
+   "rps": 7.1,
+   "p50_ms": 60003.25,
+   "p95_ms": 131022.37,
+   "p99_ms": 150455.99,
+   "max_ms": 173874.13,
+   "err_pct": 55.53,
+   "codes": {
+    "500": 170,
+    "ReadTimeout": 2691,
+    "ReadError": 1
+   }
+  },
+  "autosave_retry": {
+   "n": 2781,
+   "rps": 4.3,
+   "p50_ms": 103089.23,
+   "p95_ms": 175427.34,
+   "p99_ms": 176048.1,
+   "max_ms": 176342.26,
+   "err_pct": 100.0,
+   "codes": {
+    "ReadTimeout": 2781
+   }
+  },
+  "content": {
+   "n": 1669,
+   "rps": 21.7,
+   "p50_ms": 5.71,
+   "p95_ms": 677.94,
+   "p99_ms": 60001.9,
+   "max_ms": 60006.24,
+   "err_pct": 2.037,
+   "codes": {
+    "500": 17,
+    "ReadTimeout": 17
+   }
+  },
+  "content_304": {
+   "n": 323,
+   "rps": 0.5,
+   "p50_ms": 19.58,
+   "p95_ms": 173039.08,
+   "p99_ms": 175643.09,
+   "max_ms": 176314.42,
+   "err_pct": 28.173,
+   "codes": {
+    "ReadTimeout": 90,
+    "500": 1
+   }
+  },
+  "section_close": {
+   "n": 1444,
+   "rps": 2.1,
+   "p50_ms": 60186.22,
+   "p95_ms": 136526.51,
+   "p99_ms": 171549.71,
+   "max_ms": 175751.21,
+   "err_pct": 75.762,
+   "codes": {
+    "500": 2,
+    "ReadTimeout": 1092
+   }
+  },
+  "start": {
+   "n": 6000,
+   "rps": 20.0,
+   "p50_ms": 87615.48,
+   "p95_ms": 165368.22,
+   "p99_ms": 168293.53,
+   "max_ms": 169420.51,
+   "err_pct": 78.017,
+   "codes": {
+    "500": 35,
+    "ReadError": 8,
+    "ReadTimeout": 4638
+   }
+  },
+  "start_retry": {
+   "n": 9362,
+   "rps": 17.3,
+   "p50_ms": 137235.55,
+   "p95_ms": 175051.77,
+   "p99_ms": 175985.77,
+   "max_ms": 176422.96,
+   "err_pct": 100.0,
+   "codes": {
+    "ReadTimeout": 9362
+   }
+  },
+  "state_lazy": {
+   "n": 29,
+   "rps": 0.0,
+   "p50_ms": 117690.06,
+   "p95_ms": 130335.74,
+   "p99_ms": 172146.45,
+   "max_ms": 172146.45,
+   "err_pct": 100.0,
+   "codes": {
+    "ReadTimeout": 29
+   }
+  },
+  "state_reload": {
+   "n": 323,
+   "rps": 0.6,
+   "p50_ms": 36.11,
+   "p95_ms": 122765.78,
+   "p99_ms": 140621.81,
+   "max_ms": 150414.81,
+   "err_pct": 26.316,
+   "codes": {
+    "500": 4,
+    "ReadTimeout": 81
+   }
+  }
+ },
+ "phases": {
+  "a_start_ramp": {
+   "window_s": [
+    0,
+    300
+   ],
+   "requests": 18153,
+   "endpoints": {
+    "autosave": {
+     "n": 4522,
+     "rps": 15.9,
+     "p50_ms": 10511.88,
+     "p95_ms": 130255.56,
+     "p99_ms": 149608.42,
+     "max_ms": 168161.16,
+     "err_pct": 49.314,
+     "codes": {
+      "500": 170,
+      "ReadTimeout": 2059,
+      "ReadError": 1
+     }
+    },
+    "autosave_retry": {
+     "n": 1320,
+     "rps": 6.5,
+     "p50_ms": 70082.48,
+     "p95_ms": 134222.74,
+     "p99_ms": 167520.54,
+     "max_ms": 167847.63,
+     "err_pct": 100.0,
+     "codes": {
+      "ReadTimeout": 1320
+     }
+    },
+    "content": {
+     "n": 1669,
+     "rps": 21.7,
+     "p50_ms": 5.71,
+     "p95_ms": 677.94,
+     "p99_ms": 60001.9,
+     "max_ms": 60006.24,
+     "err_pct": 2.037,
+     "codes": {
+      "500": 17,
+      "ReadTimeout": 17
+     }
+    },
+    "content_304": {
+     "n": 283,
+     "rps": 1.0,
+     "p50_ms": 12.36,
+     "p95_ms": 68566.85,
+     "p99_ms": 162761.38,
+     "max_ms": 166161.86,
+     "err_pct": 18.021,
+     "codes": {
+      "ReadTimeout": 50,
+      "500": 1
+     }
+    },
+    "section_close": {
+     "n": 602,
+     "rps": 2.7,
+     "p50_ms": 478.03,
+     "p95_ms": 130219.2,
+     "p99_ms": 148984.38,
+     "max_ms": 151080.97,
+     "err_pct": 41.86,
+     "codes": {
+      "500": 2,
+      "ReadTimeout": 250
+     }
+    },
+    "start": {
+     "n": 6000,
+     "rps": 20.0,
+     "p50_ms": 87615.48,
+     "p95_ms": 165368.22,
+     "p99_ms": 168293.53,
+     "max_ms": 169420.51,
+     "err_pct": 78.017,
+     "codes": {
+      "500": 35,
+      "ReadError": 8,
+      "ReadTimeout": 4638
+     }
+    },
+    "start_retry": {
+     "n": 3418,
+     "rps": 15.5,
+     "p50_ms": 128385.91,
+     "p95_ms": 168387.6,
+     "p99_ms": 169049.91,
+     "max_ms": 169557.44,
+     "err_pct": 100.0,
+     "codes": {
+      "ReadTimeout": 3418
+     }
+    },
+    "state_lazy": {
+     "n": 20,
+     "rps": 0.1,
+     "p50_ms": 116616.08,
+     "p95_ms": 130335.74,
+     "p99_ms": 130335.74,
+     "max_ms": 130335.74,
+     "err_pct": 100.0,
+     "codes": {
+      "ReadTimeout": 20
+     }
+    },
+    "state_reload": {
+     "n": 319,
+     "rps": 1.3,
+     "p50_ms": 32.65,
+     "p95_ms": 121010.77,
+     "p99_ms": 140621.81,
+     "max_ms": 150414.81,
+     "err_pct": 25.392,
+     "codes": {
+      "500": 4,
+      "ReadTimeout": 77
+     }
+    }
+   },
+   "server_cpu_s": 57.47,
+   "server_cpu_util": 0.19,
+   "server_cpu_ms_per_req": 3.17,
+   "pg_cpu_s": 6.6,
+   "pg_cpu_ms_per_req": 0.36
+  },
+  "b_steady": {
+   "window_s": [
+    300,
+    510
+   ],
+   "requests": 5854,
+   "endpoints": {
+    "autosave": {
+     "n": 380,
+     "rps": 2.1,
+     "p50_ms": 122430.73,
+     "p95_ms": 163606.09,
+     "p99_ms": 170622.66,
+     "max_ms": 173874.13,
+     "err_pct": 100.0,
+     "codes": {
+      "ReadTimeout": 380
+     }
+    },
+    "autosave_retry": {
+     "n": 914,
+     "rps": 4.8,
+     "p50_ms": 171482.3,
+     "p95_ms": 175939.44,
+     "p99_ms": 176169.51,
+     "max_ms": 176342.26,
+     "err_pct": 100.0,
+     "codes": {
+      "ReadTimeout": 914
+     }
+    },
+    "content_304": {
+     "n": 36,
+     "rps": 0.4,
+     "p50_ms": 173028.66,
+     "p95_ms": 176170.13,
+     "p99_ms": 176314.42,
+     "max_ms": 176314.42,
+     "err_pct": 100.0,
+     "codes": {
+      "ReadTimeout": 36
+     }
+    },
+    "section_close": {
+     "n": 285,
+     "rps": 1.4,
+     "p50_ms": 122377.49,
+     "p95_ms": 171549.71,
+     "p99_ms": 175646.43,
+     "max_ms": 175751.21,
+     "err_pct": 100.0,
+     "codes": {
+      "ReadTimeout": 285
+     }
+    },
+    "start_retry": {
+     "n": 4231,
+     "rps": 20.3,
+     "p50_ms": 161830.45,
+     "p95_ms": 175587.86,
+     "p99_ms": 176056.73,
+     "max_ms": 176422.96,
+     "err_pct": 100.0,
+     "codes": {
+      "ReadTimeout": 4231
+     }
+    },
+    "state_lazy": {
+     "n": 4,
+     "rps": 0.0,
+     "p50_ms": 122287.43,
+     "p95_ms": 172146.45,
+     "p99_ms": 172146.45,
+     "max_ms": 172146.45,
+     "err_pct": 100.0,
+     "codes": {
+      "ReadTimeout": 4
+     }
+    },
+    "state_reload": {
+     "n": 4,
+     "rps": 0.1,
+     "p50_ms": 123965.23,
+     "p95_ms": 132356.49,
+     "p99_ms": 132356.49,
+     "max_ms": 132356.49,
+     "err_pct": 100.0,
+     "codes": {
+      "ReadTimeout": 4
+     }
+    }
+   },
+   "server_cpu_s": 14.76,
+   "server_cpu_util": 0.07,
+   "server_cpu_ms_per_req": 2.52,
+   "pg_cpu_s": 0.1,
+   "pg_cpu_ms_per_req": 0.02
+  },
+  "d_submit_burst": {
+   "window_s": [
+    510,
+    630
+   ],
+   "requests": 2438,
+   "endpoints": {
+    "autosave": {
+     "n": 170,
+     "rps": 1.5,
+     "p50_ms": 118928.04,
+     "p95_ms": 139708.54,
+     "p99_ms": 148394.56,
+     "max_ms": 148598.32,
+     "err_pct": 100.0,
+     "codes": {
+      "ReadTimeout": 170
+     }
+    },
+    "autosave_retry": {
+     "n": 344,
+     "rps": 2.9,
+     "p50_ms": 101238.18,
+     "p95_ms": 115738.6,
+     "p99_ms": 125325.67,
+     "max_ms": 130979.77,
+     "err_pct": 100.0,
+     "codes": {
+      "ReadTimeout": 344
+     }
+    },
+    "content_304": {
+     "n": 4,
+     "rps": 0.1,
+     "p50_ms": 101443.8,
+     "p95_ms": 116138.2,
+     "p99_ms": 116138.2,
+     "max_ms": 116138.2,
+     "err_pct": 100.0,
+     "codes": {
+      "ReadTimeout": 4
+     }
+    },
+    "section_close": {
+     "n": 205,
+     "rps": 1.7,
+     "p50_ms": 119034.23,
+     "p95_ms": 133259.46,
+     "p99_ms": 140911.83,
+     "max_ms": 148545.12,
+     "err_pct": 100.0,
+     "codes": {
+      "ReadTimeout": 205
+     }
+    },
+    "start_retry": {
+     "n": 1713,
+     "rps": 15.5,
+     "p50_ms": 116040.57,
+     "p95_ms": 142963.04,
+     "p99_ms": 145112.67,
+     "max_ms": 148515.3,
+     "err_pct": 100.0,
+     "codes": {
+      "ReadTimeout": 1713
+     }
+    },
+    "state_lazy": {
+     "n": 2,
+     "rps": 0.0,
+     "p50_ms": 125042.63,
+     "p95_ms": 125042.63,
+     "p99_ms": 125042.63,
+     "max_ms": 125042.63,
+     "err_pct": 100.0,
+     "codes": {
+      "ReadTimeout": 2
+     }
+    }
+   },
+   "server_cpu_s": 7.88,
+   "server_cpu_util": 0.07,
+   "server_cpu_ms_per_req": 3.23,
+   "pg_cpu_s": -0.35,
+   "pg_cpu_ms_per_req": -0.14
+  },
+  "e_after_deadline": {
+   "window_s": [
+    630,
+    797
+   ],
+   "requests": 640,
+   "endpoints": {
+    "autosave": {
+     "n": 82,
+     "rps": 0.8,
+     "p50_ms": 60008.43,
+     "p95_ms": 60176.06,
+     "p99_ms": 91396.79,
+     "max_ms": 91396.79,
+     "err_pct": 100.0,
+     "codes": {
+      "ReadTimeout": 82
+     }
+    },
+    "autosave_retry": {
+     "n": 203,
+     "rps": 2.0,
+     "p50_ms": 60009.47,
+     "p95_ms": 98238.34,
+     "p99_ms": 99378.66,
+     "max_ms": 99547.49,
+     "err_pct": 100.0,
+     "codes": {
+      "ReadTimeout": 203
+     }
+    },
+    "section_close": {
+     "n": 352,
+     "rps": 3.7,
+     "p50_ms": 60009.48,
+     "p95_ms": 60030.13,
+     "p99_ms": 80213.85,
+     "max_ms": 90645.36,
+     "err_pct": 100.0,
+     "codes": {
+      "ReadTimeout": 352
+     }
+    },
+    "state_lazy": {
+     "n": 3,
+     "rps": 0.2,
+     "p50_ms": 60019.96,
+     "p95_ms": 60023.94,
+     "p99_ms": 60023.94,
+     "max_ms": 60023.94,
+     "err_pct": 100.0,
+     "codes": {
+      "ReadTimeout": 3
+     }
+    }
+   },
+   "server_cpu_s": 4.97,
+   "server_cpu_util": 0.03,
+   "server_cpu_ms_per_req": 7.77,
+   "pg_cpu_s": -0.06,
+   "pg_cpu_ms_per_req": -0.09
+  }
+ },
+ "cpu_ms_per_request_nnls": {
+  "start": 1.65,
+  "content_200": 18.29,
+  "content_304": 6.54,
+  "autosave": 1.8,
+  "section_close": 1.85,
+  "submit": 0.0,
+  "state_get": 10.08
+ },
+ "autosave_peak_rps_10s": 75.5,
+ "submit_spread_s": null,
+ "server_rss_mb_max": 635,
+ "server_cpu_total_s": 87.7,
+ "pg_cpu_total_s": 5.9,
+ "machine_load1_max": 6.34,
+ "machine_load1_avg": 3.5
+}

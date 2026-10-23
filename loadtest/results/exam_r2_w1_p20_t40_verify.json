@@ -1,0 +1,53 @@
+{
+ "label": "r2_w1_p20_t40",
+ "assessment_id": "1048a084-be5e-4275-92d5-72bcc7e2a6cc",
+ "attempts": 1336,
+ "attempts_per_user_max": 1,
+ "status": {
+  "in_progress": 1335,
+  "graded": 1
+ },
+ "submit_reason": {
+  "-": 1335,
+  "timeout": 1
+ },
+ "in_progress_left": 1335,
+ "graded_at_missing": 0,
+ "hook_calls": 1,
+ "hook_double": 0,
+ "hook_missing": 0,
+ "hook_on_unfinalized": 0,
+ "items_total": 200400,
+ "attempts_with_ungraded_items": 0,
+ "raw_score_mismatch": 0,
+ "answers_after_grading": 0,
+ "open_sections_on_finalized": 0,
+ "key_mismatch": 0,
+ "acked_positions_checked": 5814,
+ "acked_exact": 5813,
+ "acked_superseded": 1,
+ "lost_answers": 0,
+ "lost_examples": [],
+ "acked_entries_total": 6180,
+ "started_ok": 1319,
+ "5xx_or_transport": {
+  "autosave:500": 170,
+  "autosave:ReadTimeout": 2691,
+  "autosave:ReadError": 1,
+  "autosave_retry:ReadTimeout": 2781,
+  "content:500": 17,
+  "content:ReadTimeout": 17,
+  "content_304:ReadTimeout": 90,
+  "content_304:500": 1,
+  "section_close:500": 2,
+  "section_close:ReadTimeout": 1092,
+  "start:500": 35,
+  "start:ReadError": 8,
+  "start:ReadTimeout": 4638,
+  "start_retry:ReadTimeout": 9362,
+  "state_lazy:ReadTimeout": 29,
+  "state_reload:500": 4,
+  "state_reload:ReadTimeout": 81
+ },
+ "ok": false
+}

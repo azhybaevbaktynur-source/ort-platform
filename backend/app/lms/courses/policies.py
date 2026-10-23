@@ -1,0 +1,30 @@
+"""Route policies for /courses routes (design section 5)."""
+_B = "/api/v1/courses"
+COURSE_POLICIES: dict[tuple[str, str], str] = {
+    ("GET", _B): "authenticated",
+    ("GET", f"{_B}/trash"): "authenticated",
+    ("POST", _B): "teacher_approved",
+    ("POST", f"{_B}/join"): "authenticated+ratelimit",
+    ("GET", f"{_B}/{{course_id}}"): "course:course.read",
+    ("PATCH", f"{_B}/{{course_id}}"): "course:course.update",
+    ("POST", f"{_B}/{{course_id}}/publish"): "course:course.publish",
+    ("POST", f"{_B}/{{course_id}}/unpublish"): "course:course.publish",
+    ("POST", f"{_B}/{{course_id}}/conclude"): "course:course.publish",
+    ("POST", f"{_B}/{{course_id}}/reopen"): "course:course.publish",
+    ("DELETE", f"{_B}/{{course_id}}"): "course:course.delete+owner",
+    ("POST", f"{_B}/{{course_id}}/restore"): "course:owner_restore",
+    ("POST", f"{_B}/{{course_id}}/transfer-ownership"): "course:course.transfer+owner",
+    ("POST", f"{_B}/{{course_id}}/join-code/regenerate"): "course:roster.manage",
+    ("POST", f"{_B}/{{course_id}}/leave"): "course:course.leave",
+    ("GET", f"{_B}/{{course_id}}/people"): "course:course.read",
+    ("POST", f"{_B}/{{course_id}}/staff"): "course:roster.manage",
+    ("PATCH", f"{_B}/{{course_id}}/enrollments/{{enrollment_id}}"): "course:roster.manage",
+    ("DELETE", f"{_B}/{{course_id}}/enrollments/{{enrollment_id}}"): "course:roster.manage",
+    # Phase 4 grading settings and categories (PHASE_4_DESIGN 3.3, 5)
+    ("GET", f"{_B}/{{course_id}}/grading"): "course:content.read",
+    ("PUT", f"{_B}/{{course_id}}/grading"): "course:grades.manage",
+    ("POST", f"{_B}/{{course_id}}/grade-categories"): "course:grades.manage",
+    ("PUT", f"{_B}/{{course_id}}/grade-categories/order"): "course:grades.manage",
+    ("PATCH", f"{_B}/{{course_id}}/grade-categories/{{category_id}}"): "course:grades.manage",
+    ("DELETE", f"{_B}/{{course_id}}/grade-categories/{{category_id}}"): "course:grades.manage",
+}

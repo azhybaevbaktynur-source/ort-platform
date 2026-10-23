@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
-import { GraduationCap, ShieldCheck, BookOpen, Clock, BarChart3, TrendingUp, Target, LogIn, UserPlus } from "lucide-react";
+import { GraduationCap, BookOpen, Clock, BarChart3, Languages, LogIn, UserPlus } from "lucide-react";
 
 export default function HomePage() {
   const { lang, setLang, t } = useTranslation();
@@ -24,7 +24,7 @@ export default function HomePage() {
                 {t("common.appName")}
               </span>
               <span className="text-xs text-slate-500 block">
-                ЖРТ / ОРТ Кыргызстан 2026
+                {t("landing.badge")}
               </span>
             </div>
           </div>
@@ -32,33 +32,27 @@ export default function HomePage() {
           <div className="flex items-center space-x-3">
             {/* Language Switcher */}
             <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
-              <button
-                onClick={() => setLang("ky")}
-                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
-                  lang === "ky"
-                    ? "bg-white text-brand-600 shadow-sm"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                Кыргызча
-              </button>
-              <button
-                onClick={() => setLang("ru")}
-                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
-                  lang === "ru"
-                    ? "bg-white text-brand-600 shadow-sm"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                Русский
-              </button>
+              {(["en", "ky", "ru"] as const).map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setLang(l)}
+                  aria-pressed={lang === l}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+                    lang === l
+                      ? "bg-white text-brand-600 shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  {l.toUpperCase()}
+                </button>
+              ))}
             </div>
 
             {/* Auth Actions in Header */}
             {user ? (
               <div className="flex items-center space-x-2">
                 <Link
-                  href={userProfile?.role === "admin" ? `/${lang}/exams` : `/${lang}/dashboard`}
+                  href={`/${lang}/courses`}
                   className="px-3 py-1.5 rounded-lg bg-brand-50 border border-brand-200 text-brand-700 text-xs font-bold hover:bg-brand-100 transition-colors"
                 >
                   {userProfile?.displayName || user.email}
@@ -97,34 +91,26 @@ export default function HomePage() {
         <div className="text-center max-w-3xl mx-auto space-y-6">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            12,000+ ОРТ суроолору жана жаңы формат
+            {t("landing.badge")}
           </div>
 
           <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
-            {lang === "ky"
-              ? "Жалпы республикалык тестирлөөгө жогорку деңгээлде даярданыңыз"
-              : "Готовьтесь к Общереспубликанскому тестированию на максимум"}
+            {t("landing.title")}
           </h1>
 
           <p className="text-lg text-slate-600 leading-relaxed">
-            {lang === "ky"
-              ? "Алтын сертификат максаты (219+ балл), күндүк окуу планы, терең талдоо жана бирдиктүү билим берүү экосистемасы."
-              : "Цель — Золотой сертификат (219+ баллов), ежедневный умный план, детальный анализ и единая образовательная экосистема."}
+            {t("landing.subtitle")}
           </p>
 
           {/* Universal Single Door CTA */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
             {user ? (
               <Link
-                href={userProfile?.role === "admin" ? `/${lang}/exams` : `/${lang}/dashboard`}
+                href={`/${lang}/courses`}
                 className="inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-2xl bg-brand-600 text-white font-bold text-sm hover:bg-brand-700 shadow-md shadow-brand-500/25 transition-all"
               >
                 <GraduationCap className="w-5 h-5" />
-                <span>
-                  {userProfile?.role === "admin"
-                    ? (lang === "ky" ? "Башкаруу панелине өтүү" : "Перейти к управлению")
-                    : (lang === "ky" ? "Окуучу дашбордуна өтүү" : "Перейти в кабинет ученика")}
-                </span>
+                <span>{t("landing.toCourses")}</span>
               </Link>
             ) : (
               <>
@@ -133,14 +119,14 @@ export default function HomePage() {
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-2xl bg-brand-600 text-white font-bold text-sm hover:bg-brand-700 shadow-md shadow-brand-500/25 transition-all"
                 >
                   <UserPlus className="w-4 h-4" />
-                  <span>{lang === "ky" ? "Даярданууну баштоо" : "Начать подготовку"}</span>
+                  <span>{t("landing.start")}</span>
                 </Link>
                 <Link
                   href={`/${lang}/login`}
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-2xl bg-white text-slate-800 font-bold text-sm border-2 border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all"
                 >
                   <LogIn className="w-4 h-4" />
-                  <span>{lang === "ky" ? "Кирүү" : "Войти в систему"}</span>
+                  <span>{t("landing.signIn")}</span>
                 </Link>
               </>
             )}
@@ -150,51 +136,24 @@ export default function HomePage() {
         {/* Feature Highlights Grid */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-16 pt-12 border-t border-slate-200">
           <div className="p-5 rounded-xl bg-white border border-slate-200">
-            <BookOpen className="w-8 h-8 text-brand-600 mb-3" />
-            <h3 className="font-bold text-slate-900 text-sm mb-1">
-              {lang === "ky" ? "5 Негизги Бөлүм" : "5 Основных Разделов"}
-            </h3>
-            <p className="text-xs text-slate-500">
-              {lang === "ky"
-                ? "Математика I & II, Окуу, Грамматика, Аналогиялар."
-                : "Математика I & II, Чтение, Грамматика, Аналогии."}
-            </p>
+            <BookOpen className="w-8 h-8 text-brand-600 mb-3" aria-hidden="true" />
+            <h3 className="font-bold text-slate-900 text-sm mb-1">{t("landing.f1Title")}</h3>
+            <p className="text-xs text-slate-500">{t("landing.f1Text")}</p>
           </div>
-
           <div className="p-5 rounded-xl bg-white border border-slate-200">
-            <Clock className="w-8 h-8 text-emerald-600 mb-3" />
-            <h3 className="font-bold text-slate-900 text-sm mb-1">
-              {lang === "ky" ? "Ыкчам баалоо" : "Мгновенный подсчет"}
-            </h3>
-            <p className="text-xs text-slate-500">
-              {lang === "ky"
-                ? "ЖРТнын 60-245 шкаласы боюнча реалдуу балл жана перцентиль."
-                : "Точный пересчет в шкалу ОРТ (60-245) и перцентиль."}
-            </p>
+            <Clock className="w-8 h-8 text-emerald-600 mb-3" aria-hidden="true" />
+            <h3 className="font-bold text-slate-900 text-sm mb-1">{t("landing.f2Title")}</h3>
+            <p className="text-xs text-slate-500">{t("landing.f2Text")}</p>
           </div>
-
           <div className="p-5 rounded-xl bg-white border border-slate-200">
-            <Target className="w-8 h-8 text-indigo-600 mb-3" />
-            <h3 className="font-bold text-slate-900 text-sm mb-1">
-              {lang === "ky" ? "Максаттуу балл" : "Целевой балл"}
-            </h3>
-            <p className="text-xs text-slate-500">
-              {lang === "ky"
-                ? "Алтын сертификатка (219+ балл) карай күндүк дельта трекери."
-                : "Индивидуальный трекер достижения Золотого сертификата (219+)."}
-            </p>
+            <BarChart3 className="w-8 h-8 text-amber-600 mb-3" aria-hidden="true" />
+            <h3 className="font-bold text-slate-900 text-sm mb-1">{t("landing.f3Title")}</h3>
+            <p className="text-xs text-slate-500">{t("landing.f3Text")}</p>
           </div>
-
           <div className="p-5 rounded-xl bg-white border border-slate-200">
-            <BarChart3 className="w-8 h-8 text-amber-600 mb-3" />
-            <h3 className="font-bold text-slate-900 text-sm mb-1">
-              {lang === "ky" ? "Каталар менен иштөө" : "Работа над ошибками"}
-            </h3>
-            <p className="text-xs text-slate-500">
-              {lang === "ky"
-                ? "Туура эмес жоопторду өзүнчө топтомго сактап кайталоо."
-                : "Автоматический сбор ошибочных ответов с пояснениями."}
-            </p>
+            <Languages className="w-8 h-8 text-indigo-600 mb-3" aria-hidden="true" />
+            <h3 className="font-bold text-slate-900 text-sm mb-1">{t("landing.f4Title")}</h3>
+            <p className="text-xs text-slate-500">{t("landing.f4Text")}</p>
           </div>
         </div>
       </main>

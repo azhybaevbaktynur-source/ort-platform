@@ -21,9 +21,6 @@ from app.db.session import get_db
 from app.models.user import User
 from app.schemas.user import (
     UserProfile,
-    UserRole,
-    TargetScoreUpdate,
-    TargetScore,
     UserRegisterRequest,
     RegisterResponse,
     VerifyEmailRequest,
@@ -89,23 +86,22 @@ def _issue_email_code(user: User, db: Session, lang: str) -> bool:
     return sent
 
 
-def _token_response(user: User) -> TokenResponse:
-    token = create_access_token({"sub": user.id, "email": user.email, "role": user.role})
-    user_role = UserRole.ADMIN if user.role == "admin" else UserRole.STUDENT
-    return TokenResponse(
-        access_token=token,
-        token_type="bearer",
-        role=user.role,
-        user=UserProfile(
-            id=user.id,
-            email=user.email,
-            displayName=user.display_name or user.email.split("@")[0],
-            phone=user.phone,
-            role=user_role,
-            target_score=user.target_score or 200,
-            preferredLanguage="ky",
-        ),
+def _profile(user: User) -> UserProfile:
+    return UserProfile(
+        id=user.id,
+        email=user.email,
+        displayName=user.display_name or user.email.split("@")[0],
+        phone=user.phone,
+        preferredLanguage="ky",
+        is_platform_admin=bool(user.is_platform_admin),
+        teacher_status=user.teacher_status or "none",
+        locale=user.locale,
     )
+
+
+def _token_response(user: User) -> TokenResponse:
+    token = create_access_token({"sub": user.id})
+    return TokenResponse(access_token=token, token_type="bearer", user=_profile(user))
 
 
 @router.get("/ping")
@@ -144,8 +140,6 @@ def register_user(
         user = User(
             id=f"usr_{uuid.uuid4().hex[:12]}",
             email=clean_email,
-            role="student",  # self-registration is always a student
-            target_score=200,
             created_at=_now(),
             email_verified=False,
         )
@@ -185,6 +179,9 @@ def verify_email(
     user = db.query(User).filter(User.email == clean_email).first()
     if not user or not user.password_hash or not verify_password(req.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=INVALID_CREDENTIALS)
+
+    if user.disabled_at is not None:
+        raise _error(403, "account_disabled", "This account is disabled.")
 
     if user.email_verified:
         return _token_response(user)
@@ -239,7 +236,7 @@ def login_user(
 ):
     """
     Universal user authentication:
-    Verifies credentials against SQL database and returns role ('student' or 'admin').
+    Verifies credentials against the SQL database and returns a token and the profile.
     Accounts whose email is not verified yet get a fresh code instead of a token.
     """
     clean_email = req.email.strip().lower()
@@ -251,6 +248,9 @@ def login_user(
             detail=INVALID_CREDENTIALS,
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    if user.disabled_at is not None:
+        raise _error(403, "account_disabled", "This account is disabled.")
 
     if password_needs_rehash(user.password_hash):
         # Upgrade old hashes to the current (faster) cost once we know the password
@@ -268,36 +268,9 @@ def login_user(
 
 
 @router.get("/me", response_model=UserProfile)
-def get_current_user_profile(
-    current_user: UserProfile = Depends(get_current_user),
-):
-    """
-    Returns the authenticated user's profile, including role ('student' or 'admin') and target score.
-    """
-    return current_user
-
-
-@router.put("/target-score", response_model=TargetScore)
-def update_target_score(
-    target_in: TargetScoreUpdate,
-    current_user: UserProfile = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """
-    Updates the student's target ORT score in the SQL database.
-    """
-    current_target = current_user.targetScore.model_dump()
-    update_data = {k: v for k, v in target_in.model_dump().items() if v is not None}
-    current_target.update(update_data)
-    current_user.targetScore = TargetScore(**current_target)
-
-    # Persist target score to SQL database
-    user = db.query(User).filter(User.id == current_user.id).first()
-    if user and target_in.overall is not None:
-        user.target_score = target_in.overall
-        db.commit()
-
-    return current_user.targetScore
+def get_current_user_profile(current_user: User = Depends(get_current_user)):
+    """Returns the authenticated user's profile (platform-admin flag and teacher status, no global role)."""
+    return _profile(current_user)
 
 
 @router.post("/forgot-password")
@@ -313,7 +286,8 @@ def forgot_password(
     clean_email = req.email.strip().lower()
     user = db.query(User).filter(User.email == clean_email).first()
 
-    if user and not _cooldown_left(user.reset_requested_at):
+    # Disabled accounts (incl. the ORT system teacher) get no token and no email; the answer stays the same
+    if user and user.disabled_at is None and not _cooldown_left(user.reset_requested_at):
         token = secrets.token_urlsafe(32)
         user.reset_token = _secret_hash(token)
         user.reset_token_expires = _now() + timedelta(minutes=settings.PASSWORD_RESET_TTL_MINUTES)
@@ -346,6 +320,12 @@ def reset_password(
 
     user = db.query(User).filter(User.reset_token == _secret_hash(token_str)).first()
 
+    if user is not None and user.disabled_at is not None:
+        # A disabled account never gets a password through a reset: same answer as an unknown token
+        user.reset_token = None
+        user.reset_token_expires = None
+        db.commit()
+        user = None
     if not user or not user.reset_token_expires:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
