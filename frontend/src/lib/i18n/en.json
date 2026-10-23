@@ -1960,5 +1960,15 @@
       "negative": "must not be negative",
       "positive": "must be greater than 0"
     }
+  },
+  "catalog": {
+    "title": "Course catalog",
+    "subtitle": "Courses open to every student on the platform.",
+    "students": "Students: {count}",
+    "join": "Join",
+    "joining": "Joining…",
+    "open": "Open",
+    "needsCode": "Join with a code from the teacher",
+    "closed": "Enrollment is closed"
   }
 }

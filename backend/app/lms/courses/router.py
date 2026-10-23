@@ -145,6 +145,17 @@ def regenerate_join_code(course_id: uuid.UUID, ctx: AuthzContext = Depends(get_a
     return JoinCodeOut(join_code=course.join_code)
 
 
+@router.post("/{course_id}/join", response_model=JoinOut)
+def join_open(course_id: uuid.UUID, request: Request, ctx: AuthzContext = Depends(get_authz)):
+    """Phase 5 S3 (P5-5): one-click join of an open catalog course; every miss is the bad-code 404."""
+    enr, course, already = enr_svc.join_open(ctx.db, ctx.user, course_id, client_ip_hash(request))
+    owner = ctx.db.get(User, course.owner_id)
+    return JoinOut(
+        course=course_card(course, enr.role, public_display_name(owner)),
+        enrollment=MyEnrollmentOut.model_validate(enr), already_enrolled=already,
+    )
+
+
 @router.post("/{course_id}/leave", status_code=204, response_class=Response)
 def leave_course(course_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
     course = svc.load_course(ctx.db, course_id)

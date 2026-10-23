@@ -63,3 +63,9 @@ api_router.include_router(_gradebook_router, tags=["Gradebook"])
 from app.lms.grading.schemes_router import router as _schemes_router  # noqa: E402
 
 api_router.include_router(_schemes_router, prefix="/grading-schemes", tags=["Grading Schemes"])
+
+# --- Phase 5 S3 begin ---
+from app.lms.courses.catalog_router import router as _catalog_router  # noqa: E402
+
+api_router.include_router(_catalog_router, prefix="/catalog", tags=["Catalog"])
+# --- Phase 5 S3 end ---

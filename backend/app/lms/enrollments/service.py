@@ -1,4 +1,4 @@
-"""Enrollment use cases: join by code (hot path), leave, staff management, roster queries."""
+"""Enrollment use cases: join by code or open join (hot path), leave, staff management, roster queries."""
 from __future__ import annotations
 
 import uuid
@@ -31,8 +31,11 @@ def _join_failure(db: Session, ip_hash: Optional[str]) -> NotFound:
     return NotFound(JOIN_FAIL_MESSAGE, code="join_code_invalid")
 
 
-def join_by_code(db: Session, user: User, raw_code: str, ip_hash: Optional[str]) -> tuple[Enrollment, Course, bool]:
-    user_id = user.id
+# Enrollment mode each join source requires (P5-5): a code joins invite_code courses, a click joins open ones.
+_MODE_FOR_SOURCE = {"join_code": "invite_code", "open": "open"}
+
+
+def _enforce_join_limits(user_id: str, ip_hash: Optional[str]) -> None:
     ratelimit.enforce(f"join:u:{user_id}", ratelimit.JOIN_USER_10M)
     ratelimit.enforce(f"join:u:{user_id}", ratelimit.JOIN_USER_24H)
     if ip_hash:
@@ -40,18 +43,47 @@ def join_by_code(db: Session, user: User, raw_code: str, ip_hash: Optional[str])
         if not allowed:
             raise RateLimited("Too many requests", details={"retry_after_seconds": retry})
 
+
+def join_by_code(db: Session, user: User, raw_code: str, ip_hash: Optional[str]) -> tuple[Enrollment, Course, bool]:
+    _enforce_join_limits(user.id, ip_hash)
     code = normalize_join_code((raw_code or "")[:64])
     if not JOIN_CODE_RE.match(code):
         raise _join_failure(db, ip_hash)
     course = db.execute(select(Course).where(Course.join_code == code)).scalar_one_or_none()
     if course is None:
         raise _join_failure(db, ip_hash)
+    return _join(db, user, course, source="join_code", ip_hash=ip_hash)
+
+
+def join_open(db: Session, user: User, course_id: uuid.UUID, ip_hash: Optional[str]) -> tuple[Enrollment, Course, bool]:
+    """One-click join of a published, catalog-visible, open course (P5-5). Every miss is the bad-code 404."""
+    _enforce_join_limits(user.id, ip_hash)
+    course = db.execute(select(Course).where(Course.id == course_id)).scalar_one_or_none()
+    if course is None:
+        raise _join_failure(db, ip_hash)
+    return _join(db, user, course, source="open", ip_hash=ip_hash)
+
+
+def _joinable(course: Course, source: str) -> bool:
+    if course.deleted_at is not None or course.status != "published":
+        return False
+    if course.enrollment_mode != _MODE_FOR_SOURCE[source]:
+        return False
+    if source == "open" and (course.visibility != "catalog" or course.unlisted_by_admin_at is not None):
+        return False
+    return True
+
+
+def _join(db: Session, user: User, course: Course, *, source: str,
+          ip_hash: Optional[str]) -> tuple[Enrollment, Course, bool]:
+    """Shared join write path; callers enforce the JOIN_* rate limits before looking the course up."""
+    user_id = user.id
     if course.enrollment_limit is not None:
         lock_course(db, course)
     else:
         # FOR SHARE: concurrent joins don't serialize, but unpublish/limit changes (FOR UPDATE) wait for them.
         db.refresh(course, with_for_update={"read": True})
-    if course.deleted_at is not None or course.status != "published" or course.enrollment_mode != "invite_code":
+    if not _joinable(course, source):
         raise _join_failure(db, ip_hash)
 
     existing = db.execute(
@@ -68,14 +100,14 @@ def join_by_code(db: Session, user: User, raw_code: str, ip_hash: Optional[str])
     try:
         if existing is None:
             enr = Enrollment(course_id=course_id, user_id=user_id, role="student", state="active",
-                             source="join_code", activated_at=now)
+                             source=source, activated_at=now)
             db.add(enr)
             db.flush()
             add_event(db, enr, "joined", user_id, to_role="student", to_state="active")
         else:
             enr = existing
             old_role, old_state = enr.role, enr.state
-            enr.role, enr.state, enr.source = "student", "active", "join_code"
+            enr.role, enr.state, enr.source = "student", "active", source
             enr.activated_at, enr.removed_at, enr.removed_by_id = now, None, None
             add_event(db, enr, "rejoined", user_id, from_role=old_role, to_role="student",
                       from_state=old_state, to_state="active")
