@@ -150,3 +150,5 @@ Full list: P4-1 … in `docs/phases/PHASE_4_DESIGN.md` §1. Resolved during the 
 | Neon branches | `loadtest-2026-10-22` deleted. `backup-2026-10-22-before-phase0-alembic` kept until one week after a stable Phase 5, then deleted. |
 | Brevo key | Never committed (checked all refs). Owner rotates it later; `.env.example` holds a placeholder. |
 | Render plan | Chosen by the owner before the first real exam. |
+| R2 free tier (owner req. 8) | R2 stays in the free tier, enforced by the app: stored-bytes tracking (admin warning at 8 GB, uploads refused at 9.5 GB), images max 2 MB, other files max 10 MB, WebP + SHA-256 dedup, immutable 1-year caching of content-addressed public images served from R2 (not the backend), no list operations in request paths, Standard class only, admin monthly usage estimate, free-tier exam count in `CAPACITY_REVIEW.md`. Built in Phase 5. Anything exceeding the free tier needs the owner's OK. |
+| R2 public URL | No domain purchase now: public images use the r2.dev address. Before the first large exam, switch to a custom domain the owner buys after launch (r2.dev is rate-limited). |

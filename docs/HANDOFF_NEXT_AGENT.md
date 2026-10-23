@@ -39,10 +39,20 @@ Resolved 2026-10-23:
 - Neon `loadtest-2026-10-22` deleted.
 - Brevo key: never committed (git log -S over all refs: 0 hits); the real key in the untracked `backend/.env.example` replaced with a placeholder.
 
+**R2 free-tier guard (owner requirement 8, 2026-10-23) — build in Phase 5:** R2 must stay in the free tier (10 GB storage, 1M Class A writes/lists and 10M Class B reads per month, Standard class only; Cloudflare has no spending cap, so the app enforces it).
+- Track total stored R2 bytes in the DB; warn admins at 8 GB; refuse new uploads at 9.5 GB with a clear trilingual message.
+- Upload limits: images max 2 MB (today 5 MB), other files max 10 MB (new upload type; today images only). Keep WebP conversion and SHA-256 dedup (already built).
+- Public images: content-addressed names, `Cache-Control: public, max-age=31536000, immutable` (already on `/api/v1/media`); serve them from `R2_PUBLIC_BASE_URL`, not through the backend.
+- Never list objects in request paths; never use Infrequent Access or lifecycle rules (none today; keep it so).
+- Admin area: monthly usage estimate (objects written, approx. reads). `docs/CAPACITY_REVIEW.md`: how many 6,000-student exams fit in the free tier.
+- Any design that would exceed the free tier: stop and ask the owner (costs money).
+- Public URL: owner buys no domain now (will after the platform is live), so `R2_PUBLIC_BASE_URL` is the r2.dev address for now. r2.dev is rate-limited and not meant for production: before the first large exam, move to a custom domain (owner's purchase) — remind together with the Render plan.
+
 Still open (owner):
 1. **Rotate the Brevo API key** (owner will do it later).
 2. **Delete Neon `backup-2026-10-22-before-phase0-alembic`** one week after a stable Phase 5 (agent may delete it then; owner approved).
 3. **Render plan for exam windows**: decide before the first real exam; do not raise earlier.
+4. **Custom domain for R2 public images** (replaces r2.dev): owner buys it after the platform is live; needed before the first large exam.
 
 ## 4. Decisions asked in the first session (all answered, see §4b)
 
