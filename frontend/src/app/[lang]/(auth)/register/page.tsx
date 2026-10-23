@@ -36,7 +36,7 @@ function RegisterForm() {
     if (redirectParam) {
       router.push(redirectParam);
     } else {
-      router.push(`/${lang}/dashboard`);
+      router.push(`/${lang}/courses`);
     }
   };
 
