@@ -304,7 +304,7 @@ async def test_summary_levels_and_month(db, monkeypatch):
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["level"] == "ok" and body["stored_bytes"] == 0 and body["driver"] == "db"
-    assert body["warn_bytes"] == 8 * 1024 ** 3 and body["hard_bytes"] == int(9.5 * 1024 ** 3)
+    assert body["warn_bytes"] == 8_000_000_000 and body["hard_bytes"] == 9_500_000_000
     assert body["month"]["month"] == usage.current_month() and body["public_base_is_r2dev"] is False
     set_stored(600)
     monkeypatch.setattr(settings, "STORAGE_WARN_BYTES", 500)
