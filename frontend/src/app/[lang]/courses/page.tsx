@@ -8,6 +8,7 @@ import { useTranslation } from "@/lib/i18n/context";
 import { listMyCourses } from "@/lib/lms/courses";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
 import type { CourseCard as CourseCardDto } from "@/lib/lms/types";
+import { CatalogSection } from "@/components/lms/CatalogSection";
 import { CourseCard } from "@/components/lms/CourseCard";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { JoinDialog } from "@/components/lms/JoinDialog";
@@ -63,6 +64,7 @@ export default function CoursesPage() {
 
   return (
     <div>
+      <CatalogSection onJoined={() => tab && load(tab)} />
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-slate-900">{t("courses.list.title")}</h1>
         <div className="flex flex-wrap items-center gap-2">
