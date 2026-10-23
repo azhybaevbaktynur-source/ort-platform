@@ -141,8 +141,8 @@ class Settings(BaseSettings):
     # --- Phase 5 S3 ---
     # --- Phase 5 S4 settings (storage guard) --- (R2 free-tier guard, docs/phases/PHASE_5_DESIGN.md section 6;
     # ASSET_MAX_UPLOAD_BYTES = 2 MiB is set above by S2)
-    STORAGE_WARN_BYTES: int = 8 * 1024 ** 3  # 8 GiB: admin warning
-    STORAGE_HARD_BYTES: int = int(9.5 * 1024 ** 3)  # 9.5 GiB: new blobs refused (storage_full, HTTP 507)
+    STORAGE_WARN_BYTES: int = 8_000_000_000  # 8 GB (decimal, like Cloudflare's 10 GB free tier): admin warning
+    STORAGE_HARD_BYTES: int = 9_500_000_000  # 9.5 GB (decimal): new blobs refused (storage_full, HTTP 507)
     FILE_MAX_UPLOAD_BYTES: int = 10 * 1024 * 1024  # PDF files
     FILE_ALLOWED_MIMES: list[str] = ["application/pdf"]
     STORAGE_SMOKE_RATE_PER_HOUR: int = 5

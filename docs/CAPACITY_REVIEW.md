@@ -56,14 +56,14 @@ Owner requirement 8: Cloudflare R2 has no spending cap, so the app keeps itself 
 
 **What the app enforces**
 - `storage_usage` counts every byte and object ever written (`app/lms/files/usage.py`, updated on its own connection right after a NEW blob is stored; dedup hits write nothing). On r2 nothing is deleted or listed, so the counter only grows: it is an upper bound of what R2 bills.
-- Warn at `STORAGE_WARN_BYTES` = 8 GiB (amber banner in `/[lang]/admin` and `/[lang]/admin/storage`), refuse new blobs at `STORAGE_HARD_BYTES` = 9.5 GiB (HTTP 507 `storage_full`, trilingual message). Both are settings (env vars), no code change needed to lower them.
-  - Note: 9.5 GiB = 10,200,547,328 bytes = 10.2 decimal GB. If Cloudflare's "10 GB" is decimal, the hard limit sits 2% above it; set `STORAGE_HARD_BYTES=9663676416` (9 GiB = 9.66 GB) to be strictly inside. Reaching either is thousands of exams away (below).
+- Warn at `STORAGE_WARN_BYTES` = 8 GB (8,000,000,000 bytes, decimal like Cloudflare's free tier) (amber banner in `/[lang]/admin` and `/[lang]/admin/storage`), refuse new blobs at `STORAGE_HARD_BYTES` = 9.5 GB (9,500,000,000 bytes) (HTTP 507 `storage_full`, trilingual message). Both are settings (env vars), no code change needed to lower them.
+  - Decimal units on purpose: 9.5 GiB would be 10.2 decimal GB, above the 10 GB free tier.
 - Upload caps: images 2 MiB (re-encoded to WebP, usually far smaller), PDF files 10 MiB (private bucket, owner-only download by presigned URL). Images are content-addressed (`img/{sha256}.webp`) and stored with `Cache-Control: public, max-age=31536000, immutable`, served from `R2_PUBLIC_BASE_URL`, never through the backend.
 - No list call in any request path. Class B reads are **estimated at read time** in the admin summary (`attempts started this month × distinct images in that exam version`), so the attempt hot path writes nothing.
 
 **Arithmetic for a 6,000-student ORT exam**
 - One digitized 150-question ORT exam has about 16 images (production: 16 image refs in 150 questions). Stored WebP is 3-30 KB each (tsoomo19 sample: 2.8 KB), so 16 × 30 KB = 480 KB < **1 MB per exam**.
-- Storage: rounding up to 1 MiB per exam, 9.5 GiB / 1 MiB = 9,728 exams; at the real worst case of 480 KiB (16 × 30 KiB), 9.5 × 1024³ / (16 × 30 × 1024) ≈ 20,750 exams. **Storage holds thousands of exams**; it is not the limit.
+- Storage: rounding up to 1 MiB per exam, 9.5 GB / 1 MiB ≈ 9,060 exams; at the real worst case of 480 KiB (16 × 30 KiB), 9.5 × 10⁹ / (16 × 30 × 1024) ≈ 19,330 exams. **Storage holds thousands of exams**; it is not the limit.
 - Class A (writes): ≤ 1 PUT per new image (the HEAD before it is Class B) → 16 per new exam. 1,000,000 / 16 = 62,500 new exams per month. Irrelevant.
 - **Class B (reads) is the limit**: one sitting = 6,000 students × 16 images = **96,000 public reads** (the browser cache keeps repeats within one attempt out). 10,000,000 / 96,000 ≈ **104 full 6,000-student exam sittings per month** (about 100). A 30-question subject test with 5 images: 6,000 × 5 = 30,000 reads → about 333 sittings per month.
 - The admin page shows this month's Class A (counted), Class B by the backend (counted) and Class B estimated (computed); compare with 1,000,000 / 10,000,000.

@@ -165,7 +165,7 @@
       "unsupported_type": "This question type is not supported.",
       "asset_not_usable": "This image cannot be used. Upload it again.",
       "image_invalid": "The file is not a supported image. Use PNG, JPEG, GIF or WEBP.",
-      "image_too_large": "The image is too large (maximum 5 MB).",
+      "image_too_large": "The image is too large (maximum 2 MB).",
       "image_too_many_pixels": "The image has too many pixels. Use a smaller one.",
       "storage_quota_exceeded": "Your image storage is full. Delete unused images first.",
       "storage_full": "The server storage is full. Please contact the administrator.",
