@@ -7,12 +7,10 @@ import bcrypt
 import httpx
 import pytest
 from httpx import AsyncClient, ASGITransport
-from sqlalchemy import create_engine, text
 
 from app.core.config import settings
 from app.core.security import create_access_token
 from app.db.session import SessionLocal
-from app.db.user_migrations import ensure_user_auth_columns
 from app.main import app
 from app.models.user import User
 from app.services import email_service
@@ -209,23 +207,11 @@ async def test_login_of_unverified_account_sends_fresh_code_after_cooldown():
 # Existing accounts, hashing, hardening
 # ---------------------------------------------------------------------------
 
-def test_migration_marks_existing_users_verified(tmp_path):
-    engine = create_engine(f"sqlite:///{tmp_path / 'old.db'}")
-    with engine.begin() as conn:
-        conn.execute(text("CREATE TABLE users (id VARCHAR PRIMARY KEY, email VARCHAR, password_hash VARCHAR, role VARCHAR)"))
-        conn.execute(text("INSERT INTO users VALUES ('u1', 'old@example.com', 'x', 'student')"))
-    ensure_user_auth_columns(engine)
-    ensure_user_auth_columns(engine)  # idempotent
-    with engine.connect() as conn:
-        row = conn.execute(text("SELECT email_verified, email_code_attempts FROM users WHERE id='u1'")).one()
-    assert bool(row[0]) is True and row[1] == 0
-
-
 async def test_old_cost_12_hash_is_upgraded_on_login():
     email = new_email()
     session = SessionLocal()
     try:
-        session.add(User(id=f"usr_{uuid.uuid4().hex[:12]}", email=email, role="student",
+        session.add(User(id=f"usr_{uuid.uuid4().hex[:12]}", email=email,
                          password_hash=bcrypt.hashpw(PASSWORD.encode(), bcrypt.gensalt(12)).decode()))
         session.commit()
     finally:
@@ -238,19 +224,18 @@ async def test_old_cost_12_hash_is_upgraded_on_login():
     assert bcrypt.checkpw(PASSWORD.encode(), new_hash.encode())
 
 
-async def test_mock_tokens_and_fake_tokens_rejected_when_disabled(monkeypatch):
-    monkeypatch.setattr(settings, "ALLOW_MOCK_TOKENS", False)
+async def test_no_mock_token_is_honoured_at_all():
     async with client() as c:
-        for header in ({"Authorization": "Bearer mock_admin_token"}, {"Authorization": "Bearer x_admin_x"}, {}):
+        for header in ({"Authorization": "Bearer mock_admin_token"}, {"Authorization": "Bearer mock_student_token"},
+                       {"Authorization": "Bearer x_admin_x"}, {}):
             res = await c.get("/api/v1/auth/me", headers=header)
             assert res.status_code == 401, header
-        res = await c.post("/api/v1/exam-sets", headers={"Authorization": "Bearer mock_admin_token"},
-                           json={"title": "x", "language": "ky", "exam_type": "full_main"})
-        assert res.status_code == 401
+            res = await c.get("/api/v1/me/lms", headers=header)
+            assert res.status_code == 401, header
 
 
 async def test_token_of_deleted_user_rejected():
-    token = create_access_token({"sub": "usr_does_not_exist", "email": "ghost@example.com", "role": "admin"})
+    token = create_access_token({"sub": "usr_does_not_exist", "email": "ghost@example.com"})
     async with client() as c:
         res = await c.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert res.status_code == 401

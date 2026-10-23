@@ -35,7 +35,7 @@ rows = []
 for i in range(N):
     uid = f"usr_{uuid.uuid4().hex[:12]}"
     ids.append(uid)
-    rows.append(User(id=uid, email=f"lt_{uid}@loadtest.example", password_hash=ph, role="student",
+    rows.append(User(id=uid, email=f"lt_{uid}@loadtest.example", password_hash=ph,
                      email_verified=True, teacher_status="none", is_platform_admin=False))
 db.add_all(rows); db.commit()
 state = {"course_id": str(course.id), "join_code": course.join_code, "bank_id": str(bank.id),

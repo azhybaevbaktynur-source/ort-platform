@@ -237,7 +237,7 @@ def test_global_body_cap_lms_shape_and_exemptions(client, monkeypatch):
         assert _EXEMPT.match(p), p
     r = client.post("/api/v1/upload/image", files={"file": ("a.txt", b"x" * 500)})
     assert r.status_code != 413 or "detail" in r.json()
-    assert r.status_code in (401, 403, 422)
+    assert r.status_code in (401, 403, 404, 422)  # 404: the old /upload routes are deleted in Phase 5
 
 
 def test_grading_edit_body_cap_64k(client):
