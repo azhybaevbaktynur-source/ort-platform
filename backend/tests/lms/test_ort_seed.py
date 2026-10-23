@@ -264,13 +264,29 @@ def test_admins_become_co_teachers(db):
     assert rep2.admins_enrolled == 2
     assert db.scalar(select(func.count()).select_from(Enrollment).where(Enrollment.user_id == late.id)) == 2
     assert db.scalar(select(func.count()).select_from(Enrollment)) == 2 * 4
-    # an admin who was removed is restored as teacher
+    # an admin who was removed is not revived (P5-6 as applied: create only when no row exists)
     enr = db.scalars(select(Enrollment).where(Enrollment.user_id == admin2.id)).first()
     enr.state, enr.role = "removed", "student"
     db.commit()
-    assert ensure_ort_courses(db, samples=False).admins_enrolled == 1
+    assert ensure_ort_courses(db, samples=False).admins_enrolled == 0
     db.refresh(enr)
-    assert (enr.role, enr.state) == ("teacher", "active")
+    assert (enr.role, enr.state) == ("student", "removed")
+
+
+def test_admin_who_left_stays_out_after_reseed(db):
+    """An admin leaves an ORT course through the normal leave flow; the next seed run never re-adds them."""
+    from app.core.authz import AuthzContext, enrollment_role_resolver
+    from app.lms.enrollments import service as enrollments
+
+    admin = make_user(db, platform_admin=True, teacher_status="approved")
+    ensure_ort_courses(db, samples=False)
+    course = db.get(Course, course_id_for("ru"))
+    enrollments.leave(db, AuthzContext(admin, db, enrollment_role_resolver(db, admin.id)), course)
+    rep = ensure_ort_courses(db, samples=False)
+    assert rep.ok and rep.admins_enrolled == 0
+    rows = {e.course_id: e for e in db.scalars(select(Enrollment).where(Enrollment.user_id == admin.id))}
+    assert rows[course_id_for("ru")].state == "removed"
+    assert (rows[course_id_for("ky")].role, rows[course_id_for("ky")].state) == ("teacher", "active")
 
 
 async def test_demo_teacher_cannot_log_in(db, api):

@@ -78,6 +78,10 @@ def _join(db: Session, user: User, course: Course, *, source: str,
           ip_hash: Optional[str]) -> tuple[Enrollment, Course, bool]:
     """Shared join write path; callers enforce the JOIN_* rate limits before looking the course up."""
     user_id = user.id
+    # Cheap pre-check before any row lock: a course that is not joinable this way (e.g. a private limited course via
+    # open join) is never locked. Same 404 as below; the check after the lock stays authoritative.
+    if not _joinable(course, source):
+        raise _join_failure(db, ip_hash)
     if course.enrollment_limit is not None:
         lock_course(db, course)
     else:

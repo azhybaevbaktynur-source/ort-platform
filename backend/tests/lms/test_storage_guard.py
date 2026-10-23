@@ -157,6 +157,88 @@ async def test_hard_limit_507_and_nothing_stored(db, db_storage, monkeypatch):
     assert totals() == (5000, 1)
 
 
+def test_store_blob_refused_at_limit_stores_nothing(db, db_storage, monkeypatch):
+    set_stored(990)
+    monkeypatch.setattr(settings, "STORAGE_HARD_BYTES", 1000)
+    data = b"x" * 11
+    key = blob_key(hashlib.sha256(data).hexdigest())
+    with pytest.raises(usage.StorageFull) as exc:
+        usage.store_blob(db, key, data, "image/webp")
+    assert exc.value.details == {"stored_bytes": 990, "limit_bytes": 1000}
+    assert not db_storage.exists(key) and totals() == (990, 1)
+    exact = b"y" * 10  # exactly up to the limit is allowed
+    assert usage.store_blob(db, blob_key(hashlib.sha256(exact).hexdigest()), exact, "image/webp") is True
+    assert totals() == (1000, 2)
+
+
+def test_store_blob_reserves_without_a_counter_row(db, db_storage):
+    """create_all databases have no storage_usage row: the first reservation creates it."""
+    data = b"first-blob"
+    assert usage.store_blob(db, blob_key(hashlib.sha256(data).hexdigest()), data, "image/webp") is True
+    assert totals() == (len(data), 1)
+
+
+def test_reservation_refunded_when_put_fails(db, db_storage, monkeypatch):
+    set_stored(100)
+    data = b"will-fail"
+    key = blob_key(hashlib.sha256(data).hexdigest())
+
+    def boom(*a, **kw):
+        raise OSError("disk gone")
+
+    monkeypatch.setattr(db_storage, "put", boom)
+    with pytest.raises(OSError):
+        usage.store_blob(db, key, data, "image/webp")
+    assert totals() == (100, 1) and (month().objects_written, month().bytes_written) == (1, 100)
+
+
+def test_reservation_refunded_on_dedup_race(db, db_storage, monkeypatch):
+    """exists() said no, but a concurrent request stored the blob first: put reports nothing new -> refund."""
+    set_stored(100)
+    data = b"raced-blob"
+    key = blob_key(hashlib.sha256(data).hexdigest())
+    monkeypatch.setattr(db_storage, "exists", lambda k: False)
+    monkeypatch.setattr(db_storage, "put", lambda k, d, m, checked=False: False)
+    assert usage.store_blob(db, key, data, "image/webp") is False
+    assert totals() == (100, 1) and (month().objects_written, month().bytes_written) == (1, 100)
+
+
+def test_monthly_counter_failure_never_fails_the_upload(db, db_storage, monkeypatch, caplog):
+    import logging
+
+    def broken(*a, **kw):
+        raise RuntimeError("monthly table down")
+
+    monkeypatch.setattr(usage, "_bump", broken)
+    data = b"durable-blob"
+    key = blob_key(hashlib.sha256(data).hexdigest())
+    with caplog.at_level(logging.ERROR, logger="app.lms.files.usage"):
+        assert usage.store_blob(db, key, data, "image/webp") is True
+    assert db_storage.exists(key) and totals() == (len(data), 1)
+    assert any(r.levelno == logging.ERROR and "storage_monthly_usage" in r.getMessage() for r in caplog.records)
+
+
+async def test_dedup_at_full_capacity_succeeds(db, db_storage, monkeypatch):
+    """A blob that is already stored adds nothing: another owner can still use it (image and PDF) when full."""
+    t, t2 = teacher(db), teacher(db)
+    c, c2 = make_course(db, t), make_course(db, t2)
+    img = unique_png()
+    r = await upload(t, c.id, img)
+    assert r.status_code == 201, r.text
+    r = await upload_file(t, c.id, PDF)
+    assert r.status_code == 201, r.text
+    before = totals()
+    monkeypatch.setattr(settings, "STORAGE_HARD_BYTES", before[0])  # exactly full
+    r = await upload(t2, c2.id, img)
+    assert r.status_code == 201 and r.json()["deduplicated"] is False, r.text
+    r = await upload_file(t2, c2.id, PDF)
+    assert r.status_code == 201, r.text
+    assert totals() == before
+    r = await upload(t2, c2.id, unique_png())  # a new blob is still refused
+    assert r.status_code == 507 and r.json()["error"]["code"] == "storage_full"
+    assert totals() == before
+
+
 def test_sweep_decrements_only_what_was_deleted(db, db_storage):
     from app.lms.files import service as svc
 

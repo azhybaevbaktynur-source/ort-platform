@@ -229,8 +229,7 @@ def ingest_image(db: Session, actor: User, raw: bytes, *, course_id, visibility:
         _check_user_quota(db, actor.id, len(encoded.data))
     if not caller_stored:
         _check_global_db_cap(db, key, len(encoded.data))
-        usage.check_capacity(db, len(encoded.data))
-        usage.store_blob(db, key, encoded.data, "image/webp")
+        usage.store_blob(db, key, encoded.data, "image/webp")  # exists check, then atomic reservation (507)
 
     asset = Asset(
         owner_id=actor.id, course_id=course_id, kind="image", visibility=visibility,
@@ -282,8 +281,7 @@ def ingest_file(db: Session, actor: User, raw: bytes, *, course_id, filename: Op
     _check_user_quota(db, actor.id, len(raw))
     key = blob_key(sha, "private", "pdf")
     _check_global_db_cap(db, key, len(raw))
-    usage.check_capacity(db, len(raw))
-    usage.store_blob(db, key, raw, "application/pdf")
+    usage.store_blob(db, key, raw, "application/pdf")  # exists check, then atomic reservation (507)
     asset = Asset(
         owner_id=actor.id, course_id=course_id, kind="file", visibility="private", source_sha256=sha, sha256=sha,
         storage_key=key, mime="application/pdf", extension="pdf", bytes=len(raw), source_bytes=len(raw),

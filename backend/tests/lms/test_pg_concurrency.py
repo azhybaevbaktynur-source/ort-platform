@@ -293,3 +293,46 @@ def test_parallel_open_joins_never_exceed_limit(pg):
         n = s.scalar(select(func.count()).select_from(Enrollment).where(
             Enrollment.course_id == cid, Enrollment.role == "student", Enrollment.state == "active"))
     assert n == 4
+
+
+# --- Phase 5 review fix: atomic storage reservation ---
+
+def test_parallel_storage_reservations_never_pass_the_hard_limit(pg, monkeypatch, tmp_path):
+    """Two new blobs that each fit alone but not together: exactly one is reserved and stored (10 rounds), the other
+    gets storage_full and nothing of it is stored; the counter equals what was really stored."""
+    import hashlib
+
+    from sqlalchemy import delete
+
+    from app.core.config import settings
+    from app.lms.core.models import utcnow
+    from app.lms.files import storage, usage
+    from app.lms.files.models import StorageMonthlyUsage, StorageUsage
+
+    monkeypatch.setattr(settings, "LMS_STORAGE_DRIVER", "local")
+    monkeypatch.setattr(settings, "LMS_LOCAL_STORAGE_DIR", str(tmp_path / "blobs"))
+    monkeypatch.setattr(settings, "STORAGE_HARD_BYTES", 1000)
+    storage.reset_blob_storage()
+    try:
+        store = storage.get_blob_storage()
+        for rnd in range(10):
+            with pg.begin() as c:
+                c.execute(delete(StorageUsage.__table__))
+                c.execute(delete(StorageMonthlyUsage.__table__))
+                if rnd % 2:  # half the rounds start from an existing counter row, half from none
+                    c.execute(StorageUsage.__table__.insert().values(id=1, stored_bytes=0, object_count=0,
+                                                                    updated_at=utcnow()))
+            blobs = [bytes([rnd, i]) * 300 for i in range(2)]  # 600 bytes each, limit 1000
+            keys = [storage.blob_key(hashlib.sha256(b).hexdigest()) for b in blobs]
+
+            def job(i):
+                return lambda s: usage.store_blob(s, keys[i], blobs[i], "image/webp")
+
+            out = _run_parallel(pg, [job(0), job(1)])
+            assert sorted(out) == [("lms", "storage_full"), ("ok", True)], out
+            assert sum(store.exists(k) for k in keys) == 1
+            with Session(pg) as s:
+                assert usage.stored_totals(s) == (600, 1)
+                assert usage.month_row(s)["objects_written"] == 1
+    finally:
+        storage.reset_blob_storage()

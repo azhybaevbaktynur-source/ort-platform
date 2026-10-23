@@ -132,6 +132,10 @@ def store_new_blobs(db: Session, actor_id: str, up: ParsedUpload, infos: dict[st
         for key, enc in blobs.items():
             if fsvc.usage.store_blob(db, key, enc.data, "image/webp"):  # Phase 5 S4: counted when new
                 written.append(key)
+    except fsvc.StorageFull as e:  # the atomic reservation lost a race after the summed pre-check
+        fsvc.delete_unreferenced_blobs(db, written)
+        up.issues.error(e.code, e.message)
+        return []
     except Exception:
         log.exception("blob put failed")
         fsvc.delete_unreferenced_blobs(db, written)

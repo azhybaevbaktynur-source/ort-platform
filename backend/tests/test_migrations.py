@@ -309,6 +309,27 @@ def test_0006_export_and_drop_on_pg(alembic_engine):
         conn.commit()
 
 
+def test_0006_export_without_question_sources_on_pg(alembic_engine):
+    """No question_sources table: exam sets and questions in no set are still exported (one row per language)."""
+    from alembic import command
+
+    from app.db.migrate import _config
+    from tests.test_migration_0006_data import check_without_sources, seed_0005
+
+    cfg = _config(TEST_URL)
+    with alembic_engine.connect() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, LAST_REVERSIBLE)
+        conn.commit()
+        seed_0005(conn)
+        conn.execute(text("DROP TABLE question_sources"))
+        conn.commit()
+        command.upgrade(cfg, "0006_phase5_cutover")
+        conn.commit()
+        check_without_sources(conn)
+        assert "exam_sets" not in inspect(conn).get_table_names()
+
+
 def test_0006_downgrade_refused(alembic_engine):
     from alembic import command
 

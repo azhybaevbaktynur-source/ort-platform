@@ -41,12 +41,13 @@ export const R2_FREE_CLASS_B = 10_000_000;
 export const getStorageSummary = () => lmsFetch<StorageSummaryOut>("/platform/storage");
 export const runStorageSmoke = () => lmsFetch<StorageSmokeOut>("/platform/storage/smoke", { method: "POST", body: {} });
 
-/** `units`: translated [B, KB, MB, GB] (keys `storage.units.*`). */
+/** `units`: translated [B, KB, MB, GB] (keys `storage.units.*`). Decimal (1 KB = 1000 B): the limits and
+ *  Cloudflare's free tier and billing are decimal. */
 export function formatBytes(n: number, locale: string, units: [string, string, string, string]): string {
   let v = n;
   let i = 0;
-  while (v >= 1024 && i < units.length - 1) {
-    v /= 1024;
+  while (v >= 1000 && i < units.length - 1) {
+    v /= 1000;
     i += 1;
   }
   return `${new Intl.NumberFormat(locale, { maximumFractionDigits: i === 0 ? 0 : 2 }).format(v)} ${units[i]}`;
