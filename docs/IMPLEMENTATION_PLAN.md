@@ -143,6 +143,8 @@ Phases 6, 7, 8 are independent of each other after the cutover and may run in an
 
 ## Phase 5 — ORT cutover (M)
 
+**Status: built 2026-10-23 on `phase-5/cutover`; deploy pending. See `docs/phases/PHASE_5.md`. Next: Phases 6, 7, 8 (independent, any order), then 9.**
+
 **Goal**: ORT becomes ordinary course content; the old system is deleted. This is the only destructive phase and needs your explicit go-ahead.
 
 **Work**

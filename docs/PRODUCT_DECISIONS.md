@@ -152,3 +152,31 @@ Full list: P4-1 … in `docs/phases/PHASE_4_DESIGN.md` §1. Resolved during the 
 | Render plan | Chosen by the owner before the first real exam. |
 | R2 free tier (owner req. 8) | R2 stays in the free tier, enforced by the app: stored-bytes tracking (admin warning at 8 GB, uploads refused at 9.5 GB), images max 2 MB, other files max 10 MB, WebP + SHA-256 dedup, immutable 1-year caching of content-addressed public images served from R2 (not the backend), no list operations in request paths, Standard class only, admin monthly usage estimate, free-tier exam count in `CAPACITY_REVIEW.md`. Built in Phase 5. Anything exceeding the free tier needs the owner's OK. |
 | R2 public URL | No domain purchase now: public images use the r2.dev address. Before the first large exam, switch to a custom domain the owner buys after launch (r2.dev is rate-limited). |
+
+## Decisions 2026-10-23 (Phase 5, agent defaults; full table in `phases/PHASE_5_DESIGN.md`)
+
+| Id | Decision as applied |
+|---|---|
+| P5-1 | No wipe: `users` rows kept; one revision drops old tables and columns; the `role='admin'` owner becomes platform admin + approved teacher before `role` is dropped. Old attempts and access rows are dropped. |
+| P5-2 | Conversion = export inside revision 0006 (`legacy_ort_export`), import at startup by `ensure_ort_courses()` through the existing Phase 2 importer and Phase 3 builder; idempotent. |
+| P5-3 | Missing `/uploads` images are dropped; the question is kept, tagged `missing_image`, counted and logged. |
+| P5-4 | One platform course per language ("ORT (Kyrgyz)", "ORT (Russian)"), fixed ids, published, catalog, open enrollment. Production ky course starts empty; dev/test seed samples. |
+| P5-5 | Minimal catalog and one-click join now (`GET /catalog/courses`, `POST /courses/{id}/join`); Phase 7 extends. |
+| P5-6 | Demo teacher with unusable password hash and disabled flag; every platform admin is co-teacher of both ORT courses. |
+| P5-7 | `exam_set` becomes `ort_main`/`ort_subject` assessment (section times from the old sections, attempts kept, highest score, results after submit); PIN dropped; `practice_bank` sets become banks only. |
+| P5-8 | Revision 0006 downgrade raises; rollback = Neon backup branch + previous `main` commit. |
+| P5-9 | Mock tokens, `MOCK_USERS`, Firebase fallback and header-less dev user removed; tests mint real JWTs. |
+| P5-10 | Old user columns `role, target_score, exams_taken, current_score, starting_score` dropped. |
+| P5-11 | R2 guard counts bytes ever written; warn/refuse thresholds below; images 2 MiB, PDF-only files 10 MB (private bucket, owner download); Class B reads estimated at read time. |
+| P5-12 | R2 smoke check: admin button in `/[lang]/admin/storage` and CLI (put, head, public read, delete of a 1-px WebP). |
+| P5-13 | Brief deploy overlap (old instance vs migrated DB) accepted; tester traffic only. |
+
+Accepted deviations from the design:
+- `legacy_ort_export.exam_set_id` is `String(200)`.
+- The ORT seed lock is `pg_try_advisory_xact_lock` on a separate connection that holds its transaction (not a session lock, because of Neon's pooler).
+- 0006's users batch has no `naming_convention`; reflection keeps names and tests assert them.
+- Demo teacher login answers 401 (unusable hash); disabled accounts get no reset token and reset is refused (forgot/reset check `disabled_at`).
+- The catalog requires `published_at IS NOT NULL`; catalog/join route policies live in `app/lms/enrollments/policies.py`.
+- Storage limits are decimal: warn 8,000,000,000 bytes, refuse 9,500,000,000 bytes (9.5 GiB would be about 10.2 GB, above the free tier).
+- `image_validation.py` moved into `app/lms/files/`; `attempts/bodycap.py` exempts the `files` upload route (it streams its own 10 MiB cap); the smoke audit row uses `target_type='user'`.
+- Production has no Kyrgyz questions: "ORT (Kyrgyz)" stays empty until a ky bundle is imported (owner informed).
