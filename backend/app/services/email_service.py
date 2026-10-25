@@ -11,10 +11,13 @@ Every send function returns True only when the provider accepted the message, so
 tell the user the truth instead of claiming an email was sent.
 """
 import logging
+import re
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formataddr
 from html import escape
+from typing import Optional
 
 import httpx
 
@@ -42,43 +45,75 @@ def _sender_address() -> str:
     return settings.EMAIL_FROM or settings.SMTP_FROM_EMAIL or settings.SMTP_USER
 
 
-def _send_resend(to_email: str, subject: str, text: str, html: str) -> None:
+# --- Phase 6 S3 begin --- (sender display name and Reply-To for invitation emails, PHASE_6_DESIGN 7)
+def _header_safe(value: Optional[str]) -> str:
+    """No CR/LF (header injection) and no characters that break a quoted display name."""
+    return re.sub(r'[\r\n"<>\\]', " ", value or "").strip()
+
+
+def _from_header(from_name: Optional[str]) -> str:
+    """Default (no from_name): exactly the previous format. A custom name is quoted (it may hold commas)."""
+    if from_name is None:
+        return f"{settings.EMAIL_FROM_NAME} <{_sender_address()}>"
+    return f'"{_header_safe(from_name)}" <{_sender_address()}>'
+
+
+def _clean_reply_to(reply_to: Optional[str]) -> Optional[str]:
+    value = _header_safe(reply_to)
+    return value if value and "@" in value and " " not in value else None
+# --- Phase 6 S3 end ---
+
+
+def _send_resend(to_email: str, subject: str, text: str, html: str, from_name: Optional[str] = None,
+                 reply_to: Optional[str] = None) -> None:
+    payload = {
+        "from": _from_header(from_name),
+        "to": [to_email],
+        "subject": subject,
+        "text": text,
+        "html": html,
+    }
+    if reply_to:
+        payload["reply_to"] = [reply_to]
     res = httpx.post(
         "https://api.resend.com/emails",
         headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}"},
-        json={
-            "from": f"{settings.EMAIL_FROM_NAME} <{_sender_address()}>",
-            "to": [to_email],
-            "subject": subject,
-            "text": text,
-            "html": html,
-        },
+        json=payload,
         timeout=HTTP_TIMEOUT_SECONDS,
     )
     res.raise_for_status()
 
 
-def _send_brevo(to_email: str, subject: str, text: str, html: str) -> None:
+def _send_brevo(to_email: str, subject: str, text: str, html: str, from_name: Optional[str] = None,
+                reply_to: Optional[str] = None) -> None:
+    payload = {
+        "sender": {"name": settings.EMAIL_FROM_NAME if from_name is None else _header_safe(from_name),
+                   "email": _sender_address()},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "textContent": text,
+        "htmlContent": html,
+    }
+    if reply_to:
+        payload["replyTo"] = {"email": reply_to}
     res = httpx.post(
         "https://api.brevo.com/v3/smtp/email",
         headers={"api-key": settings.BREVO_API_KEY, "accept": "application/json"},
-        json={
-            "sender": {"name": settings.EMAIL_FROM_NAME, "email": _sender_address()},
-            "to": [{"email": to_email}],
-            "subject": subject,
-            "textContent": text,
-            "htmlContent": html,
-        },
+        json=payload,
         timeout=HTTP_TIMEOUT_SECONDS,
     )
     res.raise_for_status()
 
 
-def _send_smtp(to_email: str, subject: str, text: str, html: str) -> None:
+def _send_smtp(to_email: str, subject: str, text: str, html: str, from_name: Optional[str] = None,
+               reply_to: Optional[str] = None) -> None:
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"] = _sender_address()
+    sender = _sender_address()
+    msg["From"] = sender if from_name is None else formataddr((_header_safe(from_name), sender), charset="utf-8")
     msg["To"] = to_email
+    if reply_to:
+        msg["Reply-To"] = reply_to
     msg.attach(MIMEText(text, "plain", "utf-8"))
     msg.attach(MIMEText(html, "html", "utf-8"))
     with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=HTTP_TIMEOUT_SECONDS) as server:
@@ -86,15 +121,19 @@ def _send_smtp(to_email: str, subject: str, text: str, html: str) -> None:
         server.starttls()
         server.ehlo()
         server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-        server.sendmail(msg["From"], [to_email], msg.as_string())
+        server.sendmail(sender, [to_email], msg.as_string())
 
 
-def send_email(to_email: str, subject: str, text: str, html: str) -> bool:
+def send_email(to_email: str, subject: str, text: str, html: str, *, from_name: Optional[str] = None,
+               reply_to: Optional[str] = None) -> bool:
+    """from_name / reply_to default to None: the configured sender name and no Reply-To (as before)."""
+    reply_to = _clean_reply_to(reply_to)
     provider = active_provider()
     if provider == "console":
         if not is_production():
             # Dev-only console delivery: the code must be visible to the developer.
-            logger.warning("[EMAIL console] To: %s Subject: %s\n%s", to_email, subject, text)
+            logger.warning("[EMAIL console] To: %s Subject: %s From: %s Reply-To: %s\n%s", to_email, subject,
+                           _from_header(from_name), reply_to or "-", text)
         if is_production():
             logger.error("No email provider configured (set RESEND_API_KEY or BREVO_API_KEY); email to %s NOT sent", to_email)
             return False
@@ -110,7 +149,7 @@ def send_email(to_email: str, subject: str, text: str, html: str) -> bool:
         logger.error("EMAIL_FROM is not set; cannot send email via %s", provider)
         return False
     try:
-        sender(to_email, subject, text, html)
+        sender(to_email, subject, text, html, from_name=from_name, reply_to=reply_to)
         logger.info("Email '%s' sent to %s via %s", subject, to_email, provider)
         return True
     except httpx.HTTPStatusError as e:

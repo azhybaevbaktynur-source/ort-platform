@@ -55,6 +55,13 @@ ROUTE_POLICIES.update({
 })
 # --- Phase 5 S4 end ---
 
+# --- Phase 6 S3 begin --- (invitations, PHASE_6_DESIGN 2.3)
+from app.lms.invitations.policies import INVITATION_POLICIES  # noqa: E402
+
+POLICY_NAMES = POLICY_NAMES | {"org_admin", "public+ratelimit"}
+ROUTE_POLICIES.update(INVITATION_POLICIES)
+# --- Phase 6 S3 end ---
+
 
 def iter_routes(app):
     """Yield (METHOD, path) for every HTTP route, flattening included routers.
