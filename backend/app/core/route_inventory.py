@@ -75,6 +75,11 @@ from app.lms.invitations.policies import INVITATION_POLICIES  # noqa: E402
 
 ROUTE_POLICIES.update(INVITATION_POLICIES)
 # --- Phase 6 S3 end ---
+# --- Phase 6 S6a begin --- (student home, PHASE_6_DESIGN 2.3 / 8.4)
+ROUTE_POLICIES.update({
+    ("GET", "/api/v1/me/home"): "authenticated",  # the caller's own enrollments, attempts, grades, invitations
+})
+# --- Phase 6 S6a end ---
 
 
 def iter_routes(app):

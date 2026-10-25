@@ -265,10 +265,33 @@ def gradebook_page(db: Session, ctx: AuthzContext, course: Course, *, cursor: Op
 
 # ------------------------------------------------------------------ my grades (student)
 
-def _student_state(a, sub, visible: set) -> str:
+# --- Phase 6 S6a begin --- (PHASE_6_DESIGN 8.2 S2: `not_started` vs `missing`)
+def _past_due(a, now: Optional[datetime]) -> bool:
+    """The due date or the close of the window has passed (either one makes an untouched assessment `missing`)."""
+    if now is None:
+        return True
+    due, until = course_svc._aware(a.due_at), course_svc._aware(a.available_until)
+    return (due is not None and due <= now) or (until is not None and until <= now)
+
+
+def started_assessment_ids(db: Session, enrollment_id, assessment_ids: list) -> set:
+    """Assessments the enrollment has any non-preview attempt on (at most one statement, none for an empty list)."""
+    if not assessment_ids:
+        return set()
+    return set(db.execute(
+        select(Attempt.assessment_id).where(Attempt.enrollment_id == enrollment_id,
+                                            Attempt.assessment_id.in_(assessment_ids), Attempt.is_preview.is_(False))
+        .distinct()).scalars())
+# --- Phase 6 S6a end ---
+
+
+def _student_state(a, sub, visible: set, *, started: Optional[set] = None, now: Optional[datetime] = None) -> str:
     if a.results_policy == "never":
         return "hidden"
     if sub is None:
+        # Phase 6 S6a: never started and not past due -> `not_started`; started or past due -> `missing` (as before)
+        if started is not None and a.id not in started and not _past_due(a, now):
+            return "not_started"
         return "missing"
     if sub.state == "excused":
         return "excused"
@@ -313,7 +336,11 @@ def my_grades(db: Session, ctx: AuthzContext, course: Course, *, now: datetime) 
         write_course_grades(db, [_course_grade_row(course.id, enr.id, all_t, rel_t,
                                                    map_total(course_v, all_t.current_percent), now)])
     by_assessment = {s.assessment_id: s for s in subs}
-    states = {a.id: _student_state(a, by_assessment.get(a.id), visible) for a in assessments}
+    # Phase 6 S6a: one statement only when some assessment has no submission and is not past due
+    started = started_assessment_ids(db, enr.id, [a.id for a in assessments if a.id not in by_assessment
+                                                  and a.results_policy != "never" and not _past_due(a, now)])
+    states = {a.id: _student_state(a, by_assessment.get(a.id), visible, started=started, now=now)
+              for a in assessments}
     # scheme type and label texts of graded rows from the immutable version cache (misses: one statement, then cached)
     graded_versions = versions_data(db, [by_assessment[a.id].scheme_version_id for a in assessments
                                          if states[a.id] == "graded" and by_assessment[a.id].scheme_version_id])
