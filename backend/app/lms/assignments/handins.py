@@ -66,11 +66,12 @@ class EffectiveDates:
 
 def effective_dates(assignment: Assignment, override: Optional[AssignmentOverride]) -> EffectiveDates:
     """`override.<field>` when not NULL, else the assignment's (for a quiz: the assessment's, equal by the mirror).
-    Same rule as `accommodations.effective.resolve` (S4) for the three dates."""
-    def pick(field: str):
-        v = getattr(override, field, None) if override is not None else None
-        return utc(v if v is not None else getattr(assignment, field))
-    return EffectiveDates(pick("due_at"), pick("available_from"), pick("available_until"))
+    Phase 7a S4: delegates to `accommodations.effective.resolve`, the one precedence rule (accommodations carry no
+    dates, so only the override and the assignment matter here)."""
+    from app.lms.accommodations.effective import resolve
+
+    e = resolve(assignment, None, None, override)
+    return EffectiveDates(utc(e.due_at), utc(e.available_from), utc(e.available_until))
 
 
 def window_reason(eff: EffectiveDates, now: datetime) -> Optional[str]:
