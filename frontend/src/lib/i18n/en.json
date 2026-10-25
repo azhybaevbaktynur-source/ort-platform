@@ -1590,6 +1590,7 @@
           "graded": "Graded",
           "pending": "Pending",
           "missing": "Not submitted",
+          "not_started": "Not started",
           "excused": "Excused",
           "hidden": "Not shown"
         }

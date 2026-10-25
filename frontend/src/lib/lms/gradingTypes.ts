@@ -497,7 +497,8 @@ export interface VoidAttemptIn {
 // 5. Student: my grades
 // ---------------------------------------------------------------------------
 
-export type MyGradeState = "graded" | "pending" | "missing" | "excused" | "hidden";
+/** `not_started`: no attempt yet and nothing past due (Phase 6 S6a); `missing`: started but not submitted, or past due */
+export type MyGradeState = "graded" | "pending" | "missing" | "excused" | "hidden" | "not_started";
 
 export interface MyGradeOut {
   assessment_id: string;

@@ -217,7 +217,7 @@ class MyGradesOut(BaseModel):
     items: list[MyGradeOut]
 
 
-MY_GRADE_STATES = ("graded", "pending", "missing", "excused", "hidden")
+MY_GRADE_STATES = ("graded", "pending", "missing", "excused", "hidden", "not_started")  # Phase 6 S6a: not_started
 
 
 def my_grade_out(a: Any, state: str, sub: Any = None, *, labels: Optional[dict] = None,
