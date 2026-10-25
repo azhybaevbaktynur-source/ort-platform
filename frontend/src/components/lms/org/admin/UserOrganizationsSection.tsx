@@ -87,10 +87,10 @@ export function UserOrganizationsSection({ user, readOnly }: { user: { id: strin
       {!readOnly && (
         <Card className="mt-3" headingLevel={3} title={t("organizations.adminUser.addToOrg")} description={t("organizations.adminUser.addToOrgHint")}>
           {orgsError ? <OrgError error={orgsError} onRetry={loadOrgs} /> : orgs === null ? <LoadingState label={t("lms.common.loading")} rows={1} /> : (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
               <Select containerClassName="min-w-0 flex-1" label={t("organizations.fields.organization")} value={orgId} onChange={(e) => setOrgId(e.target.value)}
                 placeholder={t("organizations.fields.organizationPick")} options={orgs.map((o) => ({ value: o.id, label: o.name }))} />
-              <Select containerClassName="sm:w-56" label={t("organizations.adminUser.role")} value={role} onChange={(e) => setRole(e.target.value as OrgRole)}
+              <Select containerClassName="lg:w-72" label={t("organizations.adminUser.role")} value={role} onChange={(e) => setRole(e.target.value as OrgRole)}
                 options={ROLES.map((r) => ({ value: r, label: t(`organizations.roles.${r}`) }))} />
               <Button variant="secondary" disabled={!org} onClick={() => { setDialogError(null); setConfirming(true); }}>
                 {t("organizations.adminUser.addToOrg")}

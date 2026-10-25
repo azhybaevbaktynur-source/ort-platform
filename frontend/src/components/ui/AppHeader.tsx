@@ -10,6 +10,8 @@ import { cn, focusRing } from "./utils";
  * App header (Phase 6b S5b, PHASE_6_DESIGN.md §3 and §8.3): brand, area switcher with only the areas the
  * person has, and an account menu (name, email, language, extra links, log out). One row of at most
  * 64 px on every width; below 1024 px the switcher and the account become two compact menu buttons.
+ * Phase 6b S12: from 1024 px the active area's sections sit in a second row under the main one (in the
+ * first row they overlapped the account name); with all four areas the account name shows from 1280 px.
  */
 
 export type AreaKey = "learning" | "teaching" | "organization" | "platform";
@@ -179,8 +181,10 @@ function initials(name: string): string {
   return (s || name[0] || "?").toUpperCase();
 }
 
-function AccountMenu({ user, links, onLanguageChange, onLogout, routeKey }: {
+function AccountMenu({ user, links, onLanguageChange, onLogout, routeKey, nameFromXl = false }: {
   user: AppHeaderProps["user"]; links: NonNullable<AppHeaderProps["accountLinks"]>; onLanguageChange: (l: Language) => void; onLogout: () => void; routeKey?: string;
+  /** Show the name only from 1280 px (four areas leave no room for it at 1024 px). */
+  nameFromXl?: boolean;
 }) {
   const { lang, t } = useTranslation();
   const pop = usePopover(routeKey);
@@ -188,13 +192,13 @@ function AccountMenu({ user, links, onLanguageChange, onLogout, routeKey }: {
   const langLabelId = useId();
   const langName: Record<Language, string> = { en: t("common.english"), ky: t("common.kyrgyz"), ru: t("common.russian") };
   return (
-    <div ref={pop.rootRef} onBlur={pop.onBlur} className="shrink-0">
+    <div ref={pop.rootRef} onBlur={pop.onBlur} className="min-w-0">
       <button ref={pop.buttonRef} type="button" aria-expanded={pop.open} aria-controls={panelId} onClick={() => pop.setOpen(!pop.open)}
         aria-label={t("shell.account.menu", { name: user.name })}
-        className={cn("inline-flex min-h-11 items-center gap-2 rounded-xl px-1 text-sm font-medium text-slate-800 hover:bg-slate-100 lg:pr-2", focusRing)}>
+        className={cn("inline-flex min-h-11 max-w-full items-center gap-2 rounded-xl px-1 text-sm font-medium text-slate-800 hover:bg-slate-100 lg:pr-2", focusRing)}>
         <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-800 text-sm font-semibold text-white">{initials(user.name)}</span>
-        <span aria-hidden="true" className="hidden max-w-[12rem] truncate lg:block">{user.name}</span>
-        <ChevronDown aria-hidden="true" className={cn("hidden h-4 w-4 text-slate-600 transition-transform lg:block", pop.open && "rotate-180")} />
+        <span aria-hidden="true" className={cn("hidden min-w-0 max-w-[12rem] truncate", nameFromXl ? "xl:block" : "lg:block")}>{user.name}</span>
+        <ChevronDown aria-hidden="true" className={cn("hidden h-4 w-4 shrink-0 text-slate-600 transition-transform lg:block", pop.open && "rotate-180")} />
       </button>
       {pop.open && (
         <div id={panelId} className={cn(PANEL, "left-4 right-4 sm:left-auto sm:right-4 sm:w-80")}>
@@ -246,6 +250,7 @@ export function AppHeader({ brandHref, areas, activeArea, user, accountLinks = [
   const { t } = useTranslation();
   const multi = areas.length > 1;
   const active = areas.find((a) => a.key === activeArea);
+  const sections = multi && active?.sections && active.sections.length > 0 ? active.sections : null;
   return (
     <header className="border-b border-slate-200 bg-white">
       <div className="relative mx-auto flex h-14 max-w-6xl items-center gap-2 px-4 sm:h-16 sm:gap-3">
@@ -253,7 +258,7 @@ export function AppHeader({ brandHref, areas, activeArea, user, accountLinks = [
         {multi && (
           <>
             <AreaMenu areas={areas} activeArea={activeArea} routeKey={routeKey} className="lg:hidden" />
-            <nav aria-label={t("shell.areas.label")} className="ml-2 hidden min-w-0 items-center gap-1 lg:flex">
+            <nav aria-label={t("shell.areas.label")} className="ml-2 hidden shrink-0 items-center gap-1 lg:flex">
               <ul className="flex items-center gap-1">
                 {areas.map((a) => (
                   <li key={a.key}>
@@ -269,25 +274,28 @@ export function AppHeader({ brandHref, areas, activeArea, user, accountLinks = [
                   </li>
                 ))}
               </ul>
-              {active?.sections && active.sections.length > 0 && (
-                <ul aria-label={active.label} className="ml-1 flex items-center gap-1 border-l border-slate-200 pl-2">
-                  {active.sections.map((s) => (
-                    <li key={s.href}>
-                      <Link href={s.href} aria-current={s.active ? "page" : undefined}
-                        className={cn(PILL, "font-medium", focusRing, s.active ? "text-brand-800 underline decoration-2 underline-offset-8" : PILL_OFF)}>
-                        {s.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
             </nav>
           </>
         )}
-        <div className="ml-auto flex items-center">
-          <AccountMenu user={user} links={accountLinks} onLanguageChange={onLanguageChange} onLogout={onLogout} routeKey={routeKey} />
+        <div className="ml-auto flex min-w-0 items-center">
+          <AccountMenu user={user} links={accountLinks} onLanguageChange={onLanguageChange} onLogout={onLogout} routeKey={routeKey} nameFromXl={areas.length >= 4} />
         </div>
       </div>
+      {sections && active && (
+        <nav aria-label={active.label} className="hidden border-t border-slate-100 lg:block">
+          {/* px-1: the pills' own padding lines their text up with the page content below */}
+          <ul className="mx-auto flex h-12 max-w-6xl items-center gap-1 px-1">
+            {sections.map((s) => (
+              <li key={s.href}>
+                <Link href={s.href} aria-current={s.active ? "page" : undefined}
+                  className={cn(PILL, "font-medium", focusRing, s.active ? "text-brand-800 underline decoration-2 underline-offset-8" : PILL_OFF)}>
+                  {s.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )}
     </header>
   );
 }
