@@ -3,7 +3,8 @@
 import React, { useEffect, useId, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import type { SubmissionStaffOut } from "@/lib/lms/gradingTypes";
-import { btnPrimary, inputCls } from "@/components/lms/content/ui";
+import { inputCls } from "@/components/lms/content/ui";
+import { btnPrimary } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { fmtNum } from "@/components/lms/grading/schemes/params";
 import { checkOverride, REASON_MAX, type OverrideIssue } from "./gradebookModel";
 

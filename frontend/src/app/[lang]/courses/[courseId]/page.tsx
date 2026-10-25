@@ -8,6 +8,7 @@ import { pickLocalized } from "@/lib/lms/localized";
 import { isStaffCourse } from "@/lib/lms/types";
 import { useCourse } from "@/components/lms/CourseContext";
 import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
+import { StaffCourseHome } from "@/components/lms/course/StaffCourseHome"; // Phase 6b S5c
 
 export default function CourseHomePage() {
   const { lang, t } = useTranslation();
@@ -31,6 +32,12 @@ export default function CourseHomePage() {
     }
   };
 
+  // --- Phase 6b S5c: staff course home (next step instead of the roadmap sentence) ---
+  if (isStaffCourse(course) && (course.my_enrollment.role === "teacher" || course.my_enrollment.role === "assistant")) {
+    return <StaffCourseHome course={course} />;
+  }
+  // --- Phase 6b S5c end ---
+  // S6b: student view (below)
   return (
     <div className="space-y-6">
       {course.status === "draft" && (

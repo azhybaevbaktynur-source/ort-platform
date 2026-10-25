@@ -13,6 +13,7 @@ import { CourseCard } from "@/components/lms/CourseCard";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { JoinDialog } from "@/components/lms/JoinDialog";
 import { Pager } from "@/components/lms/Pager";
+import { CollapsedCatalog } from "@/components/lms/course/CollapsedCatalog"; // Phase 6b S5c
 
 type Tab = "teaching" | "learning";
 
@@ -66,7 +67,9 @@ export default function CoursesPage() {
 
   return (
     <div>
-      <CatalogSection onJoined={() => tab && load(tab)} />
+      {/* --- Phase 6b S5c (UX T13): people who create courses get the catalog after their list, collapsed --- */}
+      {me && !me.can_create_courses && <CatalogSection onJoined={() => tab && load(tab)} />}
+      {/* --- Phase 6b S5c end --- */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-slate-900">{t("courses.list.title")}</h1>
         <div className="flex flex-wrap items-center gap-2">
@@ -109,6 +112,9 @@ export default function CoursesPage() {
         {items.map((c) => <CourseCard key={c.id} course={c} />)}
       </div>
       <Pager nextCursor={cursor} loading={loading} onMore={() => tab && load(tab, cursor)} />
+      {/* --- Phase 6b S5c (UX T13) --- */}
+      {me?.can_create_courses && <CollapsedCatalog onJoined={() => tab && load(tab)} />}
+      {/* --- Phase 6b S5c end --- */}
 
       <JoinDialog open={joinOpen} onClose={() => setJoinOpen(false)} onJoined={(r) => router.push(`/${lang}/courses/${r.course.id}`)} />
     </div>

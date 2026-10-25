@@ -8,7 +8,8 @@ import type { CategoryOut, TotalMode } from "@/lib/lms/gradingTypes";
 import { cleanLocalized, pickLocalized } from "@/lib/lms/localized";
 import type { Lang, LocalizedText } from "@/lib/lms/types";
 import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
-import { btnDanger, btnPrimary, btnSecondary, btnSmall, inputCls, labelCls } from "@/components/lms/content/ui";
+import { inputCls, labelCls } from "@/components/lms/content/ui";
+import { btnDanger, btnPrimary, btnSecondary, btnSmall } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { SchemeError } from "../schemes/SchemeError";
 
 interface Draft { id: string | null; title: LocalizedText; weight: string }

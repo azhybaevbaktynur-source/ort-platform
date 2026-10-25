@@ -7,12 +7,13 @@ import { useTranslation } from "@/lib/i18n/context";
 import { deletePassage, getBank, listPassages, restorePassage } from "@/lib/lms/content";
 import type { BankOut, PassageSummaryOut } from "@/lib/lms/contentTypes";
 import { useCourse } from "@/components/lms/CourseContext";
-import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
 import { Pager } from "@/components/lms/Pager";
 import { BankHeader } from "@/components/lms/content/BankHeader";
 import { ContentError } from "@/components/lms/content/ContentError";
 import { useCanEditContent } from "@/components/lms/content/StaffGate";
-import { btnPrimary, btnSecondary, btnSmall } from "@/components/lms/content/ui";
+import { btnSmall } from "@/components/lms/course/staffUi"; // Phase 6b S5c
+import { Badge, Button, ConfirmDialog, EmptyState, LinkButton, LoadingState } from "@/components/ui";
+import { excerptText } from "@/components/lms/course/excerpt";
 
 export default function PassagesPage() {
   const { lang, t } = useTranslation();
@@ -63,24 +64,25 @@ export default function PassagesPage() {
 
   return (
     <div className="space-y-4">
-      <BankHeader courseId={course.id} bank={bank} active="passages" />
-      <div className="flex flex-wrap justify-end gap-2">
-        <button type="button" className={btnSecondary} onClick={() => setTrash((s) => !s)}>{trash ? t("bank.list.hideTrash") : t("bank.list.showTrash")}</button>
-        {canEdit && <Link href={`${base}/${bankId}/passages/new`} className={btnPrimary}>{t("bank.passages.new")}</Link>}
-      </div>
+      <BankHeader courseId={course.id} bank={bank} active="passages"
+        secondaryActions={<Button variant="secondary" onClick={() => setTrash((s) => !s)}>{trash ? t("bank.list.hideTrash") : t("bank.list.showTrash")}</Button>}
+        primaryAction={canEdit ? <LinkButton href={`${base}/${bankId}/passages/new`}>{t("bank.passages.new")}</LinkButton> : undefined} />
       <ContentError error={error || (!toDelete ? actionError : null)} onRetry={error ? () => load() : undefined} />
-      {loading && items.length === 0 && !error && <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p>}
-      {!loading && !error && items.length === 0 && <p className="text-sm text-slate-500">{t("bank.passages.empty")}</p>}
+      {loading && items.length === 0 && !error && <LoadingState rows={2} />}
+      {!loading && !error && items.length === 0 && (
+        <EmptyState title={t("bank.passages.empty")}
+          action={canEdit && !trash ? <LinkButton href={`${base}/${bankId}/passages/new`}>{t("bank.passages.new")}</LinkButton> : undefined} />
+      )}
       {items.length > 0 && (
         <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
           {items.map((p) => (
-            <li key={p.id} className="flex items-start gap-3 px-4 py-3">
+            <li key={p.id} className="flex flex-wrap items-start gap-3 px-4 py-3 sm:flex-nowrap">
               <div className="min-w-0 flex-1">
                 <Link href={`${base}/p/${p.id}`} className="font-semibold text-slate-900 hover:text-brand-700">{p.title || t("bank.passages.untitled")}</Link>
-                <p className="mt-0.5 line-clamp-2 text-sm text-slate-600">{p.body_excerpt}</p>
+                <p className="mt-0.5 line-clamp-2 break-words text-sm text-slate-600">{excerptText(p.body_excerpt)}</p>
                 <p className="mt-1 text-xs text-slate-500">
                   {t(`courses.languages.${p.language}`)} · {t("bank.passages.questionCount", { n: p.question_count })}
-                  {p.deleted_at ? ` · ${t("bank.list.deletedBadge")}` : ""}
+                  {p.deleted_at && <Badge tone="danger" className="ml-2">{t("bank.list.deletedBadge")}</Badge>}
                 </p>
               </div>
               {canEdit && (p.deleted_at ? (
@@ -93,11 +95,10 @@ export default function PassagesPage() {
         </ul>
       )}
       <Pager nextCursor={cursor} loading={loading} onMore={() => load(cursor)} />
-      <ConfirmDialog open={!!toDelete} danger busy={busy} title={t("bank.passages.deleteTitle")} body={t("bank.passages.deleteBody")}
+      <ConfirmDialog open={!!toDelete} tone="danger" busy={busy} title={t("bank.passages.deleteTitle")}
+        object={toDelete ? toDelete.title || excerptText(toDelete.body_excerpt, 80) : undefined} effect={t("bank.passages.deleteBody")}
         confirmLabel={t("bank.passages.delete")} onConfirm={() => toDelete && void act(() => deletePassage(course.id, toDelete.id))}
-        onCancel={() => setToDelete(null)}>
-        {actionError ? <ContentError error={actionError} className="mt-3" /> : null}
-      </ConfirmDialog>
+        onCancel={() => setToDelete(null)} error={actionError ? <ContentError error={actionError} /> : undefined} />
     </div>
   );
 }

@@ -6,7 +6,8 @@ import { getCourseGrading, regradeAssessment } from "@/lib/lms/grading";
 import { GRADE_RELEASES, isStaffCourseGrading, type CategoryOut, type GradeRelease, type SchemeVersionRef } from "@/lib/lms/gradingTypes";
 import { pickLocalized } from "@/lib/lms/localized";
 import type { Lang } from "@/lib/lms/types";
-import { btnSecondary, inputCls, labelCls } from "@/components/lms/content/ui";
+import { inputCls, labelCls } from "@/components/lms/content/ui";
+import { btnSecondary } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { SchemePicker } from "@/components/lms/grading/settings/SchemePicker";
 import { SchemeError } from "@/components/lms/grading/schemes/SchemeError";
 

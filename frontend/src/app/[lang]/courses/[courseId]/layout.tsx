@@ -11,6 +11,7 @@ import { CourseContext } from "@/components/lms/CourseContext";
 import { CourseTabs } from "@/components/lms/CourseTabs";
 import { StatusBadge } from "@/components/lms/CourseCard";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
+import { StaffCourseBar } from "@/components/lms/course/StaffCourseUi"; // Phase 6b S5c
 
 export default function CourseLayout({ children }: { children: React.ReactNode }) {
   const { lang, t } = useTranslation();
@@ -59,6 +60,19 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
 
   const isTeacher = course.my_enrollment.role === "teacher";
   const staff = isStaffCourse(course);
+  // --- Phase 6b S5c: staff course frame on the design system (course bar + scrollable tabs; pages own the h1) ---
+  const role = course.my_enrollment.role;
+  if (staff && (role === "teacher" || role === "assistant")) {
+    return (
+      <CourseContext.Provider value={{ course, reload, setCourse }}>
+        <StaffCourseBar course={course} />
+        <CourseTabs courseId={course.id} showSettings={isTeacher} />
+        {children}
+      </CourseContext.Provider>
+    );
+  }
+  // --- Phase 6b S5c end ---
+  // S6b: student view (below)
   return (
     <CourseContext.Provider value={{ course, reload, setCourse }}>
       <div className="mb-4 flex flex-wrap items-center gap-3">

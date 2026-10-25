@@ -6,7 +6,7 @@ import { ArrowDown, ArrowUp, ImageIcon, Languages, RotateCcw, Trash2 } from "luc
 import { useTranslation } from "@/lib/i18n/context";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import type { QuestionSummaryOut } from "@/lib/lms/contentTypes";
-import { btnSmall } from "./ui";
+import { btnSmall } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 
 export function QuestionRow({
   courseId, q, busy, canEdit, onMove, onDelete, onRestore,

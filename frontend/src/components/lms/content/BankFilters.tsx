@@ -4,7 +4,8 @@ import React from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { DIFFICULTIES, QUESTION_TYPES, ORT_SECTIONS, type Difficulty, type QuestionType } from "@/lib/lms/contentTypes";
 import { LMS_LANGS, type Lang } from "@/lib/lms/types";
-import { btnSmall, inputCls } from "./ui";
+import { inputCls } from "./ui";
+import { btnSmall } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 
 export interface BankFilterState {
   q: string;

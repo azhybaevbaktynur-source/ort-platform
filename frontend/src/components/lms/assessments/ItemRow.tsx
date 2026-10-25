@@ -5,7 +5,7 @@ import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, GripVertical } from "luc
 import { useTranslation } from "@/lib/i18n/context";
 import { deleteItem, reorderItems, updateItem } from "@/lib/lms/assessments";
 import type { ItemOut, SectionOut } from "@/lib/lms/assessmentTypes";
-import { btnDanger, btnPrimary, btnSecondary, btnSmall } from "@/components/lms/content/ui";
+import { btnDanger, btnPrimary, btnSecondary, btnSmall } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { Modal } from "./Modal";
 import { PickFields, type PickValue } from "./PickFields";
 import { AssessmentError } from "./AssessmentError";
@@ -81,7 +81,7 @@ export function ItemRow({
             {open ? <ChevronDown className="h-4 w-4" aria-hidden="true" /> : <ChevronRight className="h-4 w-4" aria-hidden="true" />}
           </button>
         )}
-        <div className="min-w-0 flex-1 text-sm">
+        <div className="min-w-0 flex-1 basis-[calc(100%-4rem)] text-sm sm:basis-0">
           {item.kind === "question" && q && (
             <>
               <p className={`line-clamp-2 ${q.deleted ? "text-slate-400 line-through" : "text-slate-800"}`}>{q.stem_excerpt || t("assessments.add.noStem")}</p>
@@ -108,22 +108,24 @@ export function ItemRow({
             </>
           )}
         </div>
+        {/* Phase 6b S5c: on phones the controls share one row (points, move, remove) with "Move to section" under it. */}
+        <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
         {item.kind !== "passage" && (
-          <label className="flex items-center gap-1 text-xs text-slate-600">
+          <label className="flex items-center gap-1.5 text-sm text-slate-600">
             {t("assessments.item.points")}
-            <input type="number" min={0} max={1000} step="any" className="w-16 rounded-lg border border-slate-300 px-2 py-1 text-sm" disabled={!ctx.canEdit}
+            <input type="number" min={0} max={1000} step="any" className="min-h-11 w-16 rounded-lg border border-slate-300 px-2 py-1 text-base sm:min-h-9 sm:text-sm" disabled={!ctx.canEdit}
               value={points} onChange={(e) => setPoints(e.target.value)} onBlur={savePoints} />
           </label>
         )}
         {ctx.canEdit && (
-          <div className="flex flex-wrap items-center gap-1">
+          <div className="contents">
             <button type="button" className={btnSmall} disabled={index === 0} aria-label={t("assessments.item.up")} onClick={() => onMoveBy(-1)}><ArrowUp className="h-3.5 w-3.5" aria-hidden="true" /></button>
             <button type="button" className={btnSmall} disabled={index === count - 1} aria-label={t("assessments.item.down")} onClick={() => onMoveBy(1)}><ArrowDown className="h-3.5 w-3.5" aria-hidden="true" /></button>
             {item.kind === "pick" && item.pick && (
               <button type="button" className={btnSmall} onClick={() => { setPickError(null); setPickEdit({ bank_id: item.pick!.bank_id, count: item.pick!.count, filter: item.pick!.filter }); }}>{t("assessments.item.edit")}</button>
             )}
             {!childOf && ctx.sections.length > 1 && (
-              <select aria-label={t("assessments.item.moveTo")} className="rounded-lg border border-slate-300 px-1.5 py-1 text-xs" value=""
+              <select aria-label={t("assessments.item.moveTo")} className="order-last min-h-11 max-w-full basis-full rounded-lg border border-slate-300 px-2 py-1 text-sm sm:order-none sm:min-h-9 sm:basis-auto" value=""
                 onChange={(e) => { const sid = e.target.value; if (sid) void guard(() => updateItem(ctx.courseId, ctx.assessmentId, item.id, { section_id: sid })); }}>
                 <option value="">{t("assessments.item.moveTo")}</option>
                 {ctx.sections.filter((s) => s.id !== ctx.currentSectionId).map((s) => <option key={s.id} value={s.id}>{sectionLabel(s)}</option>)}
@@ -132,6 +134,7 @@ export function ItemRow({
             <button type="button" className={btnDanger} onClick={() => void guard(() => deleteItem(ctx.courseId, ctx.assessmentId, item.id))}>{t("assessments.item.remove")}</button>
           </div>
         )}
+        </div>
       </div>
       {item.kind === "passage" && open && item.children && item.children.length > 0 && (
         <ul className="space-y-1 border-t border-slate-100 bg-slate-50/60 p-2 pl-6">

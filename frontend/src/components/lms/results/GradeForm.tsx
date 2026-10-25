@@ -3,7 +3,8 @@
 import React, { useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
-import { btnPrimary, inputCls, labelCls } from "@/components/lms/content/ui";
+import { inputCls, labelCls } from "@/components/lms/content/ui";
+import { btnPrimary } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { scoreAttemptItem, type AttemptStaffOut, type StaffReviewItem } from "@/lib/lms/staffAttempts";
 import { fmtPoints } from "@/components/lms/assessments/format";
 

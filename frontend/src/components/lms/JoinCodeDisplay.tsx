@@ -4,7 +4,9 @@ import React, { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { formatJoinCode } from "@/lib/lms/courses";
+import { Button } from "@/components/ui";
 
+/** Join code with a copy button. Phase 6b S5c (UX T20): the code never wraps ("VDMW-YX3H" stays on one line at 375 px). */
 export function JoinCodeDisplay({ code }: { code: string }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
@@ -19,13 +21,12 @@ export function JoinCodeDisplay({ code }: { code: string }) {
     }
   };
   return (
-    <div className="flex items-center gap-3">
-      <code className="select-all rounded-xl bg-slate-100 px-4 py-2 font-mono text-xl font-bold tracking-widest text-slate-900">{formatted}</code>
-      <button type="button" onClick={copy}
-        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-        {copied ? <Check className="h-4 w-4" aria-hidden="true" /> : <Copy className="h-4 w-4" aria-hidden="true" />}
+    <div className="flex flex-wrap items-center gap-3">
+      <code className="select-all whitespace-nowrap rounded-xl bg-slate-100 px-3 py-2 font-mono text-lg font-bold tracking-wider text-slate-900 sm:px-4 sm:text-xl sm:tracking-widest">{formatted}</code>
+      <Button variant="secondary" size="sm" onClick={copy}
+        leftIcon={copied ? <Check className="h-4 w-4" aria-hidden="true" /> : <Copy className="h-4 w-4" aria-hidden="true" />}>
         <span aria-live="polite">{copied ? t("lms.common.copied") : t("lms.common.copy")}</span>
-      </button>
+      </Button>
     </div>
   );
 }

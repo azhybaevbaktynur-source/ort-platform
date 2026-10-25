@@ -11,7 +11,7 @@ import { useSchemeLabel } from "@/components/lms/grading/schemes/labels";
 import { fmtNum, fmtPercentile, toNum } from "@/components/lms/grading/schemes/params";
 import { SchemeError } from "@/components/lms/grading/schemes/SchemeError";
 import { fmtDateTime } from "@/components/lms/assessments/format";
-import { btnSecondary, btnSmall } from "@/components/lms/content/ui";
+import { btnSecondary, btnSmall } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { cellFromSubmission, cellView, fmtPointsOf } from "./gradebookModel";
 import { OverrideForm } from "./OverrideForm";
 import { SubmissionAttempts } from "./SubmissionAttempts";
