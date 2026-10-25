@@ -49,19 +49,30 @@ def ensure_membership(conn: Connection, organization_id: uuid.UUID, user_id: str
     ))
 
 
+def personal_suspension_reason(disabled: bool, approved: bool) -> Optional[str]:
+    """Why a new personal organization starts suspended (None: active). A disabled user, or an owner who is not an
+    approved teacher, gets a suspended one (as a revoke suspends it). Migration 0008 copies this rule."""
+    if disabled:
+        return "account disabled"
+    if not approved:
+        return "teacher not approved"
+    return None
+
+
 def ensure_personal_org(conn: Connection, user_id: str, display_name: Optional[str], disabled: bool, *,
-                        with_membership: bool) -> uuid.UUID:
+                        with_membership: bool, approved: bool = True) -> uuid.UUID:
     """The personal organization of an independent teacher (fixed id and slug); suspended when the user is
-    disabled. `with_membership` adds the org_admin membership (approved teachers)."""
+    disabled or not an approved teacher. `with_membership` adds the org_admin membership (approved teachers)."""
     oid = personal_org_id(user_id)
     if conn.execute(select(Organization.id).where(Organization.id == oid)).first() is None:
         now = utcnow()
         slug = personal_org_slug(user_id)
+        reason = personal_suspension_reason(disabled, approved)
         insert_ignore(conn, Organization.__table__, dict(
             id=oid, slug=slug, name=(display_name or "").strip()[:200] or slug,
-            status="suspended" if disabled else "active", settings=dict(CREATOR_SETTINGS),
+            status="suspended" if reason else "active", settings=dict(CREATOR_SETTINGS),
             created_by_id=None, created_at=now, updated_at=now,
-            suspended_at=now if disabled else None, suspended_reason="account disabled" if disabled else None,
+            suspended_at=now if reason else None, suspended_reason=reason,
         ))
     if with_membership:
         ensure_membership(conn, oid, user_id)
@@ -77,9 +88,9 @@ def default_org_for_owner(conn: Connection, owner_id: str) -> uuid.UUID:
                        .where(User.id == owner_id)).first()
     if row is None or row.is_platform_admin:
         return ensure_platform_org(conn)
-    approved = row.teacher_status == "approved" and owner_id != DEMO_TEACHER_ID
+    approved = row.teacher_status == "approved"
     return ensure_personal_org(conn, owner_id, row.display_name, row.disabled_at is not None,
-                               with_membership=approved)
+                               with_membership=approved and owner_id != DEMO_TEACHER_ID, approved=approved)
 
 
 def course_org_listener(mapper, conn: Connection, target) -> None:

@@ -109,20 +109,14 @@ def _is_join_code_conflict(exc: IntegrityError) -> bool:
     return "join_code" in str(exc.orig)
 
 
-def _teacher_ok(user: User) -> bool:
-    return user.teacher_status == "approved" and user.disabled_at is None
-
-
 # --- Phase 6 S1 begin --- (PHASE_6_DESIGN 2.2: course creation inside an organization)
 def _owner_ok(db: Session, user: User, organization_id) -> bool:
-    """A course owner: an enabled approved teacher (legacy), a platform admin, or an active member of the
-    course's organization (teachers invited into an organization have no teacher_status)."""
+    """A course owner: an enabled, active member of the course's organization (every transfer path: owner,
+    org admin and platform admin). Teacher approval or platform admin status alone is not enough."""
     from app.lms.organizations.service import is_active_member
 
     if user.disabled_at is not None:
         return False
-    if _teacher_ok(user) or user.is_platform_admin:
-        return True
     return organization_id is not None and is_active_member(db, organization_id, user.id)
 
 

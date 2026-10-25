@@ -125,6 +125,11 @@ def check(snap: dict) -> None:
     assert orgs[personal_org_id("usr_m_off")][3] == "suspended" and orgs[personal_org_id("usr_m_off")][6]
     # step 6: an owner without approved status gets an org too (slug as name when no display name), no membership
     assert orgs[personal_org_id("usr_m_nobody")][2] == personal_org_slug("usr_m_nobody")
+    # S5: ... created suspended (like a revoked teacher's); a disabled user's says so
+    assert orgs[personal_org_id("usr_m_nobody")][3] == "suspended"
+    assert orgs[personal_org_id("usr_m_nobody")][5:] == ("teacher not approved", True)
+    assert orgs[personal_org_id("usr_m_off")][5] == "account disabled"
+    assert len(personal_org_slug("usr_m_nobody")) == 14  # t- + 12 hex chars
     # step 2 + 3 memberships
     assert snap["members"] == sorted([
         (P, "usr_m_admin0", "org_admin", "active"), (P, "usr_m_admin1", "org_admin", "active"),

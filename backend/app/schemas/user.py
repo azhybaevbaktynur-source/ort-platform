@@ -1,5 +1,15 @@
+import unicodedata
 from typing import Optional
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+DISPLAY_NAME_MAX = 100
+
+
+def _no_control_chars(value: Optional[str]) -> Optional[str]:
+    """Display names reach email headers and other users' screens: no control characters (CR/LF, tabs, NUL...)."""
+    if value is not None and any(unicodedata.category(ch) == "Cc" for ch in value):
+        raise ValueError("displayName must not contain control characters")
+    return value
 
 
 class UserProfile(BaseModel):
@@ -16,9 +26,14 @@ class UserProfile(BaseModel):
 class UserRegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6, description="Password at least 6 characters")
-    displayName: Optional[str] = None
+    displayName: Optional[str] = Field(None, max_length=DISPLAY_NAME_MAX)
     phone: Optional[str] = None
     lang: Optional[str] = Field("ky", pattern="^(ky|ru)$", description="Language of the verification email")
+
+    @field_validator("displayName")
+    @classmethod
+    def _display_name_clean(cls, value: Optional[str]) -> Optional[str]:
+        return _no_control_chars(value)
 
 
 class RegisterResponse(BaseModel):

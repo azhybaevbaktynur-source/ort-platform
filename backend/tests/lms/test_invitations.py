@@ -178,13 +178,13 @@ async def test_revoke_by_platform_admin_and_by_inviter_only(db, api, outbox):
     pa = make_user(db, platform_admin=True)
     r = await api.call(pa, "POST", f"/org/{org.id}/invitations/{created['id']}/revoke")
     assert r.status_code == 200 and r.json()["state"] == "revoked"
-    # the inviter may revoke even after losing the org admin role
+    # S5: the inviter cannot revoke after losing the org admin role (they can no longer manage it) ...
     created2 = (await invite(api, admin, org, "y@example.com")).json()
     db.execute(delete(OrganizationMember).where(OrganizationMember.user_id == admin.id))
     db.commit()
     r = await api.call(admin, "POST", f"/org/{org.id}/invitations/{created2['id']}/revoke")
-    assert r.status_code == 200 and r.json()["state"] == "revoked"
-    # ... but can no longer resend or list
+    assert r.status_code == 403 and r.json()["error"]["code"] == "org_admin_required"
+    # ... nor resend or list
     assert (await api.call(admin, "GET", f"/org/{org.id}/invitations")).status_code == 403
 
 

@@ -94,7 +94,10 @@ def build_invitation_email(*, to_email: str, token: str, lang: str, inviter_name
     app = APP_NAME[lang]
     fmt = dict(inviter=inviter_name, org=organization_name, app=app, role=t[f"role_{role}"],
                course=_course_title(course_title, lang))
-    subject = t["subject"].format(**fmt)
+    # Subject and From are headers: the display names pass through the same filter as the From name (no CR/LF).
+    header_fmt = dict(fmt, inviter=email_service._header_safe(inviter_name),
+                      org=email_service._header_safe(organization_name))
+    subject = t["subject"].format(**header_fmt)
     intro = (t["intro_course"] if course_title else t["intro_org"]).format(**fmt)
     link = invite_link(token, lang)
     expires = t["expires"].format(date=expires_at.strftime("%Y-%m-%d %H:%M"))
@@ -125,7 +128,7 @@ def build_invitation_email(*, to_email: str, token: str, lang: str, inviter_name
   <p style="color: #64748b; font-size: 13px;">{escape(expires)}</p>
 """, t["footer"])
     return InvitationEmail(to_email=to_email, subject=subject, text=text, html=html,
-                           from_name=f"{inviter_name} via {app}", reply_to=inviter_email)
+                           from_name=f"{header_fmt['inviter']} via {app}", reply_to=inviter_email)
 
 
 def send_invitation_email(mail: InvitationEmail) -> bool:
