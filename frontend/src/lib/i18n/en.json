@@ -1036,7 +1036,7 @@
       "freeNav": "You can move between questions freely.",
       "sections": "Sections",
       "language": "Language",
-      "start": "Start",
+      "start": "Start test",
       "cannotStart": "You cannot start this assessment right now.",
       "reasons": {
         "not_open_yet": "This assessment has not opened yet.",
@@ -1047,7 +1047,12 @@
         "course_not_active": "The course is not active.",
         "unpublished": "This assessment is not published.",
         "not_a_student": "Only students of this course can take this assessment."
-      }
+      },
+      "startHint": "The timer starts as soon as you press the button.",
+      "startHintSection": "The timer for section {n} starts as soon as you press the button.",
+      "attemptsUsed": "{used} of {total}",
+      "durationH": "{h} h",
+      "durationHm": "{h} h {m} min"
     },
     "builder": {
       "back": "Overview",
@@ -1224,7 +1229,9 @@
       "current": "Current",
       "flagged": "Flagged",
       "title": "Questions",
-      "unanswered": "Unanswered"
+      "unanswered": "Unanswered",
+      "open": "Questions {n}/{total}",
+      "openLabel": "Question list: question {n} of {total}"
     },
     "prev": "Previous",
     "previewBanner": "Preview mode: this attempt is not counted for students.",
@@ -1235,14 +1242,14 @@
     "rejected": "The server rejected the answers to questions: {list}. Please answer them again.",
     "save": {
       "auth": "Sign in again, {n} answers not saved",
-      "error": "Save error, {n} pending",
-      "offline": "Offline, {n} pending",
+      "error": "Could not save, retrying ({n})",
+      "offline": "Offline. Answers are saved on this device and will be sent later ({n})",
       "saved": "Saved",
       "saving": "Saving..."
     },
     "section": "Section",
     "sectionEnd": {
-      "confirm": "Close section",
+      "confirm": "Finish section",
       "noReturn": "You will not be able to return to this section.",
       "stay": "Stay in section",
       "title": "Finish \"{section}\"?"
@@ -1266,7 +1273,9 @@
       "fiveMinutes": "Five minutes left",
       "label": "Time remaining",
       "oneMinute": "One minute left",
-      "unlimited": "No time limit"
+      "unlimited": "No time limit",
+      "sectionLeft": "Left in section",
+      "left": "Time left"
     },
     "true": "True",
     "unflag": "Remove flag",
@@ -1281,6 +1290,12 @@
       "title": "The exam page could not be shown",
       "body": "Your saved answers are safe. Reload the page to continue; if it happens again, tell your teacher.",
       "reload": "Reload"
+    },
+    "passage": {
+      "text": "Text",
+      "show": "Show text",
+      "hide": "Hide text",
+      "textTitle": "Text: {title}"
     }
   },
   "grading": {
@@ -1593,10 +1608,10 @@
     "grade": {
       "title": "Grade",
       "percentile": "Percentile {value}",
-      "kept": "Counted attempt",
+      "kept": "Counts toward your grade",
       "notReleased": "Not released yet",
       "sectionsTitle": "Scores by section",
-      "raw": "Raw score",
+      "raw": "Points",
       "scaled": "Scaled score",
       "overall": "Overall",
       "voidedTitle": "Attempt voided",
@@ -1619,7 +1634,8 @@
           "excused": "Excused",
           "hidden": "Not shown"
         }
-      }
+      },
+      "scaledShort": "Scaled"
     },
     "imageAlt": "Question illustration",
     "inProgress": "This attempt is still in progress.",
@@ -1649,7 +1665,13 @@
     "teacherFeedback": "Teacher feedback",
     "title": "Result",
     "true": "True",
-    "yourAnswer": "Your answer"
+    "yourAnswer": "Your answer",
+    "finishedIntro": "Test finished. Your result:",
+    "review": {
+      "onlyMistakes": "Only mistakes and unanswered",
+      "noMistakes": "No mistakes: every answer is correct.",
+      "sectionSummary": "{correct} of {total} correct"
+    }
   },
   "schemes": {
     "library": {

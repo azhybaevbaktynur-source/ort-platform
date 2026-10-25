@@ -8,7 +8,8 @@ import { LOBBY_REASONS, previewAttemptId, type AssessmentLobbyOut } from "@/lib/
 import { pickLocalized } from "@/lib/lms/localized";
 import type { Lang } from "@/lib/lms/types";
 import { useCourse } from "@/components/lms/CourseContext";
-import { btnPrimary, inputCls, labelCls } from "@/components/lms/content/ui";
+import { inputCls, labelCls } from "@/components/lms/content/ui";
+import { Button } from "@/components/ui";
 import { AssessmentError } from "./AssessmentError";
 import { fmtDateTime } from "./format";
 
@@ -30,6 +31,19 @@ export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {
   const unlimited = lobby.allowed_attempts === -1;
   const left = unlimited ? null : Math.max(0, lobby.allowed_attempts - lobby.attempts_used);
   const resume = lobby.in_progress_attempt_id;
+  // S7b, L1: say what happens on Start (the first timer runs at once).
+  const firstSection = lobby.sections[0];
+  const startHint = lobby.navigation === "section_forward_only" && firstSection?.time_limit_s
+    ? t("assessments.lobby.startHintSection", { n: firstSection.pos })
+    : lobby.time_limit_s || firstSection?.time_limit_s ? t("assessments.lobby.startHint") : "";
+
+  const duration = (sec: number) => {
+    const total = Math.round(sec / 60);
+    const h = Math.floor(total / 60);
+    const m = total % 60;
+    if (h === 0) return t("assessments.student.minutes", { n: m });
+    return m === 0 ? t("assessments.lobby.durationH", { h }) : t("assessments.lobby.durationHm", { h, m });
+  };
 
   const start = async () => {
     setBusy(true);
@@ -52,15 +66,20 @@ export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {
         <h2 className="text-xl font-bold text-slate-900">{title}</h2>
         {description && <p className="mt-1 whitespace-pre-line text-sm text-slate-600">{description}</p>}
       </div>
+      {/* S9: empty date rows are not shown; the total time reads in hours and minutes. */}
       <dl className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm sm:grid-cols-2">
-        <div><dt className="text-xs text-slate-500">{t("assessments.lobby.timeLimit")}</dt>
-          <dd className="font-medium text-slate-900">{lobby.time_limit_s ? t("assessments.student.minutes", { n: Math.round(lobby.time_limit_s / 60) }) : t("assessments.lobby.noLimit")}</dd></div>
-        <div><dt className="text-xs text-slate-500">{t("assessments.lobby.attemptsLeft")}</dt>
-          <dd className="font-medium text-slate-900">{left === null ? t("assessments.settings.unlimited") : t("assessments.student.attemptsOf", { used: lobby.attempts_used, total: lobby.allowed_attempts })}</dd></div>
-        <div><dt className="text-xs text-slate-500">{t("assessments.settings.availableFrom")}</dt>
-          <dd className="font-medium text-slate-900">{lobby.available_from ? fmtDateTime(lobby.available_from) : t("assessments.lobby.anytime")}</dd></div>
-        <div><dt className="text-xs text-slate-500">{t("assessments.settings.availableUntil")}</dt>
-          <dd className="font-medium text-slate-900">{lobby.available_until ? fmtDateTime(lobby.available_until) : t("assessments.lobby.noEnd")}</dd></div>
+        <div><dt className="text-xs text-slate-600">{t("assessments.lobby.timeLimit")}</dt>
+          <dd className="font-medium text-slate-900">{lobby.time_limit_s ? duration(lobby.time_limit_s) : t("assessments.lobby.noLimit")}</dd></div>
+        <div><dt className="text-xs text-slate-600">{t("assessments.lobby.attemptsLeft")}</dt>
+          <dd className="font-medium text-slate-900">{left === null ? t("assessments.settings.unlimited") : t("assessments.lobby.attemptsUsed", { used: lobby.attempts_used, total: lobby.allowed_attempts })}</dd></div>
+        {lobby.available_from && (
+          <div><dt className="text-xs text-slate-600">{t("assessments.settings.availableFrom")}</dt>
+            <dd className="font-medium text-slate-900">{fmtDateTime(lobby.available_from)}</dd></div>
+        )}
+        {lobby.available_until && (
+          <div><dt className="text-xs text-slate-600">{t("assessments.settings.availableUntil")}</dt>
+            <dd className="font-medium text-slate-900">{fmtDateTime(lobby.available_until)}</dd></div>
+        )}
       </dl>
       <p className="rounded-xl bg-slate-50 px-3.5 py-2 text-sm text-slate-700">
         {lobby.navigation === "section_forward_only" ? t("assessments.lobby.forwardOnly") : t("assessments.lobby.freeNav")}
@@ -71,9 +90,9 @@ export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {
           {lobby.sections.map((s) => {
             const name = pickLocalized(s.title, lang, course.default_language) || (s.key ? (t(`sections.${s.key}`) !== `sections.${s.key}` ? t(`sections.${s.key}`) : s.key) : t("assessments.section.n", { n: s.pos }));
             return (
-              <li key={s.pos} className="flex justify-between gap-3">
+              <li key={s.pos} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-3 py-0.5">
                 <span className="text-slate-800">{s.pos}. {name}</span>
-                <span className="text-slate-500">
+                <span className="whitespace-nowrap text-right text-slate-600">
                   {t("assessments.section.itemCount", { n: s.item_count })}
                   {s.time_limit_s ? ` · ${t("assessments.student.minutes", { n: Math.round(s.time_limit_s / 60) })}` : ""}
                 </span>
@@ -92,9 +111,15 @@ export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {
       )}
       <AssessmentError error={error} />
       {resume ? (
-        <button type="button" className={btnPrimary} onClick={() => router.push(player(resume))}>{t("assessments.student.resume")}</button>
+        <div className="sticky bottom-3 z-10 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
+          <Button className="w-full sm:w-auto" onClick={() => router.push(player(resume))}>{t("assessments.student.resume")}</Button>
+        </div>
       ) : lobby.can_start ? (
-        <button type="button" className={btnPrimary} disabled={busy} onClick={() => void start()}>{busy ? t("lms.common.loading") : t("assessments.lobby.start")}</button>
+        // Phones: the start row stays at the bottom of the screen with its hint (L1).
+        <div className="sticky bottom-3 z-10 space-y-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
+          <Button className="w-full sm:w-auto" loading={busy} onClick={() => void start()}>{t("assessments.lobby.start")}</Button>
+          {startHint && <p className="text-sm text-slate-600">{startHint}</p>}
+        </div>
       ) : (
         <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-sm text-amber-900">
           {lobby.reason && KNOWN_REASONS.has(lobby.reason) ? t(`assessments.lobby.reasons.${lobby.reason}`) : t("assessments.lobby.cannotStart")}

@@ -13,7 +13,7 @@ numbered passage lines, result card with the scaled score and five section rows)
 |---|---|---|
 | `lobby` | assessment lobby, full page (rules, five sections with counts) | phone + desktop, ru + ky |
 | `comparison` | math_1 question 1: Column A / Column B card, answer A chosen | same |
-| `flagged-palette` | question 2 shown; palette: #1 answered + flagged, #2 current, #3 empty | same |
+| `flagged-palette` | question 2 shown; palette: #1 answered + flagged, #2 current, #3 empty (phone: the palette sheet opened from the header button, S7b) | same |
 | `section-end` | "finish section" dialog (no-return warning, counts) | same |
 | `passage` | reading question 1 with the line-numbered passage | same |
 | `submit` | "finish test" dialog in grammar (last section) | same |
@@ -35,6 +35,10 @@ reviewed macOS set (system Google Chrome, `channel: "chrome"`). Other platforms 
 committed, the CI job (`ORT_BASELINE_RECORD_MISSING=1`) records the images instead of failing and uploads them
 as the artifact `ort-e2e-recorded`; commit that artifact's PNGs into `linux/` (reviewed like any baseline
 update) to switch the comparison on. DOM assertions always run.
+
+**Phones (S7b).** Below 1024 px the palette and the "finish" action live in a sheet opened from the header button
+("Questions n/total"); `OrtExam.withPalette()` opens it for the palette checks and closes it again, and
+`openSectionEnd` / `openSubmit` open it to reach the finish button. On desktop nothing changes.
 
 ## Data
 

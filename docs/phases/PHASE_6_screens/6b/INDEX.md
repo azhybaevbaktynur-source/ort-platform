@@ -379,3 +379,27 @@ Browser tab title / description per language: "Платформа" / "Platform" 
 | s5b-teacher-access-phone-ru.jpg | Teacher access page inside the new shell | `/ru/teacher-access` | student | 375x812 | ru | 375 | 57 |
 | s5b-teaching-schemes-desktop-ru.jpg | Teaching area active (grading schemes) | `/ru/grading-schemes` | teacher | 1440x900 | ru | 1440 | 65 |
 | s5b-teaching-schemes-phone-ru.jpg | Teaching area active (grading schemes) | `/ru/grading-schemes` | teacher | 375x812 | ru | 375 | 57 |
+
+## S7b
+
+ORT player part 1 (`docs/ORT_PLAYER_IDEAS.md` Bugs + Part 1). Every changed ORT baseline as a pair: `before` = the S7a
+baseline, `after` = the new approved baseline in `docs/phases/ORT_BASELINE/` (macOS, system Chrome; phone 375x812,
+desktop 1440x900; ru + ky). Exam behaviour unchanged: the DOM walk (`frontend/e2e/ort.spec.ts`) passes with the same
+assertions (section order, timer, palette count and states, comparison columns A/B with answers A-D, numbered
+passage lines, result card with five section rows).
+
+| Files (`ort-<screen>-<viewport>-<lang>-{before,after}.jpg`) | What changed | Part 1 IDs |
+|---|---|---|
+| `ort-lobby-{phone,desktop}-{ru,ky}` | "Start test" button with the hint "the section 1 timer starts at once" under it; on phones the start row is sticky at the bottom of the screen (in the full-page shot it floats over the middle, where the 812 px viewport ends); attempts value "0 из 1" without the repeated word; section rows as a two-column grid with the meta on one line; empty "available from / until" rows hidden and the total time as "3 h 35 min" (S9, left to S7b by S6b); not from S7b: the new `AppHeader` (S5b) and the student course frame with breadcrumbs (S6b) | L1, L2, L3, S9 |
+| `ort-comparison-{phone,desktop}-{ru,ky}` | Sans-serif stem and choices (one family); 44 px answer rows and flag button on phones; timer label "Left in section" on desktop; phones: "Questions 1/3" button in the header opens the palette sheet, the palette and the outline finish button are no longer below the question; design-system Prev/Next buttons | P1, P3, P4, P7 |
+| `ort-flagged-palette-{phone,desktop}-{ru,ky}` | Additive palette states: green fill = answered, grey = not, ring = current, amber dot = flagged (also on the current question); legend shows the dot, 12 px text; phones: the palette is the bottom sheet (focus trap, Esc, finish action inside), 44 px buttons; amber dot on the header button when something is flagged | P1, P2, P3, cross-cutting (legend size) |
+| `ort-section-end-{phone,desktop}-{ru,ky}` | Phase 6 `Dialog` (focus trap, Esc, focus return); confirm says "Finish section" like the button that opened it; red only for the no-return sentence, counts neutral; full-width stacked buttons on phones | P5, cross-cutting (colors, components) |
+| `ort-passage-{phone,desktop}-{ru,ky}` | Phones / tablets: sticky "Text" bar above the passage folds the text away and back (open by default, remembered per passage); line numbers unchanged; desktop side by side as before | P6 |
+| `ort-submit-{phone,desktop}-{ru,ky}` | Same `Dialog` treatment as the section-end dialog; the "cannot change answers" sentence in red | P5, cross-cutting |
+| `ort-result-{phone,desktop}-{ru,ky}` | "Test finished. Your result:" line; scaled grade card first, raw points as a small line under it; "Counts toward your grade" / "Points" instead of jargon; `Badge` components; section table without a minimum width (nothing cut at 375 px), short "Scale" header on phones, percentile on its own line in the total row | R1, R2, R3, B4 |
+| `ort-review-{phone,desktop}-{ru,ky}` | Review grouped by section (folding groups, all open, "1 of 3 correct" per section) and an "Only mistakes and unanswered" filter (off by default); every card unchanged in content; sans-serif text; correctness `Badge` with an icon | R4, P7, cross-cutting |
+| `ort-teacher-{bank,question-comparison,passage,import,builder,publish,attempts}-{phone,desktop}-ru` | **No S7b change.** The teacher baselines were re-recorded on top of phase-6b: new `AppHeader` and area shell (S5b) and the teaching screens on the design system (S5c: breadcrumbs, `PageHeader`, publish panel as a labelled region, `Table` with stacked cards). Two S7a locators followed S5c's markup (publish panel by its region name; the visible copy of the student name in the attempts `Table`); the assertions are the same | (S5b, S5c) |
+
+Not in a baseline: the loading skeleton of the player and of a section (P11), the save pill texts (P10), keyboard
+shortcuts with `e.code` (P9), the timer's warning icon and bold digits under five minutes (P4). The phone result
+page is checked to be no wider than the viewport (B4) in `ort-visual.spec.ts`.
