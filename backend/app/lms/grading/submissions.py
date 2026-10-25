@@ -166,10 +166,8 @@ def stale_predicate(scheme_version_id, grading_changed_at, late_policy_changed_a
 # `assignment_id` and no `assessment_id`; quiz rows are unchanged, their assignment id is the column default.)
 def placeholder_row(*, course_id, assessment_id, enrollment_id, user_id, kept_policy: str, now: datetime,
                     computed_at: Optional[datetime] = None, assignment_id=None) -> dict:
-    """Values of a fresh submissions row before its first computation. `assignment_id` is required when
-    `assessment_id` is None (a manual assignment); quiz rows derive it (`assignment_id_for`)."""
-    if assessment_id is None and assignment_id is None:
-        raise ValueError("a submission needs an assessment_id (quiz) or an assignment_id")
+    """Values of a fresh submissions row before its first computation. Quiz rows derive `assignment_id`
+    (`assignment_id_for`, the column default); manual rows pass it (here or on the returned dict)."""
     row = dict(id=uuid.uuid4(), course_id=course_id, assessment_id=assessment_id, enrollment_id=enrollment_id,
                user_id=user_id, state="graded", kept_policy=kept_policy, attempts_counted=0, late_seconds=0,
                late_deduction=ZERO, computed_at=computed_at or now, version=1, created_at=now, updated_at=now)

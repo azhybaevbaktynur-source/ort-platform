@@ -244,8 +244,11 @@ def _feedback_asset(db: Session, ctx: AuthzContext, asset_id) -> uuid.UUID:
 
 
 def _stored_rubric(db: Session, submission_id) -> list[dict]:
+    """The stored rubric scores in criterion order (the event's `old` side)."""
     return [{"criterion_id": r.criterion_id, "points": r.points, "comment": r.comment}
-            for r in db.execute(select(RS).where(RS.c.submission_id == submission_id).order_by(RS.c.criterion_id))]
+            for r in db.execute(select(RS.c.criterion_id, RS.c.points, RS.c.comment)
+                                .join(RC, RC.c.id == RS.c.criterion_id)
+                                .where(RS.c.submission_id == submission_id).order_by(RC.c.position, RC.c.id))]
 
 
 # ------------------------------------------------------------------ the write
@@ -321,11 +324,10 @@ def staff_extension(db: Session, sub: Any, kind: str, *, names: Optional[dict] =
 
 
 def hand_ins_of(db: Session, submission_id) -> list[ser.HandInOut]:
-    rows = db.execute(select(HI, Asset.original_filename, Asset.mime, Asset.bytes)
-                      .outerjoin(Asset, Asset.id == HI.c.asset_id)
-                      .where(HI.c.submission_id == submission_id).order_by(HI.c.attempt_no)).all()
-    return [ser.hand_in_out(r._mapping, {"original_filename": r[-3], "mime": r[-2], "bytes": r[-1]}
-                            if r._mapping["asset_id"] is not None else None) for r in rows]
+    """Every hand-in of one submission with its asset (one statement, S2's loader and shape)."""
+    from app.lms.assignments.handins import hand_ins_for
+
+    return [ser.hand_in_out(h, asset) for h, asset in hand_ins_for(db, [submission_id]).get(submission_id, [])]
 
 
 def rubric_scores_of(db: Session, submission_id) -> list[ser.RubricScoreOut]:

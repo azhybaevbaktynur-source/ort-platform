@@ -23,6 +23,7 @@ from app.lms.grading import actions, gradebook, registry, regrade as regrade_mod
 from app.lms.grading import submissions as subs
 from app.lms.grading.models import CourseGrade, Submission
 from app.lms.grading.seeds import PERCENT_V1_ID
+from app.lms.assignments.ids import assignment_id_for  # Phase 7a: grade routes address assignments
 from app.lms.grading.totals import compute_totals
 from tests.lms.attempt_support import T0, frozen_clock  # noqa: F401
 from tests.lms.factories import auth, grade_attempt, make_scheme, make_submission, make_user
@@ -103,19 +104,20 @@ def test_unrelease_auto_is_409_and_manual_works(client, db, frozen_clock):
     scored(db, w, w.student, 1, 5)
     ctx = ctx_for(db, w.teacher)
     with pytest.raises(Conflict) as e:
-        actions.unrelease(db, ctx, w.course, w.assessment.id, None)
+        actions.unrelease(db, ctx, w.course, assignment_id_for(w.assessment.id), None)
     assert e.value.code == "grade_release_auto" and e.value.details == {"grade_release": "auto"}
     sub = submission_of(db, w, w.student)
     assert sub.released_at is not None
-    url = f"/api/v1/courses/{w.course.id}/assessments/{w.assessment.id}/grades/unrelease"
+    url = f"/api/v1/courses/{w.course.id}/assignments/{assignment_id_for(w.assessment.id)}/grades/unrelease"
     r = client.post(url, json={"submission_ids": [str(sub.id)]}, headers=auth(w.teacher))
     assert r.status_code == 409 and r.json()["error"] == {
         "code": "grade_release_auto", "message": r.json()["error"]["message"], "details": {"grade_release": "auto"}}
     assert submission_of(db, w, w.student).released_at is not None
     m = sworld(db, grade_release="manual")
     scored(db, m, m.student, 1, 5)
-    actions.release(db, ctx_for(db, m.teacher), m.course, m.assessment.id, None)
-    assert actions.unrelease(db, ctx_for(db, m.teacher), m.course, m.assessment.id, None).unreleased == 1
+    actions.release(db, ctx_for(db, m.teacher), m.course, assignment_id_for(m.assessment.id), None)
+    assert actions.unrelease(db, ctx_for(db, m.teacher), m.course, assignment_id_for(m.assessment.id),
+                             None).unreleased == 1
 
 
 # ------------------------------------------------------------------ S2: regrade ensure pass
@@ -128,23 +130,23 @@ def test_regrade_creates_missing_submissions_and_computes_placeholders(db, froze
         _unhooked(db, w, s, 1, i + 1)
     # a backfilled placeholder (migration 0005) for student 0; the others have no row at all
     make_submission(db, w.assessment, _enrollment(db, w, w.students[0]), computed_at=subs.NEVER_COMPUTED)
-    ctx_row = regrade_mod._context(db, w.course.id, w.assessment.id)
+    ctx_row = regrade_mod._context(db, w.course.id, assignment_id_for(w.assessment.id))
     assert regrade_mod.pending_count(db, w.assessment.id, ctx_row) == 1
     assert regrade_mod.missing_count(db, w.assessment.id) == 4
     db.rollback()
     gb = gradebook.gradebook_page(db, ctx_for(db, w.teacher), w.course, cursor=None, limit=None,
-                                  assessment_ids=None, now=clock.now())
-    assert gb.assessments[0].stale_count == 1  # the placeholder is stale
+                                  assignment_ids=None, now=clock.now())
+    assert gb.assignments[0].stale_count == 1  # the placeholder is stale
     monkeypatch.setattr(settings, "GRADES_REGRADE_MAX", 3)
-    out = regrade_mod.regrade(db, ctx_for(db, w.teacher), w.course, w.assessment.id)
+    out = regrade_mod.regrade(db, ctx_for(db, w.teacher), w.course, assignment_id_for(w.assessment.id))
     assert out.regraded == 3 and out.pending == 2  # 3 created + computed this call; 2 still missing
-    out = regrade_mod.regrade(db, ctx_for(db, w.teacher), w.course, w.assessment.id)
+    out = regrade_mod.regrade(db, ctx_for(db, w.teacher), w.course, assignment_id_for(w.assessment.id))
     assert out.regraded == 2 and out.pending == 0
     for i, s in enumerate(w.students):
         sub = submission_of(db, w, s)
         assert sub.attempts_counted == 1 and sub.raw_points == D(i + 1) and sub.computed_at.year > 1970
         assert sub.state == "graded" and sub.scheme_version_id == scheme
-    assert regrade_mod.regrade(db, ctx_for(db, w.teacher), w.course, w.assessment.id).regraded == 0
+    assert regrade_mod.regrade(db, ctx_for(db, w.teacher), w.course, assignment_id_for(w.assessment.id)).regraded == 0
 
 
 # ------------------------------------------------------------------ S6: staff "my grades" writes no cache row
@@ -186,13 +188,13 @@ def test_late_policy_change_targets_late_submissions_only(db, frozen_clock):
     course_svc.update_grading_settings(db, ctx, db.get(Course, w.course.id), CourseGradingIn(
         total_mode="points", late_policy=policy))  # same policy: the timestamp stays
     assert db.get(Course, w.course.id).late_policy_changed_at == changed
-    ctx_row = regrade_mod._context(db, w.course.id, w.assessment.id)
+    ctx_row = regrade_mod._context(db, w.course.id, assignment_id_for(w.assessment.id))
     assert regrade_mod.pending_count(db, w.assessment.id, ctx_row) == 1
     db.rollback()
     gb = gradebook.gradebook_page(db, ctx, db.get(Course, w.course.id), cursor=None, limit=None,
-                                  assessment_ids=None, now=clock.now())
-    assert gb.assessments[0].stale_count == 1
-    out = regrade_mod.regrade(db, ctx_for(db, w.teacher), db.get(Course, w.course.id), w.assessment.id)
+                                  assignment_ids=None, now=clock.now())
+    assert gb.assignments[0].stale_count == 1
+    out = regrade_mod.regrade(db, ctx_for(db, w.teacher), db.get(Course, w.course.id), assignment_id_for(w.assessment.id))
     assert out.regraded == 1 and out.pending == 0
     late_sub = submission_of(db, w, late_s)
     assert late_sub.late_deduction == D("0.80") and late_sub.effective_points == D("7.20")
@@ -213,15 +215,15 @@ def test_gradebook_stale_count_equals_regrade_pending_after_hook(db, frozen_cloc
     scored(db, w, w.students[0], 2, 6)  # hook: submission at the new version, attempt 1 still at the old one
     assert submission_of(db, w, w.students[0]).scheme_version_id == scheme.current_version_id
     gb = gradebook.gradebook_page(db, ctx_for(db, w.teacher), w.course, cursor=None, limit=None,
-                                  assessment_ids=None, now=clock.now())
+                                  assignment_ids=None, now=clock.now())
     monkeypatch.setattr(settings, "GRADES_REGRADE_MAX", 0)
-    pending = regrade_mod.regrade(db, ctx_for(db, w.teacher), w.course, w.assessment.id).pending
-    assert gb.assessments[0].stale_count == pending == 3
+    pending = regrade_mod.regrade(db, ctx_for(db, w.teacher), w.course, assignment_id_for(w.assessment.id)).pending
+    assert gb.assignments[0].stale_count == pending == 3
     monkeypatch.setattr(settings, "GRADES_REGRADE_MAX", 100)
-    assert regrade_mod.regrade(db, ctx_for(db, w.teacher), w.course, w.assessment.id).pending == 0
+    assert regrade_mod.regrade(db, ctx_for(db, w.teacher), w.course, assignment_id_for(w.assessment.id)).pending == 0
     gb = gradebook.gradebook_page(db, ctx_for(db, w.teacher), w.course, cursor=None, limit=None,
-                                  assessment_ids=None, now=clock.now())
-    assert gb.assessments[0].stale_count == 0
+                                  assignment_ids=None, now=clock.now())
+    assert gb.assignments[0].stale_count == 0
 
 
 # ------------------------------------------------------------------ Q3: no_attempts
@@ -259,9 +261,9 @@ def test_totals_ignore_no_attempts():
     a1, a2 = uuid.uuid4(), uuid.uuid4()
     assessments = [SimpleNamespace(id=a, category_id=None, omit_from_total=False, points_possible=D("10"))
                    for a in (a1, a2)]
-    rows = [SimpleNamespace(assessment_id=a1, state="graded", effective_points=D("5"), points_possible=D("10"),
+    rows = [SimpleNamespace(assignment_id=a1, state="graded", effective_points=D("5"), points_possible=D("10"),
                             released_at=T0),
-            SimpleNamespace(assessment_id=a2, state="no_attempts", effective_points=D("9"),
+            SimpleNamespace(assignment_id=a2, state="no_attempts", effective_points=D("9"),
                             points_possible=D("10"), released_at=T0)]
     t = compute_totals(course, [], assessments, {"e": rows}, released_only=False)["e"]
     assert t.current_percent == D("50.00") and t.final_percent == D("25.00")

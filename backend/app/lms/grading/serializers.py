@@ -13,6 +13,7 @@ from typing import Any, Optional
 from pydantic import BaseModel
 
 from app.lms.assessments.schemas import SchemeRefOut, SchemeStudentRefOut
+from app.lms.assignments.schemas import HandInOut as _HandInOut
 from app.lms.grading.registry import GradeValue, SchemeVersionData
 from app.lms.grading.schemes import label_subset
 
@@ -155,35 +156,16 @@ def totals_out(current, final, mapped: Optional[GradeValue], warnings) -> Totals
 
 # ------------------------------------------------------------------ hand-ins and rubric scores (Phase 7a)
 
-class HandInOut(BaseModel):
-    """One hand-in of a text/file assignment (PHASE_7A_DESIGN 2.2). Returned to the student who made it and to
-    course staff; never to other students."""
-    id: uuid.UUID
-    attempt_no: int
-    kind: str
-    body_text: Optional[str] = None
-    asset_id: Optional[uuid.UUID] = None
-    filename: Optional[str] = None
-    mime: Optional[str] = None
-    bytes: Optional[int] = None
-    submitted_at: datetime
-    late_seconds: int
-    late: bool
+# One hand-in shape for the whole API: S2's `HandInOut` (hand-in routes) is reused by the staff payloads here.
+HandInOut = _HandInOut
 
 
 def hand_in_out(row: Any, asset: Any = None) -> HandInOut:
-    """`row`: an `AssignmentSubmission` (ORM or mapping); `asset`: its private asset (ORM or mapping) when the
-    caller already loaded it, for the file name and size. S2's hand-in routes render through this function."""
-    g = row.__getitem__ if isinstance(row, Mapping) else (lambda k: getattr(row, k))
-    ag = None
-    if asset is not None:
-        ag = asset.__getitem__ if isinstance(asset, Mapping) else (lambda k: getattr(asset, k))
-    late_s = int(g("late_seconds") or 0)
-    return HandInOut(
-        id=g("id"), attempt_no=g("attempt_no"), kind=g("kind"), body_text=g("body_text"), asset_id=g("asset_id"),
-        filename=ag("original_filename") if ag else None, mime=ag("mime") if ag else None,
-        bytes=ag("bytes") if ag else None, submitted_at=g("submitted_at"), late_seconds=late_s, late=late_s > 0,
-    )
+    """`row`: an `AssignmentSubmission` ORM row; `asset`: its private asset (or None). Thin alias of
+    `assignments.handins.hand_in_out` (lazy import: that module imports the grading package)."""
+    from app.lms.assignments.handins import hand_in_out as _render
+
+    return _render(row, asset)
 
 
 class RubricScoreOut(BaseModel):

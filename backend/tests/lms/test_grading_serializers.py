@@ -27,10 +27,10 @@ NAMES = ["sc", "tf"]  # 3 points, auto-graded only -> status graded
 RESULT_KEYS = {"raw_score", "points_possible", "sections", "pending_review", "submitted_at", "grade"}
 GRADE_KEYS = {"scheme_type", "scale_min", "scale_max", "display_value", "label", "percentile", "passed", "thresholds",
               "sections", "is_kept", "released", "labels"}
-GRADED_KEYS = {"assessment_id", "title", "state", "display_value", "label", "percentile", "passed", "thresholds",
+GRADED_KEYS = {"assignment_id", "kind", "assessment_id", "title", "state", "display_value", "label", "percentile", "passed", "thresholds",
                "effective_points", "points_possible", "late_deduction", "released_at", "kept_attempt_id", "due_at",
                "scheme_type"}
-NO_NUMBER_KEYS = {"assessment_id", "title", "state", "due_at"}
+NO_NUMBER_KEYS = {"assignment_id", "kind", "assessment_id", "title", "state", "due_at"}
 FORBIDDEN = ("override_reason", "submission_id", "user_id", "params", "events", "enrollment_id", SENTINEL_REASON,
              SENTINEL_EVENT, "segments")
 

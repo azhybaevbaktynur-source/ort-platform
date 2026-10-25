@@ -23,6 +23,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.db import session as db_session
+from app.lms.assignments.ids import assignment_id_for  # Phase 7a: grade routes / columns are assignments
 from app.lms.attempts.models import Attempt
 from app.lms.courses.models import Course
 from app.lms.enrollments.models import Enrollment
@@ -85,6 +86,7 @@ class Exam:
     def __init__(self, cid, aid, key):
         self.cid, self.aid, self.key = cid, aid, key
         self.base = f"/courses/{cid}/assessments/{aid}"
+        self.gbase = f"/courses/{cid}/assignments/{assignment_id_for(aid)}"  # release / regrade routes
 
     async def take(self, api, student, correct_per_section, *, expect_status=201):
         """start -> autosave each section (forward-only: close 1..4) -> submit. Returns the attempt id."""
@@ -164,6 +166,11 @@ async def _gradebook(api, teacher, cid):
     r = await api.call(teacher, "GET", f"/courses/{cid}/gradebook")
     assert r.status_code == 200, r.text
     g = r.json()
+    # Phase 7a: columns are assignments; this Phase 4 flow keeps reading them by assessment id
+    by_assessment = {c["id"]: c["assessment_id"] for c in g["assignments"]}
+    g["assessments"] = [{**c, "id": c["assessment_id"]} for c in g["assignments"]]
+    for row in g["rows"]:
+        row["cells"] = {by_assessment.get(k, k): v for k, v in row["cells"].items()}
     return g, {row["user_id"]: row for row in g["rows"]}
 
 
@@ -262,7 +269,7 @@ async def test_phase4_flow(db, api, frozen_clock):
     assert r.status_code == 200 and r.json()["grade"] is None, r.text
     mine = await _mine(api, s1, cid)
     assert [i["state"] for i in mine["items"]] == ["pending"]
-    assert set(mine["items"][0]) == {"assessment_id", "title", "state", "due_at"}
+    assert set(mine["items"][0]) == {"assignment_id", "kind", "assessment_id", "title", "state", "due_at"}
 
     # ---- 8. override S1 (reason required, stale version -> 409, then 8 points)
     clock.advance(60)
@@ -299,7 +306,7 @@ async def test_phase4_flow(db, api, frozen_clock):
 
     # ---- 10. release all (idempotent)
     clock.advance(60)
-    rel = f"{exam.base}/grades/release"
+    rel = f"{exam.gbase}/grades/release"
     r = await api.call(teacher, "POST", rel, json={})
     assert r.status_code == 200 and r.json() == {"released": 3}, r.text
     r = await api.call(teacher, "POST", rel, json={})
@@ -360,7 +367,7 @@ async def test_phase4_flow(db, api, frozen_clock):
     clock.advance(60)
     total, calls = 0, 0
     while True:
-        r = await api.call(teacher, "POST", f"{exam.base}/grades/regrade")
+        r = await api.call(teacher, "POST", f"{exam.gbase}/grades/regrade")
         assert r.status_code == 200, r.text
         calls += 1
         total += r.json()["regraded"]
@@ -369,7 +376,7 @@ async def test_phase4_flow(db, api, frozen_clock):
             break
         assert calls < 10
     assert total == 3
-    r = await api.call(teacher, "POST", f"{exam.base}/grades/regrade")
+    r = await api.call(teacher, "POST", f"{exam.gbase}/grades/regrade")
     assert r.json() == {"regraded": 0, "pending": 0, "scheme_version_id": pf_vid}, r.text
 
     pf = build_version_data("pass_fail", validate_params("pass_fail", pf_params))
@@ -443,9 +450,9 @@ async def test_phase4_flow(db, api, frozen_clock):
         ("GET", f"{base_sub}/{sid}", None),
         ("PUT", f"{base_sub}/{sid}/override", {"points": 1, "reason": "x", "version": 1}),
         ("PUT", f"{base_sub}/{sid}/excuse", {"excused": True, "version": 1}),
-        ("POST", f"{exam.base}/grades/release", {}),
-        ("POST", f"{exam.base}/grades/unrelease", {}),
-        ("POST", f"{exam.base}/grades/regrade", None),
+        ("POST", f"{exam.gbase}/grades/release", {}),
+        ("POST", f"{exam.gbase}/grades/unrelease", {}),
+        ("POST", f"{exam.gbase}/grades/regrade", None),
         ("POST", f"/courses/{cid}/attempts/{t1}/void", {"reason": "x"}),
         ("GET", f"/courses/{cid}/attempts/{t1}", None),
         ("GET", f"{exam.base}/attempts", None),
@@ -488,7 +495,7 @@ async def test_phase4_flow_pg_row_counts(db, api, frozen_clock):
     assert n == 1
     sub = _subs(db, exam.aid)[s.id]
     assert str(sub.kept_attempt_id) == t2 and sub.attempts_counted == 2 and t1 != t2
-    r = await api.call(teacher, "POST", f"{exam.base}/grades/release", json={})
+    r = await api.call(teacher, "POST", f"{exam.gbase}/grades/release", json={})
     assert r.json() == {"released": 1}
     ev = _events(db, sub.id)[0]
     ev.reason = "tampered"

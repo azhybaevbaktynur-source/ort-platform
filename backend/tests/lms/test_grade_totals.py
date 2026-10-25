@@ -1,4 +1,5 @@
-"""7.6 Course totals (P4-17): pure `compute_totals` / `map_total` plus the `course_grades` cache writes (P4-18)."""
+"""7.6 Course totals (P4-17): pure `compute_totals` / `map_total` plus the `course_grades` cache writes (P4-18).
+Phase 7a: totals are keyed by assignment (`.assignment_id` on submissions, assignment rows as columns)."""
 import uuid
 from decimal import Decimal
 from types import SimpleNamespace as NS
@@ -6,6 +7,7 @@ from types import SimpleNamespace as NS
 import pytest
 from sqlalchemy import select
 
+from app.lms.assignments.ids import assignment_id_for
 from app.lms.grading.models import CourseGrade
 from app.lms.grading.registry import build_version_data
 from app.lms.grading.seeds import PASS_FAIL_PARAMS, PASS_FAIL_V1_ID
@@ -32,7 +34,7 @@ def asmt(points, category=None, omit=False):
 
 
 def sub(a, eff, poss=None, state="graded", released=True):
-    return NS(assessment_id=a.id, state=state, effective_points=None if eff is None else D(str(eff)),
+    return NS(assignment_id=a.id, state=state, effective_points=None if eff is None else D(str(eff)),
               points_possible=D(str(poss if poss is not None else a.points_possible)),
               released_at="t" if released else None)
 
@@ -189,5 +191,6 @@ async def test_gradebook_totals_weighted_with_warning(db, api):
     total = body["rows"][0]["total"]
     assert D(total["current_percent"]) == D("80.00")  # (60*100 + 20*20) / 80
     assert total["warnings"] == [UNCATEGORIZED_EXCLUDED]
-    by_id = {x["id"]: x for x in body["assessments"]}
-    assert by_id[str(u.id)]["warnings"] == [UNCATEGORIZED_EXCLUDED] and by_id[str(a.id)]["warnings"] == []
+    by_id = {x["id"]: x for x in body["assignments"]}
+    assert by_id[str(assignment_id_for(u.id))]["warnings"] == [UNCATEGORIZED_EXCLUDED]
+    assert by_id[str(assignment_id_for(a.id))]["warnings"] == []
