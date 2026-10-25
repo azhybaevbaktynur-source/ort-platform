@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { getCourse, listPeople, transferOwnership } from "@/lib/lms/courses";
@@ -10,18 +9,18 @@ import { joinCourseAsTeacher, searchOrgMembers } from "@/lib/lms/organizations";
 import { templateTitle } from "@/lib/lms/templates";
 import { isStaffCourse, type CourseOut, type RosterEntryOut } from "@/lib/lms/types";
 import { fmtApiDate } from "@/lib/format";
-import { StatusBadge } from "@/components/lms/CourseCard";
-import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
-import { UserPicker, type PickedUser, type UserSearch } from "@/components/lms/UserPicker";
+import {
+  Badge, Button, Card, ConfirmDialog, DescriptionList, LinkButton, LoadingState, PageHeader, UserPicker, toast,
+  type PickedUser, type UserSearch,
+} from "@/components/ui";
 import { useOrg } from "@/components/lms/org/OrgShell";
-import { Loading, OrgError, btn, cardCls } from "@/components/lms/org/OrgUi";
-import { toast } from "@/components/ui/Toast";
+import { CourseStatusBadge, LoadError, OrgError } from "@/components/lms/org/OrgUi";
 
 /** Org admin course summary (design §3): facts, staff, assign owner, open course, join as teacher (A13). */
 export default function OrgCourseSummaryPage() {
   const { courseId } = useParams<{ courseId: string }>();
   const { lang, t } = useTranslation();
-  const { org, readOnly } = useOrg();
+  const { org, readOnly, crumbs } = useOrg();
   const [course, setCourse] = useState<CourseOut | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [staff, setStaff] = useState<RosterEntryOut[] | null>(null);
@@ -54,13 +53,18 @@ export default function OrgCourseSummaryPage() {
   }, [courseId]);
   useEffect(() => { void load(); void loadStaff(); }, [load, loadStaff]);
 
-  const searchMembers: UserSearch = useMemo(() => async (q) => {
-    return searchOrgMembers(org.id, q);
-  }, [org.id]);
+  const searchMembers: UserSearch = useMemo(() => async (q) => searchOrgMembers(org.id, q), [org.id]);
 
-  const back = <Link href={`/${lang}/org/${org.id}/courses`} className="text-sm font-medium text-brand-700 hover:underline">{t("organizations.courses.back")}</Link>;
-  if (error && !course) return <div className="space-y-3">{back}<OrgError error={error} onRetry={load} /></div>;
-  if (!course) return <Loading />;
+  const coursesCrumb = { label: t("organizations.org.nav.courses"), href: `/${lang}/org/${org.id}/courses` };
+  if (error && !course) {
+    return (
+      <div>
+        <PageHeader title={t("organizations.courses.title")} breadcrumbs={crumbs(coursesCrumb, { label: "…" })} />
+        <LoadError error={error} onRetry={load} />
+      </div>
+    );
+  }
+  if (!course) return <LoadingState label={t("lms.common.loading")} />;
 
   const title = pickLocalized(course.title, lang, course.default_language) || course.id;
   const staffOut = isStaffCourse(course) ? course : null;
@@ -92,75 +96,73 @@ export default function OrgCourseSummaryPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        {back}
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          <h2 className="text-xl font-bold text-slate-900">{title}</h2>
-          <StatusBadge status={course.status} />
-        </div>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Link href={`/${lang}/courses/${course.id}`} className={btn.primary}>{t("organizations.course.open")}</Link>
-        {!iAmTeacher && (
-          <button type="button" className={btn.secondary} disabled={readOnly} onClick={() => { setDialogError(null); setDialog("join"); }}>
+    <div>
+      <PageHeader
+        title={title}
+        badge={<CourseStatusBadge status={course.status} />}
+        breadcrumbs={crumbs(coursesCrumb, { label: title })}
+        primaryAction={<LinkButton href={`/${lang}/courses/${course.id}`}>{t("organizations.course.open")}</LinkButton>}
+        secondaryActions={!iAmTeacher ? (
+          <Button variant="secondary" disabled={readOnly} onClick={() => { setDialogError(null); setDialog("join"); }}>
             {t("organizations.course.join")}
-          </button>
-        )}
-      </div>
-      <section className={cardCls} aria-labelledby="oc-facts">
-        <h3 id="oc-facts" className="mb-3 font-semibold text-slate-900">{t("organizations.course.facts")}</h3>
-        <dl className="grid gap-3 text-sm sm:grid-cols-2">
-          <div><dt className="text-xs text-slate-500">{t("organizations.courses.owner")}</dt><dd>{ownerName}</dd></div>
-          <div><dt className="text-xs text-slate-500">{t("templates.field")}</dt><dd>{tpl ? templateTitle(t, tpl.key, tpl.title_key) : t("templates.general")}</dd></div>
-          {staffOut && <div><dt className="text-xs text-slate-500">{t("organizations.counts.students")}</dt><dd>{staffOut.active_student_count}</dd></div>}
-          {staffOut && <div><dt className="text-xs text-slate-500">{t("organizations.course.created")}</dt><dd>{fmtApiDate(staffOut.created_at, lang)}</dd></div>}
-          <div><dt className="text-xs text-slate-500">{t("organizations.course.languages")}</dt><dd>{course.languages.map((l) => t(`courses.languages.${l}`)).join(", ")}</dd></div>
-        </dl>
-      </section>
-      <section className={cardCls} aria-labelledby="oc-staff">
-        <h3 id="oc-staff" className="mb-3 font-semibold text-slate-900">{t("organizations.course.staff")}</h3>
-        {staffError ? <OrgError error={staffError} onRetry={loadStaff} /> : staff === null ? <Loading /> : staff.length === 0 ? (
-          <p className="text-sm text-slate-500">{t("organizations.course.noStaff")}</p>
-        ) : (
-          <ul className="divide-y divide-slate-100 text-sm">
-            {staff.map((s) => (
-              <li key={s.enrollment_id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                <span className="min-w-0">
-                  <span className="block truncate font-medium text-slate-900">{s.user.display_name || s.user.email}</span>
-                  <span className="block truncate text-xs text-slate-500">{s.user.email}</span>
-                </span>
-                <span className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
-                  {t(`courses.roles.${s.role}`)}
-                  {s.is_owner && <span className="rounded-full bg-brand-50 px-2 py-0.5 font-semibold text-brand-700">{t("organizations.course.ownerTag")}</span>}
-                  {s.source === "org_admin_self" && <span className="rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-900">{t("organizations.course.joinedAsAdmin")}</span>}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-      <section className={cardCls} aria-labelledby="oc-owner">
-        <h3 id="oc-owner" className="mb-1 font-semibold text-slate-900">{t("organizations.course.assignOwner")}</h3>
-        <p className="mb-3 text-sm text-slate-600">{t("organizations.course.assignOwnerHint")}</p>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <UserPicker label={t("organizations.course.newOwner")} value={newOwner} onChange={setNewOwner}
-              search={searchMembers} excludeIds={owner ? [owner.id] : []} disabled={readOnly} />
+          </Button>
+        ) : undefined}
+      />
+      <div className="space-y-6">
+        <Card title={t("organizations.course.facts")}>
+          <DescriptionList twoColumns items={[
+            { key: "owner", term: t("organizations.courses.owner"), description: ownerName },
+            { key: "template", term: t("templates.field"), description: tpl ? templateTitle(t, tpl.key, tpl.title_key) : t("templates.general") },
+            ...(staffOut ? [
+              { key: "students", term: t("organizations.counts.students"), description: staffOut.active_student_count },
+              { key: "created", term: t("organizations.course.created"), description: fmtApiDate(staffOut.created_at, lang) },
+            ] : []),
+            { key: "languages", term: t("organizations.course.languages"), description: course.languages.map((l) => t(`courses.languages.${l}`)).join(", ") },
+          ]} />
+        </Card>
+        <Card title={t("organizations.course.staff")} padding={staff && staff.length > 0 ? "none" : "md"}>
+          {staffError ? <OrgError error={staffError} onRetry={loadStaff} /> : staff === null ? <LoadingState label={t("lms.common.loading")} rows={1} /> : staff.length === 0 ? (
+            <p className="text-sm text-slate-600">{t("organizations.course.noStaff")}</p>
+          ) : (
+            <ul className="divide-y divide-slate-100 border-t border-slate-100">
+              {staff.map((s) => (
+                <li key={s.enrollment_id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6">
+                  <span className="min-w-0">
+                    <span className="block break-words font-medium text-slate-900">{s.user.display_name || s.user.email}</span>
+                    <span className="block break-all text-sm text-slate-600">{s.user.email}</span>
+                  </span>
+                  <span className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
+                    {t(`courses.roles.${s.role}`)}
+                    {s.is_owner && <Badge tone="info">{t("organizations.course.ownerTag")}</Badge>}
+                    {s.source === "org_admin_self" && <Badge tone="warning">{t("organizations.course.joinedAsAdmin")}</Badge>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+        <Card title={t("organizations.course.assignOwner")} description={t("organizations.course.assignOwnerHint")}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="min-w-0 flex-1">
+              <UserPicker label={t("organizations.course.newOwner")} value={newOwner} onChange={setNewOwner}
+                search={searchMembers} excludeIds={owner ? [owner.id] : []} disabled={readOnly} />
+            </div>
+            <Button variant="secondary" disabled={!newOwner || readOnly} onClick={() => { setDialogError(null); setDialog("owner"); }}>
+              {t("organizations.course.assignOwner")}
+            </Button>
           </div>
-          <button type="button" className={btn.secondary} disabled={!newOwner || readOnly} onClick={() => { setDialogError(null); setDialog("owner"); }}>
-            {t("organizations.course.assignOwner")}
-          </button>
-        </div>
-      </section>
+        </Card>
+      </div>
       <ConfirmDialog
         open={dialog !== null}
         title={dialog === "join" ? t("organizations.course.joinTitle", { course: title }) : t("organizations.course.ownerTitle", { course: title })}
-        body={dialog === "join"
+        object={title}
+        effect={dialog === "join"
           ? t("organizations.course.joinBody")
           : t("organizations.course.ownerBody", { course: title, from: ownerName, to: newOwner ? newOwner.display_name || newOwner.email : "" })}
         confirmLabel={dialog === "join" ? t("organizations.course.join") : t("organizations.course.assignOwner")}
-        busy={busy} error={dialogError} onConfirm={() => void confirm()} onCancel={() => setDialog(null)}
+        busy={busy} error={dialogError ? <OrgError error={dialogError} /> : undefined}
+        onConfirm={() => void confirm()} onCancel={() => setDialog(null)}
       />
     </div>
   );

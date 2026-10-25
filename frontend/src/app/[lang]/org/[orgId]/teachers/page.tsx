@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { UserPlus } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
@@ -9,70 +9,36 @@ import {
   listOrgInvitations, resendOrgInvitation, revokeOrgInvitation, type InvitationOut,
 } from "@/lib/lms/invitations";
 import { fmtApiDate } from "@/lib/format";
+import {
+  Button, ConfirmDialog, EmptyState, PageHeader, ReasonDialog, SearchInput, Table, toast, type TableColumn,
+} from "@/components/ui";
 import { useOrg } from "@/components/lms/org/OrgShell";
 import { InviteDialog, toastInvitationSent } from "@/components/lms/org/InviteDialog";
-import { EmptyBox, Loading, OrgBadge, OrgError, btn, inputCls, labelCls } from "@/components/lms/org/OrgUi";
-import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
-import { Pager } from "@/components/lms/Pager";
-import { ReasonDialog } from "@/components/lms/admin/ReasonDialog";
-import { toast } from "@/components/ui/Toast";
+import { OrgBadge, OrgError } from "@/components/lms/org/OrgUi";
+import { useCursorList, useDebounced } from "@/components/lms/admin/useCursorList";
+import { MoreError, useTableState } from "@/components/lms/admin/ListParts";
 
 export default function OrgTeachersPage() {
   const { lang, t } = useTranslation();
   const { me } = useLmsMe();
-  const { org, readOnly, reload } = useOrg();
+  const { org, readOnly, reload, crumbs } = useOrg();
   const [input, setInput] = useState("");
-  const [q, setQ] = useState("");
-  const [members, setMembers] = useState<OrgMemberOut[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<unknown>(null);
-  const [invites, setInvites] = useState<InvitationOut[]>([]);
-  const [invCursor, setInvCursor] = useState<string | null>(null);
-  const [invLoading, setInvLoading] = useState(true);
-  const [invError, setInvError] = useState<unknown>(null);
+  const q = useDebounced(input);
+  const fetchMembers = useCallback((cursor: string | null) => listOrgMembers(org.id, { state: "active", cursor }), [org.id]);
+  const members = useCursorList(fetchMembers);
+  // The members endpoint has no text filter: search the loaded rows.
+  const shown = members.items.filter((m) => memberMatches(m, q));
+  const membersState = useTableState(members, shown.length);
+  const fetchInvites = useCallback((cursor: string | null) => listOrgInvitations(org.id, { cursor }), [org.id]);
+  const invites = useCursorList(fetchInvites);
+  const invitesState = useTableState(invites);
   const [inviting, setInviting] = useState(false);
   const [removing, setRemoving] = useState<OrgMemberOut | null>(null);
   const [revoking, setRevoking] = useState<InvitationOut | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const [resendError, setResendError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const [dialogError, setDialogError] = useState<unknown>(null);
-
-  useEffect(() => {
-    const h = setTimeout(() => setQ(input.trim()), 350);
-    return () => clearTimeout(h);
-  }, [input]);
-
-  const loadMembers = useCallback(async (next?: string | null) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const page = await listOrgMembers(org.id, { state: "active", cursor: next });
-      setMembers((prev) => (next ? [...prev, ...page.items] : page.items));
-      setCursor(page.next_cursor);
-    } catch (e) {
-      setError(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [org.id]);
-  useEffect(() => { void loadMembers(); }, [loadMembers]);
-  // The members endpoint has no text filter: search the loaded rows.
-  const shown = members.filter((m) => memberMatches(m, q));
-
-  const loadInvites = useCallback(async (next?: string | null) => {
-    setInvLoading(true);
-    setInvError(null);
-    try {
-      const page = await listOrgInvitations(org.id, { cursor: next });
-      setInvites((prev) => (next ? [...prev, ...page.items] : page.items));
-      setInvCursor(page.next_cursor);
-    } catch (e) {
-      setInvError(e);
-    } finally {
-      setInvLoading(false);
-    }
-  }, [org.id]);
-  useEffect(() => { void loadInvites(); }, [loadInvites]);
 
   const doRemove = async (reason: string) => {
     if (!removing) return;
@@ -82,7 +48,7 @@ export default function OrgTeachersPage() {
       await removeOrgMember(org.id, removing.user.id, reason);
       toast.success(t("organizations.members.removed", { name: removing.user.display_name || removing.user.email }));
       setRemoving(null);
-      await Promise.all([loadMembers(), reload()]);
+      await Promise.all([members.reload(), reload()]);
     } catch (e) {
       setDialogError(e);
     } finally {
@@ -97,7 +63,7 @@ export default function OrgTeachersPage() {
       await revokeOrgInvitation(org.id, revoking.id);
       toast.success(t("invitations.revoked", { email: revoking.email }));
       setRevoking(null);
-      await loadInvites();
+      await invites.reload();
     } catch (e) {
       setDialogError(e);
     } finally {
@@ -105,118 +71,122 @@ export default function OrgTeachersPage() {
     }
   };
   const resend = async (i: InvitationOut) => {
-    setInvError(null);
+    setResendError(null);
+    setResendingId(i.id);
     try {
       await resendOrgInvitation(org.id, i.id);
       toast.success(t("invitations.resent", { email: i.email }));
-      await loadInvites();
+      await invites.reload();
     } catch (e) {
-      setInvError(e);
+      setResendError(e);
+    } finally {
+      setResendingId(null);
     }
   };
 
   const memberTone = (m: OrgMemberOut) => (m.state === "active" ? "active" : "removed");
-  const memberLabel = (m: OrgMemberOut) => `organizations.members.state.${memberTone(m)}`;
+  const memberColumns: TableColumn<OrgMemberOut>[] = [
+    {
+      key: "person", header: t("organizations.members.person"), primary: true, className: "sm:min-w-[14rem]",
+      cell: (m) => <>{m.user.display_name || m.user.email}<span className="block text-sm font-normal text-slate-600 [overflow-wrap:anywhere]">{m.user.email}</span></>,
+    },
+    { key: "role", header: t("organizations.adminUser.role"), cell: (m) => t(`organizations.roles.${m.role}`) },
+    { key: "state", header: t("organizations.admin.status"), cell: (m) => <OrgBadge tone={memberTone(m)} labelKey={`organizations.members.state.${memberTone(m)}`} /> },
+    { key: "since", header: t("organizations.members.sinceColumn"), nowrap: true, cell: (m) => fmtApiDate(m.created_at, lang) },
+    {
+      key: "actions", header: "", actions: true, align: "right",
+      cell: (m) => m.user.id === me?.id ? null : (
+        <Button variant="secondary" size="sm" disabled={readOnly} onClick={() => { setDialogError(null); setRemoving(m); }}>
+          {t("organizations.members.remove")}
+        </Button>
+      ),
+    },
+  ];
+  const inviteColumns: TableColumn<InvitationOut>[] = [
+    { key: "email", header: t("invitations.dialog.email"), primary: true, className: "sm:min-w-[12rem]", cell: (i) => <span className="[overflow-wrap:anywhere]">{i.email}</span> },
+    { key: "role", header: t("organizations.adminUser.role"), cell: (i) => t(`invitations.roles.${i.role}`) },
+    { key: "state", header: t("organizations.admin.status"), cell: (i) => <OrgBadge tone={i.state === "pending" ? "invited" : i.state} labelKey={`invitations.state.${i.state}`} /> },
+    {
+      key: "sent", header: t("invitations.sentColumn"),
+      cell: (i) => (
+        <>
+          {t("invitations.sentBy", { name: i.invited_by_name || "—", date: fmtApiDate(i.created_at, lang) })}
+          {i.state === "pending" && <span className="block text-sm text-slate-600">{t("invitations.expiresOn", { date: fmtApiDate(i.expires_at, lang) })}</span>}
+        </>
+      ),
+    },
+    {
+      key: "actions", header: "", actions: true, align: "right",
+      cell: (i) => (i.state === "pending" || i.state === "expired") ? (
+        <span className="flex w-full flex-wrap gap-2 sm:w-auto sm:flex-col sm:items-end">
+          <Button variant="secondary" size="sm" disabled={readOnly} loading={resendingId === i.id} onClick={() => void resend(i)}>{t("invitations.resend")}</Button>
+          {i.state === "pending" && (
+            <Button variant="secondary" size="sm" disabled={readOnly} onClick={() => { setDialogError(null); setRevoking(i); }}>{t("invitations.revoke")}</Button>
+          )}
+        </span>
+      ) : null,
+    },
+  ];
+  const inviteButton = (variant: "primary" | "secondary") => (
+    <Button variant={variant} disabled={readOnly} leftIcon={<UserPlus aria-hidden="true" className="h-4 w-4" />} onClick={() => setInviting(true)}>
+      {t("invitations.inviteTeacher")}
+    </Button>
+  );
+  const removingName = removing ? removing.user.display_name || removing.user.email : "";
   return (
-    <div className="space-y-8">
-      <section aria-labelledby="t-members">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 id="t-members" className="text-xl font-semibold text-slate-900">{t("organizations.members.title")}</h2>
-          <button type="button" className={btn.primary} disabled={readOnly} onClick={() => setInviting(true)}>
-            <UserPlus className="h-4 w-4" aria-hidden="true" />{t("invitations.inviteTeacher")}
-          </button>
-        </div>
-        <div className="mb-3 w-full sm:w-72">
-          <label htmlFor="m-q" className={labelCls}>{t("lms.common.search")}</label>
-          <input id="m-q" value={input} onChange={(e) => setInput(e.target.value)} placeholder={t("organizations.members.searchPlaceholder")} className={inputCls} />
-        </div>
-        {error ? <OrgError error={error} onRetry={() => loadMembers()} className="mb-3" /> : null}
-        {loading && members.length === 0 && !error && <Loading />}
-        {!loading && !error && shown.length === 0 && (
-          <EmptyBox text={q ? t("organizations.members.emptySearch") : t("organizations.members.empty")}>
-            {!q && !readOnly && <button type="button" className={btn.secondary} onClick={() => setInviting(true)}>{t("invitations.inviteTeacher")}</button>}
-          </EmptyBox>
-        )}
-        {shown.length > 0 && (
-          <>
-            <p className="mb-2 text-xs text-slate-500">{t("organizations.members.shown", { n: shown.length })}</p>
-            <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white text-sm">
-              {shown.map((m) => {
-                const self = m.user.id === me?.id;
-                return (
-                  <li key={m.user.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-                    <div className="min-w-0 flex-1 basis-56">
-                      <p className="truncate font-medium text-slate-900">{m.user.display_name || m.user.email}</p>
-                      <p className="truncate text-xs text-slate-500">{m.user.email}</p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs text-slate-600">{t(`organizations.roles.${m.role}`)}</span>
-                      <OrgBadge tone={memberTone(m)} labelKey={memberLabel(m)} />
-                    </div>
-                    {!self && (
-                      <button type="button" className={btn.smallDanger} disabled={readOnly}
-                        onClick={() => { setDialogError(null); setRemoving(m); }}>
-                        {t("organizations.members.remove")}
-                      </button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </>
-        )}
-        <Pager nextCursor={cursor} loading={loading} onMore={() => loadMembers(cursor)} />
+    <div>
+      <PageHeader title={t("organizations.members.title")} breadcrumbs={crumbs({ label: t("organizations.org.nav.teachers") })} primaryAction={inviteButton("primary")} />
+      <section aria-labelledby="t-members" className="mb-10">
+        <h2 id="t-members" className="sr-only">{t("organizations.members.title")}</h2>
+        <Table
+          caption={t("organizations.members.title")}
+          columns={memberColumns}
+          rows={shown}
+          rowKey={(m) => m.user.id}
+          {...membersState}
+          search={<SearchInput value={input} onChange={setInput} label={t("lms.common.search")} placeholder={t("organizations.members.searchPlaceholder")} containerClassName="sm:max-w-sm" />}
+          empty={
+            <EmptyState
+              title={q ? t("organizations.members.emptySearch") : t("organizations.members.empty")}
+              action={!q && !readOnly ? inviteButton("secondary") : undefined}
+            />
+          }
+        />
+        <MoreError list={members} />
       </section>
 
       <section aria-labelledby="t-invites">
-        <h2 id="t-invites" className="mb-3 text-xl font-semibold text-slate-900">{t("invitations.title")}</h2>
-        {invError ? <OrgError error={invError} onRetry={() => loadInvites()} className="mb-3" /> : null}
-        {invLoading && invites.length === 0 && !invError && <Loading />}
-        {!invLoading && !invError && invites.length === 0 && <EmptyBox text={t("invitations.empty")} />}
-        {invites.length > 0 && (
-          <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white text-sm">
-            {invites.map((i) => (
-              <li key={i.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-                <div className="min-w-0 flex-1 basis-56">
-                  <p className="break-all font-medium text-slate-900">{i.email}</p>
-                  <p className="text-xs text-slate-500">
-                    {t("invitations.sentBy", { name: i.invited_by_name || "—", date: fmtApiDate(i.created_at, lang) })}
-                    {i.state === "pending" ? ` · ${t("invitations.expiresOn", { date: fmtApiDate(i.expires_at, lang) })}` : ""}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-slate-600">{t(`invitations.roles.${i.role}`)}</span>
-                  <OrgBadge tone={i.state === "pending" ? "invited" : i.state} labelKey={`invitations.state.${i.state}`} />
-                </div>
-                {(i.state === "pending" || i.state === "expired") && (
-                  <div className="flex flex-wrap gap-2">
-                    <button type="button" className={btn.small} disabled={readOnly} onClick={() => void resend(i)}>{t("invitations.resend")}</button>
-                    {i.state === "pending" && (
-                      <button type="button" className={btn.smallDanger} disabled={readOnly} onClick={() => { setDialogError(null); setRevoking(i); }}>{t("invitations.revoke")}</button>
-                    )}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-        <Pager nextCursor={invCursor} loading={invLoading} onMore={() => loadInvites(invCursor)} />
+        <h2 id="t-invites" className="mb-3 text-lg font-semibold leading-7 text-slate-900">{t("invitations.title")}</h2>
+        {resendError ? <OrgError error={resendError} className="mb-3" /> : null}
+        <Table
+          caption={t("invitations.title")}
+          columns={inviteColumns}
+          rows={invites.items}
+          rowKey={(i) => i.id}
+          {...invitesState}
+          empty={<EmptyState title={t("invitations.empty")} />}
+        />
+        <MoreError list={invites} />
       </section>
 
       <InviteDialog open={inviting} orgId={org.id} orgName={org.name} onClose={() => setInviting(false)}
-        onSent={(inv, email) => { setInviting(false); toastInvitationSent(t, inv, email); void loadInvites(); void reload(); }} />
+        onSent={(inv, email) => { setInviting(false); toastInvitationSent(t, inv, email); void invites.reload(); void reload(); }} />
       <ReasonDialog
         open={!!removing}
-        title={t("organizations.members.removeTitle", { name: removing?.user.display_name || removing?.user.email || "" })}
-        body={t("organizations.members.removeBody", { name: removing?.user.display_name || removing?.user.email || "", org: org.name })}
-        confirmLabel={t("organizations.members.remove")} danger busy={busy} error={dialogError}
-        onConfirm={doRemove} onCancel={() => setRemoving(null)}
+        title={t("organizations.members.removeTitle", { name: removingName })}
+        object={removing ? (removing.user.display_name ? `${removing.user.display_name} · ${removing.user.email}` : removing.user.email) : undefined}
+        effect={t("organizations.members.removeBody", { name: removingName, org: org.name })}
+        confirmLabel={t("organizations.members.remove")} tone="danger" busy={busy}
+        error={dialogError ? <OrgError error={dialogError} /> : undefined}
+        onConfirm={(r) => void doRemove(r)} onCancel={() => setRemoving(null)}
       />
       <ConfirmDialog
         open={!!revoking}
         title={t("invitations.revokeTitle")}
-        body={t("invitations.revokeBody", { email: revoking?.email || "" })}
-        confirmLabel={t("invitations.revoke")} danger busy={busy} error={dialogError}
+        object={revoking?.email}
+        effect={t("invitations.revokeBody", { email: revoking?.email || "" })}
+        confirmLabel={t("invitations.revoke")} tone="danger" busy={busy}
+        error={dialogError ? <OrgError error={dialogError} /> : undefined}
         onConfirm={() => void doRevoke()} onCancel={() => setRevoking(null)}
       />
     </div>

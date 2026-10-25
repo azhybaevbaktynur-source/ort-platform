@@ -3,9 +3,11 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Building2, ChevronRight } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { listMyOrganizations, type MyOrganizationOut } from "@/lib/lms/organizations";
-import { EmptyBox, Loading, OrgBadge, OrgError } from "@/components/lms/org/OrgUi";
+import { EmptyState, LinkButton, LoadingState, PageHeader, cn, focusRing } from "@/components/ui";
+import { LoadError, OrgBadge } from "@/components/lms/org/OrgUi";
 
 /** Organization switcher: the organizations the person administers (one = straight in). */
 export default function OrgPickerPage() {
@@ -26,22 +28,21 @@ export default function OrgPickerPage() {
   }, [lang, router]);
   useEffect(() => { void load(); }, [load]);
 
-  if (error) return <OrgError error={error} onRetry={load} />;
-  if (!orgs) return <Loading />;
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="mb-4 text-2xl font-bold text-slate-900">{t("organizations.org.pickTitle")}</h1>
-      {orgs.length === 0 ? (
-        <EmptyBox text={t("organizations.org.pickEmpty")}>
-          <Link href={`/${lang}/courses`} className="text-sm font-medium text-brand-700 hover:underline">{t("organizations.noAccess.back")}</Link>
-        </EmptyBox>
+      <PageHeader title={t("organizations.org.pickTitle")} />
+      {error ? <LoadError error={error} onRetry={load} /> : !orgs ? <LoadingState label={t("lms.common.loading")} /> : orgs.length === 0 ? (
+        <EmptyState icon={<Building2 />} title={t("organizations.org.pickEmpty")}
+          action={<LinkButton variant="secondary" href={`/${lang}/courses`}>{t("organizations.noAccess.back")}</LinkButton>} />
       ) : (
-        <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
+        <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           {orgs.map((o) => (
             <li key={o.id}>
-              <Link href={`/${lang}/org/${o.id}`} className="flex min-h-[56px] items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50">
-                <span className="font-medium text-slate-900">{o.name}</span>
+              <Link href={`/${lang}/org/${o.id}`}
+                className={cn("flex min-h-14 items-center gap-3 px-4 py-3 hover:bg-slate-50", focusRing, "focus-visible:ring-inset focus-visible:ring-offset-0")}>
+                <span className="min-w-0 flex-1 break-words font-semibold text-slate-900">{o.name}</span>
                 <OrgBadge tone={o.status} labelKey={`organizations.status.${o.status}`} />
+                <ChevronRight aria-hidden="true" className="h-5 w-5 shrink-0 text-slate-500" />
               </Link>
             </li>
           ))}

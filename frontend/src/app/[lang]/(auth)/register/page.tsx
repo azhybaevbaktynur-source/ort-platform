@@ -5,11 +5,12 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { AuthHeader } from "@/components/auth/AuthHeader";
+import { Button, Input } from "@/components/ui";
 import { useAuth, RegisterResult } from "@/lib/auth-context";
 import { safeRedirect } from "@/lib/safeRedirect";
 import { useBackendWarmup, useSlowHint } from "@/lib/useBackendWarmup";
 import { VerifyEmailStep, authErrorMessage } from "@/components/auth/VerifyEmailStep";
-import { Mail, Lock, User, Phone, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
+import { Mail, Lock, User, Phone, ArrowRight, AlertCircle } from "lucide-react";
 
 function RegisterForm() {
   const router = useRouter();
@@ -77,114 +78,39 @@ function RegisterForm() {
             <h2 className="text-2xl font-bold tracking-tight text-slate-900">
               {t("auth.signUpTitle")}
             </h2>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-sm text-slate-600">
               {t("auth.signUpSubtitle")}
             </p>
           </div>
 
           {error && (
-            <div className="mb-5 p-3 rounded-xl bg-rose-50 border border-rose-200 flex items-center gap-2 text-rose-800 text-xs font-medium">
-              <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+            <div role="alert" className="mb-5 flex items-start gap-2 rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-medium text-danger-800">
+              <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-danger-700" />
               <span>{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                {t("auth.displayName")}
-              </label>
-              <div className="relative">
-                <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                <input
-                  type="text"
-                  required
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder={t("auth.displayNamePlaceholder")}
-                  className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 text-sm outline-none transition-all"
-                />
-              </div>
-            </div>
+            <Input label={t("auth.displayName")} leading={<User className="h-4 w-4" />} type="text" required value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={t("auth.displayNamePlaceholder")} />
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                {t("auth.phone")}
-              </label>
-              <div className="relative">
-                <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                <input
-                  type="tel"
-                  required
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder={t("auth.phonePlaceholder")}
-                  className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 text-sm outline-none transition-all"
-                />
-              </div>
-            </div>
+            <Input label={t("auth.phone")} leading={<Phone className="h-4 w-4" />} type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={t("auth.phonePlaceholder")} />
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                {t("auth.email")}
-              </label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder={t("auth.emailPlaceholder")}
-                  className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 text-sm outline-none transition-all"
-                />
-              </div>
-            </div>
+            <Input label={t("auth.email")} leading={<Mail className="h-4 w-4" />} type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("auth.emailPlaceholder")} />
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                {t("auth.password")}
-              </label>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                <input
-                  type="password"
-                  required
-                  minLength={6}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={t("auth.passwordPlaceholder")}
-                  className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 text-sm outline-none transition-all"
-                />
-              </div>
-            </div>
+            <Input label={t("auth.password")} leading={<Lock className="h-4 w-4" />} type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.passwordPlaceholder")} />
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full mt-2 py-3 px-4 rounded-xl bg-brand-600 text-white font-bold text-sm hover:bg-brand-700 shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-60"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>{t("auth.signingUp")}</span>
-                </>
-              ) : (
-                <>
-                  <span>{t("auth.signUpButton")}</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-            {slow && <p className="text-[11px] text-center text-slate-500">{t("auth.wakingServer")}</p>}
+            <Button type="submit" size="lg" fullWidth disabled={loading} loading={loading} rightIcon={<ArrowRight aria-hidden="true" className="h-4 w-4" />}>
+              {loading ? t("auth.signingUp") : t("auth.signUpButton")}
+            </Button>
+            {slow && <p className="text-sm text-center text-slate-600">{t("auth.wakingServer")}</p>}
           </form>
 
           {/* Link to Login */}
-          <div className="mt-6 text-center text-xs text-slate-500">
+          <div className="mt-6 text-center text-sm text-slate-600">
             <span>{t("auth.haveAccount")} </span>
             <Link
               href={`/${lang}/login${redirectParam ? `?redirect=${encodeURIComponent(redirectParam)}` : ""}`}
-              className="text-brand-600 font-bold hover:underline"
+              className="inline-flex min-h-11 items-center text-brand-700 font-bold hover:underline sm:min-h-0"
             >
               {t("auth.signInButton")}
             </Link>
