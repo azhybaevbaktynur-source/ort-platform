@@ -4,7 +4,9 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, Uuid
+from sqlalchemy import (
+    Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, Uuid, event, text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -48,6 +50,17 @@ class Course(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
     grading_changed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     # set only when the late policy itself changes: late submissions computed before it are regrade targets
     late_policy_changed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # --- Phase 6 S1 begin --- (organizations and course templates, PHASE_6_DESIGN 2.1)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False
+    )
+    template_key: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    template_version: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    template_settings: Mapped[dict] = mapped_column(JSONType, nullable=False, default=dict,
+                                                    server_default=text("'{}'"))
+    template_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False,
+                                                  server_default=text("false"))
+    # --- Phase 6 S1 end ---
 
     __table_args__ = (
         CheckConstraint("grading_total_mode IN ('points','weighted')", name="grading_total_mode_valid"),
@@ -69,4 +82,15 @@ class Course(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
         Index("ix_courses_owner_id", "owner_id"),
         Index("ix_courses_status_created_at", "status", "created_at"),
         Index("ix_courses_deleted_at", "deleted_at"),
+        # --- Phase 6 S1 begin ---
+        CheckConstraint("(template_key IS NULL) = (template_version IS NULL)", name="template_version_matches_key"),
+        Index("ix_courses_organization_id_status_deleted_at", "organization_id", "status", "deleted_at"),
+        # --- Phase 6 S1 end ---
     )
+
+
+# --- Phase 6 S1 begin --- (a course written without an organization gets its owner's; design 4 step 6)
+from app.lms.organizations.defaults import course_org_listener  # noqa: E402
+
+event.listen(Course, "before_insert", course_org_listener)
+# --- Phase 6 S1 end ---

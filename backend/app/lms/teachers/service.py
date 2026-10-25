@@ -18,7 +18,13 @@ from app.models.user import User
 
 
 def can_create_courses(user: User) -> bool:
-    return user.teacher_status == "approved" and user.disabled_at is None
+    """Phase 6 S1 (PHASE_6_DESIGN 2.2): from organization memberships, not from teacher_status."""
+    from sqlalchemy.orm import object_session
+
+    from app.lms.organizations.service import can_create_courses as _can
+
+    db = object_session(user)
+    return db is not None and _can(db, user)
 
 
 def set_locale(db: Session, user: User, locale: str) -> User:
@@ -75,10 +81,13 @@ def approve(db: Session, admin: User, request_id: uuid.UUID, note: Optional[str]
     req.decided_at = utcnow()
     req.reason = note
     user.teacher_status = "approved"
+    org_id = _approve_personal_org(db, user)  # Phase 6 S1
     audit.record(
         db, actor=admin, action="teacher_request.approve", target_type="teacher_request",
         target_id=str(req.id), reason=note,
-        details={"user_id": user.id, "from": before, "to": "approved"}, request=request,
+        details={"user_id": user.id, "from": before, "to": "approved",
+                 "organization_id": str(org_id) if org_id else None},
+        request=request,
     )
     db.commit()
     return req
@@ -126,9 +135,33 @@ def set_teacher_status(
         if before != "approved":
             raise Conflict("Invalid transition", code="invalid_transition")
     user.teacher_status = status
+    # --- Phase 6 S1 begin --- approval creates (or resumes) the personal organization; revoke suspends it
+    details = {"from": before, "to": status}
+    if status == "approved":
+        org_id = _approve_personal_org(db, user)
+        details["organization_id"] = str(org_id) if org_id else None
+    else:
+        from app.lms.organizations.ids import personal_org_id
+        from app.lms.organizations.service import suspend_personal_org
+
+        suspend_personal_org(db, user, reason)
+        details["organization_id"] = str(personal_org_id(user.id))
+    # --- Phase 6 S1 end ---
     audit.record(
         db, actor=admin, action="user.teacher_status.set", target_type="user", target_id=user.id,
-        reason=reason, details={"from": before, "to": status}, request=request,
+        reason=reason, details=details, request=request,
     )
     db.commit()
     return user
+
+
+# --- Phase 6 S1 begin ---
+def _approve_personal_org(db: Session, user: User):
+    """Approval of an independent teacher: personal organization + org_admin membership, in the caller's
+    transaction (PHASE_6_DESIGN 7). Platform admins get none (they create courses in the platform org)."""
+    from app.lms.organizations.service import ensure_personal_org
+
+    if user.is_platform_admin:
+        return None
+    return ensure_personal_org(db, user)
+# --- Phase 6 S1 end ---

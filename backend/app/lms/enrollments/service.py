@@ -82,6 +82,12 @@ def _join(db: Session, user: User, course: Course, *, source: str,
     # open join) is never locked. Same 404 as below; the check after the lock stays authoritative.
     if not _joinable(course, source):
         raise _join_failure(db, ip_hash)
+    # --- Phase 6 S1 begin --- (suspended organization: the same generic answer as a wrong code)
+    from app.lms.organizations.models import Organization
+
+    if db.execute(select(Organization.status).where(Organization.id == course.organization_id)).scalar() != "active":
+        raise _join_failure(db, ip_hash)
+    # --- Phase 6 S1 end ---
     if course.enrollment_limit is not None:
         lock_course(db, course)
     else:

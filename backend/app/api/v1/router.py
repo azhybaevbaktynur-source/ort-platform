@@ -63,3 +63,11 @@ from app.lms.platform_admin.storage_router import router as _storage_router  # n
 
 api_router.include_router(_storage_router, prefix="/platform", tags=["Platform Admin"])
 # --- Phase 5 S4 end ---
+# --- Phase 6 S1 begin --- (organizations)
+from app.lms.organizations.router import me_router as _me_orgs_router, router as _org_router  # noqa: E402
+from app.lms.platform_admin.organizations_router import router as _platform_orgs_router  # noqa: E402
+
+api_router.include_router(_org_router, prefix="/org", tags=["Organizations"])
+api_router.include_router(_me_orgs_router, prefix="/me", tags=["Me"])
+api_router.include_router(_platform_orgs_router, prefix="/platform", tags=["Platform Admin"])
+# --- Phase 6 S1 end ---

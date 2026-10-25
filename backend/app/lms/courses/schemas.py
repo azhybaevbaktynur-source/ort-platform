@@ -36,6 +36,11 @@ class CourseCreateIn(BaseModel):
     enrollment_limit: Optional[int] = Field(default=None, ge=1, le=10000)
     starts_at: Optional[datetime] = None
     ends_at: Optional[datetime] = None
+    # --- Phase 6 S1 begin --- (PHASE_6_DESIGN 2.2: organization, assigned owner, course template)
+    organization_id: Optional[uuid.UUID] = None
+    owner_id: Optional[str] = Field(default=None, min_length=1, max_length=64)
+    template_key: Optional[str] = Field(default=None, min_length=1, max_length=32)
+    # --- Phase 6 S1 end ---
 
     @model_validator(mode="after")
     def _p1_18(self):
@@ -111,7 +116,12 @@ class CourseStudentOut(BaseModel):
     starts_at: Optional[datetime] = None
     ends_at: Optional[datetime] = None
     owner_display_name: str
-    my_enrollment: MyEnrollmentOut
+    # Phase 6 S1: None only for an org admin viewing a course of their organization without an enrollment
+    my_enrollment: Optional[MyEnrollmentOut] = None
+    # --- Phase 6 S1 begin ---
+    organization_id: uuid.UUID
+    organization_name: str
+    # --- Phase 6 S1 end ---
 
 
 class CourseStaffOut(CourseStudentOut):
@@ -162,17 +172,19 @@ def course_card(course, my_role: Optional[str], owner_display_name: Optional[str
     )
 
 
-def course_student_out(course, enrollment, owner) -> CourseStudentOut:
+def course_student_out(course, enrollment, owner, organization_name: str = "") -> CourseStudentOut:
     return CourseStudentOut(
         id=course.id, title=course.title, description=course.description, languages=list(course.languages),
         default_language=course.default_language, status=course.status, starts_at=course.starts_at,
         ends_at=course.ends_at, owner_display_name=public_display_name(owner),
-        my_enrollment=MyEnrollmentOut.model_validate(enrollment),
+        my_enrollment=MyEnrollmentOut.model_validate(enrollment) if enrollment is not None else None,
+        organization_id=course.organization_id, organization_name=organization_name,
     )
 
 
-def course_staff_out(course, enrollment, owner, active_student_count: int, viewer_id: str) -> CourseStaffOut:
-    base = course_student_out(course, enrollment, owner).model_dump()
+def course_staff_out(course, enrollment, owner, active_student_count: int, viewer_id: str,
+                     organization_name: str = "") -> CourseStaffOut:
+    base = course_student_out(course, enrollment, owner, organization_name).model_dump()
     base["owner_display_name"] = staff_display_name(owner)
     return CourseStaffOut(
         **base, join_code=course.join_code, enrollment_mode=course.enrollment_mode,

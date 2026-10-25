@@ -180,6 +180,12 @@ class Settings(BaseSettings):
     ORT_SEED_SAMPLES: bool | None = None
     # --- Phase 5 S1 end ---
 
+    # --- Phase 6 S1 begin --- (organizations, docs/phases/PHASE_6_DESIGN.md section 4 step 1)
+    # Placeholders for the platform organization; the owner renames it with PATCH /platform/organizations/{id}.
+    PLATFORM_ORG_NAME: str = "Platform"
+    PLATFORM_ORG_SLUG: str = "platform"
+    # --- Phase 6 S1 end ---
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 

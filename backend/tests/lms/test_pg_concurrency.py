@@ -109,6 +109,11 @@ def _mk_user(s: Session, n: int, teacher=False) -> str:
     s.add(User(id=uid, email=f"{uid}@test.example", password_hash="x", email_verified=True,
                teacher_status="approved" if teacher else "none"))
     s.commit()
+    if teacher:  # Phase 6 S1: an approved independent has a personal organization (approval / migration 0008)
+        from app.lms.organizations.defaults import ensure_personal_org
+
+        ensure_personal_org(s.connection(), uid, None, False, with_membership=True)
+        s.commit()
     return uid
 
 

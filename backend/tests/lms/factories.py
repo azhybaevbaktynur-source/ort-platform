@@ -40,6 +40,13 @@ def make_user(
     )
     db.add(user)
     db.commit()
+    # --- Phase 6 S1 begin --- an approved independent teacher has a personal organization (approval/migration)
+    if teacher_status == "approved" and not platform_admin:
+        from app.lms.organizations.defaults import ensure_personal_org
+
+        ensure_personal_org(db.connection(), user.id, display_name, disabled, with_membership=True)
+        db.commit()
+    # --- Phase 6 S1 end ---
     return user
 
 
