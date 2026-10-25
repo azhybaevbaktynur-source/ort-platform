@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { joinByCode, normalizeJoinCode } from "@/lib/lms/courses";
 import type { JoinOut } from "@/lib/lms/types";
+import { Button } from "@/components/ui";
 import { JoinCodeInput } from "./JoinCodeInput";
 
 /**
@@ -42,7 +43,7 @@ export function JoinCodeForm({ initialCode = "", onJoined }: { initialCode?: str
 
   return (
     <form onSubmit={submit} className="space-y-4" noValidate>
-      <p id="join-hint" className="text-sm text-slate-600">{t("courses.join.hint")}</p>
+      <p id="join-hint" className="text-base leading-6 text-slate-600 sm:text-sm">{t("courses.join.hint")}</p>
       <JoinCodeInput value={code} onChange={setCode} disabled={busy} invalid={!!errKey} describedBy={errKey ? "join-error" : "join-hint"} />
       {errKey && (
         <p id="join-error" role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-800">
@@ -50,10 +51,10 @@ export function JoinCodeForm({ initialCode = "", onJoined }: { initialCode?: str
           {retry !== null && <span className="block text-xs">{t("lms.common.retryAfter", { seconds: retry })}</span>}
         </p>
       )}
-      <button type="submit" disabled={busy || code.length < 8}
-        className="w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
-        {busy ? t("lms.common.loading") : t("courses.join.submit")}
-      </button>
+      {/* Phase 6b S6b: design-system button (44 px+, spinner while joining) */}
+      <Button type="submit" size="lg" fullWidth loading={busy} disabled={code.length < 8}>
+        {t("courses.join.submit")}
+      </Button>
     </form>
   );
 }
