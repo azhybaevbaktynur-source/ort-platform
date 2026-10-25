@@ -1,6 +1,6 @@
 # Exam template constructor: evaluation and design (architect, 2026-10-24)
 
-**Status**: evaluation for the owner's review; no code. Source: owner brief 2026-10-24 #2 ("New feature: an exam template constructor"). Related: `docs/phases/PHASE_6_DESIGN.md` §5 (course templates), `docs/LMS_ARCHITECTURE.md` §2b, §5, §6, `docs/IMPLEMENTATION_PLAN.md` Phases 7b and 8b (proposed placement), `docs/PRODUCT_DECISIONS.md` "Owner decisions 2026-10-24 (second round)". ORT stays one special fixed template exactly as today and is **not** rebuilt on the constructor (owner decision); §8 lists what the constructor would need to express ORT, for a later decision.
+**Status**: **approved by the owner 2026-10-25** (all recommendations accepted; `PRODUCT_DECISIONS.md` "Owner decisions 2026-10-25 (third round)"). Implementation: Phase 7b (data model) and 8b (visual constructor). Source: owner brief 2026-10-24 #2 ("New feature: an exam template constructor"). Related: `docs/phases/PHASE_6_DESIGN.md` §5 (course templates), `docs/LMS_ARCHITECTURE.md` §2b, §5, §6, `docs/IMPLEMENTATION_PLAN.md` Phases 7b and 8b (proposed placement), `docs/PRODUCT_DECISIONS.md` "Owner decisions 2026-10-24 (second round)". ORT stays one special fixed template exactly as today and is **not** rebuilt on the constructor (owner decision); §8 lists what the constructor would need to express ORT, for a later decision.
 
 Every file and symbol named below was checked against the code on branch `lms` at the time of writing; "today" means that code.
 
@@ -251,7 +251,7 @@ Dependencies: 7b needs 6a (organizations, `assert_not_locked`, `CourseOut.templa
 
 ---
 
-## 10. Alternatives to discuss (owner decides)
+## 10. Alternatives (decided by the owner 2026-10-25: every recommendation below is adopted)
 
 | # | Topic | Owner's version | Alternative | Pros / cons | Recommendation |
 |---|---|---|---|---|---|
@@ -270,11 +270,14 @@ Dependencies: 7b needs 6a (organizations, `assert_not_locked`, `CourseOut.templa
 
 ---
 
-## 11. Open questions for the owner
+## 11. Owner answers (2026-10-25)
 
-1. Placement as 7b (data model, save-as-template, general import format) and 8b (visual constructor, scrolling mode): agreed, or renumber (B10)?
-2. B2: is "save this assessment as a template" an acceptable first authoring path before the visual constructor?
-3. B3: one general import format with template validation (recommended) or a generated file format per template?
-4. B4/B11: platform exam templates visible to every organization without grants?
-5. Should org admins be able to lock a template so that **teachers of the org** cannot change the exam structure (the same lock as ORT), or is locking a platform-admin power only? Proposal: the template's owner scope decides (org admins lock org templates; platform admins lock platform templates).
-6. B9: run the ORT expressibility dry-run test from 7b on as part of the ORT review (no switch)?
+1. Placement: keep the lettered sub-phases 7b and 8b (B10).
+2. B2: yes, "save as template" ships in 7b.
+3. B3: yes, one general import format validated against the template; the ORT CSV/zip format stays unchanged as the `ort` profile.
+4. B4/B11: yes, platform templates (structure only, no questions) are visible to everyone without a grant; the ORT course template stays grant-only; organization and teacher templates stay private to their organization.
+5. Locking: the template's owner (platform admin for platform templates, org admins for organization templates, the teacher for their own).
+6. B9: yes, the ORT dry-run expressibility test runs from 7b on as part of the ORT review.
+7. Invitation emails (Phase 6a): Reply-To = the inviter's email.
+
+Also B5 yes (teacher scope in the 7b model), B1 no (ORT stays on the preset path), B6/B7/B8/B12 as recommended.

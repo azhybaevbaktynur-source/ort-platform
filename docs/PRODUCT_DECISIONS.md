@@ -282,4 +282,24 @@ Architect evaluation (`phases/EXAM_TEMPLATES_DESIGN.md`): the design **holds up*
 
 ### E. Status
 
-H1 released. Phase 6 design (second draft) and the constructor evaluation wait for the owner's review. No other code until then.
+H1 released. Superseded by the third round below: the owner approved the Phase 6 design and the constructor evaluation on 2026-10-25.
+
+
+## Owner decisions 2026-10-25 (third round): exam templates approved, start Phase 6a
+
+Source: the owner's written answers of 2026-10-25 (verbatim copy kept by the orchestrator). The owner agrees with all recommendations of `phases/EXAM_TEMPLATES_DESIGN.md` §10–§11. Applied to `phases/EXAM_TEMPLATES_DESIGN.md` (§10 decided, §11 answered), `IMPLEMENTATION_PLAN.md` (7b, 8b, D24, Alternatives) and `phases/PHASE_6_DESIGN.md` (§7 invitation Reply-To, §11).
+
+| # | Topic | Decision |
+|---|---|---|
+| Q1 / B10 | Phase numbering | Keep the lettered sub-phases **7b** (data model) and **8b** (visual constructor). |
+| Q2 / B2 | First authoring path | Ship **"save as template"** in 7b; the visual constructor follows in 8b. |
+| Q3 / B3 | Import format | **One general import format validated against the template**. The ORT CSV/zip format stays unchanged as the `ort` profile. |
+| Q4 / B4 / B11 | Platform templates | Platform exam templates (structure only, no questions) are **visible to everyone without a grant**. The ORT **course** template stays grant-only. Organization and teacher templates stay private to their organization. |
+| Q5 | Who may lock | The template's owner: the platform admin for platform templates, org admins for organization templates, the teacher for their own. |
+| Q6 / B9 | ORT expressibility | Run the ORT dry-run test from 7b on, as part of the ORT review (no switch of ORT). |
+| Q7 | Invitation emails | **Reply-To = the inviter's email** (the From stays "{inviter} via {appName}" at the configured sender address). |
+| B5 | Teacher-owned templates | Yes, in the 7b data model from the start. |
+| B1 | Presets vs templates | No: ORT stays on its current `preset` path. |
+| B6, B7, B8, B12 | Other alternatives | The agent's recommendations: JSON spec in the immutable version; `min_items`/`max_items`; scrolling mode column in 7b, player in 8b; ORT exactly as today. |
+
+**Working mode from here** (owner): start Phase 6a and continue phase by phase, with the ORT review and the UX gate in every phase and all rules of `HANDOFF_NEXT_AGENT.md` and this file. **Checkpoints**: stop after **6a, 6b, 7b and 8b** are deployed and give the owner a short review list (what changed, URLs to open, what to try, screenshots to look at); continue only after the owner's OK. Between checkpoints (for example 7a, 8a) the agent does not wait. Also stop for the usual stop conditions (Neon data deletion, spending money, secrets) or when a design question would change ORT's behaviour or contradict a decision: then write it under "Alternatives to discuss" and ask.
