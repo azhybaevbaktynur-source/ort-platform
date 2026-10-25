@@ -27,27 +27,21 @@ function ResetPasswordForm() {
 
     if (!token) {
       setError(
-        lang === "ky"
-          ? "Жараксыз шилтеме же токен табылган жок"
-          : "Недействительная ссылка или токен не найден"
+        t("auth.resetInvalidToken")
       );
       return;
     }
 
     if (newPassword !== confirmPassword) {
       setError(
-        lang === "ky"
-          ? "Сырсөздөр бири-бирине дал келбейт"
-          : "Пароли не совпадают"
+        t("auth.passwordsMismatch")
       );
       return;
     }
 
     if (newPassword.length < 6) {
       setError(
-        lang === "ky"
-          ? "Сырсөз кеминде 6 белгиден турушу керек"
-          : "Пароль должен содержать не менее 6 символов"
+        t("auth.passwordTooShort")
       );
       return;
     }
@@ -66,12 +60,12 @@ function ResetPasswordForm() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || "Failed to reset password");
+        throw new Error(err.detail || t("auth.resetFailed"));
       }
 
       setSuccess(true);
     } catch (err: any) {
-      setError(err?.message || "Failed to reset password");
+      setError(err?.message || t("auth.resetFailed"));
     } finally {
       setLoading(false);
     }
@@ -96,9 +90,7 @@ function ResetPasswordForm() {
             <div className="mb-5 p-3 rounded-xl bg-warning-50 border border-warning-200 text-warning-900 text-sm font-medium flex items-center gap-2">
               <AlertCircle aria-hidden="true" className="w-4 h-4 text-warning-700 shrink-0" />
               <span>
-                {lang === "ky"
-                  ? "Сырсөздү калыбына келтирүү токени табылган жок. Шилтемени кайра сураңыз."
-                  : "Токен сброса пароля отсутствует. Запросите новую ссылку для сброса."}
+                {t("auth.resetTokenMissing")}
               </span>
             </div>
           )}
@@ -116,7 +108,7 @@ function ResetPasswordForm() {
                 <CheckCircle2 aria-hidden="true" className="w-5 h-5 text-success-700 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-semibold text-success-900 mb-1">
-                    {lang === "ky" ? "Сырсөз жаңыртылды!" : "Пароль обновлен!"}
+                    {t("auth.passwordUpdated")}
                   </p>
                   <p className="text-success-800 leading-relaxed">
                     {t("auth.passwordResetSuccess")}
@@ -159,9 +151,14 @@ function ResetPasswordForm() {
   );
 }
 
+function LoadingFallback() {
+  const { t } = useTranslation();
+  return <div className="min-h-screen flex items-center justify-center">{t("common.loading")}</div>;
+}
+
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+    <Suspense fallback={<LoadingFallback />}>
       <ResetPasswordForm />
     </Suspense>
   );
