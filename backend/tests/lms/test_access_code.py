@@ -53,18 +53,19 @@ async def test_set_and_clear_through_patch(db, api):
 
 async def test_invalid_codes_rejected_without_echo(db, api):
     q = make_quiz(db)
-    for bad in ("abc", "x" * 33, "кодкод", "tab\tcode", "   ", "y" * 65):
+    for bad in ("abc", "abcde", "x" * 33, "кодкод", "tab\tcode", "   ", "y" * 65):
         r = await set_code(api, db, q, bad)
         assert r.status_code == 422, bad
         assert bad.strip() not in r.text or len(bad.strip()) == 0
 
 
-async def test_editable_on_ort_preset(db, api):
+async def test_refused_on_ort_preset(db, api):
+    """Security review 7a / owner question Q4: no access codes on ORT preset exams (test_security_7a)."""
     q = make_quiz(db)
     q.assessment.preset = "ort_main"
     db.commit()
     r = await set_code(api, db, q, CODE)
-    assert r.status_code == 200 and r.json()["has_access_code"] is True
+    assert r.status_code == 409 and r.json()["error"]["code"] == "template_locked"
 
 
 async def test_start_gate(db, api, frozen_clock):

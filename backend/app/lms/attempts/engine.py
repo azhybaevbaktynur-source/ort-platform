@@ -623,7 +623,8 @@ def _resume(db: Session, user, attempt_id, now: datetime) -> Optional[AttemptSta
 
 
 def start_attempt(db: Session, ctx: AuthzContext, course: Course, aid, data: StartIn, *, now: datetime,
-                  version: Any = None, fresh: bool = False) -> tuple[AttemptStateOut, bool]:
+                  version: Any = None, fresh: bool = False, ip_hash: Optional[str] = None
+                  ) -> tuple[AttemptStateOut, bool]:
     """Returns (state, created). Authorization (load_course + require ASSESSMENT_TAKE) is done by the caller.
     Staff always get a preview attempt (P3-18). `version`/`fresh` serve the preview route of the builder."""
     user = ctx.user
@@ -676,7 +677,7 @@ def start_attempt(db: Session, ctx: AuthzContext, course: Course, aid, data: Sta
                            details={"reason": "not_open_yet"})
         if au is not None and now >= au:
             raise Conflict("Assessment is closed", code="assessment_not_available", details={"reason": "closed"})
-        accommodations.check_access_code(user.id, assessment, data.access_code)
+        accommodations.check_access_code(user.id, assessment, data.access_code, ip_hash)
         counted = [r for r in rows if not r.is_preview and r.status != "void"]
         if eff.allowed_attempts != -1 and len(counted) >= eff.allowed_attempts:
             raise Conflict("No attempts left", code="attempts_exhausted")

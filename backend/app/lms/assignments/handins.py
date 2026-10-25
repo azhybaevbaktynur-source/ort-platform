@@ -113,19 +113,25 @@ def is_graded_latest(sub, latest: Optional[AssignmentSubmission]) -> bool:
     return graded_item is not None and graded_item == latest.id and raw is not None
 
 
+def _released(sub) -> bool:
+    return (sub["released_at"] if isinstance(sub, dict) else sub.released_at) is not None
+
+
 def file_count(hand_ins: Sequence[AssignmentSubmission]) -> int:
     return sum(1 for h in hand_ins if h.kind == "file")
 
 
 def hand_in_block(assignment: Assignment, eff: EffectiveDates, sub, hand_ins: Sequence[AssignmentSubmission],
                   now: datetime) -> Optional[str]:
-    """Why a new hand-in is refused right now (None = accepted)."""
+    """Why a new hand-in is refused right now (None = accepted). Student-facing: a grade of the latest hand-in blocks
+    only once released, so an unreleased grade is not revealed and does not stop a resubmission (security review
+    7a); staff views read the true state through `is_graded_latest`."""
     if assignment.kind not in HAND_IN_KINDS:
         return "hand_in_not_accepted"
     w = window_reason(eff, now)
     if w is not None:
         return w
-    if is_graded_latest(sub, hand_ins[-1] if hand_ins else None):
+    if is_graded_latest(sub, hand_ins[-1] if hand_ins else None) and _released(sub):
         return "already_graded"
     if assignment.kind == "file" and file_count(hand_ins) >= settings.SUBMISSION_FILES_PER_ASSIGNMENT_MAX:
         return "limit_reached"
@@ -207,9 +213,10 @@ def own_submission(db: Session, assignment_id: uuid.UUID, enrollment_id: uuid.UU
 
 # ------------------------------------------------------------------ hand in
 
-def _usable_asset(db: Session, ctx: AuthzContext, asset_id: uuid.UUID) -> Asset:
+def _usable_asset(db: Session, ctx: AuthzContext, course: Course, asset_id: uuid.UUID) -> Asset:
     a = db.get(Asset, asset_id)
-    if (a is None or a.owner_id != ctx.user.id or a.deleted_at is not None or a.visibility != "private"
+    if (a is None or a.owner_id != ctx.user.id or a.course_id != course.id or a.deleted_at is not None
+            or a.visibility != "private"
             or a.kind not in ("file", "image")):
         raise ValidationFailed("The file cannot be handed in", code="asset_not_usable")
     return a
@@ -259,7 +266,7 @@ def hand_in(db: Session, ctx: AuthzContext, course: Course, assignment_id: uuid.
     w = window_reason(eff, now)
     if w is not None:
         raise_block(w)
-    asset = _usable_asset(db, ctx, data.asset_id) if a.kind == "file" else None
+    asset = _usable_asset(db, ctx, course, data.asset_id) if a.kind == "file" else None
 
     sub = lock_or_create_submission(db, course_id=course.id, assignment_id=a.id, enrollment_id=enr.id,
                                     user_id=ctx.user.id, now=now)

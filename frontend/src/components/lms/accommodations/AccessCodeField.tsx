@@ -6,7 +6,7 @@
 import React, { useId, useState } from "react";
 import { Eye, EyeOff, KeyRound } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
-import { ACCESS_CODE_MAX, accessCodeIssue } from "@/lib/lms/accommodations";
+import { ACCESS_CODE_MAX, ACCESS_CODE_MIN, accessCodeIssue } from "@/lib/lms/accommodations";
 import { Badge, Button, IconButton, Input } from "@/components/ui";
 
 export function accessCodeError(value: string | null | undefined): string | null {
@@ -46,7 +46,7 @@ export function AccessCodeField({ hasCode, value, onChange, disabled }: {
       {editing && (
         <div className="space-y-2">
           <Input id={`${id}-code`} label={t("accommodations.accessCode.label")} optional={!hasCode} type={show ? "text" : "password"}
-            autoComplete="off" spellCheck={false} maxLength={ACCESS_CODE_MAX + 8}
+            autoComplete="off" spellCheck={false} minLength={ACCESS_CODE_MIN} maxLength={ACCESS_CODE_MAX + 8}
             value={value ?? ""} onChange={(e) => onChange(e.target.value === "" && !hasCode ? undefined : e.target.value)}
             hint={t("accommodations.accessCode.rules")}
             error={value && issue ? t(`accommodations.accessCode.issues.${issue}`) : undefined}

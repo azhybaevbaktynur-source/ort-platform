@@ -312,7 +312,7 @@ export const ASSESSMENT_ERROR_CODES = [
   "item_type_not_allowed", "item_language_mismatch", "item_duplicate", "passage_mismatch", "publish_invalid",
   "confirm_required", "not_published", "attempts_in_progress", "assessment_not_available", "attempts_exhausted",
   "language_not_available", "question_not_found", "bank_not_found", "passage_not_found", "not_deleted",
-  "not_implemented", "validation_failed", "unsupported_type",
+  "not_implemented", "validation_failed", "unsupported_type", "access_code_too_short",
 ] as const;
 export type AssessmentErrorCode = (typeof ASSESSMENT_ERROR_CODES)[number];
 

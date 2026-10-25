@@ -82,9 +82,9 @@ class AssessmentUpdateIn(_In):
     def _access_code(self):
         if self.access_code is not None:
             code = self.access_code.strip()
-            if not (4 <= len(code) <= 32) or any(not (0x20 <= ord(ch) <= 0x7E) for ch in code):
-                raise ValueError("access_code must be 4-32 printable ASCII characters")  # never echo the value
-            self.access_code = code
+            if len(code) > 32 or any(not (0x20 <= ord(ch) <= 0x7E) for ch in code):
+                raise ValueError("access_code must be 6-32 printable ASCII characters")  # never echo the value
+            self.access_code = code  # shorter than 6: 422 `access_code_too_short` from the builder
         return self
     # --- Phase 7a S4 end ---
 

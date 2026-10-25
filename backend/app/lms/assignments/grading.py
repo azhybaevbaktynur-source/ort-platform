@@ -235,8 +235,9 @@ def _rubric(data: gs.ManualGradeIn, criteria: list, points: Optional[Decimal]) -
     return rows
 
 
-def _feedback_asset(db: Session, ctx: AuthzContext, asset_id) -> uuid.UUID:
+def _feedback_asset(db: Session, ctx: AuthzContext, course: Course, asset_id) -> uuid.UUID:
     a = db.execute(select(Asset.id).where(Asset.id == asset_id, Asset.owner_id == ctx.user.id,
+                                          Asset.course_id == course.id,  # security review 7a
                                           Asset.visibility == "private", Asset.deleted_at.is_(None))).first()
     if a is None:
         raise ValidationFailed("This file cannot be attached as feedback", code="asset_not_usable")
@@ -267,7 +268,7 @@ def grade_manual(db: Session, ctx: AuthzContext, course: Course, assignment_id, 
     fields_set = data.model_fields_set
     feedback_asset_id = None
     if data.feedback_asset_id is not None:
-        feedback_asset_id = _feedback_asset(db, ctx, data.feedback_asset_id)
+        feedback_asset_id = _feedback_asset(db, ctx, course, data.feedback_asset_id)
 
     sub = subs.lock_or_create_submission(db, course_id=course.id, assessment_id=None, assignment_id=arow.id,
                                          enrollment_id=enr.id, user_id=enr.user_id,

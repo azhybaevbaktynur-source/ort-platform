@@ -8,6 +8,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from types import SimpleNamespace
 from typing import Optional, Sequence
 
 from sqlalchemy import and_, case, func, or_, select
@@ -364,7 +365,8 @@ def list_staff(db: Session, course: Course, *, cursor: Optional[str], limit: Opt
 class _Mine:
     """The caller's per-assignment state for one page (a fixed number of queries per page)."""
 
-    def __init__(self, db: Session, enrollment: Optional[Enrollment], user_id: str, rows: list[Assignment]):
+    def __init__(self, db: Session, enrollment: Optional[Enrollment], user_id: str, rows: list[Assignment],
+                 now: Optional[datetime] = None):
         self.enrollment = enrollment
         ids = [a.id for a in rows]
         self.overrides: dict = {}
@@ -375,6 +377,7 @@ class _Mine:
         self.used: dict = {}
         self.open: dict = {}
         self.attempted: dict = {}
+        self.results_visible: set = set()  # assignment ids whose grade the caller may see now (security review 7a)
         if enrollment is None or not ids:
             return
         self.accommodation = db.get(EnrollmentAccommodation, enrollment.id)
@@ -387,9 +390,14 @@ class _Mine:
                 .order_by(AssignmentSubmission.assignment_id, AssignmentSubmission.attempt_no)).scalars():
             self.hand_ins.setdefault(h.assignment_id, []).append(h)
         quiz = {a.assessment_id: a.id for a in rows if a.kind == "quiz" and a.assessment_id is not None}
+        quiz_rows = []
         if quiz:
-            self.allowed = {quiz[x]: n for x, n in db.execute(select(Assessment.id, Assessment.allowed_attempts)
-                                                               .where(Assessment.id.in_(list(quiz))))}
+            for x, n, policy, until in db.execute(select(
+                    Assessment.id, Assessment.allowed_attempts, Assessment.results_policy, Assessment.available_until)
+                    .where(Assessment.id.in_(list(quiz)))):
+                self.allowed[quiz[x]] = n
+                quiz_rows.append(SimpleNamespace(id=quiz[x], kind="quiz", assessment_id=x, results_policy=policy,
+                                                 available_until=until))
             for x, status in db.execute(select(Attempt.assessment_id, Attempt.status).where(
                     Attempt.user_id == user_id, Attempt.assessment_id.in_(list(quiz)),
                     Attempt.is_preview.is_(False))):
@@ -400,6 +408,11 @@ class _Mine:
                     self.open[aid] = True
                 elif status != "void":
                     self.attempted[aid] = True
+        # Same rule as `/grades/mine` and `/me/home` (results_policy): non-quiz kinds always (release gates them).
+        from app.lms.grading.gradebook import visible_column_ids
+
+        self.results_visible = {a.id for a in rows if a.kind != "quiz"} | visible_column_ids(
+            db, quiz_rows, now or clock.now())
 
     def attempts_left(self, a: Assignment) -> Optional[int]:
         if a.kind != "quiz" or a.id not in self.allowed:
@@ -414,14 +427,14 @@ class _Mine:
 
 
 def student_status(a: Assignment, sub: Optional[Submission], hand_ins: list, *, open_attempt: bool,
-                   attempted: bool, due_at: Optional[datetime], now: datetime) -> str:
+                   attempted: bool, due_at: Optional[datetime], now: datetime, results_visible: bool = True) -> str:
     """not_started | in_progress | submitted | graded | missing | excused (the caller's own view; `graded` only
-    once the grade is released)."""
+    once the grade is released and, for quizzes, the results policy shows results now)."""
     if sub is not None and sub.state == "excused":
         return "excused"
     if open_attempt:
         return "in_progress"
-    if sub is not None and sub.released_at is not None and sub.state == "graded" and (
+    if results_visible and sub is not None and sub.released_at is not None and sub.state == "graded" and (
             sub.effective_points is not None or sub.raw_points is not None):
         return "graded"
     if hand_ins or attempted or (sub is not None and sub.state == "pending_review"):
@@ -439,7 +452,8 @@ def _student_item(a: Assignment, mine: _Mine, now: datetime, cls=sch.AssignmentS
     status = None
     if mine.enrollment is not None:
         status = student_status(a, mine.subs.get(a.id), hs, open_attempt=bool(mine.open.get(a.id)),
-                                attempted=bool(mine.attempted.get(a.id)), due_at=eff.due_at, now=now)
+                                attempted=bool(mine.attempted.get(a.id)), due_at=eff.due_at, now=now,
+                                results_visible=a.id in mine.results_visible)
     return cls(
         id=a.id, kind=a.kind, assessment_id=a.assessment_id, title=a.title or {}, points_possible=_f(a.points_possible),
         due_at=eff.due_at, available_from=eff.available_from, available_until=eff.available_until,
@@ -459,8 +473,8 @@ def list_student(db: Session, ctx: AuthzContext, course: Course, *, cursor: Opti
                                          id_col=Assignment.id, entity_of=lambda r: r[0], cursor=cursor,
                                          limit=min(limit or 25, MAX_PAGE), descending=False)
     items = [r[0] for r in rows]
-    mine = _Mine(db, _student_enrollment(db, ctx, course), ctx.user.id, items)
     now = clock.now()
+    mine = _Mine(db, _student_enrollment(db, ctx, course), ctx.user.id, items, now)
     return [_student_item(a, mine, now) for a in items], nxt
 
 
@@ -473,9 +487,10 @@ def limits_out() -> sch.HandInLimitsOut:
         max_file_hand_ins=settings.SUBMISSION_FILES_PER_ASSIGNMENT_MAX, accepted_mimes=list(ACCEPTED_MIMES))
 
 
-def _grade_out(db: Session, sub: Optional[Submission]) -> Optional[sch.StudentGradeOut]:
-    """Only a released grade, and only the caller's own (the caller loaded `sub` by its own enrollment)."""
-    if sub is None or sub.released_at is None or sub.state not in ("graded", "excused"):
+def _grade_out(db: Session, sub: Optional[Submission], visible: bool = True) -> Optional[sch.StudentGradeOut]:
+    """Only a released grade whose results the policy shows now (`visible`), and only the caller's own (the caller
+    loaded `sub` by its own enrollment)."""
+    if not visible or sub is None or sub.released_at is None or sub.state not in ("graded", "excused"):
         return None
     scores = db.execute(select(SubmissionRubricScore).where(SubmissionRubricScore.submission_id == sub.id)).scalars()
     return sch.StudentGradeOut(
@@ -492,8 +507,8 @@ def student_detail(db: Session, ctx: AuthzContext, course: Course, assignment_id
                    ) -> sch.AssignmentStudentDetailOut:
     a = handins.load_visible(db, course, assignment_id)
     enr = _student_enrollment(db, ctx, course)
-    mine = _Mine(db, enr, ctx.user.id, [a])
     now = clock.now()
+    mine = _Mine(db, enr, ctx.user.id, [a], now)
     rubric = [criterion_out(c) for c in live_criteria(db, a.id)] if a.kind != "quiz" else []
     if enr is None:
         return _student_item(a, mine, now, sch.AssignmentStudentDetailOut, description=a.description, rubric=rubric)
@@ -507,7 +522,7 @@ def student_detail(db: Session, ctx: AuthzContext, course: Course, assignment_id
             reason = "course_not_active"
     return _student_item(
         a, mine, now, sch.AssignmentStudentDetailOut, description=a.description, rubric=rubric,
-        hand_ins=[handins.hand_in_out(h, assets.get(h.asset_id)) for h in hs], grade=_grade_out(db, sub),
+        hand_ins=[handins.hand_in_out(h, assets.get(h.asset_id)) for h in hs], grade=_grade_out(db, sub, a.id in mine.results_visible),
         can_hand_in=a.kind in handins.HAND_IN_KINDS and reason is None, reason=reason,
         limits=limits_out() if a.kind in handins.HAND_IN_KINDS else None)
 
