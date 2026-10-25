@@ -54,6 +54,20 @@ def _ensure_organizations() -> None:
 # --- Phase 6 S1 end ---
 
 
+# --- Phase 7a S1 begin ---
+def _ensure_assignments() -> None:
+    """Phase 7a quiz assignments bootstrap (PHASE_7A_DESIGN 2.9), idempotent; never fatal."""
+    from app.db.session import SessionLocal
+    from app.lms.assignments.bootstrap import ensure_assignments
+
+    db = SessionLocal()
+    try:
+        ensure_assignments(db)
+    finally:
+        db.close()
+# --- Phase 7a S1 end ---
+
+
 def _seed_ort_courses() -> None:
     """Phase 5 ORT courses and the conversion of legacy_ort_export (P5-2); never fatal (ensure_ort_courses logs
     and stores every failure itself)."""
@@ -84,6 +98,7 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Database startup initialization notice: {e}")
     _seed_grading_schemes()
     _ensure_organizations()  # Phase 6 S1: after the schemes, before the ORT courses
+    _ensure_assignments()  # Phase 7a S1: after the organizations, before the ORT courses
     _seed_ort_courses()
     if is_production():
         if settings.SECRET_KEY == DEFAULT_SECRET_KEY:

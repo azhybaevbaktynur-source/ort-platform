@@ -25,6 +25,20 @@ _TYPE_CHECK = "type IN ('points','percent','bands','pass_fail','piecewise_curve'
 SUBMISSION_STATES = ("pending_review", "graded", "excused", "no_attempts")
 GRADE_EVENTS = ("override", "override_cleared", "excused", "unexcused", "released", "unreleased", "regraded",
                 "attempt_voided")
+# --- Phase 7a S1 begin --- (PHASE_7A_DESIGN 2.3 step 5: manual grades of none/text/file assignments)
+GRADE_EVENTS = GRADE_EVENTS + ("manual_grade",)
+_EVENT_CHECK = "event IN (" + ",".join(f"'{e}'" for e in GRADE_EVENTS) + ")"
+
+
+def _quiz_assignment_default(context):
+    """submissions.assignment_id of a quiz row = assignment_id_for(assessment_id): the deterministic id the builder,
+    the bootstrap and migration 0009 give every assessment's quiz assignment. So the Phase 4 insert paths (the
+    attempt-scored hook, `lock_or_create_submission`) stay unchanged; non-quiz rows pass assignment_id."""
+    from app.lms.assignments.ids import assignment_id_for
+
+    aid = context.get_current_parameters().get("assessment_id")
+    return assignment_id_for(aid) if aid is not None else None
+# --- Phase 7a S1 end ---
 _KEY_SET = text("key IS NOT NULL")
 
 
@@ -102,15 +116,36 @@ class GradeCategory(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
 
 
 class Submission(UUIDPKMixin, TimestampMixin, Base):
-    """One row per (enrollment, assessment): the kept result (P4-7). Never deleted."""
+    """One row per (enrollment, assignment): the kept result (P4-7). Never deleted. Phase 7a: `assignment_id` is the
+    identity; `assessment_id` is the denormalized quiz shortcut (P7-1, NULL for none/text/file assignments)."""
     __tablename__ = "submissions"
 
     course_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("courses.id", ondelete="RESTRICT"), nullable=False
     )
-    assessment_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("assessments.id", ondelete="RESTRICT"), nullable=False
+    # --- Phase 7a S1 begin --- (assessment_id nullable since 0009; assignment_id and the grading columns)
+    assessment_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("assessments.id", ondelete="RESTRICT"), nullable=True
     )
+    assignment_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("assignments.id", ondelete="RESTRICT"), nullable=False,
+        default=_quiz_assignment_default,
+    )
+    feedback_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    feedback_asset_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("assets.id", ondelete="SET NULL"), nullable=True
+    )
+    graded_item_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("assignment_submissions.id", ondelete="SET NULL", use_alter=True,
+                   name="fk_submissions_graded_item_id_assignment_submissions"),
+        nullable=True,
+    )
+    graded_by_id: Mapped[Optional[str]] = mapped_column(
+        String(64), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    graded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # --- Phase 7a S1 end ---
     enrollment_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("enrollments.id", ondelete="RESTRICT"), nullable=False
     )
@@ -153,6 +188,11 @@ class Submission(UUIDPKMixin, TimestampMixin, Base):
         Index("ix_submissions_assessment_id_state_released_at", "assessment_id", "state", "released_at"),
         Index("ix_submissions_course_id_enrollment_id", "course_id", "enrollment_id"),
         Index("ix_submissions_kept_attempt_id", "kept_attempt_id"),
+        # --- Phase 7a S1 begin ---
+        UniqueConstraint("enrollment_id", "assignment_id", name="uq_submissions_enrollment_assignment_id"),
+        CheckConstraint("kept_attempt_id IS NULL OR assessment_id IS NOT NULL", name="quiz_link_valid"),
+        Index("ix_submissions_assignment_id_state_released_at", "assignment_id", "state", "released_at"),
+        # --- Phase 7a S1 end ---
     )
 
 
@@ -198,11 +238,7 @@ class GradeEvent(UUIDPKMixin, Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     __table_args__ = (
-        CheckConstraint(
-            "event IN ('override','override_cleared','excused','unexcused','released','unreleased','regraded',"
-            "'attempt_voided')",
-            name="event_valid",
-        ),
+        CheckConstraint(_EVENT_CHECK, name="event_valid"),  # Phase 7a S1: + manual_grade
         Index("ix_grade_events_submission_id_created_at", "submission_id", "created_at"),
     )
 

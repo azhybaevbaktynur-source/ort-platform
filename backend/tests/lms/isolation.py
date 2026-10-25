@@ -42,9 +42,21 @@ def reset_lms_state() -> None:
             from app.lms.grading.models import ALLOW_PURGE_SQL
 
             conn.execute(text(ALLOW_PURGE_SQL))
+        # --- Phase 7a S1 begin --- hand-ins, rubric scores, overrides, accommodations before the submissions
+        from app.lms.accommodations.models import EnrollmentAccommodation
+        from app.lms.assignments.models import (
+            Assignment, AssignmentOverride, AssignmentRubricCriterion, AssignmentSubmission, SubmissionRubricScore,
+        )
+
+        conn.execute(delete(SubmissionRubricScore.__table__))
+        conn.execute(update(Submission.__table__).values(graded_item_id=None))
+        for model in (AssignmentSubmission, AssignmentRubricCriterion, AssignmentOverride, EnrollmentAccommodation):
+            conn.execute(delete(model.__table__))
+        # --- Phase 7a S1 end ---
         # Phase 4 first (design 2.8): grade rows, then the FKs into categories and scheme versions.
         for model in (GradeEvent, CourseGrade, AttemptGrade, Submission):
             conn.execute(delete(model.__table__))
+        conn.execute(delete(Assignment.__table__))  # --- Phase 7a S1 --- (after submissions, before assessments)
         conn.execute(update(Assessment.__table__).values(grading_scheme_version_id=None, grade_category_id=None))
         conn.execute(update(Course.__table__).values(grading_scheme_version_id=None))
         conn.execute(delete(GradeCategory.__table__))

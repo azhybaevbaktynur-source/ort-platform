@@ -21,3 +21,9 @@ from app.lms.organizations.models import (  # noqa: F401,E402
     Invitation, Organization, OrganizationMember, OrganizationTemplateGrant,
 )
 # --- Phase 6 S1 end ---
+# --- Phase 7a S1 begin ---
+from app.lms.assignments.models import (  # noqa: F401,E402
+    Assignment, AssignmentOverride, AssignmentRubricCriterion, AssignmentSubmission, SubmissionRubricScore,
+)
+from app.lms.accommodations.models import EnrollmentAccommodation  # noqa: F401,E402
+# --- Phase 7a S1 end ---
