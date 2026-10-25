@@ -98,7 +98,7 @@ export const VerifyEmailStep: React.FC<VerifyEmailStepProps> = ({
         <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center">
           <KeyRound className="w-6 h-6" />
         </div>
-        <h2 className="text-2xl font-bold tracking-tight text-slate-900">{t("auth.verify.title")}</h2>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("auth.verify.title")}</h1>
         <p className="mt-1 text-sm text-slate-600">
           {reason === "registered" ? t("auth.verify.subtitle", { email }) : t("auth.verify.notVerifiedNotice", { email })}
         </p>

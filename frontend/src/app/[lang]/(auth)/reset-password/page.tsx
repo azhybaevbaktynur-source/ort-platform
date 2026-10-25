@@ -78,9 +78,9 @@ function ResetPasswordForm() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
         <div className="bg-white py-8 px-6 sm:px-10 shadow-lg border border-slate-200/80 rounded-3xl">
           <div className="mb-6 text-center">
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
               {t("auth.resetPasswordTitle")}
-            </h2>
+            </h1>
             <p className="mt-1 text-sm text-slate-600">
               {t("auth.resetPasswordSubtitle")}
             </p>
