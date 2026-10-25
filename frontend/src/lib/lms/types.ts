@@ -248,3 +248,34 @@ export const LMS_ERROR_CODES = [
   "attempt_not_submitted", "points_out_of_range", "after_close_needs_until",
 ] as const;
 export type LmsErrorCode = (typeof LMS_ERROR_CODES)[number];
+
+// --- Phase 6 S4 begin ---
+// Phase 6a fields (docs/phases/PHASE_6_DESIGN.md §2.1, §5.3), merged into the interfaces above
+// (declaration merging). Optional so that an older backend without them still works.
+
+/** `CourseOut.template` (null = general course). Read it only through `templateUi()` in templates.ts. */
+export interface CourseTemplateOut {
+  key: string;
+  version: number;
+  locked: boolean;
+  result_view: "general" | "ort";
+  passage_display: "plain" | "numbered";
+  section_keys: string[];
+  assessment_presets: string[];
+  importer_profiles: string[];
+  title_key: string;
+}
+
+export interface CourseStudentOut {
+  organization_id?: string | null;
+  organization_name?: string | null;
+  /** `undefined` = backend without templates (today's behaviour); `null` = general course. */
+  template?: CourseTemplateOut | null;
+}
+
+export interface CourseCreateIn {
+  organization_id?: string;
+  owner_id?: string;
+  template_key?: string | null;
+}
+// --- Phase 6 S4 end ---

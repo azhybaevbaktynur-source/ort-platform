@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "ORT Preparation Platform",
+    "appName": "Platform",
     "language": "Language",
     "kyrgyz": "Кыргызча",
     "russian": "Русский",
@@ -33,12 +33,12 @@
     "native_language": "Native language"
   },
   "auth": {
-    "signInTitle": "Log in to ORT",
+    "signInTitle": "Log in",
     "signInSubtitle": "Sign in to your account to access materials and tests",
-    "signUpTitle": "Sign up for ORT",
-    "signUpSubtitle": "Create an account to start preparing for the exam",
+    "signUpTitle": "Create an account",
+    "signUpSubtitle": "Sign up to join courses, take assessments and see your grades.",
     "email": "Email",
-    "emailPlaceholder": "student@ort.kg",
+    "emailPlaceholder": "name@example.com",
     "password": "Password",
     "passwordPlaceholder": "••••••••",
     "displayName": "Your full name",
@@ -46,7 +46,7 @@
     "phone": "Phone number (WhatsApp/Telegram)",
     "phonePlaceholder": "+996 700 123 456",
     "role": "Your role",
-    "studentRole": "Student (ORT preparation)",
+    "studentRole": "Student",
     "instructorRole": "Teacher / Admin",
     "signInButton": "Log in",
     "signUpButton": "Sign up",
@@ -517,8 +517,8 @@
       "relistTitle": "Relist this course?",
       "transferTitle": "Transfer ownership?",
       "transferHeading": "Ownership",
-      "transferHint": "The new owner must be an approved, enabled teacher. Paste their user ID from the users page.",
-      "newOwnerId": "New owner user ID",
+      "transferHint": "Search the new owner by name or email. They must be an enabled account; the current owner stays a teacher of the course.",
+      "newOwnerId": "New owner",
       "roster": "Roster",
       "rosterAudited": "Viewing the roster is recorded in the audit log.",
       "showRoster": "Show roster",
@@ -1930,6 +1930,315 @@
   "files": {
     "errors": {
       "storage_full": "File storage is full. New uploads are refused until space is freed. Contact the platform administrator."
+    }
+  },
+  "organizations": {
+    "nav": {
+      "organization": "Organization",
+      "organizations": "Organizations"
+    },
+    "status": {
+      "active": "Active",
+      "suspended": "Suspended"
+    },
+    "roles": {
+      "org_admin": "Organization admin",
+      "teacher": "Teacher"
+    },
+    "counts": {
+      "orgAdmins": "Admins",
+      "teachers": "Teachers",
+      "courses": "Courses",
+      "students": "Students"
+    },
+    "fields": {
+      "name": "Name",
+      "nameMissing": "Enter a name.",
+      "slug": "Short name for links",
+      "slugHint": "2–64 characters: lowercase Latin letters, digits and hyphens. Filled in from the name.",
+      "slugEditHint": "2–64 characters: lowercase Latin letters, digits and hyphens. Changing it changes the organization's links.",
+      "contactEmail": "Contact email (optional)",
+      "teachersCanCreate": "Teachers can create courses",
+      "teachersCanCreateHint": "When off, only organization admins create courses and assign their owners."
+    },
+    "picker": {
+      "placeholder": "Name or email",
+      "change": "Change",
+      "searching": "Searching…",
+      "count": "{n} found",
+      "empty": "No one found. Check the spelling or try the email.",
+      "failed": "Search failed. Try again.",
+      "minChars": "Type at least {n} characters."
+    },
+    "noAccess": {
+      "title": "No access to this organization",
+      "body": "Only the organization's admins can open this area. Ask an admin of the organization or the platform administrator.",
+      "back": "Back to my courses"
+    },
+    "errors": {
+      "already_member": "This person is already a member of the organization.",
+      "invitation_email_mismatch": "This invitation is for a different email address. Sign in with the invited address.",
+      "template_not_granted": "This template is not available to the organization. Ask the platform administrator.",
+      "template_locked": "Fixed by the course template; this setting cannot be changed.",
+      "preset_not_available": "This exam type is not available in this course.",
+      "unknown_template": "Unknown course template.",
+      "organization_suspended": "The organization is suspended. Its courses are read-only.",
+      "slug_taken": "This short name is already used by another organization.",
+      "invalid_slug": "Use 2–64 lowercase Latin letters, digits and hyphens.",
+      "not_member": "This person is not a member of the organization.",
+      "owner_not_member": "The owner must be an active member of the organization.",
+      "invitation_not_found": "This invitation is not valid any more.",
+      "organization_not_found": "Organization not found."
+    },
+    "admin": {
+      "title": "Organizations",
+      "create": "Create organization",
+      "createTitle": "New organization",
+      "createHint": "After creating it, assign an admin on the Admins tab or invite one by email.",
+      "searchPlaceholder": "Name or short name",
+      "status": "Status",
+      "anyStatus": "Any",
+      "empty": "No organizations yet. Create one for a school or a center.",
+      "emptySearch": "No organizations match the filters.",
+      "shown": "Shown: {n}",
+      "createdOn": "created {date}",
+      "created": "Created",
+      "back": "Back to organizations",
+      "edit": "Edit",
+      "editTitle": "Edit «{org}»",
+      "saved": "Changes saved.",
+      "suspend": "Suspend",
+      "resume": "Resume",
+      "suspendTitle": "Suspend «{org}»?",
+      "suspendBody": "All courses of «{org}» become read-only and leave the catalog. Students cannot start exams and nobody can edit. You can resume it later.",
+      "resumeTitle": "Resume «{org}»?",
+      "resumeBody": "The courses of «{org}» can be edited again and published courses return to the catalog.",
+      "suspended": "«{org}» is suspended.",
+      "resumed": "«{org}» is active again.",
+      "suspendedReason": "Suspended. Reason: {reason}",
+      "tabsLabel": "Organization sections",
+      "tabs": {
+        "summary": "Summary",
+        "admins": "Admins",
+        "teachers": "Teachers",
+        "courses": "Courses",
+        "usage": "Usage",
+        "templates": "Templates",
+        "log": "Log"
+      },
+      "logIntro": "Actions on this organization (suspend, resume, template grants).",
+      "logAll": "Open the full audit log",
+      "systemAccount": "System account",
+      "systemAccountHint": "The platform needs this account (for example the ORT system teacher). It cannot be edited, blocked or given other rights."
+    },
+    "adminCourse": {
+      "deleteBody": "The course «{course}» ({n} students) goes to the trash; students lose access. You can restore it later.",
+      "restoreBody": "The course «{course}» comes back from the trash with its students and content.",
+      "unlistBody": "The course «{course}» disappears from the catalog. Current students keep their access.",
+      "relistBody": "The course «{course}» can appear in the catalog again if its teacher has made it public.",
+      "transferBody": "The course «{course}» moves from {from} to {to}. The new owner gets full control; {from} stays a teacher of the course."
+    },
+    "adminUser": {
+      "disableTarget": "Account: {name}.",
+      "grantBody": "The person can then create courses in their own organization.",
+      "notTeacher": "Not a teacher",
+      "userId": "User ID (for support)",
+      "nowPrefix": "Now:"
+    },
+    "members": {
+      "title": "Teachers and admins",
+      "searchPlaceholder": "Name or email",
+      "empty": "No teachers yet. Invite the first teacher by email.",
+      "emptySearch": "No one matches the search.",
+      "shown": "Shown: {n}",
+      "courses": "Courses: {n}",
+      "since": "member since {date}",
+      "state": {
+        "active": "Active",
+        "removed": "Removed",
+        "blocked": "Blocked"
+      },
+      "remove": "Remove from organization",
+      "removeTitle": "Remove {name} from the organization?",
+      "removeBody": "{name} leaves «{org}» but keeps their courses; assign another owner if needed. They can no longer create courses here.",
+      "removeAdminBody": "{name} stops being an admin of «{org}» and can no longer manage its teachers and courses.",
+      "removed": "{name} was removed from the organization.",
+      "assignAdmin": "Assign admin",
+      "assignAdminHint": "Find an existing account by name or email. To invite someone without an account, use an invitation.",
+      "assignAdminTitle": "Make {name} an admin?",
+      "assignAdminBody": "{name} will manage the teachers and courses of «{org}».",
+      "adminAdded": "{name} is now an admin.",
+      "addTeacher": "Add teacher",
+      "addTeacherHint": "Find an existing account by name or email.",
+      "addTeacherTitle": "Add {name} as a teacher?",
+      "addTeacherBody": "{name} becomes a teacher of «{org}» and is listed among its teachers.",
+      "teacherAdded": "{name} was added as a teacher.",
+      "person": "Person",
+      "noAdmins": "No admins yet. Assign one so the organization can be managed.",
+      "noTeachers": "No teachers yet."
+    },
+    "courses": {
+      "title": "Courses",
+      "create": "Create course",
+      "createTitle": "New course",
+      "createHint": "The course belongs to «{org}». Choose who owns and teaches it.",
+      "back": "Back to courses",
+      "searchPlaceholder": "Course title",
+      "empty": "No courses yet. Create the first course and assign a teacher.",
+      "emptySearch": "No courses match the search.",
+      "shown": "Shown: {n}",
+      "owner": "Owner",
+      "students": "Students: {n}",
+      "ownerField": "Owner (teacher of the organization)",
+      "ownerHint": "The owner can edit the course, its content and its people.",
+      "ownerMissing": "Choose the course owner."
+    },
+    "course": {
+      "open": "Open course",
+      "join": "Join as teacher",
+      "joinTitle": "Join «{course}» as a teacher?",
+      "joinBody": "You will appear in the course roster as a teacher and get full teacher rights; this is recorded in the organization log.",
+      "joined": "You joined the course as a teacher.",
+      "facts": "About the course",
+      "created": "Created",
+      "languages": "Languages",
+      "staff": "Teachers and assistants",
+      "noStaff": "No teachers in this course yet.",
+      "ownerTag": "Owner",
+      "joinedAsAdmin": "Joined as organization admin",
+      "assignOwner": "Assign owner",
+      "assignOwnerHint": "Choose a teacher of the organization. The current owner stays a teacher of the course.",
+      "newOwner": "New owner",
+      "ownerTitle": "Change the owner of «{course}»?",
+      "ownerBody": "The course «{course}» moves from {from} to {to}.",
+      "ownerChanged": "{name} is now the owner."
+    },
+    "usage": {
+      "banks": "Question banks",
+      "questions": "Questions",
+      "storage": "Storage used",
+      "storageNote": "Storage is an estimate: the files uploaded by the organization's active members."
+    },
+    "templates": {
+      "intro": "A course template gives courses a fixed exam structure. Granted organizations can create courses with it.",
+      "grantOnly": "Visible only to granted organizations.",
+      "grantedOn": "granted {date}",
+      "stateGranted": "Granted",
+      "stateNotGranted": "Not granted",
+      "switch": "Granted",
+      "grant": "Grant",
+      "revoke": "Revoke",
+      "grantTitle": "Grant «{template}» to «{org}»?",
+      "grantBody": "Admins of «{org}» can then create courses with the «{template}» template.",
+      "revokeTitle": "Revoke «{template}» from «{org}»?",
+      "revokeBody": "No new «{template}» courses can be created in «{org}». Existing courses keep working unchanged.",
+      "granted": "«{template}» granted.",
+      "revoked": "«{template}» revoked.",
+      "empty": "No course templates are registered."
+    },
+    "org": {
+      "area": "Organization",
+      "nav": {
+        "label": "Organization navigation",
+        "overview": "Overview",
+        "teachers": "Teachers",
+        "courses": "Courses"
+      },
+      "overviewTitle": "Overview",
+      "suspendedBanner": "This organization is suspended: its courses are read-only and changes are disabled. Contact the platform administrator.",
+      "pickTitle": "Your organizations",
+      "pickEmpty": "You do not administer any organization."
+    }
+  },
+  "invitations": {
+    "title": "Invitations",
+    "inviteTeacher": "Invite teacher",
+    "pendingTitle": "Pending invitations",
+    "pendingEmpty": "No pending invitations.",
+    "allLink": "All teachers and invitations",
+    "empty": "No invitations sent yet.",
+    "expiresOn": "expires {date}",
+    "sentBy": "Sent by {name} on {date}",
+    "sent": "Invitation sent to {email}.",
+    "resend": "Send again",
+    "resent": "A new invitation was sent to {email}; the old link stops working.",
+    "revoke": "Revoke invitation",
+    "revokeTitle": "Revoke this invitation?",
+    "revokeBody": "The link sent to {email} stops working. You can invite them again later.",
+    "revoked": "The invitation to {email} was revoked.",
+    "roles": {
+      "org_admin": "Organization admin",
+      "teacher": "Teacher",
+      "assistant": "Assistant"
+    },
+    "state": {
+      "pending": "Invited",
+      "accepted": "Accepted",
+      "revoked": "Revoked",
+      "expired": "Expired"
+    },
+    "dialog": {
+      "title": "Invite a teacher",
+      "titleAdmin": "Invite an organization admin",
+      "body": "We will email a link to join «{org}» as a teacher.",
+      "bodyAdmin": "We will email a link to join «{org}» as an admin.",
+      "email": "Email",
+      "emailInvalid": "Enter a valid email address.",
+      "message": "Message (optional)",
+      "messageHint": "Shown in the email. Replies go to your email address.",
+      "expiry": "The link works for 14 days and only for this email address.",
+      "send": "Send invitation"
+    },
+    "accept": {
+      "title": "«{org}» invites you",
+      "organization": "Organization",
+      "role": "Role",
+      "course": "Course",
+      "email": "For email",
+      "expires": "Valid until",
+      "signedOutHint": "Log in or create an account with {email} to accept.",
+      "login": "Log in",
+      "register": "Create account",
+      "accepting": "Accepting the invitation…",
+      "done": "Invitation accepted. Opening…",
+      "retry": "Try again",
+      "mismatch": "This invitation is for {invited}, but you are signed in as {current}. Log out and sign in with the invited address.",
+      "switchAccount": "Log out and use another account",
+      "invalidTitle": "This invitation is not valid any more",
+      "invalidBody": "It may have expired, been revoked or already used. Ask your administrator for a new invitation.",
+      "home": "Go to the home page"
+    }
+  },
+  "templates": {
+    "field": "Course template",
+    "general": "General course (no template)",
+    "generalHint": "Free structure: your own sections, any question types and grading schemes.",
+    "lockedHint": "The template fixes the exam structure, timing and scoring; questions and dates stay editable.",
+    "lockedNote": "Fixed by the ORT template",
+    "names": {
+      "ort": "ORT",
+      "general": "General course"
+    }
+  },
+  "teacherAccess": {
+    "navLink": "I am a teacher",
+    "title": "I am a teacher",
+    "intro": "Teachers work inside an organization: a school, a center or their own.",
+    "canCreate": "You can already create courses.",
+    "schoolTitle": "At a school or center?",
+    "schoolBody": "Ask your administrator for an invitation. It arrives by email; open the link in it to join.",
+    "pendingTitle": "Invitations for you: {n}",
+    "pendingItem": {
+      "org_admin": "«{org}» invites you as an organization admin.",
+      "teacher": "«{org}» invites you as a teacher.",
+      "assistant": "«{org}» invites you as an assistant in «{course}»."
+    },
+    "pendingHint": "Open the link in the invitation email to accept (valid until {date}).",
+    "independentTitle": "Independent teacher? Apply",
+    "schemesNoAccess": {
+      "title": "For teachers only",
+      "body": "Grading schemes are set up by teachers who create courses. Your results are in each course under Grades.",
+      "back": "Back to my courses"
     }
   }
 }

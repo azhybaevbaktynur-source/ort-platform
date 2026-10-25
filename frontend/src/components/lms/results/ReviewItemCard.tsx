@@ -4,7 +4,7 @@ import React from "react";
 import { Check, X } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { MathRenderer } from "@/components/math/MathRenderer";
-import { NumberedPassage } from "@/components/lms/NumberedPassage";
+import { TemplatePassage } from "@/components/lms/PlainPassage";
 import type { Correctness, ReviewItemOut, StudentQuestion } from "@/lib/lms/attemptTypes";
 import { fmtPoints } from "@/components/lms/assessments/format";
 
@@ -75,7 +75,7 @@ export function ReviewItemCard({
       {passage && (
         <details className="rounded-xl border border-slate-200 bg-slate-50 p-3">
           <summary className="cursor-pointer text-sm font-medium text-slate-700">{passage.title || t("results.passage")}</summary>
-          <div className="mt-2"><NumberedPassage text={passage.body} /></div>
+          <div className="mt-2"><TemplatePassage text={passage.body} /></div>
         </details>
       )}
 

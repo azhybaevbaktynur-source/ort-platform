@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/context";
 import { createBank, deleteBank, listBanks, restoreBank, updateBank } from "@/lib/lms/content";
 import type { BankOut } from "@/lib/lms/contentTypes";
+import { fmtApiDate } from "@/lib/format";
 import { useCourse } from "@/components/lms/CourseContext";
 import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
 import { Pager } from "@/components/lms/Pager";
@@ -110,7 +111,7 @@ export default function BankListPage() {
                 {t("bank.list.counts", { questions: b.question_count, passages: b.passage_count })}
                 {b.source_id ? ` · ${t("bank.list.source", { id: b.source_id })}` : ""}
               </p>
-              <p className="text-xs text-slate-400">{t("bank.list.updated", { date: new Date(b.updated_at).toLocaleDateString() })}</p>
+              <p className="text-xs text-slate-400">{t("bank.list.updated", { date: fmtApiDate(b.updated_at) })}</p>
             </div>
             {canEdit && (
               <div className="mt-3 flex gap-2">

@@ -3,6 +3,7 @@
 import React from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import type { CourseRole, RosterEntryOut } from "@/lib/lms/types";
+import { fmtApiDate } from "@/lib/format";
 
 /**
  * Staff roster table. Action visibility is decided by the caller through the can* props
@@ -26,7 +27,7 @@ export function RosterTable({
   busyId?: string | null;
 }) {
   const { t } = useTranslation();
-  const fmt = (s: string | null) => (s ? new Date(s).toLocaleDateString() : "—");
+  const fmt = (s: string | null) => fmtApiDate(s) || "—";
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
       <table className="w-full text-left text-sm">

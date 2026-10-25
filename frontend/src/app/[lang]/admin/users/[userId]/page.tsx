@@ -11,6 +11,11 @@ import { pickLocalized } from "@/lib/lms/localized";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { ReasonDialog } from "@/components/lms/admin/ReasonDialog";
 import { UserStatusBadge } from "@/components/lms/admin/UserStatusBadge";
+// --- Phase 6 S4 ---
+import { SystemAccountBadge } from "@/components/lms/org/OrgUi";
+import { isSystemAccount } from "@/lib/lms/organizations";
+import { fmtApiDateTime } from "@/lib/format";
+// --- Phase 6 S4 end ---
 
 type Action = "disable" | "revoke" | "grant";
 
@@ -64,8 +69,12 @@ export default function AdminUserDetailPage() {
   if (error && !user) return <div>{back}<ErrorMessage error={error} onRetry={load} className="mt-4" /></div>;
   if (!user) return <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p>;
 
-  const canDisable = user.id !== me?.id && !user.is_platform_admin;
+  // --- Phase 6 S4 (admin M5, M8): system accounts are read-only; teacher status is a labelled row ---
+  const system = isSystemAccount(user);
+  const canDisable = user.id !== me?.id && !user.is_platform_admin && !system;
+  // --- Phase 6 S4 end ---
   const btn = "rounded-xl border px-3 py-1.5 text-sm font-medium";
+  const userName = user.display_name || user.email;
   return (
     <div>
       {back}
@@ -73,20 +82,25 @@ export default function AdminUserDetailPage() {
       <p className="mb-4 text-sm text-slate-500">{user.email}</p>
       {error ? <ErrorMessage error={error} onRetry={load} className="mb-4" /> : null}
       <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 text-sm">
-        <div className="flex flex-wrap items-center gap-2">
-          <UserStatusBadge kind="teacher" status={user.teacher_status} />
-          {user.is_platform_admin && <UserStatusBadge kind="account" status="admin" />}
-          {user.disabled_at && <UserStatusBadge kind="account" status="disabled" />}
-        </div>
-        <dl className="mt-3 grid gap-2 sm:grid-cols-2">
-          <div><dt className="text-xs text-slate-500">{t("platformAdmin.users.created")}</dt><dd>{new Date(user.created_at).toLocaleString(lang)}</dd></div>
+        {(system || user.is_platform_admin || user.disabled_at) && (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            {system && <SystemAccountBadge />}
+            {user.is_platform_admin && <UserStatusBadge kind="account" status="admin" />}
+            {user.disabled_at && <UserStatusBadge kind="account" status="disabled" />}
+          </div>
+        )}
+        {system && <p className="mb-3 text-xs text-slate-600">{t("organizations.admin.systemAccountHint")}</p>}
+        <dl className="grid gap-2 sm:grid-cols-2">
+          <div><dt className="text-xs text-slate-500">{t("platformAdmin.users.teacherStatus")}</dt><dd>{user.teacher_status === "none" ? t("organizations.adminUser.notTeacher") : <UserStatusBadge kind="teacher" status={user.teacher_status} />}</dd></div>
+          <div><dt className="text-xs text-slate-500">{t("organizations.adminUser.userId")}</dt><dd className="break-all font-mono text-xs">{user.id}</dd></div>
+          <div><dt className="text-xs text-slate-500">{t("platformAdmin.users.created")}</dt><dd>{fmtApiDateTime(user.created_at, lang)}</dd></div>
           <div><dt className="text-xs text-slate-500">{t("platformAdmin.users.emailVerified")}</dt><dd>{user.email_verified ? t("platformAdmin.yes") : t("platformAdmin.no")}</dd></div>
           <div><dt className="text-xs text-slate-500">{t("platformAdmin.users.activeEnrollments")}</dt><dd>{user.active_enrollment_count}</dd></div>
           {user.disabled_at && (
             <div><dt className="text-xs text-slate-500">{t("platformAdmin.users.disabledReason")}</dt><dd>{user.disabled_reason || "—"}</dd></div>
           )}
         </dl>
-        <div className="mt-4 flex flex-wrap gap-2">
+        {!system && <div className="mt-4 flex flex-wrap gap-2">
           {user.teacher_status === "approved" ? (
             <button type="button" className={`${btn} border-slate-300 text-slate-700 hover:bg-slate-50`} onClick={() => { setDialogError(null); setAction("revoke"); }}>{t("platformAdmin.users.revokeTeacher")}</button>
           ) : (
@@ -97,7 +111,7 @@ export default function AdminUserDetailPage() {
           ) : (
             <button type="button" className={`${btn} border-red-300 text-red-700 hover:bg-red-50`} onClick={() => { setDialogError(null); setAction("disable"); }}>{t("platformAdmin.users.disable")}</button>
           ))}
-        </div>
+        </div>}
       </div>
 
       <h2 className="mb-2 text-lg font-semibold text-slate-900">{t("platformAdmin.users.ownedCourses")}</h2>
@@ -116,7 +130,7 @@ export default function AdminUserDetailPage() {
         <ul className="space-y-2">
           {user.teacher_requests.map((r) => (
             <li key={r.id} className="rounded-2xl border border-slate-200 bg-white p-3 text-sm">
-              <div className="flex justify-between"><span className="font-semibold">{t(`teacherRequest.requestStatus.${r.status}`)}</span><time className="text-xs text-slate-500">{new Date(r.created_at).toLocaleString(lang)}</time></div>
+              <div className="flex justify-between"><span className="font-semibold">{t(`teacherRequest.requestStatus.${r.status}`)}</span><time className="text-xs text-slate-500">{fmtApiDateTime(r.created_at, lang)}</time></div>
               {r.message && <p className="mt-1 whitespace-pre-wrap text-slate-700">{r.message}</p>}
               {r.reason && <p className="mt-1 text-slate-700"><strong>{t("teacherRequest.reason")}:</strong> {r.reason}</p>}
             </li>
@@ -127,7 +141,7 @@ export default function AdminUserDetailPage() {
       <ReasonDialog
         open={!!action}
         title={action === "disable" ? t("platformAdmin.users.disableTitle") : action === "revoke" ? t("platformAdmin.users.revokeTitle") : t("platformAdmin.users.grantTitle")}
-        body={action === "disable" ? t("platformAdmin.users.disableBody") : action === "revoke" ? t("platformAdmin.requests.revokeBody") : undefined}
+        body={`${t("organizations.adminUser.disableTarget", { name: userName })} ${action === "disable" ? t("platformAdmin.users.disableBody") : action === "revoke" ? t("platformAdmin.requests.revokeBody") : t("organizations.adminUser.grantBody")}`}
         confirmLabel={action === "disable" ? t("platformAdmin.users.disable") : action === "revoke" ? t("platformAdmin.requests.revoke") : t("platformAdmin.users.grantTeacher")}
         danger={action !== "grant"} optional={action !== "disable"} busy={busy} error={dialogError}
         onConfirm={run} onCancel={() => setAction(null)}

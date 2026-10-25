@@ -8,6 +8,7 @@ import { useTranslation, type Language } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
 import { LmsMeProvider, useLmsMeLoader } from "@/lib/lms/useLmsMe";
 import { ErrorMessage } from "./ErrorMessage";
+import { OrgNavLink } from "./org/OrgNavLink"; // Phase 6 S4
 
 const LANGS: Language[] = ["en", "ru", "ky"];
 
@@ -63,7 +64,8 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const isAdmin = me ? me.is_platform_admin : !!userProfile?.is_platform_admin;
   const teacherStatus = me ? me.teacher_status : userProfile?.teacher_status;
   const canCreate = me ? me.can_create_courses : teacherStatus === "approved";
-  const canRequestTeacher = !canCreate && (teacherStatus === "none" || teacherStatus === "revoked");
+  // Phase 6 S4: "I am a teacher" for everyone who cannot create courses yet (shows pending state too).
+  const canRequestTeacher = !canCreate && !isAdmin;
   const name = me?.display_name || userProfile?.displayName || user.email;
 
   const linkCls = (href: string, exact = false) => {
@@ -87,9 +89,9 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
               {canCreate && (
                 <Link href={`${coursesHref}/new`} className={linkCls(`${coursesHref}/new`)}><Plus className="h-4 w-4" aria-hidden="true" />{t("lms.nav.create")}</Link>
               )}
-              {canRequestTeacher && (
-                <Link href={`${coursesHref}/become-teacher`} className={linkCls(`${coursesHref}/become-teacher`)}><UserPlus className="h-4 w-4" aria-hidden="true" />{t("lms.nav.becomeTeacher")}</Link>
-              )}
+              {/* --- Phase 6 S4: "Become teacher" moved to the account group as "I am a teacher"; org admin link --- */}
+              <OrgNavLink enabled={!!me} className={(href) => linkCls(href)} />
+              {/* --- Phase 6 S4 end --- */}
               {(canCreate || isAdmin) && (
                 <Link href={`/${lang}/grading-schemes`} className={linkCls(`/${lang}/grading-schemes`)}><Scale className="h-4 w-4" aria-hidden="true" />{t("lms.nav.gradingSchemes")}</Link>
               )}
@@ -110,6 +112,11 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
                 <UserCircle className="h-4 w-4 flex-shrink-0 text-slate-500" aria-hidden="true" />
                 <span className="truncate">{name}</span>
               </span>
+              {/* --- Phase 6 S4 --- */}
+              {canRequestTeacher && (
+                <Link href={`/${lang}/teacher-access`} className={linkCls(`/${lang}/teacher-access`)}><UserPlus className="h-4 w-4" aria-hidden="true" />{t("teacherAccess.navLink")}</Link>
+              )}
+              {/* --- Phase 6 S4 end --- */}
               <button type="button" onClick={() => void logout()}
                 className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
                 <LogOut className="h-4 w-4" aria-hidden="true" />{t("common.logout")}

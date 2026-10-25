@@ -3,6 +3,7 @@
 import React from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import type { AuditEntryOut } from "@/lib/lms/types";
+import { fmtApiDateTime } from "@/lib/format";
 
 export function useAuditActionLabel() {
   const { t } = useTranslation();
@@ -32,7 +33,7 @@ export function AuditTable({ entries }: { entries: AuditEntryOut[] }) {
         <tbody className="divide-y divide-slate-100">
           {entries.map((e) => (
             <tr key={e.id} className="align-top">
-              <td className="whitespace-nowrap px-3 py-2">{new Date(e.created_at).toLocaleString(lang)}</td>
+              <td className="whitespace-nowrap px-3 py-2">{fmtApiDateTime(e.created_at, lang)}</td>
               <td className="px-3 py-2">{e.actor.display_name || e.actor.email}</td>
               <td className="px-3 py-2 font-medium">{label(e.action)}</td>
               <td className="px-3 py-2"><span className="text-slate-500">{e.target_type}</span> <code className="text-xs">{e.target_id}</code></td>
