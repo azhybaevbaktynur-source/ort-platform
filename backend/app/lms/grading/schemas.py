@@ -50,3 +50,29 @@ class RegradeOut(BaseModel):
 class VoidIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     reason: str = Field(min_length=1, max_length=REASON_MAX)
+
+
+# --- Phase 7a S3 (PHASE_7A_DESIGN 3.6: manual grades of none/text/file assignments) ---
+
+FEEDBACK_MAX = 10_000
+RUBRIC_COMMENT_MAX = 1_000
+RUBRIC_CRITERIA_MAX = 30
+
+
+class RubricScoreIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    criterion_id: uuid.UUID
+    points: Decimal = Field(allow_inf_nan=False)
+    comment: Optional[str] = Field(default=None, max_length=RUBRIC_COMMENT_MAX)
+
+
+class ManualGradeIn(BaseModel):
+    """`points` None clears the grade. `rubric_scores` (when given) must cover every live criterion once and add up
+    to `points` (P7-5). `feedback_text` / `feedback_asset_id`: absent = unchanged, null = cleared. `version`:
+    optimistic check against the stored row (409 `stale_grade`), optional."""
+    model_config = ConfigDict(extra="forbid")
+    points: Optional[Decimal] = Field(default=None, allow_inf_nan=False)
+    rubric_scores: Optional[list[RubricScoreIn]] = Field(default=None, max_length=RUBRIC_CRITERIA_MAX)
+    feedback_text: Optional[str] = Field(default=None, max_length=FEEDBACK_MAX)
+    feedback_asset_id: Optional[uuid.UUID] = None
+    version: Optional[int] = Field(default=None, ge=0)

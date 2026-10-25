@@ -1,5 +1,6 @@
 """7.8 (gradebook / my grades part): role x course-status matrix, tenant isolation, gradebook content, pagination,
-column filter, submission detail and fixed statement counts per page (P4-19)."""
+column filter, submission detail and fixed statement counts per page (P4-19). Phase 7a: columns are assignments
+(`id` = the quiz assignment id, `assessment_id` the assessment); cells are keyed by assignment id."""
 import uuid
 from decimal import Decimal
 
@@ -7,6 +8,7 @@ import pytest
 from sqlalchemy import event
 
 from app.db import session as db_session
+from app.lms.assignments.ids import assignment_id_for
 from app.lms.attempts.models import Attempt
 from app.lms.grading.models import Submission
 from tests.lms.factories import enroll, make_course, make_user, set_status
@@ -21,6 +23,11 @@ D = Decimal
 
 def _gb(w, **params):
     return f"/courses/{w.cid}/gradebook"
+
+
+def col(x):
+    """The gradebook column id of an assessment (its quiz assignment)."""
+    return str(assignment_id_for(x.id))
 
 
 # ------------------------------------------------------------------ matrix
@@ -138,11 +145,12 @@ async def test_gradebook_rows_cells_columns_and_totals(db, api):
     r = await api.call(w.teacher, "GET", f"/courses/{w.cid}/gradebook")
     assert r.status_code == 200, r.text
     body = r.json()
-    assert [x["id"] for x in body["assessments"]] == [str(a.id), str(b.id)]
-    col_a, col_b = body["assessments"]
-    assert set(col_a) == {"id", "title", "points_possible", "category_id", "omit_from_total", "grade_release",
-                          "due_at", "scheme", "score_policy", "submission_count", "released_count", "stale_count",
-                          "warnings"}
+    assert [x["id"] for x in body["assignments"]] == [col(a), col(b)]
+    col_a, col_b = body["assignments"]
+    assert set(col_a) == {"id", "kind", "assessment_id", "title", "points_possible", "category_id",
+                          "omit_from_total", "grade_release", "due_at", "scheme", "score_policy",
+                          "submission_count", "released_count", "stale_count", "warnings"}
+    assert col_a["kind"] == "quiz" and col_a["assessment_id"] == str(a.id)
     assert col_a["submission_count"] == 2 and col_a["released_count"] == 2 and col_a["stale_count"] == 0
     assert col_b["released_count"] == 0 and col_b["grade_release"] == "manual" and col_b["score_policy"] == "latest"
     assert D(col_b["points_possible"]) == 20
@@ -151,13 +159,13 @@ async def test_gradebook_rows_cells_columns_and_totals(db, api):
     assert [row["user_id"] for row in body["rows"]] == [s.id for s in w.students]
     r0, r1, r2 = body["rows"]
     assert r0["student_name"] == "Student 1"
-    cell_b = r0["cells"][str(b.id)]
+    cell_b = r0["cells"][col(b)]
     assert set(cell_b) == {"submission_id", "state", "kept_attempt_id", "attempts_counted", "raw_points",
                            "points_possible", "late_deduction", "override_points", "has_override", "effective_points",
                            "display_value", "label", "percentile", "passed", "thresholds", "released_at", "version"}
     assert cell_b["has_override"] is True and cell_b["released_at"] is None and SENTINEL_REASON not in r.text
     assert D(r0["total"]["current_percent"]) == D("53.33")  # (10 + 6) / 30
-    assert r1["cells"][str(a.id)]["state"] == "pending_review" and r1["total"]["current_percent"] is None
+    assert r1["cells"][col(a)]["state"] == "pending_review" and r1["total"]["current_percent"] is None
     assert D(r1["total"]["final_percent"]) == D("0.00")
     assert r2["cells"] == {} and r2["total"]["current_percent"] is None
     assert set(r0["total"]) == {"current_percent", "final_percent", "display_value", "label", "passed", "warnings"}
@@ -174,26 +182,29 @@ async def test_stale_count_after_scheme_change(db, api):
     a.grading_scheme_version_id = PASS_FAIL_V1_ID
     a.grading_changed_at = clock.now()
     db.commit()
-    col = (await api.call(w.teacher, "GET", f"/courses/{w.cid}/gradebook")).json()["assessments"][0]
-    assert col["stale_count"] == 2 and col["scheme"]["id"] == str(PASS_FAIL_V1_ID)
+    c = (await api.call(w.teacher, "GET", f"/courses/{w.cid}/gradebook")).json()["assignments"][0]
+    assert c["stale_count"] == 2 and c["scheme"]["id"] == str(PASS_FAIL_V1_ID)
 
 
-async def test_assessment_ids_filter_comma_and_repeated(db, api):
+async def test_assignment_ids_filter_comma_and_repeated(db, api):
     w = gb_world(db, students=1)
     cols = [graded_assessment(db, w.course, w.teacher)[0] for _ in range(3)]
     base = f"/courses/{w.cid}/gradebook"
-    r = await api.call(w.teacher, "GET", base, params={"assessment_ids": f"{cols[2].id},{cols[0].id}"})
-    assert r.status_code == 200 and [x["id"] for x in r.json()["assessments"]] == [str(cols[0].id), str(cols[2].id)]
-    r = await api.call(w.teacher, "GET", base, params=[("assessment_ids", str(cols[1].id)),
-                                                       ("assessment_ids", str(cols[2].id))])
-    assert [x["id"] for x in r.json()["assessments"]] == [str(cols[1].id), str(cols[2].id)]
+    r = await api.call(w.teacher, "GET", base, params={"assignment_ids": f"{col(cols[2])},{col(cols[0])}"})
+    assert r.status_code == 200 and [x["id"] for x in r.json()["assignments"]] == [col(cols[0]), col(cols[2])]
+    r = await api.call(w.teacher, "GET", base, params=[("assignment_ids", col(cols[1])),
+                                                       ("assignment_ids", col(cols[2]))])
+    assert [x["id"] for x in r.json()["assignments"]] == [col(cols[1]), col(cols[2])]
+    # the legacy `assessment_ids` parameter still selects the quiz columns of those assessments
+    r = await api.call(w.teacher, "GET", base, params={"assessment_ids": str(cols[1].id)})
+    assert [x["id"] for x in r.json()["assignments"]] == [col(cols[1])]
     # unknown ids (other course, random) are simply not columns
-    r = await api.call(w.teacher, "GET", base, params={"assessment_ids": str(uuid.uuid4())})
-    assert r.status_code == 200 and r.json()["assessments"] == []
-    r = await api.call(w.teacher, "GET", base, params={"assessment_ids": "nope"})
+    r = await api.call(w.teacher, "GET", base, params={"assignment_ids": str(uuid.uuid4())})
+    assert r.status_code == 200 and r.json()["assignments"] == []
+    r = await api.call(w.teacher, "GET", base, params={"assignment_ids": "nope"})
     assert r.status_code == 422 and r.json()["error"]["code"] == "validation_failed"
     many = ",".join(str(uuid.uuid4()) for _ in range(101))
-    r = await api.call(w.teacher, "GET", base, params={"assessment_ids": many})
+    r = await api.call(w.teacher, "GET", base, params={"assignment_ids": many})
     assert r.status_code == 422 and r.json()["error"]["code"] == "too_many_rows"
 
 
@@ -316,7 +327,7 @@ async def test_gradebook_statement_count_is_fixed(db, api):
             r = await api.call(w.teacher, "GET", f"/courses/{w.cid}/gradebook", params={"limit": 50})
         assert r.status_code == 200
         if name == "big":
-            assert len(r.json()["rows"]) == 50 and len(r.json()["assessments"]) == 20
+            assert len(r.json()["rows"]) == 50 and len(r.json()["assignments"]) == 20
             assert all(len(row["cells"]) == 20 for row in r.json()["rows"])
         counts[name] = c.n
         # user, course, role, roster page, assessments (+counts), submissions, course_grades upsert
@@ -422,7 +433,7 @@ async def test_band_labels_reach_students_and_staff(db, api):
     assert "min_percent" not in str(mine) and "min_percent" not in str(res)
 
     gb = (await api.call(w.teacher, "GET", f"/courses/{w.cid}/gradebook")).json()
-    assert gb["assessments"][0]["scheme"]["labels"]["top"] == TOP
+    assert gb["assignments"][0]["scheme"]["labels"]["top"] == TOP
     staff = (await api.call(w.teacher, "GET", f"/courses/{w.cid}/assessments/{a.id}/attempts")).json()
     assert staff["items"][0]["grade"]["labels"] == {"top": TOP}
 
