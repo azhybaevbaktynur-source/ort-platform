@@ -7,7 +7,8 @@ import {
   isStaffCourseGrading, TOTAL_MODES, type CategoryOut, type CourseGradingStaffOut, type LatePolicy, type TotalMode,
 } from "@/lib/lms/gradingTypes";
 import type { Lang } from "@/lib/lms/types";
-import { btnPrimary, inputCls, labelCls } from "@/components/lms/content/ui";
+import { inputCls, labelCls } from "@/components/lms/content/ui";
+import { btnPrimary } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { SchemeError } from "../schemes/SchemeError";
 import { CategoriesEditor } from "./CategoriesEditor";
 import { SchemePicker } from "./SchemePicker";

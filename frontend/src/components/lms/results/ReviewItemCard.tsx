@@ -54,13 +54,17 @@ export function ReviewItemCard({
   number,
   maxPoints,
   children,
+  viewer = "student",
 }: {
   item: ReviewItemOut;
   number: number;
   maxPoints?: number | string | null;
   children?: React.ReactNode;
+  /** Phase 6b S5c (UX T12, T22): "staff" labels the answer "Student's answer". Both viewers use the body font (S7b, P7). */
+  viewer?: "student" | "staff";
 }) {
   const { t } = useTranslation();
+  const answerLabel = viewer === "staff" ? t("teaching.studentAnswer") : t("results.yourAnswer");
   const q: StudentQuestion = item.question;
   const resp = (item.response ?? {}) as Record<string, unknown>;
   const key = item.key ?? null;
@@ -114,7 +118,7 @@ export function ReviewItemCard({
                 </span>
                 {/* Phase 6 S8: layout only; the label wraps instead of widening the card at 375 px (long ky text). */}
                 <span className="min-w-0 max-w-[45%] text-right text-xs font-medium text-slate-600">
-                  {picked ? t("results.yourAnswer") : ""}{picked && correct ? " · " : ""}{correct ? t("results.correctAnswer") : ""}
+                  {picked ? answerLabel : ""}{picked && correct ? " · " : ""}{correct ? t("results.correctAnswer") : ""}
                 </span>
               </li>
             );
@@ -124,7 +128,7 @@ export function ReviewItemCard({
 
       {q.type === "true_false" && (
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
-          <div><dt className="text-xs text-slate-500">{t("results.yourAnswer")}</dt><dd className="font-medium">{typeof resp.value === "boolean" ? (resp.value ? t("results.true") : t("results.false")) : t("results.noAnswer")}</dd></div>
+          <div><dt className="text-xs text-slate-500">{answerLabel}</dt><dd className="font-medium">{typeof resp.value === "boolean" ? (resp.value ? t("results.true") : t("results.false")) : t("results.noAnswer")}</dd></div>
           {key && typeof key.correct === "boolean" && <div><dt className="text-xs text-slate-500">{t("results.correctAnswer")}</dt><dd className="font-medium text-emerald-700">{key.correct ? t("results.true") : t("results.false")}</dd></div>}
         </dl>
       )}
@@ -140,7 +144,7 @@ export function ReviewItemCard({
             ))}
           </div>
           <dl className="grid gap-2 text-sm sm:grid-cols-2">
-            <div><dt className="text-xs text-slate-500">{t("results.yourAnswer")}</dt><dd className="font-medium">{typeof resp.choice === "string" ? t(`bank.types.comparison.labels.${resp.choice}`) : t("results.noAnswer")}</dd></div>
+            <div><dt className="text-xs text-slate-500">{answerLabel}</dt><dd className="font-medium">{typeof resp.choice === "string" ? t(`bank.types.comparison.labels.${resp.choice}`) : t("results.noAnswer")}</dd></div>
             {key && typeof key.correct === "string" && <div><dt className="text-xs text-slate-500">{t("results.correctAnswer")}</dt><dd className="font-medium text-emerald-700">{t(`bank.types.comparison.labels.${key.correct}`)}</dd></div>}
           </dl>
         </div>
@@ -149,7 +153,7 @@ export function ReviewItemCard({
       {(q.type === "numeric" || q.type === "short_text") && (
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-xs text-slate-500">{t("results.yourAnswer")}</dt>
+            <dt className="text-xs text-slate-500">{answerLabel}</dt>
             <dd className="font-mono font-medium">{(q.type === "numeric" ? (resp.value as string | undefined) : (resp.text as string | undefined)) || t("results.noAnswer")}</dd>
           </div>
           {key && Array.isArray(key.answers) && key.answers.length > 0 && (
@@ -160,7 +164,7 @@ export function ReviewItemCard({
 
       {q.type === "essay" && (
         <div>
-          <p className="mb-1 text-xs text-slate-500">{t("results.yourAnswer")}</p>
+          <p className="mb-1 text-xs text-slate-500">{answerLabel}</p>
           {typeof resp.text === "string" && resp.text.trim() ? (
             <p className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-900">{resp.text}</p>
           ) : (

@@ -5,7 +5,8 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { ImagePicker } from "../ImagePicker";
 import { RichTextField } from "../RichTextField";
-import { btnSmall, inputCls, labelCls } from "../ui";
+import { inputCls, labelCls } from "../ui";
+import { btnSmall } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { nextChoiceId, type ChoiceForm, type QuestionForm } from "./formModel";
 
 /** single_choice and multiple_answers: choices with letters as ids, mark correct, reorder, optional images. */

@@ -8,11 +8,12 @@ import { MathRenderer } from "@/components/math/MathRenderer";
 import { createPassage, getPassageVersion, listPassageVersions, revertPassage, updatePassage } from "@/lib/lms/content";
 import type { PassageOut, PassageVersionOut, PassageVersionSummaryOut } from "@/lib/lms/contentTypes";
 import type { Lang } from "@/lib/lms/types";
-import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
+import { ConfirmDialog } from "@/components/ui";
 import { Pager } from "@/components/lms/Pager";
 import { ContentError } from "./ContentError";
 import { ImagePicker } from "./ImagePicker";
-import { btnPrimary, btnSecondary, cardCls, inputCls, labelCls } from "./ui";
+import { cardCls, inputCls, labelCls } from "./ui";
+import { btnPrimary, btnSecondary } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import type { ImageOut } from "@/lib/lms/contentTypes";
 
 export function PassageEditor({
@@ -190,10 +191,9 @@ export function PassageHistory({
         )}
       </div>
       <ConfirmDialog open={confirm} busy={busy} title={t("bank.history.revertTitle", { n: selected?.version_no ?? 0 })}
-        body={t("bank.history.revertBody")} confirmLabel={t("bank.history.revert")}
-        onConfirm={() => void revert()} onCancel={() => setConfirm(false)}>
-        {revertError ? <ContentError error={revertError} className="mt-3" /> : null}
-      </ConfirmDialog>
+        effect={t("bank.history.revertBody")} confirmLabel={t("bank.history.revert")}
+        onConfirm={() => void revert()} onCancel={() => setConfirm(false)}
+        error={revertError ? <ContentError error={revertError} /> : undefined} />
     </div>
   );
 }

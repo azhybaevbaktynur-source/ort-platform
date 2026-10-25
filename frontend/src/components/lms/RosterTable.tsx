@@ -4,10 +4,15 @@ import React from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import type { CourseRole, RosterEntryOut } from "@/lib/lms/types";
 import { fmtApiDate } from "@/lib/format";
+import { Badge, type BadgeTone, type PaginationProps, Table, buttonClasses, cn } from "@/components/ui";
+import { fieldBase } from "@/components/ui/utils";
+
+const ROLE_TONE: Record<string, BadgeTone> = { teacher: "info", assistant: "neutral", student: "neutral" };
 
 /**
  * Staff roster table. Action visibility is decided by the caller through the can* props
  * (owner-only actions per P1-8); the server enforces the real rules.
+ * Phase 6b S5c (UX T2): design-system Table: stacked cards under 640 px (name + role, email, actions row), a count line.
  */
 export function RosterTable({
   entries,
@@ -17,6 +22,8 @@ export function RosterTable({
   onChangeRole,
   onRemove,
   busyId,
+  countText,
+  pagination,
 }: {
   entries: RosterEntryOut[];
   canRemove: (e: RosterEntryOut) => boolean;
@@ -25,61 +32,62 @@ export function RosterTable({
   onChangeRole: (e: RosterEntryOut, role: CourseRole) => void;
   onRemove: (e: RosterEntryOut) => void;
   busyId?: string | null;
+  countText?: string;
+  pagination?: PaginationProps;
 }) {
   const { t } = useTranslation();
   const fmt = (s: string | null) => fmtApiDate(s) || "—";
+  const name = (e: RosterEntryOut) => e.user.display_name || e.user.email.split("@")[0];
   return (
-    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-      <table className="w-full text-left text-sm">
-        <caption className="sr-only">{t("courses.people.tableCaption")}</caption>
-        <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-          <tr>
-            <th scope="col" className="px-4 py-3">{t("courses.people.name")}</th>
-            <th scope="col" className="px-4 py-3">{t("courses.people.email")}</th>
-            <th scope="col" className="px-4 py-3">{t("courses.people.role")}</th>
-            <th scope="col" className="px-4 py-3">{t("courses.people.state")}</th>
-            <th scope="col" className="px-4 py-3">{t("courses.people.since")}</th>
-            <th scope="col" className="px-4 py-3"><span className="sr-only">{t("courses.people.actions")}</span></th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {entries.map((e) => {
-            const busy = busyId === e.enrollment_id;
-            return (
-              <tr key={e.enrollment_id}>
-                <td className="px-4 py-3 font-medium text-slate-900">
-                  {e.user.display_name || e.user.email.split("@")[0]}
-                  {e.is_owner && <span className="ml-2 rounded-full bg-brand-100 px-2 py-0.5 text-xs font-semibold text-brand-700">{t("courses.roles.owner")}</span>}
-                </td>
-                <td className="px-4 py-3 text-slate-600">{e.user.email}</td>
-                <td className="px-4 py-3">
-                  {canChangeRole(e) ? (
-                    <select aria-label={t("courses.people.changeRole")} value={e.role} disabled={busy}
-                      onChange={(ev) => onChangeRole(e, ev.target.value as CourseRole)}
-                      className="rounded-lg border border-slate-300 px-2 py-1 text-sm">
-                      {roleOptions(e).map((r) => (
-                        <option key={r} value={r}>{t(`courses.roles.${r}`)}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    t(`courses.roles.${e.role}`)
-                  )}
-                </td>
-                <td className="px-4 py-3 text-slate-600">{t(`courses.people.states.${e.state === "removed" ? "removed" : "active"}`)}</td>
-                <td className="px-4 py-3 text-slate-600">{fmt(e.state === "removed" ? e.removed_at : e.activated_at)}</td>
-                <td className="px-4 py-3 text-right">
-                  {canRemove(e) && (
-                    <button type="button" disabled={busy} onClick={() => onRemove(e)}
-                      className="text-sm font-semibold text-red-600 hover:underline disabled:opacity-50">
-                      {t("courses.people.remove")}
-                    </button>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+    <Table<RosterEntryOut>
+      caption={t("courses.people.tableCaption")}
+      rows={entries}
+      rowKey={(e) => e.enrollment_id}
+      countText={countText}
+      pagination={pagination}
+      columns={[
+        {
+          key: "name", header: t("courses.people.name"), primary: true,
+          cell: (e) => (
+            <span className="inline-flex flex-wrap items-center gap-2">
+              <span className="break-words">{name(e)}</span>
+              {e.is_owner && <Badge tone="info">{t("courses.roles.owner")}</Badge>}
+            </span>
+          ),
+        },
+        { key: "email", header: t("courses.people.email"), cell: (e) => <span className="break-all text-slate-700">{e.user.email}</span>, mobilePriority: 0 },
+        {
+          key: "role", header: t("courses.people.role"), mobilePriority: 1,
+          cell: (e) => canChangeRole(e) ? (
+            <select aria-label={`${t("courses.people.changeRole")}: ${name(e)}`} value={e.role} disabled={busyId === e.enrollment_id}
+              onChange={(ev) => onChangeRole(e, ev.target.value as CourseRole)}
+              className={cn(fieldBase, "min-h-11 w-auto border-slate-300 py-1.5 pr-8 sm:min-h-9")}>
+              {roleOptions(e).map((r) => (
+                <option key={r} value={r}>{t(`courses.roles.${r}`)}</option>
+              ))}
+            </select>
+          ) : (
+            <Badge tone={ROLE_TONE[e.role] ?? "neutral"}>{t(`courses.roles.${e.role}`)}</Badge>
+          ),
+        },
+        {
+          key: "state", header: t("courses.people.state"), mobilePriority: 2,
+          cell: (e) => e.state === "removed"
+            ? <Badge tone="neutral">{t("courses.people.states.removed")}</Badge>
+            : <Badge tone="success">{t("courses.people.states.active")}</Badge>,
+        },
+        { key: "since", header: t("courses.people.since"), nowrap: true, mobilePriority: 3, cell: (e) => fmt(e.state === "removed" ? e.removed_at : e.activated_at) },
+        // The actions column only when some row can be removed (no empty action rows in the phone cards).
+        ...(entries.some(canRemove) ? [{
+          key: "actions", header: "", actions: true, align: "right" as const,
+          cell: (e: RosterEntryOut) => canRemove(e) ? (
+            <button type="button" disabled={busyId === e.enrollment_id} onClick={() => onRemove(e)}
+              className={buttonClasses({ variant: "secondary", size: "sm", className: "border-danger-200 text-danger-700 hover:bg-danger-50" })}>
+              {t("courses.people.remove")}<span className="sr-only">: {name(e)}</span>
+            </button>
+          ) : e.is_owner ? <span className="whitespace-normal text-sm text-slate-600">{t("teaching.ownerStays")}</span> : null,
+        }] : []),
+      ]}
+    />
   );
 }

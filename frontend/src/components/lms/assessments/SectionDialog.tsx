@@ -8,7 +8,8 @@ import { isAssessmentLocked, isPresetRuleLocked, useTemplateUi } from "@/lib/lms
 import { cleanLocalized } from "@/lib/lms/localized";
 import type { Lang, LocalizedText } from "@/lib/lms/types";
 import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
-import { btnPrimary, btnSecondary, inputCls, labelCls } from "@/components/lms/content/ui";
+import { inputCls, labelCls } from "@/components/lms/content/ui";
+import { btnPrimary, btnSecondary } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { AssessmentError } from "./AssessmentError";
 import { Modal } from "./Modal";
 import { minToSec, secToMin } from "./format";

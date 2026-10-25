@@ -4,7 +4,8 @@ import React from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { RichTextField } from "../RichTextField";
-import { btnSmall, inputCls, labelCls } from "../ui";
+import { inputCls, labelCls } from "../ui";
+import { btnSmall } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { blankNumeric, type QuestionForm } from "./formModel";
 
 type Props = { form: QuestionForm; onChange: (patch: Partial<QuestionForm>) => void; disabled?: boolean };

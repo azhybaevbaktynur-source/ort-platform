@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { Modal } from "@/components/lms/assessments/Modal";
-import { btnPrimary, btnSecondary } from "@/components/lms/content/ui";
+import { btnPrimary, btnSecondary } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 
 export interface ColumnOption {
   id: string;
