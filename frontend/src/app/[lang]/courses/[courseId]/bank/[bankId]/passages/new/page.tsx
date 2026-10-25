@@ -14,7 +14,7 @@ export default function NewPassagePage() {
   const { bankId } = useParams<{ bankId: string }>();
   const { course } = useCourse();
   const base = `/${lang}/courses/${course.id}/bank`;
-  const crumbs = useTabCrumbs("bank", [{ label: t("bank.passages.back"), href: `${base}/${bankId}/passages` }, { label: t("bank.passages.new") }], course.id);
+  const crumbs = useTabCrumbs("bank", [{ label: t("bank.passages.crumb"), href: `${base}/${bankId}/passages` }, { label: t("bank.passages.new") }], course.id);
   if (course.status === "concluded") return <p className="text-sm text-slate-600">{t("bank.concluded")}</p>;
   return (
     <div className="space-y-4">

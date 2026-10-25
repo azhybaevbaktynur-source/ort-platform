@@ -3,7 +3,7 @@
 import React from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import type { AuditEntryOut } from "@/lib/lms/types";
-import { fmtApiDateTime } from "@/lib/format";
+import { fmtApiDateTimeShort } from "@/lib/format";
 import { Table, type PaginationProps, type TableColumn } from "@/components/ui";
 import { focusRing } from "@/components/ui";
 
@@ -31,10 +31,12 @@ export function AuditTable({ entries, loading, error, empty, pagination, countTe
 }) {
   const { t, lang } = useTranslation();
   const label = useAuditActionLabel();
-  const details = (e: AuditEntryOut) => (e.details && Object.keys(e.details).length ? JSON.stringify(e.details) : "—");
+  const hasDetails = (e: AuditEntryOut) => !!e.details && Object.keys(e.details).length > 0;
+  const details = (e: AuditEntryOut) => (hasDetails(e) ? JSON.stringify(e.details) : "—");
+  const prettyDetails = (e: AuditEntryOut) => JSON.stringify(e.details, null, 2);
   const columns: TableColumn<AuditEntryOut>[] = [
     { key: "action", header: t("platformAdmin.audit.action"), primary: true, cell: (e) => label(e.action) },
-    { key: "when", header: t("platformAdmin.audit.when"), nowrap: true, cell: (e) => fmtApiDateTime(e.created_at, lang) },
+    { key: "when", header: t("platformAdmin.audit.when"), nowrap: true, cell: (e) => fmtApiDateTimeShort(e.created_at, lang) },
     { key: "actor", header: t("platformAdmin.audit.actor"), cell: (e) => e.actor.display_name || e.actor.email },
     {
       key: "target", header: t("platformAdmin.audit.target"), hideOnMobile: true,
@@ -42,8 +44,16 @@ export function AuditTable({ entries, loading, error, empty, pagination, countTe
     },
     { key: "reason", header: t("platformAdmin.audit.reason"), cell: (e) => e.reason || "—" },
     {
-      key: "details", header: t("platformAdmin.audit.details"), hideOnMobile: true,
-      cell: (e) => <code className="break-all text-xs text-slate-700">{details(e)}</code>,
+      // Phase 6b S11b (UX 7): the raw details sit behind a "Details" disclosure instead of a JSON blob in the row.
+      key: "details", header: t("platformAdmin.audit.details"), hideOnMobile: true, className: "sm:w-0",
+      cell: (e) => hasDetails(e) ? (
+        <details className="group max-w-xs">
+          <summary className={`inline-flex cursor-pointer items-center rounded-lg text-sm font-semibold text-brand-700 hover:underline ${focusRing}`}>
+            {t("platformAdmin.audit.details")}
+          </summary>
+          <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-slate-50 p-2 text-xs text-slate-700">{prettyDetails(e)}</pre>
+        </details>
+      ) : <span className="text-slate-500">—</span>,
     },
     {
       key: "more", header: "", actions: true, className: "sm:hidden", headerClassName: "sm:hidden",
@@ -53,7 +63,9 @@ export function AuditTable({ entries, loading, error, empty, pagination, countTe
             {t("platformAdmin.audit.details")}
           </summary>
           <p className="break-all text-xs"><span className="text-slate-600">{e.target_type}</span> <code>{e.target_id}</code></p>
-          <code className="mt-1 block break-all text-xs text-slate-700">{details(e)}</code>
+          {hasDetails(e)
+            ? <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-slate-50 p-2 text-xs text-slate-700">{prettyDetails(e)}</pre>
+            : <p className="mt-1 text-xs text-slate-500">{details(e)}</p>}
         </details>
       ),
     },

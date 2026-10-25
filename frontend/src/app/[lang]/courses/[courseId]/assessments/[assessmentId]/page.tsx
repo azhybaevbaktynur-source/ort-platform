@@ -78,7 +78,7 @@ export default function AssessmentPage() {
       <PublishPanel assessment={a} courseId={course.id} canEdit={canEdit} onChanged={load} />
       <Card padding="md">
         <DescriptionList twoColumns items={[
-          { term: t("assessments.overview.items"), description: `${a.item_count} · ${t("assessments.overview.points", { n: fmtPoints(a.points_possible) })}` },
+          { term: t("assessments.overview.items"), description: `${a.item_count} · ${t("assessments.overview.points", { n: fmtPoints(a.points_possible), count: Number(a.points_possible) })}` },
           { term: t("assessments.settings.languages"), description: a.languages.map((l) => l.toUpperCase()).join(", ") },
           { term: t("assessments.settings.attempts"), description: a.allowed_attempts === -1 ? t("assessments.settings.unlimited") : a.allowed_attempts },
           { term: t("assessments.settings.timeLimit"), description: a.time_limit_s ? t("assessments.student.minutes", { n: Math.round(a.time_limit_s / 60) }) : t("assessments.lobby.noLimit") },

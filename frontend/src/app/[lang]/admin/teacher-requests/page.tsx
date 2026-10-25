@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/context";
 import { approveTeacherRequest, listTeacherRequests, rejectTeacherRequest, setTeacherStatus } from "@/lib/lms/admin";
 import type { TeacherRequestAdminOut, TeacherRequestStatus } from "@/lib/lms/types";
-import { fmtApiDateTime } from "@/lib/format";
+import { fmtApiDateTimeShort } from "@/lib/format";
 import { Badge, Button, Card, EmptyState, LoadingState, PageHeader, Pagination, ReasonDialog, TabPanel, Tabs, toast } from "@/components/ui";
 import { UserStatusBadge } from "@/components/lms/admin/UserStatusBadge";
 import { useAdminCrumbs, useAdminSummary } from "@/components/lms/admin/AdminShell";
@@ -103,11 +103,11 @@ export default function TeacherRequestsPage() {
                       )}
                     </div>
                   </div>
-                  <p className="mt-1 text-sm text-slate-600">{fmtApiDateTime(r.created_at, lang)}</p>
+                  <p className="mt-1 text-sm text-slate-600">{fmtApiDateTimeShort(r.created_at, lang)}</p>
                   <p className="mt-3 whitespace-pre-wrap break-words text-base leading-6 text-slate-800 sm:text-sm">{r.message || t("platformAdmin.requests.noMessage")}</p>
                   {r.reason && <p className="mt-2 break-words text-sm text-slate-800"><strong>{t("teacherRequest.reason")}:</strong> {r.reason}</p>}
                   {r.decided_by && r.decided_at && (
-                    <p className="mt-1 text-sm text-slate-600">{t("platformAdmin.requests.decidedBy", { name: r.decided_by.display_name || r.decided_by.email, date: fmtApiDateTime(r.decided_at, lang) })}</p>
+                    <p className="mt-1 text-sm text-slate-600">{t("platformAdmin.requests.decidedBy", { name: r.decided_by.display_name || r.decided_by.email, date: fmtApiDateTimeShort(r.decided_at, lang) })}</p>
                   )}
                   {(r.status === "pending" || r.user_teacher_status === "approved") && (
                     <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap">

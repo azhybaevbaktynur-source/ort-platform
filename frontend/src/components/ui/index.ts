@@ -3,6 +3,8 @@ export { cn, focusRing } from "./utils";
 export { Spinner } from "./Spinner";
 export { Button, LinkButton, buttonClasses } from "./Button";
 export type { ButtonProps, LinkButtonProps, ButtonVariant, ButtonSize, ButtonStyleOptions } from "./Button";
+export { MenuButton } from "./MenuButton";
+export type { MenuButtonProps, MenuItem } from "./MenuButton";
 export { IconButton } from "./IconButton";
 export type { IconButtonProps, IconButtonVariant } from "./IconButton";
 export { FieldLabel, FieldHint, FieldError, useFieldIds } from "./Field";

@@ -9,7 +9,7 @@ import { disableUser, enableUser, getUser, setTeacherStatus } from "@/lib/lms/ad
 import type { AdminUserDetailOut } from "@/lib/lms/types";
 import { pickLocalized } from "@/lib/lms/localized";
 import { isSystemAccount } from "@/lib/lms/organizations";
-import { fmtApiDateTime } from "@/lib/format";
+import { fmtApiDateTimeShort } from "@/lib/format";
 import { Badge, Button, Card, DescriptionList, LoadingState, PageHeader, ReasonDialog, toast } from "@/components/ui";
 import { UserStatusBadge } from "@/components/lms/admin/UserStatusBadge";
 import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
@@ -103,7 +103,7 @@ export default function AdminUserDetailPage() {
       {canDisable && (user.disabled_at ? (
         <Button variant="secondary" loading={enabling} onClick={() => void enable()}>{t("platformAdmin.users.enable")}</Button>
       ) : (
-        <Button variant="danger" onClick={() => { setDialogError(null); setAction("disable"); }}>{t("platformAdmin.users.disable")}</Button>
+        <Button variant="dangerOutline" onClick={() => { setDialogError(null); setAction("disable"); }}>{t("platformAdmin.users.disable")}</Button>
       ))}
     </>
   ) : undefined;
@@ -123,7 +123,7 @@ export default function AdminUserDetailPage() {
         <DescriptionList twoColumns items={[
           { key: "teacher", term: t("platformAdmin.users.teacherStatus"), description: user.teacher_status === "none" ? t("organizations.adminUser.notTeacher") : <UserStatusBadge kind="teacher" status={user.teacher_status} /> },
           { key: "id", term: t("organizations.adminUser.userId"), description: <span className="break-all font-mono text-sm">{user.id}</span> },
-          { key: "created", term: t("platformAdmin.users.created"), description: fmtApiDateTime(user.created_at, lang) },
+          { key: "created", term: t("platformAdmin.users.created"), description: fmtApiDateTimeShort(user.created_at, lang) },
           { key: "verified", term: t("platformAdmin.users.emailVerified"), description: user.email_verified ? t("platformAdmin.yes") : t("platformAdmin.no") },
           { key: "enrollments", term: t("platformAdmin.users.activeEnrollments"), description: user.active_enrollment_count },
           ...(user.disabled_at ? [{ key: "reason", term: t("platformAdmin.users.disabledReason"), description: user.disabled_reason || "—" }] : []),
@@ -154,7 +154,7 @@ export default function AdminUserDetailPage() {
               <li key={r.id} className="px-4 py-3 text-sm sm:px-6">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <Badge>{t(`teacherRequest.requestStatus.${r.status}`)}</Badge>
-                  <time className="text-sm text-slate-600">{fmtApiDateTime(r.created_at, lang)}</time>
+                  <time className="text-sm text-slate-600">{fmtApiDateTimeShort(r.created_at, lang)}</time>
                 </div>
                 {r.message && <p className="mt-2 whitespace-pre-wrap break-words text-slate-800">{r.message}</p>}
                 {r.reason && <p className="mt-1 break-words text-slate-800"><strong>{t("teacherRequest.reason")}:</strong> {r.reason}</p>}

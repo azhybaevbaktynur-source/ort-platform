@@ -106,14 +106,19 @@ export default function OrgTeachersPage() {
     { key: "email", header: t("invitations.dialog.email"), primary: true, className: "sm:min-w-[12rem]", cell: (i) => <span className="[overflow-wrap:anywhere]">{i.email}</span> },
     { key: "role", header: t("organizations.adminUser.role"), cell: (i) => t(`invitations.roles.${i.role}`) },
     { key: "state", header: t("organizations.admin.status"), cell: (i) => <OrgBadge tone={i.state === "pending" ? "invited" : i.state} labelKey={`invitations.state.${i.state}`} /> },
+    // Phase 6b S11b (UX 12): "Invited by" (who and when) and "Valid until" are two columns.
     {
-      key: "sent", header: t("invitations.sentColumn"),
+      key: "invitedBy", header: t("invitations.invitedByColumn"),
       cell: (i) => (
         <>
-          {t("invitations.sentBy", { name: i.invited_by_name || "—", date: fmtApiDate(i.created_at, lang) })}
-          {i.state === "pending" && <span className="block text-sm text-slate-600">{t("invitations.expiresOn", { date: fmtApiDate(i.expires_at, lang) })}</span>}
+          {i.invited_by_name || "—"}
+          <span className="block text-sm text-slate-600">{fmtApiDate(i.created_at, lang)}</span>
         </>
       ),
+    },
+    {
+      key: "validUntil", header: t("invitations.validUntilColumn"), nowrap: true,
+      cell: (i) => (i.state === "pending" ? fmtApiDate(i.expires_at, lang) : "—"),
     },
     {
       key: "actions", header: "", actions: true, align: "right",

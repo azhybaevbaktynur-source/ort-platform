@@ -116,7 +116,8 @@ function Builder() {
   return (
     <div className="space-y-4">
       {/* Phase 6b S5c: PageHeader with breadcrumbs; the one primary of the page is "Publish" in the publish panel (UX T8). */}
-      <PageHeader breadcrumbs={crumbs} title={t("assessments.builder.title", { title })} className="mb-2" />
+      {/* Phase 6b S11b (UX 3): the assessment name is the title; "Edit" is the last breadcrumb. */}
+      <PageHeader breadcrumbs={crumbs} title={title} className="mb-2" />
       {!canEdit && <p className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-sm text-amber-900">{t("assessments.builder.readOnly")}</p>}
       <PublishPanel assessment={a} courseId={course.id} canEdit={canEdit} onChanged={load} />
       <details className="rounded-2xl">

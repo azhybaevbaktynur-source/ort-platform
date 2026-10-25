@@ -5,13 +5,15 @@ import Link from "next/link";
 import { Spinner } from "./Spinner";
 import { cn, focusRing } from "./utils";
 
-export type ButtonVariant = "primary" | "secondary" | "danger" | "link";
+export type ButtonVariant = "primary" | "secondary" | "danger" | "dangerOutline" | "link";
 export type ButtonSize = "sm" | "md" | "lg";
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary: "bg-brand-600 text-white shadow-sm hover:bg-brand-700 active:bg-brand-800",
   secondary: "border border-slate-300 bg-white text-slate-800 shadow-sm hover:bg-slate-50 active:bg-slate-100",
   danger: "bg-danger-600 text-white shadow-sm hover:bg-danger-700 active:bg-danger-800",
+  // Phase 6b S11b: a destructive action that opens a confirmation (page headers); the filled `danger` is for the confirm button.
+  dangerOutline: "border border-danger-300 bg-white text-danger-700 shadow-sm hover:bg-danger-50 active:bg-danger-100",
   link: "text-brand-700 underline-offset-4 hover:text-brand-800 hover:underline",
 };
 
