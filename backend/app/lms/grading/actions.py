@@ -1,4 +1,5 @@
-"""Grade actions: override, excuse, release, unrelease, void (design 3.6, P4-11, P4-14, P4-16, P4-20).
+"""Grade actions: override, excuse, release, unrelease, void (design 3.6, P4-11, P4-14, P4-16, P4-20; Phase 7a
+4.3: release/unrelease/regrade per assignment, override/excuse on manual rows through `assignments.grading`).
 
 Every mutation: (router) authenticate -> load_course -> (here) require_course(GRADES_MANAGE) -> ratelimit.enforce ->
 load the child scoped by (course.id, id) -> write -> commit. Services raise LMSError before commit.
@@ -16,12 +17,14 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from types import SimpleNamespace
 from typing import Optional
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import case, delete, select, update
 from sqlalchemy.orm import Session
 
 from app.core.authz import A, AuthzContext
 from app.core.config import settings
 from app.lms.assessments.models import Assessment
+from app.lms.assignments import grading as manual
+from app.lms.assignments.models import Assignment
 from app.lms.attempts.models import Attempt
 from app.lms.core import clock, ratelimit
 from app.lms.core.errors import Conflict, NotFound, ValidationFailed
@@ -61,16 +64,23 @@ def _gate(ctx: AuthzContext, course: Course, limit: ratelimit.Limit) -> None:
 
 def load_submission(db: Session, course_id, submission_id, *, for_update: bool = False
                     ) -> tuple[dict, SimpleNamespace, Optional[str]]:
-    """(submission row, grading settings of its live assessment + course late policy, override_by display name)
-    in ONE statement; FOR UPDATE OF submissions only. Any miss (other course, deleted assessment, unknown id) ->
-    404 `submission_not_found`."""
+    """(submission row, grading settings of its live assignment + course late policy, override_by display name)
+    in ONE statement; FOR UPDATE OF submissions only. Any miss (other course, deleted assignment, unknown id) ->
+    404 `submission_not_found`. Phase 7a: the settings come from the assessment for quiz rows (the truth, 3.2) and
+    from the assignment for none/text/file rows; `kind` tells the writers which recompute to run."""
+    A, Q = Assignment, Assessment
+    is_quiz = A.kind == "quiz"
     stmt = (
-        select(S, Assessment.score_policy, Assessment.grading_scheme_version_id, Assessment.due_at,
-               Assessment.grade_release, Course.late_policy, User.display_name, User.email)
-        .join(Assessment, Assessment.id == S.c.assessment_id)
+        select(S, A.kind, A.points_possible.label("a_points"), A.grading_scheme_version_id.label("a_vid"),
+               A.due_at.label("a_due_at"), A.grade_release.label("a_release"),
+               Q.score_policy, Q.grading_scheme_version_id, Q.due_at, Q.grade_release, Course.late_policy,
+               User.display_name, User.email)
+        .join(A, A.id == S.c.assignment_id)
+        .outerjoin(Q, Q.id == A.assessment_id)
         .join(Course, Course.id == S.c.course_id)
         .outerjoin(User, User.id == S.c.override_by_id)
-        .where(S.c.id == submission_id, S.c.course_id == course_id, Assessment.deleted_at.is_(None))
+        .where(S.c.id == submission_id, S.c.course_id == course_id,
+               case((is_quiz, Q.deleted_at), else_=A.deleted_at).is_(None))
     )
     if for_update:
         stmt = stmt.with_for_update(of=S)
@@ -79,9 +89,18 @@ def load_submission(db: Session, course_id, submission_id, *, for_update: bool =
         raise submission_not_found()
     m = r._mapping
     sub = {c.name: m[c] for c in S.c}
-    settings_row = SimpleNamespace(
-        score_policy=m[Assessment.score_policy], grading_scheme_version_id=m[Assessment.grading_scheme_version_id],
-        due_at=m[Assessment.due_at], grade_release=m[Assessment.grade_release], late_policy=m[Course.late_policy])
+    kind = m[A.kind]
+    if kind == "quiz":
+        settings_row = SimpleNamespace(
+            kind=kind, assignment_id=sub["assignment_id"], score_policy=m[Q.score_policy],
+            grading_scheme_version_id=m[Q.grading_scheme_version_id], due_at=m[Q.due_at],
+            grade_release=m[Q.grade_release], late_policy=m[Course.late_policy],
+            points_possible=sub["points_possible"])
+    else:
+        settings_row = SimpleNamespace(
+            kind=kind, assignment_id=sub["assignment_id"], score_policy=None,
+            grading_scheme_version_id=m["a_vid"], due_at=m["a_due_at"], grade_release=m["a_release"] or "manual",
+            late_policy=m[Course.late_policy], points_possible=m["a_points"])
     name = (m[User.display_name] or m[User.email]) if sub["override_by_id"] else None
     return sub, settings_row, name
 
@@ -92,12 +111,9 @@ def _check_version(sub: dict, version: int) -> None:
                        details={"version": sub["version"]})
 
 
-def _live_assessment(db: Session, course_id, assessment_id) -> Assessment:
-    a = db.execute(select(Assessment).where(Assessment.id == assessment_id, Assessment.course_id == course_id,
-                                            Assessment.deleted_at.is_(None))).scalar_one_or_none()
-    if a is None:
-        raise assessment_not_found()
-    return a
+def _live_assignment(db: Session, course_id, assignment_id):
+    """The live assignment of the course (quiz: its assessment must be live too) or 404 `assignment_not_found`."""
+    return manual.load_assignment(db, course_id, assignment_id)
 
 
 # ------------------------------------------------------------------ staff payload
@@ -122,7 +138,30 @@ def staff_out(db: Session, sub: dict, settings_row, attempts: list, override_by_
     events = [ser.GradeEventOut(**e) for e in list_events(db, sub["id"])]
     return ser.SubmissionStaffOut(
         **ser.cell_fields(sub), override_reason=sub["override_reason"], override_by_name=override_by_name,
-        override_at=sub["override_at"], attempts=out_attempts, events=events)
+        override_at=sub["override_at"], attempts=out_attempts, events=events,
+        **manual.staff_extension(db, sub, getattr(settings_row, "kind", "quiz")))
+
+
+def _current_out(db: Session, sub: dict, srow, by_name: Optional[str]) -> ser.SubmissionStaffOut:
+    """The staff payload of an unchanged row (no write)."""
+    if srow.kind != "quiz":
+        return manual.manual_staff_out(db, sub, srow, by_name)
+    attempts = subs.counted_attempts(db, sub["assessment_id"], sub["enrollment_id"], with_grades=True)
+    return staff_out(db, sub, srow, attempts, by_name)
+
+
+def _recompute_out(db: Session, ctx: AuthzContext, sub: dict, srow, *, now, reason, event, extra,
+                   by_name: Optional[str]) -> ser.SubmissionStaffOut:
+    """Recompute + event + staff payload: the Phase 4 attempt path for quiz rows (unchanged), the manual path
+    (stored raw points and late seconds; only `override_points` / `state` change) for none/text/file rows."""
+    if srow.kind != "quiz":
+        ch = manual.recompute_manual(db, sub, srow, srow, None, now=now, actor_id=ctx.user.id, reason=reason,
+                                     event=event, extra=extra)
+        return manual.manual_staff_out(db, ch.row, srow, by_name)
+    attempts = subs.counted_attempts(db, sub["assessment_id"], sub["enrollment_id"], with_grades=True)
+    ch = subs.recompute_submission(db, sub, srow, srow, attempts, now=now, actor_id=ctx.user.id, reason=reason,
+                                   event=event, extra=extra)
+    return staff_out(db, ch.row, srow, attempts, by_name)
 
 
 def _actor_name(ctx: AuthzContext) -> Optional[str]:
@@ -153,8 +192,7 @@ def override(db: Session, ctx: AuthzContext, course: Course, submission_id, data
     reason = (data.reason or "").strip() or None
     if data.points is None:
         if sub["override_points"] is None:  # nothing to clear: no write, no event
-            attempts = subs.counted_attempts(db, sub["assessment_id"], sub["enrollment_id"], with_grades=True)
-            out = staff_out(db, sub, srow, attempts, by_name)
+            out = _current_out(db, sub, srow, by_name)
             db.rollback()
             return out
         extra = {"override_points": None, "override_reason": None, "override_by_id": None, "override_at": None}
@@ -166,10 +204,7 @@ def override(db: Session, ctx: AuthzContext, course: Course, submission_id, data
         extra = {"override_points": pts, "override_reason": reason, "override_by_id": ctx.user.id,
                  "override_at": now}
         event, by_name = "override", _actor_name(ctx)
-    attempts = subs.counted_attempts(db, sub["assessment_id"], sub["enrollment_id"], with_grades=True)
-    ch = subs.recompute_submission(db, sub, srow, srow, attempts, now=now, actor_id=ctx.user.id, reason=reason,
-                                   event=event, extra=extra)
-    out = staff_out(db, ch.row, srow, attempts, by_name)
+    out = _recompute_out(db, ctx, sub, srow, now=now, reason=reason, event=event, extra=extra, by_name=by_name)
     db.commit()
     return out
 
@@ -183,16 +218,15 @@ def excuse(db: Session, ctx: AuthzContext, course: Course, submission_id, data: 
     sub, srow, by_name = load_submission(db, course.id, submission_id, for_update=True)
     _check_version(sub, data.version)
     reason = (data.reason or "").strip() or None
-    attempts = subs.counted_attempts(db, sub["assessment_id"], sub["enrollment_id"], with_grades=True)
     is_excused = sub["state"] == "excused"
     if bool(data.excused) == is_excused:
-        out = staff_out(db, sub, srow, attempts, by_name)
+        out = _current_out(db, sub, srow, by_name)
         db.rollback()
         return out
-    ch = subs.recompute_submission(db, sub, srow, srow, attempts, now=now, actor_id=ctx.user.id, reason=reason,
-                                   event="excused" if data.excused else "unexcused",
-                                   extra={"state": "excused" if data.excused else "graded"})  # graded: re-derived
-    out = staff_out(db, ch.row, srow, attempts, by_name)
+    out = _recompute_out(db, ctx, sub, srow, now=now, reason=reason,
+                         event="excused" if data.excused else "unexcused",
+                         extra={"state": "excused" if data.excused else "graded"},  # graded: re-derived
+                         by_name=by_name)
     db.commit()
     return out
 
@@ -208,7 +242,7 @@ def _ids(submission_ids: Optional[list]) -> Optional[list]:
     return sorted({uuid.UUID(str(i)) for i in submission_ids})
 
 
-def _release_chunks(db: Session, ctx: AuthzContext, course: Course, assessment_id, submission_ids, *,
+def _release_chunks(db: Session, ctx: AuthzContext, course: Course, assignment_id, submission_ids, *,
                     release: bool) -> int:
     """Lock + update in submissions.id order, <= GRADES_REGRADE_CHUNK rows per transaction (each commits), one
     multi-row grade_events insert per chunk. Termination: an id cursor (each row is visited at most once)."""
@@ -220,7 +254,7 @@ def _release_chunks(db: Session, ctx: AuthzContext, course: Course, assessment_i
     course_id, actor_id = course.id, ctx.user.id  # plain values: ORM rows expire at each chunk commit
     total, last = 0, None
     while True:
-        sel = select(S.c.id).where(S.c.assessment_id == assessment_id, S.c.course_id == course_id)
+        sel = select(S.c.id).where(S.c.assignment_id == assignment_id, S.c.course_id == course_id)
         sel = sel.where(S.c.released_at.is_(None) if release else S.c.released_at.is_not(None))
         if ids is not None:
             sel = sel.where(S.c.id.in_(ids))
@@ -252,25 +286,26 @@ def _release_chunks(db: Session, ctx: AuthzContext, course: Course, assessment_i
     return total
 
 
-def release(db: Session, ctx: AuthzContext, course: Course, assessment_id, submission_ids: Optional[list]
+def release(db: Session, ctx: AuthzContext, course: Course, assignment_id, submission_ids: Optional[list]
             ) -> gs.ReleaseOut:
-    """GRADES_MANAGE + `grades_release_1h`. Idempotent: only unreleased rows are touched; {released: n}."""
+    """GRADES_MANAGE + `grades_release_1h`. Idempotent: only unreleased rows are touched; {released: n}.
+    Phase 7a: addressed by assignment (quiz: `assignment_id_for(assessment_id)`)."""
     _gate(ctx, course, ratelimit.grades_release_limit())
-    a = _live_assessment(db, course.id, assessment_id)
+    a = _live_assignment(db, course.id, assignment_id)
     aid = a.id
     return gs.ReleaseOut(released=_release_chunks(db, ctx, course, aid, submission_ids, release=True))
 
 
-def unrelease(db: Session, ctx: AuthzContext, course: Course, assessment_id, submission_ids: Optional[list]
+def unrelease(db: Session, ctx: AuthzContext, course: Course, assignment_id, submission_ids: Optional[list]
               ) -> gs.UnreleaseOut:
     """Symmetric to `release`: released_at -> NULL (the student view hides the grade). Only for `manual` release:
     with `auto` the next hook or regrade would silently release again -> 409 `grade_release_auto`."""
     _gate(ctx, course, ratelimit.grades_release_limit())
-    a = _live_assessment(db, course.id, assessment_id)
+    a = _live_assignment(db, course.id, assignment_id)
     aid = a.id
     if (a.grade_release or "auto") == "auto":
         db.rollback()
-        raise Conflict("Grades of this assessment are released automatically", code="grade_release_auto",
+        raise Conflict("Grades of this assignment are released automatically", code="grade_release_auto",
                        details={"grade_release": "auto"})
     return gs.UnreleaseOut(unreleased=_release_chunks(db, ctx, course, aid, submission_ids, release=False))
 
@@ -296,7 +331,7 @@ def void_attempt(db: Session, ctx: AuthzContext, course: Course, attempt_id, rea
     old_status = attempt.status
     db.execute(update(Attempt.__table__).where(Attempt.__table__.c.id == attempt.id).values(status="void"))
     if not attempt.is_preview:
-        srow = subs.load_context(db, attempt.assessment_id)
+        srow = subs.load_context(db, attempt.assessment_id, attempt.enrollment_id)
         sub = subs.lock_or_create_submission(
             db, course_id=attempt.course_id, assessment_id=attempt.assessment_id,
             enrollment_id=attempt.enrollment_id, user_id=attempt.user_id, kept_policy=srow.score_policy, now=now)
