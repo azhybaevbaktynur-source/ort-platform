@@ -3,7 +3,7 @@
 // Phase 7a S5: grade one student's work (PHASE_7A_DESIGN 3.6, 5): hand-ins (text shown, files to download), rubric
 // scores with their sum, points, feedback text and an optional feedback file, save with the optimistic version
 // (409 stale_grade reloads the latest state), release / hide for this student, clear the grade.
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Download, Paperclip, Upload, X } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import {
@@ -19,10 +19,16 @@ import { Badge, Button, Card, ConfirmDialog, IconButton, Input, LoadingState, Te
 import { AssignmentError, LateBadge, fmtBytes, fmtPts, parsePoints, useAssignmentErrorText } from "./assignmentUi";
 
 interface ScoreRow { points: string; comment: string }
+/** The values the form was seeded with (Phase 7a UX: unsaved changes are compared with them). */
+interface Seeded { points: string; scores: Record<string, ScoreRow>; feedback: string; assetId: string | null }
 
-export function GradePanel({
-  courseId, assignment, row, defaultLanguage, canManage, onChanged, onPrev, onNext,
-}: {
+/** Phase 7a UX: the grading screen saves the panel before switching student ("Save and go"). */
+export interface GradePanelHandle {
+  /** Saves the grade; true when it was saved (false: invalid, conflict or error, shown in the panel). */
+  save: () => Promise<boolean>;
+}
+
+export const GradePanel = forwardRef<GradePanelHandle, {
   courseId: string;
   assignment: AssignmentStaffOut;
   row: AssignmentSubmissionRowOut;
@@ -32,7 +38,11 @@ export function GradePanel({
   onChanged: (sub: AssignmentSubmissionStaffOut | null) => void;
   onPrev?: () => void;
   onNext?: () => void;
-}) {
+  /** Phase 7a UX: the form differs from the saved grade (points, rubric, feedback text or file) */
+  onDirtyChange?: (dirty: boolean) => void;
+}>(function GradePanel({
+  courseId, assignment, row, defaultLanguage, canManage, onChanged, onPrev, onNext, onDirtyChange,
+}, ref) {
   const { lang, t } = useTranslation();
   const errorText = useAssignmentErrorText();
   const rubric = useMemo(() => [...(assignment.rubric ?? [])].sort((a, b) => a.position - b.position), [assignment.rubric]);
@@ -49,11 +59,13 @@ export function GradePanel({
   const [error, setError] = useState<unknown>(null);
   const [clearing, setClearing] = useState(false);
   const [touched, setTouched] = useState(false);
+  const [seeded, setSeeded] = useState<Seeded | null>(null);
   const submissionId = row.cell?.submission_id ?? null;
 
   const seed = useCallback((s: AssignmentSubmissionStaffOut | null) => {
     setSub(s);
-    setPoints(s && s.raw_points !== null && s.raw_points !== undefined ? fmtPts(s.raw_points) : "");
+    const seedPoints = s && s.raw_points !== null && s.raw_points !== undefined ? fmtPts(s.raw_points) : "";
+    setPoints(seedPoints);
     const next: Record<string, ScoreRow> = {};
     for (const c of rubric) {
       const sc = s?.rubric_scores?.find((x) => x.criterion_id === c.id);
@@ -62,6 +74,7 @@ export function GradePanel({
     setScores(next);
     setFeedback(s?.feedback_text ?? "");
     setFeedbackAsset(s?.feedback_asset_id ? { id: s.feedback_asset_id, name: t("assignments.grade.feedbackFile") } : null);
+    setSeeded({ points: seedPoints, scores: next, feedback: s?.feedback_text ?? "", assetId: s?.feedback_asset_id ?? null });
     setTouched(false);
   }, [rubric, t]);
 
@@ -90,10 +103,15 @@ export function GradePanel({
   const pts = hasRubric ? Math.round(rubricSum * 100) / 100 : parsePoints(points);
   const pointsBad = pts === null || Number.isNaN(pts) || pts < 0 || pts > possible;
   const valid = !pointsBad && (!hasRubric || !scoreBad.some(Boolean)) && feedback.length <= FEEDBACK_TEXT_MAX;
+  const dirty = canManage && !!seeded && (
+    (!hasRubric && points !== seeded.points) || feedback !== seeded.feedback || (feedbackAsset?.id ?? null) !== seeded.assetId
+    || rubric.some((c) => (scores[c.id]?.points ?? "") !== (seeded.scores[c.id]?.points ?? "") || (scores[c.id]?.comment ?? "") !== (seeded.scores[c.id]?.comment ?? "")));
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
 
-  const save = async () => {
+  const save = async (): Promise<boolean> => {
     setTouched(true);
-    if (!valid || pts === null) return;
+    if (!valid || pts === null) return false;
     setBusy("save");
     setError(null);
     try {
@@ -108,15 +126,18 @@ export function GradePanel({
       seed(out);
       onChanged(out);
       toast.success(t("assignments.grade.saved"));
+      return true;
     } catch (e) {
       if ((e as { code?: string }).code === "stale_grade" || (e as { code?: string }).code === "grade_conflict") {
         toast.error(t("assignments.errors.stale_grade"));
         await load();
       } else setError(e);
+      return false;
     } finally {
       setBusy("");
     }
   };
+  useImperativeHandle(ref, () => ({ save }));
 
   const clear = async () => {
     setBusy("clear");
@@ -175,6 +196,12 @@ export function GradePanel({
   const released = !!sub?.released_at;
   const handIns = [...(sub?.hand_ins ?? [])].sort((a, b) => b.attempt_no - a.attempt_no);
   const student = row.student_name || t("gradebook.unnamed");
+  // Phase 7a UX: the late deduction of the saved grade, next to the points while grading
+  const lateLine = sub && Number(sub.late_deduction ?? 0) > 0 ? (
+    <p className="text-sm text-warning-900">
+      {t("assignments.grade.lateDeduction", { n: fmtPts(sub.late_deduction), final: fmtPts(sub.effective_points) || "—", max: fmtPts(possible) })}
+    </p>
+  ) : null;
 
   return (
     <Card as="section" aria-label={t("assignments.grade.panelFor", { name: student })}
@@ -245,12 +272,16 @@ export function GradePanel({
                     </div>
                   ))}
                   <p className="text-sm font-medium text-slate-800" aria-live="polite">{t("assignments.grade.rubricSum", { sum: fmtPts(rubricSum), possible: fmtPts(possible) })}</p>
+                  {lateLine}
                 </fieldset>
               )}
               {!hasRubric && (
-                <Input label={t("assignments.grade.points", { max: fmtPts(possible) })} inputMode="decimal" value={points}
-                  onChange={(e) => setPoints(e.target.value)} containerClassName="sm:max-w-xs"
-                  error={touched && pointsBad ? t("assignments.grade.pointsInvalid", { max: fmtPts(possible) }) : undefined} />
+                <div className="space-y-1">
+                  <Input label={t("assignments.grade.points", { max: fmtPts(possible) })} inputMode="decimal" value={points}
+                    onChange={(e) => setPoints(e.target.value)} containerClassName="sm:max-w-xs"
+                    error={touched && pointsBad ? t("assignments.grade.pointsInvalid", { max: fmtPts(possible) }) : undefined} />
+                  {lateLine}
+                </div>
               )}
               {hasRubric && touched && pointsBad && <p className="text-sm text-danger-700">{t("assignments.grade.pointsInvalid", { max: fmtPts(possible) })}</p>}
               <Textarea label={t("assignments.grade.feedback")} optional rows={4} value={feedback} maxLength={FEEDBACK_TEXT_MAX}
@@ -293,4 +324,4 @@ export function GradePanel({
         onConfirm={() => void clear()} onCancel={() => setClearing(false)} error={error && clearing ? errorText(error) : undefined} />
     </Card>
   );
-}
+});

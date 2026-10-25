@@ -101,6 +101,25 @@ async def test_ort_preset_needs_template(api, db):
     assert db.get(Assessment, uuid.UUID(res.json()["assessment_id"])).preset == "ort_main"
 
 
+@pytest.mark.parametrize("kind", ["text", "file", "none"])
+async def test_locked_ort_course_refuses_non_quiz_assignments(api, db, kind):
+    # Phase 7a UX fix (owner Q5 default): a locked ORT course takes only quiz assignments; an unlocked one does
+    w = world(db)
+    w.course.template_key, w.course.template_version, w.course.template_locked = "ort", 1, True
+    db.commit()
+    body = {"title": {"ru": "Эссе"}, "kind": kind, "points_possible": 10}
+    res = await api.call(w.O, "POST", path(w), json=body)
+    assert res.status_code == 409, res.text
+    assert res.json()["error"]["code"] == "template_locked"
+    assert db.execute(select(Assignment)).first() is None
+    res = await api.call(w.O, "POST", path(w), json={"title": {"ru": "ОРТ"}, "kind": "quiz",
+                                                     "quiz": {"languages": ["en"], "preset": "ort_main"}})
+    assert res.status_code == 201, res.text
+    w.course.template_locked = False
+    db.commit()
+    assert (await api.call(w.O, "POST", path(w), json=body)).status_code == 201
+
+
 # --------------------------------------------------------------------------- update / delete / restore / order
 
 async def test_patch_text_assignment(api, db):

@@ -63,6 +63,8 @@ export function useAssignmentErrorText() {
     if (code === "rate_limited" && typeof e?.details?.retry_after_seconds === "number") {
       return t("assignments.errors.rate_limited_wait", { seconds: e.details.retry_after_seconds as number });
     }
+    // Phase 7a UX: a locked ORT course refuses non-quiz assignments (details.field = "kind")
+    if (code === "template_locked" && e?.details?.field === "kind") return t("assignments.errors.template_locked_kind");
     if (code && KNOWN.has(code) && code !== "network") return t(`assignments.errors.${code}`);
     return fallback(error);
   }, [t, fallback]);

@@ -15,10 +15,10 @@ import { pickLocalized } from "@/lib/lms/localized";
 import { useCourse } from "@/components/lms/CourseContext";
 import { fmtShortDateTime } from "@/components/lms/home/format";
 import {
-  Badge, Button, ConfirmDialog, EmptyState, LinkButton, LoadingState, PageHeader, Select, Table, toast, type TableColumn,
+  Badge, Button, ConfirmDialog, Dialog, EmptyState, LinkButton, LoadingState, PageHeader, Select, Table, toast, type TableColumn,
 } from "@/components/ui";
 import { AssignmentError, KindBadge, LateBadge, fmtPts, useAssignmentErrorText } from "./assignmentUi";
-import { GradePanel } from "./GradePanel";
+import { GradePanel, type GradePanelHandle } from "./GradePanel";
 
 type Filter = "all" | "to_grade" | "graded" | "missing" | "resubmitted";
 
@@ -48,6 +48,20 @@ export function GradingScreen({ assignmentId }: { assignmentId: string }) {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkError, setBulkError] = useState<unknown>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  // Phase 7a UX: an unsaved grade is never lost by switching student (ask: save and go / do not save / cancel)
+  const gradeRef = useRef<GradePanelHandle>(null);
+  const [dirty, setDirty] = useState(false);
+  const [pending, setPending] = useState<{ id: string | null } | null>(null);
+  const [leaving, setLeaving] = useState(false);
+  const stayRef = useRef<HTMLButtonElement>(null);
+  const live = useRef({ dirty, selected });
+  live.current = { dirty, selected };
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
 
   const load = useCallback(async (next?: string | null) => {
     setLoading(true);
@@ -72,12 +86,31 @@ export function GradingScreen({ assignmentId }: { assignmentId: string }) {
   const index = visible.findIndex((r) => r.enrollment_id === selected);
   const current = rows.find((r) => r.enrollment_id === selected) ?? null;
 
-  const choose = useCallback((id: string | null) => {
+  const go = useCallback((id: string | null) => {
     setSelected(id);
     if (id && typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches) {
       setTimeout(() => panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
     }
   }, []);
+  const choose = useCallback((id: string | null) => {
+    if (id === live.current.selected) return;
+    if (live.current.dirty) { setPending({ id }); return; }
+    go(id);
+  }, [go]);
+  const saveAndGo = async () => {
+    if (!pending) return;
+    setLeaving(true);
+    const ok = (await gradeRef.current?.save()) ?? false;
+    setLeaving(false);
+    setPending(null);
+    if (ok) go(pending.id); // not saved: stay, the panel shows why
+  };
+  const discardAndGo = () => {
+    if (!pending) return;
+    setPending(null);
+    setDirty(false);
+    go(pending.id);
+  };
   const prev = index > 0 ? () => choose(visible[index - 1].enrollment_id) : undefined;
   const next = index >= 0 && index < visible.length - 1 ? () => choose(visible[index + 1].enrollment_id) : undefined;
 
@@ -132,7 +165,7 @@ export function GradingScreen({ assignmentId }: { assignmentId: string }) {
   const statusBadge = (r: AssignmentSubmissionRowOut) => {
     const s = rowState(r);
     return (
-      <span className="inline-flex flex-wrap gap-1">
+      <span className="inline-flex flex-col items-start gap-1">
         {s === "graded" ? <Badge tone="success">{t("assignments.status.graded")}</Badge>
           : s === "to_grade" ? <Badge tone="info">{t("assignments.grade.needsGrading")}</Badge>
           : <Badge tone="neutral">{t("assignments.grade.notHandedIn")}</Badge>}
@@ -157,7 +190,7 @@ export function GradingScreen({ assignmentId }: { assignmentId: string }) {
     { key: "status", header: t("assignments.grade.colStatus"), cell: statusBadge, mobilePriority: 0 },
     { key: "handedIn", header: t("assignments.grade.colHandedIn"), nowrap: true, mobilePriority: 1, cell: (r) => (r.latest_submitted_at ? fmtShortDateTime(r.latest_submitted_at, lang) : "—") },
     {
-      key: "grade", header: t("assignments.grade.colGrade"), align: "right", mobilePriority: 2,
+      key: "grade", header: t("assignments.grade.colGrade"), align: "right", nowrap: true, mobilePriority: 2,
       cell: (r) => r.cell && r.cell.raw_points !== null && r.cell.raw_points !== undefined
         ? `${fmtPts(r.cell.effective_points ?? r.cell.raw_points)} / ${fmtPts(r.cell.points_possible ?? a?.points_possible)}` : "—",
     },
@@ -215,8 +248,8 @@ export function GradingScreen({ assignmentId }: { assignmentId: string }) {
         />
         <div ref={panelRef} className="scroll-mt-4 lg:sticky lg:top-4">
           {current ? (
-            <GradePanel key={current.enrollment_id} courseId={course.id} assignment={a} row={current} defaultLanguage={course.default_language}
-              canManage={canManage} onChanged={onChanged} onPrev={prev} onNext={next} />
+            <GradePanel key={current.enrollment_id} ref={gradeRef} courseId={course.id} assignment={a} row={current} defaultLanguage={course.default_language}
+              canManage={canManage} onChanged={onChanged} onPrev={prev} onNext={next} onDirtyChange={setDirty} />
           ) : (
             <EmptyState title={t("assignments.grade.pickTitle")} description={t("assignments.grade.pickBody")} />
           )}
@@ -229,6 +262,18 @@ export function GradingScreen({ assignmentId }: { assignmentId: string }) {
         effect={bulk === "release" ? t("assignments.grade.releaseAllBody") : t("assignments.list.unreleaseBody")}
         confirmLabel={bulk === "release" ? t("assignments.list.release") : t("assignments.list.unrelease")}
         onConfirm={() => void runBulk()} onCancel={() => setBulk(null)} error={bulkError ? errorText(bulkError) : undefined} />
+      <Dialog open={!!pending} onClose={() => setPending(null)} title={t("assignments.grade.unsavedTitle")} busy={leaving} size="md"
+        role="alertdialog" closeOnBackdrop={false} initialFocusRef={stayRef}
+        footer={(
+          <>
+            <Button ref={stayRef} variant="secondary" disabled={leaving} onClick={() => setPending(null)}>{t("ui.cancel")}</Button>
+            <Button variant="secondary" disabled={leaving} onClick={discardAndGo}>{t("assignments.grade.discard")}</Button>
+            <Button loading={leaving} onClick={() => void saveAndGo()}>{t("assignments.grade.saveAndGo")}</Button>
+          </>
+        )}>
+        <p className="mb-3 break-words rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-semibold text-slate-900">{current?.student_name || t("gradebook.unnamed")}</p>
+        <p className="text-slate-700">{t("assignments.grade.unsavedBody")}</p>
+      </Dialog>
     </div>
   );
 }

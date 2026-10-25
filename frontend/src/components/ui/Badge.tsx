@@ -19,12 +19,12 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   icon?: React.ReactNode;
 }
 
-/** Short status label. Text wraps instead of being cut off in long languages. */
+/** Short status label, kept on one line (Phase 7a UX: no wrapped badges in tables); keep the labels short. */
 export function Badge({ tone = "neutral", icon, className, children, ...rest }: BadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex max-w-full items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold leading-5 [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0",
+        "inline-flex max-w-full items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-semibold leading-5 [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0",
         TONES[tone],
         className,
       )}

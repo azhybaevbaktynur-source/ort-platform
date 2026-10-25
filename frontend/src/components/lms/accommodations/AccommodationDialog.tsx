@@ -8,8 +8,8 @@ import {
   EXTRA_ATTEMPTS_MAX, EXTRA_TIME_PERCENT_MAX, EXTRA_TIME_S_MAX, NOTE_MAX, clearAccommodation, setAccommodation,
   type AccommodationOut, type AccommodationRowOut,
 } from "@/lib/lms/accommodations";
-import { Button, Dialog, Input, Textarea } from "@/components/ui";
-import { AssignmentError } from "@/components/lms/assignments/assignmentUi";
+import { Button, ConfirmDialog, Dialog, Input, Textarea } from "@/components/ui";
+import { AssignmentError, useAssignmentErrorText } from "@/components/lms/assignments/assignmentUi";
 import { isBad, parseWhole } from "./fields";
 
 export function AccommodationDialog({ open, courseId, row, ortCourse, onClose, onSaved }: {
@@ -21,15 +21,18 @@ export function AccommodationDialog({ open, courseId, row, ortCourse, onClose, o
   onSaved: (enrollmentId: string, a: AccommodationOut | null) => void;
 }) {
   const { t } = useTranslation();
+  const errorText = useAssignmentErrorText();
   const [percent, setPercent] = useState("");
   const [minutes, setMinutes] = useState("");
   const [attempts, setAttempts] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState<"" | "save" | "clear">("");
   const [error, setError] = useState<unknown>(null);
+  // Phase 7a UX: "Remove all" asks first (names the student and the effect); the form dialog steps aside meanwhile
+  const [confirmClear, setConfirmClear] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) { setConfirmClear(false); return; }
     const a = row?.accommodation;
     setPercent(a?.extra_time_percent ? String(a.extra_time_percent) : "");
     setMinutes(a?.extra_time_s ? String(Math.round(a.extra_time_s / 60)) : "");
@@ -66,6 +69,7 @@ export function AccommodationDialog({ open, courseId, row, ortCourse, onClose, o
     setError(null);
     try {
       await clearAccommodation(courseId, row.enrollment_id);
+      setConfirmClear(false);
       onSaved(row.enrollment_id, null);
     } catch (err) {
       setError(err);
@@ -75,18 +79,20 @@ export function AccommodationDialog({ open, courseId, row, ortCourse, onClose, o
   };
 
   const formId = "accommodation-form";
+  const student = row?.student_name || row?.email || "—";
   return (
-    <Dialog open={open} onClose={onClose} busy={!!busy} size="md" title={t("accommodations.dialog.title")}
+    <>
+    <Dialog open={open && !confirmClear} onClose={onClose} busy={!!busy} size="md" title={t("accommodations.dialog.title")}
       description={t("accommodations.dialog.subtitle")}
       footer={(
         <>
-          {row?.accommodation && <Button variant="secondary" loading={busy === "clear"} disabled={!!busy} onClick={() => void clear()}>{t("accommodations.dialog.clear")}</Button>}
+          {row?.accommodation && <Button variant="secondary" disabled={!!busy} onClick={() => { setError(null); setConfirmClear(true); }}>{t("accommodations.dialog.clear")}</Button>}
           <Button variant="secondary" disabled={!!busy} onClick={onClose}>{t("ui.cancel")}</Button>
           <Button type="submit" form={formId} loading={busy === "save"} disabled={!!busy && busy !== "save"}>{t("accommodations.dialog.save")}</Button>
         </>
       )}>
       <form id={formId} className="space-y-4" onSubmit={(e) => void save(e)}>
-        <p className="break-words rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-semibold text-slate-900">{row?.student_name || row?.email || "—"}</p>
+        <p className="break-words rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-semibold text-slate-900">{student}</p>
         <div className="grid gap-4 sm:grid-cols-2">
           <Input label={t("accommodations.fields.extraPercent")} optional inputMode="numeric" value={percent} onChange={(e) => setPercent(e.target.value)}
             hint={t("accommodations.fields.percentHint")} error={isBad(p) ? t("accommodations.fields.percentInvalid", { max: EXTRA_TIME_PERCENT_MAX }) : undefined} />
@@ -102,5 +108,9 @@ export function AccommodationDialog({ open, courseId, row, ortCourse, onClose, o
         <AssignmentError error={error} />
       </form>
     </Dialog>
+    <ConfirmDialog open={open && confirmClear} tone="danger" busy={busy === "clear"} title={t("accommodations.dialog.clearTitle")} object={student}
+      effect={t("accommodations.dialog.clearBody")} confirmLabel={t("accommodations.dialog.clear")}
+      onConfirm={() => void clear()} onCancel={() => setConfirmClear(false)} error={error && confirmClear ? errorText(error) : undefined} />
+    </>
   );
 }

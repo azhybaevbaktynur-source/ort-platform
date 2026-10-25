@@ -93,6 +93,9 @@ def create_assignment(db: Session, ctx: AuthzContext, course: Course, data: sch.
     fields = data.model_fields_set
     if data.kind == "quiz":
         return _create_quiz(db, ctx, course, data, fields)
+    # Phase 7a UX fix (owner Q5 default): a locked ORT course has only its quiz (exam) assignments
+    if course.template_key == "ort" and course.template_locked:
+        raise Conflict("Only quizzes can be added to an ORT course", code="template_locked", details={"field": "kind"})
     if data.quiz is not None:
         raise _bad("quiz", "quiz is only for kind quiz", "quiz_body_forbidden")
     if data.points_possible is None:

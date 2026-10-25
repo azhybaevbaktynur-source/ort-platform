@@ -84,6 +84,10 @@ One person can be in several areas (a teacher who studies in another course). Th
   for timed tests only; the ORT exam stays "ORT exam" / "ЖРТ сынагы" / "Экзамен ОРТ". Kinds: "Text answer" /
   "Текст жооп" / "Текстовый ответ", "File upload" / "Файл жүктөө" / "Загрузка файла", "Offline work" /
   "Сайттан тышкаркы иш" / "Работа вне сайта". Handing in: "hand in" / "тапшыруу" / "сдать".
+- Grade release (Phase 7a UX fix): making grades visible to students is **"release / hide"** (en),
+  **"жарыялоо / жашыруу"** (ky), **"опубликовать / скрыть"** (ru: "Опубликовать оценки", "Скрыть оценки",
+  "опубликовано"); never "открыть оценки" or "показать". Publishing an assignment itself is "publish / unpublish",
+  "жарыялоо / жарыялоодон алуу", "опубликовать / снять с публикации".
 - no technical words in student UI (no "snapshot", "version", "enrollment", "payload").
 
 ## 6. ORT exam player
