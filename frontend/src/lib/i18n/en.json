@@ -264,10 +264,11 @@
       "submit": "Create course"
     },
     "join": {
-      "title": "Join a course",
+      "title": "Join with code",
       "hint": "Enter the code your teacher gave you.",
       "codeLabel": "Join code",
-      "submit": "Join"
+      "submit": "Join",
+      "noCode": "No code?"
     },
     "home": {
       "tab": "Home",
@@ -307,7 +308,8 @@
       "removeBody": "{name} will lose access to this course.",
       "addStaff": "Add a teacher or assistant",
       "add": "Add",
-      "empty": "No people found."
+      "empty": "No people found.",
+      "tabStudent": "Teachers"
     },
     "settings": {
       "tab": "Settings",
@@ -374,7 +376,7 @@
     "notFound": {
       "title": "Course not found",
       "body": "This course doesn't exist, was removed, or you are not enrolled in it. Ask your teacher for a join code or find it in the catalog.",
-      "join": "Join with a code"
+      "join": "Join with code"
     }
   },
   "teacherRequest": {
@@ -1025,7 +1027,9 @@
       },
       "startHint": "The timer starts as soon as you press the button.",
       "startHintSection": "The timer for section {n} starts as soon as you press the button.",
-      "attemptsUsed": "{used} of {total}"
+      "attemptsUsed": "{used} of {total}",
+      "durationH": "{h} h",
+      "durationHm": "{h} h {m} min"
     },
     "builder": {
       "back": "Overview",
@@ -1884,7 +1888,7 @@
     "join": "Join",
     "joining": "Joining…",
     "open": "Open",
-    "needsCode": "Join with a code from the teacher",
+    "needsCode": "Join with a code from your teacher",
     "closed": "Enrollment is closed"
   },
   "storage": {
@@ -2302,7 +2306,10 @@
       "body": "Grading schemes are set up by teachers who create courses. Your results are in each course under Grades.",
       "back": "Back to my courses"
     },
-    "pendingHintAccept": "Valid until {date}. Accept here or with the link in the email."
+    "pendingHintAccept": "Valid until {date}. Accept here or with the link in the email.",
+    "statusLine": {
+      "none": "You do not have teacher access yet. You can send a new request."
+    }
   },
   "invitationAccepted": {
     "orgTeacher": "You joined «{org}» as a teacher.",
@@ -2520,6 +2527,100 @@
       "picker": {
         "label": "New owner",
         "hint": "Search by name or email (try “ai”)."
+      }
+    }
+  },
+  "home": {
+    "greeting": "Hi, {name}!",
+    "greetingNoName": "Hi!",
+    "lead": {
+      "continue": "You have an unfinished assignment: «{title}».",
+      "next": "Next up: «{title}».",
+      "caughtUp": "You are all caught up. No new assignments right now."
+    },
+    "primary": {
+      "continue": "Continue",
+      "start": "Start the next assignment",
+      "join": "Join with code"
+    },
+    "continue": {
+      "title": "Continue"
+    },
+    "next": {
+      "title": "Next up",
+      "empty": "No new assignments. Check back later."
+    },
+    "results": {
+      "title": "Latest results",
+      "empty": "Results appear after your first assignment."
+    },
+    "courses": {
+      "title": "My courses",
+      "emptyTitle": "You are not in any course yet.",
+      "emptyBody": "Join with a code from your teacher, or choose a course in the catalog.",
+      "showAll": "Show all ({n})"
+    },
+    "openCatalog": "Open the catalog",
+    "catalogEmpty": {
+      "title": "No open courses yet.",
+      "body": "Have a code from your teacher? Join with it."
+    },
+    "personalBest": "Personal best",
+    "platformCourse": "Platform course",
+    "noDue": "No deadlines",
+    "due": "Due {date}",
+    "dueSoon": "Due soon: {date}",
+    "until": "Open until {date}",
+    "opens": "Opens {date}",
+    "closedOn": "Closed on {date}",
+    "duration": "Time: {time}",
+    "questions": "{n} questions",
+    "attemptsLeft": "Attempts left: {n}",
+    "attemptsUnlimited": "Unlimited attempts",
+    "noAttemptsLeft": "No attempts left",
+    "scoreOf": "{score} of {total}",
+    "resultValue": "Result: {value}",
+    "resultLater": "The result appears when your teacher releases it.",
+    "startedAt": "Started {date}",
+    "status": {
+      "not_started": "Not started",
+      "in_progress": "In progress",
+      "submitted": "Submitted",
+      "graded": "Graded",
+      "closed": "Closed"
+    },
+    "action": {
+      "continue": "Continue",
+      "start": "Start",
+      "again": "Try again",
+      "result": "See result",
+      "open": "Open",
+      "attempts": "My attempts"
+    },
+    "time": {
+      "hm": "{h} h {m} min",
+      "h": "{h} h",
+      "m": "{m} min"
+    },
+    "course": {
+      "nextTitle": "What to do next",
+      "noAssessments": "Your teacher has not added assignments yet. Check back later.",
+      "emptyHint": "Your teacher will add them here.",
+      "allAssessments": "All assignments",
+      "latestTitle": "Latest result",
+      "allGrades": "All grades"
+    },
+    "attempts": {
+      "title": "My attempts",
+      "exhaustedHint": "You used all attempts. Your results are here.",
+      "none": "No finished attempts yet.",
+      "item": "Attempt {n}",
+      "status": {
+        "in_progress": "In progress",
+        "submitted": "Submitted",
+        "needs_review": "Being checked",
+        "graded": "Graded",
+        "void": "Cancelled"
       }
     }
   }
