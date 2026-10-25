@@ -158,6 +158,8 @@ def _c4_world(pg):
         course = course_svc.create_course(s, owner, CourseCreateIn(
             title={"en": "C"}, languages=["en", "ru", "ky"], default_language="en"))
         course.status = "published"
+        # Phase 6 S2b: ORT imports (exam_type full_main) need an ORT course, as in production
+        course.template_key, course.template_version = "ort", 1
         s.commit()
         course_id = course.id
         ctx = AuthzContext(owner, s, enrollment_role_resolver(s, owner_id))
