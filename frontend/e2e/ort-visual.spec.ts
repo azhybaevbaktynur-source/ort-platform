@@ -146,12 +146,15 @@ for (const vp of VIEWPORT_NAMES) {
       const validate = page.getByRole("button", { name: tr(lang, "assessments.publish.validate") });
       await validate.click();
       await expect(page.getByText(tr(lang, "assessments.publish.valid"))).toBeVisible();
-      const panel = validate.locator("xpath=ancestor::div[contains(@class,'rounded-2xl')][1]");
+      // the panel is a labelled region since 6b S5c
+      const panel = page.getByRole("region", { name: tr(lang, "teaching.publishPanel") });
+      await expect(panel).toContainText(tr(lang, "assessments.publish.valid"));
       await shot("publish", { element: panel });
 
       // staff attempts: the seeded submitted attempt (dates masked)
       await open(`${c}/assessments/${s.staff_exam.id}/attempts`);
-      await expect(page.getByText(s.students["staff-seed"].name).first()).toBeVisible();
+      // the Table renders a stacked-card copy for phones (hidden on desktop) since 6b S5c: take the visible one
+      await expect(page.getByText(s.students["staff-seed"].name).filter({ visible: true }).first()).toBeVisible();
       await shot("attempts", { mask: [page.locator("time"), page.getByText(/\d{1,2}[./]\d{1,2}[./]\d{2,4}|\d{1,2}:\d{2}/)] });
     });
   });
