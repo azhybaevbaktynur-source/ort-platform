@@ -94,6 +94,20 @@ Screenshots: `docs/phases/PHASE_6_screens/6b/ort-*-{before,after}.jpg` (section 
 | R4 | Done (presentation only): grouped by section in folding groups (all open by default, so nothing shown today is hidden), per-section "n of m correct", filter "Only mistakes and unanswered" (off by default). Lazy KaTeX not done (it belongs to `MathRenderer`, outside S7b). |
 | Cross-cutting | Done: red only for the irreversible sentence in the dialogs; legend 12 px; `Button`, `Dialog`, `Skeleton`/`LoadingState`, `Badge`, `LinkButton` in the player, lobby and results. `Table` not used for the ORT section table (the DOM walk reads its `caption`/`tbody` rows, and the table now fits at 375 px). |
 
+### Status after Phase 6b S11a (UX review fixes, 2026-10-25)
+
+Look, phone layout and accessibility only; navigation, timing, question layout and scoring are unchanged. Screenshots: `docs/phases/PHASE_6_screens/6b/*-s11a.jpg` (section `## S11a` of its `INDEX.md`); baselines updated in `docs/phases/ORT_BASELINE/`.
+
+| ID | Status |
+|---|---|
+| F4 | Done: in the phone palette sheet "Finish section / Finish test" is pinned in the sheet footer; only the palette scrolls. |
+| F5 | Done: after the sheet closes, focus goes to the header "Questions n/total" button before the finish dialog opens, so "Stay in section" returns focus to it (`ort.spec.ts`, phone walk). |
+| F6 | Done: ky section-end title uses «» quotes. |
+| F7 | Done: below `sm` the offline pill says "Нет сети, ответы сохранены (n)" (ky/en equivalents); the full sentence stays as the tooltip and for screen readers. In a problem state (offline, error) the pill may take its own header line on phones. |
+| F8 | Done (readability, phones only): `NumberedPassage` below `sm` uses 15 px text and a narrower number gutter, the passage card `p-3`; most printed ORT lines now fit one screen line at 375 px. Numbering and line breaks unchanged; `sm` and up unchanged. Before/after: `ort-passage-phone-{ru,ky}-{before,after}-s11a.jpg`. |
+| F3 | Done: the lobby no longer repeats "No attempts left" under the "My attempts" panel; info list is the design-system `DescriptionList`, language picker the `Select`. |
+| Loading | Baseline `player-loading-phone-ru.png` added (the player skeleton, attempt requests held). |
+
 ---
 
 ## Part 2. Ideas that change how the exam works (owner decides)

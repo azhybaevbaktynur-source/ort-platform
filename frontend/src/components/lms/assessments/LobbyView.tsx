@@ -8,8 +8,8 @@ import { LOBBY_REASONS, previewAttemptId, type AssessmentLobbyOut } from "@/lib/
 import { pickLocalized } from "@/lib/lms/localized";
 import type { Lang } from "@/lib/lms/types";
 import { useCourse } from "@/components/lms/CourseContext";
-import { inputCls, labelCls } from "@/components/lms/content/ui";
-import { Button } from "@/components/ui";
+import { Button, DescriptionList, Select, type DescriptionItem } from "@/components/ui";
+import { fmtDuration } from "@/components/lms/home/format";
 import { AssessmentError } from "./AssessmentError";
 import { fmtDateTime } from "./format";
 
@@ -37,13 +37,14 @@ export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {
     ? t("assessments.lobby.startHintSection", { n: firstSection.pos })
     : lobby.time_limit_s || firstSection?.time_limit_s ? t("assessments.lobby.startHint") : "";
 
-  const duration = (sec: number) => {
-    const total = Math.round(sec / 60);
-    const h = Math.floor(total / 60);
-    const m = total % 60;
-    if (h === 0) return t("assessments.student.minutes", { n: m });
-    return m === 0 ? t("assessments.lobby.durationH", { h }) : t("assessments.lobby.durationHm", { h, m });
-  };
+  // S11a, F3: after the last attempt the "My attempts" panel above already says "No attempts left".
+  const exhausted = !lobby.can_start && lobby.reason === "attempts_exhausted";
+  const info: DescriptionItem[] = [
+    { key: "time", term: t("assessments.lobby.timeLimit"), description: lobby.time_limit_s ? fmtDuration(lobby.time_limit_s, t) : t("assessments.lobby.noLimit") },
+    { key: "attempts", term: t("assessments.lobby.attemptsLeft"), description: left === null ? t("assessments.settings.unlimited") : t("assessments.lobby.attemptsUsed", { used: lobby.attempts_used, total: lobby.allowed_attempts }) },
+  ];
+  if (lobby.available_from) info.push({ key: "from", term: t("assessments.settings.availableFrom"), description: fmtDateTime(lobby.available_from) });
+  if (lobby.available_until) info.push({ key: "until", term: t("assessments.settings.availableUntil"), description: fmtDateTime(lobby.available_until) });
 
   const start = async () => {
     setBusy(true);
@@ -67,20 +68,9 @@ export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {
         {description && <p className="mt-1 whitespace-pre-line text-sm text-slate-600">{description}</p>}
       </div>
       {/* S9: empty date rows are not shown; the total time reads in hours and minutes. */}
-      <dl className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm sm:grid-cols-2">
-        <div><dt className="text-xs text-slate-600">{t("assessments.lobby.timeLimit")}</dt>
-          <dd className="font-medium text-slate-900">{lobby.time_limit_s ? duration(lobby.time_limit_s) : t("assessments.lobby.noLimit")}</dd></div>
-        <div><dt className="text-xs text-slate-600">{t("assessments.lobby.attemptsLeft")}</dt>
-          <dd className="font-medium text-slate-900">{left === null ? t("assessments.settings.unlimited") : t("assessments.lobby.attemptsUsed", { used: lobby.attempts_used, total: lobby.allowed_attempts })}</dd></div>
-        {lobby.available_from && (
-          <div><dt className="text-xs text-slate-600">{t("assessments.settings.availableFrom")}</dt>
-            <dd className="font-medium text-slate-900">{fmtDateTime(lobby.available_from)}</dd></div>
-        )}
-        {lobby.available_until && (
-          <div><dt className="text-xs text-slate-600">{t("assessments.settings.availableUntil")}</dt>
-            <dd className="font-medium text-slate-900">{fmtDateTime(lobby.available_until)}</dd></div>
-        )}
-      </dl>
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <DescriptionList twoColumns items={info} />
+      </div>
       <p className="rounded-xl bg-slate-50 px-3.5 py-2 text-sm text-slate-700">
         {lobby.navigation === "section_forward_only" ? t("assessments.lobby.forwardOnly") : t("assessments.lobby.freeNav")}
       </p>
@@ -102,12 +92,9 @@ export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {
         </ol>
       </div>
       {!resume && lobby.languages.length > 1 && (
-        <div>
-          <label className={labelCls} htmlFor="lobby-lang">{t("assessments.lobby.language")}</label>
-          <select id="lobby-lang" className={inputCls} value={language} onChange={(e) => setLanguage(e.target.value as Lang)}>
-            {lobby.languages.map((l) => <option key={l} value={l}>{t(`courses.languages.${l}`)}</option>)}
-          </select>
-        </div>
+        <Select id="lobby-lang" label={t("assessments.lobby.language")} value={language}
+          onChange={(e) => setLanguage(e.target.value as Lang)}
+          options={lobby.languages.map((l) => ({ value: l, label: t(`courses.languages.${l}`) }))} />
       )}
       <AssessmentError error={error} />
       {resume ? (
@@ -120,7 +107,7 @@ export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {
           <Button className="w-full sm:w-auto" loading={busy} onClick={() => void start()}>{t("assessments.lobby.start")}</Button>
           {startHint && <p className="text-sm text-slate-600">{startHint}</p>}
         </div>
-      ) : (
+      ) : exhausted ? null : (
         <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-sm text-amber-900">
           {lobby.reason && KNOWN_REASONS.has(lobby.reason) ? t(`assessments.lobby.reasons.${lobby.reason}`) : t("assessments.lobby.cannotStart")}
         </p>

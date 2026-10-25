@@ -34,6 +34,8 @@ STUDENTS = [
     "flow-ru", "flow-ky",
     "vis-phone-ru", "vis-phone-ky", "vis-desktop-ru", "vis-desktop-ky",
     "staff-seed",
+    # S11a: phone walk of the palette sheet (after staff-seed, so the seeded names above keep their numbers)
+    "flow-phone-ru",
 ]
 
 

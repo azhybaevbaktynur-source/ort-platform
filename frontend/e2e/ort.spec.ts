@@ -93,3 +93,43 @@ for (const lang of ["ru", "ky"] as Lang[]) {
     });
   });
 }
+
+// S11a (F4, F5): on phones "finish section" sits in the palette sheet's pinned footer, and after the sheet closes
+// the section-end dialog's "stay" returns focus to the header palette button (a live element).
+test.describe("ORT palette sheet (phone, ru)", () => {
+  test.use({ viewport: VIEWPORTS.phone });
+
+  test("finish from the palette sheet (phone, ru)", async ({ page }) => {
+    const s = seed();
+    await signIn(page, s.students["flow-phone-ru"]);
+    const exam = new OrtExam(page, "ru");
+    const counts = sectionCounts();
+    await exam.openLobby();
+    await exam.start();
+    await exam.assertSection(1);
+
+    await exam.showPalette();
+    const finish = exam.finishButton(false);
+    await expect(finish).toBeVisible();
+    await expect(finish).toBeInViewport();
+    // pinned: inside the sheet, but not inside its scrolling body (the palette alone scrolls)
+    const pinned = await finish.evaluate((el) => {
+      let p = el.parentElement;
+      while (p && p.tagName !== "DIALOG") {
+        if (["auto", "scroll"].includes(getComputedStyle(p).overflowY)) return false;
+        p = p.parentElement;
+      }
+      return p?.tagName === "DIALOG";
+    });
+    expect(pinned).toBe(true);
+    await expect(exam.palette().getByRole("button", { name: exam.t("player.finishSection") })).toHaveCount(0);
+
+    await exam.openSectionEnd(1, { unanswered: counts[0], flagged: 0 });
+    await expect(exam.paletteSheet()).toBeHidden();
+    await exam.dialog().getByRole("button", { name: exam.t("player.sectionEnd.stay") }).click();
+    await expect(exam.dialog()).toBeHidden();
+    await expect(exam.paletteToggle()).toBeFocused();
+    await exam.assertSection(1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(VIEWPORTS.phone.width);
+  });
+});

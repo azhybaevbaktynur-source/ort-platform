@@ -20,7 +20,7 @@ export const PassagePane = React.forwardRef<HTMLElement, { passage: StudentPassa
         id={id}
         style={scrollMarginTop ? { scrollMarginTop } : undefined}
         className={cn(
-          "rounded-2xl border border-slate-200 bg-white p-5 shadow-xs xl:block lg:max-h-[calc(100vh-11rem)] lg:overflow-y-auto",
+          "rounded-2xl border border-slate-200 bg-white p-3 sm:p-5 shadow-xs xl:block lg:max-h-[calc(100vh-11rem)] lg:overflow-y-auto",
           !open && "hidden",
         )}
       >

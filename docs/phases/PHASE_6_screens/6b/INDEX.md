@@ -403,3 +403,82 @@ passage lines, result card with five section rows).
 Not in a baseline: the loading skeleton of the player and of a section (P11), the save pill texts (P10), keyboard
 shortcuts with `e.code` (P9), the timer's warning icon and bold digits under five minutes (P4). The phone result
 page is checked to be no wider than the viewport (B4) in `ort-visual.spec.ts`.
+
+
+## S11a UX review fixes, student and ORT screens (branch `phase-6/s11a-uxfix`, 2026-10-25)
+
+ORT pairs (`ort-*-s11a.jpg`) are the committed baselines in `docs/phases/ORT_BASELINE/` before (branch start `e52dd84`) and after, converted to JPEG (quality 72); both Playwright specs then ran twice with zero diffs. `s11a-offline-*` and the re-shot `s6b-*` files (same names as S6b, replacing the stale ones) come from the S6b scratch environment copied to `/tmp/agy_p6b_s11a` (built frontend + scratch backend, playwright-core + Chrome, phone 375x812 `isMobile`, desktop 1440x900, timezone Asia/Bishkek). `scrollWidth` = `document.documentElement.scrollWidth` on the shot.
+
+| File | Shows | Viewport | Lang | scrollWidth |
+|---|---|---|---|---|
+| ort-flagged-palette-phone-ky-after-s11a.jpg | Phone palette sheet (F4): "Finish section" pinned in the sheet footer, the palette alone scrolls (after) | 375x812 | ky | |
+| ort-flagged-palette-phone-ky-before-s11a.jpg | Phone palette sheet (F4): "Finish section" pinned in the sheet footer, the palette alone scrolls (before) | 375x812 | ky | |
+| ort-flagged-palette-phone-ru-after-s11a.jpg | Phone palette sheet (F4): "Finish section" pinned in the sheet footer, the palette alone scrolls (after) | 375x812 | ru | |
+| ort-flagged-palette-phone-ru-before-s11a.jpg | Phone palette sheet (F4): "Finish section" pinned in the sheet footer, the palette alone scrolls (before) | 375x812 | ru | |
+| ort-lobby-desktop-ky-after-s11a.jpg | ORT lobby (F3 / cleanup): info list is the library `DescriptionList`, duration via `fmtDuration` (after) | 1440x900 | ky | |
+| ort-lobby-desktop-ky-before-s11a.jpg | ORT lobby (F3 / cleanup): info list is the library `DescriptionList`, duration via `fmtDuration` (before) | 1440x900 | ky | |
+| ort-lobby-desktop-ru-after-s11a.jpg | ORT lobby (F3 / cleanup): info list is the library `DescriptionList`, duration via `fmtDuration` (after) | 1440x900 | ru | |
+| ort-lobby-desktop-ru-before-s11a.jpg | ORT lobby (F3 / cleanup): info list is the library `DescriptionList`, duration via `fmtDuration` (before) | 1440x900 | ru | |
+| ort-lobby-phone-ky-after-s11a.jpg | ORT lobby (F3 / cleanup): info list is the library `DescriptionList`, duration via `fmtDuration` (after) | 375x812 | ky | |
+| ort-lobby-phone-ky-before-s11a.jpg | ORT lobby (F3 / cleanup): info list is the library `DescriptionList`, duration via `fmtDuration` (before) | 375x812 | ky | |
+| ort-lobby-phone-ru-after-s11a.jpg | ORT lobby (F3 / cleanup): info list is the library `DescriptionList`, duration via `fmtDuration` (after) | 375x812 | ru | |
+| ort-lobby-phone-ru-before-s11a.jpg | ORT lobby (F3 / cleanup): info list is the library `DescriptionList`, duration via `fmtDuration` (before) | 375x812 | ru | |
+| ort-passage-phone-ky-after-s11a.jpg | Phone numbered passage (F8): 15 px text, narrower gutter, card `p-3`; numbering and line breaks unchanged (after) | 375x812 | ky | |
+| ort-passage-phone-ky-before-s11a.jpg | Phone numbered passage (F8): 15 px text, narrower gutter, card `p-3`; numbering and line breaks unchanged (before) | 375x812 | ky | |
+| ort-passage-phone-ru-after-s11a.jpg | Phone numbered passage (F8): 15 px text, narrower gutter, card `p-3`; numbering and line breaks unchanged (after) | 375x812 | ru | |
+| ort-passage-phone-ru-before-s11a.jpg | Phone numbered passage (F8): 15 px text, narrower gutter, card `p-3`; numbering and line breaks unchanged (before) | 375x812 | ru | |
+| ort-player-loading-phone-ru-after-s11a.jpg | Player skeleton while the attempt loads (new baseline `player-loading-phone-ru.png`) (after) | 375x812 | ru | |
+| s11a-offline-desktop-en-after.jpg | Player header with the offline save pill (F7, after): below `sm` short text, full text as tooltip / sr-only; the pill takes its own line in a problem state | 1440x900 | en | 375 at 375 |
+| s11a-offline-desktop-en-before.jpg | Player header with the offline save pill (F7, before): below `sm` short text, full text as tooltip / sr-only; the pill takes its own line in a problem state | 1440x900 | en | 375 at 375 |
+| s11a-offline-desktop-ky-after.jpg | Player header with the offline save pill (F7, after): below `sm` short text, full text as tooltip / sr-only; the pill takes its own line in a problem state | 1440x900 | ky | 375 at 375 |
+| s11a-offline-desktop-ky-before.jpg | Player header with the offline save pill (F7, before): below `sm` short text, full text as tooltip / sr-only; the pill takes its own line in a problem state | 1440x900 | ky | 375 at 375 |
+| s11a-offline-desktop-ru-after.jpg | Player header with the offline save pill (F7, after): below `sm` short text, full text as tooltip / sr-only; the pill takes its own line in a problem state | 1440x900 | ru | 375 at 375 |
+| s11a-offline-desktop-ru-before.jpg | Player header with the offline save pill (F7, before): below `sm` short text, full text as tooltip / sr-only; the pill takes its own line in a problem state | 1440x900 | ru | 375 at 375 |
+| s11a-offline-phone-en-after.jpg | Player header with the offline save pill (F7, after): below `sm` short text, full text as tooltip / sr-only; the pill takes its own line in a problem state | 375x812 | en | 375 at 375 |
+| s11a-offline-phone-en-before.jpg | Player header with the offline save pill (F7, before): below `sm` short text, full text as tooltip / sr-only; the pill takes its own line in a problem state | 375x812 | en | 375 at 375 |
+| s11a-offline-phone-ky-after.jpg | Player header with the offline save pill (F7, after): below `sm` short text, full text as tooltip / sr-only; the pill takes its own line in a problem state | 375x812 | ky | 375 at 375 |
+| s11a-offline-phone-ky-before.jpg | Player header with the offline save pill (F7, before): below `sm` short text, full text as tooltip / sr-only; the pill takes its own line in a problem state | 375x812 | ky | 375 at 375 |
+| s11a-offline-phone-ru-after.jpg | Player header with the offline save pill (F7, after): below `sm` short text, full text as tooltip / sr-only; the pill takes its own line in a problem state | 375x812 | ru | 375 at 375 |
+| s11a-offline-phone-ru-before.jpg | Player header with the offline save pill (F7, before): below `sm` short text, full text as tooltip / sr-only; the pill takes its own line in a problem state | 375x812 | ru | 375 at 375 |
+| s6b-course-home-desktop-en.jpg | General course home (re-shot): "Teacher: <name>" | 1440x900 | en | 1440 |
+| s6b-course-home-desktop-ky.jpg | General course home (re-shot): "Teacher: <name>" | 1440x900 | ky | 1440 |
+| s6b-course-home-desktop-ru.jpg | General course home (re-shot): "Teacher: <name>" | 1440x900 | ru | 1440 |
+| s6b-course-home-phone-en.jpg | General course home (re-shot): "Teacher: <name>" | 375x812 | en | 375 |
+| s6b-course-home-phone-ky.jpg | General course home (re-shot): "Teacher: <name>" | 375x812 | ky | 375 |
+| s6b-course-home-phone-ru.jpg | General course home (re-shot): "Teacher: <name>" | 375x812 | ru | 375 |
+| s6b-course-ort-desktop-en.jpg | ORT course home (F1): "Run by: Platform" instead of "Teacher: Platform course" | 1440x900 | en | 1440 |
+| s6b-course-ort-desktop-ky.jpg | ORT course home (F1): "Run by: Platform" instead of "Teacher: Platform course" | 1440x900 | ky | 1440 |
+| s6b-course-ort-desktop-ru.jpg | ORT course home (F1): "Run by: Platform" instead of "Teacher: Platform course" | 1440x900 | ru | 1440 |
+| s6b-course-ort-phone-en.jpg | ORT course home (F1): "Run by: Platform" instead of "Teacher: Platform course" | 375x812 | en | 375 |
+| s6b-course-ort-phone-ky.jpg | ORT course home (F1): "Run by: Platform" instead of "Teacher: Platform course" | 375x812 | ky | 375 |
+| s6b-course-ort-phone-ru.jpg | ORT course home (F1): "Run by: Platform" instead of "Teacher: Platform course" | 375x812 | ru | 375 |
+| s6b-home-error-desktop-en.jpg | Student home error (re-shot) | 1440x900 | en | 1440 |
+| s6b-home-error-desktop-ky.jpg | Student home error (re-shot) | 1440x900 | ky | 1440 |
+| s6b-home-error-desktop-ru.jpg | Student home error (re-shot) | 1440x900 | ru | 1440 |
+| s6b-home-error-phone-en.jpg | Student home error (re-shot) | 375x812 | en | 375 |
+| s6b-home-error-phone-ky.jpg | Student home error (re-shot) | 375x812 | ky | 375 |
+| s6b-home-error-phone-ru.jpg | Student home error (re-shot) | 375x812 | ru | 375 |
+| s6b-home-loading-desktop-en.jpg | Student home loading (re-shot) | 1440x900 | en | 1440 |
+| s6b-home-loading-desktop-ky.jpg | Student home loading (re-shot) | 1440x900 | ky | 1440 |
+| s6b-home-loading-desktop-ru.jpg | Student home loading (re-shot) | 1440x900 | ru | 1440 |
+| s6b-home-loading-phone-en.jpg | Student home loading (re-shot) | 375x812 | en | 375 |
+| s6b-home-loading-phone-ky.jpg | Student home loading (re-shot) | 375x812 | ky | 375 |
+| s6b-home-loading-phone-ru.jpg | Student home loading (re-shot) | 375x812 | ru | 375 |
+| s6b-home-new-desktop-en.jpg | New student home (re-shot on S11a) | 1440x900 | en | 1440 |
+| s6b-home-new-desktop-ky.jpg | New student home (re-shot on S11a) | 1440x900 | ky | 1440 |
+| s6b-home-new-desktop-ru.jpg | New student home (re-shot on S11a) | 1440x900 | ru | 1440 |
+| s6b-home-new-phone-en.jpg | New student home (re-shot on S11a) | 375x812 | en | 375 |
+| s6b-home-new-phone-ky.jpg | New student home (re-shot on S11a) | 375x812 | ky | 375 |
+| s6b-home-new-phone-ru.jpg | New student home (re-shot on S11a) | 375x812 | ru | 375 |
+| s6b-home-student-desktop-en.jpg | Student home (F2): one unfinished attempt is in the hero line with its start date; no separate Continue section | 1440x900 | en | 1440 |
+| s6b-home-student-desktop-ky.jpg | Student home (F2): one unfinished attempt is in the hero line with its start date; no separate Continue section | 1440x900 | ky | 1440 |
+| s6b-home-student-desktop-ru.jpg | Student home (F2): one unfinished attempt is in the hero line with its start date; no separate Continue section | 1440x900 | ru | 1440 |
+| s6b-home-student-phone-en.jpg | Student home (F2): one unfinished attempt is in the hero line with its start date; no separate Continue section | 375x812 | en | 375 |
+| s6b-home-student-phone-ky.jpg | Student home (F2): one unfinished attempt is in the hero line with its start date; no separate Continue section | 375x812 | ky | 375 |
+| s6b-home-student-phone-ru.jpg | Student home (F2): one unfinished attempt is in the hero line with its start date; no separate Continue section | 375x812 | ru | 375 |
+| s6b-lobby-no-attempts-desktop-en.jpg | Lobby after the last attempt (F3): "No attempts left" only in My attempts, no second banner | 1440x900 | en | 1440 |
+| s6b-lobby-no-attempts-desktop-ky.jpg | Lobby after the last attempt (F3): "No attempts left" only in My attempts, no second banner | 1440x900 | ky | 1440 |
+| s6b-lobby-no-attempts-desktop-ru.jpg | Lobby after the last attempt (F3): "No attempts left" only in My attempts, no second banner | 1440x900 | ru | 1440 |
+| s6b-lobby-no-attempts-phone-en.jpg | Lobby after the last attempt (F3): "No attempts left" only in My attempts, no second banner | 375x812 | en | 375 |
+| s6b-lobby-no-attempts-phone-ky.jpg | Lobby after the last attempt (F3): "No attempts left" only in My attempts, no second banner | 375x812 | ky | 375 |
+| s6b-lobby-no-attempts-phone-ru.jpg | Lobby after the last attempt (F3): "No attempts left" only in My attempts, no second banner | 375x812 | ru | 375 |
