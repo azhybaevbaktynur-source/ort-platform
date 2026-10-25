@@ -32,12 +32,12 @@ function ForgotPasswordForm() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || "Failed to process request");
+        throw new Error(err.detail || t("auth.forgotFailed"));
       }
 
       setSuccess(true);
     } catch (err: any) {
-      setError(err?.message || "Failed to send reset link");
+      setError(err?.message || t("auth.forgotFailed"));
     } finally {
       setLoading(false);
     }
@@ -71,7 +71,7 @@ function ForgotPasswordForm() {
                 <CheckCircle2 aria-hidden="true" className="w-5 h-5 text-success-700 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-semibold text-success-900 mb-1">
-                    {lang === "ky" ? "Шилтеме жөнөтүлдү!" : "Ссылка отправлена!"}
+                    {t("auth.resetLinkSentTitle")}
                   </p>
                   <p className="text-success-800 leading-relaxed">
                     {t("auth.resetLinkSent")}
@@ -111,9 +111,14 @@ function ForgotPasswordForm() {
   );
 }
 
+function LoadingFallback() {
+  const { t } = useTranslation();
+  return <div className="min-h-screen flex items-center justify-center">{t("common.loading")}</div>;
+}
+
 export default function ForgotPasswordPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+    <Suspense fallback={<LoadingFallback />}>
       <ForgotPasswordForm />
     </Suspense>
   );

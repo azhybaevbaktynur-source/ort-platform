@@ -94,7 +94,15 @@
       "email_send_failed": "Could not send the email. Please try again a bit later.",
       "network": "The server is not responding. It may be waking up, so try again in a few seconds."
     },
-    "wakingServer": "The server is waking up after being idle, so the first login may take up to a minute..."
+    "wakingServer": "The server is waking up after being idle, so the first login may take up to a minute...",
+    "resetInvalidToken": "Invalid link or token not found",
+    "passwordsMismatch": "Passwords do not match",
+    "passwordTooShort": "Password must be at least 6 characters",
+    "resetTokenMissing": "The reset token is missing. Request a new reset link.",
+    "passwordUpdated": "Password updated!",
+    "resetFailed": "Could not reset the password. Try again.",
+    "resetLinkSentTitle": "Link sent!",
+    "forgotFailed": "Could not send the reset link. Try again."
   },
   "lms": {
     "nav": {
