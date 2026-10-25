@@ -74,6 +74,7 @@ def wrong_response(qv: QuestionVersion):
 async def test_phase3_flow(db, api, frozen_clock):
     w = world(db, languages=("ru",))
     teacher, cid = w.O, w.cid
+    w.course.template_key, w.course.template_version = "ort", 1; db.commit()  # Phase 6 S2b: ORT presets/import formats need the ORT course template
     s1, s2, s3 = make_user(db), make_user(db), make_user(db)
     for s in (s1, s2, s3):
         enroll(db, w.course, s, "student")

@@ -47,7 +47,9 @@ def counts(db, bank_id=None):
 
 @pytest.fixture
 def w(db):
-    return world(db, languages=("ru", "ky", "en"))
+    w = world(db, languages=("ru", "ky", "en"))
+    w.course.template_key, w.course.template_version = "ort", 1; db.commit()  # Phase 6 S2b: ORT presets/import formats need the ORT course template
+    return w
 
 
 async def test_case1_db_level_and_case9_idempotent(w, db):
@@ -229,7 +231,8 @@ async def test_csv_external_and_bare_image_names(w):
 
 
 async def test_cross_course_isolation(w, db):
-    other = make_course(db, w.T, languages=["ru"], default_language="ru")
+    other = make_course(db, w.T, languages=["ru"], default_language="ru", template_key="ort",
+                        template_version=1)  # Phase 6 S2b: ORT presets/import formats need the ORT course template
     await imp(w.O, w.cid, zbytes(), exam_type="full_main")
     rep = (await imp(w.T, str(other.id), zbytes(), exam_type="full_main")).json()
     assert rep["ok"] and rep["banks"][0]["created"] == SECTIONS     # second course: independent bank

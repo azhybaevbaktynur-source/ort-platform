@@ -117,3 +117,21 @@ def transfer_ownership(course_id: uuid.UUID, data: AdminTransferIn, request: Req
     svc.transfer_ownership(db, admin, course, data.new_owner_user_id, by_admin=True, reason=data.reason,
                            request=request)
     return _one(db, course_id)
+
+
+# --- Phase 6 S2b begin --- (template lock: platform admin only, audited; PHASE_6_DESIGN 5.4)
+from app.lms.templates import service as _tpl  # noqa: E402
+from app.lms.templates.schemas import PlatformCoursePatchIn, PlatformCourseTemplateOut  # noqa: E402
+
+
+@router.patch("/courses/{course_id}", response_model=PlatformCourseTemplateOut)
+def patch_course(course_id: uuid.UUID, data: PlatformCoursePatchIn, request: Request,
+                 admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
+    course = svc.load_course(db, course_id, include_deleted=True, for_update=True)
+    _tpl.set_template_locked(db, admin, course, data.template_locked, reason=data.reason, request=request)
+    db.refresh(course)
+    return PlatformCourseTemplateOut(id=course.id, template_key=course.template_key,
+                                     template_version=course.template_version,
+                                     template_locked=bool(course.template_locked),
+                                     template=_tpl.course_template_out(course))
+# --- Phase 6 S2b end ---

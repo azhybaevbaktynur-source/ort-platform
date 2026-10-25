@@ -37,6 +37,10 @@ from app.lms.grading import repository as grading_repo
 from app.lms.grading.schemes import load_usable_version
 from app.lms.grading.seeds import PRESET_SCHEME_VERSIONS
 from app.models.user import User
+# --- Phase 6 S2b begin --- (course template guards, PHASE_6_DESIGN 5.2 / 5.4)
+from app.lms.templates import base as tpl_fields
+from app.lms.templates import service as tpl
+# --- Phase 6 S2b end ---
 
 _ZERO = Decimal("0")
 
@@ -61,6 +65,9 @@ def _commit(db: Session, a: Assessment) -> None:
 
 def create_assessment(db: Session, ctx: AuthzContext, course: Course, data: sch.AssessmentCreateIn) -> Assessment:
     require_course(ctx, A.CONTENT_MANAGE, course)
+    # --- Phase 6 S2b begin --- (course template guard, PHASE_6_DESIGN 5.2)
+    tpl.assert_preset_allowed(course, data.preset)
+    # --- Phase 6 S2b end ---
     if set(data.languages) - set(course.languages or []):
         raise ValidationFailed("Languages must be a subset of the course languages", code="languages_not_in_course")
     position = (db.execute(select(func.max(Assessment.position)).where(Assessment.course_id == course.id)).scalar()
@@ -94,6 +101,12 @@ def update_assessment(db: Session, ctx: AuthzContext, course: Course, aid: uuid.
         raise Conflict("The assessment was changed by someone else", code="draft_conflict",
                        details={"draft_rev": a.draft_rev})
     fields = data.model_fields_set - {"draft_rev"}
+    # --- Phase 6 S2b begin --- (course template guard, PHASE_6_DESIGN 5.4)
+    if "navigation" in fields and data.navigation != a.navigation:
+        tpl.assert_not_locked(course, tpl_fields.LOCK_NAVIGATION, preset=a.preset, actor_id=ctx.user.id)
+    if "grading_scheme_version_id" in fields and data.grading_scheme_version_id != a.grading_scheme_version_id:
+        tpl.assert_not_locked(course, tpl_fields.LOCK_SCHEME_VERSION, preset=a.preset, actor_id=ctx.user.id)
+    # --- Phase 6 S2b end ---
     if "languages" in fields and set(data.languages) - set(course.languages or []):
         raise ValidationFailed("Languages must be a subset of the course languages", code="languages_not_in_course")
     frm = utc(data.available_from) if "available_from" in fields else utc(a.available_from)
@@ -174,6 +187,9 @@ def _section_rules(a: Assessment, key: Optional[str], given: Optional[sch.Sectio
 def add_section(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID,
                 data: sch.SectionIn) -> AssessmentSection:
     a = _manage(db, ctx, course, aid)
+    # --- Phase 6 S2b begin --- (course template guard, PHASE_6_DESIGN 5.4)
+    tpl.assert_not_locked(course, tpl_fields.LOCK_SECTION_ADD_REMOVE, preset=a.preset, actor_id=ctx.user.id)
+    # --- Phase 6 S2b end ---
     sections = repo.load_sections(db, a.id)
     if len(sections) >= settings.ASSESSMENT_MAX_SECTIONS:
         raise ValidationFailed("Too many sections", code="too_many_sections")
@@ -195,6 +211,16 @@ def update_section(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUI
     old_lock = locked_rules(a.preset, s.key)
     if "key" in fields and old_lock is not None and data.key != s.key:
         raise ValidationFailed("The ORT preset fixes the key of this section", code="preset_rule_locked")
+    # --- Phase 6 S2b begin --- (course template guard, PHASE_6_DESIGN 5.4)
+    if "key" in fields and data.key != s.key:
+        tpl.assert_not_locked(course, tpl_fields.LOCK_SECTION_KEY, preset=a.preset, actor_id=ctx.user.id)
+    if "time_limit_s" in fields and data.time_limit_s != s.time_limit_s:
+        tpl.assert_not_locked(course, tpl_fields.LOCK_SECTION_TIME_LIMIT, preset=a.preset, actor_id=ctx.user.id)
+    if ("rules" in fields and tpl.is_locked(course, tpl_fields.LOCK_SECTION_RULES, preset=a.preset,
+                                            actor_id=ctx.user.id)
+            and _section_rules(a, data.key if "key" in fields else s.key, data.rules) != dict(s.rules or {})):
+        tpl.assert_not_locked(course, tpl_fields.LOCK_SECTION_RULES, preset=a.preset, actor_id=ctx.user.id)
+    # --- Phase 6 S2b end ---
     if "key" in fields:
         s.key = data.key
     if "title" in fields:
@@ -212,6 +238,9 @@ def update_section(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUI
 def delete_section(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID, section_id: uuid.UUID) -> None:
     a = _manage(db, ctx, course, aid)
     s = repo.load_section(db, a.id, section_id)
+    # --- Phase 6 S2b begin --- (course template guard, PHASE_6_DESIGN 5.4)
+    tpl.assert_not_locked(course, tpl_fields.LOCK_SECTION_ADD_REMOVE, preset=a.preset, actor_id=ctx.user.id)
+    # --- Phase 6 S2b end ---
     if db.execute(select(AssessmentItem.id).where(AssessmentItem.section_id == s.id).limit(1)).first():
         raise Conflict("The section still has items", code="section_not_empty")
     db.delete(s)
@@ -226,6 +255,10 @@ def reorder_sections(db: Session, ctx: AuthzContext, course: Course, aid: uuid.U
     sections = repo.load_sections(db, a.id)
     if len(section_ids) != len(set(section_ids)) or {s.id for s in sections} != set(section_ids):
         raise ValidationFailed("section_ids must be exactly the current sections", code="order_mismatch")
+    # --- Phase 6 S2b begin --- (course template guard, PHASE_6_DESIGN 5.4)
+    if [x.id for x in sections] != list(section_ids):
+        tpl.assert_not_locked(course, tpl_fields.LOCK_SECTION_ORDER, preset=a.preset, actor_id=ctx.user.id)
+    # --- Phase 6 S2b end ---
     by_id = {s.id: s for s in sections}
     _renumber([by_id[i] for i in section_ids])
     _commit(db, a)

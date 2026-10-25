@@ -100,6 +100,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- Phase 6 S2b begin --- (GET /courses/templates; before api_router so it wins over /courses/{course_id})
+from app.lms.templates.router import router as _templates_router  # noqa: E402
+
+app.include_router(_templates_router, prefix=settings.API_V1_STR + "/courses", tags=["Courses"])
+# --- Phase 6 S2b end ---
 # Include API v1 router
 app.include_router(api_router, prefix=settings.API_V1_STR)
 register_error_handlers(app)

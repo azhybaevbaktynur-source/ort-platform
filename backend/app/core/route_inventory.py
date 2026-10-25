@@ -55,6 +55,13 @@ ROUTE_POLICIES.update({
 })
 # --- Phase 5 S4 end ---
 
+# --- Phase 6 S2b begin --- (course templates, PHASE_6_DESIGN 2.3 / 5.4)
+ROUTE_POLICIES.update({
+    ("GET", "/api/v1/courses/templates"): "authenticated",  # + member of the organization or platform admin
+    ("PATCH", "/api/v1/platform/courses/{course_id}"): "platform_admin",  # template_locked, audited
+})
+# --- Phase 6 S2b end ---
+
 
 def iter_routes(app):
     """Yield (METHOD, path) for every HTTP route, flattening included routers.

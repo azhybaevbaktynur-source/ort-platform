@@ -116,6 +116,7 @@ async def test_import_of_n_new_images_adds_n(db, local_storage):
     from tests.lms.test_import_api import imp, zbytes
 
     w = world(db, languages=("ru", "ky", "en"))
+    w.course.template_key, w.course.template_version = "ort", 1; db.commit()  # Phase 6 S2b: ORT presets/import formats need the ORT course template
     res = await imp(w.O, w.cid, zbytes(), exam_type="full_main")
     assert res.status_code == 200 and res.json()["committed"], res.text
     keys = db.execute(select(Asset.storage_key, func.max(Asset.bytes)).group_by(Asset.storage_key)).all()
@@ -132,6 +133,7 @@ async def test_import_refused_at_hard_limit(db, local_storage, monkeypatch):
     from tests.lms.test_import_api import imp, zbytes
 
     w = world(db, languages=("ru", "ky", "en"))
+    w.course.template_key, w.course.template_version = "ort", 1; db.commit()  # Phase 6 S2b: ORT presets/import formats need the ORT course template
     set_stored(1000)
     monkeypatch.setattr(settings, "STORAGE_HARD_BYTES", 1000)
     res = await imp(w.O, w.cid, zbytes(), exam_type="full_main")
