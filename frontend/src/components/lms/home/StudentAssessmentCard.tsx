@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useContext } from "react";
+import { CourseContext } from "@/components/lms/CourseContext";
 import Link from "next/link";
 import { CalendarClock, CheckCircle2, Circle, Clock, Lock, PlayCircle, Star } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
@@ -63,14 +64,18 @@ export function StudentAssessmentCard({ a, v, href, primary, title, as = "li" }:
   if (!result && a.last_result) result = t("home.scoreOf", { score: fmtPoints(a.last_result.raw_score), total: fmtPoints(a.last_result.points_possible) });
 
   const actions: React.ReactNode[] = [];
-  if (a.in_progress_attempt_id) {
+  // Phase 6b: an org/platform admin reading the course (no enrollment) gets no start/continue action
+  const readOnly = !!useContext(CourseContext)?.course.my_enrollment.read_only;
+  if (readOnly) {
+    // read-only view: only the lobby link below
+  } else if (a.in_progress_attempt_id) {
     actions.push(<LinkButton key="go" variant={variant} href={`${href}/attempts/${a.in_progress_attempt_id}`}>{t("home.action.continue")}</LinkButton>);
   } else if (v.canStart) {
     actions.push(<LinkButton key="go" variant={variant} href={lobby}>{t(a.attempts_used > 0 ? "home.action.again" : "home.action.start")}</LinkButton>);
   }
   if (v.resultAttemptId) {
     actions.push(<LinkButton key="res" variant="secondary" href={`${href}/attempts/${v.resultAttemptId}/result`}>{t("home.action.result")}</LinkButton>);
-  } else if (!a.in_progress_attempt_id && !v.canStart) {
+  } else if (readOnly || (!a.in_progress_attempt_id && !v.canStart)) {
     actions.push(<LinkButton key="open" variant="secondary" href={lobby}>{t(a.attempts_used > 0 ? "home.action.attempts" : "home.action.open")}</LinkButton>);
   }
 

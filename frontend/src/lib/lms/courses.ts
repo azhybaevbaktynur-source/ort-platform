@@ -21,7 +21,7 @@ export const createCourse = (body: CourseCreateIn) => lmsFetch<CourseStaffOut>("
 export const getCourse = async (id: string): Promise<CourseOut> => {
   const c = await lmsFetch<CourseOut>(`/courses/${enc(id)}`);
   if (!c.my_enrollment) {
-    c.my_enrollment = { id: "", course_id: c.id, role: "student", state: "active", activated_at: null };
+    c.my_enrollment = { id: "", course_id: c.id, role: "student", state: "active", activated_at: null, read_only: true };
   }
   return c;
 };

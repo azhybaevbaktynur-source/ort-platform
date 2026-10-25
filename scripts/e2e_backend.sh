@@ -28,7 +28,10 @@ fi
 PY="$(command -v "$PY")"   # absolute: env -i below has a minimal PATH
 
 case "$E2E_DIR" in
-  /tmp/*|/private/tmp/*|"${RUNNER_TEMP:-/nonexistent}"/*) ;;
+  *..*|*/) echo "e2e_backend: E2E_DIR must not contain '..' or end with '/' (got $E2E_DIR)" >&2; exit 2 ;;
+esac
+case "$E2E_DIR" in
+  /tmp/?*|/private/tmp/?*|"${RUNNER_TEMP:-/nonexistent}"/?*) ;;
   *) echo "e2e_backend: E2E_DIR must be under /tmp (got $E2E_DIR)" >&2; exit 2 ;;
 esac
 /bin/rm -rf "$E2E_DIR"
