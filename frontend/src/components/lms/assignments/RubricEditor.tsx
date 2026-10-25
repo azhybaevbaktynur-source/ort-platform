@@ -66,8 +66,7 @@ export function RubricEditor({ courseId, assignment, defaultLanguage, canEdit, o
         title: { ...r.rest, [defaultLanguage]: r.title.trim() },
         points: parsed[i] as number,
       })));
-      const rubric = Array.isArray(out) ? out : out.rubric;
-      onSaved(rubric);
+      onSaved(out.rubric);
       toast.success(t("assignments.rubric.saved"));
     } catch (e) {
       setError(e);

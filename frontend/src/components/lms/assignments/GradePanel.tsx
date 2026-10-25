@@ -101,7 +101,8 @@ export function GradePanel({
         points: pts,
         ...(hasRubric ? { rubric_scores: rubric.map((c, i) => ({ criterion_id: c.id, points: parsedScores[i] as number, comment: scores[c.id]?.comment.trim() || null })) } : {}),
         feedback_text: feedback.trim() || null,
-        feedback_asset_id: feedbackAsset?.id ?? null,
+        // absent = unchanged (the server accepts only files the grader uploaded; another grader keeps the old one)
+        ...((feedbackAsset?.id ?? null) !== (sub?.feedback_asset_id ?? null) ? { feedback_asset_id: feedbackAsset?.id ?? null } : {}),
         ...(sub ? { version: sub.version } : {}),
       });
       seed(out);

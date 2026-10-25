@@ -81,6 +81,27 @@ def effective_for_assessment(db: Session, course_id, user_id: str, assessment) -
     return eff_mod.resolve(None, assessment, acc, ovr)
 
 
+def effective_for_assessments(db: Session, course_id, user_id: str, assessments: list) -> dict:
+    """Phase 7a S6: `{assessment_id: Effective}` of the caller for one page of quizzes (the student assessment list),
+    in at most TWO statements (the accommodation of the caller's active enrollment, then the page's overrides).
+    Without an enrollment, an accommodation and overrides every value equals the assessment's own."""
+    if not assessments:
+        return {}
+    row = db.execute(
+        select(Enrollment.id, EnrollmentAccommodation)
+        .select_from(Enrollment)
+        .outerjoin(EnrollmentAccommodation, EnrollmentAccommodation.enrollment_id == Enrollment.id)
+        .where(Enrollment.course_id == course_id, Enrollment.user_id == user_id, Enrollment.state == "active")
+    ).first()
+    acc, overrides = None, {}
+    if row is not None:
+        acc = row[1]
+        ids = {assignment_id_for(a.id): a.id for a in assessments}
+        overrides = {ids[o.assignment_id]: o for o in db.execute(select(AssignmentOverride).where(
+            AssignmentOverride.enrollment_id == row[0], AssignmentOverride.assignment_id.in_(list(ids)))).scalars()}
+    return {a.id: eff_mod.resolve(None, a, acc, overrides.get(a.id)) for a in assessments}
+
+
 # =========================================================================== access code (3.8)
 
 def normalize_access_code(code: Optional[str]) -> Optional[str]:
@@ -337,7 +358,10 @@ def _recompute_due(db: Session, ctx: AuthzContext, a: Assignment, base, enr: Enr
                    override_due: Optional[datetime]) -> None:
     """3.4: the effective due date of THIS student changed -> recompute that one quiz submission now (lock ->
     counted attempts -> recompute, event `regraded`, reason `override_changed`). Nothing else goes stale. Hand-in
-    assignments keep the late seconds measured at hand-in time; there is nothing to recompute without a row."""
+    assignments (text/file): `_recompute_hand_ins` (S6)."""
+    if a.kind in ("text", "file"):
+        _recompute_hand_ins(db, ctx, a, enr, override_due)
+        return
     if a.kind != "quiz" or a.assessment_id is None:
         return
     from app.lms.grading import submissions as gsub
@@ -356,6 +380,44 @@ def _recompute_due(db: Session, ctx: AuthzContext, a: Assignment, base, enr: Enr
     attempts = gsub.counted_attempts(db, a.assessment_id, enr.id)
     gsub.recompute_submission(db, dict(sub), ctx_row, ctx_row, attempts, now=clock.now(), actor_id=ctx.user.id,
                               reason="override_changed", event="regraded")
+
+
+def _recompute_hand_ins(db: Session, ctx: AuthzContext, a: Assignment, enr: Enrollment,
+                        override_due: Optional[datetime]) -> None:
+    """Phase 7a S6 (3.4 for hand-ins): this student's effective due date changed. Lock the grade row, re-measure
+    `late_seconds` of this student's hand-ins against the new effective due date (the hand-in content stays
+    untouched; `late_seconds` is a measurement, not content), and when a grade exists recompute it from the graded
+    hand-in (late deduction, effective points, scheme values; event `regraded`, reason `override_changed`).
+    Nothing of other students changes."""
+    from sqlalchemy import update
+
+    from app.lms.assignments import grading as manual
+    from app.lms.assignments.models import AssignmentSubmission
+    from app.lms.grading import late as late_mod
+    from app.lms.grading.models import Submission
+
+    S = Submission.__table__
+    sub = db.execute(select(S).where(S.c.enrollment_id == enr.id, S.c.assignment_id == a.id)
+                     .with_for_update()).mappings().first()
+    if sub is None:
+        return
+    course_row = db.get(Course, a.course_id)
+    due = _utc(override_due if override_due is not None else a.due_at)
+    H = AssignmentSubmission.__table__
+    graded_hand_in = None
+    for h in db.execute(select(H).where(H.c.submission_id == sub["id"]).order_by(H.c.attempt_no)).all():
+        lsec = late_mod.late_seconds(h.submitted_at, due, course_row.late_policy)
+        if lsec != int(h.late_seconds or 0):
+            db.execute(update(H).where(H.c.id == h.id).values(late_seconds=lsec))
+        if sub["graded_item_id"] is not None and h.id == sub["graded_item_id"]:
+            graded_hand_in = SimpleNamespace(id=h.id, late_seconds=lsec)
+    if sub["raw_points"] is None and sub["override_points"] is None:
+        return  # no grade yet: the hand-ins carry the new lateness; grading reads it later
+    if graded_hand_in is None or graded_hand_in.late_seconds == int(sub["late_seconds"] or 0):
+        return
+    arow = manual.load_assignment(db, a.course_id, a.id)
+    manual.recompute_manual(db, sub, arow, arow, graded_hand_in, now=clock.now(), actor_id=ctx.user.id,
+                            reason="override_changed", event="regraded")
 
 
 __all__ = ["load_rows", "effective_for_assessment", "normalize_access_code", "hash_access_code",

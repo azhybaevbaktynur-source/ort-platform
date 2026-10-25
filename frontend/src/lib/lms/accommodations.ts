@@ -37,12 +37,22 @@ export const EXTRA_ATTEMPTS_MAX = 100;
 export const NOTE_MAX = 500;
 
 export interface AccommodationOut {
+  enrollment_id?: string;
   extra_time_percent: number;
   extra_time_s: number;
   extra_attempts: number;
   /** staff only */
   note: string | null;
   updated_at?: string | null;
+  /** Q1 switch: false = extra time is stored but ORT exams ignore it */
+  preset_exams_get_extra_time?: boolean;
+}
+
+/** `UserBrief` on staff rows. */
+export interface UserBriefOut {
+  id: string;
+  display_name: string;
+  email: string;
 }
 
 export interface AccommodationIn {
@@ -52,12 +62,14 @@ export interface AccommodationIn {
   note?: string | null;
 }
 
-/** One student of `GET /courses/{c}/accommodations` (roster-paginated). Assumed field names besides `accommodation`. */
+/** One student of `GET /courses/{c}/accommodations` (roster-paginated; wire: `{enrollment_id, user, accommodation}`).
+ * `user_id`, `student_name` and `email` are copied from `user` by this client for the screens. */
 export interface AccommodationRowOut {
   enrollment_id: string;
+  user: UserBriefOut;
   user_id: string;
   student_name: string | null;
-  email?: string | null;
+  email: string | null;
   accommodation: AccommodationOut | null;
 }
 
@@ -65,8 +77,9 @@ export interface OverrideOut {
   id: string;
   assignment_id: string;
   enrollment_id: string;
-  /** assumed: name for the list */
-  student_name?: string | null;
+  user: UserBriefOut;
+  /** copied from `user.display_name` by this client */
+  student_name: string | null;
   due_at: string | null;
   available_from: string | null;
   available_until: string | null;
@@ -90,20 +103,33 @@ export interface OverrideIn {
 const e = encodeURIComponent;
 const course = (c: string) => `/courses/${e(c)}`;
 
-export const listAccommodations = (courseId: string, opts: { cursor?: string | null; limit?: number } = {}) =>
-  lmsFetch<PageOut<AccommodationRowOut>>(`${course(courseId)}/accommodations`, { params: { cursor: opts.cursor, limit: opts.limit } });
+type Wire<T> = Omit<T, "user_id" | "student_name" | "email">;
+const withName = <T extends { user: UserBriefOut }>(r: T) => ({ ...r, student_name: r.user?.display_name || null });
+
+export async function listAccommodations(courseId: string, opts: { cursor?: string | null; limit?: number } = {}): Promise<PageOut<AccommodationRowOut>> {
+  const page = await lmsFetch<PageOut<Wire<AccommodationRowOut>>>(`${course(courseId)}/accommodations`, { params: { cursor: opts.cursor, limit: opts.limit } });
+  return { ...page, items: page.items.map((r) => ({ ...withName(r), user_id: r.user.id, email: r.user.email || null })) };
+}
 export const setAccommodation = (courseId: string, enrollmentId: string, body: AccommodationIn) =>
   lmsFetch<AccommodationOut>(`${course(courseId)}/enrollments/${e(enrollmentId)}/accommodations`, { method: "PUT", body });
 export const clearAccommodation = (courseId: string, enrollmentId: string) =>
   lmsFetch<void>(`${course(courseId)}/enrollments/${e(enrollmentId)}/accommodations`, { method: "DELETE" });
 
-/** The list may come as a page or as a plain array; both are accepted. */
+/** All exceptions of one assignment (cursor pages of 50, read to the end). */
 export async function listOverrides(courseId: string, assignmentId: string): Promise<OverrideOut[]> {
-  const out = await lmsFetch<PageOut<OverrideOut> | OverrideOut[]>(`${course(courseId)}/assignments/${e(assignmentId)}/overrides`, { params: { limit: 50 } });
-  return Array.isArray(out) ? out : out.items;
+  const out: OverrideOut[] = [];
+  let cursor: string | null = null;
+  for (let i = 0; i < 40; i++) {
+    const page: PageOut<Wire<OverrideOut>> = await lmsFetch<PageOut<Wire<OverrideOut>>>(
+      `${course(courseId)}/assignments/${e(assignmentId)}/overrides`, { params: { limit: 50, cursor } });
+    out.push(...page.items.map(withName));
+    cursor = page.next_cursor;
+    if (!cursor) break;
+  }
+  return out;
 }
-export const setOverride = (courseId: string, assignmentId: string, enrollmentId: string, body: OverrideIn) =>
-  lmsFetch<OverrideOut>(`${course(courseId)}/assignments/${e(assignmentId)}/overrides/${e(enrollmentId)}`, { method: "PUT", body });
+export const setOverride = async (courseId: string, assignmentId: string, enrollmentId: string, body: OverrideIn): Promise<OverrideOut> =>
+  withName(await lmsFetch<Wire<OverrideOut>>(`${course(courseId)}/assignments/${e(assignmentId)}/overrides/${e(enrollmentId)}`, { method: "PUT", body }));
 export const clearOverride = (courseId: string, assignmentId: string, enrollmentId: string) =>
   lmsFetch<void>(`${course(courseId)}/assignments/${e(assignmentId)}/overrides/${e(enrollmentId)}`, { method: "DELETE" });
 

@@ -58,7 +58,7 @@ export function GradingScreen({ assignmentId }: { assignmentId: string }) {
         listAssignmentSubmissions(course.id, assignmentId, { cursor: next, limit: 50 }),
       ]);
       if (asg) setA(asg);
-      setRows((p) => (next ? [...p, ...page.items] : page.items));
+      setRows((p) => (next ? [...p, ...page.rows] : page.rows));
       setCursor(page.next_cursor);
     } catch (e) {
       setError(e);

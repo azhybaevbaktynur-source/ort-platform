@@ -79,6 +79,11 @@ One person can be in several areas (a teacher who studies in another course). Th
   - en: course, assessment (exam for ORT), attempt, grade, teacher, student, organization;
   - ky: курс, тапшырма (ЖРТ: сынак), аракет, баа, мугалим (never "окутуучу"), окуучу, уюм;
   - ru: курс, задание (ОРТ: экзамен), попытка, оценка, **преподаватель** (never "учитель"), ученик, организация.
+- Phase 7a (assignments): the gradable unit is the **assignment**, and a quiz is one kind of assignment. Tabs and
+  lists say **"Assignments" / "Тапшырмалар" / "Задания"** for all of them and **"Quizzes" / "Тесттер" / "Тесты"**
+  for timed tests only; the ORT exam stays "ORT exam" / "ЖРТ сынагы" / "Экзамен ОРТ". Kinds: "Text answer" /
+  "Текст жооп" / "Текстовый ответ", "File upload" / "Файл жүктөө" / "Загрузка файла", "Offline work" /
+  "Сайттан тышкаркы иш" / "Работа вне сайта". Handing in: "hand in" / "тапшыруу" / "сдать".
 - no technical words in student UI (no "snapshot", "version", "enrollment", "payload").
 
 ## 6. ORT exam player

@@ -847,6 +847,11 @@ def list_student(db: Session, ctx: AuthzContext, course: Course, *, cursor: Opti
     mine = _student_attempts(db, ctx.user.id, [a.id for a in assessments])
     briefs = grading_repo.version_briefs(db, [a.grading_scheme_version_id for a in assessments])
     now = clock.now()
+    # --- Phase 7a S6 begin --- (the caller's effective window, due date and attempts: accommodations + overrides)
+    from app.lms.accommodations import service as _acc
+
+    _effs = _acc.effective_for_assessments(db, course.id, ctx.user.id, assessments)
+    # --- Phase 7a S6 end ---
     out = []
     for a, snap, item_count in rows:
         atts = mine[a.id]
@@ -857,11 +862,12 @@ def list_student(db: Session, ctx: AuthzContext, course: Course, *, cursor: Opti
             done = [r for r in atts if r[3] in ("graded", "needs_review") and r[4] is not None]
             if done:
                 last = sch.LastResultOut(raw_score=float(done[-1][4]), points_possible=float(done[-1][5]))
+        _e = _effs[a.id]  # Phase 7a S6: effective values (equal to the assessment's without an exception)
         out.append(sch.AssessmentStudentSummaryOut(
             id=a.id, title=a.title, languages=list(a.languages or []), time_limit_s=_total_limit(snap),
-            item_count=item_count, available_from=a.available_from, available_until=a.available_until,
-            allowed_attempts=a.allowed_attempts, attempts_used=used, in_progress_attempt_id=open_id,
-            last_result=last, due_at=utc(a.due_at),
+            item_count=item_count, available_from=_e.available_from, available_until=_e.available_until,
+            allowed_attempts=_e.allowed_attempts, attempts_used=used, in_progress_attempt_id=open_id,
+            last_result=last, due_at=utc(_e.due_at),
             scheme=sch.scheme_student_ref(briefs.get(a.grading_scheme_version_id))))
     return out, nxt
 

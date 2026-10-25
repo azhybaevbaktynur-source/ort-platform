@@ -28,9 +28,8 @@ export function StudentAssignmentCard({ a, v, base, primary, title, ort = false,
   const href = assignmentHref(base, a);
   const variant = primary ? "primary" : "secondary";
   let action: React.ReactNode = null;
-  if (v.action === "continue" && a.in_progress_attempt_id) {
-    action = <LinkButton variant={variant} href={`${base}/attempts/${a.in_progress_attempt_id}`}>{t("assignments.student.continue")}</LinkButton>;
-  } else if (v.action === "continue") {
+  if (v.action === "continue") {
+    // the lobby resumes the open attempt
     action = <LinkButton variant={variant} href={href}>{t("assignments.student.continue")}</LinkButton>;
   } else if (v.action === "start") {
     action = <LinkButton variant={variant} href={href}>{t("assignments.student.start")}</LinkButton>;
