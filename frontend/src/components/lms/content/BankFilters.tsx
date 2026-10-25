@@ -30,7 +30,7 @@ export function BankFilters({ value, onChange }: { value: BankFilterState; onCha
   return (
     <div role="search" className="w-full space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
       <SearchInput label={t("bank.filters.search")} value={value.q} onChange={(q) => set({ q })} />
-      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <Select label={t("bank.filters.type")} value={value.type} onChange={(e) => set({ type: e.target.value as QuestionType | "" })}
           options={[all, ...QUESTION_TYPES.map((ty) => ({ value: ty, label: t(`bank.types.${ty}.name`) }))]} />
         <Select label={t("bank.filters.language")} value={value.language} onChange={(e) => set({ language: e.target.value as Lang | "" })}

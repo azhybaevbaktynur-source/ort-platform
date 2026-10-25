@@ -1,10 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import type { AuditEntryOut } from "@/lib/lms/types";
 import { fmtApiDateTimeShort } from "@/lib/format";
-import { Table, type PaginationProps, type TableColumn } from "@/components/ui";
+import { Button, Dialog, Table, type PaginationProps, type TableColumn } from "@/components/ui";
 import { focusRing } from "@/components/ui";
 
 export function useAuditActionLabel() {
@@ -34,6 +34,7 @@ export function AuditTable({ entries, loading, error, empty, pagination, countTe
   const hasDetails = (e: AuditEntryOut) => !!e.details && Object.keys(e.details).length > 0;
   const details = (e: AuditEntryOut) => (hasDetails(e) ? JSON.stringify(e.details) : "—");
   const prettyDetails = (e: AuditEntryOut) => JSON.stringify(e.details, null, 2);
+  const [open, setOpen] = useState<AuditEntryOut | null>(null);
   const columns: TableColumn<AuditEntryOut>[] = [
     { key: "action", header: t("platformAdmin.audit.action"), primary: true, cell: (e) => label(e.action) },
     { key: "when", header: t("platformAdmin.audit.when"), nowrap: true, cell: (e) => fmtApiDateTimeShort(e.created_at, lang) },
@@ -44,15 +45,10 @@ export function AuditTable({ entries, loading, error, empty, pagination, countTe
     },
     { key: "reason", header: t("platformAdmin.audit.reason"), cell: (e) => e.reason || "—" },
     {
-      // Phase 6b S11b (UX 7): the raw details sit behind a "Details" disclosure instead of a JSON blob in the row.
-      key: "details", header: t("platformAdmin.audit.details"), hideOnMobile: true, className: "sm:w-0",
+      // Phase 6b S11b (UX 7): the raw details open in a dialog from a "Details" button instead of a JSON blob in the row.
+      key: "details", header: t("platformAdmin.audit.details"), hideOnMobile: true, nowrap: true,
       cell: (e) => hasDetails(e) ? (
-        <details className="group max-w-xs">
-          <summary className={`inline-flex cursor-pointer items-center rounded-lg text-sm font-semibold text-brand-700 hover:underline ${focusRing}`}>
-            {t("platformAdmin.audit.details")}
-          </summary>
-          <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-slate-50 p-2 text-xs text-slate-700">{prettyDetails(e)}</pre>
-        </details>
+        <Button variant="link" size="sm" aria-haspopup="dialog" onClick={() => setOpen(e)}>{t("platformAdmin.audit.details")}</Button>
       ) : <span className="text-slate-500">—</span>,
     },
     {
@@ -71,6 +67,7 @@ export function AuditTable({ entries, loading, error, empty, pagination, countTe
     },
   ];
   return (
+    <>
     <Table
       caption={caption ?? t("platformAdmin.audit.title")}
       columns={columns}
@@ -82,5 +79,17 @@ export function AuditTable({ entries, loading, error, empty, pagination, countTe
       pagination={pagination}
       countText={countText}
     />
+    <Dialog open={!!open} onClose={() => setOpen(null)} size="lg"
+      title={open ? label(open.action) : ""}
+      description={open ? `${fmtApiDateTimeShort(open.created_at, lang)} · ${open.actor.display_name || open.actor.email}` : undefined}
+      footer={<Button variant="secondary" onClick={() => setOpen(null)}>{t("ui.close")}</Button>}>
+      {open && (
+        <>
+          <p className="break-all text-sm"><span className="text-slate-600">{t("platformAdmin.audit.target")}:</span> {open.target_type} <code className="text-xs">{open.target_id}</code></p>
+          <pre className="mt-3 max-h-[60vh] overflow-auto whitespace-pre-wrap break-all rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-800">{prettyDetails(open)}</pre>
+        </>
+      )}
+    </Dialog>
+    </>
   );
 }
