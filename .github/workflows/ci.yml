@@ -26,6 +26,28 @@ jobs:
           mkdir -p /tmp/ci/up
           python -m pytest -q -p no:cacheprovider -W ignore
 
+  # ORT parity gate (AGENTS.md rule 9): golden imports, API e2e, score parity, seed and cutover flow
+  ort-parity:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: ORT parity tests on scratch SQLite
+        env:
+          DATABASE_URL: sqlite:////tmp/ci/test.db
+          LOCAL_UPLOAD_DIR: /tmp/ci/up
+        run: |
+          mkdir -p /tmp/ci/up
+          python -m pytest -q -p no:cacheprovider -W ignore tests/lms/test_ort_import_golden.py tests/lms/test_ort_e2e_api.py tests/lms/test_ort_parity.py tests/lms/test_ort_seed.py tests/lms/test_ort_cutover_flow.py
+
   backend-postgres:
     runs-on: ubuntu-latest
     defaults:
