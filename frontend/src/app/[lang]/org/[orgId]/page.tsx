@@ -2,13 +2,14 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { UserPlus } from "lucide-react";
+import { GraduationCap, UserPlus, Users, UsersRound } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { listOrgInvitations, type InvitationOut } from "@/lib/lms/invitations";
 import { fmtApiDate } from "@/lib/format";
+import { Button, Card, EmptyState, LoadingState, PageHeader, StatTile } from "@/components/ui";
 import { useOrg } from "@/components/lms/org/OrgShell";
 import { InviteDialog, toastInvitationSent } from "@/components/lms/org/InviteDialog";
-import { EmptyBox, Loading, OrgError, StatTile, btn } from "@/components/lms/org/OrgUi";
+import { OrgBadge, OrgError } from "@/components/lms/org/OrgUi";
 
 export default function OrgOverviewPage() {
   const { lang, t } = useTranslation();
@@ -31,36 +32,41 @@ export default function OrgOverviewPage() {
   const c = org.usage;
   const base = `/${lang}/org/${org.id}`;
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-semibold text-slate-900">{t("organizations.org.overviewTitle")}</h2>
-        <button type="button" className={btn.primary} disabled={readOnly} onClick={() => setInviting(true)}>
-          <UserPlus className="h-4 w-4" aria-hidden="true" />{t("invitations.inviteTeacher")}
-        </button>
+    <div>
+      <PageHeader
+        title={org.name}
+        description={t("organizations.org.area")}
+        badge={<OrgBadge tone={org.status} labelKey={`organizations.status.${org.status}`} />}
+        primaryAction={
+          <Button disabled={readOnly} leftIcon={<UserPlus aria-hidden="true" className="h-4 w-4" />} onClick={() => setInviting(true)}>
+            {t("invitations.inviteTeacher")}
+          </Button>
+        }
+      />
+      {/* 6a carry-over: tiles link to the list they count. */}
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatTile href={`${base}/teachers`} icon={<Users />} label={t("organizations.counts.teachers")} value={c.teachers} />
+        <StatTile href={`${base}/courses`} icon={<GraduationCap />} label={t("organizations.counts.courses")} value={c.courses} />
+        <StatTile icon={<UsersRound />} label={t("organizations.counts.students")} value={c.students} />
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatTile label={t("organizations.counts.teachers")} value={c.teachers} />
-        <StatTile label={t("organizations.counts.courses")} value={c.courses} />
-        <StatTile label={t("organizations.counts.students")} value={c.students} />
-      </div>
-      <section aria-labelledby="ov-pending">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h3 id="ov-pending" className="text-lg font-semibold text-slate-900">{t("invitations.pendingTitle")}</h3>
-          <Link href={`${base}/teachers`} className="text-sm font-medium text-brand-700 hover:underline">{t("invitations.allLink")}</Link>
-        </div>
-        {error ? <OrgError error={error} onRetry={load} /> : pending === null ? <Loading /> : pending.length === 0 ? (
-          <EmptyBox text={t("invitations.pendingEmpty")} />
+      <Card
+        title={t("invitations.pendingTitle")}
+        padding={pending && pending.length > 0 ? "none" : "md"}
+        actions={<Link href={`${base}/teachers`} className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-700 hover:underline sm:min-h-0">{t("invitations.allLink")}</Link>}
+      >
+        {error ? <OrgError error={error} onRetry={load} /> : pending === null ? <LoadingState label={t("lms.common.loading")} rows={1} /> : pending.length === 0 ? (
+          <EmptyState variant="plain" className="py-4" title={t("invitations.pendingEmpty")} />
         ) : (
-          <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white text-sm">
+          <ul className="divide-y divide-slate-100 border-t border-slate-100">
             {pending.map((i) => (
-              <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+              <li key={i.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3 sm:px-6">
                 <span className="min-w-0 break-all font-medium text-slate-900">{i.email}</span>
-                <span className="text-xs text-slate-500">{t("invitations.expiresOn", { date: fmtApiDate(i.expires_at, lang) })}</span>
+                <span className="text-sm text-slate-600">{t("invitations.expiresOn", { date: fmtApiDate(i.expires_at, lang) })}</span>
               </li>
             ))}
           </ul>
         )}
-      </section>
+      </Card>
       <InviteDialog open={inviting} orgId={org.id} orgName={org.name} onClose={() => setInviting(false)}
         onSent={(inv, email) => { setInviting(false); toastInvitationSent(t, inv, email); void load(); void reload(); }} />
     </div>

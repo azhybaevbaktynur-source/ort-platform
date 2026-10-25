@@ -1,95 +1,102 @@
 "use client";
 
 import React from "react";
-import { AlertCircle, ShieldCheck } from "lucide-react";
+import { CircleAlert, RefreshCw, ShieldCheck } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
-import { ErrorMessage } from "@/components/lms/ErrorMessage";
+import { lmsErrorKey } from "@/components/lms/ErrorMessage";
+import { Badge, Button, EmptyState, ErrorState, LoadingState, cn, type BadgeTone } from "@/components/ui";
+
+type T = (key: string, params?: Record<string, string | number>) => string;
+
+/** Text of an API error: Phase 6 codes from `organizations.errors.*`, everything else from `lms.errors.*`. */
+export function apiErrorText(t: T, error: unknown): string {
+  const e = error as { code?: string; details?: Record<string, unknown> } | null;
+  const code = e?.code;
+  const orgKey = `organizations.errors.${code}`;
+  const orgText = code ? t(orgKey) : orgKey;
+  const text = orgText !== orgKey ? orgText : t(lmsErrorKey(code));
+  const retry = e?.details && typeof e.details.retry_after_seconds === "number" ? e.details.retry_after_seconds : null;
+  return retry !== null ? `${text} ${t("lms.common.retryAfter", { seconds: retry })}` : text;
+}
+
+export function useApiErrorText() {
+  const { t } = useTranslation();
+  return (error: unknown) => apiErrorText(t, error);
+}
 
 /**
- * Error box for Phase 6 endpoints: codes with a text in `organizations.errors.*` are shown with it,
- * everything else falls back to the shared `ErrorMessage` (lms.errors.*).
+ * Error box for Phase 6 endpoints (shown inside a form, a dialog or above a list): what happened in plain
+ * words, plus Retry when retrying can help.
  */
 export function OrgError({ error, onRetry, className = "" }: { error: unknown; onRetry?: () => void; className?: string }) {
   const { t } = useTranslation();
   if (!error) return null;
-  const code = (error as { code?: string }).code;
-  const key = code ? `organizations.errors.${code}` : "";
-  const text = key ? t(key) : key;
-  if (!code || text === key) return <ErrorMessage error={error} onRetry={onRetry} className={className} />;
   return (
-    <div role="alert" className={`flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-800 ${className}`}>
-      <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden="true" />
-      <p className="flex-1">{text}</p>
+    <div role="alert" className={cn("flex flex-col gap-3 rounded-xl border border-danger-200 bg-danger-50 px-3.5 py-3 sm:flex-row sm:items-start", className)}>
+      <p className="flex min-w-0 flex-1 items-start gap-2 text-sm leading-5 text-danger-800">
+        <CircleAlert aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+        <span className="min-w-0 break-words">{apiErrorText(t, error)}</span>
+      </p>
       {onRetry && (
-        <button type="button" onClick={onRetry} className="font-semibold underline">{t("lms.common.retry")}</button>
+        <Button variant="secondary" size="sm" onClick={onRetry} leftIcon={<RefreshCw aria-hidden="true" className="h-4 w-4" />}>
+          {t("ui.retry")}
+        </Button>
       )}
     </div>
   );
 }
 
-const BADGE: Record<string, string> = {
-  active: "bg-emerald-100 text-emerald-800",
-  suspended: "bg-amber-100 text-amber-900",
-  invited: "bg-sky-100 text-sky-800",
-  pending: "bg-sky-100 text-sky-800",
-  accepted: "bg-emerald-100 text-emerald-800",
-  revoked: "bg-slate-100 text-slate-700",
-  expired: "bg-slate-100 text-slate-700",
-  removed: "bg-slate-100 text-slate-700",
-  blocked: "bg-red-100 text-red-800",
-  granted: "bg-emerald-100 text-emerald-800",
-  notGranted: "bg-slate-100 text-slate-700",
+/** A whole list or page failed to load: centered `ErrorState` with the specific text and Retry. */
+export function LoadError({ error, onRetry, action }: { error: unknown; onRetry?: () => void; action?: React.ReactNode }) {
+  const { t } = useTranslation();
+  return <ErrorState message={apiErrorText(t, error)} onRetry={onRetry} action={action} />;
+}
+
+const TONE: Record<string, BadgeTone> = {
+  active: "success",
+  suspended: "warning",
+  invited: "info",
+  pending: "info",
+  accepted: "success",
+  revoked: "neutral",
+  expired: "neutral",
+  removed: "neutral",
+  blocked: "danger",
+  granted: "success",
+  notGranted: "neutral",
 };
 
-/** Small status badge; `labelKey` is a full i18n key, `tone` picks the colors. */
+/** Small status badge; `labelKey` is a full i18n key, `tone` is the state name. */
 export function OrgBadge({ tone, labelKey }: { tone: string; labelKey: string }) {
   const { t } = useTranslation();
-  return <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${BADGE[tone] || BADGE.revoked}`}>{t(labelKey)}</span>;
+  return <Badge tone={TONE[tone] ?? "neutral"}>{t(labelKey)}</Badge>;
+}
+
+const COURSE_TONE: Record<string, BadgeTone> = { draft: "warning", published: "success", concluded: "neutral" };
+
+/** Course status (draft / published / concluded) on the design-system `Badge`. */
+export function CourseStatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation();
+  return <Badge tone={COURSE_TONE[status] ?? "neutral"}>{t(`courses.status.${status}`)}</Badge>;
 }
 
 /** "System account" badge (admin M5): accounts the platform needs; they cannot be edited. */
 export function SystemAccountBadge() {
   const { t } = useTranslation();
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-800" title={t("organizations.admin.systemAccountHint")}>
-      <ShieldCheck className="h-3 w-3" aria-hidden="true" />{t("organizations.admin.systemAccount")}
-    </span>
+    <Badge tone="system" icon={<ShieldCheck aria-hidden="true" />} title={t("organizations.admin.systemAccountHint")}>
+      {t("organizations.admin.systemAccount")}
+    </Badge>
   );
 }
 
-/** Loading line in the page layout (never a blank page). */
-export function Loading() {
+/** Loading placeholder in the page layout (never a blank page). */
+export function Loading({ rows = 3 }: { rows?: number }) {
   const { t } = useTranslation();
-  return <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p>;
+  return <LoadingState label={t("lms.common.loading")} rows={rows} />;
 }
 
 /** Empty state: what this place is for plus an optional next step. */
-export function EmptyBox({ text, children }: { text: string; children?: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">
-      <p>{text}</p>
-      {children ? <div className="mt-3 flex flex-wrap justify-center gap-2">{children}</div> : null}
-    </div>
-  );
+export function EmptyBox({ text, description, children }: { text: string; description?: string; children?: React.ReactNode }) {
+  return <EmptyState title={text} description={description} action={children} />;
 }
-
-/** One number with a label (overview tiles). */
-export function StatTile({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <p className="text-xs font-medium text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-slate-900">{value}</p>
-    </div>
-  );
-}
-
-export const btn = {
-  primary: "inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50",
-  secondary: "inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50",
-  danger: "inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50",
-  small: "inline-flex min-h-[44px] items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50",
-  smallDanger: "inline-flex min-h-[44px] items-center justify-center rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50",
-};
-export const inputCls = "w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 disabled:bg-slate-50";
-export const labelCls = "mb-1 block text-sm font-medium text-slate-700";
-export const cardCls = "rounded-2xl border border-slate-200 bg-white p-5";
