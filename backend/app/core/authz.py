@@ -236,4 +236,8 @@ def require(ctx: AuthzContext, action: str, course) -> None:
     role = ctx.role_for(course.id)
     if role is None and not ctx.org_admin_for(getattr(course, "organization_id", None)):
         raise NotFound("Course not found")
+    # --- Phase 6 integration: say why when the organization is suspended (read-only) ---
+    if (action not in READ_ONLY_ACTIONS and not ctx.user.is_platform_admin
+            and ctx.org_suspended(getattr(course, "organization_id", None), course.id)):
+        raise Forbidden("Organization is suspended", code="organization_suspended")
     raise Forbidden("Action not permitted")
