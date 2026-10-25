@@ -43,11 +43,18 @@ function ViewParam({ onChange }: { onChange: (v: string | null) => void }) {
   return null;
 }
 
-function areaFromUrl(rest: string, view: string | null): AreaKey {
+/**
+ * Area of a URL. `/courses` follows `?view=`; without it, `coursesDefault` (the tab `/courses` opens with:
+ * Teaching for people who teach or create courses). Phase 6b S11b (UX 15).
+ */
+function areaFromUrl(rest: string, view: string | null, coursesDefault: AreaKey = "learning"): AreaKey {
   if (rest === "/admin" || rest.startsWith("/admin/")) return "platform";
   if (rest === "/org" || rest.startsWith("/org/")) return "organization";
   if (rest.startsWith("/grading-schemes") || rest === "/courses/new" || rest === "/courses/trash") return "teaching";
-  if (rest === "/courses" && view === "teaching") return "teaching";
+  if (rest === "/courses") {
+    if (view === "teaching" || view === "learning") return view;
+    return coursesDefault;
+  }
   return "learning";
 }
 
@@ -114,7 +121,9 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const canRequestTeacher = !isAdmin && !isTeacher;
 
   const rest = pathname.replace(/^\/(en|ky|ru)(?=\/|$)/, "") || "/";
-  const urlArea = areaFromUrl(rest, view);
+  // Same default as the /courses page: its Teaching tab opens first for teachers and course creators.
+  const coursesDefault: AreaKey = me && (me.is_teacher || me.is_platform_admin) && (me.is_teacher || me.can_create_courses) ? "teaching" : "learning";
+  const urlArea = areaFromUrl(rest, view, coursesDefault);
   // A page's own declaration wins only where the URL does not decide (course pages).
   const activeArea: AreaKey = urlArea === "learning" && declared ? declared : urlArea;
 
@@ -124,7 +133,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
       { key: "learning", label: t("shell.areas.learning"), href: hasTeaching ? `${base}/courses?view=learning` : `${base}/courses`, icon: <BookOpen /> },
     ];
     if (hasTeaching || isAdmin) {
-      const sections = [{ href: `${base}/courses?view=teaching`, label: t("shell.teaching.courses"), active: rest === "/courses" && view === "teaching" }];
+      const sections = [{ href: `${base}/courses?view=teaching`, label: t("shell.teaching.courses"), active: rest === "/courses" && urlArea === "teaching" }];
       if (canCreate) sections.push({ href: `${base}/courses/new`, label: t("lms.nav.create"), active: rest === "/courses/new" });
       if (canCreate || isAdmin) sections.push({ href: `${base}/grading-schemes`, label: t("lms.nav.gradingSchemes"), active: rest.startsWith("/grading-schemes") });
       list.push({ key: "teaching", label: t("shell.areas.teaching"), href: `${base}/courses?view=teaching`, icon: <Presentation />, sections });
@@ -139,7 +148,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
     }
     if (isAdmin) list.push({ key: "platform", label: t("shell.areas.platform"), href: `${base}/admin`, icon: <ShieldCheck /> });
     return list;
-  }, [lang, t, hasTeaching, isAdmin, canCreate, orgs, rest, view]);
+  }, [lang, t, hasTeaching, isAdmin, canCreate, orgs, rest, urlArea]);
 
   if (authLoading || !user || unauthorized) {
     // Student finding S16: the frame (header + skeleton content) shows at once, never a blank screen.

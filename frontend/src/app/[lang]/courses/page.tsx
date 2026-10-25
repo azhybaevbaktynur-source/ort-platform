@@ -112,9 +112,18 @@ export default function CoursesPage() {
   const hasTeaching = me ? me.is_teacher || me.is_platform_admin
     : !!userProfile && (userProfile.teacher_status === "approved" || !!userProfile.is_platform_admin);
 
+  // Phase 6b S11b (UX 15): `?view=` wins over the default (ViewSync may run before MeOut arrives), and switching
+  // the tab updates `?view=` so the header area follows the tab.
+  const router = useRouter();
   useEffect(() => {
-    if (me && tab === null) setTab(me.is_teacher || me.can_create_courses ? "teaching" : "learning");
+    if (!me || tab !== null) return;
+    const v = new URLSearchParams(window.location.search).get("view");
+    setTab(v === "teaching" || v === "learning" ? v : me.is_teacher || me.can_create_courses ? "teaching" : "learning");
   }, [me, tab]);
+  const changeTab = (v: Tab) => {
+    setTab(v);
+    router.replace(`/${lang}/courses?view=${v}`, { scroll: false });
+  };
 
   if (!hasTeaching) return <StudentHome />;
 
@@ -132,7 +141,7 @@ export default function CoursesPage() {
           : undefined}
       />
       <Suspense fallback={null}><ViewSync onView={setTab} /></Suspense>
-      <Tabs id={TABS_ID} label={t("courses.list.title")} value={current} onChange={(v) => setTab(v as Tab)} className="mb-6"
+      <Tabs id={TABS_ID} label={t("courses.list.title")} value={current} onChange={(v) => changeTab(v as Tab)} className="mb-6"
         items={[{ id: "teaching", label: t("courses.list.teaching") }, { id: "learning", label: t("courses.list.learning") }]} />
       <TabPanel tabsId={TABS_ID} value={current}>
         {teaching ? <TeachingList /> : <StudentHome embedded />}
