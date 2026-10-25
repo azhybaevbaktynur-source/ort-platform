@@ -36,10 +36,16 @@ class QuestionBank(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
     source_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     default_language: Mapped[Optional[str]] = mapped_column(String(2), nullable=True)
     deleted_by_id: Mapped[Optional[str]] = _deleted_by()
+    # --- Phase 6 S1 begin --- (a bank copies its course's organization, else its creator's; PHASE_6_DESIGN 2.1)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False
+    )
+    # --- Phase 6 S1 end ---
 
     __table_args__ = (
         CheckConstraint("default_language IS NULL OR default_language IN ('en','ru','ky')",
                         name="default_language_valid"),
+        Index("ix_question_banks_organization_id", "organization_id"),  # Phase 6 S1
         Index(
             "uq_question_banks_course_source", "course_id", "source_id", unique=True,
             postgresql_where=text("source_id IS NOT NULL AND course_id IS NOT NULL AND deleted_at IS NULL"),
@@ -48,6 +54,13 @@ class QuestionBank(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
         Index("ix_question_banks_course_id_deleted_at_created_at", "course_id", "deleted_at", "created_at"),
         Index("ix_question_banks_owner_id", "owner_id"),
     )
+
+
+# --- Phase 6 S1 begin --- (organization_id rule for every bank-creation path, including the importer)
+from app.lms.organizations.defaults import bank_org_listener  # noqa: E402
+
+event.listen(QuestionBank, "before_insert", bank_org_listener)
+# --- Phase 6 S1 end ---
 
 
 class TranslationGroup(UUIDPKMixin, Base):

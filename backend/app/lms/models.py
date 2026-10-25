@@ -16,3 +16,8 @@ from app.lms.grading.models import (  # noqa: F401,E402
     AttemptGrade, CourseGrade, GradeCategory, GradeEvent, GradingScheme, GradingSchemeVersion, Submission,
 )
 from app.lms.ort.models import LegacyOrtExport  # noqa: F401,E402
+# --- Phase 6 S1 begin ---
+from app.lms.organizations.models import (  # noqa: F401,E402
+    Invitation, Organization, OrganizationMember, OrganizationTemplateGrant,
+)
+# --- Phase 6 S1 end ---
