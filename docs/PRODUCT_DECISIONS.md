@@ -321,3 +321,16 @@ Taken by the agent within the approved design (owner rule: decide, record here).
 | I9 | Dates | All API datetimes are sent as UTC with `Z` (naive values are UTC); the frontend reads timezone-less strings as UTC (H2). |
 | I10 | ORT subject keys (A10) | `math_subject`, `kyrgyz_lang_lit`, `russian_lang_lit` are accepted as aliases of `advanced_math` / `native_language`; the golden import fixtures prove ORT imports unchanged. |
 | I11 | Create organization | No contact email field in 6a (not in the data model); can come with Phase 9 organization settings. |
+
+## Phase 6b implementation decisions (agent, 2026-10-25)
+
+| # | Topic | Decision |
+|---|---|---|
+| J1 | Glossary | ru "преподаватель", ky "мугалим", en "teacher" everywhere (also emails); the full glossary is in `UX_GUIDELINES.md` §5. |
+| J2 | Org/platform admin reading a course | Without an enrollment they see the read-only student views with no Start / Leave actions (the backend refuses them anyway). |
+| J3 | ORT phone player (P1) | On phones the question palette and "Finish section" sit in a bottom sheet opened from the header ("Questions n/total"); early finishing takes one extra tap, the last question keeps its finish button. Desktop unchanged. Look/layout only (UX reviewer: not a behaviour change). |
+| J4 | ORT result view (R3, R4) | Presentation only: the scaled score card comes first, raw points below; the review is grouped by section with an "only mistakes and unanswered" filter, off by default. Every number and every item is shown as before. |
+| J5 | Student grades page | The course total is hidden when the graded rows use a different scale than the total (as in ORT), because the sum would be misleading. |
+| J6 | ORT screenshot comparison | Pixel comparison against `docs/phases/ORT_BASELINE/` runs locally at every phase gate (macOS, system Chrome); CI runs the ORT browser walk with all DOM assertions on every push (Linux fonts differ from the committed baselines). |
+| J7 | Owner decision pending | P8: Kyrgyz comparison answer labels in sentence case ("А колонкасындагы маани чоңураак" …) instead of capitals — changes the answer wording students read, so it waits for the owner (`ORT_PLAYER_IDEAS.md`). |
+| J8 | Teaching links in the desktop header | From 1024 px the Teaching section links sit in a second 48 px header row (they do not fit next to four area buttons); phones keep them in the area menu. Departs from the design's single-row sketch. |

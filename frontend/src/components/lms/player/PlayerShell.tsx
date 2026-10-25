@@ -3,10 +3,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Eye, TriangleAlert } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, LayoutGrid, TriangleAlert } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
+import { Button, Dialog, LoadingState, Skeleton, SkeletonText, cn, focusRing } from "@/components/ui";
 import { pickLocalized } from "@/lib/lms/localized";
 import {
   closeSection, getAttempt, getAttemptContent, saveAnswers, saveAnswersKeepalive, submitAttempt,
@@ -25,7 +26,7 @@ import {
 } from "@/lib/lms/attemptClient";
 import { DeadlineTimer } from "./DeadlineTimer";
 import { ItemView } from "./ItemView";
-import { PassagePane } from "./PassagePane";
+import { PassagePane, PassageToggle } from "./PassagePane";
 import { Palette, type PaletteGroup } from "./Palette";
 import { SaveStatus } from "./SaveStatus";
 import { ClosedDialog, SectionEndDialog, SubmitDialog, TimeUpDialog } from "./PlayerDialogs";
@@ -63,6 +64,16 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
   const [sectionLoading, setSectionLoading] = useState(false);
   const [sectionError, setSectionError] = useState<unknown>(null);
   const [sectionRetry, setSectionRetry] = useState(0);
+  // Phone / tablet (S7b, P1): the palette opens as a sheet from the header instead of sitting below the question.
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const paletteCurrentRef = useRef<HTMLButtonElement>(null);
+  const paletteButtonRef = useRef<HTMLButtonElement>(null);
+  // Phone / tablet (S7b, P6): the reading text folds away under a sticky bar; open by default, per passage.
+  const [passageClosed, setPassageClosed] = useState<Record<string, boolean>>({});
+  const headerRef = useRef<HTMLElement>(null);
+  const [headerH, setHeaderH] = useState(0);
+  const passageRef = useRef<HTMLElement>(null);
+  const questionAreaRef = useRef<HTMLDivElement>(null);
 
   const { me } = useLmsMe();
   const meIdRef = useRef<string | null>(null);
@@ -474,15 +485,19 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
   // ---- keyboard shortcuts: arrows move, F flags, 1-5 / A-E pick a choice ----
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (dialog || timeUp || closedInfo || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (dialog || paletteOpen || timeUp || closedInfo || e.ctrlKey || e.metaKey || e.altKey) return;
       if (isTypingTarget(e.target) || !state || !content || !curItem) return;
       const k = e.key;
       if (k === "ArrowRight") { e.preventDefault(); go(1); return; }
       if (k === "ArrowLeft") { e.preventDefault(); go(-1); return; }
-      if (k === "f" || k === "F") { e.preventDefault(); onToggleFlag(curItem.position); return; }
+      // S7b, P9: physical keys (`e.code`), so F, A-E and 1-5 also work with a Russian or Kyrgyz layout.
+      const code = e.code;
+      if (code === "KeyF") { e.preventDefault(); onToggleFlag(curItem.position); return; }
       const q = itemQuestion(state, content, curItem);
       if (!q) return;
-      const idx = /^[1-5]$/.test(k) ? Number(k) - 1 : /^[a-eA-E]$/.test(k) ? k.toUpperCase().charCodeAt(0) - 65 : -1;
+      const digit = e.shiftKey ? null : /^(?:Digit|Numpad)([1-5])$/.exec(code);
+      const letterKey = /^Key([A-E])$/.exec(code);
+      const idx = digit ? Number(digit[1]) - 1 : letterKey ? letterKey[1].charCodeAt(0) - 65 : -1;
       if (idx < 0) return;
       if (q.type === "comparison" && idx < 4) {
         onAnswer(curItem.position, { choice: "ABCD"[idx] });
@@ -493,7 +508,36 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [dialog, timeUp, closedInfo, state, content, curItem, go, onToggleFlag, onAnswer]);
+  }, [dialog, paletteOpen, timeUp, closedInfo, state, content, curItem, go, onToggleFlag, onAnswer]);
+
+
+  // Header height, for the sticky passage bar under it (the header wraps differently per language and width).
+  const ready = !!state && !!content;
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!ready || !el) return;
+    const measure = () => setHeaderH(el.getBoundingClientRect().height);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ready]);
+
+  const selectFromSheet = useCallback((position: number) => {
+    setCurrentPos(position);
+    setPaletteOpen(false);
+  }, []);
+
+  // S11a, F5: the sheet's own button disappears with the sheet. Open the finish dialog one frame later, from the
+  // header button, so the dialog's Cancel returns focus to a live element.
+  const finishFromSheet = () => {
+    setPaletteOpen(false);
+    requestAnimationFrame(() => {
+      paletteButtonRef.current?.focus();
+      finishPressed();
+    });
+  };
 
   // ---- render ----
   if (loadError) {
@@ -509,37 +553,94 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
     );
   }
   if (!state || !content) {
+    // S7b, P11: the player's own layout as a skeleton, never a blank page with a sentence.
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-50">
-        <p role="status" className="text-sm text-slate-500">{t("player.loading")}</p>
-      </div>
+      <LoadingState label={t("player.loading")} className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-slate-50">
+        <div aria-hidden="true" className="border-b border-slate-200 bg-white">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-2.5">
+            <div className="w-48 space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-3 w-2/3" />
+            </div>
+            <Skeleton className="h-8 w-24 rounded-xl" />
+          </div>
+          <div className="h-1 w-full bg-slate-100" />
+        </div>
+        <div aria-hidden="true" className="mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 gap-5 px-4 py-5 lg:grid-cols-[minmax(0,1fr)_17rem]">
+          <QuestionSkeleton />
+          <div className="hidden rounded-2xl border border-slate-200 bg-white p-4 lg:block">
+            <Skeleton className="mb-3 h-4 w-24" />
+            <div className="grid grid-cols-5 gap-2">
+              {Array.from({ length: 10 }, (_, i) => <Skeleton key={i} className="h-10 rounded-xl" />)}
+            </div>
+          </div>
+        </div>
+      </LoadingState>
     );
   }
 
   const q = curItem ? itemQuestion(state, content, curItem) : undefined;
   const passage = curItem ? itemPassage(content, curItem, q) : null;
+  const passageOpen = passage ? !passageClosed[passage.id] : false;
   const deadline = effectiveDeadlineMs(state);
   const curSection = content.sections.find((s) => s.pos === (curItem?.section_pos ?? state.current_section_pos));
   const curInstructions = sectionText(curSection?.instructions, content.language ?? lang);
   const lastInSection = curIndex >= visibleItems.length - 1;
   const progressPct = visibleItems.length ? Math.round((counts.answered / visibleItems.length) * 100) : 0;
   const finishLabel = forwardOnly && !isLastSection ? t("player.finishSection") : t("player.finishTest");
+  const stickyTop = Math.round(headerH) + 8;
+
+  const togglePassage = () => {
+    if (!passage) return;
+    const opening = !passageOpen;
+    setPassageClosed((prev) => ({ ...prev, [passage.id]: !opening }));
+    // Opening: show the text from its start; closing: back to the question. Both just under the sticky bar.
+    requestAnimationFrame(() => {
+      const target = opening ? passageRef.current : questionAreaRef.current;
+      target?.scrollIntoView({ block: "start" });
+    });
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-slate-50">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-2.5">
-          <div className="min-w-0">
+      <header ref={headerRef} className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2.5">
+          <div className="min-w-0 basis-full sm:basis-auto">
             <p className="truncate text-sm font-bold text-slate-900">{sectionTitle(curItem?.section_pos ?? state.current_section_pos)}</p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-600">
               {t("player.progress", { answered: counts.answered, total: visibleItems.length })}
               {forwardOnly ? ` · ${t("player.sectionOf", { n: state.current_section_pos, total: lastSectionPos })}` : ""}
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          {/* S11a, F7: a problem state (offline, error) may take its own line on phones instead of squeezing to one word per line. */}
+          <div className={cn(
+            "flex min-w-0 flex-1 items-center justify-between gap-3 sm:flex-none sm:justify-end",
+            ["offline", "error", "auth", "closed"].includes(snap.status) && "flex-wrap gap-y-2",
+          )}>
             <SaveStatus snap={snap} onRetry={() => queueRef.current?.retryNow()} />
-            <DeadlineTimer deadlineMs={deadline} getNowMs={() => clock.now()} onExpire={onTimerExpire}
-              onTick={(rem) => queueRef.current?.setContinuous(rem <= LAST_MINUTE_MS)} />
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+              <DeadlineTimer deadlineMs={deadline} getNowMs={() => clock.now()} onExpire={onTimerExpire}
+                label={forwardOnly ? t("player.timer.sectionLeft") : t("player.timer.left")}
+                onTick={(rem) => queueRef.current?.setContinuous(rem <= LAST_MINUTE_MS)} />
+              <button
+                ref={paletteButtonRef}
+                type="button"
+                onClick={() => setPaletteOpen(true)}
+                aria-haspopup="dialog"
+                aria-expanded={paletteOpen}
+                aria-label={t("player.palette.openLabel", { n: curIndex + 1, total: visibleItems.length })}
+                className={cn(
+                  "relative inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50 lg:hidden",
+                  focusRing,
+                )}
+              >
+                <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+                {t("player.palette.open", { n: curIndex + 1, total: visibleItems.length })}
+                {counts.flagged > 0 ? (
+                  <span aria-hidden="true" className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border border-white bg-amber-500" />
+                ) : null}
+              </button>
+            </div>
           </div>
         </div>
         <div className="h-1 w-full bg-slate-100" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPct} aria-label={t("player.progressBar")}>
@@ -549,29 +650,29 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
 
       {state.is_preview ? (
         <div className="flex items-center justify-center gap-2 bg-amber-100 px-4 py-2 text-sm font-medium text-amber-900">
-          <Eye className="h-4 w-4" aria-hidden="true" />
+          <Eye className="h-4 w-4 shrink-0" aria-hidden="true" />
           {t("player.previewBanner")}
         </div>
       ) : null}
       {otherTab ? (
         <div role="alert" className="flex items-center justify-center gap-2 bg-red-50 px-4 py-2 text-sm font-medium text-red-800">
-          <TriangleAlert className="h-4 w-4" aria-hidden="true" />
+          <TriangleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
           {t("player.otherTab")}
         </div>
       ) : null}
       {rejected.length > 0 ? (
         <div role="alert" className="flex flex-wrap items-center justify-center gap-2 bg-red-50 px-4 py-2 text-sm text-red-800">
-          <TriangleAlert className="h-4 w-4" aria-hidden="true" />
+          <TriangleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
           {t("player.rejected", { list: rejected.map((p) => p + 1).join(", ") })}
-          <button type="button" className="font-semibold underline" onClick={() => setRejected([])}>{t("player.dismiss")}</button>
+          <Button variant="link" size="sm" className="text-red-800" onClick={() => setRejected([])}>{t("player.dismiss")}</Button>
         </div>
       ) : null}
 
       <main className="mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 gap-5 px-4 py-5 lg:grid-cols-[minmax(0,1fr)_17rem]">
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           {curInstructions ? (
             <details className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700" open={curIndex === 0}>
-              <summary className="cursor-pointer font-semibold text-slate-800">{t("player.instructions")}</summary>
+              <summary className="cursor-pointer py-1 font-semibold text-slate-800">{t("player.instructions")}</summary>
               <p className="mt-2 whitespace-pre-line">{curInstructions}</p>
             </details>
           ) : null}
@@ -579,56 +680,75 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
           {sectionError ? (
             <ErrorMessage error={sectionError} onRetry={() => setSectionRetry((n) => n + 1)} />
           ) : sectionLoading ? (
-            <p role="status" className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">{t("player.loading")}</p>
+            <LoadingState label={t("player.loading")}><QuestionSkeleton /></LoadingState>
           ) : curItem && q ? (
-            <div className={passage ? "grid grid-cols-1 gap-4 xl:grid-cols-2" : ""}>
-              {passage ? <PassagePane passage={passage} /> : null}
-              <ItemView
-                key={curItem.position}
-                question={q}
-                choiceOrder={curItem.choice_order}
-                number={curIndex + 1}
-                total={visibleItems.length}
-                response={answers[curItem.position]?.response ?? null}
-                flagged={!!answers[curItem.position]?.flagged}
-                onChange={(r) => onAnswer(curItem.position, r)}
-                onToggleFlag={() => onToggleFlag(curItem.position)}
-              />
-            </div>
+            <>
+              {passage ? (
+                <PassageToggle passage={passage} open={passageOpen} controls={`passage-${passage.id}`} top={stickyTop} onToggle={togglePassage} />
+              ) : null}
+              <div ref={questionAreaRef} style={{ scrollMarginTop: stickyTop + 52 }} className={passage ? "grid grid-cols-1 gap-4 xl:grid-cols-2" : ""}>
+                {passage ? (
+                  <PassagePane ref={passageRef} id={`passage-${passage.id}`} passage={passage} open={passageOpen} scrollMarginTop={stickyTop + 52} />
+                ) : null}
+                <ItemView
+                  key={curItem.position}
+                  question={q}
+                  choiceOrder={curItem.choice_order}
+                  number={curIndex + 1}
+                  total={visibleItems.length}
+                  response={answers[curItem.position]?.response ?? null}
+                  flagged={!!answers[curItem.position]?.flagged}
+                  onChange={(r) => onAnswer(curItem.position, r)}
+                  onToggleFlag={() => onToggleFlag(curItem.position)}
+                />
+              </div>
+            </>
           ) : (
             <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">{t("player.noQuestion")}</p>
           )}
 
           <div className="flex items-center justify-between gap-3">
-            <button type="button" onClick={() => go(-1)} disabled={curIndex <= 0}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40">
-              <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+            <Button variant="secondary" className="sm:min-h-10" onClick={() => go(-1)} disabled={curIndex <= 0} leftIcon={<ChevronLeft className="h-4 w-4" aria-hidden="true" />}>
               {t("player.prev")}
-            </button>
+            </Button>
             {lastInSection ? (
-              <button type="button" onClick={finishPressed}
-                className="rounded-xl bg-brand-600 px-5 py-2 text-sm font-semibold text-white hover:bg-brand-700">
-                {finishLabel}
-              </button>
+              <Button className="sm:min-h-10" onClick={finishPressed}>{finishLabel}</Button>
             ) : (
-              <button type="button" onClick={() => go(1)}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
+              <Button className="sm:min-h-10" onClick={() => go(1)} rightIcon={<ChevronRight className="h-4 w-4" aria-hidden="true" />}>
                 {t("player.next")}
-                <ChevronRight className="h-4 w-4" aria-hidden="true" />
-              </button>
+              </Button>
             )}
           </div>
-          <p className="hidden text-xs text-slate-400 lg:block">{t("player.shortcuts")}</p>
+          <p className="hidden text-xs text-slate-500 lg:block">{t("player.shortcuts")}</p>
         </div>
 
-        <aside className="space-y-3">
+        {/* Desktop: palette and the finish action beside the question. Phones and tablets use the sheet below. */}
+        <aside className="hidden space-y-3 lg:block">
           <Palette groups={paletteGroups} currentPosition={curItem?.position ?? -1} onSelect={setCurrentPos} />
-          <button type="button" onClick={finishPressed}
-            className="w-full rounded-xl border border-brand-600 bg-white px-4 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50">
+          <Button variant="secondary" fullWidth onClick={finishPressed} className="border-brand-600 text-brand-700 hover:bg-brand-50">
             {finishLabel}
-          </button>
+          </Button>
         </aside>
       </main>
+
+      <Dialog
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        title={t("player.palette.title")}
+        description={t("player.progress", { answered: counts.answered, total: visibleItems.length })}
+        initialFocusRef={paletteCurrentRef}
+        className="mb-0 w-full max-w-none rounded-b-none sm:mb-auto sm:w-[calc(100%-2rem)] sm:max-w-md sm:rounded-b-2xl"
+        // S11a, F4: the finish action stays pinned in the footer; only the palette scrolls.
+        footer={(
+          <Button variant="secondary" fullWidth onClick={finishFromSheet} className="border-brand-600 text-brand-700 hover:bg-brand-50 sm:flex-1">
+            {finishLabel}
+          </Button>
+        )}
+      >
+        <aside>
+          <Palette groups={paletteGroups} currentPosition={curItem?.position ?? -1} onSelect={selectFromSheet} hideTitle currentRef={paletteCurrentRef} />
+        </aside>
+      </Dialog>
 
       {dialog === "section" ? (
         <SectionEndDialog sectionTitle={sectionTitle(state.current_section_pos)} unanswered={counts.unanswered} flagged={counts.flagged}
@@ -642,6 +762,22 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
       {closedInfo ? (
         <ClosedDialog finished={closedInfo.finished} onContinue={() => { if (closedInfo.finished) goResult(); else setClosedInfo(null); }} />
       ) : null}
+    </div>
+  );
+}
+
+/** A question card placeholder (first load and the per-section load). */
+function QuestionSkeleton() {
+  return (
+    <div aria-hidden="true" className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 md:p-7">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+        <Skeleton className="h-6 w-28" />
+        <Skeleton className="h-9 w-24 rounded-xl" />
+      </div>
+      <SkeletonText lines={3} />
+      <div className="space-y-2">
+        {Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-12 rounded-xl" />)}
+      </div>
     </div>
   );
 }

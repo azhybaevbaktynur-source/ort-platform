@@ -6,7 +6,8 @@ import { useTranslation } from "@/lib/i18n/context";
 import { deleteAsset, listMyAssets, uploadAsset } from "@/lib/lms/content";
 import type { AssetOut, ImageOut } from "@/lib/lms/contentTypes";
 import { ContentError } from "./ContentError";
-import { btnSmall, labelCls } from "./ui";
+import { labelCls } from "./ui";
+import { btnSmall } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 
 /** Image field: file input, drag-drop and paste upload to the course assets API; "my images" grid. */
 export function ImagePicker({

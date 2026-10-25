@@ -3,23 +3,26 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { TriangleAlert } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { listAuditLog } from "@/lib/lms/admin";
 import {
-  SLUG_RE, formatBytes, getOrganization, getOrganizationUsage, listOrganizationCourses, resumeOrganization,
-  suspendOrganization, updateOrganization, type OrganizationAdminRowOut, type OrganizationOut, type OrgCourseOut, type OrgUsageOut,
+  SLUG_RE, getOrganization, getOrganizationUsage, listOrganizationCourses, resumeOrganization,
+  suspendOrganization, updateOrganization, type OrganizationAdminRowOut, type OrganizationOut, type OrgUsageOut,
 } from "@/lib/lms/organizations";
-import type { AuditEntryOut } from "@/lib/lms/types";
-import { fmtApiDateTime } from "@/lib/format";
-import { Modal } from "@/components/lms/assessments/Modal";
-import { Pager } from "@/components/lms/Pager";
+import { fmtApiDateTimeShort } from "@/lib/format";
+import { formatBytes } from "@/lib/lms/storage"; // Phase 6b S11b (UX 10): the localized formatter
+import {
+  Button, Card, Checkbox, DescriptionList, Dialog, EmptyState, Input, LoadingState, PageHeader, ReasonDialog, StatTile, TabPanel, Tabs, toast,
+} from "@/components/ui";
 import { AuditTable } from "@/components/lms/admin/AuditTable";
-import { ReasonDialog } from "@/components/lms/admin/ReasonDialog";
+import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
+import { useCursorList } from "@/components/lms/admin/useCursorList";
+import { MoreError, useTableState } from "@/components/lms/admin/ListParts";
 import { OrgCourseList } from "@/components/lms/org/OrgCourseList";
 import { OrgMembersTab } from "@/components/lms/org/admin/OrgMembersTab";
 import { OrgTemplatesTab } from "@/components/lms/org/admin/OrgTemplatesTab";
-import { EmptyBox, Loading, OrgBadge, OrgError, btn, cardCls, inputCls, labelCls } from "@/components/lms/org/OrgUi";
-import { toast } from "@/components/ui/Toast";
+import { LoadError, OrgBadge, OrgError } from "@/components/lms/org/OrgUi";
 
 const TABS = ["summary", "admins", "teachers", "courses", "usage", "templates", "log"] as const;
 type Tab = (typeof TABS)[number];
@@ -27,6 +30,7 @@ type Tab = (typeof TABS)[number];
 export default function AdminOrganizationDetailPage() {
   const { orgId } = useParams<{ orgId: string }>();
   const { lang, t } = useTranslation();
+  const crumbs = useAdminCrumbs();
   const [org, setOrg] = useState<OrganizationAdminRowOut | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [tab, setTab] = useState<Tab>("summary");
@@ -55,9 +59,16 @@ export default function AdminOrganizationDetailPage() {
   }, [orgId]);
   useEffect(() => { void load(); void loadUsage(); }, [load, loadUsage]);
 
-  const back = <Link href={`/${lang}/admin/organizations`} className="text-sm font-medium text-brand-700 hover:underline">{t("organizations.admin.back")}</Link>;
-  if (error && !org) return <div className="space-y-3">{back}<OrgError error={error} onRetry={load} /></div>;
-  if (!org) return <Loading />;
+  const orgsCrumb = { label: t("organizations.admin.title"), href: `/${lang}/admin/organizations` };
+  if (error && !org) {
+    return (
+      <div>
+        <PageHeader title={t("organizations.admin.title")} breadcrumbs={crumbs(orgsCrumb, { label: "…" })} />
+        <LoadError error={error} onRetry={load} />
+      </div>
+    );
+  }
+  if (!org) return <LoadingState label={t("lms.common.loading")} />;
 
   const suspended = org.status === "suspended";
   const toggleStatus = async (reason: string) => {
@@ -75,157 +86,113 @@ export default function AdminOrganizationDetailPage() {
     }
   };
 
-  const tabId = (k: Tab) => `org-tab-${k}`;
+  const tabsId = "org-detail";
+  const units: [string, string, string, string] = [t("storage.units.b"), t("storage.units.kb"), t("storage.units.mb"), t("storage.units.gb")];
+  const bytes = (n: number | null | undefined) => (n === null || n === undefined || !Number.isFinite(n) ? "—" : formatBytes(n, lang, units));
+  const dash = (v: React.ReactNode) => (v === undefined || v === null || v === "" ? "—" : v);
   return (
     <div>
-      {back}
-      <div className="mb-1 mt-2 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold text-slate-900">{org.name}</h1>
-        <OrgBadge tone={org.status} labelKey={`organizations.status.${org.status}`} />
-      </div>
-      <p className="mb-4 text-sm text-slate-500">{org.slug}</p>
+      <PageHeader
+        title={org.name}
+        description={org.slug}
+        badge={<OrgBadge tone={org.status} labelKey={`organizations.status.${org.status}`} />}
+        breadcrumbs={crumbs(orgsCrumb, { label: org.name })}
+        secondaryActions={
+          <>
+            <Button variant="secondary" onClick={() => setEditing(true)}>{t("organizations.admin.edit")}</Button>
+            <Button variant={suspended ? "secondary" : "dangerOutline"} onClick={() => { setDialogError(null); setStatusDialog(true); }}>
+              {t(suspended ? "organizations.admin.resume" : "organizations.admin.suspend")}
+            </Button>
+          </>
+        }
+      />
       {suspended && org.suspended_reason && (
-        <p role="status" className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          {t("organizations.admin.suspendedReason", { reason: org.suspended_reason })}
+        <p role="status" className="mb-4 flex gap-3 rounded-2xl border border-warning-200 bg-warning-50 p-4 text-sm leading-6 text-warning-900">
+          <TriangleAlert aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" />
+          <span className="min-w-0 break-words">{t("organizations.admin.suspendedReason", { reason: org.suspended_reason })}</span>
         </p>
       )}
-      <div className="mb-6 flex flex-wrap gap-2">
-        <button type="button" className={btn.secondary} onClick={() => setEditing(true)}>{t("organizations.admin.edit")}</button>
-        <button type="button" className={suspended ? btn.secondary : btn.danger} onClick={() => { setDialogError(null); setStatusDialog(true); }}>
-          {t(suspended ? "organizations.admin.resume" : "organizations.admin.suspend")}
-        </button>
-      </div>
 
-      <div role="tablist" aria-label={t("organizations.admin.tabsLabel")} className="mb-4 flex flex-wrap gap-1 border-b border-slate-200">
-        {TABS.map((k) => (
-          <button key={k} id={tabId(k)} type="button" role="tab" aria-selected={tab === k} aria-controls={`${tabId(k)}-panel`}
-            onClick={() => setTab(k)}
-            className={`min-h-[44px] rounded-t-lg px-3 text-sm font-medium ${tab === k ? "border-b-2 border-brand-600 text-brand-700" : "text-slate-600 hover:text-slate-900"}`}>
-            {t(`organizations.admin.tabs.${k}`)}
-          </button>
-        ))}
-      </div>
-      <div role="tabpanel" id={`${tabId(tab)}-panel`} aria-labelledby={tabId(tab)}>
+      <Tabs id={tabsId} label={t("organizations.admin.tabsLabel")} value={tab} onChange={(v) => setTab(v as Tab)}
+        items={TABS.map((k) => ({ id: k, label: t(`organizations.admin.tabs.${k}`) }))} />
+      <TabPanel tabsId={tabsId} value={tab}>
         {tab === "summary" && (
-          <div className={cardCls}>
-            <dl className="grid gap-3 text-sm sm:grid-cols-2">
-              <Fact label={t("organizations.counts.orgAdmins")} value={org.org_admins} />
-              <Fact label={t("organizations.counts.teachers")} value={org.teachers} />
-              <Fact label={t("organizations.counts.courses")} value={org.courses} />
-              <Fact label={t("organizations.usage.storage")} value={usage ? formatBytes(usage.storage_bytes, lang) : undefined} />
-              <Fact label={t("organizations.admin.created")} value={fmtApiDateTime(org.created_at, lang)} />
-              <Fact label={t("organizations.fields.teachersCanCreate")} value={org.settings?.teachers_can_create_courses ? t("platformAdmin.yes") : t("platformAdmin.no")} />
-            </dl>
-          </div>
+          <Card>
+            <DescriptionList twoColumns items={[
+              { key: "admins", term: t("organizations.counts.orgAdmins"), description: dash(org.org_admins) },
+              { key: "teachers", term: t("organizations.counts.teachers"), description: dash(org.teachers) },
+              { key: "courses", term: t("organizations.counts.courses"), description: dash(org.courses) },
+              { key: "storage", term: t("organizations.usage.storage"), description: usage ? bytes(usage.storage_bytes) : "—" },
+              { key: "created", term: t("organizations.admin.created"), description: fmtApiDateTimeShort(org.created_at, lang) },
+              { key: "canCreate", term: t("organizations.fields.teachersCanCreate"), description: org.settings?.teachers_can_create_courses ? t("platformAdmin.yes") : t("platformAdmin.no") },
+            ]} />
+          </Card>
         )}
         {tab === "admins" && <OrgMembersTab org={org} role="org_admin" onChanged={() => void load()} />}
         {tab === "teachers" && <OrgMembersTab org={org} role="teacher" onChanged={() => void load()} />}
         {tab === "courses" && <OrgCoursesTab org={org} />}
         {tab === "usage" && (
-          usageError ? <OrgError error={usageError} onRetry={loadUsage} /> : !usage ? <Loading /> : (
-            <div className={cardCls}>
-              <dl className="grid gap-3 text-sm sm:grid-cols-3">
-                <Fact label={t("organizations.counts.teachers")} value={usage.teachers} />
-                <Fact label={t("organizations.counts.courses")} value={usage.courses} />
-                <Fact label={t("organizations.counts.students")} value={usage.students} />
-                <Fact label={t("organizations.usage.banks")} value={usage.banks} />
-                <Fact label={t("organizations.usage.questions")} value={usage.questions} />
-                <Fact label={t("organizations.usage.storage")} value={formatBytes(usage.storage_bytes, lang)} />
-              </dl>
-              <p className="mt-3 text-xs text-slate-500">{t("organizations.usage.storageNote")}</p>
+          usageError ? <LoadError error={usageError} onRetry={loadUsage} /> : !usage ? <LoadingState label={t("lms.common.loading")} /> : (
+            <div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <StatTile label={t("organizations.counts.teachers")} value={usage.teachers} />
+                <StatTile label={t("organizations.counts.courses")} value={usage.courses} />
+                <StatTile label={t("organizations.counts.students")} value={usage.students} />
+                <StatTile label={t("organizations.usage.banks")} value={usage.banks} />
+                <StatTile label={t("organizations.usage.questions")} value={usage.questions} />
+                <StatTile label={t("organizations.usage.storage")} value={bytes(usage.storage_bytes)} />
+              </div>
+              <p className="mt-3 text-sm text-slate-600">{t("organizations.usage.storageNote")}</p>
             </div>
           )
         )}
         {tab === "templates" && <OrgTemplatesTab org={org} />}
         {tab === "log" && <OrgLogTab org={org} />}
-      </div>
+      </TabPanel>
 
       <EditOrganizationDialog open={editing} org={org} onClose={() => setEditing(false)}
         onSaved={(o) => { setOrg({ ...org, ...o }); setEditing(false); toast.success(t("organizations.admin.saved")); }} />
       <ReasonDialog
         open={statusDialog}
-        title={t(suspended ? "organizations.admin.resumeTitle" : "organizations.admin.suspendTitle", { org: org.name })}
-        body={t(suspended ? "organizations.admin.resumeBody" : "organizations.admin.suspendBody", { org: org.name })}
+        title={t(suspended ? "organizations.admin.resumeTitle" : "organizations.admin.suspendTitle")}
+        object={org.name}
+        effect={t(suspended ? "organizations.admin.resumeBody" : "organizations.admin.suspendBody")}
         confirmLabel={t(suspended ? "organizations.admin.resume" : "organizations.admin.suspend")}
-        danger={!suspended} busy={busy} error={dialogError}
+        tone={suspended ? "primary" : "danger"} busy={busy}
+        error={dialogError ? <OrgError error={dialogError} /> : undefined}
         onConfirm={(r) => void toggleStatus(r)} onCancel={() => setStatusDialog(false)}
       />
     </div>
   );
 }
 
-function Fact({ label, value }: { label: string; value: React.ReactNode | undefined }) {
-  return (
-    <div>
-      <dt className="text-xs text-slate-500">{label}</dt>
-      <dd className="font-medium text-slate-900">{value === undefined || value === null || value === "" ? "—" : value}</dd>
-    </div>
-  );
-}
-
 function OrgCoursesTab({ org }: { org: OrganizationOut }) {
   const { lang, t } = useTranslation();
-  const [items, setItems] = useState<OrgCourseOut[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<unknown>(null);
-  const load = useCallback(async (next?: string | null) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const page = await listOrganizationCourses(org.id, { cursor: next });
-      setItems((prev) => (next ? [...prev, ...page.items] : page.items));
-      setCursor(page.next_cursor);
-    } catch (e) {
-      setError(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [org.id]);
-  useEffect(() => { void load(); }, [load]);
-  if (error) return <OrgError error={error} onRetry={() => load()} />;
-  if (loading && items.length === 0) return <Loading />;
-  if (items.length === 0) return <EmptyBox text={t("organizations.courses.empty")} />;
+  const fetchPage = useCallback((cursor: string | null) => listOrganizationCourses(org.id, { cursor }), [org.id]);
+  const list = useCursorList(fetchPage);
+  const state = useTableState(list);
   return (
-    <div>
-      <p className="mb-2 text-xs text-slate-500">{t("organizations.courses.shown", { n: items.length })}</p>
-      <OrgCourseList courses={items} hrefFor={(c) => `/${lang}/admin/courses/${c.id}`} />
-      <Pager nextCursor={cursor} loading={loading} onMore={() => load(cursor)} />
-    </div>
+    <>
+      <OrgCourseList courses={list.items} hrefFor={(c) => `/${lang}/admin/courses/${c.id}`} {...state}
+        empty={<EmptyState title={t("organizations.courses.empty")} />} />
+      <MoreError list={list} />
+    </>
   );
 }
 
 function OrgLogTab({ org }: { org: OrganizationOut }) {
   const { lang, t } = useTranslation();
-  const [items, setItems] = useState<AuditEntryOut[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<unknown>(null);
-  const load = useCallback(async (next?: string | null) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const page = await listAuditLog({ target_type: "organization", target_id: org.id, cursor: next });
-      setItems((prev) => (next ? [...prev, ...page.items] : page.items));
-      setCursor(page.next_cursor);
-    } catch (e) {
-      setError(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [org.id]);
-  useEffect(() => { void load(); }, [load]);
+  const fetchPage = useCallback((cursor: string | null) => listAuditLog({ target_type: "organization", target_id: org.id, cursor }), [org.id]);
+  const list = useCursorList(fetchPage);
+  const state = useTableState(list);
   return (
     <div className="space-y-3">
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-slate-700">
         {t("organizations.admin.logIntro")}{" "}
         <Link href={`/${lang}/admin/audit-log`} className="font-medium text-brand-700 hover:underline">{t("organizations.admin.logAll")}</Link>
       </p>
-      {error ? <OrgError error={error} onRetry={() => load()} /> : null}
-      {loading && items.length === 0 && !error && <Loading />}
-      {!loading && !error && items.length === 0 && <EmptyBox text={t("platformAdmin.audit.empty")} />}
-      {items.length > 0 && <AuditTable entries={items} />}
-      <Pager nextCursor={cursor} loading={loading} onMore={() => load(cursor)} />
+      <AuditTable entries={list.items} {...state} empty={<EmptyState title={t("platformAdmin.audit.empty")} />} />
+      <MoreError list={list} />
     </div>
   );
 }
@@ -260,33 +227,25 @@ function EditOrganizationDialog({ open, org, onClose, onSaved }: { open: boolean
       setBusy(false);
     }
   };
+  const formId = "edit-org-form";
   return (
-    <Modal open={open} title={t("organizations.admin.editTitle", { org: org.name })} onClose={onClose} busy={busy}>
-      <form onSubmit={submit} noValidate className="space-y-4">
-        <div>
-          <label htmlFor="eo-name" className={labelCls}>{t("organizations.fields.name")}</label>
-          <input id="eo-name" value={name} maxLength={200} disabled={busy} aria-invalid={checked && !nameOk} onChange={(e) => setName(e.target.value)} className={inputCls} />
-          {checked && !nameOk && <p role="alert" className="mt-1 text-xs text-red-700">{t("organizations.fields.nameMissing")}</p>}
-        </div>
-        <div>
-          <label htmlFor="eo-slug" className={labelCls}>{t("organizations.fields.slug")}</label>
-          <input id="eo-slug" value={slug} maxLength={64} disabled={busy} aria-invalid={checked && !slugOk}
-            onChange={(e) => setSlug(e.target.value.toLowerCase())} className={`${inputCls} font-mono`} />
-          <p className={`mt-1 text-xs ${checked && !slugOk ? "text-red-700" : "text-slate-500"}`}>{t("organizations.fields.slugEditHint")}</p>
-        </div>
-        <label className="flex items-start gap-2 text-sm text-slate-700">
-          <input type="checkbox" className="mt-1 h-4 w-4" checked={canCreate} disabled={busy} onChange={(e) => setCanCreate(e.target.checked)} />
-          <span>
-            <span className="font-medium">{t("organizations.fields.teachersCanCreate")}</span>
-            <span className="block text-xs text-slate-500">{t("organizations.fields.teachersCanCreateHint")}</span>
-          </span>
-        </label>
+    <Dialog open={open} title={t("organizations.admin.editTitle")} onClose={onClose} busy={busy}
+      footer={
+        <>
+          <Button variant="secondary" disabled={busy} onClick={onClose}>{t("lms.common.cancel")}</Button>
+          <Button type="submit" form={formId} loading={busy}>{t("lms.common.save")}</Button>
+        </>
+      }>
+      <form id={formId} onSubmit={submit} noValidate className="space-y-4">
+        <Input label={t("organizations.fields.name")} value={name} maxLength={200} disabled={busy}
+          error={checked && !nameOk ? t("organizations.fields.nameMissing") : undefined} onChange={(e) => setName(e.target.value)} />
+        <Input label={t("organizations.fields.slug")} value={slug} maxLength={64} disabled={busy} className="font-mono"
+          error={checked && !slugOk ? t("organizations.fields.slugEditHint") : undefined} hint={checked && !slugOk ? undefined : t("organizations.fields.slugEditHint")}
+          onChange={(e) => setSlug(e.target.value.toLowerCase())} />
+        <Checkbox label={t("organizations.fields.teachersCanCreate")} hint={t("organizations.fields.teachersCanCreateHint")}
+          checked={canCreate} disabled={busy} onChange={(e) => setCanCreate(e.target.checked)} />
         <OrgError error={error} />
-        <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" className={btn.secondary} disabled={busy} onClick={onClose}>{t("lms.common.cancel")}</button>
-          <button type="submit" className={btn.primary} disabled={busy}>{busy ? t("lms.common.loading") : t("lms.common.save")}</button>
-        </div>
       </form>
-    </Modal>
+    </Dialog>
   );
 }

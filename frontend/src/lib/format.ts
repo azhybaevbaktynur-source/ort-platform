@@ -25,6 +25,12 @@ export function fmtApiDateTime(value: string | null | undefined, locale?: string
   return d ? d.toLocaleString(dayFirst(locale)) : "";
 }
 
+/** Local date and time without seconds (tables, lists), or "" for an empty/invalid value. Phase 6b S11b. */
+export function fmtApiDateTimeShort(value: string | null | undefined, locale?: string): string {
+  const d = parseApiDate(value);
+  return d ? d.toLocaleString(dayFirst(locale), { ...DATE_OPTS, hour: "2-digit", minute: "2-digit" }) : "";
+}
+
 /** Local date only (dd.mm.yyyy / dd/mm/yyyy when a UI language is given), or "" for an empty/invalid value. */
 export function fmtApiDate(value: string | null | undefined, locale?: string): string {
   const d = parseApiDate(value);

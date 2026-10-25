@@ -44,7 +44,7 @@ function Row({ item, courseId }: { item: MyGradeOut; courseId: string }) {
         <div className="mt-2 space-y-1 text-sm">
           {main && <p className="text-2xl font-bold text-slate-900">{main}</p>}
           {item.effective_points !== null && item.effective_points !== undefined && item.points_possible !== null && item.points_possible !== undefined && (
-            <p className="text-slate-600">{t("results.scoreOf", { score: fmtPoints(item.effective_points), max: fmtPoints(item.points_possible) })}</p>
+            <p className="text-slate-600">{t("results.scoreOf", { score: fmtPoints(item.effective_points), max: fmtPoints(item.points_possible), count: fmtPoints(item.points_possible) })}</p>
           )}
           {item.late_deduction !== null && item.late_deduction !== undefined && Number(item.late_deduction) > 0 && (
             <p className="text-amber-800">{t("results.grade.mine.late", { n: fmtPoints(item.late_deduction) })}</p>
@@ -92,11 +92,18 @@ export function StudentGrades({ courseId }: { courseId: string }) {
   // the total's label is a key of the course scheme: resolve it through the course scheme ref's labels
   const totalText = total ? text(total, schemeType, data.scheme?.labels) : "";
   const percent = total ? fmtNum(total.percent, 1) : "";
+  // --- Phase 6 S6b begin --- (UX S7: no raw course percent next to a curve value such as the ORT score)
+  // When every graded row uses a scheme of another type than the course total (e.g. ORT scaled scores under a
+  // percent total), the total would show a second, smaller number for the same work: hide it.
+  const gradedRows = data.items.filter((i) => i.state === "graded");
+  const totalType = schemeType ?? "percent";
+  const totalMisleading = gradedRows.length > 0 && gradedRows.every((i) => !!i.scheme_type && i.scheme_type !== totalType);
+  // --- Phase 6 S6b end ---
   return (
     <div className="space-y-5">
       <h2 className="text-xl font-bold text-slate-900">{t("results.grade.mine.title")}</h2>
       <SchemeError error={error} onRetry={() => void load()} />
-      {total && (totalText || percent) && (
+      {total && (totalText || percent) && !totalMisleading /* Phase 6 S6b */ && (
         <section className="rounded-2xl border border-brand-200 bg-brand-50 p-4" aria-label={t("results.grade.mine.total")}>
           <p className="text-xs font-medium text-brand-700">{t("results.grade.mine.total")}</p>
           <p className="break-words text-3xl font-bold text-slate-900">{totalText || `${percent}%`}</p>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Clock } from "lucide-react";
+import { AlarmClock, Clock } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { formatClock } from "./playerUtils";
 
@@ -60,16 +60,18 @@ export function DeadlineTimer({
   const secs = Math.max(0, Math.ceil(left / 1000));
   const urgent = secs <= 60;
   const warn = secs <= 300;
-  const tone = urgent ? "bg-red-50 text-red-700 border-red-200" : warn ? "bg-amber-50 text-amber-800 border-amber-200" : "bg-slate-50 text-slate-800 border-slate-200";
+  const tone = urgent ? "bg-red-50 text-red-700 border-red-300" : warn ? "bg-amber-50 text-amber-900 border-amber-300" : "bg-slate-50 text-slate-800 border-slate-200";
+  // Under five minutes the icon changes too and the digits turn bold: colour is never the only signal (S7b, P4).
+  const Icon = warn ? AlarmClock : Clock;
   return (
     <div className="flex items-center gap-2">
-      {label ? <span className="hidden text-xs text-slate-500 sm:inline">{label}</span> : null}
+      {label ? <span className="hidden text-xs text-slate-600 sm:inline">{label}</span> : null}
       <span
         role="timer"
         aria-label={t("player.timer.label")}
-        className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 font-mono text-sm font-semibold tabular-nums ${tone}`}
+        className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 font-mono text-sm tabular-nums ${warn ? "font-extrabold" : "font-semibold"} ${tone}`}
       >
-        <Clock className="h-4 w-4" aria-hidden="true" />
+        <Icon className="h-4 w-4" aria-hidden="true" />
         {formatClock(secs)}
       </span>
       {/* Announce only at the two thresholds, not every second. */}

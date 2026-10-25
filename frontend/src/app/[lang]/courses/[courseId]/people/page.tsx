@@ -6,16 +6,20 @@ import { addStaff, changeEnrollmentRole, listPeople, removeEnrollment } from "@/
 import { useLmsMe } from "@/lib/lms/useLmsMe";
 import { isStaffCourse, type CourseRole, type RosterEntryOut, type StaffPublicOut } from "@/lib/lms/types";
 import { useCourse } from "@/components/lms/CourseContext";
-import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { Pager } from "@/components/lms/Pager";
 import { RosterTable } from "@/components/lms/RosterTable";
+// --- Phase 6b S5c: staff people tab on the design system ---
+import { useListCount } from "@/components/lms/course/StaffCourseUi";
+import { Button, Card, ConfirmDialog, EmptyState, Input, LoadingState, PageHeader, SearchInput, Select } from "@/components/ui";
+// --- Phase 6b S5c end ---
 // --- Phase 6 S4b: invite staff without an account ---
 import { createCourseStaffInvitation } from "@/lib/lms/invitations";
 import { toastInvitationSent } from "@/components/lms/org/InviteDialog";
 import { OrgError } from "@/components/lms/org/OrgUi";
 // --- Phase 6 S4b end ---
 
+// S6b: student view
 function StaffList({ courseId }: { courseId: string }) {
   const { t } = useTranslation();
   const [items, setItems] = useState<StaffPublicOut[]>([]);
@@ -100,6 +104,7 @@ export default function PeoplePage() {
   }, [course.id, role, state, query]);
 
   useEffect(() => { if (staff) void load(); }, [staff, load]);
+  const countText = useListCount(); // Phase 6b S5c
 
   if (!staff) return <StaffList courseId={course.id} />;
 
@@ -171,77 +176,59 @@ export default function PeoplePage() {
 
   return (
     <div className="space-y-6">
+      {/* Phase 6b S5c: PageHeader, add-staff card with design-system fields, roster Table with phone cards (UX T2). */}
+      <PageHeader title={t("courses.people.tab")} className="mb-2" />
       {canManage && (
-        <form onSubmit={submitAdd} className="rounded-2xl border border-slate-200 bg-white p-5" noValidate>
-          <h2 className="mb-3 text-lg font-bold text-slate-900">{t("courses.people.addStaff")}</h2>
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="min-w-[14rem] flex-1">
-              <label htmlFor="staff-email" className="mb-1 block text-sm font-medium text-slate-700">{t("courses.people.email")}</label>
-              <input id="staff-email" type="email" value={email} disabled={adding || inviting} onChange={(e) => { setEmail(e.target.value); setInviteEmail(null); }}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label htmlFor="staff-role" className="mb-1 block text-sm font-medium text-slate-700">{t("courses.people.role")}</label>
-              <select id="staff-role" value={addRole} disabled={adding || inviting} onChange={(e) => setAddRole(e.target.value as "teacher" | "assistant")}
-                className="rounded-xl border border-slate-300 px-3 py-2 text-sm">
-                <option value="assistant">{t("courses.roles.assistant")}</option>
-                {isOwner && <option value="teacher">{t("courses.roles.teacher")}</option>}
-              </select>
-            </div>
-            <button type="submit" disabled={adding || !email.trim()} className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
-              {adding ? t("lms.common.loading") : t("courses.people.add")}
-            </button>
+        <Card as="section" title={t("courses.people.addStaff")}>
+        <form onSubmit={submitAdd} noValidate>
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
+            <Input id="staff-email" type="email" label={t("courses.people.email")} value={email} disabled={adding || inviting}
+              onChange={(e) => { setEmail(e.target.value); setInviteEmail(null); }} />
+            <Select id="staff-role" label={t("courses.people.role")} value={addRole} disabled={adding || inviting}
+              onChange={(e) => setAddRole(e.target.value as "teacher" | "assistant")}
+              options={[{ value: "assistant", label: t("courses.roles.assistant") }, ...(isOwner ? [{ value: "teacher", label: t("courses.roles.teacher") }] : [])]} />
+            <Button type="submit" variant="secondary" loading={adding} disabled={!email.trim()}>{t("courses.people.add")}</Button>
           </div>
           <ErrorMessage error={addError} className="mt-3" />
           {/* --- Phase 6 S4b --- */}
           {inviteEmail && (
             <div role="status" className="mt-3 space-y-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
               <p>{t("invitations.staff.noAccount", { email: inviteEmail })}</p>
-              <button type="button" disabled={inviting} onClick={() => void sendInvite()}
-                className="inline-flex min-h-[44px] items-center rounded-xl border border-sky-300 bg-white px-4 text-sm font-semibold text-brand-700 hover:bg-sky-100 disabled:opacity-50">
-                {inviting ? t("lms.common.loading") : t("invitations.staff.send")}
-              </button>
+              <Button variant="secondary" loading={inviting} onClick={() => void sendInvite()}>{t("invitations.staff.send")}</Button>
               <p className="text-xs">{t("invitations.staff.sentHint")}</p>
               <OrgError error={inviteError} />
             </div>
           )}
           {/* --- Phase 6 S4b end --- */}
         </form>
+        </Card>
       )}
 
-      <div className="flex flex-wrap items-end gap-3">
-        <div>
-          <label htmlFor="f-role" className="mb-1 block text-xs font-medium text-slate-600">{t("courses.people.role")}</label>
-          <select id="f-role" value={role} onChange={(e) => setRole(e.target.value)} className="rounded-xl border border-slate-300 px-3 py-2 text-sm">
-            <option value="">{t("courses.people.allRoles")}</option>
-            <option value="teacher">{t("courses.roles.teacher")}</option>
-            <option value="assistant">{t("courses.roles.assistant")}</option>
-            <option value="student">{t("courses.roles.student")}</option>
-          </select>
-        </div>
-        <div>
-          <label htmlFor="f-state" className="mb-1 block text-xs font-medium text-slate-600">{t("courses.people.state")}</label>
-          <select id="f-state" value={state} onChange={(e) => setState(e.target.value as "active" | "removed")} className="rounded-xl border border-slate-300 px-3 py-2 text-sm">
-            <option value="active">{t("courses.people.states.active")}</option>
-            <option value="removed">{t("courses.people.states.removed")}</option>
-          </select>
-        </div>
+      <div className="grid gap-3 sm:grid-cols-[auto_auto_minmax(0,1fr)] sm:items-end">
+        <Select id="f-role" label={t("courses.people.role")} value={role} onChange={(e) => setRole(e.target.value)}
+          options={[
+            { value: "", label: t("courses.people.allRoles") },
+            { value: "teacher", label: t("courses.roles.teacher") },
+            { value: "assistant", label: t("courses.roles.assistant") },
+            { value: "student", label: t("courses.roles.student") },
+          ]} />
+        <Select id="f-state" label={t("courses.people.state")} value={state} onChange={(e) => setState(e.target.value as "active" | "removed")}
+          options={[{ value: "active", label: t("courses.people.states.active") }, { value: "removed", label: t("courses.people.states.removed") }]} />
         <form onSubmit={(e) => { e.preventDefault(); setQuery(q.trim()); }} className="flex items-end gap-2" role="search">
-          <div>
-            <label htmlFor="f-q" className="mb-1 block text-xs font-medium text-slate-600">{t("lms.common.search")}</label>
-            <input id="f-q" type="search" value={q} onChange={(e) => setQ(e.target.value)} className="rounded-xl border border-slate-300 px-3 py-2 text-sm" />
-          </div>
-          <button type="submit" className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">{t("lms.common.search")}</button>
+          <SearchInput id="f-q" value={q} onChange={(v) => { setQ(v); if (!v) setQuery(""); }} containerClassName="min-w-0 flex-1" />
+          <Button type="submit" variant="secondary">{t("lms.common.search")}</Button>
         </form>
       </div>
 
       {error ? <ErrorMessage error={error} onRetry={() => load()} /> : null}
-      {loading && items.length === 0 && !error && <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p>}
-      {!loading && !error && items.length === 0 && <p className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">{t("courses.people.empty")}</p>}
+      {loading && items.length === 0 && !error && <LoadingState rows={3} />}
+      {!loading && !error && items.length === 0 && <EmptyState title={t("courses.people.empty")} />}
       {items.length > 0 && (
         <RosterTable
           entries={items}
           busyId={busyId}
+          countText={countText(items.length, !!cursor)}
+          pagination={{ nextCursor: cursor, loading, onLoadMore: () => void load(cursor) }}
           // Owner may manage anyone but the owner; other teachers only students and assistants (P1-8). Never yourself (use leave).
           canChangeRole={(e) => canManage && e.state === "active" && !e.is_owner && e.user.id !== me?.id && (isOwner || e.role !== "teacher")}
           roleOptions={() => (isOwner ? ["teacher", "assistant", "student"] : ["assistant", "student"])}
@@ -250,10 +237,11 @@ export default function PeoplePage() {
           onRemove={(e) => { setRemoveError(null); setRemoving(e); }}
         />
       )}
-      <Pager nextCursor={cursor} loading={loading} onMore={() => load(cursor)} />
 
-      <ConfirmDialog open={!!removing} danger busy={!!busyId} error={removeError} title={t("courses.people.removeTitle")}
-        body={t("courses.people.removeBody", { name: removing ? removing.user.display_name || removing.user.email : "" })}
+      <ConfirmDialog open={!!removing} tone="danger" busy={!!busyId} title={t("courses.people.removeTitle")}
+        object={removing ? `${removing.user.display_name || removing.user.email} · ${t(`courses.roles.${removing.role}`)}` : undefined}
+        effect={t("courses.people.removeBody", { name: removing ? removing.user.display_name || removing.user.email : "" })}
+        error={removeError ? <ErrorMessage error={removeError} /> : undefined}
         confirmLabel={t("courses.people.remove")} onConfirm={doRemove} onCancel={() => setRemoving(null)} />
     </div>
   );

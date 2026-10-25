@@ -5,7 +5,8 @@ import Link from "next/link";
 import { AlertCircle, AlertTriangle, CheckCircle2, ImageIcon } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import type { ImportBankSummary, ImportIssue, ImportReport } from "@/lib/lms/contentImport";
-import { btnSecondary, cardCls } from "@/components/lms/content/ui";
+import { cardCls } from "@/components/lms/content/ui";
+import { btnSecondary } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 
 const sum = (o: Record<string, number>) => Object.values(o).reduce((a, n) => a + n, 0);
 

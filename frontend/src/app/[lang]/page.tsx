@@ -16,8 +16,8 @@ export default function HomePage() {
       <header className="border-b border-slate-200 bg-white/80 backdrop-blur sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-brand-600 flex items-center justify-center text-white font-bold text-lg shadow-sm shadow-brand-500/30">
-              ОРТ
+            <div className="w-10 h-10 rounded-xl bg-brand-600 flex items-center justify-center text-white font-bold text-lg shadow-sm shadow-brand-500/30" aria-hidden="true">
+              {t("common.appName").charAt(0)}
             </div>
             <div>
               <span className="font-bold text-lg tracking-tight text-slate-900 block leading-tight">

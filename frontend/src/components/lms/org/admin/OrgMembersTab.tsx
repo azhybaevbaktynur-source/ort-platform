@@ -1,26 +1,24 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/context";
 import {
   addOrganizationMember, listOrganizationMembers, removeOrganizationMember, type OrganizationOut, type OrgMemberOut, type OrgRole,
 } from "@/lib/lms/organizations";
 import { fmtApiDate } from "@/lib/format";
-import { Pager } from "@/components/lms/Pager";
-import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
-import { ReasonDialog } from "@/components/lms/admin/ReasonDialog";
-import { UserPicker, platformUserSearch, type PickedUser } from "@/components/lms/UserPicker";
-import { EmptyBox, Loading, OrgError, btn, cardCls } from "../OrgUi";
-import { toast } from "@/components/ui/Toast";
+import { Button, Card, ConfirmDialog, EmptyState, ReasonDialog, Table, UserPicker, toast, type TableColumn } from "@/components/ui";
+import { platformUserSearch, type PickedUser } from "@/components/lms/UserPicker";
+import { useCursorList } from "@/components/lms/admin/useCursorList";
+import { MoreError, useTableState } from "@/components/lms/admin/ListParts";
+import { OrgError } from "../OrgUi";
 
 /** Platform admin: organization admins or teachers, with "Assign admin" / "Add teacher" (UserPicker) and remove. */
 export function OrgMembersTab({ org, role, onChanged }: { org: OrganizationOut; role: OrgRole; onChanged: () => void }) {
   const { lang, t } = useTranslation();
-  const [items, setItems] = useState<OrgMemberOut[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<unknown>(null);
+  const fetchPage = useCallback((cursor: string | null) => listOrganizationMembers(org.id, { role, state: "active", cursor }), [org.id, role]);
+  const list = useCursorList(fetchPage);
+  const state = useTableState(list);
   const [picked, setPicked] = useState<PickedUser | null>(null);
   const [confirmAdd, setConfirmAdd] = useState(false);
   const [removing, setRemoving] = useState<OrgMemberOut | null>(null);
@@ -28,21 +26,6 @@ export function OrgMembersTab({ org, role, onChanged }: { org: OrganizationOut; 
   const [dialogError, setDialogError] = useState<unknown>(null);
   const search = useMemo(() => platformUserSearch(), []);
   const isAdmins = role === "org_admin";
-
-  const load = useCallback(async (next?: string | null) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const page = await listOrganizationMembers(org.id, { role, state: "active", cursor: next });
-      setItems((prev) => (next ? [...prev, ...page.items] : page.items));
-      setCursor(page.next_cursor);
-    } catch (e) {
-      setError(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [org.id, role]);
-  useEffect(() => { void load(); }, [load]);
 
   const add = async () => {
     if (!picked) return;
@@ -53,7 +36,7 @@ export function OrgMembersTab({ org, role, onChanged }: { org: OrganizationOut; 
       toast.success(t(isAdmins ? "organizations.members.adminAdded" : "organizations.members.teacherAdded", { name: picked.display_name || picked.email }));
       setPicked(null);
       setConfirmAdd(false);
-      await load();
+      await list.reload();
       onChanged();
     } catch (e) {
       setDialogError(e);
@@ -69,7 +52,7 @@ export function OrgMembersTab({ org, role, onChanged }: { org: OrganizationOut; 
       await removeOrganizationMember(org.id, removing.user.id, reason);
       toast.success(t("organizations.members.removed", { name: removing.user.display_name || removing.user.email }));
       setRemoving(null);
-      await load();
+      await list.reload();
       onChanged();
     } catch (e) {
       setDialogError(e);
@@ -80,52 +63,60 @@ export function OrgMembersTab({ org, role, onChanged }: { org: OrganizationOut; 
 
   const pickedName = picked ? picked.display_name || picked.email : "";
   const removingName = removing ? removing.user.display_name || removing.user.email : "";
+  const columns: TableColumn<OrgMemberOut>[] = [
+    {
+      key: "person", header: t("organizations.members.person"), primary: true,
+      cell: (m) => (
+        <>
+          <Link href={`/${lang}/admin/users/${m.user.id}`} className="break-words font-semibold text-brand-700 hover:underline">{m.user.display_name || m.user.email}</Link>
+          <span className="block break-all text-sm font-normal text-slate-600">{m.user.email}</span>
+        </>
+      ),
+    },
+    { key: "since", header: t("organizations.members.sinceColumn"), nowrap: true, cell: (m) => fmtApiDate(m.created_at, lang) },
+    {
+      key: "actions", header: "", actions: true, align: "right",
+      cell: (m) => (
+        <Button variant="secondary" size="sm" onClick={() => { setDialogError(null); setRemoving(m); }}>{t("organizations.members.remove")}</Button>
+      ),
+    },
+  ];
+  const addLabel = t(isAdmins ? "organizations.members.assignAdmin" : "organizations.members.addTeacher");
   return (
     <div className="space-y-4">
-      <div className={cardCls}>
-        <h3 className="mb-1 font-semibold text-slate-900">{t(isAdmins ? "organizations.members.assignAdmin" : "organizations.members.addTeacher")}</h3>
-        <p className="mb-3 text-sm text-slate-600">{t(isAdmins ? "organizations.members.assignAdminHint" : "organizations.members.addTeacherHint")}</p>
+      <Card title={addLabel} headingLevel={3} description={t(isAdmins ? "organizations.members.assignAdminHint" : "organizations.members.addTeacherHint")}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             <UserPicker label={t("organizations.members.person")} value={picked} onChange={setPicked} search={search}
-              excludeIds={items.map((m) => m.user.id)} />
+              excludeIds={list.items.map((m) => m.user.id)} />
           </div>
-          <button type="button" className={btn.primary} disabled={!picked} onClick={() => { setDialogError(null); setConfirmAdd(true); }}>
-            {t(isAdmins ? "organizations.members.assignAdmin" : "organizations.members.addTeacher")}
-          </button>
+          <Button variant="secondary" disabled={!picked} onClick={() => { setDialogError(null); setConfirmAdd(true); }}>{addLabel}</Button>
         </div>
-      </div>
-      {error ? <OrgError error={error} onRetry={() => load()} /> : null}
-      {loading && items.length === 0 && !error && <Loading />}
-      {!loading && !error && items.length === 0 && <EmptyBox text={t(isAdmins ? "organizations.members.noAdmins" : "organizations.members.noTeachers")} />}
-      {items.length > 0 && (
-        <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white text-sm">
-          {items.map((m) => (
-            <li key={m.user.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-              <div className="min-w-0 flex-1 basis-56">
-                <Link href={`/${lang}/admin/users/${m.user.id}`} className="font-medium text-brand-700 hover:underline">{m.user.display_name || m.user.email}</Link>
-                <p className="break-words text-xs text-slate-500">{m.user.email} · <span className="whitespace-nowrap">{t("organizations.members.since", { date: fmtApiDate(m.created_at, lang) })}</span></p>
-              </div>
-              <button type="button" className={btn.smallDanger} onClick={() => { setDialogError(null); setRemoving(m); }}>
-                {t("organizations.members.remove")}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <Pager nextCursor={cursor} loading={loading} onMore={() => load(cursor)} />
+      </Card>
+      <Table
+        caption={t(isAdmins ? "organizations.admin.tabs.admins" : "organizations.admin.tabs.teachers")}
+        columns={columns}
+        rows={list.items}
+        rowKey={(m) => m.user.id}
+        {...state}
+        empty={<EmptyState title={t(isAdmins ? "organizations.members.noAdmins" : "organizations.members.noTeachers")} />}
+      />
+      <MoreError list={list} />
       <ConfirmDialog
         open={confirmAdd}
         title={t(isAdmins ? "organizations.members.assignAdminTitle" : "organizations.members.addTeacherTitle", { name: pickedName })}
-        body={t(isAdmins ? "organizations.members.assignAdminBody" : "organizations.members.addTeacherBody", { name: pickedName, org: org.name })}
-        confirmLabel={t(isAdmins ? "organizations.members.assignAdmin" : "organizations.members.addTeacher")}
-        busy={busy} error={dialogError} onConfirm={() => void add()} onCancel={() => setConfirmAdd(false)}
+        object={picked ? (picked.display_name ? `${picked.display_name} · ${picked.email}` : picked.email) : undefined}
+        effect={t(isAdmins ? "organizations.members.assignAdminBody" : "organizations.members.addTeacherBody", { name: pickedName, org: org.name })}
+        confirmLabel={addLabel}
+        busy={busy} error={dialogError ? <OrgError error={dialogError} /> : undefined}
+        onConfirm={() => void add()} onCancel={() => setConfirmAdd(false)}
       />
       <ReasonDialog
         open={!!removing}
         title={t("organizations.members.removeTitle", { name: removingName })}
-        body={t(isAdmins ? "organizations.members.removeAdminBody" : "organizations.members.removeBody", { name: removingName, org: org.name })}
-        confirmLabel={t("organizations.members.remove")} danger busy={busy} error={dialogError}
+        effect={t(isAdmins ? "organizations.members.removeAdminBody" : "organizations.members.removeBody", { name: removingName, org: org.name })}
+        confirmLabel={t("organizations.members.remove")} tone="danger" busy={busy}
+        error={dialogError ? <OrgError error={dialogError} /> : undefined}
         onConfirm={(r) => void remove(r)} onCancel={() => setRemoving(null)}
       />
     </div>

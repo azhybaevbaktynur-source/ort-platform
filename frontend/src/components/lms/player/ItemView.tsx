@@ -1,13 +1,15 @@
 "use client";
 
 import React from "react";
-import { Bookmark } from "lucide-react";
+import { Bookmark, Check } from "lucide-react";
+import { cn, focusRing } from "@/components/ui";
 import { useTranslation } from "@/lib/i18n/context";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import type { StudentQuestion } from "@/lib/lms/attemptTypes";
 import { letter, orderedChoices, type ResponseObj } from "./playerUtils";
 
-const OPTION_BASE = "flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all";
+// S7b: one type family (sans) for stem, choices and comparison labels (P7); every option is at least 44 px tall.
+const OPTION_BASE = `flex min-h-11 w-full items-center gap-3 rounded-xl border px-4 py-3 text-left text-base transition-all ${focusRing}`;
 const OPTION_ON = "border-brand-600 bg-brand-50/40 ring-1 ring-brand-600 font-medium text-slate-900";
 const OPTION_OFF = "border-slate-200 bg-white text-slate-800 hover:border-brand-300 hover:bg-slate-50/50";
 
@@ -58,18 +60,20 @@ export function ItemView({
           type="button"
           onClick={onToggleFlag}
           aria-pressed={flagged}
-          className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all ${
-            flagged ? "border-amber-300 bg-amber-100 text-amber-800" : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
-          }`}
+          className={cn(
+            "inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-3 text-sm font-semibold transition-all sm:min-h-9 sm:text-xs",
+            focusRing,
+            flagged ? "border-amber-400 bg-amber-100 text-amber-900" : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100",
+          )}
         >
-          <Bookmark className={`h-3.5 w-3.5 ${flagged ? "fill-amber-600 text-amber-600" : ""}`} aria-hidden="true" />
+          <Bookmark className={`h-4 w-4 sm:h-3.5 sm:w-3.5 ${flagged ? "fill-amber-600 text-amber-600" : ""}`} aria-hidden="true" />
           {flagged ? t("player.unflag") : t("player.flag")}
         </button>
       </header>
 
       {question.stem ? (
         <div className="min-h-[56px]">
-          <MathRenderer content={question.stem} className="font-serif text-base leading-relaxed text-gray-900 md:text-lg" />
+          <MathRenderer content={question.stem} className="text-base leading-relaxed text-slate-900 md:text-lg" />
         </div>
       ) : null}
       {question.image_url ? (
@@ -115,8 +119,10 @@ export function ItemView({
                 onClick={() => onChange({ choice_ids: on ? ids.filter((x) => x !== c.id) : [...ids, c.id] })}
                 className={`${OPTION_BASE} ${on ? OPTION_ON : OPTION_OFF}`}
               >
-                <Badge on={on} square>{on ? "✓" : letter(i)}</Badge>
+                {/* S7b, P12: the letter stays when selected; the filled badge and the check mark show the choice. */}
+                <Badge on={on} square>{letter(i)}</Badge>
                 <ChoiceBody text={c.text} imageUrl={c.image_url} />
+                <Check className={`h-5 w-5 shrink-0 text-brand-700 ${on ? "" : "invisible"}`} aria-hidden="true" />
               </button>
             );
           })}
@@ -149,10 +155,10 @@ export function ItemView({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {(["a", "b"] as const).map((k) => (
               <div key={k} className="flex flex-col items-center rounded-2xl border-2 border-slate-200 bg-slate-50/60 p-4 text-center md:p-6">
-                <span className="mb-3 inline-block rounded-md bg-gray-100 px-3 py-1 text-xs font-bold uppercase tracking-widest text-gray-500">
+                <span className="mb-3 inline-block rounded-md bg-slate-100 px-3 py-1 text-xs font-bold uppercase tracking-widest text-slate-600">
                   {k === "a" ? t("player.comparison.columnA") : t("player.comparison.columnB")}
                 </span>
-                <div className="flex min-h-[60px] items-center justify-center text-xl font-semibold text-gray-900">
+                <div className="flex min-h-[60px] items-center justify-center text-xl font-semibold text-slate-900">
                   <MathRenderer content={(k === "a" ? question.data.column_a : question.data.column_b) || "—"} />
                 </div>
               </div>
@@ -172,7 +178,7 @@ export function ItemView({
                   className={`${OPTION_BASE} ${on ? OPTION_ON : OPTION_OFF}`}
                 >
                   <Badge on={on}>{id}</Badge>
-                  <span className="flex-1">{t(`bank.types.comparison.labels.${id}`)}</span>
+                  <span className="flex-1 leading-relaxed text-slate-900">{t(`bank.types.comparison.labels.${id}`)}</span>
                 </button>
               );
             })}
@@ -219,7 +225,7 @@ export function ItemView({
 function ChoiceBody({ text, imageUrl }: { text: string; imageUrl?: string | null }) {
   return (
     <span className="flex flex-1 flex-col gap-2">
-      {text ? <MathRenderer content={text} className="font-serif text-base leading-relaxed text-gray-900" /> : null}
+      {text ? <MathRenderer content={text} className="text-base leading-relaxed text-slate-900" /> : null}
       {imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={imageUrl} alt="" className="max-h-40 w-auto rounded-md" />

@@ -1,6 +1,6 @@
 # Phase 6a: organizations foundation, course templates (ORT first), invitations
 
-**Status**: built and verified on branch `phase-6a` (2026-10-25); deploy and owner checkpoint follow. Design: `docs/phases/PHASE_6_DESIGN.md` (approved 2026-10-25). Decisions taken while building: `docs/PRODUCT_DECISIONS.md` "Phase 6a implementation decisions" (I1–I11). Slice rules: `PHASE_6A_SLICE_RULES.md`.
+**Status**: **deployed 2026-10-25** (`main` 77923cf, /health OK; Neon at `0008_phase6_organizations`, verified: 1 organization, both ORT courses locked in it and owned by the owner's account, 0 courses/banks without organization, 299 question versions and 3 attempts intact). Backups: Neon branch `backup-2026-10-25-before-phase6a` (07:03 UTC) + snapshot `before-phase6a-deploy-2026-10-25` (11:15 UTC). Owner checkpoint: waiting for the owner's OK before 6b. Design: `docs/phases/PHASE_6_DESIGN.md` (approved 2026-10-25). Decisions taken while building: `docs/PRODUCT_DECISIONS.md` "Phase 6a implementation decisions" (I1–I11). Slice rules: `PHASE_6A_SLICE_RULES.md`.
 
 ## What changed
 
@@ -40,6 +40,7 @@ UX gate: `docs/phases/PHASE_6_screens/6a/` (INDEX.md), ux-reviewer findings fixe
 - To 6b (design system, `AppHeader` with area switcher, student home): staff header height and tab rows on phones, admin sub-nav clipping, badge/button styles, org overview tiles as links, general course home copy, `/teacher-access` status wording, consistent dialog component.
 - Org setting `teachers_can_create_courses` UI beyond the toggle, contact email for organizations, departments, shared org banks, student invitations → Phase 9.
 - SQLite-only: admin user search by Cyrillic name (PostgreSQL is fine).
+- Browser tab title/meta description still "ОРТ / ЖРТ Даярдоо Платформасы" (layout metadata) → 6b with `AppHeader`/brand.
 - `docs/BUNDLE_FORMAT.md` still lists the old subject keys (they remain accepted as aliases).
 
 ## Owner items

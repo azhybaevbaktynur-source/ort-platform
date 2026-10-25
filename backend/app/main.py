@@ -128,6 +128,11 @@ from app.lms.templates.router import router as _templates_router  # noqa: E402
 
 app.include_router(_templates_router, prefix=settings.API_V1_STR + "/courses", tags=["Courses"])
 # --- Phase 6 S2b end ---
+# --- Phase 6 S6a begin --- (GET /me/home, student home, PHASE_6_DESIGN 8.4)
+from app.lms.home.router import router as _home_router  # noqa: E402
+
+app.include_router(_home_router, prefix=settings.API_V1_STR)
+# --- Phase 6 S6a end ---
 # Include API v1 router
 app.include_router(api_router, prefix=settings.API_V1_STR)
 register_error_handlers(app)

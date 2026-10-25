@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ArrowRight, AlertCircle, CheckCircle2, KeyRound, Loader2 } from "lucide-react";
+import { ArrowRight, AlertCircle, CheckCircle2, KeyRound } from "lucide-react";
+import { Button } from "@/components/ui";
 import { useTranslation } from "@/lib/i18n/context";
 import { AuthError, useAuth } from "@/lib/auth-context";
 
@@ -98,27 +99,27 @@ export const VerifyEmailStep: React.FC<VerifyEmailStepProps> = ({
           <KeyRound className="w-6 h-6" />
         </div>
         <h2 className="text-2xl font-bold tracking-tight text-slate-900">{t("auth.verify.title")}</h2>
-        <p className="mt-1 text-xs text-slate-500">
+        <p className="mt-1 text-sm text-slate-600">
           {reason === "registered" ? t("auth.verify.subtitle", { email }) : t("auth.verify.notVerifiedNotice", { email })}
         </p>
       </div>
 
       {error && (
-        <div className="mb-5 p-3 rounded-xl bg-rose-50 border border-rose-200 flex items-center gap-2 text-rose-800 text-xs font-medium">
-          <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+        <div role="alert" className="mb-5 flex items-start gap-2 rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-medium text-danger-800">
+          <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-danger-700" />
           <span>{error}</span>
         </div>
       )}
       {info && (
-        <div className="mb-5 p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center gap-2 text-emerald-800 text-xs font-medium">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+        <div role="status" className="mb-5 flex items-start gap-2 rounded-xl border border-success-200 bg-success-50 p-3 text-sm font-medium text-success-800">
+          <CheckCircle2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-success-700" />
           <span>{info}</span>
         </div>
       )}
 
       <form onSubmit={handleVerify} className="space-y-4">
         <div>
-          <label htmlFor="email-code" className="block text-xs font-semibold text-slate-700 mb-1">
+          <label htmlFor="email-code" className="mb-1 block text-sm font-medium text-slate-800">
             {t("auth.verify.codeLabel")}
           </label>
           <input
@@ -133,40 +134,26 @@ export const VerifyEmailStep: React.FC<VerifyEmailStepProps> = ({
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
             placeholder="000000"
-            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 text-center text-2xl font-bold tracking-[0.5em] outline-none transition-all"
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-center text-2xl font-bold tracking-[0.5em] outline-none transition-all focus:border-brand-600 focus:ring-2 focus:ring-brand-600/30"
           />
-          <p className="mt-1.5 text-[11px] text-slate-500">{t("auth.verify.codeValidity", { minutes: codeTtlMinutes })}</p>
+          <p className="mt-1.5 text-sm text-slate-600">{t("auth.verify.codeValidity", { minutes: codeTtlMinutes })}</p>
         </div>
 
-        <button
-          type="submit"
-          disabled={verifying || code.length !== 6}
-          className="w-full py-3 px-4 rounded-xl bg-brand-600 text-white font-bold text-sm hover:bg-brand-700 shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-60"
-        >
-          {verifying ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>{t("auth.verify.verifying")}</span>
-            </>
-          ) : (
-            <>
-              <span>{t("auth.verify.button")}</span>
-              <ArrowRight className="w-4 h-4" />
-            </>
-          )}
-        </button>
+        <Button type="submit" size="lg" fullWidth disabled={verifying || code.length !== 6} loading={verifying} rightIcon={<ArrowRight aria-hidden="true" className="h-4 w-4" />}>
+          {verifying ? t("auth.verify.verifying") : t("auth.verify.button")}
+        </Button>
       </form>
 
-      <div className="mt-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
+      <div className="mt-5 flex flex-col items-center justify-between gap-1 text-sm sm:flex-row">
         <button
           type="button"
           onClick={handleResend}
           disabled={cooldown > 0 || resending}
-          className="font-semibold text-brand-600 hover:underline disabled:text-slate-400 disabled:no-underline"
+          className="inline-flex min-h-11 items-center font-semibold text-brand-700 hover:underline disabled:text-slate-500 disabled:no-underline"
         >
           {cooldown > 0 ? t("auth.verify.resendIn", { seconds: cooldown }) : t("auth.verify.resend")}
         </button>
-        <button type="button" onClick={onChangeEmail} className="font-semibold text-slate-500 hover:underline">
+        <button type="button" onClick={onChangeEmail} className="inline-flex min-h-11 items-center font-semibold text-slate-600 hover:underline">
           {t("auth.verify.changeEmail")}
         </button>
       </div>

@@ -3,9 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { createOrgInvitation, type InvitationCreatedOut } from "@/lib/lms/invitations";
-import { toast } from "@/components/ui/Toast";
-import { Modal } from "@/components/lms/assessments/Modal";
-import { OrgError, btn, inputCls, labelCls } from "./OrgUi";
+import { Button, Dialog, Input, Textarea, toast } from "@/components/ui";
+import { OrgError } from "./OrgUi";
 
 /** "Invite teacher" (or org admin) by email; the email goes out in the inviter's UI language. */
 export function InviteDialog({
@@ -44,31 +43,26 @@ export function InviteDialog({
   };
 
   const title = role === "org_admin" ? t("invitations.dialog.titleAdmin") : t("invitations.dialog.title");
+  const formId = "invite-form";
   return (
-    <Modal open={open} title={title} onClose={onClose} busy={busy}>
-      <form onSubmit={submit} noValidate className="space-y-4">
-        <p className="text-sm text-slate-600">{t(role === "org_admin" ? "invitations.dialog.bodyAdmin" : "invitations.dialog.body", { org: orgName })}</p>
-        <div>
-          <label htmlFor="inv-email" className={labelCls}>{t("invitations.dialog.email")}</label>
-          <input id="inv-email" type="email" autoComplete="off" required value={email} disabled={busy} aria-invalid={invalid}
-            onChange={(e) => { setEmail(e.target.value); setInvalid(false); }} className={inputCls} />
-          {invalid && <p role="alert" className="mt-1 text-xs text-red-700">{t("invitations.dialog.emailInvalid")}</p>}
-        </div>
-        <div>
-          <label htmlFor="inv-message" className={labelCls}>{t("invitations.dialog.message")}</label>
-          <textarea id="inv-message" rows={3} maxLength={500} value={message} disabled={busy}
-            onChange={(e) => setMessage(e.target.value)} className={inputCls} />
-          <p className="mt-1 text-xs text-slate-500">{t("invitations.dialog.messageHint")}</p>
-        </div>
-        <p className="text-xs text-slate-500">{t("invitations.dialog.expiry")}</p>
+    <Dialog open={open} title={title} onClose={onClose} busy={busy}
+      description={t(role === "org_admin" ? "invitations.dialog.bodyAdmin" : "invitations.dialog.body", { org: orgName })}
+      footer={
+        <>
+          <Button variant="secondary" disabled={busy} onClick={onClose}>{t("lms.common.cancel")}</Button>
+          <Button type="submit" form={formId} loading={busy}>{t("invitations.dialog.send")}</Button>
+        </>
+      }>
+      <form id={formId} onSubmit={submit} noValidate className="space-y-4">
+        <Input type="email" autoComplete="off" required label={t("invitations.dialog.email")} value={email} disabled={busy}
+          error={invalid ? t("invitations.dialog.emailInvalid") : undefined}
+          onChange={(e) => { setEmail(e.target.value); setInvalid(false); }} />
+        <Textarea label={t("invitations.dialog.message")} rows={3} maxLength={500} value={message} disabled={busy}
+          hint={t("invitations.dialog.messageHint")} onChange={(e) => setMessage(e.target.value)} />
+        <p className="text-sm text-slate-600">{t("invitations.dialog.expiry")}</p>
         <OrgError error={error} />
-        {/* Phase 6 S8 (UX T1): primary on top on a phone, on the right on desktop. */}
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <button type="button" className={btn.secondary} disabled={busy} onClick={onClose}>{t("lms.common.cancel")}</button>
-          <button type="submit" className={btn.primary} disabled={busy}>{busy ? t("lms.common.loading") : t("invitations.dialog.send")}</button>
-        </div>
       </form>
-    </Modal>
+    </Dialog>
   );
 }
 

@@ -3,7 +3,8 @@
 import React, { useId, useRef } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { MathRenderer } from "@/components/math/MathRenderer";
-import { btnSmall, inputCls, labelCls } from "./ui";
+import { inputCls, labelCls } from "./ui";
+import { btnSmall } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 
 /** Textarea with ORT rich text helpers ($math$, <u>, <b>) and a live KaTeX preview. */
 export function RichTextField({
@@ -44,7 +45,8 @@ export function RichTextField({
     <div>
       {label && <label htmlFor={id} className={labelCls}>{label}</label>}
       {!compact && (
-        <div className="mb-1 flex flex-wrap gap-1.5">
+        // Phase 6b S5c: an even 2 x 2 grid of 44 px buttons at 375 px instead of ragged wrapped rows; one row from `sm`.
+        <div role="toolbar" aria-label={t("teaching.formatToolbar")} className="mb-1.5 grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap">
           <button type="button" disabled={disabled} className={btnSmall} onClick={() => wrap("$", "$")}>{t("bank.rich.math")}</button>
           <button type="button" disabled={disabled} className={btnSmall} onClick={() => wrap("$$", "$$")}>{t("bank.rich.mathBlock")}</button>
           <button type="button" disabled={disabled} className={btnSmall} onClick={() => wrap("<u>", "</u>")}>{t("bank.rich.underline")}</button>
