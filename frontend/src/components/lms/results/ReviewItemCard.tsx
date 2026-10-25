@@ -96,14 +96,15 @@ export function ReviewItemCard({
                 <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center" aria-hidden="true">
                   {correct ? <Check className="h-4 w-4 text-emerald-700" /> : picked ? <X className="h-4 w-4 text-red-700" /> : null}
                 </span>
-                <span className="flex-1">
+                <span className="min-w-0 flex-1">
                   {c.text ? <MathRenderer content={c.text} className="font-serif text-base text-gray-900" /> : null}
                   {c.image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={c.image_url} alt="" className="mt-1 max-h-32 w-auto rounded-md" />
                   ) : null}
                 </span>
-                <span className="shrink-0 text-xs font-medium text-slate-600">
+                {/* Phase 6 S8: layout only; the label wraps instead of widening the card at 375 px (long ky text). */}
+                <span className="min-w-0 max-w-[45%] text-right text-xs font-medium text-slate-600">
                   {picked ? t("results.yourAnswer") : ""}{picked && correct ? " · " : ""}{correct ? t("results.correctAnswer") : ""}
                 </span>
               </li>

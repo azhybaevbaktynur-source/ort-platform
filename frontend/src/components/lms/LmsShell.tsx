@@ -10,6 +10,7 @@ import { LmsMeProvider, useLmsMeLoader } from "@/lib/lms/useLmsMe";
 import { ErrorMessage } from "./ErrorMessage";
 import { OrgNavLink } from "./org/OrgNavLink"; // Phase 6 S4
 import { PendingInvitationsBanner } from "./PendingInvitationsBanner"; // Phase 6 S4b
+import { InvitationAcceptedNotice } from "./InvitationAcceptedNotice"; // Phase 6 S8
 
 const LANGS: Language[] = ["en", "ru", "ky"];
 
@@ -65,8 +66,10 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const isAdmin = me ? me.is_platform_admin : !!userProfile?.is_platform_admin;
   const teacherStatus = me ? me.teacher_status : userProfile?.teacher_status;
   const canCreate = me ? me.can_create_courses : teacherStatus === "approved";
-  // Phase 6 S4: "I am a teacher" for everyone who cannot create courses yet (shows pending state too).
-  const canRequestTeacher = !canCreate && !isAdmin;
+  // Phase 6 S8 (UX S1): "I am a teacher" only for people who teach nowhere yet (an org teacher who cannot
+  // create courses still teaches; shows the pending state too).
+  const isTeacher = me ? me.is_teacher : teacherStatus === "approved";
+  const canRequestTeacher = !isAdmin && !isTeacher;
   const name = me?.display_name || userProfile?.displayName || user.email;
 
   const linkCls = (href: string, exact = false) => {
@@ -127,6 +130,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
         <main className="mx-auto max-w-6xl px-4 py-8">
           {/* --- Phase 6 S4b --- */}
           <PendingInvitationsBanner enabled={!!me} />
+          <InvitationAcceptedNotice />
           {meState.error && !me ? <ErrorMessage error={meState.error} onRetry={meState.reload} /> : children}
         </main>
       </div>

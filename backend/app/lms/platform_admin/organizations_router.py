@@ -141,9 +141,10 @@ def grant_template(organization_id: uuid.UUID, template_key: str, request: Reque
 @router.delete("/organizations/{organization_id}/templates/{template_key}", status_code=204,
                response_class=Response)
 def revoke_template(organization_id: uuid.UUID, template_key: str, request: Request,
+                    reason: Optional[str] = Query(None, max_length=500),  # Phase 6 S8: optional, audited
                     admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
     org = org_svc.load_org(db, organization_id)
-    org_svc.revoke_template(db, admin, org, template_key, request)
+    org_svc.revoke_template(db, admin, org, template_key, request, reason=reason)
     return Response(status_code=204)
 
 

@@ -131,8 +131,9 @@ async def test_template_grant_revoke(db, api):
     assert (await api.call(admin, "PUT", f"/platform/organizations/{org.id}/templates/ort")).status_code == 200
     assert (await api.call(admin, "PUT", f"/platform/organizations/{org.id}/templates/nope")).json()["error"][
         "code"] == "unknown_template"
-    assert (await api.call(admin, "DELETE", f"/platform/organizations/{org.id}/templates/ort")).status_code == 204
-    assert _audit(db, "organization.template.revoke") is not None
+    assert (await api.call(admin, "DELETE", f"/platform/organizations/{org.id}/templates/ort",
+                           params={"reason": "contract ended"})).status_code == 204
+    assert _audit(db, "organization.template.revoke").reason == "contract ended"
     t = (await api.call(admin, "GET", f"/platform/organizations/{org.id}/templates")).json()
     assert t[0]["granted"] is False and t[0]["revoked_at"] is not None
     # re-grant clears revoked_at on the same row
@@ -209,6 +210,7 @@ async def test_me_organizations(db, api):
                       "can_create_courses": False}]
     me = (await api.call(u, "GET", "/me/lms")).json()
     assert me["can_create_courses"] is False
+    assert me["is_teacher"] is True  # Phase 6 S8: an org teacher sees the Teaching area without creating
 
 
 # ------------------------------------------------------------------------------------------------ POST /courses

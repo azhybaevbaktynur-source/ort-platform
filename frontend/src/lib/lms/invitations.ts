@@ -94,3 +94,34 @@ export function invitationTarget(lang: string, r: Pick<InvitationAcceptOut, "cou
 
 /** Window event fired after an invitation was accepted, so the pending-invitations banner reloads. */
 export const INVITATIONS_CHANGED_EVENT = "lms-invitations-changed";
+
+// --- Phase 6 S8 (UX S1): one-time "You joined ..." notice on the page the accept redirects to ---
+const ACCEPTED_KEY = "lms-invitation-accepted";
+
+export interface AcceptedNoticeData {
+  path: string;
+  role: InvitationRole;
+  org: string;
+  course: string | null;
+}
+
+/** Remember the accepted invitation for the target page (sessionStorage; silently skipped when unavailable). */
+export function rememberAccepted(path: string, r: Pick<InvitationAcceptOut, "role" | "organization_name" | "course_id">,
+  courseTitle: string | null): void {
+  const data: AcceptedNoticeData = { path, role: r.role, org: r.organization_name, course: r.course_id ? courseTitle : null };
+  try { window.sessionStorage.setItem(ACCEPTED_KEY, JSON.stringify(data)); } catch { /* storage blocked */ }
+}
+
+/** Read and clear the remembered notice when it belongs to `pathname` (shown once). */
+export function takeAccepted(pathname: string): AcceptedNoticeData | null {
+  try {
+    const raw = window.sessionStorage.getItem(ACCEPTED_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as AcceptedNoticeData;
+    if (data.path !== pathname) return null;
+    window.sessionStorage.removeItem(ACCEPTED_KEY);
+    return data;
+  } catch {
+    return null;
+  }
+}

@@ -40,7 +40,8 @@ export default function PassagePage() {
     <div className="space-y-4">
       <Link href={bankId ? `${base}/${bankId}/passages` : base} className="text-sm font-medium text-brand-700 hover:underline">{t("bank.passages.back")}</Link>
       <h2 className="text-xl font-bold text-slate-900">{p.current_version.title || t("bank.passages.untitled")}</h2>
-      <div role="tablist" aria-label={t("bank.editor.tabsLabel")} className="flex gap-1 border-b border-slate-200">
+      {/* Phase 6 S8: the tab row wraps at 375 px instead of widening the page. */}
+      <div role="tablist" aria-label={t("bank.editor.tabsLabel")} className="flex flex-wrap gap-x-1 border-b border-slate-200">
         {(["edit", "questions", "history"] as Tab[]).map((id) => (
           <button key={id} role="tab" type="button" aria-selected={tab === id} onClick={() => setTab(id)}
             className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold ${tab === id ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>

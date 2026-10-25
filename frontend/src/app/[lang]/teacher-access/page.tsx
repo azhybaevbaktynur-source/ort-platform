@@ -7,13 +7,12 @@ import { Building2, UserPlus } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
 import {
-  INVITATIONS_CHANGED_EVENT, acceptInvitation, invitationTarget, listMyInvitations, type MyInvitationOut,
+  INVITATIONS_CHANGED_EVENT, acceptInvitation, invitationTarget, listMyInvitations, rememberAccepted, type MyInvitationOut,
 } from "@/lib/lms/invitations";
 import { pickLocalized } from "@/lib/lms/localized";
 import { fmtApiDate } from "@/lib/format";
 import { TeacherRequestPanel } from "@/components/lms/TeacherRequestPanel";
 import { OrgError } from "@/components/lms/org/OrgUi";
-import { toast } from "@/components/ui/Toast";
 
 /** "I am a teacher" (design §7): ask your school for an invitation, or apply as an independent teacher. */
 export default function TeacherAccessPage() {
@@ -36,15 +35,17 @@ export default function TeacherAccessPage() {
     setAcceptError(null);
     try {
       const r = await acceptInvitation(i.id);
-      toast.success(t("invitations.mine.accepted"));
+      // Phase 6 S8 (UX S1): the target page shows "You joined ..." once (replaces the short toast).
+      const dest = invitationTarget(lang, r);
+      rememberAccepted(dest, r, i.course_title ? pickLocalized(i.course_title, lang) : null);
       window.dispatchEvent(new Event(INVITATIONS_CHANGED_EVENT));
       await reloadMe();
-      router.push(invitationTarget(lang, r));
+      router.push(dest);
     } catch (e) {
       setAcceptError({ id: i.id, error: e });
       setAcceptingId(null);
     }
-  }, [lang, reloadMe, router, t]);
+  }, [lang, reloadMe, router]);
 
   return (
     <div className="mx-auto max-w-2xl">

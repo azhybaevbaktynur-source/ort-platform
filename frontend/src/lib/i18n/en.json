@@ -2282,5 +2282,12 @@
       "back": "Back to my courses"
     },
     "pendingHintAccept": "Valid until {date}. Accept here or with the link in the email."
+  },
+  "invitationAccepted": {
+    "orgTeacher": "You joined «{org}» as a teacher.",
+    "orgAdmin": "You joined «{org}» as an organization admin.",
+    "courseTeacher": "You joined the course «{course}» as a teacher.",
+    "courseAssistant": "You joined the course «{course}» as an assistant.",
+    "dismiss": "Close message"
   }
 }

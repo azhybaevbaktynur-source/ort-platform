@@ -6,7 +6,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, Loader2, MailOpen } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
-import { acceptInvitation, getInvitation, invitationTarget, type InvitationAcceptOut, type InvitationPublicOut } from "@/lib/lms/invitations";
+import { acceptInvitation, getInvitation, invitationTarget, rememberAccepted, type InvitationAcceptOut, type InvitationPublicOut } from "@/lib/lms/invitations";
 import { fmtApiDate } from "@/lib/format";
 import { pickLocalized } from "@/lib/lms/localized";
 import { AuthHeader } from "@/components/auth/AuthHeader";
@@ -48,14 +48,17 @@ function InviteAccept() {
     try {
       const r = await acceptInvitation(token);
       setDone(true);
-      router.replace(target(r));
+      // Phase 6 S8 (UX S1): the target page shows "You joined ..." once.
+      const dest = target(r);
+      rememberAccepted(dest, r, inv?.course_title ? pickLocalized(inv.course_title, lang) : null);
+      router.replace(dest);
     } catch (e) {
       setAcceptError(e);
     } finally {
       setAccepting(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, lang, router]);
+  }, [token, lang, router, inv]);
 
   useEffect(() => {
     if (inv && user && !authLoading && !tried.current) {

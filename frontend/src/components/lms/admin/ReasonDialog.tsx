@@ -27,7 +27,7 @@ export function ReasonDialog({
   const trimmed = reason.trim();
   return (
     <ConfirmDialog
-      open={open} title={title} body={body} confirmLabel={confirmLabel} danger={danger} busy={busy}
+      open={open} title={title} body={body} confirmLabel={confirmLabel} danger={danger} busy={busy} stackedFooter
       error={error} onCancel={onCancel} onConfirm={() => { if (!optional && !trimmed) { setMissing(true); return; } onConfirm(trimmed); }}
     >
       <label htmlFor={id} className="mt-4 block text-sm font-medium text-slate-700">

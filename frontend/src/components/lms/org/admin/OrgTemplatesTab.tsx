@@ -8,6 +8,7 @@ import {
 import { templateTitle } from "@/lib/lms/templates";
 import { fmtApiDate } from "@/lib/format";
 import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
+import { ReasonDialog } from "@/components/lms/admin/ReasonDialog";
 import { EmptyBox, Loading, OrgBadge, OrgError } from "../OrgUi";
 import { toast } from "@/components/ui/Toast";
 
@@ -31,12 +32,12 @@ export function OrgTemplatesTab({ org }: { org: OrganizationOut }) {
   }, [org.id]);
   useEffect(() => { void load(); }, [load]);
 
-  const confirm = async () => {
+  const confirm = async (reason = "") => {
     if (!target) return;
     setBusy(true);
     setDialogError(null);
     try {
-      if (target.granted) await revokeTemplate(org.id, target.key);
+      if (target.granted) await revokeTemplate(org.id, target.key, reason);
       else await grantTemplate(org.id, target.key);
       toast.success(t(target.granted ? "organizations.templates.revoked" : "organizations.templates.granted", { template: templateTitle(t, target.key) }));
       setTarget(null);
@@ -81,12 +82,22 @@ export function OrgTemplatesTab({ org }: { org: OrganizationOut }) {
           );
         })}
       </ul>
+      {/* Phase 6 S8 (UX P2): revoke asks for an optional reason (audited) and names the organization and the
+          effect; grant is a simple confirm. Toast on success both ways. */}
+      <ReasonDialog
+        open={!!target?.granted} optional
+        title={t("organizations.templates.revokeTitle", { template: name, org: org.name })}
+        body={t("organizations.templates.revokeBody", { template: name, org: org.name })}
+        confirmLabel={t("organizations.templates.revoke")}
+        danger busy={busy} error={dialogError}
+        onConfirm={(reason) => void confirm(reason)} onCancel={() => setTarget(null)}
+      />
       <ConfirmDialog
-        open={!!target}
-        title={t(target?.granted ? "organizations.templates.revokeTitle" : "organizations.templates.grantTitle", { template: name, org: org.name })}
-        body={t(target?.granted ? "organizations.templates.revokeBody" : "organizations.templates.grantBody", { template: name, org: org.name })}
-        confirmLabel={t(target?.granted ? "organizations.templates.revoke" : "organizations.templates.grant")}
-        danger={!!target?.granted} busy={busy} error={dialogError}
+        open={!!target && !target.granted}
+        title={t("organizations.templates.grantTitle", { template: name, org: org.name })}
+        body={t("organizations.templates.grantBody", { template: name, org: org.name })}
+        confirmLabel={t("organizations.templates.grant")}
+        busy={busy} error={dialogError} stackedFooter
         onConfirm={() => void confirm()} onCancel={() => setTarget(null)}
       />
     </div>
