@@ -132,11 +132,11 @@ export function StudentCourseHome() {
         ]} />
       </Card>
 
-      <div className="border-t border-slate-200 pt-4">
+      {!course.my_enrollment.read_only && <div className="border-t border-slate-200 pt-4">
         <Button variant="link" className="text-slate-600 hover:text-danger-700" leftIcon={<LogOut aria-hidden="true" className="h-4 w-4" />} onClick={() => setLeaving(true)}>
           {t("courses.home.leave")}
         </Button>
-      </div>
+      </div>}
       <ConfirmDialog open={leaving} tone="danger" busy={busy} error={leaveError ? errorText(leaveError) : undefined}
         title={t("courses.home.leaveTitle")} object={title} effect={t("courses.home.leaveBody")}
         confirmLabel={t("courses.home.leave")} onConfirm={() => void leave()} onCancel={() => setLeaving(false)} />
