@@ -57,7 +57,14 @@ export async function apiClient<T>(endpoint: string, options: RequestOptions = {
       headers: reqHeaders,
     });
   } catch (networkErr: any) {
-    throw new Error(networkErr.message || "Серверге туташуу оңундан чыккан жок / Ошибка сети");
+    // Phase 6b: one message per UI language (no i18n context here); the page sets <html lang>.
+    const NETWORK_ERROR: Record<string, string> = {
+      en: "No connection to the server. Check your internet and try again.",
+      ky: "Сервер менен байланыш жок. Интернетти текшерип, кайра аракет кылыңыз.",
+      ru: "Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.",
+    };
+    const uiLang = typeof document !== "undefined" ? document.documentElement.lang : "";
+    throw new Error(NETWORK_ERROR[uiLang] || NETWORK_ERROR.ru);
   }
 
   if (!response.ok) {
