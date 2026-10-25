@@ -75,9 +75,9 @@ function RegisterForm() {
           ) : (
           <>
           <div className="mb-6 text-center">
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
               {t("auth.signUpTitle")}
-            </h2>
+            </h1>
             <p className="mt-1 text-sm text-slate-600">
               {t("auth.signUpSubtitle")}
             </p>

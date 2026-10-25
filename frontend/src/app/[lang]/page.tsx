@@ -15,21 +15,21 @@ export default function HomePage() {
       {/* Header */}
       <header className="border-b border-slate-200 bg-white/80 backdrop-blur sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-brand-600 flex items-center justify-center text-white font-bold text-lg shadow-sm shadow-brand-500/30" aria-hidden="true">
+          <div className="flex min-w-0 items-center space-x-3">
+            <div className="w-10 h-10 shrink-0 rounded-xl bg-brand-600 flex items-center justify-center text-white font-bold text-lg shadow-sm shadow-brand-500/30" aria-hidden="true">
               {t("common.appName").charAt(0)}
             </div>
-            <div>
-              <span className="font-bold text-lg tracking-tight text-slate-900 block leading-tight">
+            <div className="min-w-0">
+              <span className="font-bold text-lg tracking-tight text-slate-900 block truncate leading-tight">
                 {t("common.appName")}
               </span>
-              <span className="text-xs text-slate-500 block">
+              <span className="hidden text-xs text-slate-500 sm:block">
                 {t("landing.badge")}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex shrink-0 items-center space-x-2 sm:space-x-3">
             {/* Language Switcher */}
             <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
               {(["en", "ky", "ru"] as const).map((l) => (
@@ -53,7 +53,7 @@ export default function HomePage() {
               <div className="flex items-center space-x-2">
                 <Link
                   href={`/${lang}/courses`}
-                  className="px-3 py-1.5 rounded-lg bg-brand-50 border border-brand-200 text-brand-700 text-xs font-bold hover:bg-brand-100 transition-colors"
+                  className="max-w-[7rem] truncate px-3 py-1.5 rounded-lg bg-brand-50 border border-brand-200 text-brand-700 text-xs font-bold hover:bg-brand-100 transition-colors sm:max-w-[14rem]"
                 >
                   {userProfile?.displayName || user.email}
                 </Link>
@@ -65,7 +65,8 @@ export default function HomePage() {
                 </button>
               </div>
             ) : (
-              <div className="flex items-center space-x-2">
+              // phones: the hero below has the same two buttons, so the header keeps brand + language only
+              <div className="hidden items-center space-x-2 sm:flex">
                 <Link
                   href={`/${lang}/login`}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-semibold hover:bg-slate-50 transition-colors"
