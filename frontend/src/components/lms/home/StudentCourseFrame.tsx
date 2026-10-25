@@ -14,16 +14,21 @@ export function StudentCourseTabs({ courseId }: { courseId: string }) {
   const { lang, t } = useTranslation();
   const pathname = usePathname();
   const base = `/${lang}/courses/${courseId}`;
+  // --- Phase 7a S5: "Assignments" replaces the "Assessments" entry (the lobby URLs under /assessments stay and keep it active) ---
   const tabs = [
     { href: base, label: t("courses.home.tab"), exact: true },
-    { href: `${base}/assessments`, label: t("assessments.tab") },
+    { href: `${base}/assignments`, label: t("assignments.tab"), also: `${base}/assessments` },
     { href: `${base}/grades`, label: t("gradebook.tab") },
     { href: `${base}/people`, label: t("courses.people.tabStudent") },
   ];
   return (
     <TabsNav label={t("courses.home.tabsLabel")} className="mb-6"
-      items={tabs.map((tab) => ({ href: tab.href, label: tab.label, active: tab.exact ? pathname === tab.href : pathname.startsWith(tab.href) }))} />
+      items={tabs.map((tab) => ({
+        href: tab.href, label: tab.label,
+        active: tab.exact ? pathname === tab.href : pathname.startsWith(tab.href) || (!!tab.also && pathname.startsWith(tab.also)),
+      }))} />
   );
+  // --- Phase 7a S5 end ---
 }
 
 export function StudentCourseHeader({ course }: { course: CourseOut }) {

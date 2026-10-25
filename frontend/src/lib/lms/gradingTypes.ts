@@ -376,17 +376,26 @@ export interface TotalsOut {
   warnings: CourseGradingWarning[];
 }
 
+// --- Phase 7a S5 begin --- (PHASE_7A_DESIGN 4.3: the gradebook has one column per assignment)
+/** A gradebook column: `id` is the assignment id; quiz columns also carry their `assessment_id`. */
+export interface GbAssignmentOut extends Omit<GbAssessmentOut, "score_policy"> {
+  kind: "none" | "text" | "file" | "quiz";
+  assessment_id: string | null;
+  /** quiz columns only */
+  score_policy?: ScorePolicy | null;
+}
+
 export interface GbRowOut {
   enrollment_id: string;
   user_id: string;
   student_name: string | null;
-  /** keyed by assessment id; absent = no submission */
+  /** keyed by assignment id; absent = no submission */
   cells: Record<string, CellOut>;
   total: TotalsOut;
 }
 
 export interface GradebookPageOut {
-  assessments: GbAssessmentOut[];
+  assignments: GbAssignmentOut[];
   rows: GbRowOut[];
   next_cursor: string | null;
 }
@@ -395,8 +404,9 @@ export interface GradebookQuery {
   cursor?: string | null;
   /** <= 50 */
   limit?: number;
-  assessment_ids?: string[];
+  assignment_ids?: string[];
 }
+// --- Phase 7a S5 end ---
 
 /** Per-attempt grade (attempt_grades row) on result and staff payloads (slice G3). */
 export interface AttemptGradeSectionOut {
@@ -432,9 +442,10 @@ export interface SubmissionAttemptOut {
 }
 
 export type GradeEventType =
-  | "override" | "override_cleared" | "excused" | "unexcused" | "released" | "unreleased" | "regraded" | "attempt_voided";
+  | "override" | "override_cleared" | "excused" | "unexcused" | "released" | "unreleased" | "regraded" | "attempt_voided"
+  | "manual_grade"; // Phase 7a S5
 export const GRADE_EVENT_TYPES: GradeEventType[] = [
-  "override", "override_cleared", "excused", "unexcused", "released", "unreleased", "regraded", "attempt_voided",
+  "override", "override_cleared", "excused", "unexcused", "released", "unreleased", "regraded", "attempt_voided", "manual_grade",
 ];
 
 export interface GradeEventOut {
@@ -498,10 +509,21 @@ export interface VoidAttemptIn {
 // ---------------------------------------------------------------------------
 
 /** `not_started`: no attempt yet and nothing past due (Phase 6 S6a); `missing`: started but not submitted, or past due */
-export type MyGradeState = "graded" | "pending" | "missing" | "excused" | "hidden" | "not_started";
+export type MyGradeState = "graded" | "pending" | "missing" | "excused" | "hidden" | "not_started"
+  | "submitted"; // Phase 7a S5: handed in, not graded yet
 
 export interface MyGradeOut {
-  assessment_id: string;
+  // --- Phase 7a S5 begin --- (PHASE_7A_DESIGN 4.3: items per assignment)
+  /** absent on a backend before Phase 7a */
+  assignment_id?: string;
+  kind?: "none" | "text" | "file" | "quiz";
+  submitted_at?: string | null;
+  late?: boolean;
+  /** released grades only */
+  feedback_text?: string | null;
+  /** quiz assignments only (null for text / file / none) */
+  assessment_id: string | null;
+  // --- Phase 7a S5 end ---
   title: LocalizedText;
   state: MyGradeState;
   display_value?: Num | null;

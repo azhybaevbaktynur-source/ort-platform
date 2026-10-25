@@ -7,6 +7,7 @@ import type {
   SchemePreviewIn, SchemePreviewOut, SchemeSummaryOut, SchemeVersionOut, SubmissionStaffOut, UnreleaseOut,
 } from "./gradingTypes";
 import type { LocalizedText } from "./types";
+import { quizAssignmentId } from "./quizAssignmentId";
 
 const e = encodeURIComponent;
 
@@ -43,12 +44,13 @@ export const reorderCategories = (courseId: string, categoryIds: string[]) =>
   lmsFetch<CategoryOut[]>(`${course(courseId)}/grade-categories/order`, { method: "PUT", body: { category_ids: categoryIds } });
 
 // ---- Gradebook and submissions (staff) ----
+// Phase 7a S5: one column per assignment (`assignment_ids`, PHASE_7A_DESIGN 4.3).
 export const getGradebook = (courseId: string, q: GradebookQuery = {}) =>
   lmsFetch<GradebookPageOut>(`${course(courseId)}/gradebook`, {
     params: {
       cursor: q.cursor,
       limit: q.limit,
-      assessment_ids: q.assessment_ids && q.assessment_ids.length ? q.assessment_ids.join(",") : undefined,
+      assignment_ids: q.assignment_ids && q.assignment_ids.length ? q.assignment_ids.join(",") : undefined,
     },
   });
 export const getSubmission = (courseId: string, submissionId: string) =>
@@ -58,13 +60,18 @@ export const overrideSubmission = (courseId: string, submissionId: string, body:
 export const excuseSubmission = (courseId: string, submissionId: string, body: ExcuseIn) =>
   lmsFetch<SubmissionStaffOut>(`${course(courseId)}/submissions/${e(submissionId)}/excuse`, { method: "PUT", body });
 
-const grades = (c: string, a: string) => `${course(c)}/assessments/${e(a)}/grades`;
-export const releaseGrades = (courseId: string, assessmentId: string, body: ReleaseIn = {}) =>
-  lmsFetch<ReleaseOut>(`${grades(courseId, assessmentId)}/release`, { method: "POST", body });
-export const unreleaseGrades = (courseId: string, assessmentId: string, body: ReleaseIn = {}) =>
-  lmsFetch<UnreleaseOut>(`${grades(courseId, assessmentId)}/unrelease`, { method: "POST", body });
+// Phase 7a S5: release / unrelease / regrade moved to `/assignments/{id}/grades/*` (PHASE_7A_DESIGN 3.7).
+// `releaseGrades` / `unreleaseGrades` take an assignment id; `regradeAssessment` keeps its assessment-id signature
+// (assessment settings) and targets that assessment's quiz assignment.
+const grades = (c: string, a: string) => `${course(c)}/assignments/${e(a)}/grades`;
+export const releaseGrades = (courseId: string, assignmentId: string, body: ReleaseIn = {}) =>
+  lmsFetch<ReleaseOut>(`${grades(courseId, assignmentId)}/release`, { method: "POST", body });
+export const unreleaseGrades = (courseId: string, assignmentId: string, body: ReleaseIn = {}) =>
+  lmsFetch<UnreleaseOut>(`${grades(courseId, assignmentId)}/unrelease`, { method: "POST", body });
+export const regradeAssignmentGrades = (courseId: string, assignmentId: string) =>
+  lmsFetch<RegradeOut>(`${grades(courseId, assignmentId)}/regrade`, { method: "POST" });
 export const regradeAssessment = (courseId: string, assessmentId: string) =>
-  lmsFetch<RegradeOut>(`${grades(courseId, assessmentId)}/regrade`, { method: "POST" });
+  regradeAssignmentGrades(courseId, quizAssignmentId(assessmentId));
 
 // ---- Student ----
 export const getMyGrades = (courseId: string) => lmsFetch<MyGradesOut>(`${course(courseId)}/grades/mine`);

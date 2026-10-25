@@ -18,6 +18,7 @@ import { createCourseStaffInvitation } from "@/lib/lms/invitations";
 import { toastInvitationSent } from "@/components/lms/org/InviteDialog";
 import { OrgError } from "@/components/lms/org/OrgUi";
 // --- Phase 6 S4b end ---
+import { AccommodationsSection } from "@/components/lms/accommodations/AccommodationsSection"; // Phase 7a S5
 
 // S6b: student view
 function StaffList({ courseId }: { courseId: string }) {
@@ -237,6 +238,10 @@ export default function PeoplePage() {
           onRemove={(e) => { setRemoveError(null); setRemoving(e); }}
         />
       )}
+
+      {/* --- Phase 7a S5: accommodations per student (teacher only, PHASE_7A_DESIGN 4.4) --- */}
+      {isTeacher && course.status !== "concluded" && <AccommodationsSection courseId={course.id} />}
+      {/* --- Phase 7a S5 end --- */}
 
       <ConfirmDialog open={!!removing} tone="danger" busy={!!busyId} title={t("courses.people.removeTitle")}
         object={removing ? `${removing.user.display_name || removing.user.email} · ${t(`courses.roles.${removing.role}`)}` : undefined}
