@@ -229,7 +229,9 @@ export function StaffAssignmentList() {
     }] : []),
   ];
 
-  const create = canEdit && !trash ? <Button onClick={() => setCreating(true)}>{t("assignments.list.create")}</Button> : undefined;
+  // Phase 7a UX (owner Q5 default): a locked ORT course has only its exam (quiz) assignments; the server refuses others
+  const ortOnly = ui.key === "ort" && ui.locked;
+  const create = canEdit && !trash && !ortOnly ? <Button onClick={() => setCreating(true)}>{t("assignments.list.create")}</Button> : undefined;
   const filtered = !!(kind || published || category || q);
   const confirmTitle = confirm?.kind === "delete" ? t("assignments.list.deleteTitle")
     : confirm?.kind === "unpublish" ? t("assignments.list.unpublishTitle") : t("assignments.list.unreleaseTitle");

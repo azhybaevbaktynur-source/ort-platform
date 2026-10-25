@@ -7,7 +7,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Download, FileText, Paperclip, Upload } from "lucide-react";
+import { Download, FileText, Paperclip, TriangleAlert, Upload } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { getAssignment, handIn, openSubmissionFile, uploadHandInFile } from "@/lib/lms/assignments";
 import {
@@ -19,7 +19,7 @@ import { useCourse } from "@/components/lms/CourseContext";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import { useGradeText } from "@/components/lms/results/GradeBadge";
 import { DueText } from "@/components/lms/home/StudentAssessmentCard";
-import { fmtShortDateTime } from "@/components/lms/home/format";
+import { fmtShortDateTime, isPast } from "@/components/lms/home/format";
 import { Button, Card, ConfirmDialog, ErrorState, LoadingState, PageHeader, Textarea, cn } from "@/components/ui";
 import { AssignmentError, AssignmentStatusBadge, KindIcon, LateBadge, fmtBytes, fmtPts, useAssignmentErrorText } from "./assignmentUi";
 import { studentAssignmentView } from "./studentAssignment";
@@ -147,6 +147,8 @@ export function StudentAssignmentView({ assignmentId }: { assignmentId: string }
   const textTooLong = text.length > HAND_IN_TEXT_MAX;
   const ready = a.kind === "text" ? !!text.trim() && !textTooLong : !!(file && !fileProblem) || !!uploaded;
   const offline = (error as { code?: string } | null)?.code === "network";
+  // Phase 7a UX: never punish by surprise - the (effective) due date has passed, the hand-in will be marked late
+  const lateNow = canHandIn && isPast(a.due_at);
 
   const pick = (f: File | null) => {
     setFile(f);
@@ -259,6 +261,11 @@ export function StudentAssignmentView({ assignmentId }: { assignmentId: string }
 
       {closedNote && <p role="status" className="rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-base text-slate-700 sm:text-sm">{closedNote}</p>}
 
+      {lateNow && (
+        <p role="status" className="flex items-start gap-2 rounded-xl border border-warning-200 bg-warning-50 px-3 py-2 text-base text-warning-900 sm:text-sm">
+          <TriangleAlert aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" /><span>{t("assignments.submit.lateWarning")}</span>
+        </p>
+      )}
       {canHandIn && (
         <Card title={resubmit ? t("assignments.submit.again") : t("assignments.submit.title")} headingLevel={2}
           description={resubmit ? t("assignments.submit.againHint") : undefined}>
@@ -295,7 +302,8 @@ export function StudentAssignmentView({ assignmentId }: { assignmentId: string }
               <ErrorState variant="inline" className="mt-3" title={t("assignments.submit.offlineTitle")} message={t("assignments.submit.offlineBody")} onRetry={() => void submit()} retrying={busy} />
             ) : <AssignmentError error={error} className="mt-3" />
           ) : null}
-          <div className="sticky bottom-3 z-10 mt-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
+          {/* Phase 7a UX: no sticky bar on phones (it covered the textarea and the file drop zone); the button follows the field */}
+          <div className="mt-4">
             <Button className="w-full sm:w-auto" disabled={!ready || busy} onClick={() => setConfirming(true)}>{t("assignments.submit.handIn")}</Button>
           </div>
         </Card>
@@ -304,7 +312,12 @@ export function StudentAssignmentView({ assignmentId }: { assignmentId: string }
       <HandInList items={a.hand_ins ?? []} courseId={course.id} submissionId={submissionId} />
 
       <ConfirmDialog open={confirming} busy={busy} title={t("assignments.submit.confirmTitle")} object={title}
-        effect={a.kind === "file" ? t("assignments.submit.confirmFile", { name: uploaded?.name ?? file?.name ?? "" }) : t("assignments.submit.confirmText", { n: text.length })}
+        effect={(
+          <>
+            {a.kind === "file" ? t("assignments.submit.confirmFile", { name: uploaded?.name ?? file?.name ?? "" }) : t("assignments.submit.confirmText", { n: text.length })}
+            {lateNow && <p className="mt-3 rounded-xl border border-warning-200 bg-warning-50 px-3 py-2 text-sm text-warning-900">{t("assignments.submit.lateWarning")}</p>}
+          </>
+        )}
         confirmLabel={t("assignments.submit.handIn")} onConfirm={() => void submit()} onCancel={() => setConfirming(false)}
         error={error && confirming ? errorText(error) : undefined} />
       <p className="sr-only" aria-live="polite">{busy ? t("assignments.submit.sending") : ""}</p>

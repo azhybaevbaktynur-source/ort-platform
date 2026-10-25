@@ -2818,7 +2818,8 @@
       "points_possible_required": "Enter the points for this assignment (0 = feedback only).",
       "preset_template_exclusive": "Choose either a preset or an exam template, not both.",
       "rubric_not_for_quiz": "Quizzes have no rubric. Their grade comes from the attempts.",
-      "too_many_criteria": "A rubric can have at most 30 criteria."
+      "too_many_criteria": "A rubric can have at most 30 criteria.",
+      "template_locked_kind": "An ORT course takes only quizzes (the ORT exam)."
     },
     "list": {
       "title": "Assignments",
@@ -2910,7 +2911,14 @@
       "quizDraft": "The quiz is a draft. Publish it in the exam builder.",
       "openBuilder": "Open exam builder",
       "grade": "Grade hand-ins",
-      "deletedNote": "This assignment is deleted. Restore it from the deleted list to edit it."
+      "deletedNote": "This assignment is deleted. Restore it from the deleted list to edit it.",
+      "publishedToast": "Published",
+      "unpublishedToast": "Unpublished",
+      "unsavedTitle": "Save the changes?",
+      "unsavedPublishBody": "The form has unsaved changes. They are saved first, then the assignment is published.",
+      "unsavedUnpublishBody": "The form has unsaved changes. They are saved first, then the assignment is unpublished.",
+      "saveAndPublish": "Save and publish",
+      "saveAndUnpublish": "Save and unpublish"
     },
     "rubric": {
       "title": "Rubric",
@@ -2982,7 +2990,8 @@
       "notFoundTitle": "Assignment not found",
       "limitReached": "You have used all file hand-ins for this assignment.",
       "gradedNotReleased": "Your teacher has graded this work. The grade appears here when it is released.",
-      "notActive": "This course is not active, so handing in is closed."
+      "notActive": "This course is not active, so handing in is closed.",
+      "lateWarning": "The due date has passed. Your work will be marked late; the teacher may deduct points."
     },
     "grade": {
       "title": "Grading",
@@ -3038,7 +3047,12 @@
       "releaseAllBody": "Every graded student sees the grade and the feedback.",
       "quizTitle": "Quizzes are graded from attempts",
       "quizBody": "Open the gradebook to see the scores and to change a grade.",
-      "toGradebook": "Open the gradebook"
+      "toGradebook": "Open the gradebook",
+      "unsavedTitle": "Go to another student?",
+      "unsavedBody": "The unsaved grade will be lost.",
+      "saveAndGo": "Save and go",
+      "discard": "Don't save",
+      "lateDeduction": "Late deduction: −{n} · counted {final} of {max}"
     },
     "gradebook": {
       "noAssignments": "No published assignments yet.",
@@ -3060,7 +3074,11 @@
     "badge": {
       "percent": "+{n}% time",
       "minutes": "+{n} min",
-      "attempts": "+{n} attempts"
+      "attempts": "+{n} attempts",
+      "attempts_one": "+{n} attempt",
+      "attempts_few": "+{n} attempts",
+      "attempts_many": "+{n} attempts",
+      "attempts_other": "+{n} attempts"
     },
     "fields": {
       "extraPercent": "Extra time, %",
@@ -3078,7 +3096,9 @@
       "title": "Accommodations",
       "subtitle": "Apply to every quiz of this course for this student. The student only sees the longer time and the attempts.",
       "save": "Save",
-      "clear": "Remove all"
+      "clear": "Remove all",
+      "clearTitle": "Remove the accommodations?",
+      "clearBody": "The accommodations are removed from every quiz of the course."
     },
     "section": {
       "title": "Accommodations",

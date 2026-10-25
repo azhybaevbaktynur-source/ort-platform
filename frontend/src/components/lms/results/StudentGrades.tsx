@@ -10,7 +10,8 @@ import { SchemeError } from "@/components/lms/grading/schemes/SchemeError";
 import { ScaleText } from "@/components/lms/grading/schemes/SchemeBadges";
 import { fmtNum, fmtPercentile } from "@/components/lms/grading/schemes/params";
 import { useSchemeLabel } from "@/components/lms/grading/schemes/labels";
-import { fmtDateTime, fmtPoints } from "@/components/lms/assessments/format";
+import { fmtPoints } from "@/components/lms/assessments/format";
+import { fmtShortDateTime } from "@/components/lms/home/format"; // Phase 7a UX: no seconds
 import { useGradeText } from "./GradeBadge";
 import { KindIcon, LateBadge } from "@/components/lms/assignments/assignmentUi"; // Phase 7a S5
 
@@ -36,7 +37,7 @@ function Row({ item, courseId }: { item: MyGradeOut; courseId: string }) {
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="break-words font-semibold text-slate-900">{pickLocalized(item.title, lang) || t("assessments.untitled")}</p>
-          {item.due_at && <p className="text-xs text-slate-500">{t("results.grade.mine.due", { date: fmtDateTime(item.due_at) })}</p>}
+          {item.due_at && <p className="text-xs text-slate-500">{t("results.grade.mine.due", { date: fmtShortDateTime(item.due_at, lang) })}</p>}
         </div>
         <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATE_STYLE[item.state] ?? STATE_STYLE.hidden}`}>
           {item.state === "submitted" ? t("assignments.status.submitted") /* Phase 7a S5 */ : t(`results.grade.mine.state.${item.state}`)}
@@ -66,7 +67,7 @@ function Row({ item, courseId }: { item: MyGradeOut; courseId: string }) {
         <div className="mt-2 space-y-1 text-sm">
           <p className="flex flex-wrap items-center gap-2 text-slate-600">
             <span className="inline-flex items-center gap-1"><KindIcon kind={item.kind} />{t(`assignments.kinds.${item.kind}`)}</span>
-            {item.submitted_at && <span>{t("assignments.myGrades.handedIn", { date: fmtDateTime(item.submitted_at) })}</span>}
+            {item.submitted_at && <span>{t("assignments.myGrades.handedIn", { date: fmtShortDateTime(item.submitted_at, lang) })}</span>}
             {item.late && <LateBadge />}
           </p>
           {item.state === "submitted" && <p className="text-slate-600">{t("assignments.myGrades.waiting")}</p>}
