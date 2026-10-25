@@ -1,59 +1,49 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
+import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/context";
 import { approveTeacherRequest, listTeacherRequests, rejectTeacherRequest, setTeacherStatus } from "@/lib/lms/admin";
 import type { TeacherRequestAdminOut, TeacherRequestStatus } from "@/lib/lms/types";
-import { ErrorMessage } from "@/components/lms/ErrorMessage";
-import { Pager } from "@/components/lms/Pager";
-import { ReasonDialog } from "@/components/lms/admin/ReasonDialog";
+import { fmtApiDateTime } from "@/lib/format";
+import { Badge, Button, Card, EmptyState, LoadingState, PageHeader, Pagination, ReasonDialog, TabPanel, Tabs, toast } from "@/components/ui";
 import { UserStatusBadge } from "@/components/lms/admin/UserStatusBadge";
-import { useAdminSummary } from "@/components/lms/admin/AdminShell";
-import { fmtApiDateTime } from "@/lib/format"; // Phase 6 S4 (H2)
+import { useAdminCrumbs, useAdminSummary } from "@/components/lms/admin/AdminShell";
+import { useCursorList } from "@/components/lms/admin/useCursorList";
+import { MoreError } from "@/components/lms/admin/ListParts";
+import { LoadError, OrgError } from "@/components/lms/org/OrgUi";
 
 type Filter = TeacherRequestStatus | "all";
 // Phase 6 S4 (admin M7): the teacher status a request status implies; a badge shows only when they differ.
 const IMPLIED_TEACHER_STATUS: Record<string, string> = { pending: "pending", approved: "approved", rejected: "none", cancelled: "none" };
 const FILTERS: Filter[] = ["pending", "approved", "rejected", "all"];
+const REQUEST_TONE: Record<string, "warning" | "success" | "danger" | "neutral"> = { pending: "warning", approved: "success", rejected: "danger", cancelled: "neutral" };
 
 export default function TeacherRequestsPage() {
   const { lang, t } = useTranslation();
+  const crumbs = useAdminCrumbs();
   const { refresh } = useAdminSummary();
   const [filter, setFilter] = useState<Filter>("pending");
-  const [items, setItems] = useState<TeacherRequestAdminOut[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<unknown>(null);
+  const fetchPage = useCallback((cursor: string | null) => listTeacherRequests(filter, cursor), [filter]);
+  const list = useCursorList(fetchPage);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<unknown>(null);
   const [dialog, setDialog] = useState<{ kind: "reject" | "revoke"; req: TeacherRequestAdminOut } | null>(null);
   const [dialogError, setDialogError] = useState<unknown>(null);
 
-  const load = useCallback(async (next?: string | null) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const page = await listTeacherRequests(filter, next);
-      setItems((prev) => (next ? [...prev, ...page.items] : page.items));
-      setCursor(page.next_cursor);
-    } catch (e) {
-      setError(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [filter]);
-  useEffect(() => { void load(); }, [load]);
-
-  const replace = (u: TeacherRequestAdminOut) => setItems((prev) => prev.map((r) => (r.id === u.id ? u : r)));
+  const replace = (u: TeacherRequestAdminOut) => list.setItems((prev) => prev.map((r) => (r.id === u.id ? u : r)));
+  const nameOf = (r: TeacherRequestAdminOut) => r.user.display_name || r.user.email;
 
   const approve = async (r: TeacherRequestAdminOut) => {
     setBusyId(r.id);
-    setError(null);
+    setActionError(null);
     try {
       await approveTeacherRequest(r.id);
-      await load();
+      toast.success(t("platformAdmin.toast.approved", { name: nameOf(r) }));
+      await list.reload();
       refresh();
     } catch (e) {
-      setError(e);
+      setActionError(e);
     } finally {
       setBusyId(null);
     }
@@ -66,10 +56,12 @@ export default function TeacherRequestsPage() {
     try {
       if (dialog.kind === "reject") {
         await rejectTeacherRequest(dialog.req.id, reason);
-        await load();
+        toast.success(t("platformAdmin.toast.rejected", { name: nameOf(dialog.req) }));
+        await list.reload();
         refresh();
       } else {
         await setTeacherStatus(dialog.req.user.id, "revoked", reason || undefined);
+        toast.success(t("platformAdmin.toast.revoked", { name: nameOf(dialog.req) }));
         replace({ ...dialog.req, user_teacher_status: "revoked" });
       }
       setDialog(null);
@@ -80,71 +72,78 @@ export default function TeacherRequestsPage() {
     }
   };
 
+  const tabsId = "teacher-requests";
   return (
     <div>
-      <h1 className="mb-4 text-2xl font-bold text-slate-900">{t("platformAdmin.requests.title")}</h1>
-      <div role="group" aria-label={t("platformAdmin.requests.filter")} className="mb-4 flex flex-wrap gap-1">
-        {FILTERS.map((f) => (
-          <button key={f} type="button" aria-pressed={f === filter} onClick={() => setFilter(f)}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium ${f === filter ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}>
-            {t(`platformAdmin.requests.filters.${f}`)}
-          </button>
-        ))}
-      </div>
-      {error ? <ErrorMessage error={error} onRetry={() => load()} className="mb-4" /> : null}
-      {loading && items.length === 0 && !error && <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p>}
-      {!loading && !error && items.length === 0 && (
-        <p className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">{t("platformAdmin.requests.empty")}</p>
-      )}
-      <ul className="space-y-3">
-        {items.map((r) => (
-          <li key={r.id} className="rounded-2xl border border-slate-200 bg-white p-4 text-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="font-semibold text-slate-900">{r.user.display_name || r.user.email}</p>
-                <p className="text-xs text-slate-500">{r.user.email}</p>
-              </div>
-              {/* --- Phase 6 S4 (admin M7): request status only; teacher status only when it differs, prefixed "Now:" --- */}
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{t(`teacherRequest.requestStatus.${r.status}`)}</span>
-                {r.user_teacher_status !== IMPLIED_TEACHER_STATUS[r.status] && (
-                  <span className="inline-flex items-center gap-1 text-xs text-slate-600">
-                    {t("organizations.adminUser.nowPrefix")} <UserStatusBadge kind="teacher" status={r.user_teacher_status} />
-                  </span>
-                )}
-              </div>
-            </div>
-            <p className="mt-1 text-xs text-slate-500">{fmtApiDateTime(r.created_at, lang)}</p>
-            <p className="mt-2 whitespace-pre-wrap text-slate-700">{r.message || t("platformAdmin.requests.noMessage")}</p>
-            {r.reason && <p className="mt-2 text-slate-700"><strong>{t("teacherRequest.reason")}:</strong> {r.reason}</p>}
-            {r.decided_by && r.decided_at && (
-              <p className="mt-1 text-xs text-slate-500">{t("platformAdmin.requests.decidedBy", { name: r.decided_by.display_name || r.decided_by.email, date: fmtApiDateTime(r.decided_at, lang) })}</p>
-            )}
-            <div className="mt-3 flex flex-wrap gap-2">
-              {r.status === "pending" && (
-                <>
-                  <button type="button" disabled={busyId === r.id} onClick={() => approve(r)}
-                    className="rounded-xl bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">{t("platformAdmin.requests.approve")}</button>
-                  <button type="button" disabled={busyId === r.id} onClick={() => { setDialogError(null); setDialog({ kind: "reject", req: r }); }}
-                    className="rounded-xl border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">{t("platformAdmin.requests.reject")}</button>
-                </>
-              )}
-              {r.user_teacher_status === "approved" && (
-                <button type="button" disabled={busyId === r.id} onClick={() => { setDialogError(null); setDialog({ kind: "revoke", req: r }); }}
-                  className="rounded-xl border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">{t("platformAdmin.requests.revoke")}</button>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
-      <Pager nextCursor={cursor} loading={loading} onMore={() => load(cursor)} />
+      <PageHeader title={t("platformAdmin.requests.title")} breadcrumbs={crumbs({ label: t("platformAdmin.requests.title") })} />
+      <Tabs id={tabsId} label={t("platformAdmin.requests.filter")} value={filter} onChange={(v) => setFilter(v as Filter)}
+        items={FILTERS.map((f) => ({ id: f, label: t(`platformAdmin.requests.filters.${f}`) }))} />
+      <TabPanel tabsId={tabsId} value={filter}>
+        {actionError ? <OrgError error={actionError} className="mb-4" /> : null}
+        {list.items.length > 0 && <p className="mb-3 text-sm font-medium text-slate-700" aria-live="polite">{t("shell.list.shown", { n: list.items.length })}</p>}
+        {list.error && list.items.length === 0 ? <LoadError error={list.error} onRetry={() => void list.reload()} />
+          : list.loading && list.items.length === 0 ? <LoadingState label={t("lms.common.loading")} />
+          : list.items.length === 0 ? <EmptyState title={t("platformAdmin.requests.empty")} />
+          : (
+            <ul className="space-y-3">
+              {list.items.map((r) => (
+                <Card as="li" key={r.id}>
+                  <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                    <div className="min-w-0">
+                      <Link href={`/${lang}/admin/users/${r.user.id}`} className="break-words text-base font-semibold text-brand-700 hover:underline">{nameOf(r)}</Link>
+                      <p className="break-all text-sm text-slate-600">{r.user.email}</p>
+                    </div>
+                    {/* Phase 6 S4 (admin M7): request status; teacher status only when it differs, prefixed "Now:" */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone={REQUEST_TONE[r.status] ?? "neutral"}>{t(`teacherRequest.requestStatus.${r.status}`)}</Badge>
+                      {r.user_teacher_status !== IMPLIED_TEACHER_STATUS[r.status] && (
+                        <span className="inline-flex items-center gap-1 text-sm text-slate-600">
+                          {t("organizations.adminUser.nowPrefix")} <UserStatusBadge kind="teacher" status={r.user_teacher_status} />
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <p className="mt-1 text-sm text-slate-600">{fmtApiDateTime(r.created_at, lang)}</p>
+                  <p className="mt-3 whitespace-pre-wrap break-words text-base leading-6 text-slate-800 sm:text-sm">{r.message || t("platformAdmin.requests.noMessage")}</p>
+                  {r.reason && <p className="mt-2 break-words text-sm text-slate-800"><strong>{t("teacherRequest.reason")}:</strong> {r.reason}</p>}
+                  {r.decided_by && r.decided_at && (
+                    <p className="mt-1 text-sm text-slate-600">{t("platformAdmin.requests.decidedBy", { name: r.decided_by.display_name || r.decided_by.email, date: fmtApiDateTime(r.decided_at, lang) })}</p>
+                  )}
+                  {(r.status === "pending" || r.user_teacher_status === "approved") && (
+                    <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap">
+                      {r.user_teacher_status === "approved" && (
+                        <Button variant="secondary" disabled={busyId === r.id} onClick={() => { setDialogError(null); setDialog({ kind: "revoke", req: r }); }}>
+                          {t("platformAdmin.requests.revoke")}
+                        </Button>
+                      )}
+                      {r.status === "pending" && (
+                        <>
+                          <Button variant="secondary" disabled={busyId === r.id} onClick={() => { setDialogError(null); setDialog({ kind: "reject", req: r }); }}>
+                            {t("platformAdmin.requests.reject")}
+                          </Button>
+                          <Button loading={busyId === r.id && !dialog} disabled={busyId === r.id} onClick={() => void approve(r)} className="sm:order-first">
+                            {t("platformAdmin.requests.approve")}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </Card>
+              ))}
+            </ul>
+          )}
+        <Pagination nextCursor={list.cursor} onLoadMore={list.loadMore} loading={list.loading && list.items.length > 0} />
+        <MoreError list={list} />
+      </TabPanel>
       <ReasonDialog
         open={!!dialog}
         title={dialog?.kind === "reject" ? t("platformAdmin.requests.rejectTitle") : t("platformAdmin.requests.revokeTitle")}
-        body={dialog?.kind === "reject" ? t("platformAdmin.requests.rejectBody") : t("platformAdmin.requests.revokeBody")}
+        object={dialog ? (dialog.req.user.display_name ? `${dialog.req.user.display_name} · ${dialog.req.user.email}` : dialog.req.user.email) : undefined}
+        effect={dialog?.kind === "reject" ? t("platformAdmin.requests.rejectBody") : t("platformAdmin.requests.revokeBody")}
         confirmLabel={dialog?.kind === "reject" ? t("platformAdmin.requests.reject") : t("platformAdmin.requests.revoke")}
-        danger optional={dialog?.kind === "revoke"} busy={!!busyId} error={dialogError}
-        onConfirm={confirm} onCancel={() => setDialog(null)}
+        tone="danger" optional={dialog?.kind === "revoke"} busy={!!busyId}
+        error={dialogError ? <OrgError error={dialogError} /> : undefined}
+        onConfirm={(r) => void confirm(r)} onCancel={() => setDialog(null)}
       />
     </div>
   );

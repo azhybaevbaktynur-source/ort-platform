@@ -37,6 +37,11 @@ export function LanguageProvider({
     }
   }, []);
 
+  // Phase 6b: the document language follows the UI language (screen readers, hyphenation, api.ts messages).
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
+
   const setLang = (newLang: Language) => {
     setLangState(newLang);
     localStorage.setItem("ort_preferred_language", newLang);

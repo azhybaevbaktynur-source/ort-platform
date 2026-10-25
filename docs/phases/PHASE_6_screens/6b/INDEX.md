@@ -263,6 +263,123 @@ Import CSV + zip with the default `full_main`, create an `ort_main` exam through
 | s6b-teacher-access-phone-ky.jpg | I am a teacher, no request yet: no status line (6a carry-over), design-system textarea and button | `/ky/teacher-access` | 375x812 | ky | 375 |
 | s6b-teacher-access-phone-ru.jpg | I am a teacher, no request yet: no status line (6a carry-over), design-system textarea and button | `/ru/teacher-access` | 375x812 | ru | 375 |
 
+## S5b app header, area shells, platform-admin and org-admin screens (branch `phase-6/s5b-shell`, 2026-10-25)
+
+105 JPEG files (quality 70), playwright-core + Chrome against `next build` / `next start` from an rsync'd copy and a scratch
+backend (copy of the 6a UX-gate SQLite data). Phone 375x812 (`isMobile`), desktop 1440x900, ru everywhere; header also en/ky for
+student / teacher / org admin / platform admin. `scrollWidth` is `document.documentElement.scrollWidth` measured before each shot:
+375 on every phone shot and 1440 on every desktop shot. `header` is the AppHeader height in px (57 on phones, 65 on desktop incl. border; 0 = signed-out page).
+Keyboard checks in the same run: Tab stays inside the suspend dialog (6 presses), Esc closes it and focus returns to the opener (M6).
+Browser tab title / description per language: "Платформа" / "Platform" + `landing.badge` (no more "ОРТ / ЖРТ Даярдоо Платформасы").
+
+| File | Shows | Route | Role | Viewport | Lang | scrollWidth | header |
+|---|---|---|---|---|---|---|---|
+| s5b-admin-01-overview-desktop-ru.jpg | Admin overview: tiles as links, sections | `/ru/admin` | platform admin | 1440x900 | ru | 1440 | 65 |
+| s5b-admin-01-overview-phone-ru.jpg | Admin overview: tiles as links, sections | `/ru/admin` | platform admin | 375x812 | ru | 375 | 57 |
+| s5b-admin-02-organizations-desktop-ru.jpg | Organizations table | `/ru/admin/organizations` | platform admin | 1440x900 | ru | 1440 | 65 |
+| s5b-admin-02-organizations-phone-ru.jpg | Organizations table | `/ru/admin/organizations` | platform admin | 375x812 | ru | 375 | 57 |
+| s5b-admin-03-org-detail-desktop-ru.jpg | Organization detail, tab Summary | `/ru/admin/organizations/8e4687c7-21b6-4962-9c21-d1f5f36132ee` | platform admin | 1440x900 | ru | 1440 | 65 |
+| s5b-admin-03-org-detail-phone-ru.jpg | Organization detail, tab Summary | `/ru/admin/organizations/8e4687c7-21b6-4962-9c21-d1f5f36132ee` | platform admin | 375x812 | ru | 375 | 57 |
+| s5b-admin-04-org-tab-admins-desktop-ru.jpg | Organization detail, tab Администраторы | `/ru/admin/organizations/8e4687c7-21b6-4962-9c21-d1f5f36132ee` | platform admin | 1440x900 | ru | 1440 | 65 |
+| s5b-admin-04-org-tab-admins-phone-ru.jpg | Organization detail, tab Администраторы | `/ru/admin/organizations/8e4687c7-21b6-4962-9c21-d1f5f36132ee` | platform admin | 375x812 | ru | 375 | 57 |
+| s5b-admin-04-org-tab-courses-desktop-ru.jpg | Organization detail, tab Курсы | `/ru/admin/organizations/8e4687c7-21b6-4962-9c21-d1f5f36132ee` | platform admin | 1440x900 | ru | 1440 | 65 |
+| s5b-admin-04-org-tab-courses-phone-ru.jpg | Organization detail, tab Курсы | `/ru/admin/organizations/8e4687c7-21b6-4962-9c21-d1f5f36132ee` | platform admin | 375x812 | ru | 375 | 57 |
+| s5b-admin-04-org-tab-log-desktop-ru.jpg | Organization detail, tab Журнал | `/ru/admin/organizations/8e4687c7-21b6-4962-9c21-d1f5f36132ee` | platform admin | 1440x900 | ru | 1440 | 65 |
+| s5b-admin-04-org-tab-log-phone-ru.jpg | Organization detail, tab Журнал | `/ru/admin/organizations/8e4687c7-21b6-4962-9c21-d1f5f36132ee` | platform admin | 375x812 | ru | 375 | 57 |
+| s5b-admin-04-org-tab-templates-desktop-ru.jpg | Organization detail, tab Шаблоны | `/ru/admin/organizations/8e4687c7-21b6-4962-9c21-d1f5f36132ee` | platform admin | 1440x900 | ru | 1440 | 65 |
+| s5b-admin-04-org-tab-templates-phone-ru.jpg | Organization detail, tab Шаблоны | `/ru/admin/organizations/8e4687c7-21b6-4962-9c21-d1f5f36132ee` | platform admin | 375x812 | ru | 375 | 57 |
+| s5b-admin-04-org-tab-usage-desktop-ru.jpg | Organization detail, tab Использование | `/ru/admin/organizations/8e4687c7-21b6-4962-9c21-d1f5f36132ee` | platform admin | 1440x900 | ru | 1440 | 65 |
+| s5b-admin-04-org-tab-usage-phone-ru.jpg | Organization detail, tab Использование | `/ru/admin/organizations/8e4687c7-21b6-4962-9c21-d1f5f36132ee` | platform admin | 375x812 | ru | 375 | 57 |
+| s5b-admin-05-teacher-requests-all-desktop-ru.jpg | Teacher requests, tab All (request cards) | `/ru/admin/teacher-requests` | platform admin | 1440x900 | ru | 1440 | 65 |
+| s5b-admin-05-teacher-requests-all-phone-ru.jpg | Teacher requests, tab All (request cards) | `/ru/admin/teacher-requests` | platform admin | 375x812 | ru | 375 | 57 |
+| s5b-admin-05-teacher-requests-desktop-ru.jpg | Teacher requests (Tabs filter) | `/ru/admin/teacher-requests` | platform admin | 1440x900 | ru | 1440 | 65 |
+| s5b-admin-05-teacher-requests-phone-ru.jpg | Teacher requests (Tabs filter) | `/ru/admin/teacher-requests` | platform admin | 375x812 | ru | 375 | 57 |
+| s5b-admin-06-users-desktop-ru.jpg | Users table (cards on phones, M2) | `/ru/admin/users` | platform admin | 1440x900 | ru | 1440 | 65 |
+| s5b-admin-06-users-phone-ru.jpg | Users table (cards on phones, M2) | `/ru/admin/users` | platform admin | 375x812 | ru | 375 | 57 |
+| s5b-admin-07-user-detail-desktop-ru.jpg | User detail | `/ru/admin/users/usr_1451905d478d` | platform admin | 1440x900 | ru | 1440 | 65 |
+| s5b-admin-07-user-detail-phone-ru.jpg | User detail | `/ru/admin/users/usr_1451905d478d` | platform admin | 375x812 | ru | 375 | 57 |
+| s5b-admin-08-courses-desktop-ru.jpg | Courses table | `/ru/admin/courses` | platform admin | 1440x900 | ru | 1440 | 65 |
+| s5b-admin-08-courses-phone-ru.jpg | Courses table | `/ru/admin/courses` | platform admin | 375x812 | ru | 375 | 57 |
+| s5b-admin-09-course-detail-desktop-ru.jpg | Course detail | `/ru/admin/courses/a71d282e-c0fd-4841-b76b-0630880627cc` | platform admin | 1440x900 | ru | 1440 | 65 |
+| s5b-admin-09-course-detail-phone-ru.jpg | Course detail | `/ru/admin/courses/a71d282e-c0fd-4841-b76b-0630880627cc` | platform admin | 375x812 | ru | 375 | 57 |
+| s5b-admin-10-audit-log-desktop-ru.jpg | Audit log table | `/ru/admin/audit-log` | platform admin | 1440x900 | ru | 1440 | 65 |
+| s5b-admin-10-audit-log-phone-ru.jpg | Audit log table | `/ru/admin/audit-log` | platform admin | 375x812 | ru | 375 | 57 |
+| s5b-admin-11-storage-desktop-ru.jpg | Storage | `/ru/admin/storage` | platform admin | 1440x900 | ru | 1440 | 65 |
+| s5b-admin-11-storage-phone-ru.jpg | Storage | `/ru/admin/storage` | platform admin | 375x812 | ru | 375 | 57 |
+| s5b-admin-dlg-create-org-desktop-ru.jpg | Create organization dialog | `/ru/admin/organizations` | platform admin | 1440x900 | ru | 1440 | 65 |
+| s5b-admin-dlg-create-org-phone-ru.jpg | Create organization dialog | `/ru/admin/organizations` | platform admin | 375x812 | ru | 375 | 57 |
+| s5b-admin-dlg-disable-desktop-ru.jpg | Disable account dialog names the person | `/ru/admin/users/usr_1451905d478d` | platform admin | 1440x900 | ru | 1440 | 65 |
+| s5b-admin-dlg-disable-phone-ru.jpg | Disable account dialog names the person | `/ru/admin/users/usr_1451905d478d` | platform admin | 375x812 | ru | 375 | 57 |
+| s5b-admin-dlg-suspend-desktop-ru.jpg | Suspend dialog names the organization and the effect | `/ru/admin/organizations/fd38eb64-dc3b-4c5f-9300-cd4bb25e8bbb` | platform admin | 1440x900 | ru | 1440 | 65 |
+| s5b-admin-dlg-suspend-phone-ru.jpg | Suspend dialog names the organization and the effect | `/ru/admin/organizations/fd38eb64-dc3b-4c5f-9300-cd4bb25e8bbb` | platform admin | 375x812 | ru | 375 | 57 |
+| s5b-auth-forgot-desktop-ru.jpg | Signed out: /forgot-password | `/ru/forgot-password` | anonymous | 1440x900 | ru | 1440 | — |
+| s5b-auth-forgot-phone-ru.jpg | Signed out: /forgot-password | `/ru/forgot-password` | anonymous | 375x812 | ru | 375 | — |
+| s5b-auth-login-desktop-ru.jpg | Signed out: /login | `/ru/login` | anonymous | 1440x900 | ru | 1440 | — |
+| s5b-auth-login-phone-ru.jpg | Signed out: /login | `/ru/login` | anonymous | 375x812 | ru | 375 | — |
+| s5b-auth-register-desktop-ru.jpg | Signed out: /register | `/ru/register` | anonymous | 1440x900 | ru | 1440 | — |
+| s5b-auth-register-phone-ru.jpg | Signed out: /register | `/ru/register` | anonymous | 375x812 | ru | 375 | — |
+| s5b-auth-reset-desktop-ru.jpg | Signed out: /reset-password?token=x | `/ru/reset-password?token=x` | anonymous | 1440x900 | ru | 1440 | — |
+| s5b-auth-reset-phone-ru.jpg | Signed out: /reset-password?token=x | `/ru/reset-password?token=x` | anonymous | 375x812 | ru | 375 | — |
+| s5b-header-account-admin-desktop-en.jpg | Account menu open (name, email, language, log out) | `/en/admin` | admin | 1440x900 | en | 1440 | 65 |
+| s5b-header-account-admin-desktop-ky.jpg | Account menu open (name, email, language, log out) | `/ky/admin` | admin | 1440x900 | ky | 1440 | 65 |
+| s5b-header-account-admin-desktop-ru.jpg | Account menu open (name, email, language, log out) | `/ru/admin` | admin | 1440x900 | ru | 1440 | 65 |
+| s5b-header-account-admin-phone-en.jpg | Account menu open (name, email, language, log out) | `/en/admin` | admin | 375x812 | en | 375 | 57 |
+| s5b-header-account-admin-phone-ky.jpg | Account menu open (name, email, language, log out) | `/ky/admin` | admin | 375x812 | ky | 375 | 57 |
+| s5b-header-account-admin-phone-ru.jpg | Account menu open (name, email, language, log out) | `/ru/admin` | admin | 375x812 | ru | 375 | 57 |
+| s5b-header-account-student-desktop-ru.jpg | Account menu of a student: 'I am a teacher' link | `/ru/courses` | student | 1440x900 | ru | 1440 | 65 |
+| s5b-header-account-student-phone-ru.jpg | Account menu of a student: 'I am a teacher' link | `/ru/courses` | student | 375x812 | ru | 375 | 57 |
+| s5b-header-admin-desktop-en.jpg | Header as admin on /courses | `/en/courses` | admin | 1440x900 | en | 1440 | 65 |
+| s5b-header-admin-desktop-ky.jpg | Header as admin on /courses | `/ky/courses` | admin | 1440x900 | ky | 1440 | 65 |
+| s5b-header-admin-desktop-ru.jpg | Header as admin on /courses | `/ru/courses` | admin | 1440x900 | ru | 1440 | 65 |
+| s5b-header-admin-phone-en.jpg | Header as admin on /courses | `/en/courses` | admin | 375x812 | en | 375 | 57 |
+| s5b-header-admin-phone-ky.jpg | Header as admin on /courses | `/ky/courses` | admin | 375x812 | ky | 375 | 57 |
+| s5b-header-admin-phone-ru.jpg | Header as admin on /courses | `/ru/courses` | admin | 375x812 | ru | 375 | 57 |
+| s5b-header-areamenu-admin-phone-en.jpg | Phone area switcher open (platform admin) | `/en/admin` | admin | 375x812 | en | 375 | 57 |
+| s5b-header-areamenu-admin-phone-ky.jpg | Phone area switcher open (platform admin) | `/ky/admin` | admin | 375x812 | ky | 375 | 57 |
+| s5b-header-areamenu-admin-phone-ru.jpg | Phone area switcher open (platform admin) | `/ru/admin` | admin | 375x812 | ru | 375 | 57 |
+| s5b-header-areamenu-orgadmin-phone-ru.jpg | Phone area switcher open (org admin of two organizations) | `/ru/org` | orgadmin | 375x812 | ru | 375 | 57 |
+| s5b-header-orgadmin-desktop-en.jpg | Header as orgadmin on /courses | `/en/courses` | orgadmin | 1440x900 | en | 1440 | 65 |
+| s5b-header-orgadmin-desktop-ky.jpg | Header as orgadmin on /courses | `/ky/courses` | orgadmin | 1440x900 | ky | 1440 | 65 |
+| s5b-header-orgadmin-desktop-ru.jpg | Header as orgadmin on /courses | `/ru/courses` | orgadmin | 1440x900 | ru | 1440 | 65 |
+| s5b-header-orgadmin-phone-en.jpg | Header as orgadmin on /courses | `/en/courses` | orgadmin | 375x812 | en | 375 | 57 |
+| s5b-header-orgadmin-phone-ky.jpg | Header as orgadmin on /courses | `/ky/courses` | orgadmin | 375x812 | ky | 375 | 57 |
+| s5b-header-orgadmin-phone-ru.jpg | Header as orgadmin on /courses | `/ru/courses` | orgadmin | 375x812 | ru | 375 | 57 |
+| s5b-header-orgs-dropdown-desktop-ru.jpg | Organization area: picker dropdown (two organizations) | `/ru/org` | orgadmin | 1440x900 | ru | 1440 | 65 |
+| s5b-header-student-desktop-en.jpg | Header as student on /courses | `/en/courses` | student | 1440x900 | en | 1440 | 65 |
+| s5b-header-student-desktop-ky.jpg | Header as student on /courses | `/ky/courses` | student | 1440x900 | ky | 1440 | 65 |
+| s5b-header-student-desktop-ru.jpg | Header as student on /courses | `/ru/courses` | student | 1440x900 | ru | 1440 | 65 |
+| s5b-header-student-phone-en.jpg | Header as student on /courses | `/en/courses` | student | 375x812 | en | 375 | 57 |
+| s5b-header-student-phone-ky.jpg | Header as student on /courses | `/ky/courses` | student | 375x812 | ky | 375 | 57 |
+| s5b-header-student-phone-ru.jpg | Header as student on /courses | `/ru/courses` | student | 375x812 | ru | 375 | 57 |
+| s5b-header-teacher-desktop-en.jpg | Header as teacher on /courses | `/en/courses` | teacher | 1440x900 | en | 1440 | 65 |
+| s5b-header-teacher-desktop-ky.jpg | Header as teacher on /courses | `/ky/courses` | teacher | 1440x900 | ky | 1440 | 65 |
+| s5b-header-teacher-desktop-ru.jpg | Header as teacher on /courses | `/ru/courses` | teacher | 1440x900 | ru | 1440 | 65 |
+| s5b-header-teacher-phone-en.jpg | Header as teacher on /courses | `/en/courses` | teacher | 375x812 | en | 375 | 57 |
+| s5b-header-teacher-phone-ky.jpg | Header as teacher on /courses | `/ky/courses` | teacher | 375x812 | ky | 375 | 57 |
+| s5b-header-teacher-phone-ru.jpg | Header as teacher on /courses | `/ru/courses` | teacher | 375x812 | ru | 375 | 57 |
+| s5b-invite-invalid-desktop-ru.jpg | Signed out: /invite/not-a-token | `/ru/invite/not-a-token` | anonymous | 1440x900 | ru | 1440 | — |
+| s5b-invite-invalid-phone-ru.jpg | Signed out: /invite/not-a-token | `/ru/invite/not-a-token` | anonymous | 375x812 | ru | 375 | — |
+| s5b-org-00-picker-desktop-ru.jpg | Organization picker (two organizations) | `/ru/org` | org admin | 1440x900 | ru | 1440 | 65 |
+| s5b-org-00-picker-phone-ru.jpg | Organization picker (two organizations) | `/ru/org` | org admin | 375x812 | ru | 375 | 57 |
+| s5b-org-01-overview-desktop-ru.jpg | Org overview: tiles link to the lists | `/ru/org/8e4687c7-21b6-4962-9c21-d1f5f36132ee` | org admin | 1440x900 | ru | 1440 | 65 |
+| s5b-org-01-overview-phone-ru.jpg | Org overview: tiles link to the lists | `/ru/org/8e4687c7-21b6-4962-9c21-d1f5f36132ee` | org admin | 375x812 | ru | 375 | 57 |
+| s5b-org-02-teachers-desktop-ru.jpg | Org teachers and invitations tables | `/ru/org/8e4687c7-21b6-4962-9c21-d1f5f36132ee/teachers` | org admin | 1440x900 | ru | 1440 | 65 |
+| s5b-org-02-teachers-phone-ru.jpg | Org teachers and invitations tables | `/ru/org/8e4687c7-21b6-4962-9c21-d1f5f36132ee/teachers` | org admin | 375x812 | ru | 375 | 57 |
+| s5b-org-03-courses-desktop-ru.jpg | Org courses table | `/ru/org/8e4687c7-21b6-4962-9c21-d1f5f36132ee/courses` | org admin | 1440x900 | ru | 1440 | 65 |
+| s5b-org-03-courses-phone-ru.jpg | Org courses table | `/ru/org/8e4687c7-21b6-4962-9c21-d1f5f36132ee/courses` | org admin | 375x812 | ru | 375 | 57 |
+| s5b-org-04-course-desktop-ru.jpg | Org course summary | `/ru/org/8e4687c7-21b6-4962-9c21-d1f5f36132ee/courses/ecb1a978-ab08-4c89-ba96-12fa0c04490f` | org admin | 1440x900 | ru | 1440 | 65 |
+| s5b-org-04-course-phone-ru.jpg | Org course summary | `/ru/org/8e4687c7-21b6-4962-9c21-d1f5f36132ee/courses/ecb1a978-ab08-4c89-ba96-12fa0c04490f` | org admin | 375x812 | ru | 375 | 57 |
+| s5b-org-05-new-course-desktop-ru.jpg | Create course form | `/ru/org/8e4687c7-21b6-4962-9c21-d1f5f36132ee/courses/new` | org admin | 1440x900 | ru | 1440 | 65 |
+| s5b-org-05-new-course-phone-ru.jpg | Create course form | `/ru/org/8e4687c7-21b6-4962-9c21-d1f5f36132ee/courses/new` | org admin | 375x812 | ru | 375 | 57 |
+| s5b-org-06-suspended-desktop-ru.jpg | Suspended organization: banner, actions disabled (if suspended) | `/ru/org/fd38eb64-dc3b-4c5f-9300-cd4bb25e8bbb` | org admin | 1440x900 | ru | 1440 | 65 |
+| s5b-org-06-suspended-phone-ru.jpg | Suspended organization: banner, actions disabled (if suspended) | `/ru/org/fd38eb64-dc3b-4c5f-9300-cd4bb25e8bbb` | org admin | 375x812 | ru | 375 | 57 |
+| s5b-org-dlg-invite-desktop-ru.jpg | Invite teacher dialog | `/ru/org/8e4687c7-21b6-4962-9c21-d1f5f36132ee` | org admin | 1440x900 | ru | 1440 | 65 |
+| s5b-org-dlg-invite-phone-ru.jpg | Invite teacher dialog | `/ru/org/8e4687c7-21b6-4962-9c21-d1f5f36132ee` | org admin | 375x812 | ru | 375 | 57 |
+| s5b-teacher-access-desktop-ru.jpg | Teacher access page inside the new shell | `/ru/teacher-access` | student | 1440x900 | ru | 1440 | 65 |
+| s5b-teacher-access-phone-ru.jpg | Teacher access page inside the new shell | `/ru/teacher-access` | student | 375x812 | ru | 375 | 57 |
+| s5b-teaching-schemes-desktop-ru.jpg | Teaching area active (grading schemes) | `/ru/grading-schemes` | teacher | 1440x900 | ru | 1440 | 65 |
+| s5b-teaching-schemes-phone-ru.jpg | Teaching area active (grading schemes) | `/ru/grading-schemes` | teacher | 375x812 | ru | 375 | 57 |
+
 ## S7b
 
 ORT player part 1 (`docs/ORT_PLAYER_IDEAS.md` Bugs + Part 1). Every changed ORT baseline as a pair: `before` = the S7a

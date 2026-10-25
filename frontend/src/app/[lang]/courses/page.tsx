@@ -3,9 +3,9 @@
 // Phase 6b S6b: /[lang]/courses is the student home (PHASE_6_DESIGN 8.4). People with a Teaching area keep the
 // Teaching / Learning tabs; the Learning tab is the same home. The catalog moved to /courses/catalog
 // (old links to /courses#catalog are redirected there).
-import React, { useCallback, useEffect, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { KeyRound, LayoutGrid, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
@@ -20,6 +20,15 @@ import {
 } from "@/components/ui";
 
 type Tab = "teaching" | "learning";
+
+/** Phase 6b integration: the header's Teaching / Learning areas link to `?view=teaching|learning`. */
+function ViewSync({ onView }: { onView: (v: Tab) => void }) {
+  const view = useSearchParams().get("view");
+  useEffect(() => {
+    if (view === "teaching" || view === "learning") onView(view);
+  }, [view, onView]);
+  return null;
+}
 const TABS_ID = "my-courses";
 
 /** Old anchor links (`/courses#catalog`, e.g. in the header) open the catalog page. */
@@ -122,6 +131,7 @@ export default function CoursesPage() {
           ? <LinkButton variant="secondary" href={`/${lang}/courses/join`} leftIcon={<KeyRound className="h-4 w-4" aria-hidden="true" />}>{t("courses.list.join")}</LinkButton>
           : undefined}
       />
+      <Suspense fallback={null}><ViewSync onView={setTab} /></Suspense>
       <Tabs id={TABS_ID} label={t("courses.list.title")} value={current} onChange={(v) => setTab(v as Tab)} className="mb-6"
         items={[{ id: "teaching", label: t("courses.list.teaching") }, { id: "learning", label: t("courses.list.learning") }]} />
       <TabPanel tabsId={TABS_ID} value={current}>

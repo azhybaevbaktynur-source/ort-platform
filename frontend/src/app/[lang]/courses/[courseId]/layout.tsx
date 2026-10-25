@@ -12,6 +12,7 @@ import { CourseTabs } from "@/components/lms/CourseTabs";
 import { StatusBadge } from "@/components/lms/CourseCard";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { StaffCourseBar } from "@/components/lms/course/StaffCourseUi"; // Phase 6b S5c
+import { useDeclareArea } from "@/components/lms/LmsShell"; // Phase 6b integration
 // --- Phase 6 S6b begin --- (student course frame, skeleton)
 import { CourseLoadingSkeleton, StudentCourseHeader, StudentCourseTabs } from "@/components/lms/home/StudentCourseFrame";
 // --- Phase 6 S6b end ---
@@ -36,6 +37,10 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
     setCourse(null);
     void reload();
   }, [reload]);
+
+  // Phase 6b integration: course pages are Teaching for staff and Learning for students (header area switcher)
+  const staffRole = course?.my_enrollment?.role === "teacher" || course?.my_enrollment?.role === "assistant";
+  useDeclareArea(course ? (staffRole ? "teaching" : "learning") : null);
 
   const missing = (error as { status?: number } | null)?.status === 404;
   if (missing && !course) {

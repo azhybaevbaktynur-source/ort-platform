@@ -94,7 +94,15 @@
       "email_send_failed": "Could not send the email. Please try again a bit later.",
       "network": "The server is not responding. It may be waking up, so try again in a few seconds."
     },
-    "wakingServer": "The server is waking up after being idle, so the first login may take up to a minute..."
+    "wakingServer": "The server is waking up after being idle, so the first login may take up to a minute...",
+    "resetInvalidToken": "Invalid link or token not found",
+    "passwordsMismatch": "Passwords do not match",
+    "passwordTooShort": "Password must be at least 6 characters",
+    "resetTokenMissing": "The reset token is missing. Request a new reset link.",
+    "passwordUpdated": "Password updated!",
+    "resetFailed": "Could not reset the password. Try again.",
+    "resetLinkSentTitle": "Link sent!",
+    "forgotFailed": "Could not send the reset link. Try again."
   },
   "lms": {
     "nav": {
@@ -427,7 +435,9 @@
       "pendingRequests": "Teacher requests waiting for review",
       "usersHint": "Search accounts, change teacher status, disable accounts.",
       "coursesHint": "Moderate courses: unlist, delete, restore, transfer.",
-      "auditHint": "Every administrator action is recorded here."
+      "auditHint": "Every administrator action is recorded here.",
+      "orgsHint": "Schools and centers: admins, teachers, templates, suspend or resume.",
+      "sections": "Sections"
     },
     "reasonRequired": "Reason (required)",
     "reasonOptional": "Reason (optional)",
@@ -559,6 +569,19 @@
       "course_relist": "Relisted course",
       "course_transfer_ownership": "Transferred course ownership",
       "course_roster_view": "Viewed course roster"
+    },
+    "toast": {
+      "approved": "Request approved: {name} can now teach.",
+      "rejected": "Request rejected: {name}.",
+      "revoked": "Teacher access revoked: {name}.",
+      "granted": "{name} is now an approved teacher.",
+      "disabled": "Account disabled: {name}.",
+      "enabled": "Account enabled again: {name}.",
+      "courseDeleted": "«{course}» moved to the trash.",
+      "courseRestored": "«{course}» restored.",
+      "courseUnlisted": "«{course}» removed from the catalog.",
+      "courseRelisted": "«{course}» can appear in the catalog again.",
+      "ownerChanged": "{name} is now the owner of «{course}»."
     }
   },
   "bank": {
@@ -2128,7 +2151,8 @@
       "teacherAdded": "{name} was added as a teacher.",
       "person": "Person",
       "noAdmins": "No admins yet. Assign one so the organization can be managed.",
-      "noTeachers": "No teachers yet."
+      "noTeachers": "No teachers yet.",
+      "sinceColumn": "Member since"
     },
     "courses": {
       "title": "Courses",
@@ -2272,7 +2296,8 @@
       "noAccount": "There is no account with {email} yet. Send an invitation: the person joins the course after signing up with this email.",
       "send": "Send invitation",
       "sentHint": "Invitations are valid for 14 days. The person appears in the list after accepting."
-    }
+    },
+    "sentColumn": "Sent"
   },
   "templates": {
     "field": "Course template",
@@ -2645,6 +2670,29 @@
         "graded": "Graded",
         "void": "Cancelled"
       }
+    }
+  },
+  "shell": {
+    "skipToContent": "Skip to content",
+    "areas": {
+      "label": "Areas",
+      "switch": "Switch area",
+      "learning": "Learning",
+      "teaching": "Teaching",
+      "organization": "Organization",
+      "organizations": "Organizations",
+      "platform": "Admin"
+    },
+    "teaching": {
+      "courses": "Courses I teach"
+    },
+    "account": {
+      "menu": "Account menu: {name}",
+      "signedInAs": "Signed in as",
+      "language": "Interface language"
+    },
+    "list": {
+      "shown": "Shown: {n}"
     }
   }
 }
