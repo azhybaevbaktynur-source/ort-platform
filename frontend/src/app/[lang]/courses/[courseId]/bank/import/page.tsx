@@ -1,22 +1,21 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/context";
 import { useCourse } from "@/components/lms/CourseContext";
 import { ImportPanel } from "@/components/lms/content/import/ImportPanel";
 import { useCanEditContent } from "@/components/lms/content/StaffGate";
+import { PageHeader } from "@/components/ui";
+import { useTabCrumbs } from "@/components/lms/course/StaffCourseUi";
 
 export default function BankImportPage() {
-  const { lang, t } = useTranslation();
+  const { t } = useTranslation();
   const { course } = useCourse();
   const canEdit = useCanEditContent();
+  const crumbs = useTabCrumbs("bank", [{ label: t("bank.import.title") }], course.id);
   return (
     <div className="space-y-4">
-      <Link href={`/${lang}/courses/${course.id}/bank`} className="text-sm font-medium text-brand-700 hover:underline">
-        {t("bank.backToBanks")}
-      </Link>
-      <h1 className="text-xl font-bold text-slate-900">{t("bank.import.title")}</h1>
+      <PageHeader breadcrumbs={crumbs} title={t("bank.import.title")} className="mb-2" />
       {canEdit ? (
         <ImportPanel />
       ) : (

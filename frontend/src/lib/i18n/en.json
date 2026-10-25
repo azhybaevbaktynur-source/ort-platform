@@ -737,7 +737,7 @@
       "replace": "Replace image",
       "uploading": "Uploading...",
       "remove": "Remove image",
-      "hint": "Choose a file, drop it here or paste from the clipboard. PNG, JPEG, GIF or WEBP, up to 5 MB.",
+      "hint": "Choose a file, drop it here or paste from the clipboard. PNG, JPEG, GIF or WEBP, up to 2 MB.",
       "alreadyUploaded": "This image was already uploaded, so the existing copy is used.",
       "mine": "My images",
       "noImages": "You have no uploaded images yet.",
@@ -1127,7 +1127,7 @@
       "publish": "Publish",
       "republish": "Publish changes",
       "unpublish": "Unpublish",
-      "validate": "Check",
+      "validate": "Check before publishing",
       "preview": "Preview as student",
       "previewLanguage": "Preview language",
       "valid": "No problems found. Ready to publish.",
@@ -2507,6 +2507,29 @@
         "hint": "Search by name or email (try “ai”)."
       }
     }
+  },
+  "teaching": {
+    "templateBadge": "{name} template",
+    "shown": "Shown: {n}",
+    "formatToolbar": "Text formatting",
+    "chooseFile": "Choose file",
+    "noFile": "No file chosen",
+    "assessmentsEmptyHint": "Create a test, quiz or homework from the questions in your bank.",
+    "unpublishTitle": "Unpublish this assessment?",
+    "unpublishBody": "It becomes a draft: students no longer see it and cannot start a new attempt. Existing attempts and grades are kept (in progress: {inProgress}, submitted: {submitted}).",
+    "publishPanel": "Publishing",
+    "builderCrumb": "Edit",
+    "searchStudent": "Search by student",
+    "noMatch": "No one found. Check the spelling.",
+    "studentAnswer": "Student's answer",
+    "homeTitle": "Course overview",
+    "nextStepTitle": "Next step",
+    "nextStepBody": "Add questions to the bank, then build an assessment for your students from them.",
+    "createAssessment": "Create an assessment",
+    "addQuestions": "Add questions",
+    "manageEnrollment": "Enrollment settings",
+    "showCatalog": "Course catalog",
+    "ownerStays": "The owner cannot be removed. Transfer the course in Settings."
   },
   "home": {
     "greeting": "Hi, {name}!",

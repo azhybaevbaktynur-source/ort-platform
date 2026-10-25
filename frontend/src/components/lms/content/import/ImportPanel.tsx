@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Upload } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useCourse } from "@/components/lms/CourseContext";
 import { listBanks } from "@/lib/lms/content";
@@ -12,7 +12,8 @@ import {
 } from "@/lib/lms/contentImport";
 import type { Lang } from "@/lib/lms/types";
 import { ContentError } from "@/components/lms/content/ContentError";
-import { btnPrimary, btnSecondary, cardCls, inputCls, labelCls } from "@/components/lms/content/ui";
+import { cardCls, inputCls, labelCls } from "@/components/lms/content/ui";
+import { btnPrimary, btnSecondary } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { importProfileLabelKey, templateUi } from "@/lib/lms/templates";
 import { ImportReportView } from "./ImportReportView";
 
@@ -98,12 +99,20 @@ export function ImportPanel() {
         <p className="text-xs text-slate-600">{t("bank.import.subtitle")}</p>
         <div>
           <label htmlFor="imp-file" className={labelCls}>{t("bank.import.fileLabel")}</label>
-          <input
-            id="imp-file" ref={fileRef} type="file" accept=".csv,.zip,text/csv,application/zip"
-            disabled={busy !== null}
-            onChange={(e) => pick(e.target.files?.[0] ?? null)}
-            className="block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium"
-          />
+          {/* Phase 6b S5c (UX T11): a translated "Choose file" button and the file name instead of the browser's English control. */}
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              id="imp-file" ref={fileRef} type="file" accept=".csv,.zip,text/csv,application/zip"
+              disabled={busy !== null}
+              onChange={(e) => pick(e.target.files?.[0] ?? null)}
+              className="peer sr-only"
+            />
+            <label htmlFor="imp-file" aria-hidden="true"
+              className={`${btnSecondary} cursor-pointer peer-focus-visible:ring-2 peer-focus-visible:ring-brand-600 peer-focus-visible:ring-offset-2 peer-disabled:cursor-not-allowed peer-disabled:opacity-60`}>
+              <Upload className="h-4 w-4" aria-hidden="true" />{t("teaching.chooseFile")}
+            </label>
+            <span className="min-w-0 break-all text-sm text-slate-700">{file ? file.name : t("teaching.noFile")}</span>
+          </div>
           <p className="mt-1 text-xs text-slate-500">
             {t("bank.import.limits", { mb: IMPORT_LIMITS.uploadMb, rows: IMPORT_LIMITS.rows, images: IMPORT_LIMITS.images })}
           </p>

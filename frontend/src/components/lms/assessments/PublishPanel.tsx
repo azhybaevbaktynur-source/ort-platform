@@ -5,13 +5,25 @@ import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { startPreview, validateAssessment } from "@/lib/lms/assessments";
 import { previewAttemptId, type AssessmentStaffOut, type Issue } from "@/lib/lms/assessmentTypes";
+import { pickLocalized } from "@/lib/lms/localized";
+import { AssessmentStatusBadge } from "@/components/lms/course/StaffCourseUi";
+import { Badge, Button } from "@/components/ui";
 import type { Lang } from "@/lib/lms/types";
-import { btnPrimary, btnSecondary, inputCls } from "@/components/lms/content/ui";
+import { inputCls } from "@/components/lms/content/ui";
 import { AssessmentError } from "./AssessmentError";
 import { IssueList, issuesFromDetails } from "./IssueList";
 import { usePublishFlow } from "./usePublishFlow";
 
-/** Validate, publish/unpublish and preview-as-student for the builder. */
+/** True when publishing is the next step (a draft, or published with unpublished changes): the page's one primary action. */
+export function publishIsPrimary(a: Pick<AssessmentStaffOut, "status" | "has_unpublished_changes">): boolean {
+  return a.status !== "published" || a.has_unpublished_changes;
+}
+
+/**
+ * Validate, publish/unpublish and preview-as-student for the builder.
+ * Phase 6b S5c (UX T8): the publish button is primary only when publishing is the next step (else secondary),
+ * "Check before publishing" names validation, and unpublishing with attempts asks first (T6).
+ */
 export function PublishPanel({
   assessment, courseId, canEdit, onChanged,
 }: {
@@ -23,6 +35,7 @@ export function PublishPanel({
   const { lang, t } = useTranslation();
   const router = useRouter();
   const a = assessment;
+  const title = pickLocalized(a.title, lang, a.languages[0]) || t("assessments.untitled");
   const flow = usePublishFlow(courseId, onChanged);
   const [validation, setValidation] = useState<{ errors: Issue[]; warnings: Issue[] } | null>(null);
   const [vBusy, setVBusy] = useState(false);
@@ -56,28 +69,30 @@ export function PublishPanel({
 
   const published = a.status === "published";
   return (
-    <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${published ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>{t(`assessments.status.${a.status}`)}</span>
-        {a.current_version_no !== null && <span className="text-xs text-slate-500">{t("assessments.list.version", { n: a.current_version_no })}</span>}
-        {published && a.has_unpublished_changes && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">{t("assessments.list.unpublishedChanges")}</span>}
-        <span className="ml-auto flex flex-wrap items-center gap-2">
+    <section aria-label={t("teaching.publishPanel")} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <AssessmentStatusBadge status={a.status} />
+          {a.current_version_no !== null && <span className="text-sm text-slate-600">{t("assessments.list.version", { n: a.current_version_no })}</span>}
+          {published && a.has_unpublished_changes && <Badge tone="warning">{t("assessments.list.unpublishedChanges")}</Badge>}
+        </div>
+        <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end [&>*]:flex-1 sm:[&>*]:flex-none">
           {a.languages.length > 1 && (
-            <select aria-label={t("assessments.publish.previewLanguage")} className={`${inputCls} w-auto`} value={pLang} onChange={(e) => setPLang(e.target.value as Lang)}>
+            <select aria-label={t("assessments.publish.previewLanguage")} className={`${inputCls} min-h-11 w-auto sm:min-h-9`} value={pLang} onChange={(e) => setPLang(e.target.value as Lang)}>
               {a.languages.map((l) => <option key={l} value={l}>{t(`courses.languages.${l}`)}</option>)}
             </select>
           )}
-          <button type="button" className={btnSecondary} disabled={pBusy} onClick={() => void preview()}>{pBusy ? t("lms.common.loading") : t("assessments.publish.preview")}</button>
-          <button type="button" className={btnSecondary} disabled={vBusy} onClick={() => void validate()}>{vBusy ? t("lms.common.loading") : t("assessments.publish.validate")}</button>
+          <Button variant="secondary" size="sm" loading={pBusy} onClick={() => void preview()}>{t("assessments.publish.preview")}</Button>
+          <Button variant="secondary" size="sm" loading={vBusy} onClick={() => void validate()}>{t("assessments.publish.validate")}</Button>
           {canEdit && published && (
-            <button type="button" className={btnSecondary} disabled={!!flow.busyId} onClick={() => void flow.unpublish(a.id)}>{t("assessments.publish.unpublish")}</button>
+            <Button variant="secondary" size="sm" disabled={!!flow.busyId} onClick={() => flow.requestUnpublish(a.id, title, a.attempt_counts)}>{t("assessments.publish.unpublish")}</Button>
           )}
           {canEdit && (
-            <button type="button" className={btnPrimary} disabled={!!flow.busyId} onClick={() => void flow.publish(a.id)}>
-              {flow.busyId ? t("lms.common.loading") : published ? t("assessments.publish.republish") : t("assessments.publish.publish")}
-            </button>
+            <Button variant={publishIsPrimary(a) ? "primary" : "secondary"} size="sm" loading={!!flow.busyId} onClick={() => void flow.publish(a.id)}>
+              {published ? t("assessments.publish.republish") : t("assessments.publish.publish")}
+            </Button>
           )}
-        </span>
+        </div>
       </div>
       <AssessmentError error={pError} />
       <IssueList issues={pIssues} kind="error" />
@@ -97,6 +112,6 @@ export function PublishPanel({
       <IssueList issues={flow.issues} kind="error" />
       {flow.unchanged && <p role="status" className="text-sm text-slate-600">{t("assessments.publish.unchanged")}</p>}
       {flow.dialog}
-    </div>
+    </section>
   );
 }

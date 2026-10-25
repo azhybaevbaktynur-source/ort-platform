@@ -7,12 +7,12 @@ import { createBank, deleteBank, listBanks, restoreBank, updateBank } from "@/li
 import type { BankOut } from "@/lib/lms/contentTypes";
 import { fmtApiDate } from "@/lib/format";
 import { useCourse } from "@/components/lms/CourseContext";
-import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
 import { Pager } from "@/components/lms/Pager";
 import { BankDialog } from "@/components/lms/content/BankDialog";
+import { Button, ConfirmDialog, EmptyState, LinkButton, LoadingState, PageHeader } from "@/components/ui";
 import { ContentError } from "@/components/lms/content/ContentError";
 import { useCanEditContent } from "@/components/lms/content/StaffGate";
-import { btnPrimary, btnSecondary, btnSmall } from "@/components/lms/content/ui";
+import { btnSmall } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 
 export default function BankListPage() {
   const { lang, t } = useTranslation();
@@ -86,20 +86,24 @@ export default function BankListPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-bold text-slate-900">{t("bank.list.title")}</h2>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className={btnSecondary} onClick={() => setTrash((s) => !s)}>{trash ? t("bank.list.hideTrash") : t("bank.list.showTrash")}</button>
-          {canEdit && <Link href={`${base}/import`} className={btnSecondary}>{t("bank.list.import")}</Link>}
-          {canEdit && <button type="button" className={btnPrimary} onClick={() => { setActionError(null); setDialog({ bank: null }); }}>{t("bank.list.create")}</button>}
-        </div>
-      </div>
+      <PageHeader title={t("bank.list.title")} className="mb-2"
+        secondaryActions={<>
+          <Button variant="secondary" onClick={() => setTrash((s) => !s)}>{trash ? t("bank.list.hideTrash") : t("bank.list.showTrash")}</Button>
+          {canEdit && <LinkButton variant="secondary" href={`${base}/import`}>{t("bank.list.import")}</LinkButton>}
+        </>}
+        primaryAction={canEdit ? <Button onClick={() => { setActionError(null); setDialog({ bank: null }); }}>{t("bank.list.create")}</Button> : undefined} />
       <ContentError error={error || (!dialog && !toDelete ? actionError : null)} onRetry={error ? () => load() : undefined} />
-      {loading && items.length === 0 && !error && <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p>}
-      {!loading && !error && items.length === 0 && <p className="text-sm text-slate-500">{trash ? t("bank.list.emptyTrash") : t("bank.list.empty")}</p>}
+      {loading && items.length === 0 && !error && <LoadingState rows={2} />}
+      {!loading && !error && items.length === 0 && (
+        <EmptyState title={trash ? t("bank.list.emptyTrash") : t("bank.list.empty")}
+          action={!trash && canEdit ? <>
+            <Button onClick={() => { setActionError(null); setDialog({ bank: null }); }}>{t("bank.list.create")}</Button>
+            <LinkButton variant="secondary" href={`${base}/import`}>{t("bank.list.import")}</LinkButton>
+          </> : undefined} />
+      )}
       <ul className="grid gap-3 sm:grid-cols-2">
         {items.map((b) => (
-          <li key={b.id} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-4">
+          <li key={b.id} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex-1">
               {b.deleted_at ? (
                 <h3 className="font-semibold text-slate-900">{b.title}</h3>
@@ -114,7 +118,7 @@ export default function BankListPage() {
               <p className="text-xs text-slate-400">{t("bank.list.updated", { date: fmtApiDate(b.updated_at) })}</p>
             </div>
             {canEdit && (
-              <div className="mt-3 flex gap-2">
+              <div className="mt-3 flex flex-wrap gap-2">
                 {b.deleted_at ? (
                   <button type="button" className={btnSmall} onClick={() => void restore(b)}>{t("bank.list.restore")}</button>
                 ) : (
@@ -131,10 +135,9 @@ export default function BankListPage() {
       <Pager nextCursor={cursor} loading={loading} onMore={() => load(cursor)} />
       <BankDialog open={!!dialog} bank={dialog?.bank ?? null} courseLanguages={course.languages} busy={busy} error={actionError}
         onSubmit={(v) => void submit(v)} onCancel={() => setDialog(null)} />
-      <ConfirmDialog open={!!toDelete} danger busy={busy} title={t("bank.list.deleteTitle")} body={t("bank.list.deleteBody")}
-        confirmLabel={t("bank.list.delete")} onConfirm={() => void remove()} onCancel={() => setToDelete(null)}>
-        {actionError ? <ContentError error={actionError} className="mt-3" /> : null}
-      </ConfirmDialog>
+      <ConfirmDialog open={!!toDelete} tone="danger" busy={busy} title={t("bank.list.deleteTitle")} object={toDelete?.title}
+        effect={t("bank.list.deleteBody")} confirmLabel={t("bank.list.delete")} onConfirm={() => void remove()} onCancel={() => setToDelete(null)}
+        error={actionError ? <ContentError error={actionError} /> : undefined} />
     </div>
   );
 }

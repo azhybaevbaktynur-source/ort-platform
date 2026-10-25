@@ -6,7 +6,6 @@ import { useTranslation } from "@/lib/i18n/context";
 import { deleteQuestion, getBank, listQuestions, moveQuestion, restoreQuestion } from "@/lib/lms/content";
 import { QUESTION_TYPES, type BankOut, type QuestionSummaryOut, type QuestionType } from "@/lib/lms/contentTypes";
 import { useCourse } from "@/components/lms/CourseContext";
-import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
 import { Pager } from "@/components/lms/Pager";
 import { BankFilters, EMPTY_FILTERS, type BankFilterState } from "@/components/lms/content/BankFilters";
 import { BankHeader } from "@/components/lms/content/BankHeader";
@@ -14,6 +13,8 @@ import { ContentError } from "@/components/lms/content/ContentError";
 import { QuestionRow } from "@/components/lms/content/QuestionRow";
 import { useCanEditContent } from "@/components/lms/content/StaffGate";
 import { inputCls } from "@/components/lms/content/ui";
+import { ConfirmDialog, EmptyState, LoadingState } from "@/components/ui";
+import { MathRenderer } from "@/components/math/MathRenderer";
 
 export default function BankQuestionsPage() {
   const { lang, t } = useTranslation();
@@ -92,8 +93,8 @@ export default function BankQuestionsPage() {
         </div>
       )}
       <ContentError error={error || actionError} onRetry={error ? () => load() : undefined} />
-      {loading && items.length === 0 && !error && <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p>}
-      {!loading && !error && items.length === 0 && <p className="text-sm text-slate-500">{t("bank.questions.empty")}</p>}
+      {loading && items.length === 0 && !error && <LoadingState rows={3} />}
+      {!loading && !error && items.length === 0 && <EmptyState title={t("bank.questions.empty")} />}
       {items.length > 0 && (
         <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
           {items.map((q) => (
@@ -105,7 +106,9 @@ export default function BankQuestionsPage() {
         </ul>
       )}
       <Pager nextCursor={cursor} loading={loading} onMore={() => load(cursor)} />
-      <ConfirmDialog open={!!toDelete} danger busy={rowBusy} title={t("bank.questions.deleteTitle")} body={t("bank.questions.deleteBody")}
+      <ConfirmDialog open={!!toDelete} tone="danger" busy={rowBusy} title={t("bank.questions.deleteTitle")}
+        object={toDelete ? (toDelete.stem_excerpt ? <MathRenderer content={toDelete.stem_excerpt} className="!text-sm line-clamp-3" /> : t("bank.questions.noStem")) : undefined}
+        effect={t("bank.questions.deleteBody")}
         confirmLabel={t("bank.questions.delete")} onConfirm={() => toDelete && void act(() => deleteQuestion(course.id, toDelete.id))}
         onCancel={() => setToDelete(null)} />
     </div>

@@ -6,7 +6,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { KeyRound, Plus, Trash2 } from "lucide-react";
+import { KeyRound, LayoutGrid, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
 import { listMyCourses } from "@/lib/lms/courses";
@@ -73,6 +73,14 @@ function TeachingList() {
         {items.map((c) => <CourseCard key={c.id} course={c} />)}
       </div>
       <Pagination nextCursor={cursor} loading={loading} onLoadMore={() => void load(cursor)} />
+      {/* --- Phase 6b S5c (UX T13): course creators reach the catalog after their own list, not above it --- */}
+      {me?.can_create_courses && (
+        <Link href={`/${lang}/courses/catalog`}
+          className={cn("mr-6 inline-flex min-h-11 items-center gap-1.5 rounded text-sm font-medium text-brand-700 hover:underline sm:min-h-0", focusRing)}>
+          <LayoutGrid className="h-4 w-4" aria-hidden="true" />{t("teaching.showCatalog")}
+        </Link>
+      )}
+      {/* --- Phase 6b S5c end --- */}
       {me?.can_create_courses && (
         <Link href={`/${lang}/courses/trash`}
           className={cn("inline-flex min-h-11 items-center gap-1.5 rounded text-sm font-medium text-slate-600 hover:text-slate-900 sm:min-h-0", focusRing)}>

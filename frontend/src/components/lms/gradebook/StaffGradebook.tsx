@@ -11,7 +11,7 @@ import { Pager } from "@/components/lms/Pager";
 import { SchemeError } from "@/components/lms/grading/schemes/SchemeError";
 import { useSchemeLabel } from "@/components/lms/grading/schemes/labels";
 import { fmtNum } from "@/components/lms/grading/schemes/params";
-import { btnSecondary } from "@/components/lms/content/ui";
+import { Button, PageHeader } from "@/components/ui"; // Phase 6b S5c
 import { cellView, fmtPercent, mergeRows, patchCell } from "./gradebookModel";
 import { CellBody, useCellDescription } from "./GradeCell";
 import { GradebookLegend } from "./GradebookLegend";
@@ -104,23 +104,18 @@ export function StaffGradebook() {
 
   return (
     <div className="min-w-0 space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-xl font-bold text-slate-900">{t("gradebook.title")}</h2>
-          <p className="mt-1 text-sm text-slate-600">{t("gradebook.subtitle")}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+      {/* Phase 6b S5c: design-system PageHeader (the page's h1); gradebook actions are rebuilt in Phase 7 (UX T9). */}
+      <PageHeader title={t("gradebook.title")} description={t("gradebook.subtitle")} className="mb-2"
+        secondaryActions={<>
           {allColumns.length > 0 && (
-            <button type="button" onClick={() => setFilterOpen(true)} className={`${btnSecondary} inline-flex items-center gap-1.5`}>
-              <Columns3 className="h-4 w-4" aria-hidden="true" />
+            <Button variant="secondary" onClick={() => setFilterOpen(true)} leftIcon={<Columns3 className="h-4 w-4" aria-hidden="true" />}>
               {selected ? t("gradebook.columns.countOf", { shown: columns.length, total: allColumns.length }) : t("gradebook.columns.button")}
-            </button>
+            </Button>
           )}
-          <button type="button" onClick={() => void load()} disabled={loading} className={`${btnSecondary} inline-flex items-center gap-1.5`}>
-            <RefreshCw className="h-4 w-4" aria-hidden="true" />{t("gradebook.refresh")}
-          </button>
-        </div>
-      </div>
+          <Button variant="secondary" onClick={() => void load()} disabled={loading} leftIcon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}>
+            {t("gradebook.refresh")}
+          </Button>
+        </>} />
 
       {!canManage && course.status === "concluded" && (
         <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{t("gradebook.readOnlyConcluded")}</p>

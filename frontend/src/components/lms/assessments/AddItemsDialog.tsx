@@ -11,7 +11,8 @@ import { useTemplateUi } from "@/lib/lms/templates";
 import type { BulkAddOut } from "@/lib/lms/assessmentTypes";
 import { LMS_LANGS, type Lang } from "@/lib/lms/types";
 import { Pager } from "@/components/lms/Pager";
-import { btnPrimary, btnSecondary, inputCls, labelCls } from "@/components/lms/content/ui";
+import { inputCls, labelCls } from "@/components/lms/content/ui";
+import { btnPrimary, btnSecondary } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { ContentError } from "@/components/lms/content/ContentError";
 import { AssessmentError } from "./AssessmentError";
 import { Modal } from "./Modal";
