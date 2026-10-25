@@ -72,11 +72,15 @@ for _ in $(seq 1 120); do
   sleep 0.5
 done
 
+# seed output also kept in $E2E_DIR/seed.log (CI prints it as an annotation on failure: scripts/ci_log_annotations.py)
 if ! "${run_env[@]}" "$PY" "$ROOT/frontend/e2e/seed_backend.py" --api "http://127.0.0.1:$PORT" \
-    --log "$E2E_DIR/backend.log" --out "$E2E_DIR/seed.json" --root "$ROOT"; then
-  echo "e2e_backend: seeding failed; backend log:" >&2
+    --log "$E2E_DIR/backend.log" --out "$E2E_DIR/seed.json" --root "$ROOT" >"$E2E_DIR/seed.log" 2>&1; then
+  echo "e2e_backend: seeding failed; seed log:" >&2
+  tail -50 "$E2E_DIR/seed.log" >&2
+  echo "e2e_backend: backend log:" >&2
   tail -50 "$E2E_DIR/backend.log" >&2
   exit 1
 fi
+cat "$E2E_DIR/seed.log"
 echo "e2e_backend: ready on http://127.0.0.1:$PORT (seed: $E2E_DIR/seed.json)"
 wait "$API_PID"

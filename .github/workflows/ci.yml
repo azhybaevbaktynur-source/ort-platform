@@ -153,8 +153,11 @@ jobs:
       E2E_DIR: /tmp/ort_e2e
       E2E_API_PORT: "8765"
       E2E_WEB_PORT: "3765"
-      # Linux renders fonts differently from the reviewed macOS set: compare with docs/phases/ORT_BASELINE/linux/
-      # when it exists, otherwise record it (artifact "ort-e2e-recorded") instead of failing
+      # CI runs every DOM assertion and the no-horizontal-scroll checks; it does not compare pixels: Linux renders
+      # fonts differently from the reviewed macOS baselines, so the screenshots are recorded (artifact
+      # "ort-e2e-recorded") while docs/phases/ORT_BASELINE/linux/ is not committed, and a missing Linux baseline
+      # never fails the job. The pixel comparison runs locally (macOS, system Chrome) at every phase gate
+      # (docs/phases/ORT_BASELINE/README.md, "Platforms and where the pixel comparison runs").
       ORT_BASELINE_RECORD_MISSING: "1"
     steps:
       - uses: actions/checkout@v4
@@ -178,9 +181,18 @@ jobs:
         run: npx next build
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
-      - name: ORT e2e and screenshot comparison
+      - name: ORT e2e (DOM assertions; Linux screenshots recorded, not compared)
         working-directory: frontend
-        run: E2E_PYTHON="$(command -v python)" npx playwright test
+        shell: bash   # -eo pipefail: the tee below must not hide a failing run
+        # output also in /tmp/ort_e2e_playwright.log (outside E2E_DIR, which the backend wipes on start)
+        run: E2E_PYTHON="$(command -v python)" npx playwright test 2>&1 | tee /tmp/ort_e2e_playwright.log
+      - name: Logs as annotations (readable on the public check run)
+        if: failure()
+        run: >-
+          python scripts/ci_log_annotations.py --lines 40
+          "playwright output=/tmp/ort_e2e_playwright.log"
+          "seed log=/tmp/ort_e2e/seed.log"
+          "backend log=/tmp/ort_e2e/backend.log"
       - name: Upload screenshot diffs and logs
         if: failure()
         uses: actions/upload-artifact@v4
@@ -191,6 +203,8 @@ jobs:
             /tmp/ort_e2e/report
             /tmp/ort_e2e/results
             /tmp/ort_e2e/backend.log
+            /tmp/ort_e2e/seed.log
+            /tmp/ort_e2e_playwright.log
           if-no-files-found: ignore
       - name: Upload recorded baselines (platform without committed baselines)
         if: always()
