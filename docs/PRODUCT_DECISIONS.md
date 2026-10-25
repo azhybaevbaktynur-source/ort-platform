@@ -303,3 +303,21 @@ Source: the owner's written answers of 2026-10-25 (verbatim copy kept by the orc
 | B6, B7, B8, B12 | Other alternatives | The agent's recommendations: JSON spec in the immutable version; `min_items`/`max_items`; scrolling mode column in 7b, player in 8b; ORT exactly as today. |
 
 **Working mode from here** (owner): start Phase 6a and continue phase by phase, with the ORT review and the UX gate in every phase and all rules of `HANDOFF_NEXT_AGENT.md` and this file. **Checkpoints**: stop after **6a, 6b, 7b and 8b** are deployed and give the owner a short review list (what changed, URLs to open, what to try, screenshots to look at); continue only after the owner's OK. Between checkpoints (for example 7a, 8a) the agent does not wait. Also stop for the usual stop conditions (Neon data deletion, spending money, secrets) or when a design question would change ORT's behaviour or contradict a decision: then write it under "Alternatives to discuss" and ask.
+
+## Phase 6a implementation decisions (agent, 2026-10-25)
+
+Taken by the agent within the approved design (owner rule: decide, record here). None changes how ORT works for students; the one teacher-visible ORT change is listed first.
+
+| # | Topic | Decision |
+|---|---|---|
+| I1 | Locked ORT course (A7) | Structure edits of ORT preset exams answer 409 `template_locked`; the UI greys them out with "Fixed by the ORT template". Teacher-visible effect: an empty section can no longer be deleted from an `ort_main` draft (publish still refuses empty sections, so partial ORT exams cannot be published). Free assessments (`preset = none`) in an ORT course are not locked. A form that sends unchanged values gets 200. |
+| I2 | ORT seed under the lock | `ensure_ort_courses` acts as the demo teacher (unusable password, no login); that actor alone is exempt from the lock so the seed keeps working unchanged. |
+| I3 | Draft course in production | The private draft course belongs to the owner's own account, which is a platform admin; platform admins get no personal organization, so it moves to the platform organization (rehearsal 2026-10-25). |
+| I4 | Org admins and staff | Org admins manage students only; adding staff, changing a role to teacher/assistant and staff invitations need a real staff enrollment (403 `org_admin_join_required`), i.e. the audited "Join as teacher" first (security review). |
+| I5 | Ownership transfer | The new owner must be an active member of the course's organization (all paths), so courses never leave their organization. |
+| I6 | Suspended organization | Starting attempts is blocked; attempts already started may be finished and submitted. Writes answer 403 `organization_suspended`. |
+| I7 | Personal organizations | Slug `t-` + 12 hex chars of sha256(user id). A personal org for an owner who is not an approved teacher (or is disabled) is created suspended. |
+| I8 | Invitations | Accept also by invitation id from "My invitations" (a lost email is not a dead end; the account email must match). The inviter may revoke only while still allowed to manage the invitation. Invitation emails: at most 50 per hour per sender. |
+| I9 | Dates | All API datetimes are sent as UTC with `Z` (naive values are UTC); the frontend reads timezone-less strings as UTC (H2). |
+| I10 | ORT subject keys (A10) | `math_subject`, `kyrgyz_lang_lit`, `russian_lang_lit` are accepted as aliases of `advanced_math` / `native_language`; the golden import fixtures prove ORT imports unchanged. |
+| I11 | Create organization | No contact email field in 6a (not in the data model); can come with Phase 9 organization settings. |
