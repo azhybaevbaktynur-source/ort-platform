@@ -38,6 +38,7 @@ from app.lms.grading.schemes import load_usable_version
 from app.lms.grading.seeds import PRESET_SCHEME_VERSIONS
 from app.models.user import User
 # --- Phase 6 S2b begin --- (course template guards, PHASE_6_DESIGN 5.2 / 5.4)
+from app.lms.assignments import sync as assignment_sync  # --- Phase 7a S1 --- (quiz assignments mirror, 3.2)
 from app.lms.templates import base as tpl_fields
 from app.lms.templates import service as tpl
 # --- Phase 6 S2b end ---
@@ -90,6 +91,9 @@ def create_assessment(db: Session, ctx: AuthzContext, course: Course, data: sch.
         specs = []
     for i, (key, secs) in enumerate(specs, start=1):
         db.add(AssessmentSection(assessment_id=a.id, position=i, key=key, time_limit_s=secs, rules=ort_rules(key)))
+    # --- Phase 7a S1 begin --- (PHASE_7A_DESIGN 2.9: the quiz assignment, same transaction)
+    assignment_sync.ensure_quiz_assignment(db, a, ctx.user.id)
+    # --- Phase 7a S1 end ---
     db.commit()
     return a
 
@@ -131,6 +135,7 @@ def update_assessment(db: Session, ctx: AuthzContext, course: Course, aid: uuid.
         setattr(a, f, value)
     if (a.grading_scheme_version_id, a.score_policy, utc(a.due_at)) != before:
         a.grading_changed_at = clock.now()  # drives the gradebook's stale_count (P4-12, P4-15)
+    assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
     _commit(db, a)
     return a
 
@@ -151,6 +156,7 @@ def soft_delete_assessment(db: Session, ctx: AuthzContext, course: Course, aid: 
     if repo.has_open_attempts(db, a.id):
         raise Conflict("Students are taking this assessment", code="attempts_in_progress")
     a.soft_delete(ctx.user.id)
+    assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
     db.commit()
 
 
@@ -160,6 +166,7 @@ def restore_assessment(db: Session, ctx: AuthzContext, course: Course, aid: uuid
     if a.deleted_at is None:
         raise Conflict("Assessment is not deleted", code="not_deleted")
     a.restore()
+    assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
     db.commit()
     return a
 

@@ -74,6 +74,9 @@ class Assessment(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
     omit_from_total: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False,
                                                   server_default=text("false"))
     grading_changed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # --- Phase 7a S1 begin --- (PHASE_7A_DESIGN 2.7: bcrypt hash of the quiz access code; never serialized)
+    access_code_hash: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    # --- Phase 7a S1 end ---
 
     __table_args__ = (
         CheckConstraint("preset IN ('none','ort_main','ort_subject')", name="preset_valid"),

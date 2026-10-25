@@ -242,6 +242,10 @@ def make_assessment(db: Session, course: Course, actor: User, **overrides) -> As
     if items:
         for pos, q in enumerate(items, start=1):
             make_item(db, a, first, question=q, position=pos, commit=False)
+    # --- Phase 7a S1: every assessment has its quiz assignment (the builder does the same) ---
+    from app.lms.assignments.sync import ensure_quiz_assignment
+
+    ensure_quiz_assignment(db, a, actor.id)
     db.commit()
     return a
 
