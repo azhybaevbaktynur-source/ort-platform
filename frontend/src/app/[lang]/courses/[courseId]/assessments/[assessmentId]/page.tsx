@@ -15,6 +15,7 @@ import { LobbyView } from "@/components/lms/assessments/LobbyView";
 import { PublishPanel } from "@/components/lms/assessments/PublishPanel";
 import { sectionName } from "@/components/lms/assessments/SectionCard";
 import { fmtDateTime, fmtPoints } from "@/components/lms/assessments/format";
+import { MyAttemptsPanel } from "@/components/lms/home/MyAttemptsPanel"; // Phase 6 S6b
 
 export default function AssessmentPage() {
   const { lang, t } = useTranslation();
@@ -43,7 +44,20 @@ export default function AssessmentPage() {
 
   if (error && !data) return <AssessmentError error={error} onRetry={() => void load()} />;
   if (!data) return <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p>;
-  if (!isStaffAssessment(data)) return <div className="space-y-3"><Link href={base} className="text-sm font-medium text-brand-700 hover:underline">{t("assessments.backToList")}</Link><LobbyView lobby={data} /></div>;
+  // --- Phase 6 S6b begin --- (UX S1: "My attempts" with the result link; first after the last attempt)
+  if (!isStaffAssessment(data)) {
+    const exhausted = !data.can_start && data.reason === "attempts_exhausted";
+    const attempts = <MyAttemptsPanel courseId={course.id} assessmentId={data.id} exhausted={exhausted} />;
+    return (
+      <div className="space-y-4">
+        <Link href={base} className="inline-flex min-h-11 items-center text-sm font-medium text-brand-700 hover:underline sm:min-h-0">{t("assessments.backToList")}</Link>
+        {exhausted && attempts}
+        <LobbyView lobby={data} />
+        {!exhausted && attempts}
+      </div>
+    );
+  }
+  // --- Phase 6 S6b end ---
 
   const a = data;
   const title = pickLocalized(a.title, lang, course.default_language) || t("assessments.untitled");
