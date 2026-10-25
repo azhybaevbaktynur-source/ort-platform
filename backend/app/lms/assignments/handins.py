@@ -243,6 +243,27 @@ def asset_used_elsewhere(db: Session, asset_id: uuid.UUID, assignment_id: uuid.U
     return db.execute(select(Submission.id).where(Submission.feedback_asset_id == asset_id).limit(1)).first() is not None
 
 
+def _reopen_unreleased_grade(db: Session, ctx: AuthzContext, course: Course, a: Assignment, sub: dict,
+                             h: AssignmentSubmission, now: datetime) -> None:
+    """Phase 7a S6: a new hand-in after a grade that was never released. The grade belonged to an older hand-in, so
+    the row goes back to `pending_review` (the teacher's "needs grading"): the points and rubric scores are cleared
+    (one `manual_grade` event, reason `resubmitted`, keeps the old values); the unreleased feedback stays as the
+    teacher's draft. Released grades never get here (the hand-in is refused with `already_graded`)."""
+    from sqlalchemy import delete
+
+    from app.lms.assignments import grading as manual
+    from app.lms.assignments.models import SubmissionRubricScore
+
+    RS = SubmissionRubricScore.__table__
+    arow = manual.load_assignment(db, course.id, a.id)
+    old_rubric = [{"criterion_id": r.criterion_id, "points": r.points, "comment": r.comment}
+                  for r in db.execute(select(RS).where(RS.c.submission_id == sub["id"])).all()]
+    manual.recompute_manual(db, sub, arow, arow, h, now=now, actor_id=ctx.user.id, reason="resubmitted",
+                            event="manual_grade", extra={"raw_points": None},
+                            event_fields={"rubric_scores": (old_rubric, [])})
+    db.execute(delete(RS).where(RS.c.submission_id == sub["id"]))
+
+
 def hand_in(db: Session, ctx: AuthzContext, course: Course, assignment_id: uuid.UUID, data: sch.HandInIn,
             *, now: Optional[datetime] = None) -> sch.HandInOut:
     course_svc.require_course(ctx, A.ASSIGNMENT_SUBMIT, course)
@@ -289,6 +310,8 @@ def hand_in(db: Session, ctx: AuthzContext, course: Course, assignment_id: uuid.
     if sub["state"] != "excused" and sub["raw_points"] is None and sub["graded_item_id"] is None:
         db.execute(update(S).where(S.c.id == sub["id"]).values(
             state="pending_review", version=S.c.version + 1, updated_at=now))
+    elif sub["state"] != "excused" and sub["raw_points"] is not None and sub["released_at"] is None:
+        _reopen_unreleased_grade(db, ctx, course, a, sub, h, now)
     db.commit()
     return hand_in_out(h, asset)
 

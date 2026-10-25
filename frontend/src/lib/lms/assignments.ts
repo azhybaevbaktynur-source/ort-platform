@@ -6,8 +6,8 @@ import type { PageOut } from "./types";
 import type { ReleaseIn, ReleaseOut, RegradeOut, UnreleaseOut } from "./gradingTypes";
 import type {
   AssignmentCreateIn, AssignmentListQuery, AssignmentOut, AssignmentStaffOut, AssignmentStaffSummaryOut,
-  AssignmentStudentDetailOut, AssignmentStudentOut, AssignmentSubmissionRowOut, AssignmentSubmissionStaffOut,
-  AssignmentUpdateIn, HandInIn, HandInOut, ManualGradeIn, RubricCriterionIn, RubricCriterionOut, UploadedFileOut,
+  AssignmentStudentDetailOut, AssignmentStudentOut, AssignmentSubmissionsPageOut, AssignmentSubmissionStaffOut,
+  AssignmentUpdateIn, HandInIn, HandInOut, ManualGradeIn, RubricCriterionIn, UploadedFileOut,
 } from "./assignmentTypes";
 
 export { quizAssignmentId } from "./quizAssignmentId";
@@ -38,8 +38,9 @@ export const restoreAssignment = (courseId: string, assignmentId: string) =>
   lmsFetch<AssignmentStaffOut>(`${one(courseId, assignmentId)}/restore`, { method: "POST" });
 export const reorderAssignments = (courseId: string, assignmentIds: string[]) =>
   lmsFetch<unknown>(`${list(courseId)}/order`, { method: "PUT", body: { assignment_ids: assignmentIds } });
+/** Full replace (`RubricIn {criteria}`); returns the assignment with its new rubric. */
 export const putRubric = (courseId: string, assignmentId: string, criteria: RubricCriterionIn[]) =>
-  lmsFetch<RubricCriterionOut[] | { rubric: RubricCriterionOut[] }>(`${one(courseId, assignmentId)}/rubric`, { method: "PUT", body: criteria });
+  lmsFetch<AssignmentStaffOut>(`${one(courseId, assignmentId)}/rubric`, { method: "PUT", body: { criteria } });
 
 // ---- 4.2 Hand-ins and files ----
 export const getMyAssignment = (courseId: string, assignmentId: string) =>
@@ -128,7 +129,7 @@ export async function openSubmissionFile(courseId: string, submissionId: string,
 
 // ---- 4.3 Grades ----
 export const listAssignmentSubmissions = (courseId: string, assignmentId: string, opts: { cursor?: string | null; limit?: number } = {}) =>
-  lmsFetch<PageOut<AssignmentSubmissionRowOut>>(`${one(courseId, assignmentId)}/submissions`, { params: { cursor: opts.cursor, limit: opts.limit } });
+  lmsFetch<AssignmentSubmissionsPageOut>(`${one(courseId, assignmentId)}/submissions`, { params: { cursor: opts.cursor, limit: opts.limit } });
 export const getAssignmentSubmission = (courseId: string, submissionId: string) =>
   lmsFetch<AssignmentSubmissionStaffOut>(`${course(courseId)}/submissions/${e(submissionId)}`);
 export const gradeManual = (courseId: string, assignmentId: string, enrollmentId: string, body: ManualGradeIn) =>

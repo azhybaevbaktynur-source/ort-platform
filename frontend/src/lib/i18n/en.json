@@ -1023,8 +1023,8 @@
       "until": "Closes {date}"
     },
     "student": {
-      "title": "Assessments",
-      "empty": "No assessments are available yet.",
+      "title": "Quizzes",
+      "empty": "No quizzes are available yet.",
       "open": "Open",
       "resume": "Resume",
       "items": "{n} questions",
@@ -2799,7 +2799,26 @@
       "rate_limited_wait": "Too many tries. Try again in {seconds} seconds.",
       "network": "No connection. Check your internet and try again.",
       "forbidden": "You do not have access to this. Ask the course teacher.",
-      "not_found": "Not found. It may have been deleted."
+      "not_found": "Not found. It may have been deleted.",
+      "access_code_format": "The access code must be 4 to 32 characters: Latin letters, digits or symbols.",
+      "body_text_empty": "Your answer is empty. Write something before handing in.",
+      "body_text_too_long": "Your answer is too long. Shorten it and try again.",
+      "course_storage_full": "This course has no room for more files. Tell your teacher.",
+      "enrollment_not_found": "This student is not in the course any more. Reload the page.",
+      "file_already_handed_in": "This file was already handed in. Choose the file again to upload a new copy.",
+      "file_invalid": "This file cannot be read. Use a PDF, JPG, PNG or WebP file.",
+      "grade_release_auto": "Grades of this assignment are released automatically. Change the release setting first.",
+      "hand_in_kind_mismatch": "This assignment takes a different kind of work. Reload the page.",
+      "hand_in_not_accepted": "Nothing is handed in on this site for this assignment.",
+      "hand_in_limit_reached": "You have used all file hand-ins for this assignment.",
+      "rubric_criteria_mismatch": "Score every rubric criterion once. Reload the page if the rubric changed.",
+      "window_invalid": "The end of the window must be after its start.",
+      "criterion_duplicate": "A rubric criterion appears twice. Remove the copy and save again.",
+      "criterion_not_found": "A rubric criterion was not found. Reload the page.",
+      "points_possible_required": "Enter the points for this assignment (0 = feedback only).",
+      "preset_template_exclusive": "Choose either a preset or an exam template, not both.",
+      "rubric_not_for_quiz": "Quizzes have no rubric. Their grade comes from the attempts.",
+      "too_many_criteria": "A rubric can have at most 30 criteria."
     },
     "list": {
       "title": "Assignments",
@@ -2960,7 +2979,10 @@
       "pointsOf": "{points} of {possible} points",
       "feedback": "Feedback",
       "feedbackFile": "Feedback file",
-      "notFoundTitle": "Assignment not found"
+      "notFoundTitle": "Assignment not found",
+      "limitReached": "You have used all file hand-ins for this assignment.",
+      "gradedNotReleased": "Your teacher has graded this work. The grade appears here when it is released.",
+      "notActive": "This course is not active, so handing in is closed."
     },
     "grade": {
       "title": "Grading",

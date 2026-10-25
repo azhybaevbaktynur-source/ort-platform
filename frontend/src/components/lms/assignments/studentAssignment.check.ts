@@ -14,7 +14,7 @@ function ok(cond: boolean, msg: string) {
 const NOW = Date.parse("2026-10-26T12:00:00Z");
 const a = (over: Partial<AssignmentStudentOut>): AssignmentStudentOut => ({
   id: "a", kind: "text", assessment_id: null, title: { en: "A" }, points_possible: "10", due_at: null,
-  available_from: null, available_until: null, status: "not_started", ...over,
+  available_from: null, available_until: null, status: "not_started", position: 0, ...over,
 });
 
 ok(studentAssignmentView(a({}), NOW).action === "hand_in", "open text assignment -> hand in");

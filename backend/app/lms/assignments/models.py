@@ -78,7 +78,8 @@ class Assignment(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
 
 
 class AssignmentSubmission(UUIDPKMixin, Base):
-    """What the student handed in: one row per hand-in, never updated or deleted (P7-4)."""
+    """What the student handed in: one row per hand-in, never deleted; the content is never updated (P7-4). Only
+    `late_seconds` is re-measured when the student's effective due date changes (an override, S6)."""
     __tablename__ = "assignment_submissions"
 
     submission_id: Mapped[uuid.UUID] = mapped_column(

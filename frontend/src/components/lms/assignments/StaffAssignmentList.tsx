@@ -195,7 +195,7 @@ export function StaffAssignmentList() {
         <Link href={`${base}/assignments/${a.id}/edit`} className="break-words font-semibold text-slate-900 hover:text-brand-700 hover:underline">{titleOf(a)}</Link>
       ),
     },
-    { key: "kind", header: t("assignments.list.colKind"), mobilePriority: 0, cell: (a) => <KindBadge kind={a.kind} ort={!!a.preset && a.preset !== "none"} /> },
+    { key: "kind", header: t("assignments.list.colKind"), mobilePriority: 0, cell: (a) => <KindBadge kind={a.kind} ort={a.kind === "quiz" && ui.key === "ort"} /> },
     { key: "due", header: t("assignments.list.colDue"), nowrap: true, mobilePriority: 1, cell: (a) => (a.due_at ? fmtShortDateTime(a.due_at, lang) : "—") },
     { key: "points", header: t("assignments.list.colPoints"), align: "right", mobilePriority: 3, hideOnMobile: false, cell: (a) => fmtPts(a.points_possible) || "—" },
     {

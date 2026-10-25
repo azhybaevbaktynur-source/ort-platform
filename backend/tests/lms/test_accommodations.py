@@ -497,3 +497,30 @@ async def test_override_route_extends_hand_in_deadline(db, api):
                        json={"extra_attempts": 3, "extra_time_s": 600})
     assert r.status_code == 200
     assert (await hand_in(api, w.S2, w, a, body_text="x")).status_code == 409
+
+
+def _when(s):
+    from datetime import datetime
+
+    return None if s is None else timing.as_utc(datetime.fromisoformat(s.replace("Z", "+00:00")))
+
+
+async def test_student_assessment_list_shows_effective_values(db, api, frozen_clock):
+    """Phase 7a S6: the student `/assessments` list shows the caller's effective attempts and dates (accommodation
+    extra attempts, override attempts and dates win); another student sees the assessment's own values."""
+    q = make_quiz(db, allowed_attempts=2, available_until=t(1000))
+    other = make_user(db)
+    enroll(db, q.course, other)
+    lst = f"/courses/{q.course.id}/assessments"
+    assert (await api.call(q.student, "GET", lst)).json()["items"][0]["allowed_attempts"] == 2
+    accommodate(db, q, extra_attempts=1)
+    assert (await api.call(q.student, "GET", lst)).json()["items"][0]["allowed_attempts"] == 3
+    override(db, q, extra_attempts=4, due_at=t(500), available_until=t(2000))
+    mine = (await api.call(q.student, "GET", lst)).json()["items"][0]
+    assert mine["allowed_attempts"] == 6
+    assert same(_when(mine["due_at"]), t(500)) and same(_when(mine["available_until"]), t(2000))
+    theirs = (await api.call(other, "GET", lst)).json()["items"][0]
+    assert theirs["allowed_attempts"] == 2 and same(_when(theirs["available_until"]), t(1000))
+    assert theirs["due_at"] is None
+    lobby = (await api.call(q.student, "GET", f"/courses/{q.course.id}/assessments/{q.assessment.id}")).json()
+    assert lobby["allowed_attempts"] == mine["allowed_attempts"]

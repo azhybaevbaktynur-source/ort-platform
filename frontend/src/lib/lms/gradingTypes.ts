@@ -521,6 +521,8 @@ export interface MyGradeOut {
   late?: boolean;
   /** released grades only */
   feedback_text?: string | null;
+  feedback_asset_id?: string | null;
+  rubric_scores?: { criterion_id: string; points: Num; comment: string | null; title?: LocalizedText | null; max_points?: Num | null }[] | null;
   /** quiz assignments only (null for text / file / none) */
   assessment_id: string | null;
   // --- Phase 7a S5 end ---
@@ -565,5 +567,6 @@ export const GRADING_ERROR_CODES = [
   "grading_scheme_not_found", "scheme_version_not_found", "scheme_params_invalid", "version_unchanged",
   "submission_not_found", "grade_conflict", "override_reason_required", "category_not_found", "category_in_use",
   "too_many_categories", "too_many_rows", "value_out_of_range", "attempt_in_progress", "already_void",
+  "grade_release_auto", // Phase 7a S6: unrelease of an auto-release assignment
 ] as const;
 export type GradingErrorCode = (typeof GRADING_ERROR_CODES)[number];

@@ -78,12 +78,13 @@ def ingest_submission_file(db: Session, actor: User, raw: bytes, *, course_id, f
         if student:
             _check_course_cap(db, course_id, len(raw))
         return files_svc.ingest_file(db, actor, raw, course_id=course_id, filename=filename,
-                                     max_bytes=settings.SUBMISSION_FILE_MAX_BYTES)
+                                     max_bytes=settings.SUBMISSION_FILE_MAX_BYTES, course_scoped=True)
     if len(raw) > settings.ASSET_MAX_UPLOAD_BYTES:
         raise files_svc.ImageTooLarge("Image is too large", details={"max_bytes": settings.ASSET_MAX_UPLOAD_BYTES})
     if student:
         _check_course_cap(db, course_id, len(raw))
-    return files_svc.ingest_image(db, actor, raw, course_id=course_id, visibility="private", filename=filename)
+    return files_svc.ingest_image(db, actor, raw, course_id=course_id, visibility="private", filename=filename,
+                                 course_scoped=True)  # Phase 7a S6: dedup per (owner, course)
 
 
 __all__ = ["sniff", "ingest_submission_file", "course_hand_in_bytes", "max_upload_bytes", "file_too_large",

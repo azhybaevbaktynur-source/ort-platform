@@ -1,6 +1,6 @@
 // Phase 7a S5: TypeScript mirrors of the assignments API (docs/phases/PHASE_7A_DESIGN.md sections 2 and 4).
-// snake_case as on the wire. Decimal columns may arrive as strings (`Num`). Fields marked "assumed" are not spelled
-// out in the design's section 4 and are read defensively (optional) so a backend without them still renders.
+// snake_case as on the wire. Decimal columns may arrive as strings (`Num`). Phase 7a S6: reconciled field by field with
+// backend/app/lms/assignments/schemas.py and grading/serializers.py (the backend is the source of truth).
 import type { AssessmentPreset, AssessmentStatus } from "./assessmentTypes";
 import type { CellOut, GradeRelease, Num, SchemeLabelValue, SchemeType, SchemeVersionRef, SubmissionStaffOut } from "./gradingTypes";
 import type { Lang, LocalizedText } from "./types";
@@ -20,21 +20,23 @@ export const HAND_IN_ACCEPT = ".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/
 export const FEEDBACK_TEXT_MAX = 10000;
 export const RUBRIC_MAX_CRITERIA = 30;
 
-/** Counts on staff payloads (section 4.1: submitted / graded / released / stale). */
+/** Counts on staff payloads (`AssignmentCountsOut`): students with work in, hand-ins without a grade, graded, released. */
 export interface AssignmentCounts {
   submitted: number;
+  needs_grading: number;
   graded: number;
   released: number;
-  stale: number;
 }
 
-/** Brief of the linked assessment on a quiz assignment (staff). Assumed fields beyond `id`. */
+/** Brief of the linked assessment on a quiz assignment (staff, `AssessmentBriefOut`). */
 export interface AssignmentAssessmentBrief {
   id: string;
-  preset?: AssessmentPreset;
-  status?: AssessmentStatus;
-  item_count?: number;
-  has_access_code?: boolean;
+  preset: AssessmentPreset;
+  status: AssessmentStatus;
+  draft_rev: number;
+  allowed_attempts: number;
+  has_unpublished_changes: boolean;
+  has_access_code: boolean;
 }
 
 export interface RubricCriterionOut {
@@ -70,49 +72,58 @@ export interface AssignmentStaffSummaryOut {
   published_at: string | null;
   position: number;
   deleted_at: string | null;
-  /** assumed on the summary (the table shows submitted / graded counts) */
-  counts?: AssignmentCounts | null;
-  /** assumed: preset of the linked assessment (quiz), for the ORT lock and the kind badge */
-  preset?: AssessmentPreset | null;
+  counts: AssignmentCounts;
 }
 
 export interface AssignmentStaffOut extends AssignmentStaffSummaryOut {
   description: LocalizedText | null;
   assessment: AssignmentAssessmentBrief | null;
   rubric: RubricCriterionOut[];
-  counts: AssignmentCounts;
-  /** assumed: brief of the grading scheme version (keeps an older version selectable in the picker) */
-  scheme?: SchemeVersionRef | null;
+  rubric_total: Num;
+  warnings: Record<string, unknown>[];
 }
 
-/** Own grade on a student payload (only when released). */
+/** Own released grade on a student payload (`StudentGradeOut`). `points` = the effective points. */
 export interface AssignmentGradeOut {
+  points: Num | null;
+  points_possible: Num | null;
+  late_deduction: Num;
   display_value: Num | null;
   label: string | null;
-  effective_points: Num | null;
-  points_possible: Num | null;
-  late_deduction?: Num | null;
-  passed?: boolean | null;
-  scheme_type?: SchemeType | null;
-  labels?: Record<string, SchemeLabelValue> | null;
-  released_at: string | null;
+  passed: boolean | null;
+  excused: boolean;
+  feedback_text: string | null;
+  feedback_asset_id: string | null;
+  /** the grade row id (hand-in and feedback file downloads) */
+  submission_id: string;
+  rubric_scores: { criterion_id: string; points: Num; comment: string | null }[];
+  released_at: string;
 }
 
 /** One hand-in (append-only; section 2.2). */
 export interface HandInOut {
   id: string;
+  /** the grade row id (download route) */
+  submission_id: string;
   attempt_no: number;
   kind: "text" | "file";
   body_text: string | null;
   asset_id: string | null;
-  /** assumed file metadata for file hand-ins */
-  filename?: string | null;
-  bytes?: number | null;
-  mime?: string | null;
+  filename: string | null;
+  bytes: number | null;
+  mime: string | null;
   submitted_at: string;
   late_seconds: number;
-  /** assumed: late_seconds > 0 */
-  late?: boolean;
+  late: boolean;
+}
+
+/** Hand-in limits on the student detail (`HandInLimitsOut`). */
+export interface HandInLimitsOut {
+  text_max_chars: number;
+  pdf_max_bytes: number;
+  image_max_bytes: number;
+  max_file_hand_ins: number;
+  accepted_mimes: string[];
 }
 
 export interface AssignmentStudentOut {
@@ -129,21 +140,22 @@ export interface AssignmentStudentOut {
   status?: AssignmentStudentStatus | null;
   /** null = unlimited (quiz only) */
   attempts_left?: number | null;
-  /** assumed: quiz with an open attempt */
-  in_progress_attempt_id?: string | null;
-  position?: number;
+  position: number;
+  /** latest hand-in */
+  submitted_at?: string | null;
+  late?: boolean;
 }
 
 export interface AssignmentStudentDetailOut extends AssignmentStudentOut {
   description: LocalizedText | null;
+  rubric: RubricCriterionOut[];
   hand_ins: HandInOut[];
-  /** the grade row id (download route); null before the first hand-in */
-  submission_id?: string | null;
-  grade?: AssignmentGradeOut | null;
-  feedback_text?: string | null;
-  feedback_asset_id?: string | null;
-  /** assumed: file name of the feedback file */
-  feedback_filename?: string | null;
+  /** released grade only, with the feedback */
+  grade: AssignmentGradeOut | null;
+  can_hand_in: boolean;
+  /** why not: not_open_yet | closed | already_graded | limit_reached | course_not_active ... */
+  reason: string | null;
+  limits: HandInLimitsOut | null;
 }
 
 export type AssignmentOut = AssignmentStaffOut | AssignmentStudentDetailOut;
@@ -184,6 +196,8 @@ export interface AssignmentUpdateIn {
   grade_release?: GradeRelease;
   omit_from_total?: boolean;
   published?: boolean;
+  /** quiz only: the assessment's draft_rev for the delegated builder update */
+  draft_rev?: number;
 }
 
 export interface AssignmentListQuery {
@@ -198,7 +212,7 @@ export interface AssignmentListQuery {
 /** Response of the hand-in file upload (section 4.2). */
 export interface UploadedFileOut {
   asset_id: string;
-  filename: string;
+  filename: string | null;
   bytes: number;
   mime: string;
 }
@@ -220,10 +234,18 @@ export interface AssignmentSubmissionRowOut {
   resubmitted: boolean;
 }
 
+/** `GET /courses/{c}/assignments/{a}/submissions` (`AssignmentSubmissionsPageOut`): `rows`, not `items`. */
+export interface AssignmentSubmissionsPageOut {
+  rows: AssignmentSubmissionRowOut[];
+  next_cursor: string | null;
+}
+
 export interface RubricScoreOut {
   criterion_id: string;
   points: Num;
   comment: string | null;
+  title?: LocalizedText | null;
+  max_points?: Num | null;
 }
 
 export interface RubricScoreIn {
@@ -262,5 +284,10 @@ export const ASSIGNMENT_ERROR_CODES = [
   "rubric_total_mismatch", "points_out_of_range", "stale_grade", "template_locked", "exam_templates_not_available",
   "access_code_required", "access_code_invalid", "storage_full", "file_too_large", "image_too_large", "submission_not_found",
   "rate_limited", "network", "forbidden", "not_found",
+  // Phase 7a S6: every remaining code of assignments/**, accommodations/** and the manual grade path
+  "access_code_format", "body_text_empty", "body_text_too_long", "course_storage_full", "enrollment_not_found",
+  "file_already_handed_in", "file_invalid", "grade_release_auto", "hand_in_kind_mismatch", "hand_in_not_accepted",
+  "hand_in_limit_reached", "rubric_criteria_mismatch", "window_invalid", "criterion_duplicate", "criterion_not_found",
+  "points_possible_required", "preset_template_exclusive", "rubric_not_for_quiz", "too_many_criteria",
 ] as const;
 export type AssignmentErrorCode = (typeof ASSIGNMENT_ERROR_CODES)[number];

@@ -141,7 +141,8 @@ export function StudentAssignmentView({ assignmentId }: { assignmentId: string }
   const description = pickLocalized(a.description, lang, course.default_language);
   const status = a.status ?? "not_started";
   const graded = status === "graded";
-  const canHandIn = !readOnly && (a.kind === "text" || a.kind === "file") && !v.opensLater && !v.windowClosed && !graded && status !== "excused";
+  // the server decides (window, graded latest hand-in, file limit, course state); the client checks only add to it
+  const canHandIn = !readOnly && a.can_hand_in && (a.kind === "text" || a.kind === "file") && !v.opensLater && !v.windowClosed && !graded && status !== "excused";
   const resubmit = a.hand_ins.length > 0;
   const textTooLong = text.length > HAND_IN_TEXT_MAX;
   const ready = a.kind === "text" ? !!text.trim() && !textTooLong : !!(file && !fileProblem) || !!uploaded;
@@ -189,22 +190,28 @@ export function StudentAssignmentView({ assignmentId }: { assignmentId: string }
     }
   };
 
+  const g = a.grade;
+  // the grade row id: on the released grade, else on every hand-in
+  const submissionId = g?.submission_id ?? a.hand_ins[0]?.submission_id ?? null;
   const openFeedback = async () => {
-    if (!a.submission_id || !a.feedback_asset_id) return;
+    if (!submissionId || !g?.feedback_asset_id) return;
     setFeedbackBusy(true);
     setFeedbackError(null);
-    try { await openSubmissionFile(course.id, a.submission_id, a.feedback_asset_id, a.feedback_filename); } catch (e) { setFeedbackError(e); } finally { setFeedbackBusy(false); }
+    try { await openSubmissionFile(course.id, submissionId, g.feedback_asset_id); } catch (e) { setFeedbackError(e); } finally { setFeedbackBusy(false); }
   };
 
-  const g = a.grade;
-  const gradeValue = g ? gradeText(g, g.scheme_type ?? undefined, g.labels) : "";
-  const points = g && g.effective_points !== null && g.effective_points !== undefined ? fmtPts(g.effective_points) : "";
+  const gradeValue = g ? gradeText(g) : "";
+  const points = g && g.points !== null && g.points !== undefined ? fmtPts(g.points) : "";
 
   let closedNote: string | null = null;
   if (!readOnly && (a.kind === "text" || a.kind === "file")) {
     if (v.opensLater && a.available_from) closedNote = t("assignments.submit.notOpen", { date: fmtShortDateTime(a.available_from, lang) });
     else if (graded) closedNote = t("assignments.submit.alreadyGraded");
     else if (v.windowClosed) closedNote = a.available_until ? t("assignments.submit.closedOn", { date: fmtShortDateTime(a.available_until, lang) }) : t("assignments.submit.closed");
+    else if (a.reason === "already_graded") closedNote = t("assignments.submit.gradedNotReleased");
+    else if (a.reason === "limit_reached") closedNote = t("assignments.submit.limitReached");
+    else if (a.reason === "course_not_active") closedNote = t("assignments.submit.notActive");
+    else if (a.reason === "closed" || a.reason === "not_open_yet") closedNote = t("assignments.submit.closed");
   }
 
   return (
@@ -225,13 +232,13 @@ export function StudentAssignmentView({ assignmentId }: { assignmentId: string }
           {gradeValue && <p className="text-3xl font-bold leading-9 text-slate-900">{gradeValue}</p>}
           {points && <p className="text-base text-slate-700">{t("assignments.submit.pointsOf", { points, possible: fmtPts(g.points_possible) || "—" })}</p>}
           {g.late_deduction && Number(g.late_deduction) > 0 ? <p className="text-sm text-warning-900">{t("results.grade.mine.late", { n: fmtPts(g.late_deduction) })}</p> : null}
-          {a.feedback_text && (
+          {g.feedback_text && (
             <div className="mt-3">
               <h3 className="text-sm font-semibold text-slate-900">{t("assignments.submit.feedback")}</h3>
-              <p className="mt-1 whitespace-pre-wrap break-words text-base leading-6 text-slate-800 sm:text-sm">{a.feedback_text}</p>
+              <p className="mt-1 whitespace-pre-wrap break-words text-base leading-6 text-slate-800 sm:text-sm">{g.feedback_text}</p>
             </div>
           )}
-          {a.feedback_asset_id && a.submission_id && (
+          {g.feedback_asset_id && submissionId && (
             <div className="mt-3">
               <Button variant="secondary" loading={feedbackBusy} leftIcon={<Download aria-hidden="true" className="h-4 w-4" />} onClick={() => void openFeedback()}>
                 {t("assignments.submit.feedbackFile")}
@@ -241,7 +248,7 @@ export function StudentAssignmentView({ assignmentId }: { assignmentId: string }
           )}
         </Card>
       )}
-      {status === "submitted" && !done && <p role="status" className="rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-base text-brand-800 sm:text-sm">{t("assignments.submit.waiting")}</p>}
+      {status === "submitted" && !done && a.reason !== "already_graded" && <p role="status" className="rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-base text-brand-800 sm:text-sm">{t("assignments.submit.waiting")}</p>}
       {done && <p role="status" className="rounded-xl border border-success-200 bg-success-50 px-3 py-2 text-base text-success-800 sm:text-sm">{t("assignments.submit.handedIn")}</p>}
 
       <Card title={t("assignments.submit.instructions")} headingLevel={2}>
@@ -294,7 +301,7 @@ export function StudentAssignmentView({ assignmentId }: { assignmentId: string }
         </Card>
       )}
 
-      <HandInList items={a.hand_ins ?? []} courseId={course.id} submissionId={a.submission_id} />
+      <HandInList items={a.hand_ins ?? []} courseId={course.id} submissionId={submissionId} />
 
       <ConfirmDialog open={confirming} busy={busy} title={t("assignments.submit.confirmTitle")} object={title}
         effect={a.kind === "file" ? t("assignments.submit.confirmFile", { name: uploaded?.name ?? file?.name ?? "" }) : t("assignments.submit.confirmText", { n: text.length })}

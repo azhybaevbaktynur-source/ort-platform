@@ -95,7 +95,7 @@ export function AssignmentEditor({ assignmentId }: { assignmentId: string }) {
   if (!a || !form) return <LoadingState rows={3} />;
 
   const quiz = a.kind === "quiz";
-  const preset = a.preset ?? a.assessment?.preset ?? null;
+  const preset = a.assessment?.preset ?? null;
   const ortLocked = quiz && isAssessmentLocked(ui, preset);
   const set = (patch: Partial<Form>) => setForm((f) => (f ? { ...f, ...patch } : f));
   const pts = parsePoints(form.points);
@@ -206,7 +206,7 @@ export function AssignmentEditor({ assignmentId }: { assignmentId: string }) {
             <div>
               <FieldLabel htmlFor="asg-scheme">{t("grading.settings.scheme")}</FieldLabel>
               <div className="mt-1">
-                <SchemePicker id="asg-scheme" value={form.scheme} current={a.scheme ?? null} disabled={disabled || ortLocked}
+                <SchemePicker id="asg-scheme" value={form.scheme} current={null} disabled={disabled || ortLocked}
                   defaultLanguage={course.default_language} onChange={(id) => set({ scheme: id })} />
               </div>
               <p className="mt-1 text-sm text-slate-600">{ortLocked ? t("templates.lockedNote") : t("grading.settings.schemeHint")}</p>

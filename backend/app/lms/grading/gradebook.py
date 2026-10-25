@@ -346,7 +346,9 @@ def assignment_submissions_page(db: Session, ctx: AuthzContext, course: Course, 
             cell=ser.cell_out(sub) if sub is not None else None, hand_in_count=n,
             latest_submitted_at=latest.submitted_at if latest is not None else None,
             late=bool(latest is not None and int(latest.late_seconds or 0) > 0),
-            resubmitted=bool(graded and latest is not None and sub.graded_item_id != latest.id),
+            # a hand-in newer than the graded one (S6: also after the reopened, cleared unreleased grade)
+            resubmitted=bool(sub is not None and sub.graded_item_id is not None and latest is not None
+                             and sub.graded_item_id != latest.id and (graded or sub.state == "pending_review")),
         ))
     return ser.AssignmentSubmissionsPageOut(rows=rows, next_cursor=next_cursor)
 
