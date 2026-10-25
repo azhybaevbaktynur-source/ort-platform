@@ -23,6 +23,7 @@ async def patch(api, user, cid, aid, **body):
 
 async def test_presets_attach_system_versions(db, api):
     w = world(db)
+    w.course.template_key, w.course.template_version = "ort", 1; db.commit()  # Phase 6 S2b: ORT presets/import formats need the ORT course template
     main = await mk(api, w.O, w.cid, preset="ort_main")
     subj = await mk(api, w.O, w.cid, preset="ort_subject", subject_key="chemistry")
     none = await mk(api, w.O, w.cid)
@@ -96,6 +97,7 @@ async def test_student_views_expose_scheme_brief_and_due_at(db, api):
     from tests.lms.factories import make_bank
 
     w = world(db)
+    w.course.template_key, w.course.template_version = "ort", 1; db.commit()  # Phase 6 S2b: ORT presets/import formats need the ORT course template
     a = await mk(api, w.O, w.cid, preset="ort_subject", subject_key="chemistry")
     bank = make_bank(db, w.course, w.O)
     await add_q(api, w.O, w.cid, a["id"], a["sections"][0]["id"], sc(db, bank, w.O).id)

@@ -156,7 +156,7 @@ class Settings(BaseSettings):
     # Note: Render free instances block outbound SMTP ports, so use an HTTP API (Resend/Brevo) there.
     EMAIL_PROVIDER: str = ""
     EMAIL_FROM: str = ""             # e.g. "noreply@yourdomain.kg" (must be verified with the provider)
-    EMAIL_FROM_NAME: str = "ОРТ Платформа"
+    EMAIL_FROM_NAME: str = "Platform"  # default = per-language platform name in auth emails; any other value overrides
     RESEND_API_KEY: str = ""
     BREVO_API_KEY: str = ""
 
@@ -179,6 +179,12 @@ class Settings(BaseSettings):
     # None: follows the environment (on unless ENVIRONMENT=production). Never seeds in production.
     ORT_SEED_SAMPLES: bool | None = None
     # --- Phase 5 S1 end ---
+
+    # --- Phase 6 S1 begin --- (organizations, docs/phases/PHASE_6_DESIGN.md section 4 step 1)
+    # Placeholders for the platform organization; the owner renames it with PATCH /platform/organizations/{id}.
+    PLATFORM_ORG_NAME: str = "Platform"
+    PLATFORM_ORG_SLUG: str = "platform"
+    # --- Phase 6 S1 end ---
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

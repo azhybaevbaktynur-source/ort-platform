@@ -7,6 +7,7 @@ import {
   RESULTS_POLICIES, SCORE_POLICIES, type AssessmentStaffOut, type Navigation, type ResultsPolicy, type ScorePolicy,
 } from "@/lib/lms/assessmentTypes";
 import { cleanLocalized } from "@/lib/lms/localized";
+import { isAssessmentLocked, useTemplateUi } from "@/lib/lms/templates";
 import { LMS_LANGS, type Lang, type LocalizedText } from "@/lib/lms/types";
 import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
 import { btnPrimary, inputCls, labelCls } from "@/components/lms/content/ui";
@@ -56,6 +57,8 @@ export function SettingsPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [saved, setSaved] = useState(false);
+  // --- Phase 6 S4b: locked course template (design §5.4): navigation and grading scheme are fixed ---
+  const tplLocked = isAssessmentLocked(useTemplateUi(), a.preset);
 
   // Re-seed when the server copy changes (after reload).
   useEffect(() => {
@@ -151,10 +154,11 @@ export function SettingsPanel({
         </div>
         <div>
           <label className={labelCls} htmlFor="as-nav">{t("assessments.settings.navigation")}</label>
-          <select id="as-nav" className={inputCls} disabled={disabled} value={navigation} onChange={(e) => setNavigation(e.target.value as Navigation)}>
+          <select id="as-nav" className={inputCls} disabled={disabled || tplLocked} value={navigation} onChange={(e) => setNavigation(e.target.value as Navigation)}>
             <option value="free">{t("assessments.navigation.free")}</option>
             <option value="section_forward_only">{t("assessments.navigation.section_forward_only")}</option>
           </select>
+          {tplLocked && <p className="mt-1 text-xs text-slate-500">{t("templates.lockedNote")}</p>}
         </div>
         <div>
           <label className={labelCls} htmlFor="as-results">{t("assessments.settings.resultsPolicy")}</label>
@@ -175,7 +179,7 @@ export function SettingsPanel({
         {check("as-shuf-c", t("assessments.settings.shuffleChoices"), shuffleChoices, setShuffleChoices)}
       </div>
       <SettingsPanelGrading courseId={courseId} assessmentId={a.id} value={grading} onChange={setGrading}
-        currentScheme={a.scheme} defaultLanguage={defaultLanguage} disabled={disabled} />
+        currentScheme={a.scheme} defaultLanguage={defaultLanguage} disabled={disabled} schemeLocked={tplLocked} />
       <AssessmentError error={error} />
       <div className="flex items-center gap-3">
         <button type="submit" className={btnPrimary} disabled={disabled || busy}>{busy ? t("lms.common.loading") : t("lms.common.save")}</button>

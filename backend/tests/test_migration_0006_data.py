@@ -252,6 +252,8 @@ def test_0006_export_feeds_the_seed(tmp_path):
         conn.commit()
         command.upgrade(cfg, REV)
         conn.commit()
+        command.upgrade(cfg, "head")  # Phase 6: the current models need the later columns (0008 organizations)
+        conn.commit()
     with Session(bind=engine) as db:
         ensure_system_schemes(db)
         rep = ensure_ort_courses(db, samples=False)

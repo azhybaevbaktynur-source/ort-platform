@@ -36,7 +36,9 @@ class Enrollment(UUIDPKMixin, TimestampMixin, Base):
         CheckConstraint("role IN ('teacher','assistant','student')", name="role_valid"),
         CheckConstraint("state IN ('requested','invited','active','declined','removed')", name="state_valid"),
         CheckConstraint(
-            "source IN ('owner','join_code','staff_add','admin','invite','form','open')", name="source_valid"
+            # Phase 6 S1: 'org_admin_self' (an org admin who joined as teacher, PHASE_6_DESIGN 2.2)
+            "source IN ('owner','join_code','staff_add','admin','invite','form','open','org_admin_self')",
+            name="source_valid"
         ),
         CheckConstraint(
             "content_language IS NULL OR content_language IN ('en','ru','ky')", name="content_language_valid"

@@ -3,7 +3,7 @@
 import React from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { MathRenderer } from "@/components/math/MathRenderer";
-import { NumberedPassage } from "@/components/lms/NumberedPassage";
+import { TemplatePassage } from "@/components/lms/PlainPassage";
 import type { StudentQuestionOut } from "@/lib/lms/contentTypes";
 
 /** Read-only render of the student view (no key). */
@@ -19,7 +19,7 @@ export function StudentPreview({ q }: { q: StudentQuestionOut }) {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={q.passage.image_url} alt="" className="mb-3 max-h-72 w-auto rounded-lg" />
           )}
-          <NumberedPassage text={q.passage.body} />
+          <TemplatePassage text={q.passage.body} />
         </div>
       )}
       <div className="rounded-2xl border border-slate-200 bg-white p-5">

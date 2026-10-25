@@ -33,9 +33,11 @@ from app.lms.teachers.policies import ME_POLICIES  # noqa: E402
 
 # Policy names allowed as values (design section 5). 'course:<action>' variants are validated by prefix.
 POLICY_NAMES = frozenset({
-    "authenticated", "authenticated+ratelimit", "teacher_approved", "course:owner_restore",
-    "teacher_approved+ratelimit",
+    "authenticated", "authenticated+ratelimit", "course:owner_restore",
+    "teacher_approved+ratelimit",  # grading scheme writes (still teacher_status based; not a Phase 6 S1 file)
     "platform_admin", "public", "attempt_owner", "internal_token",
+    # Phase 6 S1 (PHASE_6_DESIGN 2.3): 'teacher_approved' is replaced by 'course_creator' on POST /courses
+    "org_admin", "course_creator", "public+ratelimit",
 })
 
 ROUTE_POLICIES: dict[tuple[str, str], str] = {
@@ -54,6 +56,25 @@ ROUTE_POLICIES.update({
     ("POST", "/api/v1/platform/storage/smoke"): "platform_admin",  # + rate limit 5/h, audited
 })
 # --- Phase 5 S4 end ---
+
+# --- Phase 6 S1 begin --- (organizations: platform admin, org admin and /me/organizations routes)
+from app.lms.organizations.policies import ORG_POLICIES  # noqa: E402
+from app.lms.platform_admin.organizations_policies import PLATFORM_ORG_POLICIES  # noqa: E402
+
+ROUTE_POLICIES.update(ORG_POLICIES)
+ROUTE_POLICIES.update(PLATFORM_ORG_POLICIES)
+# --- Phase 6 S1 end ---
+# --- Phase 6 S2b begin --- (course templates, PHASE_6_DESIGN 2.3 / 5.4)
+ROUTE_POLICIES.update({
+    ("GET", "/api/v1/courses/templates"): "authenticated",  # + member of the organization or platform admin
+    ("PATCH", "/api/v1/platform/courses/{course_id}"): "platform_admin",  # template_locked, audited
+})
+# --- Phase 6 S2b end ---
+# --- Phase 6 S3 begin --- (invitations, PHASE_6_DESIGN 2.3)
+from app.lms.invitations.policies import INVITATION_POLICIES  # noqa: E402
+
+ROUTE_POLICIES.update(INVITATION_POLICIES)
+# --- Phase 6 S3 end ---
 
 
 def iter_routes(app):

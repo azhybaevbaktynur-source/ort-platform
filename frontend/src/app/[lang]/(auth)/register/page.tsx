@@ -4,6 +4,7 @@ import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
+import { AuthHeader } from "@/components/auth/AuthHeader";
 import { useAuth, RegisterResult } from "@/lib/auth-context";
 import { safeRedirect } from "@/lib/safeRedirect";
 import { useBackendWarmup, useSlowHint } from "@/lib/useBackendWarmup";
@@ -13,7 +14,7 @@ import { Mail, Lock, User, Phone, ArrowRight, AlertCircle, Loader2 } from "lucid
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { lang, setLang, t } = useTranslation();
+  const { lang, t } = useTranslation();
   const { signUp } = useAuth();
 
   const rawRedirect = searchParams.get("redirect");
@@ -22,7 +23,7 @@ function RegisterForm() {
 
   const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(searchParams.get("email") || ""); // Phase 6 S4: prefilled from an invitation
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -56,41 +57,7 @@ function RegisterForm() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      {/* Top Header with App Logo & Lang Switcher */}
-      <div className="sm:mx-auto sm:w-full sm:max-w-md px-4 flex items-center justify-between mb-8">
-        <Link href={`/${lang}`} className="flex items-center space-x-3 group">
-          <div className="w-10 h-10 rounded-xl bg-brand-600 flex items-center justify-center text-white font-bold text-lg shadow-sm shadow-brand-500/30">
-            ОРТ
-          </div>
-          <div>
-            <span className="font-bold text-lg tracking-tight text-slate-900 block leading-tight">
-              {t("common.appName")}
-            </span>
-            <span className="text-xs text-slate-500 block">
-              ЖРТ / ОРТ 2026
-            </span>
-          </div>
-        </Link>
-
-        <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs">
-          <button
-            onClick={() => setLang("ky")}
-            className={`px-2 py-0.5 rounded font-semibold transition-all ${
-              lang === "ky" ? "bg-white text-brand-600 shadow-2xs" : "text-slate-600"
-            }`}
-          >
-            Кыргызча
-          </button>
-          <button
-            onClick={() => setLang("ru")}
-            className={`px-2 py-0.5 rounded font-semibold transition-all ${
-              lang === "ru" ? "bg-white text-brand-600 shadow-2xs" : "text-slate-600"
-            }`}
-          >
-            Русский
-          </button>
-        </div>
-      </div>
+      <AuthHeader />
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
         <div className="bg-white py-8 px-6 sm:px-10 shadow-lg border border-slate-200/80 rounded-3xl">

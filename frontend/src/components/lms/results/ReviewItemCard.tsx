@@ -4,7 +4,7 @@ import React from "react";
 import { Check, X } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { MathRenderer } from "@/components/math/MathRenderer";
-import { NumberedPassage } from "@/components/lms/NumberedPassage";
+import { TemplatePassage } from "@/components/lms/PlainPassage";
 import type { Correctness, ReviewItemOut, StudentQuestion } from "@/lib/lms/attemptTypes";
 import { fmtPoints } from "@/components/lms/assessments/format";
 
@@ -75,7 +75,7 @@ export function ReviewItemCard({
       {passage && (
         <details className="rounded-xl border border-slate-200 bg-slate-50 p-3">
           <summary className="cursor-pointer text-sm font-medium text-slate-700">{passage.title || t("results.passage")}</summary>
-          <div className="mt-2"><NumberedPassage text={passage.body} /></div>
+          <div className="mt-2"><TemplatePassage text={passage.body} /></div>
         </details>
       )}
 
@@ -96,14 +96,15 @@ export function ReviewItemCard({
                 <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center" aria-hidden="true">
                   {correct ? <Check className="h-4 w-4 text-emerald-700" /> : picked ? <X className="h-4 w-4 text-red-700" /> : null}
                 </span>
-                <span className="flex-1">
+                <span className="min-w-0 flex-1">
                   {c.text ? <MathRenderer content={c.text} className="font-serif text-base text-gray-900" /> : null}
                   {c.image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={c.image_url} alt="" className="mt-1 max-h-32 w-auto rounded-md" />
                   ) : null}
                 </span>
-                <span className="shrink-0 text-xs font-medium text-slate-600">
+                {/* Phase 6 S8: layout only; the label wraps instead of widening the card at 375 px (long ky text). */}
+                <span className="min-w-0 max-w-[45%] text-right text-xs font-medium text-slate-600">
                   {picked ? t("results.yourAnswer") : ""}{picked && correct ? " · " : ""}{correct ? t("results.correctAnswer") : ""}
                 </span>
               </li>

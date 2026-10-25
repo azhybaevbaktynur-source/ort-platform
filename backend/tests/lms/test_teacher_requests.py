@@ -36,12 +36,26 @@ async def test_me_and_locale(client, db):
     assert r.status_code == 200
     body = r.json()
     assert set(body) == {"id", "email", "display_name", "locale", "is_platform_admin", "teacher_status",
-                         "can_create_courses"}
-    assert body["can_create_courses"] is False
+                         "can_create_courses", "is_teacher"}
+    assert body["can_create_courses"] is False and body["is_teacher"] is False
     r = await client.patch(f"{P}/me/lms", json={"locale": "ky"}, headers=auth(u))
     assert r.status_code == 200 and r.json()["locale"] == "ky"
     r = await client.patch(f"{P}/me/lms", json={"locale": "xx"}, headers=auth(u))
     assert r.status_code == 422
+
+
+async def test_me_is_teacher_sources(client, db):
+    """Phase 6 S8: is_teacher = approved, or org teacher/admin, or active course staff; a student is not."""
+    from tests.lms.factories import enroll
+    owner = make_user(db, teacher_status="approved")
+    assert (await client.get(f"{P}/me/lms", headers=auth(owner))).json()["is_teacher"] is True
+    course = make_course(db, owner)
+    student, assistant, removed = make_user(db), make_user(db), make_user(db)
+    enroll(db, course, student, role="student")
+    enroll(db, course, assistant, role="assistant")
+    enroll(db, course, removed, role="teacher", state="removed")
+    for u, want in ((student, False), (assistant, True), (removed, False)):
+        assert (await client.get(f"{P}/me/lms", headers=auth(u))).json()["is_teacher"] is want
 
 
 async def test_request_approve_flow(client, db):
@@ -140,7 +154,8 @@ async def test_revoke_and_direct_grant(client, db):
     req = db.get(TeacherRequest, uuid.UUID(rid))
     assert req.status == "approved" and req.decided_by_id == admin.id
 
-    # existing course stays editable; new course creation is blocked after revoke
+    # new course creation is blocked after revoke; Phase 6 (PHASE_6_DESIGN 7): revoke suspends the personal
+    # organization, so the existing course becomes read-only
     course = make_course(db, user)
     r = await client.post(f"{P}/platform/users/{user.id}/teacher-status",
                           json={"status": "revoked", "reason": "policy"}, headers=auth(admin))
@@ -152,7 +167,8 @@ async def test_revoke_and_direct_grant(client, db):
     if r.status_code not in (404, 405):
         assert r.status_code == 403
         r = await client.patch(f"{P}/courses/{course.id}", json={"title": {"en": "New"}}, headers=auth(user))
-        assert r.status_code == 200, r.text
+        assert r.status_code == 403, r.text
+        assert (await client.get(f"{P}/courses/{course.id}", headers=auth(user))).status_code == 200
 
     # invalid transitions
     r = await client.post(f"{P}/platform/users/{user.id}/teacher-status", json={"status": "revoked"},

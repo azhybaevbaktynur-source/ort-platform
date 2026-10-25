@@ -7,6 +7,7 @@ import { useTranslation } from "@/lib/i18n/context";
 import { addSection, deleteSection, getAssessment, reorderSections, updateSection } from "@/lib/lms/assessments";
 import { isStaffAssessment, type AssessmentStaffOut, type SectionIn, type SectionOut } from "@/lib/lms/assessmentTypes";
 import { pickLocalized } from "@/lib/lms/localized";
+import { isAssessmentLocked, useTemplateUi } from "@/lib/lms/templates";
 import { useCourse } from "@/components/lms/CourseContext";
 import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
 import { StaffGate, useCanEditContent } from "@/components/lms/content/StaffGate";
@@ -31,6 +32,7 @@ function Builder() {
   const params = useParams<{ assessmentId: string }>();
   const router = useRouter();
   const canEdit = useCanEditContent();
+  const ui = useTemplateUi(); // Phase 6 S4b
   const aid = params.assessmentId;
   const base = `/${lang}/courses/${course.id}/assessments`;
   const [a, setA] = useState<AssessmentStaffOut | null>(null);
@@ -61,7 +63,9 @@ function Builder() {
   }, [course.id, aid, load]);
   const sectionIds = a?.sections.map((s) => s.id) ?? [];
   const moveSection = (from: number, to: number) => void reorder(moveIndex(sectionIds, from, to));
-  const drag = useDragReorder(moveSection, canEdit);
+  // --- Phase 6 S4b: a locked course template fixes the sections (add, delete, reorder), design §5.4 ---
+  const structureLocked = !!a && isAssessmentLocked(ui, a.preset);
+  const drag = useDragReorder(moveSection, canEdit && !structureLocked);
 
   if (error && !a) return <AssessmentError error={error} onRetry={() => void load()} />;
   if (!a) return <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p>;
@@ -118,14 +122,15 @@ function Builder() {
       </details>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-base font-bold text-slate-900">{t("assessments.builder.sections")}</h3>
-        {canEdit && <button type="button" className={btnPrimary} onClick={() => { setSecError(null); setSectionDlg({ section: null }); }}>{t("assessments.section.add")}</button>}
+        {canEdit && <button type="button" className={btnPrimary} disabled={structureLocked} onClick={() => { setSecError(null); setSectionDlg({ section: null }); }}>{t("assessments.section.add")}</button>}
       </div>
+      {canEdit && structureLocked && <p role="note" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">{t("templates.lockedNote")}</p>}
       <AssessmentError error={actionError} />
       {a.sections.length === 0 && <p className="text-sm text-slate-500">{t("assessments.builder.noSections")}</p>}
       <div className="space-y-4">
         {a.sections.map((s, i) => (
           <SectionCard key={s.id} section={s} assessment={a} ctx={ctx} index={i} count={a.sections.length} defaultLanguage={course.default_language}
-            dragProps={drag(i)} onMoveBy={(d) => moveSection(i, i + d)}
+            dragProps={drag(i)} onMoveBy={(d) => moveSection(i, i + d)} structureLocked={structureLocked}
             onEdit={() => { setSecError(null); setSectionDlg({ section: s }); }}
             onDelete={() => { setSecError(null); setToDelete(s); }} onAdd={() => setAddTo(s.id)} />
         ))}

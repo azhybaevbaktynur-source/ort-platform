@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { NumberedPassage } from "@/components/lms/NumberedPassage";
+import { TemplatePassage } from "@/components/lms/PlainPassage";
 import type { StudentPassage } from "@/lib/lms/attemptTypes";
 
 export function PassagePane({ passage }: { passage: StudentPassage }) {
@@ -12,7 +12,7 @@ export function PassagePane({ passage }: { passage: StudentPassage }) {
         // eslint-disable-next-line @next/next/no-img-element
         <img src={passage.image_url} alt="" className="mb-3 max-h-72 w-auto rounded-lg" />
       ) : null}
-      <NumberedPassage text={passage.body} />
+      <TemplatePassage text={passage.body} />
     </section>
   );
 }

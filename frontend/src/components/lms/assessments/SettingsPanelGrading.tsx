@@ -21,7 +21,7 @@ export interface GradingFormValue {
 
 /** The "Grading" group of the assessment settings form (controlled by SettingsPanel). */
 export function SettingsPanelGrading({
-  courseId, assessmentId, value, onChange, currentScheme, defaultLanguage, disabled,
+  courseId, assessmentId, value, onChange, currentScheme, defaultLanguage, disabled, schemeLocked = false,
 }: {
   courseId: string;
   assessmentId: string;
@@ -30,6 +30,8 @@ export function SettingsPanelGrading({
   currentScheme: SchemeVersionRef | null;
   defaultLanguage: Lang;
   disabled: boolean;
+  /** Phase 6 S4b: the grading scheme is fixed by a locked course template (greyed out with a note). */
+  schemeLocked?: boolean;
 }) {
   const { lang, t } = useTranslation();
   const [categories, setCategories] = useState<CategoryOut[]>([]);
@@ -73,9 +75,9 @@ export function SettingsPanelGrading({
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className={labelCls} htmlFor="ag-scheme">{t("grading.settings.scheme")}</label>
-          <SchemePicker id="ag-scheme" value={value.schemeVersionId} current={currentScheme} disabled={disabled}
+          <SchemePicker id="ag-scheme" value={value.schemeVersionId} current={currentScheme} disabled={disabled || schemeLocked}
             defaultLanguage={defaultLanguage} onChange={(id) => set({ schemeVersionId: id })} />
-          <p className="mt-1 text-xs text-slate-500">{t("grading.settings.schemeHint")}</p>
+          <p className="mt-1 text-xs text-slate-500">{schemeLocked ? t("templates.lockedNote") : t("grading.settings.schemeHint")}</p>
         </div>
         <div>
           <label className={labelCls} htmlFor="ag-category">{t("grading.settings.category")}</label>

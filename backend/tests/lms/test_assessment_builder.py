@@ -15,6 +15,7 @@ def err(res):
 
 async def test_preset_ort_main(db, api):
     w = world(db)
+    w.course.template_key, w.course.template_version = "ort", 1; db.commit()  # Phase 6 S2b: ORT presets/import formats need the ORT course template
     a = await mk(api, w.O, w.cid, preset="ort_main")
     assert a["navigation"] == "section_forward_only" and a["results_policy"] == "after_submit"
     assert a["show_correct_answers"] is True and a["allowed_attempts"] == 1 and a["status"] == "draft"
@@ -29,6 +30,7 @@ async def test_preset_ort_main(db, api):
 
 async def test_preset_ort_subject_and_none(db, api):
     w = world(db)
+    w.course.template_key, w.course.template_version = "ort", 1; db.commit()  # Phase 6 S2b: ORT presets/import formats need the ORT course template
     a = await mk(api, w.O, w.cid, preset="ort_subject", subject_key="chemistry")
     assert [(s["key"], s["time_limit_s"]) for s in a["sections"]] == [("chemistry", 3600)]
     bad = await api.call(w.O, "POST", f"/courses/{w.cid}/assessments",
@@ -50,6 +52,7 @@ async def test_create_validation(db, api):
 
 async def test_math1_rejects_single_choice_and_preset_lock(db, api):
     w = world(db)
+    w.course.template_key, w.course.template_version = "ort", 1; db.commit()  # Phase 6 S2b: ORT presets/import formats need the ORT course template
     bank = make_bank(db, w.course, w.O)
     q_sc, q_cmp = sc(db, bank, w.O), cmp_q(db, bank, w.O)
     a = await mk(api, w.O, w.cid, preset="ort_main")
@@ -208,6 +211,7 @@ async def test_bulk_by_bank_filter(db, api):
 
 async def test_passage_item_add(db, api):
     w = world(db)
+    w.course.template_key, w.course.template_version = "ort", 1; db.commit()  # Phase 6 S2b: ORT presets/import formats need the ORT course template
     bank = make_bank(db, w.course, w.O)
     p = make_passage(db, bank, w.O)
     qs = [sc(db, bank, w.O, passage_id=p.id) for _ in range(2)]

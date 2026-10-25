@@ -82,6 +82,12 @@ def _join(db: Session, user: User, course: Course, *, source: str,
     # open join) is never locked. Same 404 as below; the check after the lock stays authoritative.
     if not _joinable(course, source):
         raise _join_failure(db, ip_hash)
+    # --- Phase 6 S1 begin --- (suspended organization: the same generic answer as a wrong code)
+    from app.lms.organizations.models import Organization
+
+    if db.execute(select(Organization.status).where(Organization.id == course.organization_id)).scalar() != "active":
+        raise _join_failure(db, ip_hash)
+    # --- Phase 6 S1 end ---
     if course.enrollment_limit is not None:
         lock_course(db, course)
     else:
@@ -142,6 +148,13 @@ def _owner_only(ctx: AuthzContext, course: Course) -> None:
         raise Forbidden("Only the owner can do this", code="owner_only")
 
 
+def require_staff_power(ctx: AuthzContext, course: Course) -> None:
+    """Staff changes need a teacher enrollment (or the platform admin): org admin power alone stops at the
+    student-level roster (owner decision A13). Full powers only via the audited join-as-teacher."""
+    if ctx.role_for(course.id) != "teacher" and not getattr(ctx.user, "is_platform_admin", False):
+        raise Forbidden("Join the course as a teacher first", code="org_admin_join_required")
+
+
 def _approved_teacher(user: User) -> bool:
     return user.teacher_status == "approved" and user.disabled_at is None
 
@@ -163,6 +176,7 @@ def leave(db: Session, ctx: AuthzContext, course: Course) -> None:
 
 def add_staff(db: Session, ctx: AuthzContext, course: Course, email: str, role: Literal["teacher", "assistant"]) -> Enrollment:
     require_course(ctx, A.ROSTER_MANAGE, course)
+    require_staff_power(ctx, course)
     if role == "teacher":
         _owner_only(ctx, course)
     actor = ctx.user
@@ -207,6 +221,8 @@ def change_role(db: Session, ctx: AuthzContext, course: Course, enrollment_id: u
     enr = load_enrollment_in_course(db, course.id, enrollment_id, for_update=True)
     if enr.user_id == course.owner_id:
         raise Conflict("The owner cannot be changed", code="owner_immutable")
+    if role in ("teacher", "assistant"):
+        require_staff_power(ctx, course)
     if enr.role == "teacher" or role == "teacher":
         _owner_only(ctx, course)
     if role == "teacher":

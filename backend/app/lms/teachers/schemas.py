@@ -15,6 +15,7 @@ class MeOut(BaseModel):
     is_platform_admin: bool
     teacher_status: str
     can_create_courses: bool
+    is_teacher: bool  # Phase 6 S8: approved, org teacher/admin, or course staff (UI area, not a permission)
 
 
 class MePatchIn(BaseModel):

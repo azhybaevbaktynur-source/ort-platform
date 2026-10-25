@@ -69,7 +69,8 @@ export default function QuestionPage() {
         <h2 className="text-xl font-bold text-slate-900">{t("bank.editor.title", { n: q.version_no })}</h2>
         {deleted && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">{t("bank.list.deletedBadge")}</span>}
       </div>
-      <div role="tablist" aria-label={t("bank.editor.tabsLabel")} className="flex gap-1 border-b border-slate-200">
+      {/* Phase 6 S8: the tab row wraps at 375 px instead of widening the page. */}
+      <div role="tablist" aria-label={t("bank.editor.tabsLabel")} className="flex flex-wrap gap-x-1 border-b border-slate-200">
         {TABS.map((id) => (
           <button key={id} role="tab" type="button" aria-selected={tab === id} onClick={() => setTab(id)}
             className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold ${tab === id ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>

@@ -5,13 +5,15 @@ import { useTranslation } from "@/lib/i18n/context";
 import type { AttemptResultOut } from "@/lib/lms/attemptTypes";
 import type { AttemptGradeOut } from "@/lib/lms/gradingTypes";
 import { fmtDateTime, fmtPoints } from "@/components/lms/assessments/format";
+import { useTemplateUi } from "@/lib/lms/templates";
 import { GradeBadge } from "./GradeBadge";
 import { OrtResultView } from "./OrtResultView";
 
 export function ResultSummary({ result, grade: gradeProp }: { result: AttemptResultOut; grade?: AttemptGradeOut | null }) {
   const { t } = useTranslation();
+  const ui = useTemplateUi();
   const grade = gradeProp ?? result.grade ?? null;
-  const scaled = !!grade && !!grade.sections && grade.sections.length > 0;
+  const scaled = ui.resultView === "ort" && !!grade && !!grade.sections && grade.sections.length > 0;
   return (
     <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5" aria-label={t("results.title")}>
       <div className="flex flex-wrap items-end justify-between gap-3">

@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { createAssessment } from "@/lib/lms/assessments";
-import { ASSESSMENT_PRESETS, ORT_SUBJECT_KEYS, type AssessmentPreset, type AssessmentStaffOut } from "@/lib/lms/assessmentTypes";
+import type { AssessmentPreset, AssessmentStaffOut } from "@/lib/lms/assessmentTypes";
+import { LEGACY_UI, useTemplateUi } from "@/lib/lms/templates";
 import { cleanLocalized } from "@/lib/lms/localized";
 import type { Lang, LocalizedText } from "@/lib/lms/types";
 import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
@@ -22,16 +23,22 @@ export function CreateAssessmentDialog({
   onCancel: () => void;
 }) {
   const { t } = useTranslation();
+  const ui = useTemplateUi();
+  const presets = ui.assessmentPresets;
+  // UX F5: the ORT hint only in ORT courses (and the pre-template fallback, today's behaviour).
+  const ortCourse = ui.key === "ort" || ui === LEGACY_UI;
+  const subjects = ui.subjectKeys;
+  const firstSubject = subjects[0] ?? "";
   const [title, setTitle] = useState<LocalizedText>({});
   const [preset, setPreset] = useState<AssessmentPreset>("none");
   const [languages, setLanguages] = useState<Lang[]>([defaultLanguage]);
-  const [subject, setSubject] = useState<string>(ORT_SUBJECT_KEYS[0]);
+  const [subject, setSubject] = useState<string>(firstSubject);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
-    if (open) { setTitle({}); setPreset("none"); setLanguages([defaultLanguage]); setSubject(ORT_SUBJECT_KEYS[0]); setError(null); }
-  }, [open, defaultLanguage]);
+    if (open) { setTitle({}); setPreset("none"); setLanguages([defaultLanguage]); setSubject(firstSubject); setError(null); }
+  }, [open, defaultLanguage, firstSubject]);
 
   const toggle = (l: Lang) => {
     setLanguages((cur) => (cur.includes(l) ? (cur.length > 1 ? cur.filter((x) => x !== l) : cur) : courseLanguages.filter((x) => cur.includes(x) || x === l)));
@@ -61,10 +68,10 @@ export function CreateAssessmentDialog({
       <form onSubmit={submit} className="space-y-4">
         <LocalizedTextInput label={t("assessments.create.titleLabel")} languages={courseLanguages} defaultLanguage={defaultLanguage}
           value={title} onChange={setTitle} maxLength={200} required />
-        <fieldset>
+        {presets.length > 1 && <fieldset>
           <legend className={labelCls}>{t("assessments.create.preset")}</legend>
           <div className="space-y-2">
-            {ASSESSMENT_PRESETS.map((p) => (
+            {presets.map((p) => (
               <label key={p} className="flex items-start gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm">
                 <input type="radio" name="preset" className="mt-1" checked={preset === p} onChange={() => setPreset(p)} />
                 <span>
@@ -74,12 +81,12 @@ export function CreateAssessmentDialog({
               </label>
             ))}
           </div>
-        </fieldset>
+        </fieldset>}
         {preset === "ort_subject" && (
           <div>
             <label className={labelCls} htmlFor="subject-key">{t("assessments.create.subject")}</label>
             <select id="subject-key" className={inputCls} value={subject} onChange={(e) => setSubject(e.target.value)}>
-              {ORT_SUBJECT_KEYS.map((k) => <option key={k} value={k}>{t(`sections.${k}`)}</option>)}
+              {subjects.map((k) => <option key={k} value={k}>{t(`sections.${k}`)}</option>)}
             </select>
           </div>
         )}
@@ -93,7 +100,7 @@ export function CreateAssessmentDialog({
               </label>
             ))}
           </div>
-          <p className="mt-1 text-xs text-slate-500">{t("assessments.create.languagesHint")}</p>
+          <p className="mt-1 text-xs text-slate-500">{t(ortCourse ? "assessments.create.languagesHint" : "assessments.create.languagesHintGeneral")}</p>
         </fieldset>
         <AssessmentError error={error} />
         <div className="flex justify-end gap-2">

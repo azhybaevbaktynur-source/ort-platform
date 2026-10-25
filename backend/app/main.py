@@ -40,6 +40,20 @@ def _seed_grading_schemes() -> None:
         db.close()
 
 
+# --- Phase 6 S1 begin ---
+def _ensure_organizations() -> None:
+    """Phase 6 organizations bootstrap (PHASE_6_DESIGN 4), idempotent; never fatal."""
+    from app.db.session import SessionLocal
+    from app.lms.organizations.bootstrap import ensure_organizations
+
+    db = SessionLocal()
+    try:
+        ensure_organizations(db)
+    finally:
+        db.close()
+# --- Phase 6 S1 end ---
+
+
 def _seed_ort_courses() -> None:
     """Phase 5 ORT courses and the conversion of legacy_ort_export (P5-2); never fatal (ensure_ort_courses logs
     and stores every failure itself)."""
@@ -69,6 +83,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Database startup initialization notice: {e}")
     _seed_grading_schemes()
+    _ensure_organizations()  # Phase 6 S1: after the schemes, before the ORT courses
     _seed_ort_courses()
     if is_production():
         if settings.SECRET_KEY == DEFAULT_SECRET_KEY:
@@ -90,6 +105,14 @@ cors_origins = settings.ALLOWED_ORIGINS or settings.BACKEND_CORS_ORIGINS or ["*"
 from app.lms.attempts.bodycap import BodyCapMiddleware
 # Innermost (added first): Content-Length 413s and CORS preflights never wait for a slot; CORS still wraps the 503 (B1).
 app.add_middleware(admission.AdmissionMiddleware)
+# --- Phase 6 S3 begin --- (H2: datetimes in JSON always carry a timezone; invitation routes)
+from app.core.utc_json import UTCDatetimeJSONMiddleware  # noqa: E402
+from app.lms.invitations.router import router as _invitations_router  # noqa: E402
+
+# Just outside the admission gate, inside GZip: it sees the uncompressed JSON body the route produced.
+app.add_middleware(UTCDatetimeJSONMiddleware)
+app.include_router(_invitations_router, prefix=settings.API_V1_STR)
+# --- Phase 6 S3 end ---
 app.add_middleware(BodyCapMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(
@@ -100,6 +123,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- Phase 6 S2b begin --- (GET /courses/templates; before api_router so it wins over /courses/{course_id})
+from app.lms.templates.router import router as _templates_router  # noqa: E402
+
+app.include_router(_templates_router, prefix=settings.API_V1_STR + "/courses", tags=["Courses"])
+# --- Phase 6 S2b end ---
 # Include API v1 router
 app.include_router(api_router, prefix=settings.API_V1_STR)
 register_error_handlers(app)

@@ -221,6 +221,10 @@ def _ensure_course(db: Session, demo: User, lang: str, report: SeedReport) -> Co
     if course is not None:
         if course.status == "published" and course.published_at is None:  # the catalog needs it (keyset)
             course.published_at = utcnow()
+        # --- Phase 6 S1 begin --- (PHASE_6_DESIGN 4 step 5: no re-adding once a real account owns the course)
+        if course.owner_id != DEMO_TEACHER_ID:
+            return course
+        # --- Phase 6 S1 end ---
         _ensure_enrollment(db, course, demo, "owner")
         return course
     now = utcnow()
@@ -233,6 +237,12 @@ def _ensure_course(db: Session, demo: User, lang: str, report: SeedReport) -> Co
                     status="published", visibility="catalog", enrollment_mode="open", enrollment_limit=None,
                     join_code=generate_join_code(), join_code_rotated_at=now, settings={}, published_at=now,
                 )
+                # --- Phase 6 S1 begin --- (platform organization, locked ORT template v1)
+                from app.lms.organizations.defaults import ort_course_fields
+
+                for key, value in ort_course_fields(db.connection(), lang).items():
+                    setattr(course, key, value)
+                # --- Phase 6 S1 end ---
                 db.add(course)
                 db.flush()
             break

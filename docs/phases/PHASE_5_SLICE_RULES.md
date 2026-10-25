@@ -3,7 +3,6 @@
 Read this, then `docs/phases/PHASE_5_DESIGN.md` (your slice's sections), then only the code you need.
 
 - Work ONLY in your own git worktree (you were started in one). First: `git checkout -b phase-5/<slice-branch>` (name given in your brief). Commit there, push with `git push -u origin <branch>`. Never touch `main`, `lms` or `phase-5/cutover` directly; the orchestrator merges.
-- Commit messages end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Own only the files listed for your slice in design §10. `backend/app/core/config.py` and `backend/app/core/route_inventory.py` belong to S2; other slices add ONE clearly delimited block (`# --- Phase 5 S3 begin/end ---`) instead of editing other lines. i18n JSON (`frontend/src/lib/i18n/{en,ky,ru}.json`): S3 adds only the top-level group `catalog`, S4 only `storage` (+ `files.errors.storage_full` is S4's), S5 everything else. Add new top-level groups at the END of the file so merges stay simple.
 - NEVER read, print or modify `backend/.env`. No secrets or passwords in code (public repo). Rules: `AGENTS.md` §7.
 - `rm/cp/mv` are aliased interactive: use `/bin/rm -f`, `/bin/cp -f`, `/bin/mv -f`. macOS `sed -i ''`; prefer small Python scripts for edits.

@@ -3,7 +3,7 @@ _B = "/api/v1/courses"
 COURSE_POLICIES: dict[tuple[str, str], str] = {
     ("GET", _B): "authenticated",
     ("GET", f"{_B}/trash"): "authenticated",
-    ("POST", _B): "teacher_approved",
+    ("POST", _B): "course_creator",  # Phase 6 S1: can_create_courses + organization rules
     ("POST", f"{_B}/join"): "authenticated+ratelimit",
     ("GET", f"{_B}/{{course_id}}"): "course:course.read",
     ("PATCH", f"{_B}/{{course_id}}"): "course:course.update",

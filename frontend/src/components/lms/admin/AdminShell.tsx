@@ -36,6 +36,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   const items = [
     { href: `/${lang}/admin`, label: t("platformAdmin.nav.overview"), exact: true },
+    // --- Phase 6 S4 ---
+    { href: `/${lang}/admin/organizations`, label: t("organizations.nav.organizations") },
+    // --- Phase 6 S4 end ---
     { href: `/${lang}/admin/teacher-requests`, label: t("platformAdmin.nav.teacherRequests"), badge: pending },
     { href: `/${lang}/admin/users`, label: t("platformAdmin.nav.users") },
     { href: `/${lang}/admin/courses`, label: t("platformAdmin.nav.courses") },

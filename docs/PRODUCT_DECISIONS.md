@@ -8,9 +8,9 @@ Source: answers to the 15 open questions in `PROJECT_UNDERSTANDING.md` §8. The 
 |---|---|
 | Teachers | **Superseded 2026-10-22**: see "Decisions 2026-10-22 (teachers)" below. Originally: self sign-up, a sign-up is a teacher. Roles stay per enrollment. |
 | The 12k questions | Not important. ORT becomes a course a teacher creates (upload ORT questions) and can make visible to everyone. No platform-owned bank required. |
-| Sharing questions between teachers | Later. Not now. |
+| Sharing questions between teachers | **Superseded 2026-10-24**: shared question banks per organization (Phase 9). Originally: later. |
 | Sections / cohorts | None. One course = one group of students. |
-| Schools / Accounts (B2B) | Not near term. |
+| Schools / Accounts (B2B) | **Superseded 2026-10-24**: organizations from Phase 6 (see "Owner decisions 2026-10-24"). Originally: not near term. |
 | Grading | Flexible per course/test. Not ORT-only. ORT scaling is one grading scheme among others. |
 | Existing users and data | Testers only. May be deleted. Nothing to migrate. |
 | Deleting content | Sophisticated: soft delete, history kept. |
@@ -38,7 +38,7 @@ Source: answers to the 15 open questions in `PROJECT_UNDERSTANDING.md` §8. The 
 
 | Topic | Decision |
 |---|---|
-| Who can create courses | Only **admin-approved teachers**. Everyone who signs up is a student. A user may request teacher access; a platform admin approves or rejects it. Revocable. (Replaces self sign-up as teacher and D10.) |
+| Who can create courses | **Partly superseded 2026-10-24** (see below): teachers now arrive by invitation from an org admin or platform admin; the request flow stays only for independent teachers; course creation is an organization setting. Original (2026-10-22): only admin-approved teachers; everyone who signs up is a student; a user may request teacher access; a platform admin approves or rejects it. Revocable. |
 | Age (D5) | Not a problem for course creation, because an admin verifies every teacher first. Student minimum age and consent wording are deferred. |
 | D2 (domain/CDN) and D5 (age/consent) | Postponed until the overall build is finished and a domain exists. |
 | Platform admin | Approves teacher requests (and does support/moderation). Role is read from the database on every request. |
@@ -181,3 +181,143 @@ Accepted deviations from the design:
 - `image_validation.py` moved into `app/lms/files/`; `attempts/bodycap.py` exempts the `files` upload route (it streams its own 10 MiB cap); the smoke audit row uses `target_type='user'`.
 - Production has no Kyrgyz questions: "ORT (Kyrgyz)" stays empty until a ky bundle is imported (owner informed).
 - Post-cutover fix: `NEXT_PUBLIC_API_URL` on Vercel is the bare Render origin, so every client now normalizes it once (`frontend/src/lib/apiBase.ts`, appends `/api/v1` like `next.config.ts`). A 401 on `/me/lms` (expired or pre-cutover token) signs out and goes to login. The LMS header shows role-aware links (admin, create course, grading schemes, become teacher), the account name and sign out; a missing course shows a friendly "course not found" page.
+
+## Owner decisions 2026-10-24 (answers to `docs/DISCUSSION.md`, planning rules)
+
+Source: the owner's written answers of 2026-10-24 (verbatim copy kept by the orchestrator). The owner says these ideas are not final: where the agents see a simpler, cheaper or safer option, it goes into "Alternatives to discuss" (`IMPLEMENTATION_PLAN.md`, end of file, and the Phase 6 design), never silently applied; the owner decides. Order of work: review the whole plan (done in this update), then UX guidelines and audit, then the Phase 6 design, then stop for the owner's review. No feature code before that review.
+
+### A. ORT must not change (hard rule for every phase)
+
+| Topic | Decision |
+|---|---|
+| ORT experience | Kept exactly as it is now: exam player (comparison card, line-numbered passages, LaTeX, section timers, forward-only sections, palette, flags, autosave), ORT question bank and exam management, ORT CSV and zip bundle import (same files, same screens, same results), ORT scoring and result view (scaled scores, percentiles, section breakdown, golden certificate). |
+| Course templates | A general "course template" feature; ORT is its first template. A template covers the whole course: structure and default banks, importer profile, question types and passage options, ready-made exams with section structure, timing and navigation rules, grading scheme, result view. The existing ORT code stays as it is and becomes part of the ORT template; the database records only which template a course uses and its settings. ORT logic is **not** rewritten into generic settings or simplified. General courses get general versions; new exam types reuse general pieces and get new code only for truly new formats. No ORT-specific checks spread through the code. |
+| Locked templates | A template can be locked; courses using it cannot change the exam structure. A teacher in an ORT course sees the same upload, bank, exam and result screens as today. |
+| ORT template permission | Granted only by platform admins to selected organizations or teachers; other teachers do not see it. (Per-teacher grants: Alternatives A1.) |
+| Proof every phase | The same CSV/zip files import identically; ORT exams look and behave the same (end-to-end tests plus screenshot comparisons of the exam player); ORT scores match. Written into the plan's definition of done as the ORT parity gate. |
+
+### B. Accounts and organizations: institutional Canvas, not Free for Teacher
+
+| Topic | Decision |
+|---|---|
+| Q1/Q2 sign-up | Students sign up themselves (join code or open catalog). Teachers do not pick "teacher" at sign-up; they come in by invitation from an org admin or a platform admin. Independent teachers may apply to the platform admin: the current request flow is kept only for that. (Replaces the 2026-10-22 "request teacher access" default and DISCUSSION option B.) |
+| Q3 co-teachers | Course owners add co-teachers and assistants to their own course themselves. |
+| Q4 organizations | Phase 6 builds only the foundation: `organizations` table, every course and bank belongs to an organization, `org_admin` role, a small org admin area (teachers: invite/remove; courses list). Start with one organization the owner owns holding both ORT courses, plus a default organization for independent teachers. Nullable `parent_id` for later departments; no tree management, roster CSV import or org settings beyond "teachers can create courses" (off by default) in Phase 6. |
+| Platform admin area | Manages organizations: create, edit, suspend; assign and remove org admins; see each organization's teachers, courses and usage; grant or remove course templates such as ORT. |
+| Four areas | Platform admin (owner), organization admin, teaching, student. (Implemented as navigation; per-course roles stay the authority: Alternatives A8.) |
+| Institutional exam features | For the exam-related phases: shared question banks per organization (Phase 9), availability windows (exist), access codes (Phase 7), per-student accommodations with extra time and extra attempts (Phase 7), quiz statistics (Phase 10). |
+
+### C. Other answers
+
+| Topic | Decision |
+|---|---|
+| Q5 platform name | Not decided. A placeholder in i18n so the final name is a one-line change. |
+| Q6 phase order | The new order is accepted, with the organization foundation inside Phase 6: 6 organizations foundation + course templates + sign-up/invite flows + design system + student home; 7 assignments + general gradebook; 8 course structure (modules, pages, files, announcements, gating); 9 organizations completion + enrollment forms/invitations; 10 practice, analytics, quiz statistics, student tools; 11 privacy (observer/parent with consent), hardening, launch. |
+| Q7 submission types | None (manual grade), text, file (PDF/image). Media and links later. |
+| Q8 announcements/discussions | Announcements yes (Phase 8). Discussions later. |
+| Q9 parents | Observer accounts with Phase 11 privacy, tied to under-14 consent. |
+| Q10 ORT result view and line numbers | ORT keeps them through the ORT template; they are not the default for every course. |
+
+### D. UI/UX quality (applies from now on)
+
+| Topic | Decision |
+|---|---|
+| ux-reviewer agent | `.claude/agents/ux-reviewer.md` (model: fable) reviews screens from screenshots and code against `docs/UX_GUIDELINES.md` and reports concrete problems (screen, what is wrong, why it hurts the user, the fix). |
+| UX guidelines | `docs/UX_GUIDELINES.md`, short and practical. Students: very simple and motivating; the home screen answers "what should I do next?" (next exam or assignment, due dates, recent results) and little else; one main action per screen, no dense dashboards, plain friendly language, clear progress, small celebrations without noise. Mobile-first: everything works on a phone over a slow connection; test at 375 px and desktop. Teachers and admins: more information is fine but organized: clear navigation, tables with search and filters, no hidden features. Everywhere: one consistent design system (colors, type, spacing, components), helpful empty states and error messages (never a bare "Something went wrong"), loading states, accessibility basics (contrast, keyboard, labels), layouts that fit the longer Russian and Kyrgyz texts. |
+| UX audit now | Current pages (student, teacher, admin; desktop and phone screenshots); findings and fixes go into the plan: design system and student home in Phase 6, the rest where it fits. |
+| UX gate every phase | Before merging: screenshots of every new or changed screen (phone and desktop, all three languages for student screens), ux-reviewer check, fixes, screenshots saved in `docs/phases/PHASE_N_screens/`. |
+| ORT exam player ideas | ux-reviewer proposes improvements in `docs/ORT_PLAYER_IDEAS.md`. Fidelity-preserving ones are done without asking (readability, phone layout, accessibility, clearer timer/palette/flag states, loading and autosave feedback, error messages) with before/after screenshots. Anything that changes how the exam works (navigation rules, timing, question layout, scoring, anything differing from the real ORT) goes only into the ideas file for the owner's decision. |
+| No waiting | UX reviews never wait for the owner: fix the findings and continue; the owner looks at the saved screenshots when they want. |
+
+### E/F. Process
+
+| Topic | Decision |
+|---|---|
+| E. Plan review | Done 2026-10-24 by the architect on Fable: `IMPLEMENTATION_PLAN.md` Phases 6–11, `LMS_ARCHITECTURE.md`, this file and the handoff updated for organizations, course templates, assignments, modules, enrollment, privacy and UX gates. |
+| F. Phase 6 design | `docs/phases/PHASE_6_DESIGN.md`: organization and permission tables, platform admin and org admin pages; migration of existing users and the two ORT courses; the course template design and exactly which ORT code becomes the ORT template, with the tests that prove nothing changed; sign-up and invite flows; UX audit results and the student home plan; "Alternatives to discuss". The agent stops there for the owner's review. |
+
+## Owner decisions 2026-10-24 (second round: answers to `phases/PHASE_6_DESIGN.md` §10/§11, ORT reviews, exam template constructor)
+
+Source: the owner's written answers of 2026-10-24 #2 (verbatim copy kept by the orchestrator). Applied to `phases/PHASE_6_DESIGN.md` (§10 "Decided"), `IMPLEMENTATION_PLAN.md` (§0.4, overview, Phases 6–9, D10, D19, D23, D24) and `LMS_ARCHITECTURE.md` §2b. Only the H1 hotfix is implemented before the owner's next review.
+
+### A. Answers to the Phase 6 alternatives and questions
+
+| # | Topic | Decision |
+|---|---|---|
+| H1 | Player crash hotfix | Fix today, release it alone, then continue. (Done.) |
+| A1 | Independent teachers | A **personal organization** for each independent teacher (auto-created on approval; the teacher is its org admin). **Banks must never be shared between independent teachers.** Template grants go to organizations only. |
+| A10 | Importer subject keys | Yes: fix the subject-key alias bug inside the ORT importer; **prove ORT imports come out identical** (golden fixtures). |
+| A11 | ORT course owner | Yes: the owner's account owns both ORT courses (demo teacher = system co-teacher). |
+| A13 | Org admin inside courses | **Read-only** access inside courses plus roster management and reassigning the teacher. Full teacher powers only by adding themselves as a teacher (visible in the roster, logged). |
+| A14 | Course creation for independents | Stays **on**, within the personal organization. (Off by default for new school organizations.) |
+| A7 | Locked ORT settings | Greyed out with a short note. |
+| Org name | The owner's organization | Placeholder name and short id (`PLATFORM_ORG_NAME` / `PLATFORM_ORG_SLUG`, defaults "Platform" / `platform`), renameable by the owner later. |
+| Tester course | The private draft course in production | Moves to that tester's personal organization. |
+| Emails | Invitation sender | "{Inviter's name} via {Platform name}" (platform name from the i18n placeholder `common.appName`); address = the configured sender. |
+| A4 | Release | 6a and 6b are released separately. |
+| A6 | ORT bank screens | Keep today's screens (no split by section). |
+| A3 | Screenshot check | Compare against the **approved "after" images**, so allowed polish is not flagged as a regression. |
+| A2, A8, A9, A15–A18 | Agent proposals | Accepted as written in the Phase 6 design. |
+
+### B. ORT: one special, fixed template, exactly as today
+
+ORT keeps its current code, CSV/zip import, exam rules and scoring unchanged; it is owned by the owner and granted only by platform admins; it is **not rebuilt on the constructor now**. Later decision (not now): once the constructor works and is proven on other exams, the owner and the agents decide together whether ORT moves onto it. `phases/EXAM_TEMPLATES_DESIGN.md` §8 records what the constructor would need to express ORT exactly, and the constructor is designed so that this move stays possible without changing ORT's behaviour or import files (the ORT importer stays a code building block; `preset` and exam templates are mutually exclusive; a dry-run expressibility test is proposed).
+
+### C. ORT review in every phase (refines rule A of the first round)
+
+"Unchanged" means ORT's **functionality and exam behaviour** stay the same. Its **design and layout keep up** with the platform. In each phase:
+
+1. Check ORT's screens (bank, CSV/zip upload, exam builder, exam player, results, the student course pages) for design and arrangement: do they match the new design system, navigation and the rest of the platform, and do they work well on phones? Apply visual and layout updates (colors, spacing, components, menus, page arrangement, phone layout) so ORT does not look like an old, separate app.
+2. Check ORT's functionality with the parity tests (same imports, same scores, same exam rules) and a **real walkthrough**: upload a CSV and a zip, build an ORT exam, take it as a student, see the result.
+3. ux-reviewer reviews the ORT screens with the rest. Fix design findings without asking. Anything that changes how ORT works (exam rules, timing, navigation, question layout during the exam, scoring, import formats) goes into `docs/ORT_PLAYER_IDEAS.md` for the owner's decision.
+4. Report in `docs/phases/PHASE_N.md` what changed in ORT's look, with before/after screenshots, and confirm its functionality is unchanged.
+
+Written into `IMPLEMENTATION_PLAN.md` §0.4 as the **ORT review** (replaces the "ORT parity gate" wording; the parity tests are part of it) and into `phases/PHASE_6_DESIGN.md` §6.
+
+### D. Exam template constructor (owner's new feature; architect evaluation for review)
+
+The owner asks for a builder in which an exam template is designed and saved: sections in order (name, question count, time limit), navigation (free or forward-only), display mode (one question per page or scrolling), allowed question types per section, passage options (e.g. line numbers), scoring (points, percent, lookup scale), result view, and an import format generated from the template's sections and question types that validates uploads; new question types and special scoring rules are pluggable building blocks that appear in the constructor; templates are versioned and running exams keep their version; owners are the platform, an organization (shared inside it) and maybe a teacher; templates can be locked; staging: data model first, then the visual builder.
+
+Architect evaluation (`phases/EXAM_TEMPLATES_DESIGN.md`): the design **holds up**; most blocks exist (section rules and timers, navigation, question-type registry, grading scheme versions, immutable assessment snapshots); new are the stored, versioned exam structure, assessment creation from a template version, a general import format validated against a template, a block catalog, a scrolling display mode and an explicit result-view key. Cost about M (data model, API, general import format) + M (scrolling mode, result views) + L (visual constructor). Proposed placement: **Phase 7b** (data model, "save assessment as template", general import format; after assignments) and **Phase 8b** (visual constructor, scrolling mode; after the design system). Not Phase 6a. Course template (code, Phase 6) and exam template (data, 7b) are distinct terms; ORT uses the former only. Alternatives B1–B12 and open questions are in that document; **the owner decides before any constructor code**.
+
+### E. Status
+
+H1 released. Superseded by the third round below: the owner approved the Phase 6 design and the constructor evaluation on 2026-10-25.
+
+
+## Owner decisions 2026-10-25 (third round): exam templates approved, start Phase 6a
+
+Source: the owner's written answers of 2026-10-25 (verbatim copy kept by the orchestrator). The owner agrees with all recommendations of `phases/EXAM_TEMPLATES_DESIGN.md` §10–§11. Applied to `phases/EXAM_TEMPLATES_DESIGN.md` (§10 decided, §11 answered), `IMPLEMENTATION_PLAN.md` (7b, 8b, D24, Alternatives) and `phases/PHASE_6_DESIGN.md` (§7 invitation Reply-To, §11).
+
+| # | Topic | Decision |
+|---|---|---|
+| Q1 / B10 | Phase numbering | Keep the lettered sub-phases **7b** (data model) and **8b** (visual constructor). |
+| Q2 / B2 | First authoring path | Ship **"save as template"** in 7b; the visual constructor follows in 8b. |
+| Q3 / B3 | Import format | **One general import format validated against the template**. The ORT CSV/zip format stays unchanged as the `ort` profile. |
+| Q4 / B4 / B11 | Platform templates | Platform exam templates (structure only, no questions) are **visible to everyone without a grant**. The ORT **course** template stays grant-only. Organization and teacher templates stay private to their organization. |
+| Q5 | Who may lock | The template's owner: the platform admin for platform templates, org admins for organization templates, the teacher for their own. |
+| Q6 / B9 | ORT expressibility | Run the ORT dry-run test from 7b on, as part of the ORT review (no switch of ORT). |
+| Q7 | Invitation emails | **Reply-To = the inviter's email** (the From stays "{inviter} via {appName}" at the configured sender address). |
+| B5 | Teacher-owned templates | Yes, in the 7b data model from the start. |
+| B1 | Presets vs templates | No: ORT stays on its current `preset` path. |
+| B6, B7, B8, B12 | Other alternatives | The agent's recommendations: JSON spec in the immutable version; `min_items`/`max_items`; scrolling mode column in 7b, player in 8b; ORT exactly as today. |
+
+**Working mode from here** (owner): start Phase 6a and continue phase by phase, with the ORT review and the UX gate in every phase and all rules of `HANDOFF_NEXT_AGENT.md` and this file. **Checkpoints**: stop after **6a, 6b, 7b and 8b** are deployed and give the owner a short review list (what changed, URLs to open, what to try, screenshots to look at); continue only after the owner's OK. Between checkpoints (for example 7a, 8a) the agent does not wait. Also stop for the usual stop conditions (Neon data deletion, spending money, secrets) or when a design question would change ORT's behaviour or contradict a decision: then write it under "Alternatives to discuss" and ask.
+
+## Phase 6a implementation decisions (agent, 2026-10-25)
+
+Taken by the agent within the approved design (owner rule: decide, record here). None changes how ORT works for students; the one teacher-visible ORT change is listed first.
+
+| # | Topic | Decision |
+|---|---|---|
+| I1 | Locked ORT course (A7) | Structure edits of ORT preset exams answer 409 `template_locked`; the UI greys them out with "Fixed by the ORT template". Teacher-visible effect: an empty section can no longer be deleted from an `ort_main` draft (publish still refuses empty sections, so partial ORT exams cannot be published). Free assessments (`preset = none`) in an ORT course are not locked. A form that sends unchanged values gets 200. |
+| I2 | ORT seed under the lock | `ensure_ort_courses` acts as the demo teacher (unusable password, no login); that actor alone is exempt from the lock so the seed keeps working unchanged. |
+| I3 | Draft course in production | The private draft course belongs to the owner's own account, which is a platform admin; platform admins get no personal organization, so it moves to the platform organization (rehearsal 2026-10-25). |
+| I4 | Org admins and staff | Org admins manage students only; adding staff, changing a role to teacher/assistant and staff invitations need a real staff enrollment (403 `org_admin_join_required`), i.e. the audited "Join as teacher" first (security review). |
+| I5 | Ownership transfer | The new owner must be an active member of the course's organization (all paths), so courses never leave their organization. |
+| I6 | Suspended organization | Starting attempts is blocked; attempts already started may be finished and submitted. Writes answer 403 `organization_suspended`. |
+| I7 | Personal organizations | Slug `t-` + 12 hex chars of sha256(user id). A personal org for an owner who is not an approved teacher (or is disabled) is created suspended. |
+| I8 | Invitations | Accept also by invitation id from "My invitations" (a lost email is not a dead end; the account email must match). The inviter may revoke only while still allowed to manage the invitation. Invitation emails: at most 50 per hour per sender. |
+| I9 | Dates | All API datetimes are sent as UTC with `Z` (naive values are UTC); the frontend reads timezone-less strings as UTC (H2). |
+| I10 | ORT subject keys (A10) | `math_subject`, `kyrgyz_lang_lit`, `russian_lang_lit` are accepted as aliases of `advanced_math` / `native_language`; the golden import fixtures prove ORT imports unchanged. |
+| I11 | Create organization | No contact email field in 6a (not in the data model); can come with Phase 9 organization settings. |

@@ -26,10 +26,13 @@ export default function CoursesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [joinOpen, setJoinOpen] = useState(false);
+  // UX F4 / Phase 6 S8 (UX S1): the Teaching / Learning tabs only for people who teach (MeOut.is_teacher: approved,
+  // org teacher or admin, or staff in some course) and platform admins; others get one plain list.
+  const hasTeaching = me ? me.is_teacher || me.is_platform_admin : null;
 
   // Default tab: teachers start on Teaching, everyone else on Learning.
   useEffect(() => {
-    if (me && tab === null) setTab(me.can_create_courses ? "teaching" : "learning");
+    if (me && tab === null) setTab(me.is_teacher || me.can_create_courses ? "teaching" : "learning");
   }, [me, tab]);
 
   const load = useCallback(async (which: Tab, next?: string | null) => {
@@ -54,7 +57,6 @@ export default function CoursesPage() {
     }
   }, [tab, load]);
 
-  const showBecome = me && !me.can_create_courses && (me.teacher_status === "none" || me.teacher_status === "revoked");
   const tabBtn = (id: Tab, label: string) => (
     <button type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
       className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-semibold ${tab === id ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>
@@ -83,24 +85,18 @@ export default function CoursesPage() {
         </div>
       </div>
 
-      {showBecome && (
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-4">
-          <p className="text-sm text-slate-700">{t("courses.list.becomeTeacherText")}</p>
-          <Link href={`/${lang}/courses/become-teacher`} className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
-            {t("courses.list.becomeTeacher")}
-          </Link>
+      {/* UX F4: no "become a teacher" card here; the header's "I am a teacher" link leads to /teacher-access. */}
+      {hasTeaching && (
+        <div role="tablist" aria-label={t("courses.list.title")} className="mb-5 flex items-center border-b border-slate-200">
+          {tabBtn("teaching", t("courses.list.teaching"))}
+          {tabBtn("learning", t("courses.list.learning"))}
+          {me?.can_create_courses && (
+            <Link href={`/${lang}/courses/trash`} className="ml-auto inline-flex items-center gap-1.5 px-3 py-2 text-sm text-slate-500 hover:text-slate-800">
+              <Trash2 className="h-4 w-4" aria-hidden="true" />{t("courses.list.trash")}
+            </Link>
+          )}
         </div>
       )}
-
-      <div role="tablist" aria-label={t("courses.list.title")} className="mb-5 flex items-center border-b border-slate-200">
-        {tabBtn("teaching", t("courses.list.teaching"))}
-        {tabBtn("learning", t("courses.list.learning"))}
-        {me?.can_create_courses && (
-          <Link href={`/${lang}/courses/trash`} className="ml-auto inline-flex items-center gap-1.5 px-3 py-2 text-sm text-slate-500 hover:text-slate-800">
-            <Trash2 className="h-4 w-4" aria-hidden="true" />{t("courses.list.trash")}
-          </Link>
-        )}
-      </div>
 
       {error ? <ErrorMessage error={error} onRetry={() => tab && load(tab)} /> : null}
       {loading && items.length === 0 && !error && <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p>}

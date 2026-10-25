@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { QUESTION_TYPES, type QuestionType } from "@/lib/lms/contentTypes";
 import type { AssessmentStaffOut, SectionIn, SectionOut } from "@/lib/lms/assessmentTypes";
-import { ORT_SECTIONS } from "@/lib/lms/contentTypes";
+import { isAssessmentLocked, isPresetRuleLocked, useTemplateUi } from "@/lib/lms/templates";
 import { cleanLocalized } from "@/lib/lms/localized";
 import type { Lang, LocalizedText } from "@/lib/lms/types";
 import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
@@ -44,7 +44,10 @@ export function SectionDialog({
     setPassages(section?.rules.allow_passages ?? false);
   }, [open, section]);
 
-  const locked = assessment.preset !== "none" && !!section?.key && ORT_SECTIONS.some((k) => k === section.key);
+  const ui = useTemplateUi();
+  // Template lock (design §5.4): section key, time limit and rules are fixed; greyed out, never hidden.
+  const tplLocked = isAssessmentLocked(ui, assessment.preset); // Phase 6 S4b: free (`none`) assessments are not locked
+  const locked = tplLocked || isPresetRuleLocked(assessment.preset, section?.key);
   const free = assessment.navigation === "free";
   const toggleType = (q: QuestionType) => setTypes((c) => (c.includes(q) ? c.filter((x) => x !== q) : [...c, q]));
 
@@ -67,16 +70,17 @@ export function SectionDialog({
   return (
     <Modal open={open} title={section ? t("assessments.section.editTitle") : t("assessments.section.addTitle")} onClose={onCancel} busy={busy}>
       <form onSubmit={submit} className="space-y-4">
+        {tplLocked && <p role="note" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">{t("templates.lockedNote")}</p>}
         <div>
           <label className={labelCls} htmlFor="sec-key">{t("assessments.section.key")}</label>
-          <input id="sec-key" list="sec-keys" className={inputCls} maxLength={40} value={key} onChange={(e) => setKey(e.target.value)} />
-          <datalist id="sec-keys">{ORT_SECTIONS.map((k) => <option key={k} value={k}>{t(`sections.${k}`)}</option>)}</datalist>
+          <input id="sec-key" list={ui.sectionKeys.length ? "sec-keys" : undefined} className={inputCls} maxLength={40} value={key} disabled={tplLocked} onChange={(e) => setKey(e.target.value)} />
+          {ui.sectionKeys.length > 0 && <datalist id="sec-keys">{ui.sectionKeys.map((k) => <option key={k} value={k}>{t(`sections.${k}`)}</option>)}</datalist>}
         </div>
         <LocalizedTextInput label={t("assessments.section.titleLabel")} languages={languages} defaultLanguage={defaultLanguage} value={title} onChange={setTitle} maxLength={200} />
         <LocalizedTextInput label={t("assessments.section.instructions")} languages={languages} defaultLanguage={defaultLanguage} value={instructions} onChange={setInstructions} multiline />
         <div>
           <label className={labelCls} htmlFor="sec-limit">{t("assessments.section.timeLimit")}</label>
-          <input id="sec-limit" type="number" min={1} max={1440} className={inputCls} disabled={free} value={limit} onChange={(e) => setLimit(e.target.value)} />
+          <input id="sec-limit" type="number" min={1} max={1440} className={inputCls} disabled={free || tplLocked} value={limit} onChange={(e) => setLimit(e.target.value)} />
           <p className="mt-1 text-xs text-slate-500">{free ? t("assessments.section.timeLimitFreeHint") : t("assessments.section.timeLimitHint")}</p>
         </div>
         <fieldset disabled={locked}>
@@ -88,15 +92,15 @@ export function SectionDialog({
               </label>
             ))}
           </div>
-          <p className="mt-1 text-xs text-slate-500">{locked ? t("assessments.section.rulesLocked") : t("assessments.section.allowedTypesHint")}</p>
+          <p className="mt-1 text-xs text-slate-500">{tplLocked ? t("templates.lockedNote") : locked ? t("assessments.section.rulesLocked") : t("assessments.section.allowedTypesHint")}</p>
         </fieldset>
         <label className="flex items-center gap-2 text-sm text-slate-700">
-          <input type="checkbox" checked={passages} onChange={(e) => setPassages(e.target.checked)} />{t("assessments.section.allowPassages")}
+          <input type="checkbox" checked={passages} disabled={tplLocked} onChange={(e) => setPassages(e.target.checked)} />{t("assessments.section.allowPassages")}
         </label>
         <AssessmentError error={error} />
         <div className="flex justify-end gap-2">
           <button type="button" className={btnSecondary} disabled={busy} onClick={onCancel}>{t("lms.common.cancel")}</button>
-          <button type="submit" className={btnPrimary} disabled={busy}>{busy ? t("lms.common.loading") : t("lms.common.save")}</button>
+          <button type="submit" className={btnPrimary} disabled={busy || (tplLocked && !section)}>{busy ? t("lms.common.loading") : t("lms.common.save")}</button>
         </div>
       </form>
     </Modal>

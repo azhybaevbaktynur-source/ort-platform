@@ -9,8 +9,11 @@ import { Pager } from "@/components/lms/Pager";
 import { ReasonDialog } from "@/components/lms/admin/ReasonDialog";
 import { UserStatusBadge } from "@/components/lms/admin/UserStatusBadge";
 import { useAdminSummary } from "@/components/lms/admin/AdminShell";
+import { fmtApiDateTime } from "@/lib/format"; // Phase 6 S4 (H2)
 
 type Filter = TeacherRequestStatus | "all";
+// Phase 6 S4 (admin M7): the teacher status a request status implies; a badge shows only when they differ.
+const IMPLIED_TEACHER_STATUS: Record<string, string> = { pending: "pending", approved: "approved", rejected: "none", cancelled: "none" };
 const FILTERS: Filter[] = ["pending", "approved", "rejected", "all"];
 
 export default function TeacherRequestsPage() {
@@ -101,16 +104,21 @@ export default function TeacherRequestsPage() {
                 <p className="font-semibold text-slate-900">{r.user.display_name || r.user.email}</p>
                 <p className="text-xs text-slate-500">{r.user.email}</p>
               </div>
-              <div className="flex items-center gap-2">
-                <UserStatusBadge kind="teacher" status={r.user_teacher_status} />
+              {/* --- Phase 6 S4 (admin M7): request status only; teacher status only when it differs, prefixed "Now:" --- */}
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{t(`teacherRequest.requestStatus.${r.status}`)}</span>
+                {r.user_teacher_status !== IMPLIED_TEACHER_STATUS[r.status] && (
+                  <span className="inline-flex items-center gap-1 text-xs text-slate-600">
+                    {t("organizations.adminUser.nowPrefix")} <UserStatusBadge kind="teacher" status={r.user_teacher_status} />
+                  </span>
+                )}
               </div>
             </div>
-            <p className="mt-1 text-xs text-slate-500">{new Date(r.created_at).toLocaleString(lang)}</p>
+            <p className="mt-1 text-xs text-slate-500">{fmtApiDateTime(r.created_at, lang)}</p>
             <p className="mt-2 whitespace-pre-wrap text-slate-700">{r.message || t("platformAdmin.requests.noMessage")}</p>
             {r.reason && <p className="mt-2 text-slate-700"><strong>{t("teacherRequest.reason")}:</strong> {r.reason}</p>}
             {r.decided_by && r.decided_at && (
-              <p className="mt-1 text-xs text-slate-500">{t("platformAdmin.requests.decidedBy", { name: r.decided_by.display_name || r.decided_by.email, date: new Date(r.decided_at).toLocaleString(lang) })}</p>
+              <p className="mt-1 text-xs text-slate-500">{t("platformAdmin.requests.decidedBy", { name: r.decided_by.display_name || r.decided_by.email, date: fmtApiDateTime(r.decided_at, lang) })}</p>
             )}
             <div className="mt-3 flex flex-wrap gap-2">
               {r.status === "pending" && (

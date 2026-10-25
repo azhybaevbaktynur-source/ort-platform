@@ -501,6 +501,10 @@ def _run(db: Session, actor_id: str, course: Any, raw: Any, filename: str, opts:
 
 def preview(db: Session, ctx: Any, course: Any, raw: Any, filename: str, opts: ImportOptions) -> ImportReport:
     """Parse + validate + read-only plan: no locks, no encoding, nothing written."""
+    # --- Phase 6 S2b begin --- (course template importer profiles, PHASE_6_DESIGN 5.2)
+    from app.lms.templates.service import assert_import_profile_allowed
+    assert_import_profile_allowed(course, opts.exam_type)
+    # --- Phase 6 S2b end ---
     rep = _run(db, ctx.user.id, course, raw, filename, opts, write=False)
     db.rollback()
     return rep
@@ -508,4 +512,8 @@ def preview(db: Session, ctx: Any, course: Any, raw: Any, filename: str, opts: I
 
 def commit(db: Session, ctx: Any, course: Any, raw: Any, filename: str, opts: ImportOptions) -> ImportReport:
     """Any error -> report.ok false and nothing written (zero blobs); otherwise one transaction."""
+    # --- Phase 6 S2b begin --- (course template importer profiles, PHASE_6_DESIGN 5.2)
+    from app.lms.templates.service import assert_import_profile_allowed
+    assert_import_profile_allowed(course, opts.exam_type)
+    # --- Phase 6 S2b end ---
     return _run(db, ctx.user.id, course, raw, filename, opts, write=True)

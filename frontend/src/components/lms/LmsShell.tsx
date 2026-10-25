@@ -8,6 +8,9 @@ import { useTranslation, type Language } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
 import { LmsMeProvider, useLmsMeLoader } from "@/lib/lms/useLmsMe";
 import { ErrorMessage } from "./ErrorMessage";
+import { OrgNavLink } from "./org/OrgNavLink"; // Phase 6 S4
+import { PendingInvitationsBanner } from "./PendingInvitationsBanner"; // Phase 6 S4b
+import { InvitationAcceptedNotice } from "./InvitationAcceptedNotice"; // Phase 6 S8
 
 const LANGS: Language[] = ["en", "ru", "ky"];
 
@@ -63,7 +66,10 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const isAdmin = me ? me.is_platform_admin : !!userProfile?.is_platform_admin;
   const teacherStatus = me ? me.teacher_status : userProfile?.teacher_status;
   const canCreate = me ? me.can_create_courses : teacherStatus === "approved";
-  const canRequestTeacher = !canCreate && (teacherStatus === "none" || teacherStatus === "revoked");
+  // Phase 6 S8 (UX S1): "I am a teacher" only for people who teach nowhere yet (an org teacher who cannot
+  // create courses still teaches; shows the pending state too).
+  const isTeacher = me ? me.is_teacher : teacherStatus === "approved";
+  const canRequestTeacher = !isAdmin && !isTeacher;
   const name = me?.display_name || userProfile?.displayName || user.email;
 
   const linkCls = (href: string, exact = false) => {
@@ -87,9 +93,12 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
               {canCreate && (
                 <Link href={`${coursesHref}/new`} className={linkCls(`${coursesHref}/new`)}><Plus className="h-4 w-4" aria-hidden="true" />{t("lms.nav.create")}</Link>
               )}
+              {/* --- Phase 6 S4: "I am a teacher" (nav row so the account group fits 375 px, UX F1); org admin link --- */}
               {canRequestTeacher && (
-                <Link href={`${coursesHref}/become-teacher`} className={linkCls(`${coursesHref}/become-teacher`)}><UserPlus className="h-4 w-4" aria-hidden="true" />{t("lms.nav.becomeTeacher")}</Link>
+                <Link href={`/${lang}/teacher-access`} className={linkCls(`/${lang}/teacher-access`)}><UserPlus className="h-4 w-4" aria-hidden="true" />{t("teacherAccess.navLink")}</Link>
               )}
+              <OrgNavLink enabled={!!me} className={(href) => linkCls(href)} />
+              {/* --- Phase 6 S4 end --- */}
               {(canCreate || isAdmin) && (
                 <Link href={`/${lang}/grading-schemes`} className={linkCls(`/${lang}/grading-schemes`)}><Scale className="h-4 w-4" aria-hidden="true" />{t("lms.nav.gradingSchemes")}</Link>
               )}
@@ -105,19 +114,23 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
                 </button>
               ))}
             </div>
-            <div role="group" aria-label={t("lms.nav.account")} className="flex items-center gap-1">
-              <span className="inline-flex max-w-[14rem] items-center gap-1.5 truncate px-2 text-sm text-slate-700" title={user.email}>
+            <div role="group" aria-label={t("lms.nav.account")} className="flex min-w-0 max-w-full items-center gap-1">
+              <span className="inline-flex min-w-0 max-w-[13rem] items-center gap-1.5 px-2 text-sm text-slate-700 sm:max-w-[14rem]"
+                title={name === user.email ? name : `${name} (${user.email})`}>
                 <UserCircle className="h-4 w-4 flex-shrink-0 text-slate-500" aria-hidden="true" />
                 <span className="truncate">{name}</span>
               </span>
               <button type="button" onClick={() => void logout()}
-                className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
+                className="inline-flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
                 <LogOut className="h-4 w-4" aria-hidden="true" />{t("common.logout")}
               </button>
             </div>
           </div>
         </header>
         <main className="mx-auto max-w-6xl px-4 py-8">
+          {/* --- Phase 6 S4b --- */}
+          <PendingInvitationsBanner enabled={!!me} />
+          <InvitationAcceptedNotice />
           {meState.error && !me ? <ErrorMessage error={meState.error} onRetry={meState.reload} /> : children}
         </main>
       </div>

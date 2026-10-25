@@ -158,6 +158,15 @@ async def test_delete_restore_trash(db, api):
     assert (await api.call(t, "GET", "/courses/trash")).json()["items"] == []
 
 
+def _add_org_member(db, organization_id, user, role: str = "teacher") -> None:
+    """S5: ownership transfers require the new owner to be an active member of the course's organization."""
+    from app.lms.organizations.models import OrganizationMember
+
+    db.add(OrganizationMember(id=uuid.uuid4(), organization_id=organization_id, user_id=user.id, role=role,
+                              state="active"))
+    db.commit()
+
+
 async def test_transfer(db, api):
     o, co, other, stud = teacher(db), teacher(db), teacher(db), make_user(db)
     c = make_course(db, o, status="published")
@@ -166,12 +175,10 @@ async def test_transfer(db, api):
     for target in (stud.id, other.id, o.id, "usr_nope"):
         r = await api.call(o, "POST", f"/courses/{c.id}/transfer-ownership", json={"new_owner_user_id": target})
         assert r.status_code == 422 and r.json()["error"]["code"] == "invalid_new_owner", target
-    co.teacher_status = "revoked"
-    db.commit()
+    # S5: an approved co-teacher outside the course's organization cannot become the owner ...
     r = await api.call(o, "POST", f"/courses/{c.id}/transfer-ownership", json={"new_owner_user_id": co.id})
-    assert r.status_code == 422
-    co.teacher_status = "approved"
-    db.commit()
+    assert r.status_code == 422 and r.json()["error"]["code"] == "invalid_new_owner"
+    _add_org_member(db, c.organization_id, co)  # ... an active member can
     r = await api.call(o, "POST", f"/courses/{c.id}/transfer-ownership", json={"new_owner_user_id": co.id})
     assert r.status_code == 200 and r.json()["is_owner"] is False and r.json()["owner"]["id"] == co.id
     db.expire_all()
@@ -217,7 +224,7 @@ async def test_list_pagination_and_as_filter(db, api):
 
 def test_policies_are_declared_and_known():
     import re
-    ok = re.compile(r"^(authenticated(\+ratelimit)?|teacher_approved|platform_admin|legacy|course:[a-z_.]+(\+owner)?)$")
+    ok = re.compile(r"^(authenticated(\+ratelimit)?|course_creator|platform_admin|legacy|course:[a-z_.]+(\+owner)?)$")
     for key, pol in {**COURSE_POLICIES, **PLATFORM_COURSE_POLICIES}.items():
         assert ok.match(pol), (key, pol)
         assert ROUTE_POLICIES[key] == pol
@@ -253,6 +260,9 @@ async def test_admin_moderation_is_audited(db, api):
     r = await post("unlist", {"reason": "spam"})
     assert r.json()["unlisted_by_admin_at"]
     assert (await post("relist", {})).json()["unlisted_by_admin_at"] is None
+    r = await post("transfer-ownership", {"new_owner_user_id": new.id, "reason": "handover"})
+    assert r.status_code == 422 and r.json()["error"]["code"] == "invalid_new_owner"  # S5: not a member
+    _add_org_member(db, c.organization_id, new)
     r = await post("transfer-ownership", {"new_owner_user_id": new.id, "reason": "handover"})
     assert r.status_code == 200 and r.json()["owner"]["id"] == new.id
     assert (await post("transfer-ownership", {"new_owner_user_id": stud.id, "reason": "x"})).status_code == 422
