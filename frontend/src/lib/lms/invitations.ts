@@ -1,7 +1,7 @@
 // Invitations API (docs/phases/PHASE_6_DESIGN.md §2.3, §7).
 import { lmsFetch } from "./client";
 import { asPage, type ListParams } from "./organizations";
-import type { Lang, PageOut } from "./types";
+import type { Lang, LocalizedText, PageOut } from "./types";
 
 const enc = encodeURIComponent;
 const post = <T,>(path: string, body?: unknown) => lmsFetch<T>(path, { method: "POST", body: body ?? {} });
@@ -9,15 +9,24 @@ const post = <T,>(path: string, body?: unknown) => lmsFetch<T>(path, { method: "
 export type InvitationRole = "org_admin" | "teacher" | "assistant";
 export type InvitationState = "pending" | "accepted" | "revoked" | "expired";
 
+/** `InvitationOut` of GET /org/{orgId}/invitations and of revoke. */
 export interface InvitationOut {
   id: string;
   email: string;
   role: InvitationRole;
+  course_id: string | null;
+  /** Localized course title (staff invitations only). */
+  course_title: LocalizedText | null;
   state: InvitationState;
-  invited_by_name: string | null;
+  invited_by_name: string;
   created_at: string;
   expires_at: string;
-  course_title?: string | null;
+  accepted_at: string | null;
+}
+
+/** `InvitationCreatedOut`: create, resend and course staff invitations. */
+export interface InvitationCreatedOut extends InvitationOut {
+  email_sent: boolean;
 }
 
 export interface OrgInvitationIn {
@@ -31,41 +40,57 @@ export interface OrgInvitationIn {
 export interface InvitationPublicOut {
   organization_name: string;
   role: InvitationRole;
-  course_title?: string | null;
+  course_title: LocalizedText | null;
   masked_email: string;
   expires_at: string;
 }
 
-/** POST /invitations/{token}/accept result (assumed; used only to pick the redirect). */
+/** POST /invitations/{tokenOrId}/accept. */
 export interface InvitationAcceptOut {
-  organization_id?: string | null;
-  course_id?: string | null;
-  role?: InvitationRole;
-}
-
-/** GET /me/invitations item (assumed shape). */
-export interface MyInvitationOut {
-  id: string;
+  organization_id: string;
   organization_name: string;
   role: InvitationRole;
-  course_title?: string | null;
+  course_id: string | null;
+  already_accepted: boolean;
+}
+
+/** GET /me/invitations item: pending invitations for my email. `id` works in place of the token in accept. */
+export interface MyInvitationOut {
+  id: string;
+  organization_id: string;
+  organization_name: string;
+  role: InvitationRole;
+  course_id: string | null;
+  course_title: LocalizedText | null;
+  invited_by_name: string;
   expires_at: string;
 }
 
 export const listOrgInvitations = (orgId: string, p: ListParams & { state?: InvitationState } = {}) =>
-  lmsFetch<PageOut<InvitationOut> | InvitationOut[]>(`/org/${enc(orgId)}/invitations`, { params: { limit: 50, ...p } }).then((x) => asPage<InvitationOut>(x));
+  lmsFetch<PageOut<InvitationOut>>(`/org/${enc(orgId)}/invitations`, { params: { limit: 50, ...p } }).then((x) => asPage<InvitationOut>(x));
 export const createOrgInvitation = (orgId: string, body: OrgInvitationIn) =>
-  post<InvitationOut>(`/org/${enc(orgId)}/invitations`, body);
+  post<InvitationCreatedOut>(`/org/${enc(orgId)}/invitations`, body);
 export const revokeOrgInvitation = (orgId: string, id: string) =>
   post<InvitationOut>(`/org/${enc(orgId)}/invitations/${enc(id)}/revoke`);
 export const resendOrgInvitation = (orgId: string, id: string) =>
-  post<InvitationOut>(`/org/${enc(orgId)}/invitations/${enc(id)}/resend`);
+  post<InvitationCreatedOut>(`/org/${enc(orgId)}/invitations/${enc(id)}/resend`);
 
 export const getInvitation = (token: string) => lmsFetch<InvitationPublicOut>(`/invitations/${enc(token)}`);
-export const acceptInvitation = (token: string) => post<InvitationAcceptOut>(`/invitations/${enc(token)}/accept`);
-export const listMyInvitations = () =>
-  lmsFetch<PageOut<MyInvitationOut> | MyInvitationOut[]>("/me/invitations").then((x) => asPage<MyInvitationOut>(x).items);
+/** Accept by the emailed token, or by the invitation id from GET /me/invitations (same route). */
+export const acceptInvitation = (tokenOrId: string) => post<InvitationAcceptOut>(`/invitations/${enc(tokenOrId)}/accept`);
+export const listMyInvitations = (p: ListParams = {}) =>
+  lmsFetch<PageOut<MyInvitationOut>>("/me/invitations", { params: { limit: 50, ...p } }).then((x) => asPage<MyInvitationOut>(x).items);
 
-/** Course owner invites a co-teacher or assistant who has no account yet. */
+/** Course owner (or a course manager, for assistants) invites a co-teacher or assistant who has no account yet. */
 export const createCourseStaffInvitation = (courseId: string, body: { email: string; role: "teacher" | "assistant"; language: Lang }) =>
-  post<InvitationOut>(`/courses/${enc(courseId)}/staff/invitations`, body);
+  post<InvitationCreatedOut>(`/courses/${enc(courseId)}/staff/invitations`, body);
+
+/** Where to go after accepting: the course for a staff invitation, the org area for an org admin, else my courses. */
+export function invitationTarget(lang: string, r: Pick<InvitationAcceptOut, "course_id" | "role" | "organization_id">): string {
+  if (r.course_id) return `/${lang}/courses/${r.course_id}`;
+  if (r.role === "org_admin") return `/${lang}/org/${r.organization_id}`;
+  return `/${lang}/courses`;
+}
+
+/** Window event fired after an invitation was accepted, so the pending-invitations banner reloads. */
+export const INVITATIONS_CHANGED_EVENT = "lms-invitations-changed";

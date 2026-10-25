@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { cleanLocalized } from "@/lib/lms/localized";
-import { createOrgCourse, listOrgMembers } from "@/lib/lms/organizations";
+import { createOrgCourse, searchOrgMembers } from "@/lib/lms/organizations";
 import { listCourseTemplates, templateTitle, type TemplateChoiceOut } from "@/lib/lms/templates";
 import type { Lang, LocalizedText } from "@/lib/lms/types";
 import { LanguagePicker } from "@/components/lms/LanguagePicker";
@@ -42,8 +42,7 @@ export default function OrgNewCoursePage() {
   }, [org.id]);
 
   const searchMembers: UserSearch = useMemo(() => async (q) => {
-    const page = await listOrgMembers(org.id, { q, state: "active", limit: 10 });
-    return page.items.filter((m) => !m.disabled).map((m) => ({ id: m.user_id, display_name: m.display_name, email: m.email }));
+    return searchOrgMembers(org.id, q);
   }, [org.id]);
 
   const submit = async (ev: React.FormEvent) => {

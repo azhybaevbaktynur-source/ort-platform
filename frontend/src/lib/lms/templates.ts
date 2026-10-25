@@ -100,6 +100,14 @@ export function useTemplateUi(): TemplateUi {
 }
 
 /**
+ * Template lock of one assessment, as the backend's `assert_not_locked` (design §5.4): the course template is
+ * locked and the assessment is not a free (`none`) one. Locked controls are disabled with `templates.lockedNote`.
+ */
+export function isAssessmentLocked(ui: Pick<TemplateUi, "locked">, preset: string | null | undefined): boolean {
+  return ui.locked && preset !== "none";
+}
+
+/**
  * Preset rule lock (unchanged from Phase 3): sections of a preset assessment whose key is a known
  * preset section keep their type rules (server error `preset_rule_locked`).
  */
@@ -115,12 +123,12 @@ export function importProfileLabelKey(p: ImportExamType | ""): string {
 
 // --- API ---
 
-/** GET /courses/templates?organization_id= : granted templates of that organization (general = no entry). */
+/** GET /courses/templates?organization_id= (required): granted templates of that organization (general = no entry). */
 export interface TemplateChoiceOut {
   key: string;
   title_key: string;
 }
-export const listCourseTemplates = (organizationId?: string | null) =>
+export const listCourseTemplates = (organizationId: string) =>
   lmsFetch<TemplateChoiceOut[]>("/courses/templates", { params: { organization_id: organizationId } });
 
 /** Template title: the backend's `title_key`, then `templates.names.<key>`, then the key itself. */

@@ -17,4 +17,6 @@ PLATFORM_ORG_POLICIES: dict[tuple[str, str], str] = {
     ("PUT", f"{_O}/templates/{{template_key}}"): "platform_admin",  # grant, audited
     ("DELETE", f"{_O}/templates/{{template_key}}"): "platform_admin",  # revoke, audited
     ("GET", "/api/v1/platform/templates"): "platform_admin",
+    # --- Phase 6 S4b --- (admin user detail: organizations and roles of one user)
+    ("GET", "/api/v1/platform/users/{user_id}/organizations"): "platform_admin",
 }

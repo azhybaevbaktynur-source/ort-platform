@@ -21,6 +21,14 @@ from app.lms.organizations.schemas import (
 )
 from app.lms.platform_admin import organizations_service as svc
 from app.models.user import User
+# --- Phase 6 S4b begin ---
+from datetime import datetime
+
+from pydantic import BaseModel
+from sqlalchemy import select
+
+from app.lms.core.errors import NotFound
+# --- Phase 6 S4b end ---
 
 router = APIRouter()
 
@@ -142,3 +150,34 @@ def revoke_template(organization_id: uuid.UUID, template_key: str, request: Requ
 @router.get("/templates", response_model=list[TemplateOut])
 def list_templates(admin: User = Depends(require_platform_admin)):
     return [TemplateOut(**t) for t in org_svc.known_templates()]
+
+
+# --- Phase 6 S4b begin --- (admin user detail: the user's organizations and roles, PHASE_6_DESIGN 3)
+class UserOrganizationOut(BaseModel):
+    organization_id: uuid.UUID
+    organization_name: str
+    organization_slug: str
+    organization_status: str
+    role: str
+    state: str
+    created_at: datetime
+    removed_at: Optional[datetime] = None
+
+
+@router.get("/users/{user_id}/organizations", response_model=PageOut[UserOrganizationOut])
+def user_organizations(user_id: str, state: Literal["active", "removed"] = "active", cursor: Optional[str] = None,
+                       limit: int = 25, admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
+    if db.get(User, user_id) is None:
+        raise NotFound("User not found", code="user_not_found")
+    stmt = (select(OrganizationMember, Organization)
+            .join(Organization, Organization.id == OrganizationMember.organization_id)
+            .where(OrganizationMember.user_id == user_id, OrganizationMember.state == state,
+                   Organization.deleted_at.is_(None)))
+    rows, nxt = course_svc.paginate_rows(db, stmt, sort_col=OrganizationMember.created_at,
+                                         id_col=OrganizationMember.id, entity_of=lambda r: r[0], cursor=cursor,
+                                         limit=limit, descending=False)
+    return PageOut[UserOrganizationOut](items=[UserOrganizationOut(
+        organization_id=o.id, organization_name=o.name, organization_slug=o.slug, organization_status=o.status,
+        role=m.role, state=m.state, created_at=m.created_at, removed_at=m.removed_at) for m, o in rows],
+        next_cursor=nxt)
+# --- Phase 6 S4b end ---

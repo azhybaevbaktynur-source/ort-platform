@@ -29,7 +29,7 @@ export default function OrgCoursesPage() {
     setLoading(true);
     setError(null);
     try {
-      const page = await listOrgCourses(org.id, { q, cursor: next });
+      const page = await listOrgCourses(org.id, { cursor: next });
       setItems((prev) => (next ? [...prev, ...page.items] : page.items));
       setCursor(page.next_cursor);
     } catch (e) {
@@ -37,8 +37,14 @@ export default function OrgCoursesPage() {
     } finally {
       setLoading(false);
     }
-  }, [org.id, q]);
+  }, [org.id]);
   useEffect(() => { void load(); }, [load]);
+  // The courses endpoint has no text filter: search the loaded rows (any title language, owner).
+  const needle = q.toLowerCase();
+  const shown = needle
+    ? items.filter((c) => [...Object.values(c.title), c.owner.display_name ?? "", c.owner.email]
+      .some((v) => (v ?? "").toLowerCase().includes(needle)))
+    : items;
 
   const base = `/${lang}/org/${org.id}/courses`;
   const create = readOnly ? (
@@ -58,13 +64,13 @@ export default function OrgCoursesPage() {
       </div>
       {error ? <OrgError error={error} onRetry={() => load()} className="mb-3" /> : null}
       {loading && items.length === 0 && !error && <Loading />}
-      {!loading && !error && items.length === 0 && (
+      {!loading && !error && shown.length === 0 && (
         <EmptyBox text={q ? t("organizations.courses.emptySearch") : t("organizations.courses.empty")}>{!q && !readOnly ? create : null}</EmptyBox>
       )}
-      {items.length > 0 && (
+      {shown.length > 0 && (
         <>
-          <p className="mb-2 text-xs text-slate-500">{t("organizations.courses.shown", { n: items.length })}</p>
-          <OrgCourseList courses={items} hrefFor={(c) => `${base}/${c.id}`} />
+          <p className="mb-2 text-xs text-slate-500">{t("organizations.courses.shown", { n: shown.length })}</p>
+          <OrgCourseList courses={shown} hrefFor={(c) => `${base}/${c.id}`} />
         </>
       )}
       <Pager nextCursor={cursor} loading={loading} onMore={() => load(cursor)} />

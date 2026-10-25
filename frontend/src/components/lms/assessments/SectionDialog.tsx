@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { QUESTION_TYPES, type QuestionType } from "@/lib/lms/contentTypes";
 import type { AssessmentStaffOut, SectionIn, SectionOut } from "@/lib/lms/assessmentTypes";
-import { isPresetRuleLocked, useTemplateUi } from "@/lib/lms/templates";
+import { isAssessmentLocked, isPresetRuleLocked, useTemplateUi } from "@/lib/lms/templates";
 import { cleanLocalized } from "@/lib/lms/localized";
 import type { Lang, LocalizedText } from "@/lib/lms/types";
 import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
@@ -46,7 +46,7 @@ export function SectionDialog({
 
   const ui = useTemplateUi();
   // Template lock (design §5.4): section key, time limit and rules are fixed; greyed out, never hidden.
-  const tplLocked = ui.locked;
+  const tplLocked = isAssessmentLocked(ui, assessment.preset); // Phase 6 S4b: free (`none`) assessments are not locked
   const locked = tplLocked || isPresetRuleLocked(assessment.preset, section?.key);
   const free = assessment.navigation === "free";
   const toggleType = (q: QuestionType) => setTypes((c) => (c.includes(q) ? c.filter((x) => x !== q) : [...c, q]));

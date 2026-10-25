@@ -23,7 +23,7 @@ export function sectionName(s: SectionOut, uiLang: Lang, defLang: Lang, t: (k: s
 }
 
 export function SectionCard({
-  section, assessment, ctx, index, count, defaultLanguage, onMoveBy, onEdit, onDelete, onAdd, dragProps,
+  section, assessment, ctx, index, count, defaultLanguage, onMoveBy, onEdit, onDelete, onAdd, dragProps, structureLocked = false,
 }: {
   section: SectionOut;
   assessment: AssessmentStaffOut;
@@ -36,6 +36,8 @@ export function SectionCard({
   onDelete: () => void;
   onAdd: () => void;
   dragProps?: React.HTMLAttributes<HTMLElement>;
+  /** Phase 6 S4b: locked course template: reorder and delete are disabled (never hidden), design §5.4. */
+  structureLocked?: boolean;
 }) {
   const { lang, t } = useTranslation();
   const [reorderBusy, setReorderBusy] = useState(false);
@@ -53,7 +55,7 @@ export function SectionCard({
   return (
     <section {...dragProps} className="rounded-2xl border border-slate-200 bg-slate-50 p-3" aria-label={sectionName(section, lang, defaultLanguage, t)}>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        {ctx.canEdit && <GripVertical className="h-4 w-4 cursor-grab text-slate-400" aria-hidden="true" />}
+        {ctx.canEdit && !structureLocked && <GripVertical className="h-4 w-4 cursor-grab text-slate-400" aria-hidden="true" />}
         <div className="min-w-0 flex-1">
           <h3 className="font-semibold text-slate-900">{index + 1}. {sectionName(section, lang, defaultLanguage, t)}</h3>
           <p className="text-xs text-slate-500">
@@ -64,10 +66,10 @@ export function SectionCard({
         </div>
         {ctx.canEdit && (
           <div className="flex flex-wrap items-center gap-1">
-            <button type="button" className={btnSmall} disabled={index === 0} aria-label={t("assessments.section.up")} onClick={() => onMoveBy(-1)}><ArrowUp className="h-3.5 w-3.5" aria-hidden="true" /></button>
-            <button type="button" className={btnSmall} disabled={index === count - 1} aria-label={t("assessments.section.down")} onClick={() => onMoveBy(1)}><ArrowDown className="h-3.5 w-3.5" aria-hidden="true" /></button>
+            <button type="button" className={btnSmall} disabled={index === 0 || structureLocked} aria-label={t("assessments.section.up")} title={structureLocked ? t("templates.lockedNote") : undefined} onClick={() => onMoveBy(-1)}><ArrowUp className="h-3.5 w-3.5" aria-hidden="true" /></button>
+            <button type="button" className={btnSmall} disabled={index === count - 1 || structureLocked} aria-label={t("assessments.section.down")} title={structureLocked ? t("templates.lockedNote") : undefined} onClick={() => onMoveBy(1)}><ArrowDown className="h-3.5 w-3.5" aria-hidden="true" /></button>
             <button type="button" className={btnSmall} onClick={onEdit}>{t("assessments.section.edit")}</button>
-            <button type="button" className={btnDanger} onClick={onDelete}>{t("assessments.section.delete")}</button>
+            <button type="button" className={btnDanger} disabled={structureLocked} title={structureLocked ? t("templates.lockedNote") : undefined} onClick={onDelete}>{t("assessments.section.delete")}</button>
           </div>
         )}
       </div>

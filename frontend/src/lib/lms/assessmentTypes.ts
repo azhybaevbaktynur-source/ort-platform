@@ -140,7 +140,7 @@ export interface DraftConflictDetails {
 }
 
 /** Student lobby `reason` when `can_start` is false (anything else falls back to the generic message). */
-export const LOBBY_REASONS = ["not_open_yet", "closed", "attempts_exhausted", "unpublished"] as const;
+export const LOBBY_REASONS = ["not_open_yet", "closed", "attempts_exhausted", "unpublished", "not_a_student", "course_not_active"] as const; // Phase 6 S4b: last two
 export type LobbyReason = (typeof LOBBY_REASONS)[number];
 
 export interface AssessmentStaffOut extends AssessmentStaffSummaryOut, AssessmentGradingFields {

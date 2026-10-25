@@ -4,13 +4,13 @@ import React, { useCallback, useEffect, useState } from "react";
 import { UserPlus } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
-import { listOrgMembers, removeOrgMember, type OrgMemberOut } from "@/lib/lms/organizations";
+import { listOrgMembers, memberMatches, removeOrgMember, type OrgMemberOut } from "@/lib/lms/organizations";
 import {
   listOrgInvitations, resendOrgInvitation, revokeOrgInvitation, type InvitationOut,
 } from "@/lib/lms/invitations";
 import { fmtApiDate } from "@/lib/format";
 import { useOrg } from "@/components/lms/org/OrgShell";
-import { InviteDialog } from "@/components/lms/org/InviteDialog";
+import { InviteDialog, toastInvitationSent } from "@/components/lms/org/InviteDialog";
 import { EmptyBox, Loading, OrgBadge, OrgError, btn, inputCls, labelCls } from "@/components/lms/org/OrgUi";
 import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
 import { Pager } from "@/components/lms/Pager";
@@ -46,7 +46,7 @@ export default function OrgTeachersPage() {
     setLoading(true);
     setError(null);
     try {
-      const page = await listOrgMembers(org.id, { q, state: "active", cursor: next });
+      const page = await listOrgMembers(org.id, { state: "active", cursor: next });
       setMembers((prev) => (next ? [...prev, ...page.items] : page.items));
       setCursor(page.next_cursor);
     } catch (e) {
@@ -54,8 +54,10 @@ export default function OrgTeachersPage() {
     } finally {
       setLoading(false);
     }
-  }, [org.id, q]);
+  }, [org.id]);
   useEffect(() => { void loadMembers(); }, [loadMembers]);
+  // The members endpoint has no text filter: search the loaded rows.
+  const shown = members.filter((m) => memberMatches(m, q));
 
   const loadInvites = useCallback(async (next?: string | null) => {
     setInvLoading(true);
@@ -77,8 +79,8 @@ export default function OrgTeachersPage() {
     setBusy(true);
     setDialogError(null);
     try {
-      await removeOrgMember(org.id, removing.user_id, reason);
-      toast.success(t("organizations.members.removed", { name: removing.display_name || removing.email }));
+      await removeOrgMember(org.id, removing.user.id, reason);
+      toast.success(t("organizations.members.removed", { name: removing.user.display_name || removing.user.email }));
       setRemoving(null);
       await Promise.all([loadMembers(), reload()]);
     } catch (e) {
@@ -113,7 +115,7 @@ export default function OrgTeachersPage() {
     }
   };
 
-  const memberTone = (m: OrgMemberOut) => (m.disabled ? "blocked" : m.state === "active" ? "active" : "removed");
+  const memberTone = (m: OrgMemberOut) => (m.state === "active" ? "active" : "removed");
   const memberLabel = (m: OrgMemberOut) => `organizations.members.state.${memberTone(m)}`;
   return (
     <div className="space-y-8">
@@ -130,27 +132,26 @@ export default function OrgTeachersPage() {
         </div>
         {error ? <OrgError error={error} onRetry={() => loadMembers()} className="mb-3" /> : null}
         {loading && members.length === 0 && !error && <Loading />}
-        {!loading && !error && members.length === 0 && (
+        {!loading && !error && shown.length === 0 && (
           <EmptyBox text={q ? t("organizations.members.emptySearch") : t("organizations.members.empty")}>
             {!q && !readOnly && <button type="button" className={btn.secondary} onClick={() => setInviting(true)}>{t("invitations.inviteTeacher")}</button>}
           </EmptyBox>
         )}
-        {members.length > 0 && (
+        {shown.length > 0 && (
           <>
-            <p className="mb-2 text-xs text-slate-500">{t("organizations.members.shown", { n: members.length })}</p>
+            <p className="mb-2 text-xs text-slate-500">{t("organizations.members.shown", { n: shown.length })}</p>
             <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white text-sm">
-              {members.map((m) => {
-                const self = m.user_id === me?.id;
+              {shown.map((m) => {
+                const self = m.user.id === me?.id;
                 return (
-                  <li key={m.user_id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+                  <li key={m.user.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
                     <div className="min-w-0 flex-1 basis-56">
-                      <p className="truncate font-medium text-slate-900">{m.display_name || m.email}</p>
-                      <p className="truncate text-xs text-slate-500">{m.email}</p>
+                      <p className="truncate font-medium text-slate-900">{m.user.display_name || m.user.email}</p>
+                      <p className="truncate text-xs text-slate-500">{m.user.email}</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs text-slate-600">{t(`organizations.roles.${m.role}`)}</span>
                       <OrgBadge tone={memberTone(m)} labelKey={memberLabel(m)} />
-                      {typeof m.course_count === "number" && <span className="text-xs text-slate-500">{t("organizations.members.courses", { n: m.course_count })}</span>}
                     </div>
                     {!self && (
                       <button type="button" className={btn.smallDanger} disabled={readOnly}
@@ -203,11 +204,11 @@ export default function OrgTeachersPage() {
       </section>
 
       <InviteDialog open={inviting} orgId={org.id} orgName={org.name} onClose={() => setInviting(false)}
-        onSent={(_inv, email) => { setInviting(false); toast.success(t("invitations.sent", { email })); void loadInvites(); void reload(); }} />
+        onSent={(inv, email) => { setInviting(false); toastInvitationSent(t, inv, email); void loadInvites(); void reload(); }} />
       <ReasonDialog
         open={!!removing}
-        title={t("organizations.members.removeTitle", { name: removing?.display_name || removing?.email || "" })}
-        body={t("organizations.members.removeBody", { name: removing?.display_name || removing?.email || "", org: org.name })}
+        title={t("organizations.members.removeTitle", { name: removing?.user.display_name || removing?.user.email || "" })}
+        body={t("organizations.members.removeBody", { name: removing?.user.display_name || removing?.user.email || "", org: org.name })}
         confirmLabel={t("organizations.members.remove")} danger busy={busy} error={dialogError}
         onConfirm={doRemove} onCancel={() => setRemoving(null)}
       />

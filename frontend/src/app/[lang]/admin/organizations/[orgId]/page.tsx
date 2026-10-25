@@ -7,7 +7,7 @@ import { useTranslation } from "@/lib/i18n/context";
 import { listAuditLog } from "@/lib/lms/admin";
 import {
   SLUG_RE, formatBytes, getOrganization, getOrganizationUsage, listOrganizationCourses, resumeOrganization,
-  suspendOrganization, updateOrganization, type OrganizationOut, type OrgCourseOut, type OrgUsageOut,
+  suspendOrganization, updateOrganization, type OrganizationAdminRowOut, type OrganizationOut, type OrgCourseOut, type OrgUsageOut,
 } from "@/lib/lms/organizations";
 import type { AuditEntryOut } from "@/lib/lms/types";
 import { fmtApiDateTime } from "@/lib/format";
@@ -27,7 +27,7 @@ type Tab = (typeof TABS)[number];
 export default function AdminOrganizationDetailPage() {
   const { orgId } = useParams<{ orgId: string }>();
   const { lang, t } = useTranslation();
-  const [org, setOrg] = useState<OrganizationOut | null>(null);
+  const [org, setOrg] = useState<OrganizationAdminRowOut | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [tab, setTab] = useState<Tab>("summary");
   const [usage, setUsage] = useState<OrgUsageOut | null>(null);
@@ -65,10 +65,9 @@ export default function AdminOrganizationDetailPage() {
     setDialogError(null);
     try {
       const updated = suspended ? await resumeOrganization(org.id, reason) : await suspendOrganization(org.id, reason);
-      setOrg(updated ?? org);
+      setOrg({ ...org, ...updated });
       toast.success(t(suspended ? "organizations.admin.resumed" : "organizations.admin.suspended", { org: org.name }));
       setStatusDialog(false);
-      if (!updated) await load();
     } catch (e) {
       setDialogError(e);
     } finally {
@@ -110,9 +109,9 @@ export default function AdminOrganizationDetailPage() {
         {tab === "summary" && (
           <div className={cardCls}>
             <dl className="grid gap-3 text-sm sm:grid-cols-2">
-              <Fact label={t("organizations.counts.orgAdmins")} value={org.counts?.org_admins} />
-              <Fact label={t("organizations.counts.teachers")} value={org.counts?.teachers} />
-              <Fact label={t("organizations.counts.courses")} value={org.counts?.courses} />
+              <Fact label={t("organizations.counts.orgAdmins")} value={org.org_admins} />
+              <Fact label={t("organizations.counts.teachers")} value={org.teachers} />
+              <Fact label={t("organizations.counts.courses")} value={org.courses} />
               <Fact label={t("organizations.usage.storage")} value={usage ? formatBytes(usage.storage_bytes, lang) : undefined} />
               <Fact label={t("organizations.admin.created")} value={fmtApiDateTime(org.created_at, lang)} />
               <Fact label={t("organizations.fields.teachersCanCreate")} value={org.settings?.teachers_can_create_courses ? t("platformAdmin.yes") : t("platformAdmin.no")} />
@@ -142,7 +141,7 @@ export default function AdminOrganizationDetailPage() {
       </div>
 
       <EditOrganizationDialog open={editing} org={org} onClose={() => setEditing(false)}
-        onSaved={(o) => { setOrg(o); setEditing(false); toast.success(t("organizations.admin.saved")); }} />
+        onSaved={(o) => { setOrg({ ...org, ...o }); setEditing(false); toast.success(t("organizations.admin.saved")); }} />
       <ReasonDialog
         open={statusDialog}
         title={t(suspended ? "organizations.admin.resumeTitle" : "organizations.admin.suspendTitle", { org: org.name })}
@@ -252,7 +251,7 @@ function EditOrganizationDialog({ open, org, onClose, onSaved }: { open: boolean
     setError(null);
     try {
       const o = await updateOrganization(org.id, {
-        name: name.trim(), slug, settings: { ...(org.settings || {}), teachers_can_create_courses: canCreate },
+        name: name.trim(), slug, settings: { teachers_can_create_courses: canCreate },
       });
       onSaved(o);
     } catch (err) {

@@ -1,25 +1,50 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Building2, UserPlus } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
-import { listMyInvitations, type MyInvitationOut } from "@/lib/lms/invitations";
+import {
+  INVITATIONS_CHANGED_EVENT, acceptInvitation, invitationTarget, listMyInvitations, type MyInvitationOut,
+} from "@/lib/lms/invitations";
+import { pickLocalized } from "@/lib/lms/localized";
 import { fmtApiDate } from "@/lib/format";
 import { TeacherRequestPanel } from "@/components/lms/TeacherRequestPanel";
+import { OrgError } from "@/components/lms/org/OrgUi";
+import { toast } from "@/components/ui/Toast";
 
 /** "I am a teacher" (design §7): ask your school for an invitation, or apply as an independent teacher. */
 export default function TeacherAccessPage() {
   const { lang, t } = useTranslation();
-  const { me } = useLmsMe();
+  const { me, reload: reloadMe } = useLmsMe();
+  const router = useRouter();
   const [invitations, setInvitations] = useState<MyInvitationOut[]>([]);
+  // --- Phase 6 S4b: accept by invitation id (same route as the emailed token) ---
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const [acceptError, setAcceptError] = useState<{ id: string; error: unknown } | null>(null);
 
   useEffect(() => {
     let alive = true;
     listMyInvitations().then((r) => { if (alive) setInvitations(r); }).catch(() => { if (alive) setInvitations([]); });
     return () => { alive = false; };
   }, []);
+
+  const accept = useCallback(async (i: MyInvitationOut) => {
+    setAcceptingId(i.id);
+    setAcceptError(null);
+    try {
+      const r = await acceptInvitation(i.id);
+      toast.success(t("invitations.mine.accepted"));
+      window.dispatchEvent(new Event(INVITATIONS_CHANGED_EVENT));
+      await reloadMe();
+      router.push(invitationTarget(lang, r));
+    } catch (e) {
+      setAcceptError({ id: i.id, error: e });
+      setAcceptingId(null);
+    }
+  }, [lang, reloadMe, router, t]);
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -43,14 +68,23 @@ export default function TeacherAccessPage() {
           <div className="mt-4">
             <h3 className="text-sm font-semibold text-slate-900">{t("teacherAccess.pendingTitle", { n: invitations.length })}</h3>
             <ul className="mt-2 space-y-2">
-              {invitations.map((i) => (
-                <li key={i.id} className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
-                  <p className="font-medium">
-                    {t(`teacherAccess.pendingItem.${i.role}`, { org: i.organization_name, course: i.course_title || "" })}
-                  </p>
-                  <p className="mt-0.5 text-xs">{t("teacherAccess.pendingHint", { date: fmtApiDate(i.expires_at, lang) })}</p>
-                </li>
-              ))}
+              {invitations.map((i) => {
+                const course = pickLocalized(i.course_title, lang);
+                const itemKey = i.role === "teacher" && course ? "teacherCourse" : i.role;
+                return (
+                  <li key={i.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+                    <div className="min-w-0 flex-1 basis-56">
+                      <p className="font-medium">{t(`teacherAccess.pendingItem.${itemKey}`, { org: i.organization_name, course })}</p>
+                      <p className="mt-0.5 text-xs">{t("teacherAccess.pendingHintAccept", { date: fmtApiDate(i.expires_at, lang) })}</p>
+                    </div>
+                    <button type="button" disabled={acceptingId !== null} onClick={() => void accept(i)}
+                      className="inline-flex min-h-[44px] items-center rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60">
+                      {acceptingId === i.id ? t("lms.common.loading") : t("invitations.mine.accept")}
+                    </button>
+                    {acceptError?.id === i.id && <OrgError error={acceptError.error} className="w-full" />}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}

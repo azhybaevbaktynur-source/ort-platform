@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
@@ -11,6 +11,7 @@ import type { Lang, LocalizedText } from "@/lib/lms/types";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { LanguagePicker } from "@/components/lms/LanguagePicker";
 import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
+import { listMyOrganizations, type MyOrganizationOut } from "@/lib/lms/organizations"; // Phase 6 S4b
 
 export default function NewCoursePage() {
   const { lang, t } = useTranslation();
@@ -26,6 +27,19 @@ export default function NewCoursePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [titleMissing, setTitleMissing] = useState(false);
+  // --- Phase 6 S4b: a teacher in several organizations chooses one (else 422 organization_required) ---
+  const [orgs, setOrgs] = useState<MyOrganizationOut[]>([]);
+  const [orgId, setOrgId] = useState("");
+  const [orgMissing, setOrgMissing] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    listMyOrganizations()
+      .then((rows) => { if (alive) setOrgs(rows.filter((o) => o.can_create_courses)); })
+      .catch(() => { if (alive) setOrgs([]); });
+    return () => { alive = false; };
+  }, []);
+  const chooseOrg = orgs.length > 1;
+  // --- Phase 6 S4b end ---
 
   if (loading) return <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p>;
   if (me && !me.can_create_courses) {
@@ -40,11 +54,14 @@ export default function NewCoursePage() {
   const submit = async (ev: React.FormEvent) => {
     ev.preventDefault();
     const cleanTitle = cleanLocalized(title, languages);
+    const noOrg = chooseOrg && !orgId; // Phase 6 S4b
+    setOrgMissing(noOrg);
     if (!cleanTitle[defaultLanguage]) {
       setTitleMissing(true);
       return;
     }
     setTitleMissing(false);
+    if (noOrg) return;
     setBusy(true);
     setError(null);
     try {
@@ -56,6 +73,7 @@ export default function NewCoursePage() {
         default_language: defaultLanguage,
         enrollment_mode: mode,
         enrollment_limit: n,
+        ...(chooseOrg ? { organization_id: orgId } : {}), // Phase 6 S4b
       });
       router.push(`/${lang}/courses/${course.id}`);
     } catch (e) {
@@ -67,6 +85,21 @@ export default function NewCoursePage() {
   return (
     <form onSubmit={submit} noValidate className="mx-auto max-w-2xl space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <h1 className="text-xl font-bold text-slate-900">{t("courses.create.title")}</h1>
+      {/* --- Phase 6 S4b --- */}
+      {chooseOrg && (
+        <div>
+          <label htmlFor="new-org" className="mb-1 block text-sm font-medium text-slate-700">{t("organizations.fields.organization")}</label>
+          <select id="new-org" value={orgId} disabled={busy} aria-invalid={orgMissing} onChange={(e) => setOrgId(e.target.value)}
+            className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm">
+            <option value="">{t("organizations.fields.organizationPick")}</option>
+            {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+          </select>
+          <p className={`mt-1 text-xs ${orgMissing ? "text-red-700" : "text-slate-500"}`} role={orgMissing ? "alert" : undefined}>
+            {orgMissing ? t("organizations.errors.organization_required") : t("organizations.fields.organizationHint")}
+          </p>
+        </div>
+      )}
+      {/* --- Phase 6 S4b end --- */}
       <LanguagePicker languages={languages} defaultLanguage={defaultLanguage} disabled={busy}
         onChange={(ls, d) => { setLanguages(ls); setDefaultLanguage(d); }} />
       <LocalizedTextInput label={t("courses.create.courseTitle")} languages={languages} defaultLanguage={defaultLanguage}

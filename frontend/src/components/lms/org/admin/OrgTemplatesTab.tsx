@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import {
-  grantTemplate, listOrganizationTemplates, listPlatformTemplates, revokeTemplate, type OrganizationOut, type OrgTemplateGrantOut,
+  grantTemplate, listOrganizationTemplates, revokeTemplate, type OrganizationOut, type OrgTemplateGrantOut,
 } from "@/lib/lms/organizations";
 import { templateTitle } from "@/lib/lms/templates";
 import { fmtApiDate } from "@/lib/format";
@@ -23,16 +23,8 @@ export function OrgTemplatesTab({ org }: { org: OrganizationOut }) {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [grants, registry] = await Promise.all([
-        listOrganizationTemplates(org.id),
-        listPlatformTemplates().catch(() => []),
-      ]);
-      const byKey = new Map((Array.isArray(grants) ? grants : []).map((g) => [g.template_key, g]));
-      // Every registry template appears, granted or not (the grants endpoint may list only some).
-      for (const r of Array.isArray(registry) ? registry : []) {
-        if (!byKey.has(r.key)) byKey.set(r.key, { template_key: r.key, title_key: r.title_key, granted: false, granted_at: null });
-      }
-      setRows(Array.from(byKey.values()));
+      // One row per registry template, granted or not (the backend lists every known template).
+      setRows(await listOrganizationTemplates(org.id));
     } catch (e) {
       setError(e);
     }
@@ -44,9 +36,9 @@ export function OrgTemplatesTab({ org }: { org: OrganizationOut }) {
     setBusy(true);
     setDialogError(null);
     try {
-      if (target.granted) await revokeTemplate(org.id, target.template_key);
-      else await grantTemplate(org.id, target.template_key);
-      toast.success(t(target.granted ? "organizations.templates.revoked" : "organizations.templates.granted", { template: templateTitle(t, target.template_key, target.title_key) }));
+      if (target.granted) await revokeTemplate(org.id, target.key);
+      else await grantTemplate(org.id, target.key);
+      toast.success(t(target.granted ? "organizations.templates.revoked" : "organizations.templates.granted", { template: templateTitle(t, target.key) }));
       setTarget(null);
       await load();
     } catch (e) {
@@ -59,16 +51,16 @@ export function OrgTemplatesTab({ org }: { org: OrganizationOut }) {
   if (error) return <OrgError error={error} onRetry={load} />;
   if (!rows) return <Loading />;
   if (rows.length === 0) return <EmptyBox text={t("organizations.templates.empty")} />;
-  const name = target ? templateTitle(t, target.template_key, target.title_key) : "";
+  const name = target ? templateTitle(t, target.key) : "";
   return (
     <div className="space-y-3">
       <p className="text-sm text-slate-600">{t("organizations.templates.intro")}</p>
       <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white text-sm">
         {rows.map((r) => {
-          const title = templateTitle(t, r.template_key, r.title_key);
-          const id = `tpl-${r.template_key}`;
+          const title = templateTitle(t, r.key);
+          const id = `tpl-${r.key}`;
           return (
-            <li key={r.template_key} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+            <li key={r.key} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
               <div className="min-w-0 flex-1 basis-56">
                 <p id={id} className="font-medium text-slate-900">{title}</p>
                 <p className="text-xs text-slate-500">

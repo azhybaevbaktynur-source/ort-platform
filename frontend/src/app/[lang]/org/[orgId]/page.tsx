@@ -7,9 +7,8 @@ import { useTranslation } from "@/lib/i18n/context";
 import { listOrgInvitations, type InvitationOut } from "@/lib/lms/invitations";
 import { fmtApiDate } from "@/lib/format";
 import { useOrg } from "@/components/lms/org/OrgShell";
-import { InviteDialog } from "@/components/lms/org/InviteDialog";
+import { InviteDialog, toastInvitationSent } from "@/components/lms/org/InviteDialog";
 import { EmptyBox, Loading, OrgError, StatTile, btn } from "@/components/lms/org/OrgUi";
-import { toast } from "@/components/ui/Toast";
 
 export default function OrgOverviewPage() {
   const { lang, t } = useTranslation();
@@ -29,8 +28,7 @@ export default function OrgOverviewPage() {
   }, [org.id]);
   useEffect(() => { void load(); }, [load]);
 
-  const c = org.counts || {};
-  const n = (v: number | undefined) => (typeof v === "number" ? v : "—");
+  const c = org.usage;
   const base = `/${lang}/org/${org.id}`;
   return (
     <div className="space-y-6">
@@ -41,9 +39,9 @@ export default function OrgOverviewPage() {
         </button>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatTile label={t("organizations.counts.teachers")} value={n(c.teachers)} />
-        <StatTile label={t("organizations.counts.courses")} value={n(c.courses)} />
-        <StatTile label={t("organizations.counts.students")} value={n(c.students)} />
+        <StatTile label={t("organizations.counts.teachers")} value={c.teachers} />
+        <StatTile label={t("organizations.counts.courses")} value={c.courses} />
+        <StatTile label={t("organizations.counts.students")} value={c.students} />
       </div>
       <section aria-labelledby="ov-pending">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -64,7 +62,7 @@ export default function OrgOverviewPage() {
         )}
       </section>
       <InviteDialog open={inviting} orgId={org.id} orgName={org.name} onClose={() => setInviting(false)}
-        onSent={(_inv, email) => { setInviting(false); toast.success(t("invitations.sent", { email })); void load(); void reload(); }} />
+        onSent={(inv, email) => { setInviting(false); toastInvitationSent(t, inv, email); void load(); void reload(); }} />
     </div>
   );
 }
