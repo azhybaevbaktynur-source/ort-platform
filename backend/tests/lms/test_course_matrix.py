@@ -51,6 +51,11 @@ def build(db, status):
         Enrollment(course_id=course.id, user_id=u["V"].id, role="student", state="active", source="join_code"),
     ]
     db.add_all(rows)
+    # S5: a transfer target must be an active member of the course's organization
+    from app.lms.organizations.models import OrganizationMember
+
+    db.add(OrganizationMember(organization_id=course.organization_id, user_id=u["T"].id, role="teacher",
+                              state="active"))
     if status == "deleted":
         course.deleted_at = utcnow()
         course.deleted_by_id = u["O"].id

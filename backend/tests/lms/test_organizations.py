@@ -32,7 +32,7 @@ def test_fixed_ids():
     assert ORG_NS == uuid.uuid5(uuid.NAMESPACE_URL, "https://ort-platform/lms/organizations")
     assert platform_org_id() == uuid.uuid5(ORG_NS, "org:platform")
     assert personal_org_id("usr_x") == uuid.uuid5(ORG_NS, "org:personal:usr_x")
-    assert personal_org_slug("usr_x") == "t-" + hashlib.sha256(b"usr_x").hexdigest()[:8]
+    assert personal_org_slug("usr_x") == "t-" + hashlib.sha256(b"usr_x").hexdigest()[:12]
 
 
 # ------------------------------------------------------------------------------------------------ platform CRUD

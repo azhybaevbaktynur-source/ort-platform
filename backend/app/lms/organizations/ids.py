@@ -16,4 +16,4 @@ def personal_org_id(user_id: str) -> uuid.UUID:
 
 
 def personal_org_slug(user_id: str) -> str:
-    return "t-" + hashlib.sha256(str(user_id).encode("utf-8")).hexdigest()[:8]
+    return "t-" + hashlib.sha256(str(user_id).encode("utf-8")).hexdigest()[:12]

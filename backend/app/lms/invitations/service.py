@@ -26,6 +26,7 @@ from app.lms.core.ratelimit import Limit
 from app.lms.courses.models import Course
 from app.lms.courses.service import add_event, get_enrollment, paginate_rows, require_course
 from app.lms.enrollments.models import Enrollment
+from app.lms.enrollments.service import require_staff_power
 from app.lms.invitations import emails
 from app.lms.invitations.policies import forbidden_org, load_organization, org_access
 from app.lms.invitations.schemas import (
@@ -241,6 +242,7 @@ def create_staff_invitation(db: Session, ctx: AuthzContext, course: Course, *, e
                             request: Optional[Request] = None) -> InvitationCreatedOut:
     """POST /courses/{id}/staff/invitations: course `roster.manage`; a co-teacher only by the owner (as add_staff)."""
     require_course(ctx, A.ROSTER_MANAGE, course)
+    require_staff_power(ctx, course)
     actor = ctx.user
     if role == "teacher" and course.owner_id != actor.id:
         raise Forbidden("Only the owner can do this", code="owner_only")
@@ -333,7 +335,8 @@ def revoke(db: Session, user: User, organization_id: uuid.UUID, invitation_id: u
     """By the inviter, any org admin of that organization, or the platform admin. Revoking twice is a no-op."""
     org, admin = _access(db, user, organization_id)
     inv = _load_in_org(db, org.id, invitation_id)
-    if not admin and (inv is None or inv.invited_by_id != user.id):
+    # the inviter only while they can still manage it (course roster.manage; an org invitation needs org admin)
+    if not admin and (inv is None or not _inviter_can_manage(db, user, inv, _course_of(db, inv))):
         raise forbidden_org()
     if inv is None:
         raise not_found_invitation()
@@ -360,6 +363,8 @@ def resend(db: Session, user: User, organization_id: uuid.UUID, invitation_id: u
         raise not_found_invitation()
     if inv.course_id is not None and course is None:
         raise not_found_invitation()
+    if inv.course_id is not None and inv.role == "teacher" and course.owner_id != user.id:
+        raise Forbidden("Only the owner can do this", code="owner_only")  # same rule as create
     if inv.accepted_at is not None or inv.revoked_at is not None:
         raise Conflict("Invitation is not pending", code="invitation_not_pending")
     db.rollback()  # nothing written yet; the rate-limit counter needs a session without open writes

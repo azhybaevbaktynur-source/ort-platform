@@ -7,17 +7,20 @@ response class), so the one central place that sees every response is an ASGI mi
 
 Rule (one format everywhere): a JSON string value that is exactly an ISO datetime without an offset gets `Z`, and
 `+00:00` is normalized to `Z` (what Pydantic already emits for aware UTC values). Other offsets are left as they
-are. Only complete string values match: the opening quote must not be escaped and the closing quote must follow
-the seconds directly, so datetimes quoted inside longer text are untouched."""
+are. Only complete string *values* match: the opening quote follows `:`, `[`, `,` or the start of the body
+(whitespace allowed), so an escaped quote inside longer text never matches; the closing quote follows the seconds
+directly; and a string followed by `:` is an object key, never rewritten (a datetime-like key stays as it is)."""
 from __future__ import annotations
 
 import re
 
-NAIVE_OR_UTC = re.compile(rb'(?<!\\)"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?)(?:\+00:00)?"')
+NAIVE_OR_UTC = re.compile(
+    rb'((?:^|[:\[,])\s*)"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?)(?:\+00:00)?"(?!\s*:)'
+)
 
 
 def rewrite(body: bytes) -> bytes:
-    return NAIVE_OR_UTC.sub(rb'"\1Z"', body)
+    return NAIVE_OR_UTC.sub(rb'\1"\2Z"', body)
 
 
 def _header(headers, name: bytes) -> bytes:

@@ -14,7 +14,7 @@ import hashlib
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Sequence, Union
+from typing import Optional, Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
@@ -54,7 +54,7 @@ def _personal_org_id(user_id: str) -> uuid.UUID:
 
 
 def _personal_org_slug(user_id: str) -> str:
-    return "t-" + hashlib.sha256(str(user_id).encode("utf-8")).hexdigest()[:8]
+    return "t-" + hashlib.sha256(str(user_id).encode("utf-8")).hexdigest()[:12]
 
 
 def _ort_course_id(lang: str) -> uuid.UUID:
@@ -249,13 +249,23 @@ def _schema() -> None:
 
 # ------------------------------------------------------------------------------------------------- data steps
 
-def _ensure_org(conn, oid, slug, name, *, suspended: bool, now) -> None:
+def _suspension_reason(u) -> Optional[str]:
+    """Copy of organizations/defaults.py::personal_suspension_reason: a disabled user, or an owner who is not an
+    approved teacher, gets a suspended personal organization (as a revoke suspends it)."""
+    if u.disabled_at is not None:
+        return "account disabled"
+    if u.teacher_status != "approved":
+        return "teacher not approved"
+    return None
+
+
+def _ensure_org(conn, oid, slug, name, *, reason: Optional[str], now) -> None:
     if conn.execute(sa.select(_orgs.c.id).where(_orgs.c.id == oid)).first() is not None:
         return
     conn.execute(_orgs.insert().values(
-        id=oid, slug=slug, name=(name or "").strip()[:200] or slug, status="suspended" if suspended else "active",
+        id=oid, slug=slug, name=(name or "").strip()[:200] or slug, status="suspended" if reason else "active",
         settings=dict(CREATOR_SETTINGS), created_at=now, updated_at=now,
-        suspended_at=now if suspended else None, suspended_reason="account disabled" if suspended else None,
+        suspended_at=now if reason else None, suspended_reason=reason,
     ))
 
 
@@ -272,7 +282,7 @@ def _data(conn, now) -> None:
 
     platform = _platform_org_id()
     # step 1: the platform organization (placeholders; renamed later by the owner)
-    _ensure_org(conn, platform, settings.PLATFORM_ORG_SLUG, settings.PLATFORM_ORG_NAME, suspended=False, now=now)
+    _ensure_org(conn, platform, settings.PLATFORM_ORG_SLUG, settings.PLATFORM_ORG_NAME, reason=None, now=now)
     users = {r.id: r for r in conn.execute(sa.select(
         _users.c.id, _users.c.display_name, _users.c.teacher_status, _users.c.is_platform_admin,
         _users.c.disabled_at, _users.c.created_at))}
@@ -281,8 +291,7 @@ def _data(conn, now) -> None:
         u = users[uid]
         if u.teacher_status == "approved" and uid != DEMO_TEACHER_ID and not u.is_platform_admin:
             oid = _personal_org_id(uid)
-            _ensure_org(conn, oid, _personal_org_slug(uid), u.display_name, suspended=u.disabled_at is not None,
-                        now=now)
+            _ensure_org(conn, oid, _personal_org_slug(uid), u.display_name, reason=_suspension_reason(u), now=now)
             _ensure_member(conn, oid, uid, now)
     # step 3: platform admins administer the platform organization
     for uid in sorted(users):
@@ -348,7 +357,7 @@ def _owner_org(conn, users, owner_id, platform, now):
     if u is None or u.is_platform_admin:
         return platform
     oid = _personal_org_id(owner_id)
-    _ensure_org(conn, oid, _personal_org_slug(owner_id), u.display_name, suspended=u.disabled_at is not None, now=now)
+    _ensure_org(conn, oid, _personal_org_slug(owner_id), u.display_name, reason=_suspension_reason(u), now=now)
     return oid
 
 
