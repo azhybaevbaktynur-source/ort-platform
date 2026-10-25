@@ -79,7 +79,7 @@ export function ReviewItemCard({
           <CorrectnessBadge value={item.correctness} />
           {item.score !== null && item.score !== undefined && (
             <span className="font-semibold text-slate-700">
-              {max !== null && max !== undefined ? t("results.scoreOf", { score: fmtPoints(item.score), max: fmtPoints(max) }) : fmtPoints(item.score)}
+              {max !== null && max !== undefined ? t("results.scoreOf", { score: fmtPoints(item.score), max: fmtPoints(max), count: fmtPoints(max) }) : fmtPoints(item.score)}
             </span>
           )}
         </div>

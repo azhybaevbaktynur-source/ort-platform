@@ -44,7 +44,7 @@ function Row({ item, courseId }: { item: MyGradeOut; courseId: string }) {
         <div className="mt-2 space-y-1 text-sm">
           {main && <p className="text-2xl font-bold text-slate-900">{main}</p>}
           {item.effective_points !== null && item.effective_points !== undefined && item.points_possible !== null && item.points_possible !== undefined && (
-            <p className="text-slate-600">{t("results.scoreOf", { score: fmtPoints(item.effective_points), max: fmtPoints(item.points_possible) })}</p>
+            <p className="text-slate-600">{t("results.scoreOf", { score: fmtPoints(item.effective_points), max: fmtPoints(item.points_possible), count: fmtPoints(item.points_possible) })}</p>
           )}
           {item.late_deduction !== null && item.late_deduction !== undefined && Number(item.late_deduction) > 0 && (
             <p className="text-amber-800">{t("results.grade.mine.late", { n: fmtPoints(item.late_deduction) })}</p>

@@ -554,3 +554,50 @@ walk `ort.spec.ts`: 2 passed). ORT options, defaults and lock notes are unchange
 | `teacher-passage-{phone,desktop}-ru` | Breadcrumb 'Тексты' instead of 'Назад к текстам' |
 | `teacher-builder-{phone,desktop}-ru` | Title = the exam name; 'Редактирование' is the last breadcrumb |
 | `teacher-attempts-{phone,desktop}-ru`, `teacher-import-phone-ru`, `teacher-question-comparison-phone-ru` | Below the diff threshold, re-recorded with the rest: on phones the course tab row keeps 56 px of the neighbouring tab visible under the edge fade (UX 11) |
+
+## Phase 6b S12 (final slice): header, plural forms, final ORT gate
+
+Built frontend (`next build` + `next start` from an rsync'd copy) against a scratch backend (`env -i`, SQLite copy
+of the S11b screenshot DB, `LMS_STORAGE_DRIVER=db`), playwright-core + Chrome, timezone Asia/Bishkek. Long display
+names on purpose: "Бакытбек Жээнбеков-Осмоналиев" (platform admin), "Гульнара Токтогулова-Абдыкадырова" (org admin).
+
+**Header fix.** On desktop the active area's sections (Teaching: "Курсы, которые я веду", "Создать курс",
+"Схемы оценивания") were drawn in the first row next to four area pills and ran over the account name (visible in
+the S11b `teacher-bank-desktop-ru` baseline). From 1024 px they now sit in a second header row (48 px, under the
+main 64 px row); the area pills no longer shrink, the account button may (its name truncates at 12rem); with all
+four areas the name shows from 1280 px (avatar + chevron at 1024-1279 px). Phones are unchanged (56 px, sections in
+the area menu). Header element shots, `s12-header-<role>-<width>-<lang>.jpg`:
+
+| Files | Role combination |
+|---|---|
+| `s12-header-student-{375,1024,1280,1440}-{en,ky,ru}.jpg` | student (Learning only) |
+| `s12-header-teacher-{375,1024,1280,1440}-{en,ky,ru}.jpg` | teacher (Learning + Teaching) |
+| `s12-header-orgadmin-teacher-{375,1024,1280,1440}-{en,ky,ru}.jpg` | org admin of two organizations + teacher (Learning, Teaching, Организации dropdown) |
+| `s12-header-admin-teacher-orgadmin-{375,1024,1280,1440}-{en,ky,ru}.jpg` | platform admin + teacher + org admin of two organizations (all four areas) |
+
+Checks on every shot (160 PASS, 0 FAIL): no two visible header links/buttons overlap, none sticks out of the
+viewport, `document.documentElement.scrollWidth` = viewport width, header height at 375 px = 57 px (56 + border).
+Desktop teaching pages: 64 + 49 px.
+
+**Add to organization** (admin user detail): `s12-admin-add-to-org-dialog-{phone,desktop}-ru.jpg`, viewport shots
+of the confirm dialog (scrollWidth 375 / 1440). The form row now stacks below 1024 px and the role select is wider
+(`lg:w-72`), so "Администратор организации" is no longer cut off.
+
+**Plural forms** (`t()` `_one/_few/_many/_other`, count from `count` or `n`): `results.scoreOf` (count = max:
+"из 1 балла", "из 5 баллов", "из 21 балла"), `results.grade.mine.late` ("1 балл", "2 балла", "5 баллов"),
+`results.pendingReview`, `player.essay.words`, `player.save.auth`, `home.questions` (en singular forms; ky has no
+plural agreement, the same text in every form). The other `{n}` strings in `player`, `results`,
+`assessments.lobby` and `home` already use the colon form ("Вопросов: {n}") and need no plural.
+
+### S12 ORT gate (merged tree `4db98ed` + S12)
+
+Both specs on the built tree: before the re-record 6 teacher desktop screens differed (header row), every student
+screen and every phone screen passed. `UPDATE_BASELINES=1`, then every PNG whose change stayed under the 0.5 %
+threshold was copied back (student screens, phone teacher screens, `teacher-publish-desktop-ru`). Then both specs
+twice: 10 passed, 0 diffs, each run. `frontend/e2e/**` and `playwright.config.ts` are unchanged (same DOM
+assertions). Pairs `ort-<baseline>-s12-{before,after}.jpg` (before = the S11b baseline):
+
+| Baseline | What changed |
+|---|---|
+| `teacher-bank-desktop-ru`, `teacher-passage-desktop-ru`, `teacher-builder-desktop-ru`, `teacher-attempts-desktop-ru` | Teaching sections in the second header row; the account name "E2E Admin" no longer covered; page content 49 px lower |
+| `teacher-import-desktop-ru` (1440x900 -> 1440x918), `teacher-question-comparison-desktop-ru` (1440x1874 -> 1440x1923) | Same, full-page shots grow by the second row |
