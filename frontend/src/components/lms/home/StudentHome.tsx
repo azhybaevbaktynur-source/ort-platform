@@ -10,7 +10,8 @@ import { useTranslation } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
 import { getHome } from "@/lib/lms/home";
-import type { HomeCourseOut, HomeOut } from "@/lib/lms/homeTypes";
+import type { HomeCourseOut, HomeNextUpOut, HomeOut } from "@/lib/lms/homeTypes";
+import { KindIcon } from "@/components/lms/assignments/assignmentUi"; // Phase 7a S5
 import { listMyCourses } from "@/lib/lms/courses";
 import type { CourseCard } from "@/lib/lms/types";
 import { pickLocalized } from "@/lib/lms/localized";
@@ -20,6 +21,14 @@ import { HomeRow, HomeSection } from "./HomeRow";
 import { DueText } from "./StudentAssessmentCard";
 import { fmtShortDateTime } from "./format";
 import { useErrorText } from "./useErrorText";
+
+// --- Phase 7a S5: next-up rows are assignments: a quiz opens its lobby, text / file the submit page ---
+function nextUpHref(coursesBase: string, r: HomeNextUpOut): string {
+  if ((!r.kind || r.kind === "quiz") && r.assessment_id) return `${coursesBase}/${r.course_id}/assessments/${r.assessment_id}`;
+  if (r.assignment_id) return `${coursesBase}/${r.course_id}/assignments/${r.assignment_id}`;
+  return `${coursesBase}/${r.course_id}`;
+}
+// --- Phase 7a S5 end ---
 
 const linkCls = cn("inline-flex min-h-11 items-center gap-1.5 rounded text-sm font-semibold text-brand-700 hover:underline sm:min-h-0", focusRing);
 
@@ -49,7 +58,7 @@ function Greeting({ data, name, headingLevel, pending }: { data: HomeOut | null;
       primary = <LinkButton size="lg" href={`/${lang}/courses/${running.course_id}/attempts/${running.attempt_id}`}>{t("home.primary.continue")}</LinkButton>;
     } else if (next) {
       line = t("home.lead.next", { title: pickLocalized(next.title, lang) || t("assessments.untitled") });
-      primary = <LinkButton size="lg" href={`/${lang}/courses/${next.course_id}/assessments/${next.assessment_id}`}>{t("home.primary.start")}</LinkButton>;
+      primary = <LinkButton size="lg" href={nextUpHref(`/${lang}/courses`, next)}>{t("home.primary.start")}</LinkButton>; // Phase 7a S5
     } else if (data.courses_total > 0) {
       line = t("home.lead.caughtUp");
       primary = <LinkButton size="lg" href={`/${lang}/courses/join`} leftIcon={<KeyRound aria-hidden="true" className="h-5 w-5" />}>{t("home.primary.join")}</LinkButton>;
@@ -188,14 +197,16 @@ function Sections({ data }: { data: HomeOut }) {
         ) : (
           <ul className="divide-y divide-slate-100">
             {data.next_up.map((r) => (
-              <HomeRow key={r.assessment_id} href={`${base}/${r.course_id}/assessments/${r.assessment_id}`}
+              <HomeRow key={r.assignment_id ?? r.assessment_id ?? r.course_id} href={nextUpHref(base, r) /* Phase 7a S5 */}
                 title={pickLocalized(r.title, lang) || untitled}
                 meta={(
                   <>
+                    {/* Phase 7a S5: kind icon + text */}
+                    {r.kind && <span className="inline-flex items-center gap-1"><KindIcon kind={r.kind} />{t(`assignments.kinds.${r.kind}`)}</span>}
                     <span>{pickLocalized(r.course_title, lang)}</span>
                     {r.due_at ? <DueText value={r.due_at} lang={lang} />
                       : r.available_until ? <span>{t("home.until", { date: fmtShortDateTime(r.available_until, lang) })}</span> : null}
-                    {r.attempts_left !== null && <span>{t("home.attemptsLeft", { n: r.attempts_left })}</span>}
+                    {r.attempts_left !== null && r.attempts_left !== undefined && <span>{t("home.attemptsLeft", { n: r.attempts_left })}</span>}
                   </>
                 )}
                 actionLabel={t("home.action.open")} />
@@ -211,9 +222,11 @@ function Sections({ data }: { data: HomeOut }) {
           <ul className="divide-y divide-slate-100">
             {data.latest_results.map((r) => {
               const value = gradeText(r, r.scheme_type ?? undefined);
-              const href = r.kept_attempt_id ? `${base}/${r.course_id}/attempts/${r.kept_attempt_id}/result` : `${base}/${r.course_id}/grades`;
+              // Phase 7a S5: a released manual grade opens its assignment page (grade and feedback)
+              const href = r.kept_attempt_id ? `${base}/${r.course_id}/attempts/${r.kept_attempt_id}/result`
+                : r.assignment_id && r.kind && r.kind !== "quiz" ? `${base}/${r.course_id}/assignments/${r.assignment_id}` : `${base}/${r.course_id}/grades`;
               return (
-                <HomeRow key={r.assessment_id} href={href} title={pickLocalized(r.title, lang) || untitled}
+                <HomeRow key={r.assignment_id ?? r.assessment_id ?? href} href={href} title={pickLocalized(r.title, lang) || untitled}
                   meta={(
                     <>
                       <span>{pickLocalized(r.course_title, lang)}</span>

@@ -57,6 +57,13 @@ def attempt_start_limit() -> Limit:
     return Limit("attempt_start_10m", settings.ATTEMPT_START_RATE_PER_10M, 600)
 
 
+# --- Phase 7a S4 begin --- (PHASE_7A_DESIGN 3.8)
+def access_code_fail_limit() -> Limit:
+    """Wrong quiz access codes, per user: 10 failures per 10 minutes, then 429 before any comparison."""
+    return Limit("access_code_fail_10m", 10, 600)
+# --- Phase 7a S4 end ---
+
+
 def grade_item_limit() -> Limit:
     """Phase 3 (P3-28): manual item scoring, per user."""
     return Limit("grade_item_1h", settings.GRADE_ITEM_RATE_PER_HOUR, 3600)

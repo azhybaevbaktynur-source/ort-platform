@@ -8,7 +8,8 @@ import { LOBBY_REASONS, previewAttemptId, type AssessmentLobbyOut } from "@/lib/
 import { pickLocalized } from "@/lib/lms/localized";
 import type { Lang } from "@/lib/lms/types";
 import { useCourse } from "@/components/lms/CourseContext";
-import { Button, DescriptionList, Select, type DescriptionItem } from "@/components/ui";
+import { Button, DescriptionList, Input, Select, type DescriptionItem } from "@/components/ui";
+import { startAttemptWithCode } from "@/lib/lms/accommodations"; // Phase 7a S5
 import { fmtDuration } from "@/components/lms/home/format";
 import { AssessmentError } from "./AssessmentError";
 import { fmtDateTime } from "./format";
@@ -25,6 +26,7 @@ export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {
   const [language, setLanguage] = useState<Lang>(initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const [accessCode, setAccessCode] = useState(""); // Phase 7a S5
 
   const title = pickLocalized(lobby.title, lang, course.default_language) || t("assessments.untitled");
   const description = pickLocalized(lobby.description, lang, course.default_language);
@@ -46,11 +48,20 @@ export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {
   if (lobby.available_from) info.push({ key: "from", term: t("assessments.settings.availableFrom"), description: fmtDateTime(lobby.available_from) });
   if (lobby.available_until) info.push({ key: "until", term: t("assessments.settings.availableUntil"), description: fmtDateTime(lobby.available_until) });
 
+  // --- Phase 7a S5: access code (PHASE_7A_DESIGN 3.8): asked only when the exam has one; resumes never ask ---
+  const needsCode = !!lobby.requires_access_code && !resume;
+  const codeError = error && ["access_code_required", "access_code_invalid"].includes((error as { code?: string }).code ?? "")
+    ? t(`accommodations.accessCode.errors.${(error as { code: string }).code}`) : undefined;
+  // --- Phase 7a S5 end ---
+
   const start = async () => {
+    if (needsCode && !accessCode.trim()) { setError({ code: "access_code_required" }); return; } // Phase 7a S5
     setBusy(true);
     setError(null);
     try {
-      const out = await startAssessmentAttempt(course.id, lobby.id, language);
+      const out = needsCode // Phase 7a S5
+        ? await startAttemptWithCode(course.id, lobby.id, language, accessCode)
+        : await startAssessmentAttempt(course.id, lobby.id, language);
       const id = previewAttemptId(out);
       if (id) router.push(player(id));
       else setError({ code: "unknown" });
@@ -96,7 +107,7 @@ export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {
           onChange={(e) => setLanguage(e.target.value as Lang)}
           options={lobby.languages.map((l) => ({ value: l, label: t(`courses.languages.${l}`) }))} />
       )}
-      <AssessmentError error={error} />
+      {!codeError && <AssessmentError error={error} />}
       {resume ? (
         <div className="sticky bottom-3 z-10 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
           <Button className="w-full sm:w-auto" onClick={() => router.push(player(resume))}>{t("assessments.student.resume")}</Button>
@@ -106,6 +117,13 @@ export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {
         <div className="sticky bottom-3 z-10 space-y-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
           <Button className="w-full sm:w-auto" loading={busy} onClick={() => void start()}>{t("assessments.lobby.start")}</Button>
           {startHint && <p className="text-sm text-slate-600">{startHint}</p>}
+          {/* --- Phase 7a S5: access code field (below the Start button), only when the exam has a code --- */}
+          {needsCode && (
+            <Input id="lobby-code" label={t("accommodations.accessCode.lobbyLabel")} hint={t("accommodations.accessCode.lobbyHint")}
+              autoComplete="off" spellCheck={false} maxLength={64} value={accessCode} error={codeError}
+              onChange={(e) => { setAccessCode(e.target.value); if (codeError) setError(null); }}
+              onKeyDown={(e) => { if (e.key === "Enter") void start(); }} containerClassName="sm:max-w-sm" />
+          )}
         </div>
       ) : exhausted ? null : (
         <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-sm text-amber-900">

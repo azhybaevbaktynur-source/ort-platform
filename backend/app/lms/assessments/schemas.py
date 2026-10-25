@@ -74,6 +74,19 @@ class AssessmentUpdateIn(_In):
     due_at: Optional[datetime] = None
     grade_release: Optional[GradeRelease] = None
     omit_from_total: Optional[bool] = None
+    # --- Phase 7a S4 begin --- (PHASE_7A_DESIGN 2.7, 3.8): string sets, null clears, absent = unchanged. Stored only
+    # as a bcrypt hash; never serialized (staff see `has_access_code`, students `requires_access_code`).
+    access_code: Optional[str] = Field(default=None, max_length=64, repr=False)
+
+    @model_validator(mode="after")
+    def _access_code(self):
+        if self.access_code is not None:
+            code = self.access_code.strip()
+            if not (4 <= len(code) <= 32) or any(not (0x20 <= ord(ch) <= 0x7E) for ch in code):
+                raise ValueError("access_code must be 4-32 printable ASCII characters")  # never echo the value
+            self.access_code = code
+        return self
+    # --- Phase 7a S4 end ---
 
     @model_validator(mode="after")
     def _v(self):
@@ -322,6 +335,7 @@ class AssessmentStaffSummaryOut(BaseModel):
     available_from: Optional[datetime] = None
     available_until: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
+    has_access_code: bool = False  # --- Phase 7a S4 --- (2.7: the hash itself is never serialized)
 
 
 class AssessmentStaffOut(AssessmentStaffSummaryOut):
@@ -434,6 +448,7 @@ class AssessmentLobbyOut(BaseModel):
     reason: Optional[str] = None
     due_at: Optional[datetime] = None
     scheme: Optional[SchemeStudentRefOut] = None
+    requires_access_code: bool = False  # --- Phase 7a S4 --- (3.8: a student must enter the code at start)
 
 
 # Exact key sets, asserted by the contract tests.

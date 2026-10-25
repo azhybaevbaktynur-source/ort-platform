@@ -20,7 +20,9 @@ export function CourseTabs({ courseId, showSettings }: { courseId: string; showS
   const tabs = [
     { href: base, label: t("courses.home.tab"), exact: true },
     { href: `${base}/people`, label: t("courses.people.tab") },
-    { href: `${base}/assessments`, label: t("assessments.tab") },
+    // --- Phase 7a S5: Assignments (every gradable item); the quiz builder list keeps its own tab ---
+    { href: `${base}/assignments`, label: t("assignments.tab") },
+    { href: `${base}/assessments`, label: t("assignments.tabQuizzes") },
     { href: `${base}/grades`, label: t("gradebook.tab") },
     ...(showBank ? [{ href: `${base}/bank`, label: t("bank.tab") }] : []),
     ...(showSettings ? [{ href: `${base}/settings`, label: t("courses.settings.tab") }] : []),
