@@ -184,6 +184,14 @@ def maybe_sweep_orphans(db: Session) -> None:
         log.exception("orphan blob sweep failed")
 
 
+def course_dedup_key(source_sha: str, course_id) -> str:
+    """Phase 7a S6: dedup key of a course-scoped private upload (hand-ins, feedback files). Such assets must belong
+    to the course they are used in, so the same bytes uploaded in another course become a separate asset (the blob
+    is still shared through `sha256` / the storage key). Stored in `source_sha256`, the column of the per-owner
+    unique key `uq_assets_owner_source`; public image dedup is unchanged."""
+    return hashlib.sha256(f"course:{course_id}:{source_sha}".encode()).hexdigest()
+
+
 def _find(db: Session, owner_id: str, source_sha: str, visibility: str) -> Optional[Asset]:
     return db.execute(
         select(Asset).where(Asset.owner_id == owner_id, Asset.source_sha256 == source_sha,
@@ -193,17 +201,23 @@ def _find(db: Session, owner_id: str, source_sha: str, visibility: str) -> Optio
 
 def ingest_image(db: Session, actor: User, raw: bytes, *, course_id, visibility: str = "public",
                  filename: Optional[str] = None, max_bytes: Optional[int] = None,
-                 encoded: Optional[EncodedImage] = None, precheck_done: bool = False) -> tuple[Asset, bool]:
+                 encoded: Optional[EncodedImage] = None, precheck_done: bool = False,
+                 course_scoped: bool = False) -> tuple[Asset, bool]:
     """Returns (asset, deduplicated). Does NOT commit.
 
     The blob is written (own connection) before the first session write. When `encoded` is given the
     caller has already stored the blob. `precheck_done`: the caller already checked quota / caps for a whole
-    batch and knows no asset exists for this source (importer); skips the per-image queries."""
+    batch and knows no asset exists for this source (importer); skips the per-image queries. `course_scoped`
+    (private only): dedup per (owner, course), `course_dedup_key`."""
     if visibility not in ("public", "private"):
         raise ValidationFailed("visibility must be public or private")
     if max_bytes is None:
         max_bytes = settings.ASSET_MAX_UPLOAD_BYTES
     source_sha = encoded.source_sha256 if encoded is not None else hashlib.sha256(raw).hexdigest()
+    if course_scoped:
+        if visibility != "private":
+            raise ValidationFailed("course_scoped is for private uploads")
+        source_sha = course_dedup_key(source_sha, course_id)
 
     if not precheck_done:
         maybe_sweep_orphans(db)
@@ -233,7 +247,7 @@ def ingest_image(db: Session, actor: User, raw: bytes, *, course_id, visibility:
 
     asset = Asset(
         owner_id=actor.id, course_id=course_id, kind="image", visibility=visibility,
-        source_sha256=encoded.source_sha256, sha256=encoded.sha256, storage_key=key, mime="image/webp",
+        source_sha256=source_sha, sha256=encoded.sha256, storage_key=key, mime="image/webp",
         extension="webp", bytes=len(encoded.data), source_bytes=encoded.source_bytes, width=encoded.width,
         height=encoded.height, original_filename=_clean_filename(filename),
     )
@@ -260,17 +274,19 @@ PDF_MAGIC = b"%PDF-"
 
 
 def ingest_file(db: Session, actor: User, raw: bytes, *, course_id, filename: Optional[str] = None,
-                max_bytes: Optional[int] = None) -> tuple[Asset, bool]:
+                max_bytes: Optional[int] = None, course_scoped: bool = False) -> tuple[Asset, bool]:
     """PDF upload (P5-11): private only, stored as-is under `priv/{sha}.pdf`. Returns (asset, deduplicated).
-    The client's Content-Type is ignored; the bytes must start with `%PDF-`. Does NOT commit."""
+    The client's Content-Type is ignored; the bytes must start with `%PDF-`. Does NOT commit. `course_scoped`:
+    dedup per (owner, course) (`course_dedup_key`; hand-ins and feedback files)."""
     cap = settings.FILE_MAX_UPLOAD_BYTES if max_bytes is None else max_bytes
     if len(raw) > cap:
         raise FileTooLarge("File is too large", details={"max_bytes": cap})
     if not raw.startswith(PDF_MAGIC) or "application/pdf" not in settings.FILE_ALLOWED_MIMES:
         raise FileInvalid("Only PDF files are accepted")
     sha = hashlib.sha256(raw).hexdigest()
+    dedup = course_dedup_key(sha, course_id) if course_scoped else sha
     maybe_sweep_orphans(db)
-    existing = _find(db, actor.id, sha, "private")
+    existing = _find(db, actor.id, dedup, "private")
     if existing is not None:
         if existing.deleted_at is not None:
             existing.restore()
@@ -283,11 +299,11 @@ def ingest_file(db: Session, actor: User, raw: bytes, *, course_id, filename: Op
     _check_global_db_cap(db, key, len(raw))
     usage.store_blob(db, key, raw, "application/pdf")  # exists check, then atomic reservation (507)
     asset = Asset(
-        owner_id=actor.id, course_id=course_id, kind="file", visibility="private", source_sha256=sha, sha256=sha,
+        owner_id=actor.id, course_id=course_id, kind="file", visibility="private", source_sha256=dedup, sha256=sha,
         storage_key=key, mime="application/pdf", extension="pdf", bytes=len(raw), source_bytes=len(raw),
         original_filename=_clean_filename(filename),
     )
-    return _add_asset(db, asset, actor.id, sha, "private")
+    return _add_asset(db, asset, actor.id, dedup, "private")
 
 
 def resolve_image_refs(db: Session, actor: User, ids: Iterable[uuid.UUID], *,

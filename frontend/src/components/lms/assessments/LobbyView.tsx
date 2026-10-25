@@ -115,15 +115,16 @@ export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {
       ) : lobby.can_start ? (
         // Phones: the start row stays at the bottom of the screen with its hint (L1).
         <div className="sticky bottom-3 z-10 space-y-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
-          <Button className="w-full sm:w-auto" loading={busy} onClick={() => void start()}>{t("assessments.lobby.start")}</Button>
-          {startHint && <p className="text-sm text-slate-600">{startHint}</p>}
-          {/* --- Phase 7a S5: access code field (below the Start button), only when the exam has a code --- */}
+          {/* --- Phase 7a S5/S6: access code field, only when the exam has a code (S6: above Start, so the code is
+              entered first; exams without a code, ORT included, render exactly as before) --- */}
           {needsCode && (
             <Input id="lobby-code" label={t("accommodations.accessCode.lobbyLabel")} hint={t("accommodations.accessCode.lobbyHint")}
               autoComplete="off" spellCheck={false} maxLength={64} value={accessCode} error={codeError}
               onChange={(e) => { setAccessCode(e.target.value); if (codeError) setError(null); }}
               onKeyDown={(e) => { if (e.key === "Enter") void start(); }} containerClassName="sm:max-w-sm" />
           )}
+          <Button className="w-full sm:w-auto" loading={busy} onClick={() => void start()}>{t("assessments.lobby.start")}</Button>
+          {startHint && <p className="text-sm text-slate-600">{startHint}</p>}
         </div>
       ) : exhausted ? null : (
         <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-sm text-amber-900">

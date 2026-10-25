@@ -146,8 +146,10 @@ export function GradingScreen({ assignmentId }: { assignmentId: string }) {
     {
       key: "student", header: t("gradebook.student"), primary: true,
       cell: (r) => (
+        // S6: the name is the one action of the row (a separate "Grade" column was cut off in the half-width table)
         <button type="button" onClick={() => choose(r.enrollment_id)} aria-current={r.enrollment_id === selected ? "true" : undefined}
-          className="min-h-11 break-words text-left font-semibold text-brand-700 hover:underline sm:min-h-0">
+          aria-label={`${t("assignments.grade.open")}: ${r.student_name || t("gradebook.unnamed")}`}
+          className="min-h-11 break-words text-left font-semibold text-brand-700 underline-offset-2 hover:underline sm:min-h-0">
           {r.student_name || t("gradebook.unnamed")}
         </button>
       ),
@@ -158,15 +160,6 @@ export function GradingScreen({ assignmentId }: { assignmentId: string }) {
       key: "grade", header: t("assignments.grade.colGrade"), align: "right", mobilePriority: 2,
       cell: (r) => r.cell && r.cell.raw_points !== null && r.cell.raw_points !== undefined
         ? `${fmtPts(r.cell.effective_points ?? r.cell.raw_points)} / ${fmtPts(r.cell.points_possible ?? a?.points_possible)}` : "—",
-    },
-    {
-      key: "act", header: "", actions: true, align: "right",
-      cell: (r) => (
-        <Button variant="secondary" size="sm" onClick={() => choose(r.enrollment_id)}
-          aria-pressed={r.enrollment_id === selected}>
-          {t("assignments.grade.open")}<span className="sr-only">: {r.student_name}</span>
-        </Button>
-      ),
     },
   ];
 
