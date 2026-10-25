@@ -121,9 +121,13 @@ export class OrtExam {
     if (await this.paletteToggle().isVisible()) await this.showPalette();
   }
 
-  /** The aside "finish section / finish test" button (present on every question; on phones in the palette sheet). */
+  /**
+   * The "finish section / finish test" button (present on every question): desktop in the side panel, phones in
+   * the palette sheet's footer (S11a, F4). Only the visible one.
+   */
   finishButton(last: boolean): Locator {
-    return this.page.locator("aside").getByRole("button", { name: this.t(last ? "player.finishTest" : "player.finishSection") });
+    const name = this.t(last ? "player.finishTest" : "player.finishSection");
+    return this.page.locator("aside").or(this.paletteSheet()).getByRole("button", { name, exact: true }).filter({ visible: true });
   }
 
   dialog(): Locator {

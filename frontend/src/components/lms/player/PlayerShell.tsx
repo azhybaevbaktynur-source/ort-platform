@@ -67,6 +67,7 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
   // Phone / tablet (S7b, P1): the palette opens as a sheet from the header instead of sitting below the question.
   const [paletteOpen, setPaletteOpen] = useState(false);
   const paletteCurrentRef = useRef<HTMLButtonElement>(null);
+  const paletteButtonRef = useRef<HTMLButtonElement>(null);
   // Phone / tablet (S7b, P6): the reading text folds away under a sticky bar; open by default, per passage.
   const [passageClosed, setPassageClosed] = useState<Record<string, boolean>>({});
   const headerRef = useRef<HTMLElement>(null);
@@ -528,9 +529,14 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
     setPaletteOpen(false);
   }, []);
 
+  // S11a, F5: the sheet's own button disappears with the sheet. Open the finish dialog one frame later, from the
+  // header button, so the dialog's Cancel returns focus to a live element.
   const finishFromSheet = () => {
     setPaletteOpen(false);
-    finishPressed();
+    requestAnimationFrame(() => {
+      paletteButtonRef.current?.focus();
+      finishPressed();
+    });
   };
 
   // ---- render ----
@@ -613,6 +619,7 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
                 label={forwardOnly ? t("player.timer.sectionLeft") : t("player.timer.left")}
                 onTick={(rem) => queueRef.current?.setContinuous(rem <= LAST_MINUTE_MS)} />
               <button
+                ref={paletteButtonRef}
                 type="button"
                 onClick={() => setPaletteOpen(true)}
                 aria-haspopup="dialog"
@@ -727,12 +734,15 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
         description={t("player.progress", { answered: counts.answered, total: visibleItems.length })}
         initialFocusRef={paletteCurrentRef}
         className="mb-0 w-full max-w-none rounded-b-none sm:mb-auto sm:w-[calc(100%-2rem)] sm:max-w-md sm:rounded-b-2xl"
-      >
-        <aside className="space-y-4">
-          <Palette groups={paletteGroups} currentPosition={curItem?.position ?? -1} onSelect={selectFromSheet} hideTitle currentRef={paletteCurrentRef} />
-          <Button variant="secondary" fullWidth onClick={finishFromSheet} className="border-brand-600 text-brand-700 hover:bg-brand-50">
+        // S11a, F4: the finish action stays pinned in the footer; only the palette scrolls.
+        footer={(
+          <Button variant="secondary" fullWidth onClick={finishFromSheet} className="border-brand-600 text-brand-700 hover:bg-brand-50 sm:flex-1">
             {finishLabel}
           </Button>
+        )}
+      >
+        <aside>
+          <Palette groups={paletteGroups} currentPosition={curItem?.position ?? -1} onSelect={selectFromSheet} hideTitle currentRef={paletteCurrentRef} />
         </aside>
       </Dialog>
 

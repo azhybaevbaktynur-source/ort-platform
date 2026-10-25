@@ -293,7 +293,9 @@
       "contentSoon": "Lessons and assignments will appear here in a future update.",
       "leave": "Leave course",
       "leaveTitle": "Leave this course?",
-      "leaveBody": "You will lose access. You can join again with a valid code."
+      "leaveBody": "You will lose access. You can join again with a valid code.",
+      "provider": "Run by",
+      "providerPlatform": "Platform"
     },
     "people": {
       "tab": "People",
@@ -1050,9 +1052,7 @@
       },
       "startHint": "The timer starts as soon as you press the button.",
       "startHintSection": "The timer for section {n} starts as soon as you press the button.",
-      "attemptsUsed": "{used} of {total}",
-      "durationH": "{h} h",
-      "durationHm": "{h} h {m} min"
+      "attemptsUsed": "{used} of {total}"
     },
     "builder": {
       "back": "Overview",
@@ -2584,7 +2584,8 @@
     "lead": {
       "continue": "You have an unfinished assignment: «{title}».",
       "next": "Next up: «{title}».",
-      "caughtUp": "You are all caught up. No new assignments right now."
+      "caughtUp": "You are all caught up. No new assignments right now.",
+      "continueStarted": "You have an unfinished assignment: «{title}». Started {date}."
     },
     "primary": {
       "continue": "Continue",

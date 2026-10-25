@@ -85,7 +85,9 @@ export function StudentCourseHome() {
 
   const description = pickLocalized(course.description, lang, course.default_language);
   const title = pickLocalized(course.title, lang, course.default_language) || t("courses.list.untitled");
-  const teacher = course.template?.locked ? t("home.platformCourse") : course.owner_display_name || "—";
+  // S11a, F1: a locked platform template (ORT) has no teacher to name; say who runs it instead.
+  const platformRun = !!course.template?.locked;
+  const teacher = platformRun ? t("courses.home.providerPlatform") : course.owner_display_name || "—";
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6">
@@ -127,7 +129,7 @@ export function StudentCourseHome() {
       <Card title={t("courses.home.about")} headingLevel={2}>
         <p className="whitespace-pre-line break-words text-base leading-6 text-slate-800">{description || t("courses.home.noDescription")}</p>
         <DescriptionList className="mt-5" twoColumns items={[
-          { key: "teacher", term: t("courses.home.owner"), description: teacher },
+          { key: "teacher", term: platformRun ? t("courses.home.provider") : t("courses.home.owner"), description: teacher },
           { key: "langs", term: t("courses.home.languages"), description: course.languages.map((l) => t(`courses.languages.${l}`)).join(", ") },
         ]} />
       </Card>

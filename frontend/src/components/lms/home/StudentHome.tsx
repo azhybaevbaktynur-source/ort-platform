@@ -41,7 +41,11 @@ function Greeting({ data, name, headingLevel, pending }: { data: HomeOut | null;
     const running = data.in_progress[0];
     const next = data.next_up[0];
     if (running) {
-      line = t("home.lead.continue", { title: pickLocalized(running.assessment_title, lang) || t("assessments.untitled") });
+      const runTitle = pickLocalized(running.assessment_title, lang) || t("assessments.untitled");
+      // S11a, F2: a single unfinished attempt lives in the hero only (with its start date); no Continue section.
+      line = data.in_progress.length === 1
+        ? t("home.lead.continueStarted", { title: runTitle, date: fmtShortDateTime(running.started_at, lang) })
+        : t("home.lead.continue", { title: runTitle });
       primary = <LinkButton size="lg" href={`/${lang}/courses/${running.course_id}/attempts/${running.attempt_id}`}>{t("home.primary.continue")}</LinkButton>;
     } else if (next) {
       line = t("home.lead.next", { title: pickLocalized(next.title, lang) || t("assessments.untitled") });
@@ -165,7 +169,7 @@ function Sections({ data }: { data: HomeOut }) {
 
   return (
     <div className="space-y-8">
-      {data.in_progress.length > 0 && (
+      {data.in_progress.length > 1 && (
         <HomeSection id="home-continue" title={t("home.continue.title")}>
           <ul className="divide-y divide-slate-100">
             {data.in_progress.map((r) => (
