@@ -1,22 +1,28 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+// Phase 6b S6b (UX S1, S6, S16): status badge, due date, duration and attempts left per row; one primary button
+// for the row that is in progress or next; after the last attempt the row links to the result.
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { ClipboardList } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { listAssessments } from "@/lib/lms/assessments";
 import type { AssessmentStudentSummaryOut } from "@/lib/lms/assessmentTypes";
+import { getMyGrades } from "@/lib/lms/grading";
+import type { MyGradeOut } from "@/lib/lms/gradingTypes";
 import { pickLocalized } from "@/lib/lms/localized";
 import { useCourse } from "@/components/lms/CourseContext";
-import { Pager } from "@/components/lms/Pager";
-import { btnPrimary, btnSecondary } from "@/components/lms/content/ui";
-import { AssessmentError } from "./AssessmentError";
-import { fmtDateTime, fmtPoints } from "./format";
+import { EmptyState, ErrorState, LoadingState, Pagination } from "@/components/ui";
+import { primaryAssessmentId, studentAssessmentView } from "@/components/lms/home/assessmentStatus";
+import { StudentAssessmentCard } from "@/components/lms/home/StudentAssessmentCard";
+import { useErrorText } from "@/components/lms/home/useErrorText";
 
 export function StudentAssessmentList() {
   const { lang, t } = useTranslation();
   const { course } = useCourse();
+  const errorText = useErrorText();
   const base = `/${lang}/courses/${course.id}`;
   const [items, setItems] = useState<AssessmentStudentSummaryOut[]>([]);
+  const [grades, setGrades] = useState<Record<string, MyGradeOut>>({});
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
@@ -25,9 +31,14 @@ export function StudentAssessmentList() {
     setLoading(true);
     setError(null);
     try {
-      const page = await listAssessments(course.id, { cursor: next, limit: 50 });
+      // Grades only add the scheme value and the result link: a failure there must not hide the list.
+      const [page, mine] = await Promise.all([
+        listAssessments(course.id, { cursor: next, limit: 50 }),
+        next ? Promise.resolve(null) : getMyGrades(course.id).catch(() => null),
+      ]);
       const rows = page.items as AssessmentStudentSummaryOut[];
       setItems((p) => (next ? [...p, ...rows] : rows));
+      if (mine) setGrades(Object.fromEntries(mine.items.map((g) => [g.assessment_id, g])));
       setCursor(page.next_cursor);
     } catch (e) {
       setError(e);
@@ -37,48 +48,32 @@ export function StudentAssessmentList() {
   }, [course.id]);
   useEffect(() => { void load(); }, [load]);
 
+  const rows = useMemo(() => {
+    const now = Date.now();
+    return items.map((a) => ({ a, v: studentAssessmentView(a, grades[a.id], now) }));
+  }, [items, grades]);
+  const primaryId = primaryAssessmentId(rows);
+
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-bold text-slate-900">{t("assessments.student.title")}</h2>
-      <AssessmentError error={error} onRetry={error ? () => load() : undefined} />
-      {loading && items.length === 0 && !error && <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p>}
-      {!loading && !error && items.length === 0 && <p className="text-sm text-slate-500">{t("assessments.student.empty")}</p>}
-      <ul className="space-y-3">
-        {items.map((a) => {
-          const title = pickLocalized(a.title, lang, course.default_language) || t("assessments.untitled");
-          const unlimited = a.allowed_attempts === -1;
-          return (
-            <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-              <div className="min-w-0 flex-1">
-                <Link href={`${base}/assessments/${a.id}`} className="font-semibold text-slate-900 hover:text-brand-700">{title}</Link>
-                <p className="mt-1 text-xs text-slate-500">
-                  {t("assessments.student.items", { n: a.item_count })}
-                  {a.time_limit_s ? ` · ${t("assessments.student.minutes", { n: Math.round(a.time_limit_s / 60) })}` : ""}
-                  {" · "}{unlimited ? t("assessments.student.attemptsUnlimited", { used: a.attempts_used }) : t("assessments.student.attemptsOf", { used: a.attempts_used, total: a.allowed_attempts })}
-                </p>
-                {(a.available_from || a.available_until) && (
-                  <p className="text-xs text-slate-400">
-                    {a.available_from ? t("assessments.list.from", { date: fmtDateTime(a.available_from) }) : ""}
-                    {a.available_from && a.available_until ? " · " : ""}
-                    {a.available_until ? t("assessments.list.until", { date: fmtDateTime(a.available_until) }) : ""}
-                  </p>
-                )}
-                {a.last_result && (
-                  <p className="mt-1 text-xs font-medium text-emerald-700">
-                    {t("assessments.student.lastResult", { score: fmtPoints(a.last_result.raw_score), total: fmtPoints(a.last_result.points_possible) })}
-                  </p>
-                )}
-              </div>
-              {a.in_progress_attempt_id ? (
-                <Link href={`${base}/attempts/${a.in_progress_attempt_id}`} className={btnPrimary}>{t("assessments.student.resume")}</Link>
-              ) : (
-                <Link href={`${base}/assessments/${a.id}`} className={btnSecondary}>{t("assessments.student.open")}</Link>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-      <Pager nextCursor={cursor} loading={loading} onMore={() => load(cursor)} />
+      <h2 className="text-lg font-semibold leading-7 text-slate-900">{t("assessments.student.title")}</h2>
+      {error && items.length === 0 ? (
+        <ErrorState message={errorText(error)} onRetry={() => void load()} retrying={loading} />
+      ) : null}
+      {error && items.length > 0 ? <ErrorState variant="inline" message={errorText(error)} onRetry={() => void load(cursor)} /> : null}
+      {loading && items.length === 0 && !error && <LoadingState rows={3} />}
+      {!loading && !error && items.length === 0 && (
+        <EmptyState icon={<ClipboardList />} title={t("assessments.student.empty")} description={t("home.course.emptyHint")} />
+      )}
+      {rows.length > 0 && (
+        <ul className="space-y-3">
+          {rows.map(({ a, v }) => (
+            <StudentAssessmentCard key={a.id} a={a} v={v} href={base} primary={a.id === primaryId}
+              title={pickLocalized(a.title, lang, course.default_language) || t("assessments.untitled")} />
+          ))}
+        </ul>
+      )}
+      <Pagination nextCursor={cursor} loading={loading} onLoadMore={() => void load(cursor)} />
     </div>
   );
 }
