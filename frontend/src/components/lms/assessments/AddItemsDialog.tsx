@@ -5,8 +5,9 @@ import { useTranslation } from "@/lib/i18n/context";
 import { addItem, addItemsBulk } from "@/lib/lms/assessments";
 import { listPassages, listQuestions } from "@/lib/lms/content";
 import {
-  DIFFICULTIES, ORT_SECTIONS, QUESTION_TYPES, type Difficulty, type PassageSummaryOut, type QuestionSummaryOut, type QuestionType,
+  DIFFICULTIES, QUESTION_TYPES, type Difficulty, type PassageSummaryOut, type QuestionSummaryOut, type QuestionType,
 } from "@/lib/lms/contentTypes";
+import { useTemplateUi } from "@/lib/lms/templates";
 import type { BulkAddOut } from "@/lib/lms/assessmentTypes";
 import { LMS_LANGS, type Lang } from "@/lib/lms/types";
 import { Pager } from "@/components/lms/Pager";
@@ -33,6 +34,7 @@ export function AddItemsDialog({
   onAdded: () => void | Promise<void>;
 }) {
   const { t } = useTranslation();
+  const ui = useTemplateUi();
   const [tab, setTab] = useState<Tab>("questions");
   const { banks, error: banksError } = useBanks(courseId, open);
   const [bankId, setBankId] = useState("");
@@ -164,8 +166,8 @@ export function AddItemsDialog({
               </select>
             </label>
             <label className="text-xs font-medium text-slate-600">{t("bank.filters.section")}
-              <input list="add-sections" className={`${inputCls} mt-0.5`} value={filters.section} onChange={(e) => set({ section: e.target.value })} />
-              <datalist id="add-sections">{ORT_SECTIONS.map((s) => <option key={s} value={s}>{t(`sections.${s}`)}</option>)}</datalist>
+              <input list={ui.sectionKeys.length ? "add-sections" : undefined} className={`${inputCls} mt-0.5`} value={filters.section} onChange={(e) => set({ section: e.target.value })} />
+              {ui.sectionKeys.length > 0 && <datalist id="add-sections">{ui.sectionKeys.map((s) => <option key={s} value={s}>{t(`sections.${s}`)}</option>)}</datalist>}
             </label>
             <label className="text-xs font-medium text-slate-600">{t("bank.filters.topic")}
               <input className={`${inputCls} mt-0.5`} value={filters.topic} onChange={(e) => set({ topic: e.target.value })} />

@@ -1,4 +1,5 @@
 /** Small formatting helpers shared by the assessment UI. */
+import { parseApiDate } from "@/lib/format";
 
 export function secToMin(s: number | null | undefined): string {
   return s === null || s === undefined ? "" : String(Math.round(s / 60));
@@ -13,9 +14,8 @@ export function minToSec(v: string): number | null {
 
 /** ISO timestamp -> value for <input type="datetime-local"> in local time. */
 export function toLocalInput(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
+  const d = parseApiDate(iso);
+  if (!d) return "";
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
@@ -27,9 +27,8 @@ export function fromLocalInput(v: string): string | null {
 }
 
 export function fmtDateTime(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "" : d.toLocaleString();
+  const d = parseApiDate(iso);
+  return d ? d.toLocaleString() : "";
 }
 
 export function fmtPoints(p: number | string | null | undefined): string {

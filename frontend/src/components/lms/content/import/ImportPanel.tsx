@@ -13,23 +13,21 @@ import {
 import type { Lang } from "@/lib/lms/types";
 import { ContentError } from "@/components/lms/content/ContentError";
 import { btnPrimary, btnSecondary, cardCls, inputCls, labelCls } from "@/components/lms/content/ui";
+import { importProfileLabelKey, templateUi } from "@/lib/lms/templates";
 import { ImportReportView } from "./ImportReportView";
-
-const FORMATS: { value: "" | ImportExamType; key: string }[] = [
-  { value: "full_main", key: "ortMain" },
-  { value: "subject", key: "ortSubject" },
-  { value: "practice_bank", key: "ortPractice" },
-  { value: "", key: "general" },
-];
 
 export function ImportPanel() {
   const { lang, t } = useTranslation();
   const { course } = useCourse();
+  // Formats come from the course template (T11): template profiles + the general format; a general
+  // course has no profiles, shows no format select and sends exam_type = null.
+  const ui = templateUi(course);
+  const formats: ("" | ImportExamType)[] = ui.importerProfiles.length ? [...ui.importerProfiles, ""] : [];
   const bankBase = `/${lang}/courses/${course.id}/bank`;
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [language, setLanguage] = useState<Lang>(course.languages.includes("ky") ? "ky" : course.languages[0]);
-  const [format, setFormat] = useState<"" | ImportExamType>("full_main");
+  const [format, setFormat] = useState<"" | ImportExamType>(ui.defaultImportProfile);
   const [targetBankId, setTargetBankId] = useState("");
   const [onConflict, setOnConflict] = useState<ImportConflictPolicy>("skip");
   const [banks, setBanks] = useState<BankOut[]>([]);
@@ -121,14 +119,14 @@ export function ImportPanel() {
             </select>
             <p className="mt-1 text-xs text-slate-500">{t("bank.import.languageNote")}</p>
           </div>
-          <div>
+          {formats.length > 0 && <div>
             <label htmlFor="imp-format" className={labelCls}>{t("bank.import.format")}</label>
             <select id="imp-format" className={inputCls} value={format} disabled={busy !== null}
               onChange={(e) => { setFormat(e.target.value as "" | ImportExamType); invalidate(); }}>
-              {FORMATS.map((f) => <option key={f.key} value={f.value}>{t(`bank.import.formats.${f.key}`)}</option>)}
+              {formats.map((f) => <option key={importProfileLabelKey(f)} value={f}>{t(importProfileLabelKey(f))}</option>)}
             </select>
             <p className="mt-1 text-xs text-slate-500">{t(format ? "bank.import.formatOrtNote" : "bank.import.formatGeneralNote")}</p>
-          </div>
+          </div>}
         </div>
 
         <div>

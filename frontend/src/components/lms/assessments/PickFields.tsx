@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { listBanks } from "@/lib/lms/content";
-import { DIFFICULTIES, ORT_SECTIONS, QUESTION_TYPES, type BankOut, type Difficulty, type QuestionType } from "@/lib/lms/contentTypes";
+import { DIFFICULTIES, QUESTION_TYPES, type BankOut, type Difficulty, type QuestionType } from "@/lib/lms/contentTypes";
+import { useTemplateUi } from "@/lib/lms/templates";
 import type { PickFilter } from "@/lib/lms/assessmentTypes";
 import { inputCls, labelCls } from "@/components/lms/content/ui";
 import { ContentError } from "@/components/lms/content/ContentError";
@@ -39,6 +40,7 @@ export interface PickValue { bank_id: string; count: number; filter: PickFilter 
 /** Pick N random questions from a bank by filter. Pool size (per language) is shown by the item after it is saved. */
 export function PickFields({ courseId, value, onChange, lockBank = false }: { courseId: string; value: PickValue; onChange: (v: PickValue) => void; lockBank?: boolean }) {
   const { t } = useTranslation();
+  const ui = useTemplateUi();
   const { banks, error } = useBanks(courseId);
   const setF = (p: Partial<PickFilter>) => {
     const f: PickFilter = { ...value.filter, ...p };
@@ -64,8 +66,8 @@ export function PickFields({ courseId, value, onChange, lockBank = false }: { co
         </div>
         <div>
           <label className={labelCls} htmlFor="pick-section">{t("bank.filters.section")}</label>
-          <input id="pick-section" list="pick-sections" className={inputCls} value={value.filter.section ?? ""} onChange={(e) => setF({ section: e.target.value })} />
-          <datalist id="pick-sections">{ORT_SECTIONS.map((s) => <option key={s} value={s}>{t(`sections.${s}`)}</option>)}</datalist>
+          <input id="pick-section" list={ui.sectionKeys.length ? "pick-sections" : undefined} className={inputCls} value={value.filter.section ?? ""} onChange={(e) => setF({ section: e.target.value })} />
+          {ui.sectionKeys.length > 0 && <datalist id="pick-sections">{ui.sectionKeys.map((s) => <option key={s} value={s}>{t(`sections.${s}`)}</option>)}</datalist>}
         </div>
         <div>
           <label className={labelCls} htmlFor="pick-topic">{t("bank.filters.topic")}</label>

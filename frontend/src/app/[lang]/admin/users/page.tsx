@@ -10,6 +10,11 @@ import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { Pager } from "@/components/lms/Pager";
 import { ReasonDialog } from "@/components/lms/admin/ReasonDialog";
 import { UserStatusBadge } from "@/components/lms/admin/UserStatusBadge";
+// --- Phase 6 S4 ---
+import { SystemAccountBadge } from "@/components/lms/org/OrgUi";
+import { isSystemAccount } from "@/lib/lms/organizations";
+import { fmtApiDate } from "@/lib/format";
+// --- Phase 6 S4 end ---
 
 const STATUSES: (TeacherStatus | "")[] = ["", "none", "pending", "approved", "revoked"];
 
@@ -112,7 +117,8 @@ export default function AdminUsersPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {items.map((u) => {
-                const canToggle = u.id !== me?.id && !u.is_platform_admin;
+                const system = isSystemAccount(u); // Phase 6 S4 (admin M5)
+                const canToggle = u.id !== me?.id && !u.is_platform_admin && !system;
                 return (
                   <tr key={u.id}>
                     <td className="px-3 py-2">
@@ -121,10 +127,11 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="px-3 py-2"><UserStatusBadge kind="teacher" status={u.teacher_status} /></td>
                     <td className="space-x-1 px-3 py-2">
+                      {system && <SystemAccountBadge />}
                       {u.is_platform_admin && <UserStatusBadge kind="account" status="admin" />}
                       {u.disabled_at && <UserStatusBadge kind="account" status="disabled" />}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2">{new Date(u.created_at).toLocaleDateString(lang)}</td>
+                    <td className="whitespace-nowrap px-3 py-2">{fmtApiDate(u.created_at, lang)}</td>
                     <td className="px-3 py-2 text-right">
                       {canToggle && (u.disabled_at ? (
                         <button type="button" onClick={() => doEnable(u)} className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium hover:bg-slate-50">{t("platformAdmin.users.enable")}</button>
@@ -140,7 +147,8 @@ export default function AdminUsersPage() {
         </div>
       )}
       <Pager nextCursor={cursor} loading={loading} onMore={() => load(cursor)} />
-      <ReasonDialog open={!!target} title={t("platformAdmin.users.disableTitle")} body={t("platformAdmin.users.disableBody")}
+      <ReasonDialog open={!!target} title={t("platformAdmin.users.disableTitle")}
+        body={`${t("organizations.adminUser.disableTarget", { name: target ? target.display_name || target.email : "" })} ${t("platformAdmin.users.disableBody")}`}
         confirmLabel={t("platformAdmin.users.disable")} danger busy={busy} error={dialogError}
         onConfirm={doDisable} onCancel={() => setTarget(null)} />
     </div>

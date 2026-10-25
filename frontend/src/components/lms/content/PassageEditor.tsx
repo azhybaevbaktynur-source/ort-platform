@@ -2,7 +2,8 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
-import { NumberedPassage } from "@/components/lms/NumberedPassage";
+import { TemplatePassage } from "@/components/lms/PlainPassage";
+import { fmtApiDateTime } from "@/lib/format";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import { createPassage, getPassageVersion, listPassageVersions, revertPassage, updatePassage } from "@/lib/lms/content";
 import type { PassageOut, PassageVersionOut, PassageVersionSummaryOut } from "@/lib/lms/contentTypes";
@@ -90,7 +91,7 @@ export function PassageEditor({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={image.url} alt="" className="mb-3 max-h-72 w-auto rounded-lg" />
           )}
-          <NumberedPassage text={body} />
+          <TemplatePassage text={body} />
         </div>
       )}
       {empty && <p role="alert" className="text-sm text-red-700">{t("bank.passages.errBody")}</p>}
@@ -163,7 +164,7 @@ export function PassageHistory({
                 className={`w-full rounded-xl border px-3 py-2 text-left text-sm ${selected?.id === v.id ? "border-brand-400 bg-brand-50" : "border-slate-200 bg-white hover:bg-slate-50"}`}>
                 <span className="font-semibold">{t("bank.history.version", { n: v.version_no })}</span>
                 {v.id === currentId && <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">{t("bank.history.current")}</span>}
-                <span className="block text-xs text-slate-500">{t(`bank.history.origin.${v.origin}`)} · {new Date(v.created_at).toLocaleString()}{v.created_by_name ? ` · ${v.created_by_name}` : ""}</span>
+                <span className="block text-xs text-slate-500">{t(`bank.history.origin.${v.origin}`)} · {fmtApiDateTime(v.created_at)}{v.created_by_name ? ` · ${v.created_by_name}` : ""}</span>
               </button>
             </li>
           ))}
