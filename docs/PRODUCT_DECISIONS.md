@@ -344,3 +344,4 @@ From `phases/PHASE_7A_DESIGN.md` §8. Work continues with the interim default; t
 | Q1 | Extra time for accommodated students on ORT exams (changes their section timers) | Stored, but **not applied** to ORT preset exams (`extra_time_s = 0`); extra attempts and date exceptions apply | Proportional per-section extra time, accommodated students only |
 | Q2 | Storage budget for student uploads (R2 free tier) | 5 MB per student file, per-course cap as a config default; the free-tier guard refuses uploads before any cost | Same; paying for more R2 storage is the owner's call |
 | Q3 | Who sets accommodations | Course teachers only (org admins via "Join as teacher") | Same |
+| Q4 | Quiz access codes on ORT exams (would add a code prompt to the ORT start screen) | **Not allowed** on ORT preset exams (security review 7a); general quizzes may use codes (min. 6 characters) | Keep blocked unless the owner wants proctored ORT sessions |
