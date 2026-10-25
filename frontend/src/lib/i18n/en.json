@@ -2289,5 +2289,217 @@
     "courseTeacher": "You joined the course «{course}» as a teacher.",
     "courseAssistant": "You joined the course «{course}» as an assistant.",
     "dismiss": "Close message"
+  },
+  "ui": {
+    "close": "Close",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "retry": "Retry",
+    "loading": "Loading…",
+    "details": "Details",
+    "back": "Back",
+    "optional": "(optional)",
+    "search": "Search",
+    "clearSearch": "Clear search",
+    "resetFilters": "Reset filters",
+    "breadcrumbs": "You are here",
+    "error": {
+      "title": "Could not load this",
+      "body": "Check your connection and press Retry. If it keeps happening, try again later.",
+      "offline": "No connection. Check the internet and try again."
+    },
+    "empty": {
+      "title": "Nothing here yet"
+    },
+    "pagination": {
+      "label": "Pages",
+      "loadMore": "Load more",
+      "previous": "Previous",
+      "next": "Next",
+      "shown": "{shown} of {total} shown"
+    },
+    "table": {
+      "count": "{count} results",
+      "empty": "Nothing to show yet.",
+      "sortBy": "Sort by",
+      "notSorted": "Not sorted",
+      "sortOptionAsc": "{column}, ascending",
+      "sortOptionDesc": "{column}, descending",
+      "actions": "Actions"
+    },
+    "reason": {
+      "required": "Reason (required)",
+      "optional": "Reason (optional)",
+      "missing": "Please enter a reason.",
+      "limit": "Up to {n} characters."
+    },
+    "picker": {
+      "placeholder": "Name or email",
+      "change": "Change",
+      "searching": "Searching…",
+      "count": "{n} found",
+      "empty": "No one found. Check the spelling or try the email.",
+      "failed": "Search failed. Try again.",
+      "minChars": "Type at least {n} characters."
+    },
+    "demo": {
+      "title": "Design system",
+      "intro": "Every component of the library in every variant. This page exists only in development.",
+      "s": {
+        "tokens": "Colors",
+        "buttons": "Buttons",
+        "fields": "Form fields",
+        "badges": "Badges",
+        "cards": "Cards, tiles and details",
+        "header": "Page header",
+        "tabs": "Tabs",
+        "table": "Table",
+        "states": "Empty, error and loading states",
+        "dialogs": "Dialogs",
+        "toasts": "Notifications",
+        "picker": "User picker"
+      },
+      "b": {
+        "save": "Save changes",
+        "delete": "Delete course",
+        "details": "View details",
+        "add": "Add question",
+        "disabled": "Not available yet",
+        "small": "Small",
+        "large": "Start the exam",
+        "toCatalog": "Open the catalog",
+        "edit": "Edit",
+        "remove": "Remove",
+        "settings": "Settings",
+        "loadingNote": "Loading buttons keep their label, show a spinner and set aria-busy."
+      },
+      "f": {
+        "title": "Course title",
+        "titleHint": "Students see this title in the catalog.",
+        "email": "Email",
+        "emailError": "Enter a valid email address, for example name@school.kg.",
+        "subtitle": "Short subtitle",
+        "code": "Join code",
+        "description": "Description",
+        "descriptionHint": "What students learn and how the course is graded.",
+        "language": "Language of instruction",
+        "languagePlaceholder": "Choose a language",
+        "ky": "Kyrgyz",
+        "ru": "Russian",
+        "en": "English",
+        "languageError": "Choose the language the course is taught in.",
+        "catalog": "Show the course in the catalog",
+        "catalogHint": "Students can find it and ask to join.",
+        "rules": "I accept the platform rules",
+        "rulesError": "Accept the rules to continue.",
+        "late": "Allow late submissions",
+        "lateHint": "Students can submit after the due date; the work is marked late.",
+        "emails": "Send email notifications",
+        "ortScoring": "Use ORT scoring (set by the template)"
+      },
+      "badge": {
+        "published": "Published",
+        "draft": "Draft",
+        "inProgress": "In progress",
+        "late": "Late",
+        "notPassed": "Not passed",
+        "system": "System account"
+      },
+      "card": {
+        "title": "Algebra 9A",
+        "description": "Teacher: Aibek Toktogulov · 28 students",
+        "open": "Open course",
+        "body": "Next: Quadratic equations test, due 4 November."
+      },
+      "stat": {
+        "students": "Students",
+        "review": "Waiting for review",
+        "reviewHint": "3 new today",
+        "best": "Personal best",
+        "bestHint": "ORT, 2 November"
+      },
+      "dl": {
+        "owner": "Owner",
+        "created": "Created",
+        "language": "Language",
+        "visibility": "Who can join",
+        "visibilityValue": "Anyone from the catalog can ask to join; the teacher approves."
+      },
+      "header": {
+        "org": "School No. 5",
+        "courses": "Courses",
+        "description": "Course settings, people and assessments.",
+        "primary": "Create an assessment",
+        "invite": "Invite a teacher",
+        "settings": "Course settings"
+      },
+      "tabs": {
+        "label": "Course sections",
+        "home": "Home",
+        "people": "People",
+        "assessments": "Assessments",
+        "grades": "Grades",
+        "bank": "Question bank",
+        "files": "Files",
+        "announcements": "Announcements",
+        "settings": "Settings",
+        "panel": "Content of the tab «{tab}».",
+        "navNote": "Links to pages use TabsNav (aria-current) with the same look:"
+      },
+      "table": {
+        "caption": "Students of the course",
+        "name": "Student",
+        "email": "Email",
+        "status": "Status",
+        "score": "Score",
+        "joined": "Joined",
+        "open": "Open",
+        "countText": "{count} students",
+        "allStatuses": "All statuses",
+        "viewState": "Show the table as",
+        "stateData": "Data",
+        "stateLoading": "Loading",
+        "stateEmpty": "Empty",
+        "stateError": "Error",
+        "emptyTitle": "No students yet.",
+        "emptyBody": "Share the join code with your class.",
+        "emptyAction": "Show the join code",
+        "errorTitle": "The list of students did not load"
+      },
+      "states": {
+        "emptyTitle": "No courses yet.",
+        "emptyBody": "Join a course with a code from your teacher.",
+        "emptyAction": "Join with a code",
+        "inlineTitle": "Your answers were not sent",
+        "inlineBody": "No connection. Your answers are saved on this device and will be sent when you are back online.",
+        "skeleton": "Skeleton while a list loads:"
+      },
+      "dialog": {
+        "open": "Rename the course",
+        "description": "The new title is shown to students right away.",
+        "newTitle": "New title",
+        "openConfirm": "Delete the course…",
+        "confirmTitle": "Delete the course?",
+        "confirmEffect": "Students lose access to its assessments and grades. This cannot be undone.",
+        "openReason": "Disable the account…",
+        "reasonTitle": "Disable the account?",
+        "reasonEffect": "The person can no longer sign in. Their courses and grades stay.",
+        "reasonConfirm": "Disable account",
+        "done": "Done (demo, nothing was changed)."
+      },
+      "toast": {
+        "success": "Changes saved.",
+        "error": "Could not save. Check your connection and try again.",
+        "info": "The import runs in the background. You can leave this page.",
+        "showSuccess": "Show success",
+        "showError": "Show error",
+        "showInfo": "Show info"
+      },
+      "picker": {
+        "label": "New owner",
+        "hint": "Search by name or email (try “ai”)."
+      }
+    }
   }
 }
