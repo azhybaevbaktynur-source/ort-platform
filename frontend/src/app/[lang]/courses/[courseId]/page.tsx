@@ -8,6 +8,7 @@ import { pickLocalized } from "@/lib/lms/localized";
 import { isStaffCourse } from "@/lib/lms/types";
 import { useCourse } from "@/components/lms/CourseContext";
 import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
+import { StudentCourseHome } from "@/components/lms/home/StudentCourseHome"; // Phase 6 S6b
 
 export default function CourseHomePage() {
   const { lang, t } = useTranslation();
@@ -30,6 +31,10 @@ export default function CourseHomePage() {
       setBusy(false);
     }
   };
+
+  // --- Phase 6 S6b begin --- (student view: next assessment, latest result, about; UX S5)
+  if (course.my_enrollment.role === "student") return <StudentCourseHome />;
+  // --- Phase 6 S6b end ---
 
   return (
     <div className="space-y-6">

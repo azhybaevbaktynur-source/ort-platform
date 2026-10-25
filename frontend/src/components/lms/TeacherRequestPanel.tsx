@@ -6,8 +6,10 @@ import { useTranslation } from "@/lib/i18n/context";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
 import { listMyTeacherRequests, submitTeacherRequest } from "@/lib/lms/teacher";
 import type { MyTeacherRequestOut } from "@/lib/lms/types";
-import { fmtApiDateTime } from "@/lib/format";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
+// Phase 6b S6b: design-system pieces, dates without seconds (UX S15), plain status sentence (6a carry-over)
+import { Badge, Button, Skeleton, Textarea, type BadgeTone } from "@/components/ui";
+import { fmtShortDateTime } from "@/components/lms/home/format";
 
 /** Independent teacher request: today's become-teacher form and state (moved here in Phase 6, §7). */
 export function TeacherRequestPanel() {
@@ -51,17 +53,15 @@ export function TeacherRequestPanel() {
   const pending = status === "pending" || requests.some((r) => r.status === "pending");
   const canAsk = (status === "none" || status === "revoked") && !pending;
   const latestRejected = requests.find((r) => r.status === "rejected");
-  const badge: Record<string, string> = {
-    pending: "bg-amber-100 text-amber-800", approved: "bg-emerald-100 text-emerald-800",
-    rejected: "bg-red-100 text-red-800", cancelled: "bg-slate-100 text-slate-600",
-  };
+  const badge: Record<string, BadgeTone> = { pending: "warning", approved: "success", rejected: "danger", cancelled: "neutral" };
+  // One plain sentence, only once there is something to say (a request exists); the boxes below explain
+  // pending / approved / revoked / rejected, so the sentence covers the remaining case.
+  const showStatusLine = !loading && requests.length > 0 && status === "none" && !pending && !latestRejected;
 
   return (
     <div>
-      <p className="mb-4 text-sm text-slate-600">{t("teacherRequest.intro")}</p>
-      <p className="mb-6 text-sm text-slate-700">
-        {t("teacherRequest.currentStatus")}: <strong>{t(`teacherRequest.status.${status}`)}</strong>
-      </p>
+      <p className="mb-4 text-base leading-6 text-slate-600 sm:text-sm">{t("teacherRequest.intro")}</p>
+      {showStatusLine && <p className="mb-6 text-base leading-6 text-slate-700 sm:text-sm">{t("teacherAccess.statusLine.none")}</p>}
 
       {error ? <ErrorMessage error={error} onRetry={load} className="mb-4" /> : null}
 
@@ -85,28 +85,25 @@ export function TeacherRequestPanel() {
       )}
 
       {canAsk && (
-        <form onSubmit={submit} className="mb-8 rounded-2xl border border-slate-200 bg-white p-5">
-          <label htmlFor="tr-message" className="block text-sm font-medium text-slate-700">{t("teacherRequest.messageLabel")}</label>
-          <textarea id="tr-message" rows={5} maxLength={2000} value={message} onChange={(e) => setMessage(e.target.value)}
-            placeholder={t("teacherRequest.messagePlaceholder")}
-            className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
-          <p className="mt-1 text-xs text-slate-500">{message.length}/2000</p>
-          <button type="submit" disabled={busy}
-            className="mt-3 min-h-[44px] rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
-            {busy ? t("lms.common.loading") : t("teacherRequest.submit")}
-          </button>
+        <form onSubmit={submit} className="mb-8 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
+          <Textarea id="tr-message" label={t("teacherRequest.messageLabel")} rows={5} maxLength={2000} value={message}
+            onChange={(e) => setMessage(e.target.value)} placeholder={t("teacherRequest.messagePlaceholder")}
+            hint={`${message.length}/2000`} />
+          <Button type="submit" loading={busy} className="mt-3 w-full sm:w-auto">{t("teacherRequest.submit")}</Button>
         </form>
       )}
 
       <h3 className="mb-3 text-base font-semibold text-slate-900">{t("teacherRequest.history")}</h3>
-      {loading && <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p>}
-      {!loading && requests.length === 0 && <p className="text-sm text-slate-500">{t("teacherRequest.noHistory")}</p>}
+      {loading && (
+        <div role="status" aria-live="polite"><span className="sr-only">{t("ui.loading")}</span><Skeleton className="h-16 w-full rounded-2xl" /></div>
+      )}
+      {!loading && requests.length === 0 && <p className="text-base leading-6 text-slate-600 sm:text-sm">{t("teacherRequest.noHistory")}</p>}
       <ul className="space-y-3">
         {requests.map((r) => (
           <li key={r.id} className="rounded-2xl border border-slate-200 bg-white p-4 text-sm">
             <div className="flex items-center justify-between gap-2">
-              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${badge[r.status] || badge.cancelled}`}>{t(`teacherRequest.requestStatus.${r.status}`)}</span>
-              <time className="text-xs text-slate-500">{fmtApiDateTime(r.created_at, lang)}</time>
+              <Badge tone={badge[r.status] ?? "neutral"}>{t(`teacherRequest.requestStatus.${r.status}`)}</Badge>
+              <time dateTime={r.created_at} className="text-sm text-slate-600">{fmtShortDateTime(r.created_at, lang)}</time>
             </div>
             {r.message && <p className="mt-2 whitespace-pre-wrap text-slate-700">{r.message}</p>}
             {r.reason && <p className="mt-2 text-slate-700"><strong>{t("teacherRequest.reason")}:</strong> {r.reason}</p>}
