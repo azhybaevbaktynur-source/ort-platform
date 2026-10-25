@@ -105,6 +105,14 @@ cors_origins = settings.ALLOWED_ORIGINS or settings.BACKEND_CORS_ORIGINS or ["*"
 from app.lms.attempts.bodycap import BodyCapMiddleware
 # Innermost (added first): Content-Length 413s and CORS preflights never wait for a slot; CORS still wraps the 503 (B1).
 app.add_middleware(admission.AdmissionMiddleware)
+# --- Phase 6 S3 begin --- (H2: datetimes in JSON always carry a timezone; invitation routes)
+from app.core.utc_json import UTCDatetimeJSONMiddleware  # noqa: E402
+from app.lms.invitations.router import router as _invitations_router  # noqa: E402
+
+# Just outside the admission gate, inside GZip: it sees the uncompressed JSON body the route produced.
+app.add_middleware(UTCDatetimeJSONMiddleware)
+app.include_router(_invitations_router, prefix=settings.API_V1_STR)
+# --- Phase 6 S3 end ---
 app.add_middleware(BodyCapMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(

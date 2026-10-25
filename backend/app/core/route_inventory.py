@@ -70,6 +70,11 @@ ROUTE_POLICIES.update({
     ("PATCH", "/api/v1/platform/courses/{course_id}"): "platform_admin",  # template_locked, audited
 })
 # --- Phase 6 S2b end ---
+# --- Phase 6 S3 begin --- (invitations, PHASE_6_DESIGN 2.3)
+from app.lms.invitations.policies import INVITATION_POLICIES  # noqa: E402
+
+ROUTE_POLICIES.update(INVITATION_POLICIES)
+# --- Phase 6 S3 end ---
 
 
 def iter_routes(app):
