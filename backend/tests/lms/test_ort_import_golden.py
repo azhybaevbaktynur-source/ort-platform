@@ -270,6 +270,53 @@ async def test_bundle_zip_import_like_frozen_and_reimport_is_noop(db):
     check_or_write("ort_import_golden_zip.json", out)
 
 
+# ------------------------------------------------------------------------------------------------ A10
+
+def _subject_csv(rows: list[tuple[str, str]]) -> bytes:
+    lines = ["section,stem,option_a,option_b,option_c,option_d,correct_option"]
+    lines += [f'{sec},"{stem}",a,b,c,d,B' for sec, stem in rows]
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+def test_a10_subject_keys_map_to_the_ort_subject_presets():
+    """A10: the BUNDLE_FORMAT subject keys become the `ort_subject` keys; the old spellings stay accepted."""
+    from app.lms.assessments.rules import ORT_SUBJECT_KEYS
+
+    data = _subject_csv([("math_subject", "q1"), ("Math Subject", "q2"), ("kyrgyz_lang_lit", "q3"),
+                         ("russian-lang-lit", "q4"), ("advanced_math", "q5"), ("native_language", "q6")])
+    up = parse_upload(data, "subject.csv", ImportOptions(exam_type="subject", language="ru", allowed_languages=["ru"]))
+    assert up.issues.errors == []
+    secs = [it.section for it in up.bundles[0].items]
+    assert secs == ["advanced_math", "advanced_math", "native_language", "native_language", "advanced_math",
+                    "native_language"]
+    assert set(secs) <= set(ORT_SUBJECT_KEYS)
+
+
+def test_a10_math_subject_export_becomes_an_ort_subject_assessment(db):
+    """A subject export with `math_subject` rows (refused at the assessment stage before A10: 'subject section
+    ['math_subject'] has no ORT subject preset') now becomes a published `ort_subject` exam for advanced_math."""
+    from app.lms.assessments.models import Assessment, AssessmentSection
+    from tests.lms.test_ort_seed import insert_export, tsoomo_payload
+
+    payload = [p for p in tsoomo_payload(keep_images=False) if p["section"] == "math_2"][:5]
+    for p in payload:
+        p["section"] = "math_subject"
+        p["external_id"] = p["external_id"].replace("math_2", "math_subject")
+    insert_export(db, exam_set_id="ort_subject_math_ru", exam_type="subject", payload=payload,
+                  sections=[{"section": "math_subject", "questionCount": 5, "timeLimitMinutes": 80}],
+                  source_id="math_src", title="Математика")
+    rep = ensure_ort_courses(db, samples=False)
+    assert rep.ok and rep.assessments_published == 1 and rep.questions_created == 5, rep
+    db.expire_all()
+    qs = list(db.scalars(select(BankQuestion)))
+    assert {q.section for q in qs} == {"advanced_math"} and len(qs) == 5
+    assert all(q.source_ref.startswith("tsoomo19:math_subject:") for q in qs)  # external ids are untouched
+    a = db.scalars(select(Assessment).where(Assessment.course_id == course_id_for("ru"))).one()
+    assert (a.preset, a.status) == ("ort_subject", "published")
+    secs = list(db.scalars(select(AssessmentSection).where(AssessmentSection.assessment_id == a.id)))
+    assert [(s.key, s.time_limit_s) for s in secs] == [("advanced_math", 4800)]
+
+
 def test_importer_keeps_double_backslash_verbatim():
     """Freezes today's importer: CSV text is stored as written, a `\\\\frac` stays `\\\\frac` (the old dev samples had
     double backslashes; they were fixed in the sample files, never in the importer)."""

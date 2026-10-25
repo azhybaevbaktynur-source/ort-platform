@@ -39,6 +39,8 @@ SECTION_ALIASES = {
     "history": "history", "тарых": "history", "история": "history",
     "english": "english", "англис": "english", "англис тили": "english",
     "английский": "english", "английский язык": "english",
+    # A10 (owner OK 2026-10-24): BUNDLE_FORMAT subject keys -> the ort_subject preset keys; old keys stay accepted
+    "math_subject": "advanced_math", "kyrgyz_lang_lit": "native_language", "russian_lang_lit": "native_language",
 }
 
 
