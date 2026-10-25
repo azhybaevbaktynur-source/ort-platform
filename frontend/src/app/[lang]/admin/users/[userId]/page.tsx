@@ -16,6 +16,7 @@ import { SystemAccountBadge } from "@/components/lms/org/OrgUi";
 import { isSystemAccount } from "@/lib/lms/organizations";
 import { fmtApiDateTime } from "@/lib/format";
 // --- Phase 6 S4 end ---
+import { UserOrganizationsSection } from "@/components/lms/org/admin/UserOrganizationsSection"; // Phase 6 S4b
 
 type Action = "disable" | "revoke" | "grant";
 
@@ -114,6 +115,8 @@ export default function AdminUserDetailPage() {
         </div>}
       </div>
 
+      {/* --- Phase 6 S4b: organizations and roles, add to organization --- */}
+      <UserOrganizationsSection user={user} readOnly={system} />
       <h2 className="mb-2 text-lg font-semibold text-slate-900">{t("platformAdmin.users.ownedCourses")}</h2>
       {user.owned_courses.length === 0 ? <p className="mb-6 text-sm text-slate-500">{t("platformAdmin.users.noCourses")}</p> : (
         <ul className="mb-6 divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white text-sm">

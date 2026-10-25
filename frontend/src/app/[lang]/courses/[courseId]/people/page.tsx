@@ -10,6 +10,11 @@ import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { Pager } from "@/components/lms/Pager";
 import { RosterTable } from "@/components/lms/RosterTable";
+// --- Phase 6 S4b: invite staff without an account ---
+import { createCourseStaffInvitation } from "@/lib/lms/invitations";
+import { toastInvitationSent } from "@/components/lms/org/InviteDialog";
+import { OrgError } from "@/components/lms/org/OrgUi";
+// --- Phase 6 S4b end ---
 
 function StaffList({ courseId }: { courseId: string }) {
   const { t } = useTranslation();
@@ -51,7 +56,7 @@ function StaffList({ courseId }: { courseId: string }) {
 }
 
 export default function PeoplePage() {
-  const { t } = useTranslation();
+  const { lang, t } = useTranslation();
   const { course } = useCourse();
   const { me } = useLmsMe();
   const staff = isStaffCourse(course);
@@ -74,6 +79,11 @@ export default function PeoplePage() {
   const [addRole, setAddRole] = useState<"teacher" | "assistant">("assistant");
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<unknown>(null);
+  // --- Phase 6 S4b: no account with this email -> offer a staff invitation ---
+  const [inviteEmail, setInviteEmail] = useState<string | null>(null);
+  const [inviting, setInviting] = useState(false);
+  const [inviteError, setInviteError] = useState<unknown>(null);
+  // --- Phase 6 S4b end ---
 
   const load = useCallback(async (next?: string | null) => {
     setLoading(true);
@@ -127,16 +137,37 @@ export default function PeoplePage() {
     ev.preventDefault();
     setAdding(true);
     setAddError(null);
+    setInviteEmail(null);
+    setInviteError(null);
     try {
       await addStaff(course.id, { email: email.trim(), role: addRole });
       setEmail("");
       await load();
     } catch (err) {
-      setAddError(err);
+      if ((err as { code?: string }).code === "user_not_found") setInviteEmail(email.trim()); // Phase 6 S4b
+      else setAddError(err);
     } finally {
       setAdding(false);
     }
   };
+
+  // --- Phase 6 S4b ---
+  const sendInvite = async () => {
+    if (!inviteEmail) return;
+    setInviting(true);
+    setInviteError(null);
+    try {
+      const inv = await createCourseStaffInvitation(course.id, { email: inviteEmail, role: addRole, language: lang });
+      toastInvitationSent(t, inv, inviteEmail);
+      setInviteEmail(null);
+      setEmail("");
+    } catch (err) {
+      setInviteError(err);
+    } finally {
+      setInviting(false);
+    }
+  };
+  // --- Phase 6 S4b end ---
 
   return (
     <div className="space-y-6">
@@ -146,12 +177,12 @@ export default function PeoplePage() {
           <div className="flex flex-wrap items-end gap-3">
             <div className="min-w-[14rem] flex-1">
               <label htmlFor="staff-email" className="mb-1 block text-sm font-medium text-slate-700">{t("courses.people.email")}</label>
-              <input id="staff-email" type="email" value={email} disabled={adding} onChange={(e) => setEmail(e.target.value)}
+              <input id="staff-email" type="email" value={email} disabled={adding || inviting} onChange={(e) => { setEmail(e.target.value); setInviteEmail(null); }}
                 className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
             </div>
             <div>
               <label htmlFor="staff-role" className="mb-1 block text-sm font-medium text-slate-700">{t("courses.people.role")}</label>
-              <select id="staff-role" value={addRole} disabled={adding} onChange={(e) => setAddRole(e.target.value as "teacher" | "assistant")}
+              <select id="staff-role" value={addRole} disabled={adding || inviting} onChange={(e) => setAddRole(e.target.value as "teacher" | "assistant")}
                 className="rounded-xl border border-slate-300 px-3 py-2 text-sm">
                 <option value="assistant">{t("courses.roles.assistant")}</option>
                 {isOwner && <option value="teacher">{t("courses.roles.teacher")}</option>}
@@ -162,6 +193,19 @@ export default function PeoplePage() {
             </button>
           </div>
           <ErrorMessage error={addError} className="mt-3" />
+          {/* --- Phase 6 S4b --- */}
+          {inviteEmail && (
+            <div role="status" className="mt-3 space-y-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
+              <p>{t("invitations.staff.noAccount", { email: inviteEmail })}</p>
+              <button type="button" disabled={inviting} onClick={() => void sendInvite()}
+                className="inline-flex min-h-[44px] items-center rounded-xl border border-sky-300 bg-white px-4 text-sm font-semibold text-brand-700 hover:bg-sky-100 disabled:opacity-50">
+                {inviting ? t("lms.common.loading") : t("invitations.staff.send")}
+              </button>
+              <p className="text-xs">{t("invitations.staff.sentHint")}</p>
+              <OrgError error={inviteError} />
+            </div>
+          )}
+          {/* --- Phase 6 S4b end --- */}
         </form>
       )}
 

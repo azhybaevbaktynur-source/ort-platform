@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { getCourse, listPeople, transferOwnership } from "@/lib/lms/courses";
 import { pickLocalized } from "@/lib/lms/localized";
-import { joinCourseAsTeacher, listOrgMembers } from "@/lib/lms/organizations";
+import { joinCourseAsTeacher, searchOrgMembers } from "@/lib/lms/organizations";
 import { templateTitle } from "@/lib/lms/templates";
 import { isStaffCourse, type CourseOut, type RosterEntryOut } from "@/lib/lms/types";
 import { fmtApiDate } from "@/lib/format";
@@ -55,8 +55,7 @@ export default function OrgCourseSummaryPage() {
   useEffect(() => { void load(); void loadStaff(); }, [load, loadStaff]);
 
   const searchMembers: UserSearch = useMemo(() => async (q) => {
-    const page = await listOrgMembers(org.id, { q, state: "active", limit: 10 });
-    return page.items.filter((m) => !m.disabled).map((m) => ({ id: m.user_id, display_name: m.display_name, email: m.email }));
+    return searchOrgMembers(org.id, q);
   }, [org.id]);
 
   const back = <Link href={`/${lang}/org/${org.id}/courses`} className="text-sm font-medium text-brand-700 hover:underline">{t("organizations.courses.back")}</Link>;

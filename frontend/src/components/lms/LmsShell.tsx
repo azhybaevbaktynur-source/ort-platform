@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth-context";
 import { LmsMeProvider, useLmsMeLoader } from "@/lib/lms/useLmsMe";
 import { ErrorMessage } from "./ErrorMessage";
 import { OrgNavLink } from "./org/OrgNavLink"; // Phase 6 S4
+import { PendingInvitationsBanner } from "./PendingInvitationsBanner"; // Phase 6 S4b
 
 const LANGS: Language[] = ["en", "ru", "ky"];
 
@@ -125,6 +126,8 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         <main className="mx-auto max-w-6xl px-4 py-8">
+          {/* --- Phase 6 S4b --- */}
+          <PendingInvitationsBanner enabled={!!me} />
           {meState.error && !me ? <ErrorMessage error={meState.error} onRetry={meState.reload} /> : children}
         </main>
       </div>

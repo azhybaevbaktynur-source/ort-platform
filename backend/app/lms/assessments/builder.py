@@ -865,6 +865,14 @@ def lobby(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID) -> sch
     used = sum(1 for r in atts if r[3] != "void")
     open_id = next((r[1] for r in atts if r[3] == "in_progress"), None)
     can_start, reason = _start_state(a, used, open_id, clock.now())
+    # --- Phase 6 S4b begin --- (an org admin may read the lobby but not take the exam: mirror the start route)
+    from app.core.authz import can as _authz_can
+
+    if can_start and not _authz_can(ctx, A.ASSESSMENT_TAKE, course):
+        # a student of a concluded course or a suspended organization vs. a non-student (an org admin)
+        can_start = False
+        reason = "course_not_active" if ctx.role_for(course.id) == "student" else "not_a_student"
+    # --- Phase 6 S4b end ---
     briefs = grading_repo.version_briefs(db, [a.grading_scheme_version_id])
     return sch.AssessmentLobbyOut(
         id=a.id, title=a.title, description=a.description, languages=list(snap.get("languages") or []),

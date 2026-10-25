@@ -11,7 +11,7 @@ import { Pager } from "@/components/lms/Pager";
 import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
 import { ReasonDialog } from "@/components/lms/admin/ReasonDialog";
 import { UserPicker, platformUserSearch, type PickedUser } from "@/components/lms/UserPicker";
-import { EmptyBox, Loading, OrgBadge, OrgError, btn, cardCls } from "../OrgUi";
+import { EmptyBox, Loading, OrgError, btn, cardCls } from "../OrgUi";
 import { toast } from "@/components/ui/Toast";
 
 /** Platform admin: organization admins or teachers, with "Assign admin" / "Add teacher" (UserPicker) and remove. */
@@ -66,8 +66,8 @@ export function OrgMembersTab({ org, role, onChanged }: { org: OrganizationOut; 
     setBusy(true);
     setDialogError(null);
     try {
-      await removeOrganizationMember(org.id, removing.user_id, reason);
-      toast.success(t("organizations.members.removed", { name: removing.display_name || removing.email }));
+      await removeOrganizationMember(org.id, removing.user.id, reason);
+      toast.success(t("organizations.members.removed", { name: removing.user.display_name || removing.user.email }));
       setRemoving(null);
       await load();
       onChanged();
@@ -79,7 +79,7 @@ export function OrgMembersTab({ org, role, onChanged }: { org: OrganizationOut; 
   };
 
   const pickedName = picked ? picked.display_name || picked.email : "";
-  const removingName = removing ? removing.display_name || removing.email : "";
+  const removingName = removing ? removing.user.display_name || removing.user.email : "";
   return (
     <div className="space-y-4">
       <div className={cardCls}>
@@ -88,7 +88,7 @@ export function OrgMembersTab({ org, role, onChanged }: { org: OrganizationOut; 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1">
             <UserPicker label={t("organizations.members.person")} value={picked} onChange={setPicked} search={search}
-              excludeIds={items.map((m) => m.user_id)} />
+              excludeIds={items.map((m) => m.user.id)} />
           </div>
           <button type="button" className={btn.primary} disabled={!picked} onClick={() => { setDialogError(null); setConfirmAdd(true); }}>
             {t(isAdmins ? "organizations.members.assignAdmin" : "organizations.members.addTeacher")}
@@ -101,12 +101,11 @@ export function OrgMembersTab({ org, role, onChanged }: { org: OrganizationOut; 
       {items.length > 0 && (
         <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white text-sm">
           {items.map((m) => (
-            <li key={m.user_id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+            <li key={m.user.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
               <div className="min-w-0 flex-1 basis-56">
-                <Link href={`/${lang}/admin/users/${m.user_id}`} className="font-medium text-brand-700 hover:underline">{m.display_name || m.email}</Link>
-                <p className="truncate text-xs text-slate-500">{m.email} · {t("organizations.members.since", { date: fmtApiDate(m.created_at, lang) })}</p>
+                <Link href={`/${lang}/admin/users/${m.user.id}`} className="font-medium text-brand-700 hover:underline">{m.user.display_name || m.user.email}</Link>
+                <p className="truncate text-xs text-slate-500">{m.user.email} · {t("organizations.members.since", { date: fmtApiDate(m.created_at, lang) })}</p>
               </div>
-              {m.disabled && <OrgBadge tone="blocked" labelKey="organizations.members.state.blocked" />}
               <button type="button" className={btn.smallDanger} onClick={() => { setDialogError(null); setRemoving(m); }}>
                 {t("organizations.members.remove")}
               </button>

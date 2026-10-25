@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import {
-  SLUG_RE, createOrganization, listOrganizations, slugify, type OrganizationOut, type OrgStatus,
+  SLUG_RE, createOrganization, listOrganizations, slugify, type OrganizationAdminRowOut, type OrganizationOut, type OrgStatus,
 } from "@/lib/lms/organizations";
 import { fmtApiDate } from "@/lib/format";
 import { Modal } from "@/components/lms/assessments/Modal";
@@ -21,7 +21,7 @@ export default function AdminOrganizationsPage() {
   const [input, setInput] = useState("");
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<OrgStatus | "">("");
-  const [items, setItems] = useState<OrganizationOut[]>([]);
+  const [items, setItems] = useState<OrganizationAdminRowOut[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
@@ -87,9 +87,9 @@ export default function AdminOrganizationsPage() {
                 </div>
                 <OrgBadge tone={o.status} labelKey={`organizations.status.${o.status}`} />
                 <dl className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
-                  <div className="flex gap-1"><dt>{t("organizations.counts.orgAdmins")}:</dt><dd className="font-semibold text-slate-900">{n(o.counts?.org_admins)}</dd></div>
-                  <div className="flex gap-1"><dt>{t("organizations.counts.teachers")}:</dt><dd className="font-semibold text-slate-900">{n(o.counts?.teachers)}</dd></div>
-                  <div className="flex gap-1"><dt>{t("organizations.counts.courses")}:</dt><dd className="font-semibold text-slate-900">{n(o.counts?.courses)}</dd></div>
+                  <div className="flex gap-1"><dt>{t("organizations.counts.orgAdmins")}:</dt><dd className="font-semibold text-slate-900">{n(o.org_admins)}</dd></div>
+                  <div className="flex gap-1"><dt>{t("organizations.counts.teachers")}:</dt><dd className="font-semibold text-slate-900">{n(o.teachers)}</dd></div>
+                  <div className="flex gap-1"><dt>{t("organizations.counts.courses")}:</dt><dd className="font-semibold text-slate-900">{n(o.courses)}</dd></div>
                 </dl>
               </li>
             ))}
@@ -108,12 +108,11 @@ function CreateOrganizationDialog({ open, onClose, onCreated }: { open: boolean;
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
-  const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [checked, setChecked] = useState(false);
 
-  useEffect(() => { if (open) { setName(""); setSlug(""); setSlugTouched(false); setEmail(""); setError(null); setChecked(false); } }, [open]);
+  useEffect(() => { if (open) { setName(""); setSlug(""); setSlugTouched(false); setError(null); setChecked(false); } }, [open]);
 
   const effectiveSlug = slugTouched ? slug : slugify(name);
   const nameOk = name.trim().length > 0;
@@ -125,7 +124,7 @@ function CreateOrganizationDialog({ open, onClose, onCreated }: { open: boolean;
     setBusy(true);
     setError(null);
     try {
-      onCreated(await createOrganization({ name: name.trim(), slug: effectiveSlug, contact_email: email.trim() || undefined }));
+      onCreated(await createOrganization({ name: name.trim(), slug: effectiveSlug }));
     } catch (err) {
       setError(err);
     } finally {
@@ -146,10 +145,6 @@ function CreateOrganizationDialog({ open, onClose, onCreated }: { open: boolean;
           <input id="no-slug" value={effectiveSlug} maxLength={64} disabled={busy} aria-invalid={checked && !slugOk}
             onChange={(e) => { setSlugTouched(true); setSlug(e.target.value.toLowerCase()); }} className={`${inputCls} font-mono`} />
           <p className={`mt-1 text-xs ${checked && !slugOk ? "text-red-700" : "text-slate-500"}`}>{t("organizations.fields.slugHint")}</p>
-        </div>
-        <div>
-          <label htmlFor="no-email" className={labelCls}>{t("organizations.fields.contactEmail")}</label>
-          <input id="no-email" type="email" value={email} disabled={busy} onChange={(e) => setEmail(e.target.value)} className={inputCls} />
         </div>
         <p className="text-xs text-slate-500">{t("organizations.admin.createHint")}</p>
         <OrgError error={error} />

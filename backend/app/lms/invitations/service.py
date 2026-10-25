@@ -240,6 +240,13 @@ def create_staff_invitation(db: Session, ctx: AuthzContext, course: Course, *, e
                             message: Optional[str], language: str,
                             request: Optional[Request] = None) -> InvitationCreatedOut:
     """POST /courses/{id}/staff/invitations: course `roster.manage`; a co-teacher only by the owner (as add_staff)."""
+    # --- Phase 6 S4b begin --- (a suspended organization makes every write fail in authz with a generic 403;
+    # course staff get the specific code instead. Non-staff still get the 404 of require_course.)
+    if ctx.role_for(course.id) in ("teacher", "assistant"):
+        staff_org = load_organization(db, course.organization_id)
+        if staff_org is not None:
+            _ensure_active_org(staff_org)
+    # --- Phase 6 S4b end ---
     require_course(ctx, A.ROSTER_MANAGE, course)
     actor = ctx.user
     if role == "teacher" and course.owner_id != actor.id:

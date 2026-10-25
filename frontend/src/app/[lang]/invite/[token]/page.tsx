@@ -6,8 +6,9 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, Loader2, MailOpen } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
-import { acceptInvitation, getInvitation, type InvitationAcceptOut, type InvitationPublicOut } from "@/lib/lms/invitations";
+import { acceptInvitation, getInvitation, invitationTarget, type InvitationAcceptOut, type InvitationPublicOut } from "@/lib/lms/invitations";
 import { fmtApiDate } from "@/lib/format";
+import { pickLocalized } from "@/lib/lms/localized";
 import { AuthHeader } from "@/components/auth/AuthHeader";
 import { OrgError } from "@/components/lms/org/OrgUi";
 
@@ -39,11 +40,7 @@ function InviteAccept() {
   }, [token]);
   useEffect(() => { void lookup(); }, [lookup]);
 
-  const target = (r: InvitationAcceptOut | undefined) => {
-    if (r?.course_id) return `/${lang}/courses/${r.course_id}`;
-    if (r?.role === "org_admin" && r.organization_id) return `/${lang}/org/${r.organization_id}`;
-    return `/${lang}/courses`;
-  };
+  const target = (r: InvitationAcceptOut) => invitationTarget(lang, r);
 
   const accept = useCallback(async () => {
     setAccepting(true);
@@ -51,7 +48,7 @@ function InviteAccept() {
     try {
       const r = await acceptInvitation(token);
       setDone(true);
-      router.replace(target(r ?? undefined));
+      router.replace(target(r));
     } catch (e) {
       setAcceptError(e);
     } finally {
@@ -95,7 +92,7 @@ function InviteAccept() {
         <dl className="mt-5 space-y-2 rounded-2xl bg-slate-50 p-4 text-sm">
           <div className="flex flex-wrap justify-between gap-2"><dt className="text-slate-500">{t("invitations.accept.organization")}</dt><dd className="font-medium text-slate-900">{inv.organization_name}</dd></div>
           <div className="flex flex-wrap justify-between gap-2"><dt className="text-slate-500">{t("invitations.accept.role")}</dt><dd className="font-medium text-slate-900">{roleText}</dd></div>
-          {inv.course_title && <div className="flex flex-wrap justify-between gap-2"><dt className="text-slate-500">{t("invitations.accept.course")}</dt><dd className="font-medium text-slate-900">{inv.course_title}</dd></div>}
+          {inv.course_title && <div className="flex flex-wrap justify-between gap-2"><dt className="text-slate-500">{t("invitations.accept.course")}</dt><dd className="font-medium text-slate-900">{pickLocalized(inv.course_title, lang)}</dd></div>}
           <div className="flex flex-wrap justify-between gap-2"><dt className="text-slate-500">{t("invitations.accept.email")}</dt><dd className="font-medium text-slate-900">{inv.masked_email}</dd></div>
           <div className="flex flex-wrap justify-between gap-2"><dt className="text-slate-500">{t("invitations.accept.expires")}</dt><dd className="font-medium text-slate-900">{fmtApiDate(inv.expires_at, lang)}</dd></div>
         </dl>

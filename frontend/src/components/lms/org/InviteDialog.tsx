@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
-import { createOrgInvitation, type InvitationOut } from "@/lib/lms/invitations";
+import { createOrgInvitation, type InvitationCreatedOut } from "@/lib/lms/invitations";
+import { toast } from "@/components/ui/Toast";
 import { Modal } from "@/components/lms/assessments/Modal";
 import { OrgError, btn, inputCls, labelCls } from "./OrgUi";
 
@@ -15,7 +16,7 @@ export function InviteDialog({
   orgName: string;
   role?: "teacher" | "org_admin";
   onClose: () => void;
-  onSent: (inv: InvitationOut | null, email: string) => void;
+  onSent: (inv: InvitationCreatedOut | null, email: string) => void;
 }) {
   const { lang, t } = useTranslation();
   const [email, setEmail] = useState("");
@@ -68,4 +69,10 @@ export function InviteDialog({
       </form>
     </Modal>
   );
+}
+
+/** Toast after an invitation was created: the backend never fails the call when the email could not be sent. */
+export function toastInvitationSent(t: (k: string, p?: Record<string, string | number>) => string, inv: { email_sent: boolean } | null, email: string) {
+  if (inv && !inv.email_sent) toast.error(t("invitations.emailNotSent", { email }));
+  else toast.success(t("invitations.sent", { email }));
 }

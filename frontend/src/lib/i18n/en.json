@@ -1019,7 +1019,8 @@
         "attempts_exhausted": "You have used all your attempts.",
         "not_available": "This assessment is not available.",
         "course_not_active": "The course is not active.",
-        "unpublished": "This assessment is not published."
+        "unpublished": "This assessment is not published.",
+        "not_a_student": "Only students of this course can take this assessment."
       }
     },
     "builder": {
@@ -1959,7 +1960,10 @@
       "slugEditHint": "2–64 characters: lowercase Latin letters, digits and hyphens. Changing it changes the organization's links.",
       "contactEmail": "Contact email (optional)",
       "teachersCanCreate": "Teachers can create courses",
-      "teachersCanCreateHint": "When off, only organization admins create courses and assign their owners."
+      "teachersCanCreateHint": "When off, only organization admins create courses and assign their owners.",
+      "organization": "Organization",
+      "organizationPick": "Choose an organization",
+      "organizationHint": "You teach in several organizations. The course belongs to the one you choose."
     },
     "picker": {
       "placeholder": "Name or email",
@@ -1988,7 +1992,21 @@
       "not_member": "This person is not a member of the organization.",
       "owner_not_member": "The owner must be an active member of the organization.",
       "invitation_not_found": "This invitation is not valid any more.",
-      "organization_not_found": "Organization not found."
+      "organization_not_found": "Organization not found.",
+      "organization_required": "Choose the organization for this course.",
+      "course_creation_not_allowed": "You cannot create courses in this organization. Ask its administrator.",
+      "owner_assignment_not_allowed": "Only an organization admin can choose another owner.",
+      "invalid_owner": "The owner must be an active teacher or admin of the organization.",
+      "member_not_found": "This person is not a member of the organization.",
+      "cannot_remove_self": "You cannot remove yourself from the organization. Ask another admin.",
+      "organization_mismatch": "The course belongs to another organization.",
+      "import_profile_not_available": "This import format is not available in this course.",
+      "no_template": "This course has no template.",
+      "invitation_not_pending": "This invitation was already accepted, revoked or has expired.",
+      "invitation_conflict": "The invitation could not be accepted. Reload the page and try again.",
+      "invalid_email": "Enter a valid email address.",
+      "org_admin_required": "Only an admin of the organization can do this.",
+      "course_concluded": "The course has ended; this is no longer possible."
     },
     "admin": {
       "title": "Organizations",
@@ -2043,7 +2061,16 @@
       "grantBody": "The person can then create courses in their own organization.",
       "notTeacher": "Not a teacher",
       "userId": "User ID (for support)",
-      "nowPrefix": "Now:"
+      "nowPrefix": "Now:",
+      "orgsTitle": "Organizations and roles",
+      "orgsEmpty": "Not a member of any organization yet.",
+      "addToOrg": "Add to organization",
+      "addToOrgHint": "The person gets the chosen role in the organization at once.",
+      "role": "Role",
+      "addTitle": "Add {name} to «{org}»?",
+      "addBody": "{name} becomes «{role}» in «{org}». This is recorded in the audit log.",
+      "added": "{name} was added to «{org}».",
+      "orgsLoadFailed": "Could not load the organizations list."
     },
     "members": {
       "title": "Teachers and admins",
@@ -2207,6 +2234,18 @@
       "invalidTitle": "This invitation is not valid any more",
       "invalidBody": "It may have expired, been revoked or already used. Ask your administrator for a new invitation.",
       "home": "Go to the home page"
+    },
+    "emailNotSent": "The invitation to {email} was saved, but the email could not be sent. Use \"Send again\" later.",
+    "mine": {
+      "banner": "Invitations for you: {n}",
+      "view": "View invitations",
+      "accept": "Accept",
+      "accepted": "Invitation accepted."
+    },
+    "staff": {
+      "noAccount": "There is no account with {email} yet. Send an invitation: the person joins the course after signing up with this email.",
+      "send": "Send invitation",
+      "sentHint": "Invitations are valid for 14 days. The person appears in the list after accepting."
     }
   },
   "templates": {
@@ -2231,7 +2270,8 @@
     "pendingItem": {
       "org_admin": "«{org}» invites you as an organization admin.",
       "teacher": "«{org}» invites you as a teacher.",
-      "assistant": "«{org}» invites you as an assistant in «{course}»."
+      "assistant": "«{org}» invites you as an assistant in «{course}».",
+      "teacherCourse": "«{org}» invites you as a teacher in «{course}»."
     },
     "pendingHint": "Open the link in the invitation email to accept (valid until {date}).",
     "independentTitle": "Independent teacher? Apply",
@@ -2239,6 +2279,7 @@
       "title": "For teachers only",
       "body": "Grading schemes are set up by teachers who create courses. Your results are in each course under Grades.",
       "back": "Back to my courses"
-    }
+    },
+    "pendingHintAccept": "Valid until {date}. Accept here or with the link in the email."
   }
 }
