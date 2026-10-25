@@ -6,12 +6,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from html import escape
 from typing import Optional
+from urllib.parse import quote
 
 from app.core.config import settings
 from app.services import email_service
 
 # Placeholder for the frontend i18n key `common.appName` (one value per language) until the platform name is final.
-APP_NAME: dict[str, str] = {"en": "Platform", "ru": "Платформа", "ky": "Платформа"}
+APP_NAME: dict[str, str] = email_service.APP_NAME
 
 LANGUAGES = ("en", "ky", "ru")
 
@@ -75,9 +76,13 @@ def clean_language(lang: Optional[str]) -> str:
     return lang if lang in LANGUAGES else "en"
 
 
-def invite_link(token: str, lang: str) -> str:
+def invite_link(token: str, lang: str, email: Optional[str] = None) -> str:
+    """`?email=` lets the invite page prefill the register form (UX F2); the address is the recipient's own."""
     base = (settings.FRONTEND_URL or "http://localhost:3000").rstrip("/")
-    return f"{base}/{clean_language(lang)}/invite/{token}"
+    link = f"{base}/{clean_language(lang)}/invite/{token}"
+    if email:
+        link += f"?email={quote(email, safe='')}"
+    return link
 
 
 def _course_title(title: Optional[dict], lang: str) -> str:
@@ -99,7 +104,7 @@ def build_invitation_email(*, to_email: str, token: str, lang: str, inviter_name
                       org=email_service._header_safe(organization_name))
     subject = t["subject"].format(**header_fmt)
     intro = (t["intro_course"] if course_title else t["intro_org"]).format(**fmt)
-    link = invite_link(token, lang)
+    link = invite_link(token, lang, to_email)
     expires = t["expires"].format(date=expires_at.strftime("%Y-%m-%d %H:%M"))
     msg_label = t["message"].format(**fmt)
     message = (message or "").strip()

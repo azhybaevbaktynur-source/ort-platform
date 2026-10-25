@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { createAssessment } from "@/lib/lms/assessments";
 import type { AssessmentPreset, AssessmentStaffOut } from "@/lib/lms/assessmentTypes";
-import { useTemplateUi } from "@/lib/lms/templates";
+import { LEGACY_UI, useTemplateUi } from "@/lib/lms/templates";
 import { cleanLocalized } from "@/lib/lms/localized";
 import type { Lang, LocalizedText } from "@/lib/lms/types";
 import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
@@ -25,6 +25,8 @@ export function CreateAssessmentDialog({
   const { t } = useTranslation();
   const ui = useTemplateUi();
   const presets = ui.assessmentPresets;
+  // UX F5: the ORT hint only in ORT courses (and the pre-template fallback, today's behaviour).
+  const ortCourse = ui.key === "ort" || ui === LEGACY_UI;
   const subjects = ui.subjectKeys;
   const firstSubject = subjects[0] ?? "";
   const [title, setTitle] = useState<LocalizedText>({});
@@ -98,7 +100,7 @@ export function CreateAssessmentDialog({
               </label>
             ))}
           </div>
-          <p className="mt-1 text-xs text-slate-500">{t("assessments.create.languagesHint")}</p>
+          <p className="mt-1 text-xs text-slate-500">{t(ortCourse ? "assessments.create.languagesHint" : "assessments.create.languagesHintGeneral")}</p>
         </fieldset>
         <AssessmentError error={error} />
         <div className="flex justify-end gap-2">
