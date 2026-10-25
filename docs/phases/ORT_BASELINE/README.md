@@ -29,12 +29,25 @@ numbered passage lines, result card with the scaled score and five section rows)
 
 46 images, about 3.4 MB.
 
-**Platforms.** Fonts are system fonts, so images are per rendering platform: the files in this folder are the
-reviewed macOS set (system Google Chrome, `channel: "chrome"`). Other platforms use a subfolder named after
-`process.platform`: CI (`ubuntu-latest`, Playwright chromium) compares with `linux/`. While `linux/` is not
-committed, the CI job (`ORT_BASELINE_RECORD_MISSING=1`) records the images instead of failing and uploads them
-as the artifact `ort-e2e-recorded`; commit that artifact's PNGs into `linux/` (reviewed like any baseline
-update) to switch the comparison on. DOM assertions always run.
+**Platforms and where the pixel comparison runs** (orchestrator decision, Phase 6b S10). Fonts are system fonts,
+so images are per rendering platform: the files in this folder are the reviewed macOS set (system Google Chrome,
+`channel: "chrome"`).
+
+- **CI (every push, job `ort-e2e`, `ubuntu-latest`, Playwright chromium)** runs both specs with every DOM
+  assertion (section order and counts, timer, palette states, comparison columns, passage line numbers, result
+  card, review) and the no-horizontal-scroll check. It does **not** compare pixels: Linux renders the fonts
+  differently from the macOS baselines. With `ORT_BASELINE_RECORD_MISSING=1` and no committed `linux/` folder,
+  every screenshot is recorded instead of compared and uploaded as the artifact `ort-e2e-recorded` (kept for a
+  later Linux baseline set). A missing Linux baseline never fails the job.
+- **Phase gate (local, macOS, system Chrome)** runs the pixel comparison against this folder (see "Run"), at
+  every phase gate and for every change that touches an ORT screen. That run is the ORT screenshot parity proof.
+- **Later, optional**: committing a reviewed set of the recorded PNGs into `linux/` (a subfolder named after
+  `process.platform`) switches the comparison on in CI with no other change.
+
+On failure the job prints the github-reporter annotations (failure message and spec line) and, via
+`scripts/ci_log_annotations.py`, the last 40 lines of the Playwright output, `seed.log` and `backend.log` as
+`::error` annotations on the public check run (lines mentioning a secret, password or token are dropped), and
+uploads the artifact `ort-e2e-diffs` (diffs, html report, traces, logs).
 
 **Phones (S7b).** Below 1024 px the palette and the "finish" action live in a sheet opened from the header button
 ("Questions n/total"); `OrtExam.withPalette()` opens it for the palette checks and closes it again, and

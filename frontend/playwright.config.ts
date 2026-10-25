@@ -25,7 +25,9 @@ export default defineConfig({
   forbidOnly: CI,
   timeout: 180_000,
   expect: { timeout: 15_000 },
-  reporter: CI ? [["list"], ["html", { outputFolder: path.join(E2E_DIR, "report"), open: "never" }]] : [["list"]],
+  // CI: the github reporter turns every failure into an `::error` annotation (message + file:line), readable on
+  // the public check run without the job log; the html report goes into the failure artifact
+  reporter: CI ? [["github"], ["list"], ["html", { outputFolder: path.join(E2E_DIR, "report"), open: "never" }]] : "list",
   use: {
     baseURL: WEB_ORIGIN,
     // local runs use the installed Chrome; CI installs Playwright's chromium (`npx playwright install chromium`)
