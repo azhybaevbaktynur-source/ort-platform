@@ -27,3 +27,6 @@ from app.lms.assignments.models import (  # noqa: F401,E402
 )
 from app.lms.accommodations.models import EnrollmentAccommodation  # noqa: F401,E402
 # --- Phase 7a S1 end ---
+# --- Phase 7b S1 begin ---
+from app.lms.exam_templates.models import ExamTemplate, ExamTemplateVersion  # noqa: F401,E402
+# --- Phase 7b S1 end ---
