@@ -334,3 +334,13 @@ Taken by the agent within the approved design (owner rule: decide, record here).
 | J6 | ORT screenshot comparison | Pixel comparison against `docs/phases/ORT_BASELINE/` runs locally at every phase gate (macOS, system Chrome); CI runs the ORT browser walk with all DOM assertions on every push (Linux fonts differ from the committed baselines). |
 | J7 | Owner decision pending | P8: Kyrgyz comparison answer labels in sentence case ("А колонкасындагы маани чоңураак" …) instead of capitals — changes the answer wording students read, so it waits for the owner (`ORT_PLAYER_IDEAS.md`). |
 | J8 | Teaching links in the desktop header | From 1024 px the Teaching section links sit in a second 48 px header row (they do not fit next to four area buttons); phones keep them in the area menu. Departs from the design's single-row sketch. |
+
+## Phase 7a: open owner questions with interim defaults (agent, 2026-10-26)
+
+From `phases/PHASE_7A_DESIGN.md` §8. Work continues with the interim default; the owner may change it at any time.
+
+| # | Question | Interim default (in effect) | Architect's recommendation |
+|---|---|---|---|
+| Q1 | Extra time for accommodated students on ORT exams (changes their section timers) | Stored, but **not applied** to ORT preset exams (`extra_time_s = 0`); extra attempts and date exceptions apply | Proportional per-section extra time, accommodated students only |
+| Q2 | Storage budget for student uploads (R2 free tier) | 5 MB per student file, per-course cap as a config default; the free-tier guard refuses uploads before any cost | Same; paying for more R2 storage is the owner's call |
+| Q3 | Who sets accommodations | Course teachers only (org admins via "Join as teacher") | Same |
