@@ -193,7 +193,9 @@ def plan_for(db: Session, attempt) -> Any:
     return cache_api().get_plan(db, attempt.assessment_version_id)
 
 
-def _section_limits(plan) -> dict[int, Optional[int]]:
+def _section_limits(plan, extra_s: int = 0) -> dict[int, Optional[int]]:
+    if extra_s:  # --- Phase 7a S4 --- accommodated attempt: sections scaled with the total (PHASE_7A_DESIGN 3.4)
+        return timing.extended_section_limits(plan.snapshot, extra_s)
     return {int(s["pos"]): s.get("time_limit_s") for s in plan.snapshot.get("sections", [])}
 
 
@@ -201,8 +203,8 @@ def _navigation(plan) -> str:
     return plan.snapshot.get("navigation") or "free"
 
 
-def _states(sections, plan) -> list[timing.SectionState]:
-    limits = _section_limits(plan)
+def _states(sections, plan, extra_s: int = 0) -> list[timing.SectionState]:
+    limits = _section_limits(plan, extra_s)  # --- Phase 7a S4 --- (extra_s = attempt.extra_time_s)
     return [timing.SectionState(s.section_pos, timing.as_utc(s.started_at), timing.as_utc(s.deadline_at),
                                 timing.as_utc(s.closed_at), limits.get(s.section_pos)) for s in sections]
 
@@ -230,7 +232,8 @@ def apply_lazy(db: Session, attempt: Attempt, sections: list, plan, *, now: date
         return LazyResult(sections=sections)
     closed = _env_closed(attempt, env)
     grace = settings.ATTEMPT_GRACE_S
-    if not closed and not timing.advance(_states(sections, plan), _timing_view(attempt, plan), now, grace):
+    if not closed and not timing.advance(_states(sections, plan, attempt.extra_time_s or 0),  # Phase 7a S4
+                                         _timing_view(attempt, plan), now, grace):
         return LazyResult(sections=sections)
 
     db.refresh(attempt, with_for_update=True)  # attempts first in the lock order
@@ -240,7 +243,8 @@ def apply_lazy(db: Session, attempt: Attempt, sections: list, plan, *, now: date
         return LazyResult(sections=load_sections(db, attempt.id, refresh=True))
     sections = load_sections(db, attempt.id, refresh=True)
     reason: Optional[str] = "closed" if closed else None
-    transitions = [] if closed else timing.advance(_states(sections, plan), _timing_view(attempt, plan), now, grace)
+    transitions = [] if closed else timing.advance(_states(sections, plan, attempt.extra_time_s or 0),  # Phase 7a S4
+                                                   _timing_view(attempt, plan), now, grace)
     if not closed and not transitions:  # someone else advanced it while we waited for the lock
         if commit:
             db.rollback()
@@ -435,7 +439,8 @@ def close_section(db: Session, user, attempt_id, pos: int, *, now: datetime) -> 
     section.close_reason = "timeout" if timed_out else "manual"
     start = deadline if timed_out else now
     nxt.started_at = start
-    nxt.deadline_at = timing.section_deadline(start, _section_limits(plan).get(nxt.section_pos),
+    nxt.deadline_at = timing.section_deadline(start, _section_limits(plan, attempt.extra_time_s or 0)  # Phase 7a S4
+                                              .get(nxt.section_pos),
                                               timing.as_utc(attempt.deadline_at))
     attempt.current_section_pos = pos + 1
     db.flush()
@@ -657,21 +662,31 @@ def start_attempt(db: Session, ctx: AuthzContext, course: Course, aid, data: Sta
             rows = [r for r in rows if r.id != open_.id]
 
     next_no = None
+    # --- Phase 7a S4 begin --- (PHASE_7A_DESIGN 3.4, 3.8: the student's effective window / attempts / extra time
+    # from the accommodation and the override (one SELECT), then the access code. Without either, `eff` equals the
+    # assessment's own values and zero extra time, so the checks and deadlines are exactly the Phase 3 ones.)
+    eff = s4_enr = None
     if not staff:
-        af, au = timing.as_utc(assessment.available_from), timing.as_utc(assessment.available_until)
+        from app.lms.accommodations import service as accommodations
+
+        s4_enr, eff = accommodations.start_context(db, course.id, user.id, assessment)  # enrollment row comes along
+        af, au = timing.as_utc(eff.available_from), timing.as_utc(eff.available_until)
         if af is not None and now < af:
             raise Conflict("Assessment is not open yet", code="assessment_not_available",
                            details={"reason": "not_open_yet"})
         if au is not None and now >= au:
             raise Conflict("Assessment is closed", code="assessment_not_available", details={"reason": "closed"})
+        accommodations.check_access_code(user.id, assessment, data.access_code)
         counted = [r for r in rows if not r.is_preview and r.status != "void"]
-        if assessment.allowed_attempts != -1 and len(counted) >= assessment.allowed_attempts:
+        if eff.allowed_attempts != -1 and len(counted) >= eff.allowed_attempts:
             raise Conflict("No attempts left", code="attempts_exhausted")
         next_no = max([r.attempt_no or 0 for r in rows if not r.is_preview] or [0]) + 1
+    # --- Phase 7a S4 end ---
 
     plan = cache_api().get_plan(db, version_id)
-    enr = db.execute(select(Enrollment.id, Enrollment.content_language).where(
-        Enrollment.course_id == course.id, Enrollment.user_id == user.id, Enrollment.state == "active")
+    enr = s4_enr if not staff else db.execute(  # Phase 7a S4: a student's row came with `eff` (same filter)
+        select(Enrollment.id, Enrollment.content_language).where(
+            Enrollment.course_id == course.id, Enrollment.user_id == user.id, Enrollment.state == "active")
     ).first()
     if enr is None:
         raise NotFound("Course not found", code="course_not_found")
@@ -685,8 +700,11 @@ def start_attempt(db: Session, ctx: AuthzContext, course: Course, aid, data: Sta
     snapshot = plan.snapshot
     entries = _expand_rows(plan, lang, bool(snapshot.get("shuffle_items")), bool(snapshot.get("shuffle_choices")))
     navigation = _navigation(plan)
-    ad = timing.attempt_deadline(now, snapshot, 0, assessment.available_until if not staff else None)
-    limits = _section_limits(plan)
+    # --- Phase 7a S4 begin --- (extra time; ORT presets get 0 while owner question Q1 is open, effective.py)
+    extra_s = timing.extra_seconds(snapshot, eff.extra_time_percent, eff.extra_time_s) if eff is not None else 0
+    ad = timing.attempt_deadline(now, snapshot, extra_s, eff.available_until if eff is not None else None)
+    limits = _section_limits(plan, extra_s)
+    # --- Phase 7a S4 end ---
     section_rows = []
     for sp in sorted({int(s["pos"]) for s in snapshot.get("sections", [])}):
         if navigation == timing.FORWARD_ONLY:
@@ -703,7 +721,7 @@ def start_attempt(db: Session, ctx: AuthzContext, course: Course, aid, data: Sta
     attempt_row = dict(
         id=attempt_id, assessment_id=assessment_id, assessment_version_id=version_id, course_id=course.id,
         enrollment_id=enr.id, user_id=user.id, attempt_no=next_no, language=lang, is_preview=staff,
-        status="in_progress", started_at=now, deadline_at=ad, extra_time_s=0, current_section_pos=1,
+        status="in_progress", started_at=now, deadline_at=ad, extra_time_s=extra_s, current_section_pos=1,  # S4
         item_count=len(entries), points_possible=points, created_at=now, updated_at=now)
     item_rows = [dict(attempt_id=attempt_id, position=e["position"], section_pos=e["section_pos"], slot=e["slot"],
                       question_version_id=e["qv"],
