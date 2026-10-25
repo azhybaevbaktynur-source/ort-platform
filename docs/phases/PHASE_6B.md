@@ -1,6 +1,6 @@
 # Phase 6b: design system, app header with areas, student home, ORT player part 1
 
-**Status**: built and verified on branch `phase-6b` (2026-10-25); deploy and owner checkpoint follow. Design: `docs/phases/PHASE_6_DESIGN.md` §8 (approved). Decisions while building: `docs/PRODUCT_DECISIONS.md` "Phase 6b implementation decisions" (J1–J7). Slice rules: `PHASE_6B_SLICE_RULES.md`.
+**Status**: **deployed 2026-10-25** (`main` 89050a4; Render /health and Vercel verified; no database changes). Owner checkpoint: waiting for the owner's OK before Phase 7a. Design: `docs/phases/PHASE_6_DESIGN.md` §8 (approved). Decisions while building: `docs/PRODUCT_DECISIONS.md` "Phase 6b implementation decisions" (J1–J7). Slice rules: `PHASE_6B_SLICE_RULES.md`.
 
 ## What changed
 

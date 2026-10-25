@@ -27,7 +27,7 @@ Gone until Phase 10: practice, mistakes notebook, progress, planner, target scor
 
 ## 5. Verification
 ```bash
-# Backend, SQLite scratch (expect ~2630 passed, 23 skipped):
+# Backend, SQLite scratch (expect ~2651 passed, 23 skipped):
 cd backend && /bin/rm -rf /tmp/agy_t && /bin/mkdir -p /tmp/agy_t/up && \
 DATABASE_URL="sqlite:////tmp/agy_t/test.db" LOCAL_UPLOAD_DIR="/tmp/agy_t/up" \
 venv/bin/python -m pytest -q -p no:cacheprovider -W ignore
@@ -55,4 +55,4 @@ Frontend: `cd frontend && npx tsc --noEmit`; `python scripts/check_i18n_parity.p
 10. **UX gate** every phase: screenshots of every new/changed screen at 375px and desktop (student screens in en/ky/ru), reviewed by the `ux-reviewer` agent against `docs/UX_GUIDELINES.md`, findings fixed, screenshots saved in `docs/phases/PHASE_N_screens/`. Never wait for the owner on UX reviews.
 
 ## 7. Roadmap
-Done: Phases 0-5 (foundations, courses, content/files, assessments/attempts, grading, ORT cutover) and 6a (organizations, course templates with ORT locked, invitations; `docs/phases/PHASE_6A.md`). Owner decisions 2026-10-24 (`docs/PRODUCT_DECISIONS.md`) reordered the rest: 6 organizations foundation + course templates (ORT first, locked, admin-granted) + sign-up/invite flows + design system + student home (design `docs/phases/PHASE_6_DESIGN.md` first, owner review before code); 7 assignments + general gradebook; 8 modules, pages, files, announcements, gating; 9 organizations completion + enrollment forms/invitations; 10 practice, analytics, quiz statistics, student tools; 11 privacy (observer/parent consent), hardening, launch. Plan: `docs/IMPLEMENTATION_PLAN.md`.
+Done: Phases 0-5 (foundations, courses, content/files, assessments/attempts, grading, ORT cutover) 6a (organizations, course templates with ORT locked, invitations; `docs/phases/PHASE_6A.md`) and 6b (design system `components/ui/`, app header with areas, student home, ORT player part 1, ORT Playwright suite + baselines `docs/phases/ORT_BASELINE/`; `docs/phases/PHASE_6B.md`). Owner decisions 2026-10-24 (`docs/PRODUCT_DECISIONS.md`) reordered the rest: 6 organizations foundation + course templates (ORT first, locked, admin-granted) + sign-up/invite flows + design system + student home (design `docs/phases/PHASE_6_DESIGN.md` first, owner review before code); 7 assignments + general gradebook; 8 modules, pages, files, announcements, gating; 9 organizations completion + enrollment forms/invitations; 10 practice, analytics, quiz statistics, student tools; 11 privacy (observer/parent consent), hardening, launch. Plan: `docs/IMPLEMENTATION_PLAN.md`.
