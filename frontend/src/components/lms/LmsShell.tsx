@@ -7,8 +7,8 @@ import { useTranslation, type Language } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
 import { LmsMeProvider, useLmsMeLoader } from "@/lib/lms/useLmsMe";
 import { listMyOrganizations, type MyOrganizationOut } from "@/lib/lms/organizations";
-import { AppHeader, type AppHeaderArea, type AreaKey } from "@/components/ui/AppHeader";
-import { ErrorState, LoadingState } from "@/components/ui";
+import { AppHeader, Brand, type AppHeaderArea, type AreaKey } from "@/components/ui/AppHeader";
+import { ErrorState, LoadingState, Skeleton } from "@/components/ui";
 import { lmsErrorKey } from "./ErrorMessage";
 import { PendingInvitationsBanner } from "./PendingInvitationsBanner"; // Phase 6 S4b
 import { InvitationAcceptedNotice } from "./InvitationAcceptedNotice"; // Phase 6 S8
@@ -142,11 +142,19 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   }, [lang, t, hasTeaching, isAdmin, canCreate, orgs, rest, view]);
 
   if (authLoading || !user || unauthorized) {
+    // Student finding S16: the frame (header + skeleton content) shows at once, never a blank screen.
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-        <LoadingState label={t("lms.common.loading")}>
-          <p className="text-sm text-slate-600">{t("lms.common.loading")}</p>
-        </LoadingState>
+      <div className="min-h-screen bg-slate-50">
+        <header className="border-b border-slate-200 bg-white">
+          <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:h-16">
+            <Brand href={`/${lang}/courses`} />
+            <Skeleton className="ml-auto h-9 w-9 rounded-full" />
+          </div>
+        </header>
+        <main className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+          <Skeleton className="mb-6 h-8 w-2/3 max-w-sm" />
+          <LoadingState label={t("lms.common.loading")} />
+        </main>
       </div>
     );
   }

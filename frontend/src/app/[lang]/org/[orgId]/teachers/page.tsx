@@ -103,11 +103,11 @@ export default function OrgTeachersPage() {
     },
   ];
   const inviteColumns: TableColumn<InvitationOut>[] = [
-    { key: "email", header: t("invitations.dialog.email"), primary: true, className: "sm:min-w-[14rem]", cell: (i) => <span className="[overflow-wrap:anywhere]">{i.email}</span> },
+    { key: "email", header: t("invitations.dialog.email"), primary: true, className: "sm:min-w-[12rem]", cell: (i) => <span className="[overflow-wrap:anywhere]">{i.email}</span> },
     { key: "role", header: t("organizations.adminUser.role"), cell: (i) => t(`invitations.roles.${i.role}`) },
     { key: "state", header: t("organizations.admin.status"), cell: (i) => <OrgBadge tone={i.state === "pending" ? "invited" : i.state} labelKey={`invitations.state.${i.state}`} /> },
     {
-      key: "sent", header: t("invitations.sentColumn"), className: "sm:min-w-[13rem]",
+      key: "sent", header: t("invitations.sentColumn"),
       cell: (i) => (
         <>
           {t("invitations.sentBy", { name: i.invited_by_name || "—", date: fmtApiDate(i.created_at, lang) })}
@@ -118,7 +118,7 @@ export default function OrgTeachersPage() {
     {
       key: "actions", header: "", actions: true, align: "right",
       cell: (i) => (i.state === "pending" || i.state === "expired") ? (
-        <span className="flex flex-wrap justify-end gap-2 lg:flex-nowrap">
+        <span className="flex w-full flex-wrap gap-2 sm:w-auto sm:flex-col sm:items-end">
           <Button variant="secondary" size="sm" disabled={readOnly} loading={resendingId === i.id} onClick={() => void resend(i)}>{t("invitations.resend")}</Button>
           {i.state === "pending" && (
             <Button variant="secondary" size="sm" disabled={readOnly} onClick={() => { setDialogError(null); setRevoking(i); }}>{t("invitations.revoke")}</Button>
