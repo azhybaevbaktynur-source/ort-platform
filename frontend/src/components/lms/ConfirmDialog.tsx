@@ -15,6 +15,7 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
   children,
+  stackedFooter = false,
 }: {
   open: boolean;
   title: string;
@@ -26,6 +27,8 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
   children?: React.ReactNode;
+  /** Phase 6 S8 (UX T1): opt-in; on a phone the buttons stack full width with the primary on top. */
+  stackedFooter?: boolean;
 }) {
   const { t } = useTranslation();
   const titleId = useId();
@@ -49,7 +52,7 @@ export function ConfirmDialog({
         {body && <p className="mt-2 text-sm text-slate-600">{body}</p>}
         {children}
         {error ? <ErrorMessage error={error} className="mt-3" /> : null}
-        <div className="mt-5 flex justify-end gap-2">
+        <div className={stackedFooter ? "mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end [&>button]:min-h-[44px]" : "mt-5 flex justify-end gap-2"}>
           <button ref={cancelRef} type="button" disabled={busy} onClick={onCancel}
             className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">
             {t("lms.common.cancel")}

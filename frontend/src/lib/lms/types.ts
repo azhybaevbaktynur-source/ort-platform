@@ -28,6 +28,8 @@ export interface MeOut {
   is_platform_admin: boolean;
   teacher_status: TeacherStatus;
   can_create_courses: boolean;
+  /** Phase 6 S8: teaches somewhere (approved, org teacher/admin, or course staff); shows the Teaching area. */
+  is_teacher: boolean;
 }
 export interface MePatchIn {
   locale: Lang;

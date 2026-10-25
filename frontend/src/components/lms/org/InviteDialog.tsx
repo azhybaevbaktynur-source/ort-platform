@@ -62,7 +62,8 @@ export function InviteDialog({
         </div>
         <p className="text-xs text-slate-500">{t("invitations.dialog.expiry")}</p>
         <OrgError error={error} />
-        <div className="flex flex-wrap justify-end gap-2">
+        {/* Phase 6 S8 (UX T1): primary on top on a phone, on the right on desktop. */}
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button type="button" className={btn.secondary} disabled={busy} onClick={onClose}>{t("lms.common.cancel")}</button>
           <button type="submit" className={btn.primary} disabled={busy}>{busy ? t("lms.common.loading") : t("invitations.dialog.send")}</button>
         </div>

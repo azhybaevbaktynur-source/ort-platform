@@ -104,7 +104,7 @@ export function OrgMembersTab({ org, role, onChanged }: { org: OrganizationOut; 
             <li key={m.user.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
               <div className="min-w-0 flex-1 basis-56">
                 <Link href={`/${lang}/admin/users/${m.user.id}`} className="font-medium text-brand-700 hover:underline">{m.user.display_name || m.user.email}</Link>
-                <p className="truncate text-xs text-slate-500">{m.user.email} · {t("organizations.members.since", { date: fmtApiDate(m.created_at, lang) })}</p>
+                <p className="break-words text-xs text-slate-500">{m.user.email} · <span className="whitespace-nowrap">{t("organizations.members.since", { date: fmtApiDate(m.created_at, lang) })}</span></p>
               </div>
               <button type="button" className={btn.smallDanger} onClick={() => { setDialogError(null); setRemoving(m); }}>
                 {t("organizations.members.remove")}

@@ -15,14 +15,19 @@ export function parseApiDate(value: string | null | undefined): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+// Phase 6 S8 (UX S3): day first in every UI language; English uses the en-GB order (25/10/2026), not en-US.
+const DATE_OPTS: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit", year: "numeric" };
+const dayFirst = (locale?: string) => (locale === "en" ? "en-GB" : locale);
+
 /** Local date and time, or "" for an empty/invalid value. */
 export function fmtApiDateTime(value: string | null | undefined, locale?: string): string {
   const d = parseApiDate(value);
-  return d ? d.toLocaleString(locale) : "";
+  return d ? d.toLocaleString(dayFirst(locale)) : "";
 }
 
-/** Local date only, or "" for an empty/invalid value. */
+/** Local date only (dd.mm.yyyy / dd/mm/yyyy when a UI language is given), or "" for an empty/invalid value. */
 export function fmtApiDate(value: string | null | undefined, locale?: string): string {
   const d = parseApiDate(value);
-  return d ? d.toLocaleDateString(locale) : "";
+  if (!d) return "";
+  return locale ? d.toLocaleDateString(dayFirst(locale), DATE_OPTS) : d.toLocaleDateString();
 }

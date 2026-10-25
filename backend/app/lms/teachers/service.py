@@ -27,6 +27,29 @@ def can_create_courses(user: User) -> bool:
     return db is not None and _can(db, user)
 
 
+def is_teacher(user: User) -> bool:
+    """Phase 6 S8: the person teaches somewhere (shows the Teaching area; not a permission). Approved teacher_status,
+    or an active org membership as teacher/org_admin, or an active staff enrollment in any course (one SQL)."""
+    from sqlalchemy import exists, or_
+    from sqlalchemy.orm import object_session
+
+    from app.lms.enrollments.models import Enrollment
+    from app.lms.organizations.models import Organization, OrganizationMember
+
+    if user.teacher_status == "approved":
+        return True
+    db = object_session(user)
+    if db is None:
+        return False
+    member = exists().where(
+        OrganizationMember.user_id == user.id, OrganizationMember.state == "active",
+        OrganizationMember.role.in_(("teacher", "org_admin")),
+        Organization.id == OrganizationMember.organization_id, Organization.deleted_at.is_(None))
+    staff = exists().where(Enrollment.user_id == user.id, Enrollment.state == "active",
+                           Enrollment.role.in_(("teacher", "assistant")))
+    return bool(db.execute(select(or_(member, staff))).scalar())
+
+
 def set_locale(db: Session, user: User, locale: str) -> User:
     user.locale = locale
     db.commit()

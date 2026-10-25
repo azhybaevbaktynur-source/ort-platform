@@ -376,7 +376,7 @@ def grant_template(db: Session, admin: User, org: Organization, template_key: st
 
 
 def revoke_template(db: Session, admin: User, org: Organization, template_key: str,
-                    request: Optional[Request]) -> None:
+                    request: Optional[Request], reason: Optional[str] = None) -> None:
     """Revoking blocks new courses with the template only; existing courses keep working (design 5.5)."""
     _check_template_key(template_key)
     g = db.execute(select(OrganizationTemplateGrant).where(
@@ -386,7 +386,7 @@ def revoke_template(db: Session, admin: User, org: Organization, template_key: s
         return
     g.revoked_at, g.revoked_by_id = utcnow(), admin.id
     audit.record(db, actor=admin, action="organization.template.revoke", target_type="organization",
-                 target_id=str(org.id), details={"organization_id": str(org.id), "template_key": template_key},
+                 target_id=str(org.id), reason=(reason or "").strip() or None, details={"organization_id": str(org.id), "template_key": template_key},
                  request=request)
     db.commit()
 

@@ -162,8 +162,9 @@ export const listOrganizationTemplates = (id: string) =>
   lmsFetch<OrgTemplateGrantOut[]>(`/platform/organizations/${enc(id)}/templates`);
 export const grantTemplate = (id: string, key: string) =>
   lmsFetch<OrgTemplateGrantOut>(`/platform/organizations/${enc(id)}/templates/${enc(key)}`, { method: "PUT" });
-export const revokeTemplate = (id: string, key: string) =>
-  lmsFetch<void>(`/platform/organizations/${enc(id)}/templates/${enc(key)}`, { method: "DELETE" });
+/** Phase 6 S8: optional reason as a query parameter (audited), like removeOrganizationMember. */
+export const revokeTemplate = (id: string, key: string, reason = "") =>
+  lmsFetch<void>(`/platform/organizations/${enc(id)}/templates/${enc(key)}`, { method: "DELETE", params: { reason } });
 export const listPlatformTemplates = () => lmsFetch<PlatformTemplateOut[]>("/platform/templates");
 export const listUserOrganizations = (userId: string, p: ListParams & { state?: OrgMemberState } = {}) =>
   page(lmsFetch<PageOut<UserOrganizationOut>>(`/platform/users/${enc(userId)}/organizations`, { params: { limit: 50, ...p } }));

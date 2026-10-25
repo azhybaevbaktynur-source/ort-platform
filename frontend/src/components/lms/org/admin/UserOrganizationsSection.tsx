@@ -89,7 +89,7 @@ export function UserOrganizationsSection({ user, readOnly }: { user: { id: strin
             <li key={m.organization_id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
               <div className="min-w-0 flex-1 basis-56">
                 <Link href={`/${lang}/admin/organizations/${m.organization_id}`} className="font-medium text-brand-700 hover:underline">{m.organization_name}</Link>
-                <p className="truncate text-xs text-slate-500">{t("organizations.members.since", { date: fmtApiDate(m.created_at, lang) })}</p>
+                <p className="break-words text-xs text-slate-500">{t("organizations.members.since", { date: fmtApiDate(m.created_at, lang) })}</p>
               </div>
               <span className="text-xs text-slate-700">{t(`organizations.roles.${m.role}`)}</span>
               {m.organization_status !== "active" && <OrgBadge tone={m.organization_status} labelKey={`organizations.status.${m.organization_status}`} />}

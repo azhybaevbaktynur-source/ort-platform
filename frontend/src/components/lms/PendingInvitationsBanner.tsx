@@ -32,7 +32,8 @@ export function PendingInvitationsBanner({ enabled }: { enabled: boolean }) {
     <div role="status" className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
       <MailOpen className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
       <p className="min-w-0 flex-1 font-medium">{t("invitations.mine.banner", { n: count })}</p>
-      <Link href={href} className="inline-flex min-h-[44px] items-center rounded-xl border border-sky-300 bg-white px-4 text-sm font-semibold text-brand-700 hover:bg-sky-100">
+      {/* Phase 6 S8 (UX S2): on a phone the button takes its own full-width row under the text. */}
+      <Link href={href} className="inline-flex min-h-[44px] w-full basis-full items-center justify-center rounded-xl border border-sky-300 bg-white px-4 text-sm font-semibold text-brand-700 hover:bg-sky-100 sm:w-auto sm:basis-auto">
         {t("invitations.mine.view")}
       </Link>
     </div>

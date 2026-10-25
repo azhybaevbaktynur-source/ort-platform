@@ -26,25 +26,13 @@ export default function CoursesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [joinOpen, setJoinOpen] = useState(false);
-  // UX F4: the Teaching / Learning tabs only for people who teach (can create courses, or staff in some course).
-  // Others get one plain list; one teaching probe (limit 1) decides for users without the create permission.
-  const [hasTeaching, setHasTeaching] = useState<boolean | null>(null);
-  useEffect(() => {
-    if (!me) return;
-    if (me.can_create_courses || me.is_platform_admin) {
-      setHasTeaching(true);
-      return;
-    }
-    let alive = true;
-    listMyCourses("teaching", null, 1)
-      .then((page) => { if (alive) setHasTeaching(page.items.length > 0); })
-      .catch(() => { if (alive) setHasTeaching(false); });
-    return () => { alive = false; };
-  }, [me]);
+  // UX F4 / Phase 6 S8 (UX S1): the Teaching / Learning tabs only for people who teach (MeOut.is_teacher: approved,
+  // org teacher or admin, or staff in some course) and platform admins; others get one plain list.
+  const hasTeaching = me ? me.is_teacher || me.is_platform_admin : null;
 
   // Default tab: teachers start on Teaching, everyone else on Learning.
   useEffect(() => {
-    if (me && tab === null) setTab(me.can_create_courses ? "teaching" : "learning");
+    if (me && tab === null) setTab(me.is_teacher || me.can_create_courses ? "teaching" : "learning");
   }, [me, tab]);
 
   const load = useCallback(async (which: Tab, next?: string | null) => {
