@@ -40,6 +40,20 @@ def _seed_grading_schemes() -> None:
         db.close()
 
 
+# --- Phase 6 S1 begin ---
+def _ensure_organizations() -> None:
+    """Phase 6 organizations bootstrap (PHASE_6_DESIGN 4), idempotent; never fatal."""
+    from app.db.session import SessionLocal
+    from app.lms.organizations.bootstrap import ensure_organizations
+
+    db = SessionLocal()
+    try:
+        ensure_organizations(db)
+    finally:
+        db.close()
+# --- Phase 6 S1 end ---
+
+
 def _seed_ort_courses() -> None:
     """Phase 5 ORT courses and the conversion of legacy_ort_export (P5-2); never fatal (ensure_ort_courses logs
     and stores every failure itself)."""
@@ -69,6 +83,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Database startup initialization notice: {e}")
     _seed_grading_schemes()
+    _ensure_organizations()  # Phase 6 S1: after the schemes, before the ORT courses
     _seed_ort_courses()
     if is_production():
         if settings.SECRET_KEY == DEFAULT_SECRET_KEY:

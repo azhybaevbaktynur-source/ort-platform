@@ -61,13 +61,17 @@ def catalog_courses(user_id: str) -> Select:
     """Rows of (Course, my_role, my_state): published, catalog-visible, not deleted, not unlisted by an admin.
 
     published_at IS NOT NULL keeps the keyset cursor well defined (the publish transition always sets it)."""
+    from app.lms.organizations.models import Organization  # Phase 6 S1
+
     mine = aliased(Enrollment)
     return (
         select(Course, mine.role.label("my_role"), mine.state.label("my_state"))
         .outerjoin(mine, and_(mine.course_id == Course.id, mine.user_id == user_id))
+        .join(Organization, Organization.id == Course.organization_id)  # Phase 6 S1: suspended orgs leave
         .where(
             Course.status == "published", Course.visibility == "catalog", Course.deleted_at.is_(None),
             Course.unlisted_by_admin_at.is_(None), Course.published_at.is_not(None),
+            Organization.status == "active", Organization.deleted_at.is_(None),
         )
     )
 

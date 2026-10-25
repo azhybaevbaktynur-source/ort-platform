@@ -113,21 +113,92 @@ def _teacher_ok(user: User) -> bool:
     return user.teacher_status == "approved" and user.disabled_at is None
 
 
+# --- Phase 6 S1 begin --- (PHASE_6_DESIGN 2.2: course creation inside an organization)
+def _owner_ok(db: Session, user: User, organization_id) -> bool:
+    """A course owner: an enabled approved teacher (legacy), a platform admin, or an active member of the
+    course's organization (teachers invited into an organization have no teacher_status)."""
+    from app.lms.organizations.service import is_active_member
+
+    if user.disabled_at is not None:
+        return False
+    if _teacher_ok(user) or user.is_platform_admin:
+        return True
+    return organization_id is not None and is_active_member(db, organization_id, user.id)
+
+
+def _resolve_creation(db: Session, actor: User, data: CourseCreateIn, organization_id=None):
+    """(organization id, owner User, template fields) for a new course, or the LMSError of the design."""
+    from app.lms.organizations import defaults as org_defaults
+    from app.lms.organizations import service as orgs
+    from app.lms.organizations.models import Organization
+
+    if organization_id is not None and data.organization_id is not None and data.organization_id != organization_id:
+        raise ValidationFailed("organization_id does not match the route", code="organization_mismatch")
+    oid = organization_id or data.organization_id
+    eligible = orgs.creator_organizations(db, actor.id)
+    if oid is None:
+        if not eligible and actor.is_platform_admin:
+            eligible = [org_defaults.ensure_platform_org(db.connection())]
+        if not eligible:
+            raise Forbidden("Teacher approval required", code="teacher_not_approved")
+        if len(eligible) > 1:
+            raise ValidationFailed("Choose an organization", code="organization_required",
+                                   details={"organization_ids": [str(e) for e in eligible]})
+        oid = eligible[0]
+    org = db.execute(select(Organization).where(Organization.id == oid, Organization.deleted_at.is_(None))
+                     ).scalar_one_or_none()
+    if org is None:
+        raise orgs.org_not_found()
+    org_admin = actor.is_platform_admin or orgs.is_org_admin(db, org.id, actor.id)
+    member = org_admin or orgs.is_active_member(db, org.id, actor.id)
+    if not actor.is_platform_admin:
+        if not member:
+            raise orgs.org_not_found()
+        if org.status != "active":
+            raise orgs.org_suspended_error()
+        if oid not in eligible:
+            raise Forbidden("Course creation is not allowed in this organization",
+                            code="course_creation_not_allowed")
+    owner = actor
+    if data.owner_id is not None and data.owner_id != actor.id:
+        if not org_admin:
+            raise Forbidden("Only an organization admin can assign the owner", code="owner_assignment_not_allowed")
+        owner = db.get(User, data.owner_id)
+        if owner is None or owner.disabled_at is not None or not orgs.is_active_member(db, org.id, owner.id):
+            raise ValidationFailed("The owner must be an active member of the organization", code="invalid_owner")
+    template: dict = {}
+    if data.template_key is not None:
+        if data.template_key not in orgs.KNOWN_TEMPLATE_KEYS:
+            raise ValidationFailed("Unknown template", code="unknown_template")
+        if not orgs.has_active_grant(db, org.id, data.template_key):
+            raise Forbidden("The template is not granted to this organization", code="template_not_granted")
+        template = dict(
+            template_key=data.template_key, template_version=orgs.KNOWN_TEMPLATE_KEYS[data.template_key],
+            template_locked=True,
+            template_settings={"language": data.default_language} if data.template_key == "ort" else {},
+        )
+    return org.id, owner, template
+# --- Phase 6 S1 end ---
+
+
 # ---------------------------------------------------------------- create
 
-def create_course(db: Session, actor: User, data: CourseCreateIn) -> Course:
-    if not _teacher_ok(actor):
-        raise Forbidden("Teacher approval required", code="teacher_not_approved")
+def create_course(db: Session, actor: User, data: CourseCreateIn, *, organization_id=None,
+                  request: Optional[Request] = None) -> Course:
+    org_id, owner, template = _resolve_creation(db, actor, data, organization_id)  # Phase 6 S1
+    owner_id = owner.id
+    db.commit()  # ends the read transaction (and a platform-org insert), so the course row is the first write below
     now = utcnow()
     course = None
     for _ in range(5):
         # The course row is the first write of the transaction, so a failed attempt can be rolled back whole.
         candidate = Course(
-            owner_id=actor.id, title=data.title, description=data.description, languages=list(data.languages),
+            owner_id=owner_id, title=data.title, description=data.description, languages=list(data.languages),
             default_language=data.default_language, status="draft", visibility="private",
             enrollment_mode=data.enrollment_mode, join_code=generate_join_code(),
             join_code_rotated_at=now, enrollment_limit=data.enrollment_limit,
             starts_at=_aware(data.starts_at), ends_at=_aware(data.ends_at), settings={},
+            organization_id=org_id, **template,
         )
         db.add(candidate)
         try:
@@ -141,11 +212,18 @@ def create_course(db: Session, actor: User, data: CourseCreateIn) -> Course:
         break
     if course is None:
         raise Conflict("Could not allocate a join code", code="join_code_exhausted")
-    enr = Enrollment(course_id=course.id, user_id=actor.id, role="teacher", state="active", source="owner",
+    enr = Enrollment(course_id=course.id, user_id=owner_id, role="teacher", state="active", source="owner",
                      activated_at=now)
     db.add(enr)
     db.flush()
     add_event(db, enr, "created", actor.id, to_role="teacher", to_state="active")
+    # --- Phase 6 S1 begin --- (org admin / platform admin creating for an owner: audited)
+    if owner_id != actor.id or organization_id is not None:
+        audit.record(db, actor=actor, action="organization.course.create", target_type="course",
+                     target_id=str(course.id),
+                     details={"organization_id": str(org_id), "owner_id": owner_id,
+                              "template_key": template.get("template_key")}, request=request)
+    # --- Phase 6 S1 end ---
     db.commit()
     return course
 
@@ -268,11 +346,20 @@ def restore_course(db: Session, actor: User, course: Course, *, by_admin: bool =
 def transfer_ownership(db: Session, actor: User, course: Course, new_owner_id: str, *, by_admin: bool = False,
                        reason: Optional[str] = None, request: Optional[Request] = None) -> Course:
     lock_course(db, course)
+    # --- Phase 6 S1 begin --- (A13: an org admin of the course's organization reassigns the owner, audited)
+    by_org_admin = False
     if not by_admin and course.owner_id != actor.id:
-        raise Forbidden("Only the owner can do this", code="owner_only")
+        from app.lms.organizations.service import is_active_member, is_org_admin
+
+        if not is_org_admin(db, course.organization_id, actor.id):
+            raise Forbidden("Only the owner can do this", code="owner_only")
+        if not is_active_member(db, course.organization_id, new_owner_id):
+            raise ValidationFailed("Invalid new owner", code="invalid_new_owner")
+        by_admin = by_org_admin = True
     target = db.get(User, new_owner_id)
-    if target is None or target.id == course.owner_id or not _teacher_ok(target):
+    if target is None or target.id == course.owner_id or not _owner_ok(db, target, course.organization_id):
         raise ValidationFailed("Invalid new owner", code="invalid_new_owner")
+    # --- Phase 6 S1 end ---
     old_owner_id = course.owner_id
     target_enr = db.execute(
         select(Enrollment).where(Enrollment.course_id == course.id, Enrollment.user_id == target.id).with_for_update()
@@ -296,9 +383,11 @@ def transfer_ownership(db: Session, actor: User, course: Course, new_owner_id: s
         add_event(db, old_enr, "owner_transferred_out", actor.id, details={"to_user_id": target.id})
     add_event(db, target_enr, "owner_transferred_in", actor.id, details={"from_user_id": old_owner_id})
     if by_admin:
+        details = {"from_user_id": old_owner_id, "to_user_id": target.id}
+        if by_org_admin:  # Phase 6 S1
+            details["organization_id"] = str(course.organization_id)
         audit.record(db, actor=actor, action="course.transfer_ownership", target_type="course",
-                     target_id=str(course.id), reason=reason,
-                     details={"from_user_id": old_owner_id, "to_user_id": target.id}, request=request)
+                     target_id=str(course.id), reason=reason, details=details, request=request)
     db.commit()
     return course
 

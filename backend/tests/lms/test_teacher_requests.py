@@ -140,7 +140,8 @@ async def test_revoke_and_direct_grant(client, db):
     req = db.get(TeacherRequest, uuid.UUID(rid))
     assert req.status == "approved" and req.decided_by_id == admin.id
 
-    # existing course stays editable; new course creation is blocked after revoke
+    # new course creation is blocked after revoke; Phase 6 (PHASE_6_DESIGN 7): revoke suspends the personal
+    # organization, so the existing course becomes read-only
     course = make_course(db, user)
     r = await client.post(f"{P}/platform/users/{user.id}/teacher-status",
                           json={"status": "revoked", "reason": "policy"}, headers=auth(admin))
@@ -152,7 +153,8 @@ async def test_revoke_and_direct_grant(client, db):
     if r.status_code not in (404, 405):
         assert r.status_code == 403
         r = await client.patch(f"{P}/courses/{course.id}", json={"title": {"en": "New"}}, headers=auth(user))
-        assert r.status_code == 200, r.text
+        assert r.status_code == 403, r.text
+        assert (await client.get(f"{P}/courses/{course.id}", headers=auth(user))).status_code == 200
 
     # invalid transitions
     r = await client.post(f"{P}/platform/users/{user.id}/teacher-status", json={"status": "revoked"},

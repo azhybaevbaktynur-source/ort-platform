@@ -33,16 +33,20 @@ def promote_user(email: str, revoke: bool = False) -> bool:
 
         if revoke:
             user.is_platform_admin = False
+            _remove_platform_membership(session, user.id)  # Phase 6 S1
             session.commit()
             print(f"Revoked admin rights from '{clean_email}' (ID: {user.id}).")
             return True
 
         if user.is_platform_admin and user.teacher_status == "approved":
+            _ensure_platform_membership(session, user.id)  # Phase 6 S1 (idempotent)
+            session.commit()
             print(f"User '{clean_email}' is already an admin.")
             return True
 
         user.is_platform_admin = True
         user.teacher_status = "approved"
+        _ensure_platform_membership(session, user.id)  # Phase 6 S1
         session.commit()
         print(f"Success! '{clean_email}' (ID: {user.id}) is now an admin.")
         return True
@@ -52,6 +56,36 @@ def promote_user(email: str, revoke: bool = False) -> bool:
         return False
     finally:
         session.close()
+
+
+# --- Phase 6 S1 begin --- (PHASE_6_DESIGN 4: platform admins administer the platform organization)
+def _ensure_platform_membership(session, user_id: str) -> None:
+    """Insert where missing; a removed membership row is revived."""
+    from sqlalchemy import update
+
+    from app.lms.organizations.defaults import ensure_membership, ensure_platform_org
+    from app.lms.organizations.models import OrganizationMember
+
+    conn = session.connection()
+    org_id = ensure_platform_org(conn)
+    if not ensure_membership(conn, org_id, user_id):
+        conn.execute(update(OrganizationMember.__table__).where(
+            OrganizationMember.organization_id == org_id, OrganizationMember.user_id == user_id,
+            OrganizationMember.state != "active").values(state="active", role="org_admin", removed_at=None,
+                                                         removed_by_id=None))
+
+
+def _remove_platform_membership(session, user_id: str) -> None:
+    from sqlalchemy import update
+
+    from app.lms.core.models import utcnow
+    from app.lms.organizations.ids import platform_org_id
+    from app.lms.organizations.models import OrganizationMember
+
+    session.connection().execute(update(OrganizationMember.__table__).where(
+        OrganizationMember.organization_id == platform_org_id(), OrganizationMember.user_id == user_id,
+        OrganizationMember.state == "active").values(state="removed", removed_at=utcnow()))
+# --- Phase 6 S1 end ---
 
 
 def main():

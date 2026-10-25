@@ -61,8 +61,20 @@ def reset_lms_state() -> None:
         # Break the circular version FKs first.
         conn.execute(update(BankQuestion.__table__).values(current_version_id=None, imported_version_id=None))
         conn.execute(update(Passage.__table__).values(current_version_id=None, imported_version_id=None))
+        # --- Phase 6 S1 begin --- organization rows (members, invitations, grants before courses and users)
+        from app.lms.organizations.models import (
+            Invitation, Organization, OrganizationMember, OrganizationTemplateGrant,
+        )
+
+        for model in (OrganizationMember, Invitation, OrganizationTemplateGrant):
+            conn.execute(delete(model.__table__))
+        # --- Phase 6 S1 end ---
         for model in tables:
             conn.execute(delete(model.__table__))
+        # --- Phase 6 S1 begin --- organizations themselves after courses and banks
+        conn.execute(update(Organization.__table__).values(parent_id=None))
+        conn.execute(delete(Organization.__table__))
+        # --- Phase 6 S1 end ---
         conn.execute(delete(User.__table__).where(User.id.notin_(SEED_USER_IDS)))
     _reset_storage_caches()
     _reset_phase3_caches()

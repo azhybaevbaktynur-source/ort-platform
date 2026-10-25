@@ -217,7 +217,7 @@ async def test_list_pagination_and_as_filter(db, api):
 
 def test_policies_are_declared_and_known():
     import re
-    ok = re.compile(r"^(authenticated(\+ratelimit)?|teacher_approved|platform_admin|legacy|course:[a-z_.]+(\+owner)?)$")
+    ok = re.compile(r"^(authenticated(\+ratelimit)?|course_creator|platform_admin|legacy|course:[a-z_.]+(\+owner)?)$")
     for key, pol in {**COURSE_POLICIES, **PLATFORM_COURSE_POLICIES}.items():
         assert ok.match(pol), (key, pol)
         assert ROUTE_POLICIES[key] == pol

@@ -56,15 +56,15 @@ PLATFORM_ADMIN_ACTIONS = frozenset({A.COURSE_READ, A.ROSTER_READ, A.COURSE_DELET
 
 CONCLUDED_ACTIONS = READ_ONLY_ACTIONS | {A.COURSE_PUBLISH, A.COURSE_DELETE, A.COURSE_TRANSFER, A.COURSE_LEAVE}
 
+# --- Phase 6 S1 begin --- (PHASE_6_DESIGN 2.2, owner decision A13): an org admin of course.organization_id reads
+# the course and its content (student-facing views only: no answer keys, attempts or grades), manages the roster
+# and reassigns the owner. Full teacher powers only through a teacher enrollment (join-as-teacher).
+ORG_ADMIN_ACTIONS = frozenset({A.COURSE_READ, A.ROSTER_READ, A.ROSTER_MANAGE, A.COURSE_TRANSFER, A.CONTENT_READ})
+# --- Phase 6 S1 end ---
 
-def decide(*, role: Optional[str], course_status: str, action: str, is_platform_admin: bool = False) -> bool:
-    if action not in ALL_ACTIONS:
-        return False
-    if role not in ROLE_GRANTS:
-        return is_platform_admin and action in PLATFORM_ADMIN_ACTIONS
-    if action not in ROLE_GRANTS[role]:
-        return False
-    if course_status not in COURSE_STATUSES:
+
+def _role_allows(role: Optional[str], course_status: str, action: str) -> bool:
+    if role not in ROLE_GRANTS or action not in ROLE_GRANTS[role]:
         return False
     if action == A.COURSE_LEAVE:
         return True
@@ -75,6 +75,31 @@ def decide(*, role: Optional[str], course_status: str, action: str, is_platform_
     return action in CONCLUDED_ACTIONS  # concluded
 
 
+def _org_admin_allows(course_status: str, action: str) -> bool:
+    if action not in ORG_ADMIN_ACTIONS:
+        return False
+    if course_status == "concluded":
+        return action in CONCLUDED_ACTIONS
+    return True  # draft and published: the org admin is staff-like for these read/roster actions
+
+
+def decide(*, role: Optional[str], course_status: str, action: str, is_platform_admin: bool = False,
+           org_admin: bool = False, org_suspended: bool = False) -> bool:
+    if action not in ALL_ACTIONS:
+        return False
+    if course_status not in COURSE_STATUSES:
+        return False
+    if org_suspended and not is_platform_admin and action not in READ_ONLY_ACTIONS:
+        return False  # suspended organization: read-only for everyone except the platform admin
+    if role not in ROLE_GRANTS:
+        if org_admin and _org_admin_allows(course_status, action):
+            return True
+        return is_platform_admin and action in PLATFORM_ADMIN_ACTIONS
+    if _role_allows(role, course_status, action):
+        return True
+    return org_admin and _org_admin_allows(course_status, action)
+
+
 def _no_role(course_id) -> Optional[str]:
     return None
 
@@ -83,13 +108,24 @@ def enrollment_role_resolver(db: Session, user_id: str) -> Callable:
     """Returns course_id -> active enrollment role (or None). One query per course; caching is in AuthzContext."""
     from app.lms.enrollments.models import Enrollment
 
-    def resolve(course_id) -> Optional[str]:
-        return db.execute(
-            select(Enrollment.role).where(
-                Enrollment.course_id == course_id, Enrollment.user_id == user_id, Enrollment.state == "active"
-            )
-        ).scalar_one_or_none()
+    from app.lms.courses.models import Course
+    from app.lms.organizations.models import Organization
 
+    def resolve(course_id) -> Optional[str]:
+        # Phase 6 S1: the organization status comes with the role (same statement), so the suspension gate
+        # costs enrolled users no extra query on the hot paths (attempt start, autosave).
+        row = db.execute(
+            select(Enrollment.role, Organization.status)
+            .join(Course, Course.id == Enrollment.course_id)
+            .join(Organization, Organization.id == Course.organization_id)
+            .where(Enrollment.course_id == course_id, Enrollment.user_id == user_id, Enrollment.state == "active")
+        ).first()
+        if row is None:
+            return None
+        resolve.org_status[_norm(course_id)] = row[1]
+        return row[0]
+
+    resolve.org_status = {}
     return resolve
 
 
@@ -108,6 +144,42 @@ class AuthzContext:
         self.enrollment_cache: dict = {}
         self.role_resolver = role_resolver
         self.allow_platform_admin = allow_platform_admin
+        self.org_cache: dict = {}  # Phase 6 S1: organization_id -> (status, deleted, is_org_admin)
+
+    # --- Phase 6 S1 begin --- (organizations, PHASE_6_DESIGN 2.2)
+    def _org(self, organization_id):
+        """(status, deleted, is_org_admin) of one organization: one query per organization per request."""
+        if organization_id is None:
+            return ("active", False, False)
+        key = _norm(organization_id)
+        if key not in self.org_cache:
+            from app.lms.organizations.models import Organization, OrganizationMember
+
+            member = (
+                select(OrganizationMember.id).where(
+                    OrganizationMember.organization_id == Organization.id,
+                    OrganizationMember.user_id == self.user.id, OrganizationMember.state == "active",
+                    OrganizationMember.role == "org_admin",
+                ).correlate(Organization).exists()
+            )
+            row = self.db.execute(
+                select(Organization.status, Organization.deleted_at, member).where(Organization.id == key)
+            ).first()
+            self.org_cache[key] = ("active", False, False) if row is None else (
+                row[0], row[1] is not None, bool(row[2]) and row[1] is None)
+        return self.org_cache[key]
+
+    def org_admin_for(self, organization_id) -> bool:
+        """Active org admin membership in a non-deleted organization (cached per request)."""
+        return self._org(organization_id)[2]
+
+    def org_suspended(self, organization_id, course_id=None) -> bool:
+        if course_id is not None:
+            hint = getattr(self.role_resolver, "org_status", {}).get(_norm(course_id))
+            if hint is not None:
+                return hint == "suspended"
+        return self._org(organization_id)[0] == "suspended"
+    # --- Phase 6 S1 end ---
 
     @property
     def is_platform_admin(self) -> bool:
@@ -144,10 +216,16 @@ def get_authz(user=Depends(get_lms_user), db: Session = Depends(get_db)) -> Auth
 def can(ctx: AuthzContext, action: str, course) -> bool:
     if getattr(course, "deleted_at", None) is not None:
         return False
-    return decide(
-        role=ctx.role_for(course.id), course_status=course.status,
-        action=action, is_platform_admin=ctx.is_platform_admin,
-    )
+    org_id = getattr(course, "organization_id", None)
+    role = ctx.role_for(course.id)
+    # the organization row is read only when needed (a write needs the suspension state; a miss needs the org
+    # admin membership), so read-only requests of enrolled users cost no extra query
+    suspended = action not in READ_ONLY_ACTIONS and ctx.org_suspended(org_id, course.id)
+    kw = dict(role=role, course_status=course.status, action=action, is_platform_admin=ctx.is_platform_admin,
+              org_suspended=suspended)
+    if decide(**kw):
+        return True
+    return decide(**kw, org_admin=ctx.org_admin_for(org_id))
 
 
 def require(ctx: AuthzContext, action: str, course) -> None:
@@ -156,6 +234,6 @@ def require(ctx: AuthzContext, action: str, course) -> None:
     if can(ctx, action, course):
         return
     role = ctx.role_for(course.id)
-    if role is None:
+    if role is None and not ctx.org_admin_for(getattr(course, "organization_id", None)):
         raise NotFound("Course not found")
     raise Forbidden("Action not permitted")

@@ -35,9 +35,22 @@ def _out(ctx: AuthzContext, course: Course):
     db = ctx.db
     enrollment = svc.get_enrollment(db, course.id, ctx.user.id)
     owner = db.get(User, course.owner_id)
-    if enrollment is not None and enrollment.role in STAFF_ROLES:
-        return course_staff_out(course, enrollment, owner, svc.active_student_count(db, course.id), ctx.user.id)
-    return course_student_out(course, enrollment, owner)
+    org_name = _org_name(db, course)  # Phase 6 S1
+    # Phase 6 S1: an org admin of the course's organization gets the staff view (roster management; A13)
+    if (enrollment is not None and enrollment.role in STAFF_ROLES) or (
+            enrollment is None and ctx.org_admin_for(course.organization_id)):
+        return course_staff_out(course, enrollment, owner, svc.active_student_count(db, course.id), ctx.user.id,
+                                org_name)
+    return course_student_out(course, enrollment, owner, org_name)
+
+
+# --- Phase 6 S1 begin ---
+def _org_name(db: Session, course: Course) -> str:
+    from app.lms.organizations.models import Organization
+
+    org = db.get(Organization, course.organization_id) if course.organization_id else None
+    return org.name if org is not None else ""
+# --- Phase 6 S1 end ---
 
 
 def _staff_out(ctx: AuthzContext, course: Course) -> CourseStaffOut:
@@ -70,8 +83,8 @@ def list_trash(cursor: Optional[str] = None, limit: int = 25, ctx: AuthzContext 
 
 
 @router.post("", status_code=201, response_model=CourseStaffOut)
-def create_course(data: CourseCreateIn, ctx: AuthzContext = Depends(get_authz)):
-    course = svc.create_course(ctx.db, ctx.user, data)
+def create_course(data: CourseCreateIn, request: Request, ctx: AuthzContext = Depends(get_authz)):
+    course = svc.create_course(ctx.db, ctx.user, data, request=request)
     return _out(ctx, course)
 
 
@@ -172,7 +185,7 @@ def people(course_id: uuid.UUID, role: Optional[Literal["teacher", "assistant", 
     db = ctx.db
     course = svc.load_course(db, course_id)
     svc.require_course(ctx, A.COURSE_READ, course)
-    if ctx.role_for(course.id) in STAFF_ROLES:
+    if ctx.role_for(course.id) in STAFF_ROLES or ctx.org_admin_for(course.organization_id):  # Phase 6 S1
         svc.require_course(ctx, A.ROSTER_READ, course)
         rows, nxt = svc.paginate_rows(
             db, enr_svc.roster_query(course.id, role=role, state=state, q=q), sort_col=Enrollment.created_at,

@@ -41,6 +41,8 @@ DEMO_TEACHER_ID = "usr_ort_demo_teacher"
 CREATOR_SETTINGS = {"teachers_can_create_courses": True}
 OLD_SOURCES = "source IN ('owner','join_code','staff_add','admin','invite','form','open')"
 NEW_SOURCES = "source IN ('owner','join_code','staff_add','admin','invite','form','open','org_admin_self')"
+OLD_TARGETS = "target_type IN ('user','course','teacher_request','enrollment')"
+NEW_TARGETS = "target_type IN ('user','course','teacher_request','enrollment','organization','invitation')"
 
 
 def _platform_org_id() -> uuid.UUID:
@@ -240,6 +242,9 @@ def _schema() -> None:
     with op.batch_alter_table("enrollments") as b:
         b.drop_constraint(op.f("ck_enrollments_source_valid"), type_="check")
         b.create_check_constraint(op.f("ck_enrollments_source_valid"), NEW_SOURCES)
+    with op.batch_alter_table("admin_audit_log") as b:
+        b.drop_constraint(op.f("ck_admin_audit_log_target_type_valid"), type_="check")
+        b.create_check_constraint(op.f("ck_admin_audit_log_target_type_valid"), NEW_TARGETS)
 
 
 # ------------------------------------------------------------------------------------------------- data steps
@@ -376,6 +381,10 @@ def downgrade() -> None:
     with op.batch_alter_table("enrollments") as b:
         b.drop_constraint(op.f("ck_enrollments_source_valid"), type_="check")
         b.create_check_constraint(op.f("ck_enrollments_source_valid"), OLD_SOURCES)
+    op.execute("DELETE FROM admin_audit_log WHERE target_type IN ('organization','invitation')")
+    with op.batch_alter_table("admin_audit_log") as b:
+        b.drop_constraint(op.f("ck_admin_audit_log_target_type_valid"), type_="check")
+        b.create_check_constraint(op.f("ck_admin_audit_log_target_type_valid"), OLD_TARGETS)
     with op.batch_alter_table("question_banks") as b:
         b.drop_index("ix_question_banks_organization_id")
         b.drop_constraint(op.f("fk_question_banks_organization_id_organizations"), type_="foreignkey")
