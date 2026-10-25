@@ -76,8 +76,8 @@ export async function signIn(page: Page, user: SeedUser): Promise<void> {
 // ----------------------------------------------------------------------------- stable rendering
 
 /** Network quiet, web fonts loaded, KaTeX laid out, no "loading" placeholder, pointer parked off any hover target. */
-export async function settle(page: Page): Promise<void> {
-  await page.waitForLoadState("networkidle");
+export async function settle(page: Page, network = true): Promise<void> {
+  if (network) await page.waitForLoadState("networkidle");
   await page.evaluate(async () => {
     await document.fonts.ready;
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -121,6 +121,8 @@ export interface ShotOptions {
   /** screenshot only this element instead of the viewport */
   element?: Locator;
   fullPage?: boolean;
+  /** false: do not wait for network idle (a loading state whose request is held on purpose) */
+  waitNetwork?: boolean;
 }
 
 /**
@@ -129,7 +131,7 @@ export interface ShotOptions {
  * output and in $E2E_DIR/diffs/ (uploaded by CI).
  */
 export async function expectScreen(page: Page, info: TestInfo, name: string, opts: ShotOptions = {}): Promise<void> {
-  await settle(page);
+  await settle(page, opts.waitNetwork !== false);
   const shotOpts = { animations: "disabled" as const, caret: "hide" as const, mask: opts.mask ?? [], maskColor: MASK_COLOR };
   const buf = opts.element ? await opts.element.screenshot(shotOpts) : await page.screenshot({ ...shotOpts, fullPage: !!opts.fullPage });
   const dir = baselineDir();

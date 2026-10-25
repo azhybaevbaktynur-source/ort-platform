@@ -10,6 +10,9 @@ export function SaveStatus({ snap, onRetry }: { snap: QueueSnapshot; onRetry?: (
   const { t } = useTranslation();
   let icon = <Check className="h-3.5 w-3.5" aria-hidden="true" />;
   let text = t("player.save.saved");
+  // S11a, F7: phones get a short line (the header has ~1/3 of 375 px for it); the full text stays as the
+  // tooltip and for screen readers.
+  let short: string | null = null;
   let tone = "text-emerald-700 bg-emerald-50 border-emerald-200";
   const retry = snap.status === "offline" || snap.status === "error" || snap.status === "auth";
   if (snap.status === "saving" || (snap.status === "idle" && snap.pending > 0)) {
@@ -19,6 +22,7 @@ export function SaveStatus({ snap, onRetry }: { snap: QueueSnapshot; onRetry?: (
   } else if (snap.status === "offline") {
     icon = <CloudOff className="h-3.5 w-3.5" aria-hidden="true" />;
     text = t("player.save.offline", { n: snap.pending });
+    short = t("player.save.offlineShort", { n: snap.pending });
     tone = "text-amber-800 bg-amber-50 border-amber-200";
   } else if (snap.status === "auth") {
     icon = <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />;
@@ -31,9 +35,16 @@ export function SaveStatus({ snap, onRetry }: { snap: QueueSnapshot; onRetry?: (
   }
   return (
     <div className="flex min-w-0 items-center gap-2" role="status" aria-live="polite">
-      <span className={`inline-flex min-w-0 items-center gap-1.5 rounded-2xl border px-2.5 py-1 text-xs font-medium leading-4 ${tone}`}>
+      <span title={short ? text : undefined} className={`inline-flex min-w-0 items-center gap-1.5 rounded-2xl border px-2.5 py-1 text-xs font-medium leading-4 ${tone}`}>
         <span className="shrink-0">{icon}</span>
-        <span className="min-w-0">{text}</span>
+        {short ? (
+          <span className="min-w-0">
+            <span aria-hidden="true" className="sm:hidden">{short}</span>
+            <span className="sr-only sm:not-sr-only">{text}</span>
+          </span>
+        ) : (
+          <span className="min-w-0">{text}</span>
+        )}
       </span>
       {retry && onRetry ? (
         <Button variant="link" size="sm" onClick={onRetry} className="shrink-0 text-xs">

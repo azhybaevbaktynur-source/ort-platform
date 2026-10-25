@@ -1244,6 +1244,7 @@
       "auth": "Sign in again, {n} answers not saved",
       "error": "Could not save, retrying ({n})",
       "offline": "Offline. Answers are saved on this device and will be sent later ({n})",
+      "offlineShort": "Offline, answers saved ({n})",
       "saved": "Saved",
       "saving": "Saving..."
     },

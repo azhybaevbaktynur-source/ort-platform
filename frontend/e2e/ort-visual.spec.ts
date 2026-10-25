@@ -93,6 +93,26 @@ for (const vp of VIEWPORT_NAMES) {
   }
 }
 
+// ----------------------------------------------------------------------------- ORT player loading (phone, ru)
+
+// S11a: the player's own skeleton (S7b, P11) while the attempt is loading. The attempt requests are held, so the
+// state is the same on every run.
+test.describe("ORT player loading phone ru", () => {
+  test.use({ viewport: VIEWPORTS.phone });
+
+  test("player skeleton (phone, ru)", async ({ page }, info) => {
+    const s = seed();
+    await signIn(page, s.students["vis-phone-ru"]);
+    await page.route((url) => url.href.startsWith(s.api) && url.pathname.includes("/attempts/"), () => { /* held: never answered */ });
+    await page.goto(`/ru/courses/${s.course_id}/attempts/${s.staff_attempt_id}`);
+    const loading = page.getByRole("status").filter({ hasText: tr("ru", "player.loading") });
+    await expect(loading).toHaveCount(1);
+    await expect(page.getByRole("progressbar")).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(VIEWPORTS.phone.width);
+    await expectScreen(page, info, "player-loading-phone-ru", { waitNetwork: false });
+  });
+});
+
 // ----------------------------------------------------------------------------- ORT teacher screens (ru)
 
 for (const vp of VIEWPORT_NAMES) {
