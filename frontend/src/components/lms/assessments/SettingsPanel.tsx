@@ -10,7 +10,8 @@ import { cleanLocalized } from "@/lib/lms/localized";
 import { isAssessmentLocked, useTemplateUi } from "@/lib/lms/templates";
 import { LMS_LANGS, type Lang, type LocalizedText } from "@/lib/lms/types";
 import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
-import { btnPrimary, inputCls, labelCls } from "@/components/lms/content/ui";
+import { inputCls, labelCls } from "@/components/lms/content/ui";
+import { btnPrimary } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { AssessmentError } from "./AssessmentError";
 import { SettingsPanelGrading, type GradingFormValue } from "./SettingsPanelGrading";
 import { fromLocalInput, minToSec, secToMin, toLocalInput } from "./format";

@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   backend-sqlite:
     runs-on: ubuntu-latest
@@ -142,3 +145,71 @@ jobs:
         with:
           python-version: "3.11"
       - run: python scripts/check_i18n_parity.py
+
+  # ORT browser e2e + screenshot baselines (PHASE_6_DESIGN section 6, docs/phases/ORT_BASELINE/README.md)
+  ort-e2e:
+    runs-on: ubuntu-latest
+    env:
+      E2E_DIR: /tmp/ort_e2e
+      E2E_API_PORT: "8765"
+      E2E_WEB_PORT: "3765"
+      # CI runs every DOM assertion and the no-horizontal-scroll checks; it does not compare pixels: Linux renders
+      # fonts differently from the reviewed macOS baselines, so the screenshots are recorded (artifact
+      # "ort-e2e-recorded") while docs/phases/ORT_BASELINE/linux/ is not committed, and a missing Linux baseline
+      # never fails the job. The pixel comparison runs locally (macOS, system Chrome) at every phase gate
+      # (docs/phases/ORT_BASELINE/README.md, "Platforms and where the pixel comparison runs").
+      ORT_BASELINE_RECORD_MISSING: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r backend/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - name: Build the frontend against the scratch backend
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:8765
+        run: npx next build
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: ORT e2e (DOM assertions; Linux screenshots recorded, not compared)
+        working-directory: frontend
+        shell: bash   # -eo pipefail: the tee below must not hide a failing run
+        # output also in /tmp/ort_e2e_playwright.log (outside E2E_DIR, which the backend wipes on start)
+        run: E2E_PYTHON="$(command -v python)" npx playwright test 2>&1 | tee /tmp/ort_e2e_playwright.log
+      - name: Logs as annotations (readable on the public check run)
+        if: failure()
+        run: >-
+          python scripts/ci_log_annotations.py --lines 40
+          "playwright output=/tmp/ort_e2e_playwright.log"
+          "seed log=/tmp/ort_e2e/seed.log"
+          "backend log=/tmp/ort_e2e/backend.log"
+      - name: Upload screenshot diffs and logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ort-e2e-diffs
+          path: |
+            /tmp/ort_e2e/diffs
+            /tmp/ort_e2e/report
+            /tmp/ort_e2e/results
+            /tmp/ort_e2e/backend.log
+            /tmp/ort_e2e/seed.log
+            /tmp/ort_e2e_playwright.log
+          if-no-files-found: ignore
+      - name: Upload recorded baselines (platform without committed baselines)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ort-e2e-recorded
+          path: /tmp/ort_e2e/recorded
+          if-no-files-found: ignore

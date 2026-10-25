@@ -15,7 +15,16 @@ export const listTrash = (cursor?: string | null, limit = 24) =>
   lmsFetch<PageOut<CourseCard>>("/courses/trash", { params: { cursor, limit } });
 
 export const createCourse = (body: CourseCreateIn) => lmsFetch<CourseStaffOut>("/courses", { method: "POST", body });
-export const getCourse = (id: string) => lmsFetch<CourseOut>(`/courses/${enc(id)}`);
+// Phase 6b integration: an org admin reading a course of their organization has no enrollment
+// (`my_enrollment: null`); they get the read-only student views (PHASE_6_DESIGN 2.2), so the pages see a
+// student-like, id-less enrollment instead of null.
+export const getCourse = async (id: string): Promise<CourseOut> => {
+  const c = await lmsFetch<CourseOut>(`/courses/${enc(id)}`);
+  if (!c.my_enrollment) {
+    c.my_enrollment = { id: "", course_id: c.id, role: "student", state: "active", activated_at: null, read_only: true };
+  }
+  return c;
+};
 export const updateCourse = (id: string, body: CourseUpdateIn) =>
   lmsFetch<CourseStaffOut>(`/courses/${enc(id)}`, { method: "PATCH", body });
 

@@ -1,25 +1,34 @@
 "use client";
 
 import React from "react";
-import { Check, X } from "lucide-react";
+import { Check, Circle, Clock, Minus, X } from "lucide-react";
+import { Badge, type BadgeTone } from "@/components/ui";
 import { useTranslation } from "@/lib/i18n/context";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import { TemplatePassage } from "@/components/lms/PlainPassage";
 import type { Correctness, ReviewItemOut, StudentQuestion } from "@/lib/lms/attemptTypes";
 import { fmtPoints } from "@/components/lms/assessments/format";
 
-const BADGE: Record<Correctness, string> = {
-  correct: "bg-emerald-100 text-emerald-800",
-  incorrect: "bg-red-100 text-red-800",
-  partial: "bg-amber-100 text-amber-800",
-  unanswered: "bg-slate-100 text-slate-700",
-  pending: "bg-indigo-100 text-indigo-800",
+// Design-system Badge with an icon, so colour is never the only signal (S7b, cross-cutting).
+const TONE: Record<Correctness, BadgeTone> = {
+  correct: "success",
+  incorrect: "danger",
+  partial: "warning",
+  unanswered: "neutral",
+  pending: "info",
+};
+const ICON: Record<Correctness, React.ReactNode> = {
+  correct: <Check aria-hidden="true" />,
+  incorrect: <X aria-hidden="true" />,
+  partial: <Circle aria-hidden="true" />,
+  unanswered: <Minus aria-hidden="true" />,
+  pending: <Clock aria-hidden="true" />,
 };
 
 export function CorrectnessBadge({ value }: { value: Correctness | null }) {
   const { t } = useTranslation();
   if (!value) return null;
-  return <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${BADGE[value]}`}>{t(`results.correctness.${value}`)}</span>;
+  return <Badge tone={TONE[value]} icon={ICON[value]}>{t(`results.correctness.${value}`)}</Badge>;
 }
 
 function asArr(v: unknown): string[] {
@@ -45,13 +54,17 @@ export function ReviewItemCard({
   number,
   maxPoints,
   children,
+  viewer = "student",
 }: {
   item: ReviewItemOut;
   number: number;
   maxPoints?: number | string | null;
   children?: React.ReactNode;
+  /** Phase 6b S5c (UX T12, T22): "staff" labels the answer "Student's answer". Both viewers use the body font (S7b, P7). */
+  viewer?: "student" | "staff";
 }) {
   const { t } = useTranslation();
+  const answerLabel = viewer === "staff" ? t("teaching.studentAnswer") : t("results.yourAnswer");
   const q: StudentQuestion = item.question;
   const resp = (item.response ?? {}) as Record<string, unknown>;
   const key = item.key ?? null;
@@ -66,7 +79,7 @@ export function ReviewItemCard({
           <CorrectnessBadge value={item.correctness} />
           {item.score !== null && item.score !== undefined && (
             <span className="font-semibold text-slate-700">
-              {max !== null && max !== undefined ? t("results.scoreOf", { score: fmtPoints(item.score), max: fmtPoints(max) }) : fmtPoints(item.score)}
+              {max !== null && max !== undefined ? t("results.scoreOf", { score: fmtPoints(item.score), max: fmtPoints(max), count: fmtPoints(max) }) : fmtPoints(item.score)}
             </span>
           )}
         </div>
@@ -79,7 +92,7 @@ export function ReviewItemCard({
         </details>
       )}
 
-      {q.stem ? <MathRenderer content={q.stem} className="font-serif text-base leading-relaxed text-gray-900" /> : null}
+      {q.stem ? <MathRenderer content={q.stem} className="text-base leading-relaxed text-slate-900" /> : null}
       {q.image_url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={q.image_url} alt={t("results.imageAlt")} className="max-h-72 w-auto rounded-lg border border-slate-100" />
@@ -97,7 +110,7 @@ export function ReviewItemCard({
                   {correct ? <Check className="h-4 w-4 text-emerald-700" /> : picked ? <X className="h-4 w-4 text-red-700" /> : null}
                 </span>
                 <span className="min-w-0 flex-1">
-                  {c.text ? <MathRenderer content={c.text} className="font-serif text-base text-gray-900" /> : null}
+                  {c.text ? <MathRenderer content={c.text} className="text-base text-slate-900" /> : null}
                   {c.image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={c.image_url} alt="" className="mt-1 max-h-32 w-auto rounded-md" />
@@ -105,7 +118,7 @@ export function ReviewItemCard({
                 </span>
                 {/* Phase 6 S8: layout only; the label wraps instead of widening the card at 375 px (long ky text). */}
                 <span className="min-w-0 max-w-[45%] text-right text-xs font-medium text-slate-600">
-                  {picked ? t("results.yourAnswer") : ""}{picked && correct ? " · " : ""}{correct ? t("results.correctAnswer") : ""}
+                  {picked ? answerLabel : ""}{picked && correct ? " · " : ""}{correct ? t("results.correctAnswer") : ""}
                 </span>
               </li>
             );
@@ -115,7 +128,7 @@ export function ReviewItemCard({
 
       {q.type === "true_false" && (
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
-          <div><dt className="text-xs text-slate-500">{t("results.yourAnswer")}</dt><dd className="font-medium">{typeof resp.value === "boolean" ? (resp.value ? t("results.true") : t("results.false")) : t("results.noAnswer")}</dd></div>
+          <div><dt className="text-xs text-slate-500">{answerLabel}</dt><dd className="font-medium">{typeof resp.value === "boolean" ? (resp.value ? t("results.true") : t("results.false")) : t("results.noAnswer")}</dd></div>
           {key && typeof key.correct === "boolean" && <div><dt className="text-xs text-slate-500">{t("results.correctAnswer")}</dt><dd className="font-medium text-emerald-700">{key.correct ? t("results.true") : t("results.false")}</dd></div>}
         </dl>
       )}
@@ -131,7 +144,7 @@ export function ReviewItemCard({
             ))}
           </div>
           <dl className="grid gap-2 text-sm sm:grid-cols-2">
-            <div><dt className="text-xs text-slate-500">{t("results.yourAnswer")}</dt><dd className="font-medium">{typeof resp.choice === "string" ? t(`bank.types.comparison.labels.${resp.choice}`) : t("results.noAnswer")}</dd></div>
+            <div><dt className="text-xs text-slate-500">{answerLabel}</dt><dd className="font-medium">{typeof resp.choice === "string" ? t(`bank.types.comparison.labels.${resp.choice}`) : t("results.noAnswer")}</dd></div>
             {key && typeof key.correct === "string" && <div><dt className="text-xs text-slate-500">{t("results.correctAnswer")}</dt><dd className="font-medium text-emerald-700">{t(`bank.types.comparison.labels.${key.correct}`)}</dd></div>}
           </dl>
         </div>
@@ -140,7 +153,7 @@ export function ReviewItemCard({
       {(q.type === "numeric" || q.type === "short_text") && (
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-xs text-slate-500">{t("results.yourAnswer")}</dt>
+            <dt className="text-xs text-slate-500">{answerLabel}</dt>
             <dd className="font-mono font-medium">{(q.type === "numeric" ? (resp.value as string | undefined) : (resp.text as string | undefined)) || t("results.noAnswer")}</dd>
           </div>
           {key && Array.isArray(key.answers) && key.answers.length > 0 && (
@@ -151,7 +164,7 @@ export function ReviewItemCard({
 
       {q.type === "essay" && (
         <div>
-          <p className="mb-1 text-xs text-slate-500">{t("results.yourAnswer")}</p>
+          <p className="mb-1 text-xs text-slate-500">{answerLabel}</p>
           {typeof resp.text === "string" && resp.text.trim() ? (
             <p className="whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-900">{resp.text}</p>
           ) : (

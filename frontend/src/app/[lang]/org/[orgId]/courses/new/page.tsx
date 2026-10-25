@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { cleanLocalized } from "@/lib/lms/localized";
@@ -10,15 +9,15 @@ import { listCourseTemplates, templateTitle, type TemplateChoiceOut } from "@/li
 import type { Lang, LocalizedText } from "@/lib/lms/types";
 import { LanguagePicker } from "@/components/lms/LanguagePicker";
 import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
-import { UserPicker, type PickedUser, type UserSearch } from "@/components/lms/UserPicker";
+import { Button, Card, FieldError, LinkButton, PageHeader, Select, UserPicker, type PickedUser, type UserSearch } from "@/components/ui";
 import { useOrg } from "@/components/lms/org/OrgShell";
-import { OrgError, btn, cardCls, inputCls, labelCls } from "@/components/lms/org/OrgUi";
+import { OrgError } from "@/components/lms/org/OrgUi";
 
 /** Org admin creates a course and assigns its owner (design §3, A2). */
 export default function OrgNewCoursePage() {
   const { lang, t } = useTranslation();
   const router = useRouter();
-  const { org, readOnly } = useOrg();
+  const { org, readOnly, crumbs } = useOrg();
   const initial: Lang = lang;
   const [languages, setLanguages] = useState<Lang[]>([initial]);
   const [defaultLanguage, setDefaultLanguage] = useState<Lang>(initial);
@@ -72,39 +71,38 @@ export default function OrgNewCoursePage() {
   };
 
   const disabled = busy || readOnly;
+  const coursesHref = `/${lang}/org/${org.id}/courses`;
   return (
-    <form onSubmit={submit} noValidate className={`${cardCls} mx-auto max-w-2xl space-y-6`}>
-      <div>
-        <Link href={`/${lang}/org/${org.id}/courses`} className="text-sm font-medium text-brand-700 hover:underline">{t("organizations.courses.back")}</Link>
-        <h2 className="mt-2 text-xl font-bold text-slate-900">{t("organizations.courses.createTitle")}</h2>
-        <p className="mt-1 text-sm text-slate-600">{t("organizations.courses.createHint", { org: org.name })}</p>
-      </div>
+    <div className="max-w-2xl">
+      <PageHeader title={t("organizations.courses.createTitle")} description={t("organizations.courses.createHint", { org: org.name })}
+        breadcrumbs={crumbs({ label: t("organizations.org.nav.courses"), href: coursesHref }, { label: t("organizations.courses.createTitle") })} />
+    <Card>
+    <form onSubmit={submit} noValidate className="space-y-6">
       <LanguagePicker languages={languages} defaultLanguage={defaultLanguage} disabled={disabled}
         onChange={(ls, d) => { setLanguages(ls); setDefaultLanguage(d); }} />
       <LocalizedTextInput label={t("courses.create.courseTitle")} languages={languages} defaultLanguage={defaultLanguage}
         value={title} onChange={setTitle} maxLength={200} required disabled={disabled} />
-      {titleMissing && <p role="alert" className="text-sm text-red-700">{t("lms.errors.title_required")}</p>}
+      {titleMissing && <div role="alert" className="-mt-4"><FieldError>{t("lms.errors.title_required")}</FieldError></div>}
       <LocalizedTextInput label={t("courses.create.description")} languages={languages} defaultLanguage={defaultLanguage}
         value={description} onChange={setDescription} multiline maxLength={5000} disabled={disabled} />
       <div>
-        <label htmlFor="c-template" className={labelCls}>{t("templates.field")}</label>
-        <select id="c-template" className={inputCls} value={templateKey} disabled={disabled} onChange={(e) => setTemplateKey(e.target.value)}>
-          <option value="">{t("templates.general")}</option>
-          {templates.map((tp) => <option key={tp.key} value={tp.key}>{templateTitle(t, tp.key, tp.title_key)}</option>)}
-        </select>
-        <p className="mt-1 text-xs text-slate-500">{templateKey ? t("templates.lockedHint") : t("templates.generalHint")}</p>
+        <Select id="c-template" label={t("templates.field")} value={templateKey} disabled={disabled} onChange={(e) => setTemplateKey(e.target.value)}
+          hint={templateKey ? t("templates.lockedHint") : t("templates.generalHint")}
+          options={[{ value: "", label: t("templates.general") }, ...templates.map((tp) => ({ value: tp.key, label: templateTitle(t, tp.key, tp.title_key) }))]} />
         {templatesError ? <OrgError error={templatesError} className="mt-2" /> : null}
       </div>
       <div>
         <UserPicker label={t("organizations.courses.ownerField")} hint={t("organizations.courses.ownerHint")}
           value={owner} onChange={(u) => { setOwner(u); setOwnerMissing(false); }} search={searchMembers} disabled={disabled} />
-        {ownerMissing && <p role="alert" className="mt-1 text-sm text-red-700">{t("organizations.courses.ownerMissing")}</p>}
+        {ownerMissing && <div role="alert"><FieldError>{t("organizations.courses.ownerMissing")}</FieldError></div>}
       </div>
       <OrgError error={error} />
-      <div className="flex flex-wrap justify-end gap-2">
-        <Link href={`/${lang}/org/${org.id}/courses`} className={btn.secondary}>{t("lms.common.cancel")}</Link>
-        <button type="submit" disabled={disabled} className={btn.primary}>{busy ? t("lms.common.loading") : t("courses.create.submit")}</button>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <LinkButton variant="secondary" href={coursesHref}>{t("lms.common.cancel")}</LinkButton>
+        <Button type="submit" disabled={readOnly} loading={busy}>{t("courses.create.submit")}</Button>
       </div>
     </form>
+    </Card>
+    </div>
   );
 }

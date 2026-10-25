@@ -72,6 +72,8 @@ export interface MyEnrollmentOut {
   role: CourseRole;
   state: EnrollmentState;
   activated_at: string | null;
+  /** Phase 6b: set by getCourse when the viewer has no enrollment (org/platform admin reading the course). */
+  read_only?: boolean;
 }
 
 export interface CourseStudentOut {

@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { addSection, deleteSection, getAssessment, reorderSections, updateSection } from "@/lib/lms/assessments";
@@ -9,9 +8,9 @@ import { isStaffAssessment, type AssessmentStaffOut, type SectionIn, type Sectio
 import { pickLocalized } from "@/lib/lms/localized";
 import { isAssessmentLocked, useTemplateUi } from "@/lib/lms/templates";
 import { useCourse } from "@/components/lms/CourseContext";
-import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
 import { StaffGate, useCanEditContent } from "@/components/lms/content/StaffGate";
-import { btnPrimary } from "@/components/lms/content/ui";
+import { useTabCrumbs } from "@/components/lms/course/StaffCourseUi"; // Phase 6b S5c
+import { Button, ConfirmDialog, EmptyState, LoadingState, PageHeader } from "@/components/ui";
 import { AddItemsDialog } from "@/components/lms/assessments/AddItemsDialog";
 import { AssessmentError } from "@/components/lms/assessments/AssessmentError";
 import type { RowCtx } from "@/components/lms/assessments/ItemRow";
@@ -66,9 +65,14 @@ function Builder() {
   // --- Phase 6 S4b: a locked course template fixes the sections (add, delete, reorder), design §5.4 ---
   const structureLocked = !!a && isAssessmentLocked(ui, a.preset);
   const drag = useDragReorder(moveSection, canEdit && !structureLocked);
+  const aTitle = a ? pickLocalized(a.title, lang, course.default_language) || t("assessments.untitled") : "";
+  const crumbs = useTabCrumbs("assessments", [
+    { label: aTitle || t("lms.common.loading"), href: `${base}/${aid}` },
+    { label: t("teaching.builderCrumb") },
+  ], course.id);
 
   if (error && !a) return <AssessmentError error={error} onRetry={() => void load()} />;
-  if (!a) return <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p>;
+  if (!a) return <LoadingState rows={3} />;
 
   const ctx: RowCtx = {
     courseId: course.id, assessmentId: a.id, canEdit, sections: a.sections, currentSectionId: "",
@@ -104,13 +108,16 @@ function Builder() {
     }
   };
 
-  const title = pickLocalized(a.title, lang, course.default_language) || t("assessments.untitled");
+  const title = aTitle;
+  const addSectionBtn = canEdit ? (
+    <Button variant="secondary" disabled={structureLocked} title={structureLocked ? t("templates.lockedNote") : undefined}
+      onClick={() => { setSecError(null); setSectionDlg({ section: null }); }}>{t("assessments.section.add")}</Button>
+  ) : undefined;
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <Link href={`${base}/${a.id}`} className="text-sm font-medium text-brand-700 hover:underline">{t("assessments.builder.back")}</Link>
-        <h2 className="text-lg font-bold text-slate-900">{t("assessments.builder.title", { title })}</h2>
-      </div>
+      {/* Phase 6b S5c: PageHeader with breadcrumbs; the one primary of the page is "Publish" in the publish panel (UX T8). */}
+      {/* Phase 6b S11b (UX 3): the assessment name is the title; "Edit" is the last breadcrumb. */}
+      <PageHeader breadcrumbs={crumbs} title={title} className="mb-2" />
       {!canEdit && <p className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-sm text-amber-900">{t("assessments.builder.readOnly")}</p>}
       <PublishPanel assessment={a} courseId={course.id} canEdit={canEdit} onChanged={load} />
       <details className="rounded-2xl">
@@ -121,12 +128,12 @@ function Builder() {
         </div>
       </details>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-base font-bold text-slate-900">{t("assessments.builder.sections")}</h3>
-        {canEdit && <button type="button" className={btnPrimary} disabled={structureLocked} onClick={() => { setSecError(null); setSectionDlg({ section: null }); }}>{t("assessments.section.add")}</button>}
+        <h2 className="text-lg font-semibold text-slate-900">{t("assessments.builder.sections")}</h2>
+        {addSectionBtn}
       </div>
-      {canEdit && structureLocked && <p role="note" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">{t("templates.lockedNote")}</p>}
+      {canEdit && structureLocked && <p role="note" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{t("templates.lockedNote")}</p>}
       <AssessmentError error={actionError} />
-      {a.sections.length === 0 && <p className="text-sm text-slate-500">{t("assessments.builder.noSections")}</p>}
+      {a.sections.length === 0 && <EmptyState title={t("assessments.builder.noSections")} action={addSectionBtn} />}
       <div className="space-y-4">
         {a.sections.map((s, i) => (
           <SectionCard key={s.id} section={s} assessment={a} ctx={ctx} index={i} count={a.sections.length} defaultLanguage={course.default_language}
@@ -137,11 +144,11 @@ function Builder() {
       </div>
       <SectionDialog open={!!sectionDlg} section={sectionDlg?.section ?? null} assessment={a} languages={a.languages} defaultLanguage={a.languages.includes(course.default_language) ? course.default_language : a.languages[0]}
         busy={secBusy} error={secError} onSubmit={(v) => void submitSection(v)} onCancel={() => setSectionDlg(null)} />
-      <ConfirmDialog open={!!toDelete} danger busy={secBusy} title={t("assessments.section.deleteTitle")}
-        body={t("assessments.section.deleteBody", { name: toDelete ? sectionName(toDelete, lang, course.default_language, t) : "" })}
-        confirmLabel={t("assessments.section.delete")} onConfirm={() => void removeSection()} onCancel={() => setToDelete(null)}>
-        <AssessmentError error={secError} className="mt-3" />
-      </ConfirmDialog>
+      <ConfirmDialog open={!!toDelete} tone="danger" busy={secBusy} title={t("assessments.section.deleteTitle")}
+        object={toDelete ? sectionName(toDelete, lang, course.default_language, t) : undefined}
+        effect={t("assessments.section.deleteBody", { name: toDelete ? sectionName(toDelete, lang, course.default_language, t) : "" })}
+        confirmLabel={t("assessments.section.delete")} onConfirm={() => void removeSection()} onCancel={() => setToDelete(null)}
+        error={secError ? <AssessmentError error={secError} /> : undefined} />
       {addTo && (
         <AddItemsDialog open courseId={course.id} assessmentId={a.id} sectionId={addTo} onClose={() => setAddTo(null)} onAdded={load} />
       )}

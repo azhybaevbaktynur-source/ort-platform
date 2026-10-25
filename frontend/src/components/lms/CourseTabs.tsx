@@ -1,12 +1,15 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
+import { TabsNav } from "@/components/ui";
 import { useCourse } from "./CourseContext";
 
-/** Role-aware tabs. Settings is shown to teachers only; the server stays authoritative. */
+/**
+ * Role-aware tabs. Settings is shown to teachers only; the server stays authoritative.
+ * Phase 6b S5c (UX T29): one scrollable row (design-system `TabsNav`) with the active tab kept in view.
+ */
 export function CourseTabs({ courseId, showSettings }: { courseId: string; showSettings: boolean }) {
   const { lang, t } = useTranslation();
   const pathname = usePathname();
@@ -23,16 +26,14 @@ export function CourseTabs({ courseId, showSettings }: { courseId: string; showS
     ...(showSettings ? [{ href: `${base}/settings`, label: t("courses.settings.tab") }] : []),
   ];
   return (
-    <nav aria-label={t("courses.home.tabsLabel")} className="mb-6 flex flex-wrap gap-1 border-b border-slate-200">
-      {tabs.map((tab) => {
-        const active = tab.exact ? pathname === tab.href : pathname.startsWith(tab.href);
-        return (
-          <Link key={tab.href} href={tab.href} aria-current={active ? "page" : undefined}
-            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold ${active ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>
-            {tab.label}
-          </Link>
-        );
-      })}
-    </nav>
+    <TabsNav
+      label={t("courses.home.tabsLabel")}
+      className="mb-6"
+      items={tabs.map((tab) => ({
+        href: tab.href,
+        label: tab.label,
+        active: tab.exact ? pathname === tab.href : pathname.startsWith(tab.href),
+      }))}
+    />
   );
 }

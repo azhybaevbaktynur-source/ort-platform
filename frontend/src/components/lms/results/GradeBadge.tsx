@@ -7,6 +7,7 @@ import type { AttemptGradeOut, Num, SchemeLabelValue } from "@/lib/lms/gradingTy
 import { fmtNum, fmtPercentile } from "@/components/lms/grading/schemes/params";
 import { ScaleText } from "@/components/lms/grading/schemes/SchemeBadges";
 import { useSchemeLabel } from "@/components/lms/grading/schemes/labels";
+import { Badge } from "@/components/ui";
 
 /**
  * Display text for a grade value as sent by the server (never computed here); percent schemes get a % sign.
@@ -36,23 +37,19 @@ export function GradeBadge({ grade, showKept = true }: { grade: AttemptGradeOut;
     <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4" role="group" aria-label={t("results.grade.title")}>
       <p className="text-xs font-medium text-brand-700">{t("results.grade.title")}</p>
       <p className="break-words text-4xl font-bold text-slate-900">{main || "—"}</p>
-      <p className="mt-1 text-xs text-slate-600">
+      <p className="mt-1 text-xs text-slate-700">
         <ScaleText min={grade.scale_min} max={grade.scale_max} />
       </p>
-      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-        {pct && <span className="rounded-full bg-white px-2.5 py-0.5 font-medium text-slate-800">{t("results.grade.percentile", { value: pct })}</span>}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {pct && <Badge className="border-brand-200 bg-white text-sm text-slate-800">{t("results.grade.percentile", { value: pct })}</Badge>}
         {grade.passed !== null && grade.passed !== undefined && grade.scheme_type !== "pass_fail" && (
-          <span className={`rounded-full px-2.5 py-0.5 font-semibold ${grade.passed ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}>
-            {label(grade.passed ? "pass" : "fail")}
-          </span>
+          <Badge tone={grade.passed ? "success" : "danger"}>{label(grade.passed ? "pass" : "fail")}</Badge>
         )}
         {flags.map((k) => (
-          <span key={k} className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 font-semibold text-amber-900">
-            <Award className="h-3.5 w-3.5" aria-hidden="true" />{label(k, grade.labels)}
-          </span>
+          <Badge key={k} tone="warning" icon={<Award aria-hidden="true" />}>{label(k, grade.labels)}</Badge>
         ))}
-        {showKept && grade.is_kept && <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 font-medium text-indigo-800">{t("results.grade.kept")}</span>}
-        {!grade.released && <span className="rounded-full bg-slate-200 px-2.5 py-0.5 font-medium text-slate-700">{t("results.grade.notReleased")}</span>}
+        {showKept && grade.is_kept && <Badge tone="info" className="bg-white">{t("results.grade.kept")}</Badge>}
+        {!grade.released && <Badge tone="neutral">{t("results.grade.notReleased")}</Badge>}
       </div>
     </div>
   );

@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/context";
 import { getAttempt, getAttemptResult, getAttemptReview } from "@/lib/lms/attempts";
-import type { AttemptResultOut, AttemptState, ReviewOut } from "@/lib/lms/attemptTypes";
+import type { AttemptResultOut, AttemptState, Correctness, ReviewItemOut, ReviewOut } from "@/lib/lms/attemptTypes";
 import { LmsApiError } from "@/lib/lms/client";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
+import { ChevronDown } from "lucide-react";
+import { LinkButton, LoadingState, cn, focusRing } from "@/components/ui";
 import { ResultSummary } from "./ResultSummary";
 import { ReviewItemCard } from "./ReviewItemCard";
 
@@ -58,7 +60,7 @@ export function StudentResult({ courseId, attemptId }: { courseId: string; attem
   const back = `/${lang}/courses/${courseId}/assessments${state ? `/${state.assessment_id}` : ""}`;
   const backLink = <Link href={back} className="text-sm font-medium text-brand-700 hover:underline">{t("results.back")}</Link>;
 
-  if (loading && !state) return <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p>;
+  if (loading && !state) return <LoadingState label={t("lms.common.loading")} rows={2} />;
   if (error && !state) return <div className="space-y-3">{backLink}<ErrorMessage error={error} onRetry={() => void load()} /></div>;
   if (!state) return null;
 
@@ -68,7 +70,7 @@ export function StudentResult({ courseId, attemptId }: { courseId: string; attem
         {backLink}
         <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
           <p className="mb-3 font-semibold">{t("results.inProgress")}</p>
-          <Link href={`/${lang}/courses/${courseId}/attempts/${attemptId}`} className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">{t("results.resume")}</Link>
+          <LinkButton href={`/${lang}/courses/${courseId}/attempts/${attemptId}`}>{t("results.resume")}</LinkButton>
         </div>
       </div>
     );
@@ -108,13 +110,82 @@ export function StudentResult({ courseId, attemptId }: { courseId: string; attem
       <ErrorMessage error={error} onRetry={() => void load()} />
       {result && <ResultSummary result={result} />}
       {reviewError ? <ErrorMessage error={reviewError} onRetry={() => void load()} /> : null}
-      {review && review.items.length > 0 && (
-        <section className="space-y-4" aria-label={t("results.reviewTitle")}>
-          <h3 className="text-base font-semibold text-slate-900">{t("results.reviewTitle")}</h3>
-          {review.items.map((it, i) => <ReviewItemCard key={it.position} item={it} number={i + 1} />)}
-        </section>
-      )}
+      {review && review.items.length > 0 && <ReviewList items={review.items} sections={result?.sections ?? []} />}
       {review && review.items.length === 0 && <p className="text-sm text-slate-500">{t("results.noReview")}</p>}
     </div>
+  );
+}
+
+const MISTAKES = new Set<Correctness>(["incorrect", "partial", "unanswered"]);
+
+/**
+ * The answer review (S7b, R4): grouped by section (folding groups, all open), with an optional "only mistakes"
+ * filter that is off by default. Every card and its content are unchanged; numbering stays global.
+ */
+function ReviewList({ items, sections }: { items: ReviewItemOut[]; sections: AttemptResultOut["sections"] }) {
+  const { t } = useTranslation();
+  const [onlyMistakes, setOnlyMistakes] = useState(false);
+  const groups = useMemo(() => {
+    const out: { pos: number; entries: { item: ReviewItemOut; number: number }[] }[] = [];
+    items.forEach((item, i) => {
+      let g = out.find((x) => x.pos === item.section_pos);
+      if (!g) {
+        g = { pos: item.section_pos, entries: [] };
+        out.push(g);
+      }
+      g.entries.push({ item, number: i + 1 });
+    });
+    return out;
+  }, [items]);
+  const sectionName = (pos: number) => {
+    const idx = sections.findIndex((s) => s.pos === pos);
+    const key = idx >= 0 ? sections[idx].key : null;
+    if (key && t(`sections.${key}`) !== `sections.${key}`) return t(`sections.${key}`);
+    return t("results.sectionN", { n: idx >= 0 ? idx + 1 : pos });
+  };
+  const show = (it: ReviewItemOut) => !onlyMistakes || (it.correctness !== null && MISTAKES.has(it.correctness));
+  const anyShown = items.some(show);
+  const grouped = groups.length > 1;
+
+  return (
+    <section className="space-y-4" aria-label={t("results.reviewTitle")}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-base font-semibold text-slate-900">{t("results.reviewTitle")}</h3>
+        <button
+          type="button"
+          aria-pressed={onlyMistakes}
+          onClick={() => setOnlyMistakes((v) => !v)}
+          className={cn(
+            "inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold transition-colors sm:min-h-9",
+            focusRing,
+            onlyMistakes ? "border-brand-600 bg-brand-600 text-white hover:bg-brand-700" : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50",
+          )}
+        >
+          {t("results.review.onlyMistakes")}
+        </button>
+      </div>
+      {!anyShown && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{t("results.review.noMistakes")}</p>}
+      {grouped
+        ? groups.map((g) => {
+          const shown = g.entries.filter((e) => show(e.item));
+          if (shown.length === 0) return null;
+          const correct = g.entries.filter((e) => e.item.correctness === "correct").length;
+          return (
+            <details key={g.pos} open className="group space-y-4">
+              <summary className={cn("flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 [&::-webkit-details-marker]:hidden", focusRing)}>
+                <span className="font-semibold text-slate-900">{sectionName(g.pos)}</span>
+                <span className="flex shrink-0 items-center gap-2 text-sm text-slate-700">
+                  {t("results.review.sectionSummary", { correct, total: g.entries.length })}
+                  <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+                </span>
+              </summary>
+              <div className="space-y-4">
+                {shown.map((e) => <ReviewItemCard key={e.item.position} item={e.item} number={e.number} />)}
+              </div>
+            </details>
+          );
+        })
+        : groups.flatMap((g) => g.entries).filter((e) => show(e.item)).map((e) => <ReviewItemCard key={e.item.position} item={e.item} number={e.number} />)}
+    </section>
   );
 }

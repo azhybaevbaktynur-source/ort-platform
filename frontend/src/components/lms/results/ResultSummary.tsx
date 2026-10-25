@@ -14,24 +14,43 @@ export function ResultSummary({ result, grade: gradeProp }: { result: AttemptRes
   const ui = useTemplateUi();
   const grade = gradeProp ?? result.grade ?? null;
   const scaled = ui.resultView === "ort" && !!grade && !!grade.sections && grade.sections.length > 0;
+  const pending = result.pending_review > 0 ? (
+    <p role="status" className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
+      {t("results.pendingReview", { n: result.pending_review })}
+    </p>
+  ) : null;
   return (
     <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5" aria-label={t("results.title")}>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium text-slate-500">{t("results.rawScore")}</p>
-          <p className="text-3xl font-bold text-slate-900">
-            {fmtPoints(result.raw_score)} <span className="text-lg font-medium text-slate-500">/ {fmtPoints(result.points_possible)}</span>
-          </p>
-        </div>
-        {result.submitted_at && <p className="text-xs text-slate-500">{t("results.submittedAt", { date: fmtDateTime(result.submitted_at) })}</p>}
-      </div>
-      {result.pending_review > 0 && (
-        <p role="status" className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
-          {t("results.pendingReview", { n: result.pending_review })}
-        </p>
+      {scaled && grade ? (
+        // S7b, R3: ORT opens with the scaled grade; the raw points are a small line under it.
+        <>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <p className="text-base font-semibold text-slate-900">{t("results.finishedIntro")}</p>
+            {result.submitted_at && <p className="text-xs text-slate-600">{t("results.submittedAt", { date: fmtDateTime(result.submitted_at) })}</p>}
+          </div>
+          <OrtResultView grade={grade} sections={result.sections}>
+            <p className="flex flex-wrap items-baseline gap-x-2 text-sm text-slate-700">
+              <span>{t("results.rawScore")}</span>
+              <span className="font-semibold tabular-nums text-slate-900">{fmtPoints(result.raw_score)} / {fmtPoints(result.points_possible)}</span>
+            </p>
+            {pending}
+          </OrtResultView>
+        </>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-medium text-slate-600">{t("results.rawScore")}</p>
+              <p className="text-3xl font-bold text-slate-900">
+                {fmtPoints(result.raw_score)} <span className="text-lg font-medium text-slate-600">/ {fmtPoints(result.points_possible)}</span>
+              </p>
+            </div>
+            {result.submitted_at && <p className="text-xs text-slate-600">{t("results.submittedAt", { date: fmtDateTime(result.submitted_at) })}</p>}
+          </div>
+          {pending}
+          {grade && <GradeBadge grade={grade} />}
+        </>
       )}
-      {grade && scaled && <OrtResultView grade={grade} sections={result.sections} />}
-      {grade && !scaled && <GradeBadge grade={grade} />}
       {!scaled && result.sections.length > 0 && (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

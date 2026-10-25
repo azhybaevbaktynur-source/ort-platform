@@ -1,18 +1,21 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
-import { AlertTriangle } from "lucide-react";
+import { Building2, TriangleAlert } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { getOrg, type OrgSummaryOut } from "@/lib/lms/organizations";
-import { Loading, OrgBadge, OrgError } from "./OrgUi";
+import { AreaShell } from "@/components/ui/AreaShell";
+import { EmptyState, LinkButton, LoadingState, type Breadcrumb } from "@/components/ui";
+import { LoadError, OrgBadge } from "./OrgUi";
 
 interface OrgCtx {
   org: OrgSummaryOut;
   /** Suspended organization: write actions are disabled (server enforces). */
   readOnly: boolean;
   reload: () => Promise<void>;
+  /** Breadcrumbs of an org page: organization → section (→ page). */
+  crumbs: (...rest: Breadcrumb[]) => Breadcrumb[];
 }
 
 const OrgContext = createContext<OrgCtx | null>(null);
@@ -23,7 +26,7 @@ export function useOrg(): OrgCtx {
   return c;
 }
 
-/** Org admin area frame: loads GET /org/{orgId}, side nav, suspended banner, no-access state. */
+/** Org admin area frame: loads GET /org/{orgId}, section nav (`AreaShell`), suspended banner, no-access state. */
 export function OrgShell({ children }: { children: React.ReactNode }) {
   const { lang, t } = useTranslation();
   const { orgId } = useParams<{ orgId: string }>();
@@ -44,50 +47,46 @@ export function OrgShell({ children }: { children: React.ReactNode }) {
   const status = (error as { status?: number } | null)?.status;
   if (!org && (status === 403 || status === 404)) {
     return (
-      <div role="alert" className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
-        <h1 className="text-xl font-bold text-slate-900">{t("organizations.noAccess.title")}</h1>
-        <p className="mt-2 text-sm text-slate-600">{t("organizations.noAccess.body")}</p>
-        <Link href={`/${lang}/courses`} className="mt-4 inline-block text-sm font-medium text-brand-700 hover:underline">{t("organizations.noAccess.back")}</Link>
-      </div>
+      <EmptyState
+        icon={<Building2 />}
+        title={t("organizations.noAccess.title")}
+        description={t("organizations.noAccess.body")}
+        action={<LinkButton href={`/${lang}/courses`} variant="secondary">{t("organizations.noAccess.back")}</LinkButton>}
+      />
     );
   }
-  if (!org && error) return <OrgError error={error} onRetry={reload} />;
-  if (!org) return <Loading />;
+  if (!org && error) return <LoadError error={error} onRetry={reload} />;
+  if (!org) return <LoadingState label={t("lms.common.loading")} />;
 
   const base = `/${lang}/org/${org.id}`;
   const items = [
-    { href: base, label: t("organizations.org.nav.overview"), exact: true },
-    { href: `${base}/teachers`, label: t("organizations.org.nav.teachers") },
-    { href: `${base}/courses`, label: t("organizations.org.nav.courses") },
+    { href: base, label: t("organizations.org.nav.overview"), active: pathname === base },
+    { href: `${base}/teachers`, label: t("organizations.org.nav.teachers"), active: pathname.startsWith(`${base}/teachers`) },
+    { href: `${base}/courses`, label: t("organizations.org.nav.courses"), active: pathname.startsWith(`${base}/courses`) },
   ];
   const readOnly = org.status === "suspended";
+  const crumbs = (...rest: Breadcrumb[]): Breadcrumb[] => [{ label: org.name, href: base }, ...rest];
   return (
-    <OrgContext.Provider value={{ org, readOnly, reload }}>
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t("organizations.org.area")}</p>
-        <h1 className="w-full text-2xl font-bold text-slate-900 sm:w-auto">{org.name}</h1>
-        <OrgBadge tone={org.status} labelKey={`organizations.status.${org.status}`} />
-      </div>
-      {readOnly && (
-        <div role="status" className="mb-4 flex items-start gap-2 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden="true" />
-          <p>{t("organizations.org.suspendedBanner")}</p>
-        </div>
-      )}
-      <div className="flex flex-col gap-6 md:flex-row">
-        <nav aria-label={t("organizations.org.nav.label")} className="flex flex-wrap gap-1 md:w-56 md:flex-shrink-0 md:flex-col">
-          {items.map((i) => {
-            const active = i.exact ? pathname === i.href : pathname.startsWith(i.href);
-            return (
-              <Link key={i.href} href={i.href} aria-current={active ? "page" : undefined}
-                className={`inline-flex min-h-[44px] items-center whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium ${active ? "bg-brand-600 text-white" : "text-slate-700 hover:bg-slate-100"}`}>
-                {i.label}
-              </Link>
-            );
-          })}
-        </nav>
-        <div className="min-w-0 flex-1">{children}</div>
-      </div>
+    <OrgContext.Provider value={{ org, readOnly, reload, crumbs }}>
+      <AreaShell
+        label={t("organizations.org.nav.label")}
+        items={items}
+        heading={
+          <>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">{t("organizations.org.area")}</p>
+            <p className="mt-1 break-words text-base font-semibold leading-6 text-slate-900">{org.name}</p>
+            {readOnly && <div className="mt-1"><OrgBadge tone={org.status} labelKey={`organizations.status.${org.status}`} /></div>}
+          </>
+        }
+        banner={readOnly ? (
+          <div role="status" className="mb-4 flex items-start gap-3 rounded-2xl border border-warning-200 bg-warning-50 p-4 text-sm leading-6 text-warning-900">
+            <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+            <p>{t("organizations.org.suspendedBanner")}</p>
+          </div>
+        ) : undefined}
+      >
+        {children}
+      </AreaShell>
     </OrgContext.Provider>
   );
 }

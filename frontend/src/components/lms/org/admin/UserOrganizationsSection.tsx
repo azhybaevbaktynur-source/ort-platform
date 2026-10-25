@@ -8,10 +8,10 @@ import {
   type UserOrganizationOut,
 } from "@/lib/lms/organizations";
 import { fmtApiDate } from "@/lib/format";
-import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
-import { Pager } from "@/components/lms/Pager";
-import { EmptyBox, Loading, OrgBadge, OrgError, btn, cardCls, inputCls, labelCls } from "../OrgUi";
-import { toast } from "@/components/ui/Toast";
+import { Button, Card, ConfirmDialog, EmptyState, LoadingState, Select, Table, toast, type TableColumn } from "@/components/ui";
+import { useCursorList } from "@/components/lms/admin/useCursorList";
+import { MoreError, useTableState } from "@/components/lms/admin/ListParts";
+import { OrgBadge, OrgError } from "../OrgUi";
 
 const ROLES: OrgRole[] = ["teacher", "org_admin"];
 
@@ -21,10 +21,9 @@ const ROLES: OrgRole[] = ["teacher", "org_admin"];
  */
 export function UserOrganizationsSection({ user, readOnly }: { user: { id: string; display_name: string | null; email: string }; readOnly: boolean }) {
   const { lang, t } = useTranslation();
-  const [items, setItems] = useState<UserOrganizationOut[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<unknown>(null);
+  const fetchPage = useCallback((cursor: string | null) => listUserOrganizations(user.id, { cursor }), [user.id]);
+  const list = useCursorList(fetchPage);
+  const state = useTableState(list);
   const [orgs, setOrgs] = useState<OrganizationAdminRowOut[] | null>(null);
   const [orgsError, setOrgsError] = useState<unknown>(null);
   const [orgId, setOrgId] = useState("");
@@ -32,21 +31,6 @@ export function UserOrganizationsSection({ user, readOnly }: { user: { id: strin
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [dialogError, setDialogError] = useState<unknown>(null);
-
-  const load = useCallback(async (next?: string | null) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const page = await listUserOrganizations(user.id, { cursor: next });
-      setItems((prev) => (next ? [...prev, ...page.items] : page.items));
-      setCursor(page.next_cursor);
-    } catch (e) {
-      setError(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [user.id]);
-  useEffect(() => { void load(); }, [load]);
 
   const loadOrgs = useCallback(async () => {
     setOrgsError(null);
@@ -69,7 +53,7 @@ export function UserOrganizationsSection({ user, readOnly }: { user: { id: strin
       toast.success(t("organizations.adminUser.added", { name, org: org.name }));
       setConfirming(false);
       setOrgId("");
-      await load();
+      await list.reload();
     } catch (e) {
       setDialogError(e);
     } finally {
@@ -77,60 +61,52 @@ export function UserOrganizationsSection({ user, readOnly }: { user: { id: strin
     }
   };
 
+  const columns: TableColumn<UserOrganizationOut>[] = [
+    {
+      key: "org", header: t("organizations.fields.organization"), primary: true,
+      cell: (m) => <Link href={`/${lang}/admin/organizations/${m.organization_id}`} className="break-words font-semibold text-brand-700 hover:underline">{m.organization_name}</Link>,
+    },
+    {
+      key: "role", header: t("organizations.adminUser.role"),
+      cell: (m) => (
+        <span className="inline-flex flex-wrap items-center justify-end gap-2 sm:justify-start">
+          {t(`organizations.roles.${m.role}`)}
+          {m.organization_status !== "active" && <OrgBadge tone={m.organization_status} labelKey={`organizations.status.${m.organization_status}`} />}
+        </span>
+      ),
+    },
+    { key: "since", header: t("organizations.members.sinceColumn"), nowrap: true, cell: (m) => fmtApiDate(m.created_at, lang) },
+  ];
   return (
     <section aria-labelledby="uo-title" className="mb-6">
-      <h2 id="uo-title" className="mb-2 text-lg font-semibold text-slate-900">{t("organizations.adminUser.orgsTitle")}</h2>
-      {error ? <OrgError error={error} onRetry={() => load()} className="mb-3" /> : null}
-      {loading && items.length === 0 && !error && <Loading />}
-      {!loading && !error && items.length === 0 && <EmptyBox text={t("organizations.adminUser.orgsEmpty")} />}
-      {items.length > 0 && (
-        <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white text-sm">
-          {items.map((m) => (
-            <li key={m.organization_id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
-              <div className="min-w-0 flex-1 basis-56">
-                <Link href={`/${lang}/admin/organizations/${m.organization_id}`} className="font-medium text-brand-700 hover:underline">{m.organization_name}</Link>
-                <p className="break-words text-xs text-slate-500">{t("organizations.members.since", { date: fmtApiDate(m.created_at, lang) })}</p>
-              </div>
-              <span className="text-xs text-slate-700">{t(`organizations.roles.${m.role}`)}</span>
-              {m.organization_status !== "active" && <OrgBadge tone={m.organization_status} labelKey={`organizations.status.${m.organization_status}`} />}
-            </li>
-          ))}
-        </ul>
-      )}
-      <Pager nextCursor={cursor} loading={loading} onMore={() => load(cursor)} />
+      <h2 id="uo-title" className="mb-3 text-lg font-semibold leading-7 text-slate-900">{t("organizations.adminUser.orgsTitle")}</h2>
+      <Table caption={t("organizations.adminUser.orgsTitle")} columns={columns} rows={list.items} rowKey={(m) => m.organization_id}
+        {...state} countText={undefined} empty={<EmptyState title={t("organizations.adminUser.orgsEmpty")} />} />
+      <MoreError list={list} />
 
       {!readOnly && (
-        <div className={`${cardCls} mt-3`}>
-          <h3 className="mb-1 font-semibold text-slate-900">{t("organizations.adminUser.addToOrg")}</h3>
-          <p className="mb-3 text-sm text-slate-600">{t("organizations.adminUser.addToOrgHint")}</p>
-          {orgsError ? <OrgError error={orgsError} onRetry={loadOrgs} /> : orgs === null ? <Loading /> : (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <div className="min-w-0 flex-1">
-                <label htmlFor="uo-org" className={labelCls}>{t("organizations.fields.organization")}</label>
-                <select id="uo-org" value={orgId} onChange={(e) => setOrgId(e.target.value)} className={inputCls}>
-                  <option value="">{t("organizations.fields.organizationPick")}</option>
-                  {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-                </select>
-              </div>
-              <div className="sm:w-56">
-                <label htmlFor="uo-role" className={labelCls}>{t("organizations.adminUser.role")}</label>
-                <select id="uo-role" value={role} onChange={(e) => setRole(e.target.value as OrgRole)} className={inputCls}>
-                  {ROLES.map((r) => <option key={r} value={r}>{t(`organizations.roles.${r}`)}</option>)}
-                </select>
-              </div>
-              <button type="button" className={btn.secondary} disabled={!org} onClick={() => { setDialogError(null); setConfirming(true); }}>
+        <Card className="mt-3" headingLevel={3} title={t("organizations.adminUser.addToOrg")} description={t("organizations.adminUser.addToOrgHint")}>
+          {orgsError ? <OrgError error={orgsError} onRetry={loadOrgs} /> : orgs === null ? <LoadingState label={t("lms.common.loading")} rows={1} /> : (
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+              <Select containerClassName="min-w-0 flex-1" label={t("organizations.fields.organization")} value={orgId} onChange={(e) => setOrgId(e.target.value)}
+                placeholder={t("organizations.fields.organizationPick")} options={orgs.map((o) => ({ value: o.id, label: o.name }))} />
+              <Select containerClassName="lg:w-72" label={t("organizations.adminUser.role")} value={role} onChange={(e) => setRole(e.target.value as OrgRole)}
+                options={ROLES.map((r) => ({ value: r, label: t(`organizations.roles.${r}`) }))} />
+              <Button variant="secondary" disabled={!org} onClick={() => { setDialogError(null); setConfirming(true); }}>
                 {t("organizations.adminUser.addToOrg")}
-              </button>
+              </Button>
             </div>
           )}
-        </div>
+        </Card>
       )}
       <ConfirmDialog
         open={confirming && !!org}
-        title={t("organizations.adminUser.addTitle", { name, org: org?.name ?? "" })}
-        body={t("organizations.adminUser.addBody", { name, org: org?.name ?? "", role: t(`organizations.roles.${role}`) })}
+        title={t("organizations.adminUser.addTitle")}
+        object={org?.name}
+        effect={t("organizations.adminUser.addBody", { name, org: org?.name ?? "", role: t(`organizations.roles.${role}`) })}
         confirmLabel={t("organizations.adminUser.addToOrg")}
-        busy={busy} error={dialogError} onConfirm={() => void add()} onCancel={() => setConfirming(false)}
+        busy={busy} error={dialogError ? <OrgError error={dialogError} /> : undefined}
+        onConfirm={() => void add()} onCancel={() => setConfirming(false)}
       />
     </section>
   );

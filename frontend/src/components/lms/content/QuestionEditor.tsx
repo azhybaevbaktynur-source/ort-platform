@@ -15,7 +15,8 @@ import { ComparisonFields, EssayFields, NumericFields, ShortTextFields, TrueFals
 import {
   contentFromForm, emptyForm, formFromStaff, metaFromForm, validateForm, type QuestionForm,
 } from "./types/formModel";
-import { btnPrimary, cardCls, inputCls, labelCls } from "./ui";
+import { cardCls, inputCls, labelCls } from "./ui";
+import { btnPrimary } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 
 /** Create / edit form for one question. Save sends base_version_id; the page handles conflicts. */
 export function QuestionEditor({

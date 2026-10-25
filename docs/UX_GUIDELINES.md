@@ -75,6 +75,10 @@ One person can be in several areas (a teacher who studies in another course). Th
 **Writing:**
 - short sentences;
 - the same word for the same thing everywhere (one glossary per language: course, assessment/exam, attempt, grade);
+- glossary (decided Phase 6b, S9; use these words, never a synonym):
+  - en: course, assessment (exam for ORT), attempt, grade, teacher, student, organization;
+  - ky: курс, тапшырма (ЖРТ: сынак), аракет, баа, мугалим (never "окутуучу"), окуучу, уюм;
+  - ru: курс, задание (ОРТ: экзамен), попытка, оценка, **преподаватель** (never "учитель"), ученик, организация.
 - no technical words in student UI (no "snapshot", "version", "enrollment", "payload").
 
 ## 6. ORT exam player

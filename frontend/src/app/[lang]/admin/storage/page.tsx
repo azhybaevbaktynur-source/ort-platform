@@ -1,21 +1,23 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2, TriangleAlert, XCircle } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { LmsApiError } from "@/lib/lms/client";
 import {
   R2_FREE_CLASS_A, R2_FREE_CLASS_B, formatBytes, getStorageSummary, runStorageSmoke,
   type StorageSmokeOut, type StorageSummaryOut,
 } from "@/lib/lms/storage";
-import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { StorageLevelBanner } from "@/components/lms/admin/StorageLevelBanner";
+import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
+import { LoadError, OrgError } from "@/components/lms/org/OrgUi";
+import { Button, Card, LoadingState, PageHeader } from "@/components/ui";
 
 function Check({ ok, label }: { ok: boolean; label: string }) {
   const { t } = useTranslation();
   return (
     <li className="flex items-center gap-2 text-sm">
-      {ok ? <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" /> : <XCircle className="h-4 w-4 text-red-600" aria-hidden="true" />}
+      {ok ? <CheckCircle2 className="h-4 w-4 shrink-0 text-success-700" aria-hidden="true" /> : <XCircle className="h-4 w-4 shrink-0 text-danger-700" aria-hidden="true" />}
       <span className="text-slate-800">{label}</span>
       <span className="sr-only">{ok ? t("storage.smoke.passed") : t("storage.smoke.failed")}</span>
     </li>
@@ -24,6 +26,7 @@ function Check({ ok, label }: { ok: boolean; label: string }) {
 
 export default function AdminStoragePage() {
   const { lang, t } = useTranslation();
+  const crumbs = useAdminCrumbs();
   const [summary, setSummary] = useState<StorageSummaryOut | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [running, setRunning] = useState(false);
@@ -65,26 +68,27 @@ export default function AdminStoragePage() {
     return null;
   };
 
-  const card = "rounded-2xl border border-slate-200 bg-white p-5";
-  const dt = "text-xs font-medium uppercase tracking-wide text-slate-500";
+  const dt = "text-sm font-medium leading-5 text-slate-600";
   const dd = "mt-1 text-lg font-semibold text-slate-900";
   const pct = summary ? Math.min(100, Math.round((summary.stored_bytes / summary.hard_bytes) * 100)) : 0;
 
   return (
     <div>
-      <h1 className="mb-2 text-2xl font-bold text-slate-900">{t("storage.title")}</h1>
-      <p className="mb-6 text-sm text-slate-600">{t("storage.intro")}</p>
-      {error ? <ErrorMessage error={error} onRetry={() => load()} className="mb-4" /> : null}
-      {!summary && !error ? <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p> : null}
+      <PageHeader title={t("storage.title")} description={t("storage.intro")} breadcrumbs={crumbs({ label: t("storage.nav") })} />
+      {error && !summary ? <LoadError error={error} onRetry={() => void load()} /> : null}
+      {error && summary ? <OrgError error={error} onRetry={() => void load()} className="mb-4" /> : null}
+      {!summary && !error ? <LoadingState label={t("lms.common.loading")} /> : null}
       {summary ? (
         <div className="space-y-6">
           <StorageLevelBanner level={summary.level} />
           {summary.public_base_is_r2dev ? (
-            <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">{t("storage.r2devWarning")}</div>
+            <div className="flex gap-3 rounded-2xl border border-warning-200 bg-warning-50 p-4 text-sm leading-6 text-warning-900">
+              <TriangleAlert aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" />
+              <p>{t("storage.r2devWarning")}</p>
+            </div>
           ) : null}
 
-          <section className={card} aria-labelledby="st-total">
-            <h2 id="st-total" className="mb-4 font-semibold text-slate-900">{t("storage.totals.title")}</h2>
+          <Card title={t("storage.totals.title")}>
             <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div><dt className={dt}>{t("storage.totals.driver")}</dt><dd className={dd}>{summary.driver}</dd></div>
               <div><dt className={dt}>{t("storage.totals.stored")}</dt><dd className={dd}>{bytes(summary.stored_bytes)}</dd></div>
@@ -93,17 +97,16 @@ export default function AdminStoragePage() {
             </dl>
             <div className="mt-4" aria-hidden="true">
               <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                <div className={`h-2 ${summary.level === "full" ? "bg-red-500" : summary.level === "warn" ? "bg-amber-500" : "bg-emerald-500"}`} style={{ width: `${pct}%` }} />
+                <div className={`h-2 ${summary.level === "full" ? "bg-danger-600" : summary.level === "warn" ? "bg-warning-500" : "bg-success-600"}`} style={{ width: `${pct}%` }} />
               </div>
             </div>
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-sm text-slate-600">
               {t("storage.totals.limits", { warn: bytes(summary.warn_bytes), hard: bytes(summary.hard_bytes) })}
             </p>
-            <p className="mt-1 text-xs text-slate-500">{t("storage.totals.everWritten")}</p>
-          </section>
+            <p className="mt-1 text-sm text-slate-600">{t("storage.totals.everWritten")}</p>
+          </Card>
 
-          <section className={card} aria-labelledby="st-month">
-            <h2 id="st-month" className="mb-4 font-semibold text-slate-900">{t("storage.month.title", { month: summary.month.month })}</h2>
+          <Card title={t("storage.month.title", { month: summary.month.month })}>
             <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div><dt className={dt}>{t("storage.month.objectsWritten")}</dt><dd className={dd}>{num(summary.month.objects_written)}</dd></div>
               <div><dt className={dt}>{t("storage.month.bytesWritten")}</dt><dd className={dd}>{bytes(summary.month.bytes_written)}</dd></div>
@@ -111,24 +114,21 @@ export default function AdminStoragePage() {
               <div><dt className={dt}>{t("storage.month.classBBackend")}</dt><dd className={dd}>{num(summary.month.class_b_backend)}</dd></div>
               <div><dt className={dt}>{t("storage.month.classBEstimated")}</dt><dd className={dd}>{t("storage.month.ofFree", { n: num(summary.month.class_b_estimated), free: num(R2_FREE_CLASS_B) })}</dd></div>
             </dl>
-            <p className="mt-3 text-xs text-slate-500">{t("storage.month.estimateNote")}</p>
-          </section>
+            <p className="mt-3 text-sm text-slate-600">{t("storage.month.estimateNote")}</p>
+          </Card>
 
-          <section className={card} aria-labelledby="st-smoke">
-            <h2 id="st-smoke" className="mb-1 font-semibold text-slate-900">{t("storage.smoke.title")}</h2>
-            <p className="mb-4 text-sm text-slate-600">{t("storage.smoke.hint")}</p>
-            <button type="button" onClick={run} disabled={running}
-              className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60">
+          <Card title={t("storage.smoke.title")} description={t("storage.smoke.hint")}>
+            <Button variant="secondary" onClick={() => void run()} loading={running}>
               {running ? t("storage.smoke.running") : t("storage.smoke.run")}
-            </button>
+            </Button>
             {smokeError ? (
               smokeErrorText(smokeError)
-                ? <p role="alert" className="mt-4 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-3 text-sm text-amber-900">{smokeErrorText(smokeError)}</p>
-                : <ErrorMessage error={smokeError} className="mt-4" />
+                ? <p role="alert" className="mt-4 rounded-xl border border-warning-200 bg-warning-50 px-3.5 py-3 text-sm text-warning-900">{smokeErrorText(smokeError)}</p>
+                : <OrgError error={smokeError} className="mt-4" />
             ) : null}
             {smoke ? (
               <div className="mt-4" aria-live="polite">
-                <p className={`mb-2 text-sm font-semibold ${smoke.put_ok && smoke.head_ok && smoke.public_read_ok && smoke.deleted ? "text-emerald-700" : "text-red-700"}`}>
+                <p className={`mb-2 text-sm font-semibold ${smoke.put_ok && smoke.head_ok && smoke.public_read_ok && smoke.deleted ? "text-success-700" : "text-danger-700"}`}>
                   {smoke.put_ok && smoke.head_ok && smoke.public_read_ok && smoke.deleted ? t("storage.smoke.allOk") : t("storage.smoke.someFailed")}
                 </p>
                 <ul className="space-y-1">
@@ -137,7 +137,7 @@ export default function AdminStoragePage() {
                   <Check ok={smoke.public_read_ok} label={t("storage.smoke.publicRead")} />
                   <Check ok={smoke.deleted} label={t("storage.smoke.deleted")} />
                 </ul>
-                <dl className="mt-3 space-y-1 text-xs text-slate-600">
+                <dl className="mt-3 space-y-1 text-sm text-slate-700">
                   {smoke.public_url ? <div><dt className="inline font-medium">{t("storage.smoke.publicUrl")}: </dt><dd className="inline break-all">{smoke.public_url}</dd></div> : null}
                   {smoke.status_code !== null ? <div><dt className="inline font-medium">{t("storage.smoke.statusCode")}: </dt><dd className="inline">{smoke.status_code}</dd></div> : null}
                   <div><dt className="inline font-medium">{t("storage.smoke.latency")}: </dt><dd className="inline">{t("storage.smoke.ms", { n: num(smoke.latency_ms) })}</dd></div>
@@ -145,7 +145,7 @@ export default function AdminStoragePage() {
                 </dl>
               </div>
             ) : null}
-          </section>
+          </Card>
         </div>
       ) : null}
     </div>

@@ -10,7 +10,7 @@ import { regradeAssessment, releaseGrades, unreleaseGrades } from "@/lib/lms/gra
 import { Modal } from "@/components/lms/assessments/Modal";
 import { SchemeError } from "@/components/lms/grading/schemes/SchemeError";
 import { ScaleText } from "@/components/lms/grading/schemes/SchemeBadges";
-import { btnPrimary, btnSecondary } from "@/components/lms/content/ui";
+import { btnPrimary, btnSecondary } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { fmtDateTime } from "@/components/lms/assessments/format";
 import { runRegrade, type RegradeEnd, type RegradeProgress } from "./gradebookModel";
 import { useWarningText } from "./warnings";

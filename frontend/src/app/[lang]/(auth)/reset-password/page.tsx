@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { AuthHeader } from "@/components/auth/AuthHeader";
-import { Lock, ArrowRight, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { Button, Input, buttonClasses } from "@/components/ui";
+import { Lock, ArrowRight, AlertCircle, CheckCircle2 } from "lucide-react";
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -26,27 +27,21 @@ function ResetPasswordForm() {
 
     if (!token) {
       setError(
-        lang === "ky"
-          ? "Жараксыз шилтеме же токен табылган жок"
-          : "Недействительная ссылка или токен не найден"
+        t("auth.resetInvalidToken")
       );
       return;
     }
 
     if (newPassword !== confirmPassword) {
       setError(
-        lang === "ky"
-          ? "Сырсөздөр бири-бирине дал келбейт"
-          : "Пароли не совпадают"
+        t("auth.passwordsMismatch")
       );
       return;
     }
 
     if (newPassword.length < 6) {
       setError(
-        lang === "ky"
-          ? "Сырсөз кеминде 6 белгиден турушу керек"
-          : "Пароль должен содержать не менее 6 символов"
+        t("auth.passwordTooShort")
       );
       return;
     }
@@ -65,12 +60,12 @@ function ResetPasswordForm() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || "Failed to reset password");
+        throw new Error(err.detail || t("auth.resetFailed"));
       }
 
       setSuccess(true);
     } catch (err: any) {
-      setError(err?.message || "Failed to reset password");
+      setError(err?.message || t("auth.resetFailed"));
     } finally {
       setLoading(false);
     }
@@ -86,38 +81,36 @@ function ResetPasswordForm() {
             <h2 className="text-2xl font-bold tracking-tight text-slate-900">
               {t("auth.resetPasswordTitle")}
             </h2>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-sm text-slate-600">
               {t("auth.resetPasswordSubtitle")}
             </p>
           </div>
 
           {!token && (
-            <div className="mb-5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            <div className="mb-5 p-3 rounded-xl bg-warning-50 border border-warning-200 text-warning-900 text-sm font-medium flex items-center gap-2">
+              <AlertCircle aria-hidden="true" className="w-4 h-4 text-warning-700 shrink-0" />
               <span>
-                {lang === "ky"
-                  ? "Сырсөздү калыбына келтирүү токени табылган жок. Шилтемени кайра сураңыз."
-                  : "Токен сброса пароля отсутствует. Запросите новую ссылку для сброса."}
+                {t("auth.resetTokenMissing")}
               </span>
             </div>
           )}
 
           {error && (
-            <div className="mb-5 p-3 rounded-xl bg-rose-50 border border-rose-200 flex items-center gap-2 text-rose-800 text-xs font-medium">
-              <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+            <div role="alert" className="mb-5 flex items-start gap-2 rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-medium text-danger-800">
+              <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-danger-700" />
               <span>{error}</span>
             </div>
           )}
 
           {success ? (
             <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="p-4 rounded-2xl bg-success-50 border border-success-200 text-success-800 text-sm font-medium flex items-start gap-3">
+                <CheckCircle2 aria-hidden="true" className="w-5 h-5 text-success-700 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-semibold text-emerald-900 mb-1">
-                    {lang === "ky" ? "Сырсөз жаңыртылды!" : "Пароль обновлен!"}
+                  <p className="font-semibold text-success-900 mb-1">
+                    {t("auth.passwordUpdated")}
                   </p>
-                  <p className="text-emerald-700 leading-relaxed">
+                  <p className="text-success-800 leading-relaxed">
                     {t("auth.passwordResetSuccess")}
                   </p>
                 </div>
@@ -126,72 +119,26 @@ function ResetPasswordForm() {
               <button
                 type="button"
                 onClick={() => router.push(`/${lang}/login`)}
-                className="w-full py-3 px-4 rounded-xl bg-brand-600 text-white font-bold text-sm hover:bg-brand-700 shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className={buttonClasses({ size: "lg", fullWidth: true })}
               >
                 <span>{t("auth.signInButton")}</span>
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight aria-hidden="true" className="h-4 w-4" />
               </button>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  {t("auth.newPassword")}
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                  <input
-                    type="password"
-                    required
-                    minLength={6}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder={t("auth.passwordPlaceholder")}
-                    className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 text-sm outline-none transition-all"
-                  />
-                </div>
-              </div>
+              <Input label={t("auth.newPassword")} leading={<Lock className="h-4 w-4" />} type="password" required minLength={6} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={t("auth.passwordPlaceholder")} />
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  {t("auth.confirmNewPassword")}
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                  <input
-                    type="password"
-                    required
-                    minLength={6}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder={t("auth.passwordPlaceholder")}
-                    className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 text-sm outline-none transition-all"
-                  />
-                </div>
-              </div>
+              <Input label={t("auth.confirmNewPassword")} leading={<Lock className="h-4 w-4" />} type="password" required minLength={6} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder={t("auth.passwordPlaceholder")} />
 
-              <button
-                type="submit"
-                disabled={loading || !token}
-                className="w-full mt-2 py-3 px-4 rounded-xl bg-brand-600 text-white font-bold text-sm hover:bg-brand-700 shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>{t("common.loading")}</span>
-                  </>
-                ) : (
-                  <>
-                    <span>{t("auth.resetPasswordButton")}</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
+              <Button type="submit" size="lg" fullWidth disabled={loading || !token} loading={loading} rightIcon={<ArrowRight aria-hidden="true" className="h-4 w-4" />}>
+              {loading ? t("common.loading") : t("auth.resetPasswordButton")}
+            </Button>
 
               <div className="mt-4 text-center">
                 <Link
                   href={`/${lang}/login`}
-                  className="text-xs text-slate-500 hover:text-brand-600 font-semibold transition"
+                  className="inline-flex min-h-11 items-center text-sm text-slate-600 hover:text-brand-700 font-semibold transition"
                 >
                   ← {t("auth.backToLogin")}
                 </Link>
@@ -204,9 +151,14 @@ function ResetPasswordForm() {
   );
 }
 
+function LoadingFallback() {
+  const { t } = useTranslation();
+  return <div className="min-h-screen flex items-center justify-center">{t("common.loading")}</div>;
+}
+
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+    <Suspense fallback={<LoadingFallback />}>
       <ResetPasswordForm />
     </Suspense>
   );

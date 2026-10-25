@@ -7,9 +7,10 @@ import { useTranslation } from "@/lib/i18n/context";
 import { addTranslation, linkTranslation, listQuestions, unlinkTranslation } from "@/lib/lms/content";
 import type { QuestionStaffOut, QuestionSummaryOut } from "@/lib/lms/contentTypes";
 import type { Lang } from "@/lib/lms/types";
-import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
+import { ConfirmDialog } from "@/components/ui";
 import { ContentError } from "./ContentError";
-import { btnSecondary, btnSmall, cardCls, inputCls } from "./ui";
+import { cardCls, inputCls } from "./ui";
+import { btnSecondary, btnSmall } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 
 /** Translation variants of a question (D15): add a copy in another course language, link an existing question, unlink. */
 export function TranslationPanel({
@@ -133,7 +134,7 @@ export function TranslationPanel({
         </div>
       )}
       <ConfirmDialog open={confirmUnlink} busy={busy === "unlink"} title={t("bank.translations.unlinkTitle")}
-        body={t("bank.translations.unlinkBody")} confirmLabel={t("bank.translations.unlink")}
+        effect={t("bank.translations.unlinkBody")} confirmLabel={t("bank.translations.unlink")}
         onConfirm={() => void unlink()} onCancel={() => setConfirmUnlink(false)} />
     </div>
   );

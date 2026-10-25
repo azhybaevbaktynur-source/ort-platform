@@ -94,7 +94,15 @@
       "email_send_failed": "Could not send the email. Please try again a bit later.",
       "network": "The server is not responding. It may be waking up, so try again in a few seconds."
     },
-    "wakingServer": "The server is waking up after being idle, so the first login may take up to a minute..."
+    "wakingServer": "The server is waking up after being idle, so the first login may take up to a minute...",
+    "resetInvalidToken": "Invalid link or token not found",
+    "passwordsMismatch": "Passwords do not match",
+    "passwordTooShort": "Password must be at least 6 characters",
+    "resetTokenMissing": "The reset token is missing. Request a new reset link.",
+    "passwordUpdated": "Password updated!",
+    "resetFailed": "Could not reset the password. Try again.",
+    "resetLinkSentTitle": "Link sent!",
+    "forgotFailed": "Could not send the reset link. Try again."
   },
   "lms": {
     "nav": {
@@ -264,10 +272,11 @@
       "submit": "Create course"
     },
     "join": {
-      "title": "Join a course",
+      "title": "Join with code",
       "hint": "Enter the code your teacher gave you.",
       "codeLabel": "Join code",
-      "submit": "Join"
+      "submit": "Join",
+      "noCode": "No code?"
     },
     "home": {
       "tab": "Home",
@@ -284,7 +293,9 @@
       "contentSoon": "Lessons and assignments will appear here in a future update.",
       "leave": "Leave course",
       "leaveTitle": "Leave this course?",
-      "leaveBody": "You will lose access. You can join again with a valid code."
+      "leaveBody": "You will lose access. You can join again with a valid code.",
+      "provider": "Run by",
+      "providerPlatform": "Platform"
     },
     "people": {
       "tab": "People",
@@ -307,7 +318,8 @@
       "removeBody": "{name} will lose access to this course.",
       "addStaff": "Add a teacher or assistant",
       "add": "Add",
-      "empty": "No people found."
+      "empty": "No people found.",
+      "tabStudent": "Teachers"
     },
     "settings": {
       "tab": "Settings",
@@ -374,7 +386,7 @@
     "notFound": {
       "title": "Course not found",
       "body": "This course doesn't exist, was removed, or you are not enrolled in it. Ask your teacher for a join code or find it in the catalog.",
-      "join": "Join with a code"
+      "join": "Join with code"
     }
   },
   "teacherRequest": {
@@ -425,7 +437,9 @@
       "pendingRequests": "Teacher requests waiting for review",
       "usersHint": "Search accounts, change teacher status, disable accounts.",
       "coursesHint": "Moderate courses: unlist, delete, restore, transfer.",
-      "auditHint": "Every administrator action is recorded here."
+      "auditHint": "Every administrator action is recorded here.",
+      "orgsHint": "Schools and centers: admins, teachers, templates, suspend or resume.",
+      "sections": "Sections"
     },
     "reasonRequired": "Reason (required)",
     "reasonOptional": "Reason (optional)",
@@ -557,6 +571,19 @@
       "course_relist": "Relisted course",
       "course_transfer_ownership": "Transferred course ownership",
       "course_roster_view": "Viewed course roster"
+    },
+    "toast": {
+      "approved": "Request approved: {name} can now teach.",
+      "rejected": "Request rejected: {name}.",
+      "revoked": "Teacher access revoked: {name}.",
+      "granted": "{name} is now an approved teacher.",
+      "disabled": "Account disabled: {name}.",
+      "enabled": "Account enabled again: {name}.",
+      "courseDeleted": "«{course}» moved to the trash.",
+      "courseRestored": "«{course}» restored.",
+      "courseUnlisted": "«{course}» removed from the catalog.",
+      "courseRelisted": "«{course}» can appear in the catalog again.",
+      "ownerChanged": "{name} is now the owner of «{course}»."
     }
   },
   "bank": {
@@ -589,7 +616,7 @@
       "deletedBadge": "Deleted"
     },
     "filters": {
-      "search": "Search questions...",
+      "search": "Search questions",
       "type": "Type",
       "language": "Language",
       "section": "Section",
@@ -608,7 +635,6 @@
     "questions": {
       "tab": "Questions ({n})",
       "new": "New question",
-      "pickType": "Choose a type...",
       "newTitle": "New question",
       "empty": "No questions found.",
       "noStem": "(no text)",
@@ -735,7 +761,7 @@
       "replace": "Replace image",
       "uploading": "Uploading...",
       "remove": "Remove image",
-      "hint": "Choose a file, drop it here or paste from the clipboard. PNG, JPEG, GIF or WEBP, up to 5 MB.",
+      "hint": "Choose a file, drop it here or paste from the clipboard. PNG, JPEG, GIF or WEBP, up to 2 MB.",
       "alreadyUploaded": "This image was already uploaded, so the existing copy is used.",
       "mine": "My images",
       "noImages": "You have no uploaded images yet.",
@@ -794,10 +820,14 @@
         "history": "History"
       },
       "new": "New passage",
-      "back": "Back to passages",
+      "crumb": "Passages",
       "empty": "No passages yet.",
       "untitled": "Untitled passage",
       "questionCount": "{n} questions",
+      "questionCount_one": "{n} question",
+      "questionCount_few": "{n} questions",
+      "questionCount_many": "{n} questions",
+      "questionCount_other": "{n} questions",
       "title": "Title (optional)",
       "body": "Passage text",
       "lineHelp": "Start a line with [5], [10] and so on to show a line number there. Without markers every fifth line is numbered. Formulas use $...$.",
@@ -864,6 +894,10 @@
       "message": "Message",
       "rowHint": "The row number is the data row in the CSV (the header is not counted), as in manifest.json.",
       "confirm": "Import {count} questions",
+      "confirm_one": "Import {count} question",
+      "confirm_few": "Import {count} questions",
+      "confirm_many": "Import {count} questions",
+      "confirm_other": "Import {count} questions",
       "importing": "Importing: uploading images and saving...",
       "doneTitle": "Import complete",
       "openBank": "Open the bank",
@@ -911,6 +945,10 @@
         "question_edited_locally": "The question was edited after the last import, so your version was kept",
         "question_deleted_skipped": "The question was deleted in the bank, so it was skipped",
         "questions_missing_from_bundle": "{count} previously imported questions from source \"{source_id}\" are not in this file and were left unchanged",
+        "questions_missing_from_bundle_one": "{count} previously imported question from source \"{source_id}\" is not in this file and was left unchanged",
+        "questions_missing_from_bundle_few": "{count} previously imported questions from source \"{source_id}\" are not in this file and were left unchanged",
+        "questions_missing_from_bundle_many": "{count} previously imported questions from source \"{source_id}\" are not in this file and were left unchanged",
+        "questions_missing_from_bundle_other": "{count} previously imported questions from source \"{source_id}\" are not in this file and were left unchanged",
         "storage_error": "The images could not be saved to storage",
         "database_error": "The questions could not be saved, nothing was imported",
         "too_many_issues": "Showing {shown} issues. In total: {errors_total} errors and {warnings_total} warnings."
@@ -998,6 +1036,10 @@
       "attempts": "Attempts",
       "items": "Questions",
       "points": "{n} points",
+      "points_one": "{n} point",
+      "points_few": "{n} points",
+      "points_many": "{n} points",
+      "points_other": "{n} points",
       "versions": "Published versions",
       "noVersions": "Not published yet."
     },
@@ -1011,7 +1053,7 @@
       "freeNav": "You can move between questions freely.",
       "sections": "Sections",
       "language": "Language",
-      "start": "Start",
+      "start": "Start test",
       "cannotStart": "You cannot start this assessment right now.",
       "reasons": {
         "not_open_yet": "This assessment has not opened yet.",
@@ -1022,11 +1064,13 @@
         "course_not_active": "The course is not active.",
         "unpublished": "This assessment is not published.",
         "not_a_student": "Only students of this course can take this assessment."
-      }
+      },
+      "startHint": "The timer starts as soon as you press the button.",
+      "startHintSection": "The timer for section {n} starts as soon as you press the button.",
+      "attemptsUsed": "{used} of {total}"
     },
     "builder": {
       "back": "Overview",
-      "title": "Edit: {title}",
       "readOnly": "This course is concluded, so the assessment is read-only.",
       "settings": "Settings",
       "sections": "Sections",
@@ -1125,7 +1169,7 @@
       "publish": "Publish",
       "republish": "Publish changes",
       "unpublish": "Unpublish",
-      "validate": "Check",
+      "validate": "Check before publishing",
       "preview": "Preview as student",
       "previewLanguage": "Preview language",
       "valid": "No problems found. Ready to publish.",
@@ -1178,6 +1222,10 @@
     "essay": {
       "label": "Your essay",
       "words": "{n} words",
+      "words_one": "{n} word",
+      "words_few": "{n} words",
+      "words_many": "{n} words",
+      "words_other": "{n} words",
       "wordsLimit": "{n} of {limit} words"
     },
     "false": "False",
@@ -1199,7 +1247,9 @@
       "current": "Current",
       "flagged": "Flagged",
       "title": "Questions",
-      "unanswered": "Unanswered"
+      "unanswered": "Unanswered",
+      "open": "Questions {n}/{total}",
+      "openLabel": "Question list: question {n} of {total}"
     },
     "prev": "Previous",
     "previewBanner": "Preview mode: this attempt is not counted for students.",
@@ -1210,14 +1260,19 @@
     "rejected": "The server rejected the answers to questions: {list}. Please answer them again.",
     "save": {
       "auth": "Sign in again, {n} answers not saved",
-      "error": "Save error, {n} pending",
-      "offline": "Offline, {n} pending",
+      "auth_one": "Sign in again, {n} answer not saved",
+      "auth_few": "Sign in again, {n} answers not saved",
+      "auth_many": "Sign in again, {n} answers not saved",
+      "auth_other": "Sign in again, {n} answers not saved",
+      "error": "Could not save, retrying ({n})",
+      "offline": "Offline. Answers are saved on this device and will be sent later ({n})",
+      "offlineShort": "Offline, answers saved ({n})",
       "saved": "Saved",
       "saving": "Saving..."
     },
     "section": "Section",
     "sectionEnd": {
-      "confirm": "Close section",
+      "confirm": "Finish section",
       "noReturn": "You will not be able to return to this section.",
       "stay": "Stay in section",
       "title": "Finish \"{section}\"?"
@@ -1241,7 +1296,9 @@
       "fiveMinutes": "Five minutes left",
       "label": "Time remaining",
       "oneMinute": "One minute left",
-      "unlimited": "No time limit"
+      "unlimited": "No time limit",
+      "sectionLeft": "Left in section",
+      "left": "Time left"
     },
     "true": "True",
     "unflag": "Remove flag",
@@ -1256,6 +1313,12 @@
       "title": "The exam page could not be shown",
       "body": "Your saved answers are safe. Reload the page to continue; if it happens again, tell your teacher.",
       "reload": "Reload"
+    },
+    "passage": {
+      "text": "Text",
+      "show": "Show text",
+      "hide": "Hide text",
+      "textTitle": "Text: {title}"
     }
   },
   "grading": {
@@ -1436,6 +1499,10 @@
       "due": "Due",
       "total": "Total",
       "staleN": "{n} grades were computed with older settings. Regrade to apply the current scheme, kept-attempt rule and late policy.",
+      "staleN_one": "{n} grade was computed with older settings. Regrade to apply the current scheme, kept-attempt rule and late policy.",
+      "staleN_few": "{n} grades were computed with older settings. Regrade to apply the current scheme, kept-attempt rule and late policy.",
+      "staleN_many": "{n} grades were computed with older settings. Regrade to apply the current scheme, kept-attempt rule and late policy.",
+      "staleN_other": "{n} grades were computed with older settings. Regrade to apply the current scheme, kept-attempt rule and late policy.",
       "releaseAll": "Release all grades",
       "unreleaseAll": "Hide all grades",
       "unreleaseAutoHint": "Grades of this assessment are released automatically. To hide grades, switch grade release to manual in the assessment settings.",
@@ -1568,10 +1635,10 @@
     "grade": {
       "title": "Grade",
       "percentile": "Percentile {value}",
-      "kept": "Counted attempt",
+      "kept": "Counts toward your grade",
       "notReleased": "Not released yet",
       "sectionsTitle": "Scores by section",
-      "raw": "Raw score",
+      "raw": "Points",
       "scaled": "Scaled score",
       "overall": "Overall",
       "voidedTitle": "Attempt voided",
@@ -1584,16 +1651,22 @@
         "empty": "No graded work yet.",
         "due": "Due {date}",
         "late": "Late penalty: {n} points",
+        "late_one": "Late penalty: {n} point",
+        "late_few": "Late penalty: {n} points",
+        "late_many": "Late penalty: {n} points",
+        "late_other": "Late penalty: {n} points",
         "pendingHint": "Your result will appear here after it is graded or released by your teacher.",
         "viewResult": "View result",
         "state": {
           "graded": "Graded",
           "pending": "Pending",
           "missing": "Not submitted",
+          "not_started": "Not started",
           "excused": "Excused",
           "hidden": "Not shown"
         }
-      }
+      },
+      "scaledShort": "Scaled"
     },
     "imageAlt": "Question illustration",
     "inProgress": "This attempt is still in progress.",
@@ -1602,6 +1675,10 @@
     "notAvailable": "Your answers are saved. The result will be available later, according to the teacher's settings (after the teacher releases it or after the assessment closes).",
     "passage": "Reading passage",
     "pendingReview": "{n} answer(s) are waiting for your teacher to grade them. The score will change after grading.",
+    "pendingReview_one": "{n} answer is waiting for your teacher to grade it. The score will change after grading.",
+    "pendingReview_few": "{n} answers are waiting for your teacher to grade them. The score will change after grading.",
+    "pendingReview_many": "{n} answers are waiting for your teacher to grade them. The score will change after grading.",
+    "pendingReview_other": "{n} answers are waiting for your teacher to grade them. The score will change after grading.",
     "points": "Points",
     "preview": "Preview attempt",
     "questionN": "Question {n}",
@@ -1609,6 +1686,10 @@
     "resume": "Resume attempt",
     "reviewTitle": "Review of your answers",
     "scoreOf": "{score} of {max} points",
+    "scoreOf_one": "{score} of {max} point",
+    "scoreOf_few": "{score} of {max} points",
+    "scoreOf_many": "{score} of {max} points",
+    "scoreOf_other": "{score} of {max} points",
     "section": "Section",
     "sectionN": "Section {n}",
     "status": {
@@ -1623,7 +1704,13 @@
     "teacherFeedback": "Teacher feedback",
     "title": "Result",
     "true": "True",
-    "yourAnswer": "Your answer"
+    "yourAnswer": "Your answer",
+    "finishedIntro": "Test finished. Your result:",
+    "review": {
+      "onlyMistakes": "Only mistakes and unanswered",
+      "noMistakes": "No mistakes: every answer is correct.",
+      "sectionSummary": "{correct} of {total} correct"
+    }
   },
   "schemes": {
     "library": {
@@ -1863,7 +1950,7 @@
     "join": "Join",
     "joining": "Joining…",
     "open": "Open",
-    "needsCode": "Join with a code from the teacher",
+    "needsCode": "Join with a code from your teacher",
     "closed": "Enrollment is closed"
   },
   "storage": {
@@ -2024,16 +2111,16 @@
       "created": "Created",
       "back": "Back to organizations",
       "edit": "Edit",
-      "editTitle": "Edit «{org}»",
+      "editTitle": "Edit organization",
       "saved": "Changes saved.",
       "suspend": "Suspend",
       "resume": "Resume",
-      "suspendTitle": "Suspend «{org}»?",
-      "suspendBody": "All courses of «{org}» become read-only and leave the catalog. Students cannot start exams and nobody can edit. You can resume it later.",
-      "resumeTitle": "Resume «{org}»?",
-      "resumeBody": "The courses of «{org}» can be edited again and published courses return to the catalog.",
-      "suspended": "«{org}» is suspended.",
-      "resumed": "«{org}» is active again.",
+      "suspendTitle": "Suspend this organization?",
+      "suspendBody": "All courses of this organization become read-only and leave the catalog. Students cannot start exams and nobody can edit. You can resume it later.",
+      "resumeTitle": "Resume this organization?",
+      "resumeBody": "The organization's courses can be edited again and published courses return to the catalog.",
+      "suspended": "{org} is suspended.",
+      "resumed": "{org} is active again.",
       "suspendedReason": "Suspended. Reason: {reason}",
       "tabsLabel": "Organization sections",
       "tabs": {
@@ -2068,9 +2155,9 @@
       "addToOrg": "Add to organization",
       "addToOrgHint": "The person gets the chosen role in the organization at once.",
       "role": "Role",
-      "addTitle": "Add {name} to «{org}»?",
-      "addBody": "{name} becomes «{role}» in «{org}». This is recorded in the audit log.",
-      "added": "{name} was added to «{org}».",
+      "addTitle": "Add to the organization?",
+      "addBody": "{name} becomes «{role}» in {org}. This is recorded in the audit log.",
+      "added": "{name} was added to {org}.",
       "orgsLoadFailed": "Could not load the organizations list."
     },
     "members": {
@@ -2103,7 +2190,8 @@
       "teacherAdded": "{name} was added as a teacher.",
       "person": "Person",
       "noAdmins": "No admins yet. Assign one so the organization can be managed.",
-      "noTeachers": "No teachers yet."
+      "noTeachers": "No teachers yet.",
+      "sinceColumn": "Member since"
     },
     "courses": {
       "title": "Courses",
@@ -2186,7 +2274,6 @@
     "allLink": "All teachers and invitations",
     "empty": "No invitations sent yet.",
     "expiresOn": "expires {date}",
-    "sentBy": "Sent by {name} on {date}",
     "sent": "Invitation sent to {email}.",
     "resend": "Send again",
     "resent": "A new invitation was sent to {email}; the old link stops working.",
@@ -2247,7 +2334,9 @@
       "noAccount": "There is no account with {email} yet. Send an invitation: the person joins the course after signing up with this email.",
       "send": "Send invitation",
       "sentHint": "Invitations are valid for 14 days. The person appears in the list after accepting."
-    }
+    },
+    "invitedByColumn": "Invited by",
+    "validUntilColumn": "Valid until"
   },
   "templates": {
     "field": "Course template",
@@ -2278,10 +2367,13 @@
     "independentTitle": "Independent teacher? Apply",
     "schemesNoAccess": {
       "title": "For teachers only",
-      "body": "Grading schemes are set up by teachers who create courses. Your results are in each course under Grades.",
+      "body": "Grading schemes are available to teachers who can create courses.",
       "back": "Back to my courses"
     },
-    "pendingHintAccept": "Valid until {date}. Accept here or with the link in the email."
+    "pendingHintAccept": "Valid until {date}. Accept here or with the link in the email.",
+    "statusLine": {
+      "none": "You do not have teacher access yet. You can send a new request."
+    }
   },
   "invitationAccepted": {
     "orgTeacher": "You joined «{org}» as a teacher.",
@@ -2289,5 +2381,362 @@
     "courseTeacher": "You joined the course «{course}» as a teacher.",
     "courseAssistant": "You joined the course «{course}» as an assistant.",
     "dismiss": "Close message"
+  },
+  "ui": {
+    "close": "Close",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "retry": "Retry",
+    "loading": "Loading…",
+    "details": "Details",
+    "back": "Back",
+    "optional": "(optional)",
+    "search": "Search",
+    "clearSearch": "Clear search",
+    "resetFilters": "Reset filters",
+    "breadcrumbs": "You are here",
+    "error": {
+      "title": "Could not load this",
+      "body": "Check your connection and press Retry. If it keeps happening, try again later.",
+      "offline": "No connection. Check the internet and try again."
+    },
+    "empty": {
+      "title": "Nothing here yet"
+    },
+    "pagination": {
+      "label": "Pages",
+      "loadMore": "Load more",
+      "previous": "Previous",
+      "next": "Next",
+      "shown": "{shown} of {total} shown"
+    },
+    "table": {
+      "count": "{count} results",
+      "empty": "Nothing to show yet.",
+      "sortBy": "Sort by",
+      "notSorted": "Not sorted",
+      "sortOptionAsc": "{column}, ascending",
+      "sortOptionDesc": "{column}, descending",
+      "actions": "Actions"
+    },
+    "reason": {
+      "required": "Reason (required)",
+      "optional": "Reason (optional)",
+      "missing": "Please enter a reason.",
+      "limit": "Up to {n} characters."
+    },
+    "picker": {
+      "placeholder": "Name or email",
+      "change": "Change",
+      "searching": "Searching…",
+      "count": "{n} found",
+      "empty": "No one found. Check the spelling or try the email.",
+      "failed": "Search failed. Try again.",
+      "minChars": "Type at least {n} characters."
+    },
+    "demo": {
+      "title": "Design system",
+      "intro": "Every component of the library in every variant. This page exists only in development.",
+      "s": {
+        "tokens": "Colors",
+        "buttons": "Buttons",
+        "fields": "Form fields",
+        "badges": "Badges",
+        "cards": "Cards, tiles and details",
+        "header": "Page header",
+        "tabs": "Tabs",
+        "table": "Table",
+        "states": "Empty, error and loading states",
+        "dialogs": "Dialogs",
+        "toasts": "Notifications",
+        "picker": "User picker"
+      },
+      "b": {
+        "save": "Save changes",
+        "delete": "Delete course",
+        "details": "View details",
+        "add": "Add question",
+        "disabled": "Not available yet",
+        "small": "Small",
+        "large": "Start the exam",
+        "toCatalog": "Open the catalog",
+        "edit": "Edit",
+        "remove": "Remove",
+        "settings": "Settings",
+        "loadingNote": "Loading buttons keep their label, show a spinner and set aria-busy."
+      },
+      "f": {
+        "title": "Course title",
+        "titleHint": "Students see this title in the catalog.",
+        "email": "Email",
+        "emailError": "Enter a valid email address, for example name@school.kg.",
+        "subtitle": "Short subtitle",
+        "code": "Join code",
+        "description": "Description",
+        "descriptionHint": "What students learn and how the course is graded.",
+        "language": "Language of instruction",
+        "languagePlaceholder": "Choose a language",
+        "ky": "Kyrgyz",
+        "ru": "Russian",
+        "en": "English",
+        "languageError": "Choose the language the course is taught in.",
+        "catalog": "Show the course in the catalog",
+        "catalogHint": "Students can find it and ask to join.",
+        "rules": "I accept the platform rules",
+        "rulesError": "Accept the rules to continue.",
+        "late": "Allow late submissions",
+        "lateHint": "Students can submit after the due date; the work is marked late.",
+        "emails": "Send email notifications",
+        "ortScoring": "Use ORT scoring (set by the template)"
+      },
+      "badge": {
+        "published": "Published",
+        "draft": "Draft",
+        "inProgress": "In progress",
+        "late": "Late",
+        "notPassed": "Not passed",
+        "system": "System account"
+      },
+      "card": {
+        "title": "Algebra 9A",
+        "description": "Teacher: Aibek Toktogulov · 28 students",
+        "open": "Open course",
+        "body": "Next: Quadratic equations test, due 4 November."
+      },
+      "stat": {
+        "students": "Students",
+        "review": "Waiting for review",
+        "reviewHint": "3 new today",
+        "best": "Personal best",
+        "bestHint": "ORT, 2 November"
+      },
+      "dl": {
+        "owner": "Owner",
+        "created": "Created",
+        "language": "Language",
+        "visibility": "Who can join",
+        "visibilityValue": "Anyone from the catalog can ask to join; the teacher approves."
+      },
+      "header": {
+        "org": "School No. 5",
+        "courses": "Courses",
+        "description": "Course settings, people and assessments.",
+        "primary": "Create an assessment",
+        "invite": "Invite a teacher",
+        "settings": "Course settings"
+      },
+      "tabs": {
+        "label": "Course sections",
+        "home": "Home",
+        "people": "People",
+        "assessments": "Assessments",
+        "grades": "Grades",
+        "bank": "Question bank",
+        "files": "Files",
+        "announcements": "Announcements",
+        "settings": "Settings",
+        "panel": "Content of the tab «{tab}».",
+        "navNote": "Links to pages use TabsNav (aria-current) with the same look:"
+      },
+      "table": {
+        "caption": "Students of the course",
+        "name": "Student",
+        "email": "Email",
+        "status": "Status",
+        "score": "Score",
+        "joined": "Joined",
+        "open": "Open",
+        "countText": "{count} students",
+        "allStatuses": "All statuses",
+        "viewState": "Show the table as",
+        "stateData": "Data",
+        "stateLoading": "Loading",
+        "stateEmpty": "Empty",
+        "stateError": "Error",
+        "emptyTitle": "No students yet.",
+        "emptyBody": "Share the join code with your class.",
+        "emptyAction": "Show the join code",
+        "errorTitle": "The list of students did not load"
+      },
+      "states": {
+        "emptyTitle": "No courses yet.",
+        "emptyBody": "Join a course with a code from your teacher.",
+        "emptyAction": "Join with a code",
+        "inlineTitle": "Your answers were not sent",
+        "inlineBody": "No connection. Your answers are saved on this device and will be sent when you are back online.",
+        "skeleton": "Skeleton while a list loads:"
+      },
+      "dialog": {
+        "open": "Rename the course",
+        "description": "The new title is shown to students right away.",
+        "newTitle": "New title",
+        "openConfirm": "Delete the course…",
+        "confirmTitle": "Delete the course?",
+        "confirmEffect": "Students lose access to its assessments and grades. This cannot be undone.",
+        "openReason": "Disable the account…",
+        "reasonTitle": "Disable the account?",
+        "reasonEffect": "The person can no longer sign in. Their courses and grades stay.",
+        "reasonConfirm": "Disable account",
+        "done": "Done (demo, nothing was changed)."
+      },
+      "toast": {
+        "success": "Changes saved.",
+        "error": "Could not save. Check your connection and try again.",
+        "info": "The import runs in the background. You can leave this page.",
+        "showSuccess": "Show success",
+        "showError": "Show error",
+        "showInfo": "Show info"
+      },
+      "picker": {
+        "label": "New owner",
+        "hint": "Search by name or email (try “ai”)."
+      }
+    }
+  },
+  "teaching": {
+    "templateBadge": "{name} template",
+    "shown": "Shown: {n}",
+    "formatToolbar": "Text formatting",
+    "chooseFile": "Choose file",
+    "noFile": "No file chosen",
+    "assessmentsEmptyHint": "Create a test, quiz or homework from the questions in your bank.",
+    "unpublishTitle": "Unpublish this assessment?",
+    "unpublishBody": "It becomes a draft: students no longer see it and cannot start a new attempt. Existing attempts and grades are kept (in progress: {inProgress}, submitted: {submitted}).",
+    "publishPanel": "Publishing",
+    "builderCrumb": "Edit",
+    "searchStudent": "Search by student",
+    "noMatch": "No one found. Check the spelling.",
+    "studentAnswer": "Student's answer",
+    "homeTitle": "Course overview",
+    "nextStepTitle": "Next step",
+    "nextStepBody": "Add questions to the bank, then build an assessment for your students from them.",
+    "createAssessment": "Create an assessment",
+    "addQuestions": "Add questions",
+    "manageEnrollment": "Enrollment settings",
+    "showCatalog": "Course catalog",
+    "ownerStays": "The owner cannot be removed. Transfer the course in Settings."
+  },
+  "home": {
+    "greeting": "Hi, {name}!",
+    "greetingNoName": "Hi!",
+    "lead": {
+      "continue": "You have an unfinished assignment: «{title}».",
+      "next": "Next up: «{title}».",
+      "caughtUp": "You are all caught up. No new assignments right now.",
+      "continueStarted": "You have an unfinished assignment: «{title}». Started {date}."
+    },
+    "primary": {
+      "continue": "Continue",
+      "start": "Start the next assignment",
+      "join": "Join with code"
+    },
+    "continue": {
+      "title": "Continue"
+    },
+    "next": {
+      "title": "Next up",
+      "empty": "No new assignments. Check back later."
+    },
+    "results": {
+      "title": "Latest results",
+      "empty": "Results appear after your first assignment."
+    },
+    "courses": {
+      "title": "My courses",
+      "emptyTitle": "You are not in any course yet.",
+      "emptyBody": "Join with a code from your teacher, or choose a course in the catalog.",
+      "showAll": "Show all ({n})"
+    },
+    "openCatalog": "Open the catalog",
+    "catalogEmpty": {
+      "title": "No open courses yet.",
+      "body": "Have a code from your teacher? Join with it."
+    },
+    "personalBest": "Personal best",
+    "platformCourse": "Platform course",
+    "noDue": "No deadlines",
+    "due": "Due {date}",
+    "dueSoon": "Due soon: {date}",
+    "until": "Open until {date}",
+    "opens": "Opens {date}",
+    "closedOn": "Closed on {date}",
+    "duration": "Time: {time}",
+    "questions": "{n} questions",
+    "questions_one": "{n} question",
+    "questions_few": "{n} questions",
+    "questions_many": "{n} questions",
+    "questions_other": "{n} questions",
+    "attemptsLeft": "Attempts left: {n}",
+    "attemptsUnlimited": "Unlimited attempts",
+    "noAttemptsLeft": "No attempts left",
+    "scoreOf": "{score} of {total}",
+    "resultValue": "Result: {value}",
+    "resultLater": "The result appears when your teacher releases it.",
+    "startedAt": "Started {date}",
+    "status": {
+      "not_started": "Not started",
+      "in_progress": "In progress",
+      "submitted": "Submitted",
+      "graded": "Graded",
+      "closed": "Closed"
+    },
+    "action": {
+      "continue": "Continue",
+      "start": "Start",
+      "again": "Try again",
+      "result": "See result",
+      "open": "Open",
+      "attempts": "My attempts"
+    },
+    "time": {
+      "hm": "{h} h {m} min",
+      "h": "{h} h",
+      "m": "{m} min"
+    },
+    "course": {
+      "nextTitle": "What to do next",
+      "noAssessments": "Your teacher has not added assignments yet. Check back later.",
+      "emptyHint": "Your teacher will add them here.",
+      "allAssessments": "All assignments",
+      "latestTitle": "Latest result",
+      "allGrades": "All grades"
+    },
+    "attempts": {
+      "title": "My attempts",
+      "exhaustedHint": "You used all attempts. Your results are here.",
+      "none": "No finished attempts yet.",
+      "item": "Attempt {n}",
+      "status": {
+        "in_progress": "In progress",
+        "submitted": "Submitted",
+        "needs_review": "Being checked",
+        "graded": "Graded",
+        "void": "Cancelled"
+      }
+    }
+  },
+  "shell": {
+    "skipToContent": "Skip to content",
+    "areas": {
+      "label": "Areas",
+      "switch": "Switch area",
+      "learning": "Learning",
+      "teaching": "Teaching",
+      "organization": "Organization",
+      "organizations": "Organizations",
+      "platform": "Admin"
+    },
+    "teaching": {
+      "courses": "Courses I teach"
+    },
+    "account": {
+      "menu": "Account menu: {name}",
+      "signedInAs": "Signed in as",
+      "language": "Interface language"
+    },
+    "list": {
+      "shown": "Shown: {n}"
+    }
   }
 }

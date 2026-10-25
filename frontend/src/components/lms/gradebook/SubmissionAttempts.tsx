@@ -7,7 +7,7 @@ import type { SchemeLabelValue, SubmissionAttemptOut } from "@/lib/lms/gradingTy
 import { useSchemeLabel } from "@/components/lms/grading/schemes/labels";
 import { fmtNum, fmtPercentile } from "@/components/lms/grading/schemes/params";
 import { fmtDateTime } from "@/components/lms/assessments/format";
-import { btnDanger } from "@/components/lms/content/ui";
+import { btnDanger } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { canVoid, fmtPointsOf, lateParts } from "./gradebookModel";
 
 /** Counted attempts of a submission with their own grade, the kept marker and a Void action. */

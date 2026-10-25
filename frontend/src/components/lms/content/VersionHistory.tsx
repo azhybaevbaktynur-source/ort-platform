@@ -4,12 +4,13 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { getQuestionVersion, listQuestionVersions, revertQuestion } from "@/lib/lms/content";
 import type { QuestionStaffOut, VersionOut, VersionSummaryOut } from "@/lib/lms/contentTypes";
-import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
+import { ConfirmDialog } from "@/components/ui";
 import { fmtApiDateTime } from "@/lib/format";
 import { Pager } from "@/components/lms/Pager";
 import { ContentError } from "./ContentError";
 import { VersionView } from "./VersionView";
-import { btnPrimary, btnSecondary, cardCls } from "./ui";
+import { cardCls } from "./ui";
+import { btnPrimary, btnSecondary } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 
 /** Question version history: list, view a version next to the current one, revert (creates a new version). */
 export function VersionHistory({
@@ -124,10 +125,9 @@ export function VersionHistory({
         )}
       </div>
       <ConfirmDialog open={confirm} busy={busy} title={t("bank.history.revertTitle", { n: selected?.version_no ?? 0 })}
-        body={t("bank.history.revertBody")} confirmLabel={t("bank.history.revert")}
-        onConfirm={() => void revert()} onCancel={() => setConfirm(false)}>
-        {revertError ? <ContentError error={revertError} className="mt-3" /> : null}
-      </ConfirmDialog>
+        effect={t("bank.history.revertBody")} confirmLabel={t("bank.history.revert")}
+        onConfirm={() => void revert()} onCancel={() => setConfirm(false)}
+        error={revertError ? <ContentError error={revertError} /> : undefined} />
     </div>
   );
 }
