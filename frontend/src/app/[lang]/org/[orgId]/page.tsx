@@ -52,7 +52,6 @@ export default function OrgOverviewPage() {
       <Card
         title={t("invitations.pendingTitle")}
         padding={pending && pending.length > 0 ? "none" : "md"}
-        actions={<Link href={`${base}/teachers`} className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-700 hover:underline sm:min-h-0">{t("invitations.allLink")}</Link>}
       >
         {error ? <OrgError error={error} onRetry={load} /> : pending === null ? <LoadingState label={t("lms.common.loading")} rows={1} /> : pending.length === 0 ? (
           <EmptyState variant="plain" className="py-4" title={t("invitations.pendingEmpty")} />
@@ -66,6 +65,9 @@ export default function OrgOverviewPage() {
             ))}
           </ul>
         )}
+        <div className={pending && pending.length > 0 ? "border-t border-slate-100 px-4 py-2 sm:px-6" : "mt-2"}>
+          <Link href={`${base}/teachers`} className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-700 hover:underline">{t("invitations.allLink")}</Link>
+        </div>
       </Card>
       <InviteDialog open={inviting} orgId={org.id} orgName={org.name} onClose={() => setInviting(false)}
         onSent={(inv, email) => { setInviting(false); toastInvitationSent(t, inv, email); void load(); void reload(); }} />

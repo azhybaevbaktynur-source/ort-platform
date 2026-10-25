@@ -87,8 +87,8 @@ export default function OrgTeachersPage() {
   const memberTone = (m: OrgMemberOut) => (m.state === "active" ? "active" : "removed");
   const memberColumns: TableColumn<OrgMemberOut>[] = [
     {
-      key: "person", header: t("organizations.members.person"), primary: true,
-      cell: (m) => <>{m.user.display_name || m.user.email}<span className="block break-all text-sm font-normal text-slate-600">{m.user.email}</span></>,
+      key: "person", header: t("organizations.members.person"), primary: true, className: "sm:min-w-[14rem]",
+      cell: (m) => <>{m.user.display_name || m.user.email}<span className="block text-sm font-normal text-slate-600 [overflow-wrap:anywhere]">{m.user.email}</span></>,
     },
     { key: "role", header: t("organizations.adminUser.role"), cell: (m) => t(`organizations.roles.${m.role}`) },
     { key: "state", header: t("organizations.admin.status"), cell: (m) => <OrgBadge tone={memberTone(m)} labelKey={`organizations.members.state.${memberTone(m)}`} /> },
@@ -103,11 +103,11 @@ export default function OrgTeachersPage() {
     },
   ];
   const inviteColumns: TableColumn<InvitationOut>[] = [
-    { key: "email", header: t("invitations.dialog.email"), primary: true, cell: (i) => <span className="break-all">{i.email}</span> },
+    { key: "email", header: t("invitations.dialog.email"), primary: true, className: "sm:min-w-[14rem]", cell: (i) => <span className="[overflow-wrap:anywhere]">{i.email}</span> },
     { key: "role", header: t("organizations.adminUser.role"), cell: (i) => t(`invitations.roles.${i.role}`) },
     { key: "state", header: t("organizations.admin.status"), cell: (i) => <OrgBadge tone={i.state === "pending" ? "invited" : i.state} labelKey={`invitations.state.${i.state}`} /> },
     {
-      key: "sent", header: t("invitations.sentColumn"),
+      key: "sent", header: t("invitations.sentColumn"), className: "sm:min-w-[13rem]",
       cell: (i) => (
         <>
           {t("invitations.sentBy", { name: i.invited_by_name || "—", date: fmtApiDate(i.created_at, lang) })}
@@ -118,7 +118,7 @@ export default function OrgTeachersPage() {
     {
       key: "actions", header: "", actions: true, align: "right",
       cell: (i) => (i.state === "pending" || i.state === "expired") ? (
-        <span className="flex flex-wrap justify-end gap-2">
+        <span className="flex flex-wrap justify-end gap-2 lg:flex-nowrap">
           <Button variant="secondary" size="sm" disabled={readOnly} loading={resendingId === i.id} onClick={() => void resend(i)}>{t("invitations.resend")}</Button>
           {i.state === "pending" && (
             <Button variant="secondary" size="sm" disabled={readOnly} onClick={() => { setDialogError(null); setRevoking(i); }}>{t("invitations.revoke")}</Button>

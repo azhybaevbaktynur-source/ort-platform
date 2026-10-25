@@ -51,13 +51,13 @@ export function Brand({ href, hideNameOnPhone = false, tagline = false, classNam
   const { t } = useTranslation();
   return (
     <Link href={href} aria-label={hideNameOnPhone ? t("common.appName") : undefined}
-      className={cn("inline-flex min-h-11 min-w-0 shrink-0 items-center gap-2.5 rounded-xl", focusRing, className)}>
+      className={cn("inline-flex min-h-11 min-w-0 items-center gap-2.5 rounded-xl", tagline ? "shrink" : "shrink-0", focusRing, className)}>
       <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm">
         <GraduationCap className="h-5 w-5" />
       </span>
       <span className={cn("min-w-0", hideNameOnPhone && "hidden sm:block")}>
         <span className="block truncate text-base font-bold leading-5 text-slate-900">{t("common.appName")}</span>
-        {tagline && <span className="block text-xs leading-4 text-slate-600">{t("landing.badge")}</span>}
+        {tagline && <span className="block break-words text-xs leading-4 text-slate-600">{t("landing.badge")}</span>}
       </span>
     </Link>
   );
