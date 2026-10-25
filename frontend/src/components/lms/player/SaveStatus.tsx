@@ -4,6 +4,7 @@ import React from "react";
 import { Check, CloudOff, Loader2, AlertTriangle } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import type { QueueSnapshot } from "@/lib/lms/attemptClient";
+import { Button } from "@/components/ui";
 
 export function SaveStatus({ snap, onRetry }: { snap: QueueSnapshot; onRetry?: () => void }) {
   const { t } = useTranslation();
@@ -29,15 +30,15 @@ export function SaveStatus({ snap, onRetry }: { snap: QueueSnapshot; onRetry?: (
     tone = "text-red-700 bg-red-50 border-red-200";
   }
   return (
-    <div className="flex items-center gap-2" role="status" aria-live="polite">
-      <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${tone}`}>
-        {icon}
-        {text}
+    <div className="flex min-w-0 items-center gap-2" role="status" aria-live="polite">
+      <span className={`inline-flex min-w-0 items-center gap-1.5 rounded-2xl border px-2.5 py-1 text-xs font-medium leading-4 ${tone}`}>
+        <span className="shrink-0">{icon}</span>
+        <span className="min-w-0">{text}</span>
       </span>
       {retry && onRetry ? (
-        <button type="button" onClick={onRetry} className="text-xs font-semibold text-brand-700 hover:underline">
+        <Button variant="link" size="sm" onClick={onRetry} className="shrink-0 text-xs">
           {t("lms.common.retry")}
-        </button>
+        </Button>
       ) : null}
     </div>
   );

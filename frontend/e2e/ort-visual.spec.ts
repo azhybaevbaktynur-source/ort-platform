@@ -49,7 +49,8 @@ for (const vp of VIEWPORT_NAMES) {
         await exam.next();
         await exam.assertPaletteEntry(1, { answered: true, flagged: true, current: false });
         await exam.assertPaletteEntry(2, { answered: false, flagged: false, current: true });
-        await exam.palette().scrollIntoViewIfNeeded();
+        // desktop: the side panel; phones: the palette sheet opened from the header (S7b, P1)
+        await exam.showPalette();
         await shot("flagged-palette", timerMask(page));
 
         // section-end dialog
@@ -85,6 +86,8 @@ for (const vp of VIEWPORT_NAMES) {
         await exam.review().getByRole("heading", { name: tr(lang, "results.reviewTitle"), exact: true })
           .evaluate((el) => el.scrollIntoView({ block: "start" }));
         await shot("review", [submitted]);
+        // B4 / R1: the result page with the review never scrolls sideways (the page is as wide as the viewport)
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(VIEWPORTS[vp].width);
       });
     });
   }

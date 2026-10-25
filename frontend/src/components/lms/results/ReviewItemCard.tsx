@@ -1,25 +1,34 @@
 "use client";
 
 import React from "react";
-import { Check, X } from "lucide-react";
+import { Check, Circle, Clock, Minus, X } from "lucide-react";
+import { Badge, type BadgeTone } from "@/components/ui";
 import { useTranslation } from "@/lib/i18n/context";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import { TemplatePassage } from "@/components/lms/PlainPassage";
 import type { Correctness, ReviewItemOut, StudentQuestion } from "@/lib/lms/attemptTypes";
 import { fmtPoints } from "@/components/lms/assessments/format";
 
-const BADGE: Record<Correctness, string> = {
-  correct: "bg-emerald-100 text-emerald-800",
-  incorrect: "bg-red-100 text-red-800",
-  partial: "bg-amber-100 text-amber-800",
-  unanswered: "bg-slate-100 text-slate-700",
-  pending: "bg-indigo-100 text-indigo-800",
+// Design-system Badge with an icon, so colour is never the only signal (S7b, cross-cutting).
+const TONE: Record<Correctness, BadgeTone> = {
+  correct: "success",
+  incorrect: "danger",
+  partial: "warning",
+  unanswered: "neutral",
+  pending: "info",
+};
+const ICON: Record<Correctness, React.ReactNode> = {
+  correct: <Check aria-hidden="true" />,
+  incorrect: <X aria-hidden="true" />,
+  partial: <Circle aria-hidden="true" />,
+  unanswered: <Minus aria-hidden="true" />,
+  pending: <Clock aria-hidden="true" />,
 };
 
 export function CorrectnessBadge({ value }: { value: Correctness | null }) {
   const { t } = useTranslation();
   if (!value) return null;
-  return <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${BADGE[value]}`}>{t(`results.correctness.${value}`)}</span>;
+  return <Badge tone={TONE[value]} icon={ICON[value]}>{t(`results.correctness.${value}`)}</Badge>;
 }
 
 function asArr(v: unknown): string[] {
@@ -79,7 +88,7 @@ export function ReviewItemCard({
         </details>
       )}
 
-      {q.stem ? <MathRenderer content={q.stem} className="font-serif text-base leading-relaxed text-gray-900" /> : null}
+      {q.stem ? <MathRenderer content={q.stem} className="text-base leading-relaxed text-slate-900" /> : null}
       {q.image_url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={q.image_url} alt={t("results.imageAlt")} className="max-h-72 w-auto rounded-lg border border-slate-100" />
@@ -97,7 +106,7 @@ export function ReviewItemCard({
                   {correct ? <Check className="h-4 w-4 text-emerald-700" /> : picked ? <X className="h-4 w-4 text-red-700" /> : null}
                 </span>
                 <span className="min-w-0 flex-1">
-                  {c.text ? <MathRenderer content={c.text} className="font-serif text-base text-gray-900" /> : null}
+                  {c.text ? <MathRenderer content={c.text} className="text-base text-slate-900" /> : null}
                   {c.image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={c.image_url} alt="" className="mt-1 max-h-32 w-auto rounded-md" />

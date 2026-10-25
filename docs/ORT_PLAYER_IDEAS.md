@@ -63,6 +63,37 @@ Severity: **blocker** (cannot finish / data risk), **major** (confusing, slow, i
 - **States**: loading (P11) and crash (B1) are the two missing states; empty and error states exist.
 - **Dates**: B3 affects every screen.
 
+### Status after Phase 6b S7b (2026-10-25)
+
+Screenshots: `docs/phases/PHASE_6_screens/6b/ort-*-{before,after}.jpg` (section `## S7b` of its `INDEX.md`); baselines updated in `docs/phases/ORT_BASELINE/`.
+
+| ID | Status |
+|---|---|
+| B1 | Done earlier (H1: localized section titles, `attempts/[attemptId]/error.tsx`). |
+| B2 | Content fix, not player code (sample CSVs); unchanged here. |
+| B3 | Done in 6a (`parseApiDate` appends `Z` to naive timestamps; every date goes through it). |
+| B4 | Done (label wraps since 6a S8; S7b also removed the section table's minimum width). `ort-visual.spec.ts` asserts the phone result page is no wider than 375 px. |
+| P1 | Done: phones and tablets get a "Questions n/total" header button (amber dot when something is flagged) that opens the same `Palette` as a bottom sheet (`Dialog`); the finish action moved into the sheet, so the question screen has one finish button (the primary one on the last question). Finishing early from any question still works (sheet, then finish). Desktop unchanged. |
+| P2 | Done: fill = answered / not, ring = current, amber dot = flagged, all at once, including on the current question; legend shows the dot. |
+| P3 | Done: palette buttons, flag button, Prev/Next and answer rows are at least 44 px on phones. |
+| P4 | Done: "Left in section" / "Time left" label (desktop and tablet); under 5 minutes an alarm icon and bold digits besides the colour; aria-live announcements unchanged. |
+| P5 | Done: confirm = "Finish section" in en/ky/ru; Phase 6 `Dialog` (focus trap, Esc, focus return); full-width stacked buttons on phones (the library puts the primary on top). |
+| P6 | Done: below `xl` the passage sits under a sticky "Text" bar that folds it away and back (open by default, remembered per passage); `NumberedPassage` untouched. |
+| P7 | Done: stem, choices, comparison labels and review cards are sans-serif. The passage text keeps its serif `TemplatePassage` (line numbers, unchanged on purpose). |
+| P8 | Not done in S7b: the labels live in the `bank` i18n group (`bank.types.comparison.labels`), which S7b does not own (it also changes the teacher editor). Proposed ky values: A "А колонкасындагы маани чоңураак", B "Б колонкасындагы маани чоңураак", C "Эки маани барабар", D "Аныктоого маалымат жетишсиз". |
+| P9 | Done: `e.code` (`KeyF`, `KeyA`-`KeyE`, `Digit1`-`Digit5`, `Numpad1`-`Numpad5`); same keys, now independent of the keyboard layout. |
+| P10 | Done: "Offline. Answers are saved on this device and will be sent later (n)" / "Could not save, retrying (n)" in en/ky/ru; Retry kept. |
+| P11 | Done: header + question card + palette skeleton on the first load, question-card skeleton on the per-section load. |
+| P12 | Done: the letter stays in the filled badge; a check mark at the end of the row. |
+| L1 | Done: "Start test", hint "The timer for section 1 starts as soon as you press the button" (or the whole-test variant), sticky start row on phones. |
+| L2 | Done: value "0 из 1" under the label "Попытки". |
+| L3 | Done: two-column grid, meta on one line. |
+| R1 | Done: no minimum width, names wrap, numbers do not, short "Scale" header on phones, percentile on its own line. |
+| R2 | Done: "Идёт в зачёт" / "Эсепке кирет" / "Counts toward your grade"; raw column "Баллы" / "Упай" / "Points"; "Шкальный балл" kept. |
+| R3 | Done: "Test finished. Your result:" line, scaled card first, raw points as a small line under it; golden banner stays above the card. |
+| R4 | Done (presentation only): grouped by section in folding groups (all open by default, so nothing shown today is hidden), per-section "n of m correct", filter "Only mistakes and unanswered" (off by default). Lazy KaTeX not done (it belongs to `MathRenderer`, outside S7b). |
+| Cross-cutting | Done: red only for the irreversible sentence in the dialogs; legend 12 px; `Button`, `Dialog`, `Skeleton`/`LoadingState`, `Badge`, `LinkButton` in the player, lobby and results. `Table` not used for the ORT section table (the DOM walk reads its `caption`/`tbody` rows, and the table now fits at 375 px). |
+
 ---
 
 ## Part 2. Ideas that change how the exam works (owner decides)

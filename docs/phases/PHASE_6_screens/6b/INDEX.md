@@ -72,3 +72,26 @@
 | ui-toasts-phone-ru.jpg | Toasts (success + error) in the polite live region | `/ru/dev/ui` | 375x812 | ru |
 | ui-tokens-desktop-ru.jpg | Color tokens (brand, slate, success, warning, danger, gold) and type scale | `/ru/dev/ui` | 1440x900 | ru |
 | ui-tokens-phone-ru.jpg | Color tokens (brand, slate, success, warning, danger, gold) and type scale | `/ru/dev/ui` | 375x812 | ru |
+
+## S7b
+
+ORT player part 1 (`docs/ORT_PLAYER_IDEAS.md` Bugs + Part 1). Every changed ORT baseline as a pair: `before` = the S7a
+baseline, `after` = the new approved baseline in `docs/phases/ORT_BASELINE/` (macOS, system Chrome; phone 375x812,
+desktop 1440x900; ru + ky). Exam behaviour unchanged: the DOM walk (`frontend/e2e/ort.spec.ts`) passes with the same
+assertions (section order, timer, palette count and states, comparison columns A/B with answers A-D, numbered
+passage lines, result card with five section rows).
+
+| Files (`ort-<screen>-<viewport>-<lang>-{before,after}.jpg`) | What changed | Part 1 IDs |
+|---|---|---|
+| `ort-lobby-{phone,desktop}-{ru,ky}` | "Start test" button with the hint "the section 1 timer starts at once" under it; on phones the start row is sticky at the bottom of the screen (in the full-page shot it floats over the middle, where the 812 px viewport ends); attempts value "0 из 1" without the repeated word; section rows as a two-column grid with the meta on one line | L1, L2, L3 |
+| `ort-comparison-{phone,desktop}-{ru,ky}` | Sans-serif stem and choices (one family); 44 px answer rows and flag button on phones; timer label "Left in section" on desktop; phones: "Questions 1/3" button in the header opens the palette sheet, the palette and the outline finish button are no longer below the question; design-system Prev/Next buttons | P1, P3, P4, P7 |
+| `ort-flagged-palette-{phone,desktop}-{ru,ky}` | Additive palette states: green fill = answered, grey = not, ring = current, amber dot = flagged (also on the current question); legend shows the dot, 12 px text; phones: the palette is the bottom sheet (focus trap, Esc, finish action inside), 44 px buttons; amber dot on the header button when something is flagged | P1, P2, P3, cross-cutting (legend size) |
+| `ort-section-end-{phone,desktop}-{ru,ky}` | Phase 6 `Dialog` (focus trap, Esc, focus return); confirm says "Finish section" like the button that opened it; red only for the no-return sentence, counts neutral; full-width stacked buttons on phones | P5, cross-cutting (colors, components) |
+| `ort-passage-{phone,desktop}-{ru,ky}` | Phones / tablets: sticky "Text" bar above the passage folds the text away and back (open by default, remembered per passage); line numbers unchanged; desktop side by side as before | P6 |
+| `ort-submit-{phone,desktop}-{ru,ky}` | Same `Dialog` treatment as the section-end dialog; the "cannot change answers" sentence in red | P5, cross-cutting |
+| `ort-result-{phone,desktop}-{ru,ky}` | "Test finished. Your result:" line; scaled grade card first, raw points as a small line under it; "Counts toward your grade" / "Points" instead of jargon; `Badge` components; section table without a minimum width (nothing cut at 375 px), short "Scale" header on phones, percentile on its own line in the total row | R1, R2, R3, B4 |
+| `ort-review-{phone,desktop}-{ru,ky}` | Review grouped by section (folding groups, all open, "1 of 3 correct" per section) and an "Only mistakes and unanswered" filter (off by default); every card unchanged in content; sans-serif text; correctness `Badge` with an icon | R4, P7, cross-cutting |
+
+Not in a baseline: the loading skeleton of the player and of a section (P11), the save pill texts (P10), keyboard
+shortcuts with `e.code` (P9), the timer's warning icon and bold digits under five minutes (P4). The phone result
+page is checked to be no wider than the viewport (B4) in `ort-visual.spec.ts`.

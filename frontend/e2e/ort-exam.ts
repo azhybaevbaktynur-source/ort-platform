@@ -49,7 +49,9 @@ export class OrtExam {
   async start() {
     await this.startButton().click();
     await this.page.waitForURL(/\/attempts\/[0-9a-f-]+$/);
-    await expect(this.palette()).toBeVisible();
+    await this.withPalette(async () => {
+      await expect(this.palette()).toBeVisible();
+    });
   }
 
   // ---- player
@@ -59,6 +61,43 @@ export class OrtExam {
 
   paletteButtons(): Locator {
     return this.palette().getByRole("button");
+  }
+
+  /** Phones and tablets (S7b, P1): the header button that opens the palette sheet. Hidden on desktop. */
+  paletteToggle(): Locator {
+    // accessible name "Question list: question n of total", any n / total
+    const label = this.t("player.palette.openLabel", { n: 999, total: 999 });
+    const pattern = label.replace(/[.*+?^$()|[\]\\{}]/g, "\\$&").replace(/999/g, "\\d+");
+    return this.page.locator("header").getByRole("button", { name: new RegExp(`^${pattern}$`) });
+  }
+
+  paletteSheet(): Locator {
+    return this.page.getByRole("dialog", { name: this.t("player.palette.title") });
+  }
+
+  /** Make the palette visible: on phones open the sheet (and leave it open); on desktop it is always there. */
+  async showPalette() {
+    if (await this.paletteToggle().isVisible()) {
+      if (!(await this.paletteSheet().isVisible())) await this.paletteToggle().click();
+      await expect(this.paletteSheet()).toBeVisible();
+    } else {
+      await this.palette().scrollIntoViewIfNeeded();
+    }
+    await expect(this.palette()).toBeVisible();
+  }
+
+  /** Run palette checks; on phones inside the sheet, which is closed again unless it was already open. */
+  async withPalette(fn: () => Promise<void>) {
+    // the header is rendered once the attempt has loaded
+    await expect(this.page.getByRole("progressbar", { name: this.t("player.progressBar") })).toBeVisible();
+    const phone = await this.paletteToggle().isVisible();
+    const wasOpen = phone && (await this.paletteSheet().isVisible());
+    if (phone && !wasOpen) await this.showPalette();
+    await fn();
+    if (phone && !wasOpen) {
+      await this.page.keyboard.press("Escape");
+      await expect(this.paletteSheet()).toBeHidden();
+    }
   }
 
   timer(): Locator {
@@ -77,7 +116,12 @@ export class OrtExam {
     return this.page.getByText(this.t("player.save.saved"), { exact: true });
   }
 
-  /** The aside "finish section / finish test" button (present on every question). */
+  /** On phones the aside finish button lives in the palette sheet: open it first. */
+  async openFinish() {
+    if (await this.paletteToggle().isVisible()) await this.showPalette();
+  }
+
+  /** The aside "finish section / finish test" button (present on every question; on phones in the palette sheet). */
   finishButton(last: boolean): Locator {
     return this.page.locator("aside").getByRole("button", { name: this.t(last ? "player.finishTest" : "player.finishSection") });
   }
@@ -91,7 +135,9 @@ export class OrtExam {
     const header = this.page.locator("header").filter({ has: this.page.getByRole("progressbar") });
     await expect(header).toContainText(this.sectionName(pos));
     await expect(header).toContainText(this.t("player.sectionOf", { n: pos, total: 5 }));
-    await expect(this.paletteButtons()).toHaveCount(sectionCounts()[pos - 1]);
+    await this.withPalette(async () => {
+      await expect(this.paletteButtons()).toHaveCount(sectionCounts()[pos - 1]);
+    });
     await expect(this.timer()).toBeVisible();
     await expect(this.timer()).toHaveText(/^\d{1,2}:\d{2}(:\d{2})?$/);
   }
@@ -136,14 +182,17 @@ export class OrtExam {
     let name = `${this.t("player.question")} ${n}`;
     if (state.answered) name += `, ${this.t("player.palette.answered")}`;
     if (state.flagged) name += `, ${this.t("player.palette.flagged")}`;
-    const btn = this.paletteButtons().nth(n - 1);
-    await expect(btn).toHaveAccessibleName(name);
-    if (state.current) await expect(btn).toHaveAttribute("aria-current", "true");
-    else await expect(btn).not.toHaveAttribute("aria-current", "true");
+    await this.withPalette(async () => {
+      const btn = this.paletteButtons().nth(n - 1);
+      await expect(btn).toHaveAccessibleName(name);
+      if (state.current) await expect(btn).toHaveAttribute("aria-current", "true");
+      else await expect(btn).not.toHaveAttribute("aria-current", "true");
+    });
   }
 
   /** Open the section-end dialog: title names the section, no-return warning, unanswered/flagged counts. */
   async openSectionEnd(pos: number, counts: { unanswered: number; flagged: number }) {
+    await this.openFinish();
     await this.finishButton(false).click();
     const d = this.dialog();
     await expect(d).toBeVisible();
@@ -179,6 +228,7 @@ export class OrtExam {
   }
 
   async openSubmit(counts: { unanswered: number; flagged: number }) {
+    await this.openFinish();
     await this.finishButton(true).click();
     const d = this.dialog();
     await expect(d).toBeVisible();
