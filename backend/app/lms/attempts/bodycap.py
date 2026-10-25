@@ -21,6 +21,11 @@ _EXEMPT = re.compile(r"^/api/v1/(upload(/|$)|bulk/|courses/[^/]+/(assets|imports
 _OLD = re.compile(r"^/api/v1/(auth|users|questions|bulk|mock-tests|mock_tests|exam-sets|exam_sets|upload|planner|"
                   r"analytics|practice|admin)(/|$)")
 _METHODS = {"POST", "PUT", "PATCH"}
+# --- Phase 7a S2 begin --- (PHASE_7A_DESIGN 3.5, 4.2: hand-in and feedback file uploads stream with their own cap;
+# text hand-ins get the 64 KiB grading cap)
+_EXEMPT = re.compile(rf"(?:{_EXEMPT.pattern})|^/api/v1/courses/[^/]+/assignments/[^/]+/(submissions/files|feedback-files)/?$")
+_GRADING = re.compile(rf"(?:{_GRADING.pattern})|^/api/v1/courses/[^/]+/assignments/[^/]+/submissions/?$")
+# --- Phase 7a S2 end ---
 
 
 class _TooLarge(Exception):
