@@ -20,7 +20,10 @@ from app.lms.organizations.models import Organization, OrganizationMember, Organ
 from app.models.user import User
 
 SLUG_RE = re.compile(r"^[a-z0-9-]{2,64}$")
-KNOWN_TEMPLATE_KEYS = {"ort": 1}  # S2 replaces with templates.registry (key -> version)
+from app.lms.templates import registry as _template_registry  # noqa: E402
+
+# key -> version, from the course template registry (PHASE_6_DESIGN 5.1)
+KNOWN_TEMPLATE_KEYS = {t.key: t.version for t in _template_registry.all()}
 
 
 # ------------------------------------------------------------------------------------------------ errors
@@ -330,7 +333,7 @@ def usage(db: Session, org: Organization) -> dict:
 # ------------------------------------------------------------------------------------------------ templates
 
 def known_templates() -> list[dict]:
-    return [{"key": k, "version": v} for k, v in sorted(KNOWN_TEMPLATE_KEYS.items())]
+    return [{"key": t.key, "version": t.version, "title_key": t.title_key} for t in sorted(_template_registry.all(), key=lambda t: t.key)]
 
 
 def org_templates(db: Session, org: Organization) -> list[dict]:

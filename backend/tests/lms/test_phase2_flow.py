@@ -37,6 +37,11 @@ async def test_phase2_flow(db, api, db_driver):
                                                           "default_language": "ru"})
     assert r.status_code == 201, r.text
     cid = r.json()["id"]
+    import uuid as _uuid
+
+    from app.lms.courses.models import Course
+
+    _c = db.get(Course, _uuid.UUID(cid)); _c.template_key, _c.template_version = "ort", 1; db.commit()  # Phase 6 S2b: ORT presets/import formats need the ORT course template
     assert (await api.call(teacher, "POST", f"/courses/{cid}/publish")).status_code == 200
     enroll_code = r.json()["join_code"]
     assert (await api.call(student, "POST", "/courses/join", json={"code": enroll_code})).status_code == 200

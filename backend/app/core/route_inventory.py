@@ -64,6 +64,12 @@ from app.lms.platform_admin.organizations_policies import PLATFORM_ORG_POLICIES 
 ROUTE_POLICIES.update(ORG_POLICIES)
 ROUTE_POLICIES.update(PLATFORM_ORG_POLICIES)
 # --- Phase 6 S1 end ---
+# --- Phase 6 S2b begin --- (course templates, PHASE_6_DESIGN 2.3 / 5.4)
+ROUTE_POLICIES.update({
+    ("GET", "/api/v1/courses/templates"): "authenticated",  # + member of the organization or platform admin
+    ("PATCH", "/api/v1/platform/courses/{course_id}"): "platform_admin",  # template_locked, audited
+})
+# --- Phase 6 S2b end ---
 
 
 def iter_routes(app):

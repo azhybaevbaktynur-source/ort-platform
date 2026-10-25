@@ -122,6 +122,9 @@ class CourseStudentOut(BaseModel):
     organization_id: uuid.UUID
     organization_name: str
     # --- Phase 6 S1 end ---
+    # --- Phase 6 S2b begin --- (course template, PHASE_6_DESIGN 5.3; null for a general course)
+    template: Optional["CourseTemplateOut"] = None
+    # --- Phase 6 S2b end ---
 
 
 class CourseStaffOut(CourseStudentOut):
@@ -163,6 +166,20 @@ class AdminCourseOut(BaseModel):
     deleted_by_id: Optional[str] = None
 
 
+# --- Phase 6 S2b begin --- (course template, PHASE_6_DESIGN 5.3)
+from app.lms.templates.schemas import CourseTemplateOut  # noqa: E402
+
+CourseStudentOut.model_rebuild()
+CourseStaffOut.model_rebuild()
+
+
+def _course_template_out(course):
+    from app.lms.templates.service import course_template_out
+
+    return course_template_out(course)
+# --- Phase 6 S2b end ---
+
+
 def course_card(course, my_role: Optional[str], owner_display_name: Optional[str]) -> CourseCard:
     return CourseCard(
         id=course.id, title=course.title, languages=list(course.languages),
@@ -179,6 +196,7 @@ def course_student_out(course, enrollment, owner, organization_name: str = "") -
         ends_at=course.ends_at, owner_display_name=public_display_name(owner),
         my_enrollment=MyEnrollmentOut.model_validate(enrollment) if enrollment is not None else None,
         organization_id=course.organization_id, organization_name=organization_name,
+        template=_course_template_out(course),  # --- Phase 6 S2b --- (one line)
     )
 
 

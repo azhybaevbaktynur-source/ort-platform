@@ -112,6 +112,11 @@ class Exam:
 
 
 async def _build_exam(api, db, teacher, cid, *, category_id, due_at) -> Exam:
+    import uuid as _uuid
+
+    from app.lms.courses.models import Course
+
+    _c = db.get(Course, _uuid.UUID(str(cid))); _c.template_key, _c.template_version = "ort", 1; db.commit()  # Phase 6 S2b: ORT presets/import formats need the ORT course template
     a = await mk(api, teacher, cid, title={"ru": "ОРТ пробный"}, preset="ort_main", languages=["ru"])
     assert [s["key"] for s in a["sections"]] == SECTION_KEYS
     # P4-6: the ort_main preset attaches the system ORT-main scheme version
