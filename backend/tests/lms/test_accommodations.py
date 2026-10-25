@@ -466,3 +466,34 @@ async def test_note_never_in_student_payloads(db, api, frozen_clock):
     # and the student cannot read the staff routes
     assert (await api.call(q.student, "GET", f"/courses/{q.course.id}/accommodations")).status_code == 403
     assert enr.id is not None
+
+
+async def test_override_route_extends_hand_in_deadline(db, api):
+    """S2's hand-in checks go through effective.resolve: an override written through the S4 route reopens a closed
+    text assignment and moves its due date for that student only (on time, not late); the other student stays
+    closed and the student list / detail show the student's own dates."""
+    from app.lms.core.models import utcnow
+    from tests.lms.assignment_support import hand_in, make_assignment
+    from tests.lms.assignment_support import world as a_world
+
+    w = a_world(db)
+    n = utcnow()
+    a = make_assignment(db, w.course, w.O, kind="text", due_at=n - timedelta(hours=3),
+                        available_until=n - timedelta(hours=1))
+    r = await hand_in(api, w.S, w, a, body_text="x")
+    assert r.status_code == 409 and r.json()["error"]["details"]["reason"] == "closed"
+    path = f"/courses/{w.cid}/assignments/{a.id}/overrides/{w.enr.id}"
+    r = await api.call(w.O, "PUT", path, json={"due_at": iso(n + timedelta(days=1)),
+                                               "available_until": iso(n + timedelta(days=2))})
+    assert r.status_code == 200, r.text
+    r = await hand_in(api, w.S, w, a, body_text="thanks to the extension")
+    assert r.status_code == 201, r.text
+    assert r.json()["late"] is False and r.json()["late_seconds"] == 0
+    assert (await hand_in(api, w.S2, w, a, body_text="x")).status_code == 409
+    mine = (await api.call(w.S, "GET", f"/courses/{w.cid}/assignments/{a.id}/mine")).json()
+    assert mine["due_at"][:16] == (n + timedelta(days=1)).isoformat()[:16]
+    # an accommodation (no dates) does not reopen anything
+    r = await api.call(w.O, "PUT", f"/courses/{w.cid}/enrollments/{w.enr2.id}/accommodations",
+                       json={"extra_attempts": 3, "extra_time_s": 600})
+    assert r.status_code == 200
+    assert (await hand_in(api, w.S2, w, a, body_text="x")).status_code == 409
