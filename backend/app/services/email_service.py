@@ -170,58 +170,106 @@ def _wrap_html(title: str, body_html: str, footer: str) -> str:
 """
 
 
+# --- Phase 6 UX F3 begin --- (neutral auth emails: the platform-name placeholder instead of ORT branding)
+# Placeholder for the frontend i18n key `common.appName` (one value per language) until the platform name is final.
+APP_NAME: dict[str, str] = {"en": "Platform", "ru": "Платформа", "ky": "Платформа"}
+DEFAULT_FROM_NAME = "Platform"  # = config default of EMAIL_FROM_NAME
+AUTH_LANGUAGES = ("en", "ky", "ru")
+
+
+def _auth_lang(lang: Optional[str]) -> str:
+    return lang if lang in AUTH_LANGUAGES else "ky"
+
+
+def _auth_from_name(lang: str) -> Optional[str]:
+    """A configured EMAIL_FROM_NAME wins (None = send_email uses the setting); the default becomes the
+    platform name in the email's language."""
+    if settings.EMAIL_FROM_NAME and settings.EMAIL_FROM_NAME != DEFAULT_FROM_NAME:
+        return None
+    return APP_NAME[lang]
+
+
+_VERIFY_TEXTS: dict[str, dict[str, str]] = {
+    "en": {
+        "subject": "{app}: your confirmation code {code}",
+        "title": "Confirm your email",
+        "intro": "Your code to confirm your email on {app}:",
+        "validity": "The code is valid for {minutes} minutes.",
+        "footer": "If you did not sign up on {app}, just ignore this email.",
+    },
+    "ru": {
+        "subject": "{app}: код подтверждения {code}",
+        "title": "Подтверждение email",
+        "intro": "Ваш код для подтверждения email:",
+        "validity": "Код действует {minutes} минут.",
+        "footer": "Если вы не регистрировались, просто проигнорируйте это письмо.",
+    },
+    "ky": {
+        "subject": "{app}: ырастоо коду {code}",
+        "title": "Email'ди ырастоо",
+        "intro": "Email'иңизди ырастоо коду:",
+        "validity": "Код {minutes} мүнөт жарактуу.",
+        "footer": "Эгер сиз катталбасаңыз, бул катты этибарга албаңыз.",
+    },
+}
+
+_RESET_TEXTS: dict[str, dict[str, str]] = {
+    "en": {
+        "subject": "{app}: reset your password",
+        "title": "Reset your password",
+        "intro": "Hello! You asked to reset your password on {app}.",
+        "button": "Set a new password",
+        "copy_hint": "Or copy this link into your browser:",
+        "footer": "The link is valid for {minutes} minutes. If you did not ask for this, ignore this email.",
+    },
+    "ru": {
+        "subject": "{app}: восстановление пароля",
+        "title": "Восстановление пароля",
+        "intro": "Здравствуйте! Вы запросили восстановление пароля.",
+        "button": "Установить новый пароль",
+        "copy_hint": "Или скопируйте ссылку в адресную строку браузера:",
+        "footer": "Ссылка действительна {minutes} минут. Если вы не отправляли запрос, проигнорируйте это письмо.",
+    },
+    "ky": {
+        "subject": "{app}: сырсөздү калыбына келтирүү",
+        "title": "Сырсөздү калыбына келтирүү",
+        "intro": "Саламатсызбы! Сиз сырсөздү калыбына келтирүүнү сурандыңыз.",
+        "button": "Сырсөздү алмаштыруу",
+        "copy_hint": "Же шилтемени көчүрүп, браузерге чаптаңыз:",
+        "footer": "Шилтеме {minutes} мүнөт жарактуу. Эгерде өтүнүч жөнөтпөсөңүз, катты өчүрүп салыңыз.",
+    },
+}
+
+
 def send_verification_code_email(to_email: str, code: str, lang: str = "ky") -> bool:
-    minutes = settings.EMAIL_CODE_TTL_MINUTES
-    if lang == "ru":
-        subject = f"Код подтверждения ОРТ: {code}"
-        intro = "Ваш код для подтверждения email на платформе подготовки к ОРТ:"
-        validity = f"Код действует {minutes} минут."
-        footer = "Если вы не регистрировались на платформе ОРТ, просто проигнорируйте это письмо."
-        title = "Подтверждение email"
-    else:
-        subject = f"ЖРТ ырастоо коду: {code}"
-        intro = "ЖРТ даярдоо платформасында email'иңизди ырастоо коду:"
-        validity = f"Код {minutes} мүнөт жарактуу."
-        footer = "Эгер сиз ЖРТ платформасында катталбасаңыз, бул катты этибарга албаңыз."
-        title = "Email'ди ырастоо"
-    text = f"{intro}\n\n{code}\n\n{validity}\n\n{footer}\n"
-    html = _wrap_html(title, f"""
-  <p style="color: #475569; font-size: 14px;">{escape(intro)}</p>
+    lang = _auth_lang(lang)
+    fmt = dict(app=APP_NAME[lang], code=code, minutes=settings.EMAIL_CODE_TTL_MINUTES)
+    t = {k: v.format(**fmt) for k, v in _VERIFY_TEXTS[lang].items()}
+    text = f"{t['intro']}\n\n{code}\n\n{t['validity']}\n\n{t['footer']}\n"
+    html = _wrap_html(t["title"], f"""
+  <p style="color: #475569; font-size: 14px;">{escape(t['intro'])}</p>
   <p style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #1e293b; margin: 24px 0;">{escape(code)}</p>
-  <p style="color: #64748b; font-size: 13px;">{escape(validity)}</p>
-""", footer)
-    return send_email(to_email, subject, text, html)
+  <p style="color: #64748b; font-size: 13px;">{escape(t['validity'])}</p>
+""", t["footer"])
+    return send_email(to_email, t["subject"], text, html, from_name=_auth_from_name(lang))
 
 
 def send_password_reset_email(to_email: str, token: str, lang: str = "ky") -> bool:
     """Sends a password reset link valid for PASSWORD_RESET_TTL_MINUTES."""
     frontend_base = (settings.FRONTEND_URL or "http://localhost:3000").rstrip("/")
-    clean_lang = lang if lang in ("ky", "ru") else "ky"
+    clean_lang = _auth_lang(lang)
     reset_link = f"{frontend_base}/{clean_lang}/reset-password?token={token}"
-    minutes = settings.PASSWORD_RESET_TTL_MINUTES
+    fmt = dict(app=APP_NAME[clean_lang], minutes=settings.PASSWORD_RESET_TTL_MINUTES)
+    t = {k: v.format(**fmt) for k, v in _RESET_TEXTS[clean_lang].items()}
 
-    if clean_lang == "ru":
-        subject = "Платформа ОРТ: Восстановление пароля"
-        title = "Восстановление пароля"
-        intro = "Здравствуйте! Вы запросили восстановление пароля на платформе подготовки к ОРТ."
-        button = "Установить новый пароль"
-        copy_hint = "Или скопируйте ссылку в адресную строку браузера:"
-        footer = f"Ссылка действительна {minutes} минут. Если вы не отправляли запрос, проигнорируйте это письмо."
-    else:
-        subject = "ЖРТ Платформасы: Сырсөздү калыбына келтирүү"
-        title = "Сырсөздү калыбына келтирүү"
-        intro = "Саламатсызбы! Сиз ЖРТ платформасында сырсөздү калыбына келтирүүнү сурандыңыз."
-        button = "Сырсөздү алмаштыруу"
-        copy_hint = "Же шилтемени көчүрүп, браузерге чаптаңыз:"
-        footer = f"Шилтеме {minutes} мүнөт жарактуу. Эгерде өтүнүч жөнөтпөсөңүз, катты өчүрүп салыңыз."
-
-    text = f"{intro}\n\n{reset_link}\n\n{footer}\n"
+    text = f"{t['intro']}\n\n{reset_link}\n\n{t['footer']}\n"
     safe_link = escape(reset_link, quote=True)
-    html = _wrap_html(title, f"""
-  <p style="color: #475569; font-size: 14px;">{escape(intro)}</p>
+    html = _wrap_html(t["title"], f"""
+  <p style="color: #475569; font-size: 14px;">{escape(t['intro'])}</p>
   <div style="margin: 24px 0;">
-    <a href="{safe_link}" style="background-color: #4f46e5; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">{escape(button)}</a>
+    <a href="{safe_link}" style="background-color: #4f46e5; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">{escape(t['button'])}</a>
   </div>
-  <p style="color: #64748b; font-size: 12px;">{escape(copy_hint)}<br><a href="{safe_link}">{safe_link}</a></p>
-""", footer)
-    return send_email(to_email, subject, text, html)
+  <p style="color: #64748b; font-size: 12px;">{escape(t['copy_hint'])}<br><a href="{safe_link}">{safe_link}</a></p>
+""", t["footer"])
+    return send_email(to_email, t["subject"], text, html, from_name=_auth_from_name(clean_lang))
+# --- Phase 6 UX F3 end ---

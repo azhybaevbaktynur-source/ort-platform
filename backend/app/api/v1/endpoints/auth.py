@@ -76,7 +76,7 @@ def _issue_email_code(user: User, db: Session, lang: str) -> bool:
     user.email_code_attempts = 0
     user.email_code_sent_at = _now()
     db.commit()
-    sent = send_verification_code_email(to_email=user.email, code=code, lang=lang if lang in ("ky", "ru") else "ky")
+    sent = send_verification_code_email(to_email=user.email, code=code, lang=lang if lang in ("en", "ky", "ru") else "ky")
     if not sent:
         # Nothing reached the user: no resend wait, and no code that could only be guessed
         user.email_code_sent_at = None

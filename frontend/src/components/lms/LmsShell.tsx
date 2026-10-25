@@ -90,7 +90,10 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
               {canCreate && (
                 <Link href={`${coursesHref}/new`} className={linkCls(`${coursesHref}/new`)}><Plus className="h-4 w-4" aria-hidden="true" />{t("lms.nav.create")}</Link>
               )}
-              {/* --- Phase 6 S4: "Become teacher" moved to the account group as "I am a teacher"; org admin link --- */}
+              {/* --- Phase 6 S4: "I am a teacher" (nav row so the account group fits 375 px, UX F1); org admin link --- */}
+              {canRequestTeacher && (
+                <Link href={`/${lang}/teacher-access`} className={linkCls(`/${lang}/teacher-access`)}><UserPlus className="h-4 w-4" aria-hidden="true" />{t("teacherAccess.navLink")}</Link>
+              )}
               <OrgNavLink enabled={!!me} className={(href) => linkCls(href)} />
               {/* --- Phase 6 S4 end --- */}
               {(canCreate || isAdmin) && (
@@ -108,18 +111,14 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
                 </button>
               ))}
             </div>
-            <div role="group" aria-label={t("lms.nav.account")} className="flex items-center gap-1">
-              <span className="inline-flex max-w-[14rem] items-center gap-1.5 truncate px-2 text-sm text-slate-700" title={user.email}>
+            <div role="group" aria-label={t("lms.nav.account")} className="flex min-w-0 max-w-full items-center gap-1">
+              <span className="inline-flex min-w-0 max-w-[13rem] items-center gap-1.5 px-2 text-sm text-slate-700 sm:max-w-[14rem]"
+                title={name === user.email ? name : `${name} (${user.email})`}>
                 <UserCircle className="h-4 w-4 flex-shrink-0 text-slate-500" aria-hidden="true" />
                 <span className="truncate">{name}</span>
               </span>
-              {/* --- Phase 6 S4 --- */}
-              {canRequestTeacher && (
-                <Link href={`/${lang}/teacher-access`} className={linkCls(`/${lang}/teacher-access`)}><UserPlus className="h-4 w-4" aria-hidden="true" />{t("teacherAccess.navLink")}</Link>
-              )}
-              {/* --- Phase 6 S4 end --- */}
               <button type="button" onClick={() => void logout()}
-                className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
+                className="inline-flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
                 <LogOut className="h-4 w-4" aria-hidden="true" />{t("common.logout")}
               </button>
             </div>

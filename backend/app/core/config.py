@@ -156,7 +156,7 @@ class Settings(BaseSettings):
     # Note: Render free instances block outbound SMTP ports, so use an HTTP API (Resend/Brevo) there.
     EMAIL_PROVIDER: str = ""
     EMAIL_FROM: str = ""             # e.g. "noreply@yourdomain.kg" (must be verified with the provider)
-    EMAIL_FROM_NAME: str = "ОРТ Платформа"
+    EMAIL_FROM_NAME: str = "Platform"  # default = per-language platform name in auth emails; any other value overrides
     RESEND_API_KEY: str = ""
     BREVO_API_KEY: str = ""
 

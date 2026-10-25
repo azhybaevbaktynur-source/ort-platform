@@ -961,6 +961,7 @@
       "subject": "Subject",
       "languages": "Languages of the assessment",
       "languagesHint": "Every question must exist in each selected language. ORT exams are normally one language each.",
+      "languagesHintGeneral": "Every question must exist in each selected language.",
       "submit": "Create"
     },
     "list": {

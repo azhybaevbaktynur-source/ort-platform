@@ -28,7 +28,7 @@ class UserRegisterRequest(BaseModel):
     password: str = Field(min_length=6, description="Password at least 6 characters")
     displayName: Optional[str] = Field(None, max_length=DISPLAY_NAME_MAX)
     phone: Optional[str] = None
-    lang: Optional[str] = Field("ky", pattern="^(ky|ru)$", description="Language of the verification email")
+    lang: Optional[str] = Field("ky", pattern="^(en|ky|ru)$", description="Language of the verification email")
 
     @field_validator("displayName")
     @classmethod
@@ -52,12 +52,12 @@ class VerifyEmailRequest(BaseModel):
 
 class ResendCodeRequest(BaseModel):
     email: EmailStr
-    lang: Optional[str] = Field("ky", pattern="^(ky|ru)$")
+    lang: Optional[str] = Field("ky", pattern="^(en|ky|ru)$")
 
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
-    lang: Optional[str] = Field("ky", pattern="^(ky|ru)$")
+    lang: Optional[str] = Field("ky", pattern="^(en|ky|ru)$")
 
 
 class ResetPasswordRequest(BaseModel):
@@ -68,7 +68,7 @@ class ResetPasswordRequest(BaseModel):
 class UserLoginRequest(BaseModel):
     email: EmailStr
     password: str
-    lang: Optional[str] = Field("ky", pattern="^(ky|ru)$", description="Language of a verification email, if one is needed")
+    lang: Optional[str] = Field("ky", pattern="^(en|ky|ru)$", description="Language of a verification email, if one is needed")
 
 
 class TokenResponse(BaseModel):

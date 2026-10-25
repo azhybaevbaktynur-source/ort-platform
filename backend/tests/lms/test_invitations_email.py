@@ -30,11 +30,19 @@ def test_texts_per_language(lang, subject, button, app_name, monkeypatch):
     mail = build(lang, message="Join us <b>now</b>")
     assert mail.subject == subject
     assert mail.from_name == f"Aida via {app_name}" and mail.reply_to == "aida@school.example"
-    link = f"https://app.example/{lang}/invite/TOKEN_abc-123"
+    link = f"https://app.example/{lang}/invite/TOKEN_abc-123?email=new%40example.com"  # UX F2: prefill register
     assert link in mail.text and link in mail.html and button in mail.html
     assert "2026-11-08 12:30" in mail.text
     assert "Join us <b>now</b>" in mail.text and "Join us &lt;b&gt;now&lt;/b&gt;" in mail.html
     assert "aida@school.example" not in mail.text and "aida@school.example" not in mail.html
+
+
+def test_invite_link_encodes_the_email(monkeypatch):
+    monkeypatch.setattr(settings, "FRONTEND_URL", "https://app.example")
+    assert emails.invite_link("T", "ru", "a+b&c@x.example") == "https://app.example/ru/invite/T?email=a%2Bb%26c%40x.example"
+    assert emails.invite_link("T", "ru") == "https://app.example/ru/invite/T"
+    mail = build("ru", to_email="a+b&c@x.example")
+    assert "?email=a%2Bb%26c%40x.example" in mail.text and "?email=a%2Bb%26c%40x.example" in mail.html
 
 
 def test_course_invitation_text_and_unknown_language():
