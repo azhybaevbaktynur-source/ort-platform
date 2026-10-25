@@ -34,7 +34,7 @@ export default function PassagePage() {
   const base = `/${lang}/courses/${course.id}/bank`;
   const bankId = p ? p.bank_id || p.questions[0]?.bank_id : undefined;
   const crumbs = useTabCrumbs("bank", [
-    { label: t("bank.passages.back"), href: bankId ? `${base}/${bankId}/passages` : base },
+    { label: t("bank.passages.crumb"), href: bankId ? `${base}/${bankId}/passages` : base },
     { label: p?.current_version.title || t("bank.passages.untitled") },
   ], course.id);
   if (error && !p) return <ContentError error={error} onRetry={load} />;

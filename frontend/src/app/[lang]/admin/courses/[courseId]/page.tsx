@@ -10,7 +10,7 @@ import {
 import type { AdminCourseOut, RosterEntryOut } from "@/lib/lms/types";
 import { pickLocalized } from "@/lib/lms/localized";
 import { isSystemAccount } from "@/lib/lms/organizations";
-import { fmtApiDateTime } from "@/lib/format";
+import { fmtApiDateTimeShort } from "@/lib/format";
 import {
   Badge, Button, Card, DescriptionList, LoadingState, PageHeader, ReasonDialog, Table, UserPicker, toast, type TableColumn,
 } from "@/components/ui";
@@ -130,7 +130,7 @@ export default function AdminCourseDetailPage() {
       {course.unlisted_by_admin_at
         ? <Button variant="secondary" onClick={() => open("relist")}>{labels.relist}</Button>
         : <Button variant="secondary" onClick={() => open("unlist")}>{labels.unlist}</Button>}
-      <Button variant="danger" onClick={() => open("delete")}>{labels.delete}</Button>
+      <Button variant="dangerOutline" onClick={() => open("delete")}>{labels.delete}</Button>
     </>
   );
   const badges = (
@@ -166,9 +166,9 @@ export default function AdminCourseDetailPage() {
           },
           { key: "visibility", term: t("platformAdmin.courses.visibility"), description: t(`platformAdmin.courses.visibilityValues.${course.visibility}`) },
           { key: "students", term: t("platformAdmin.courses.students"), description: course.active_student_count },
-          { key: "created", term: t("platformAdmin.users.created"), description: fmtApiDateTime(course.created_at, lang) },
-          ...(course.unlisted_by_admin_at ? [{ key: "unlisted", term: t("platformAdmin.courses.unlisted"), description: fmtApiDateTime(course.unlisted_by_admin_at, lang) }] : []),
-          ...(course.deleted_at ? [{ key: "deleted", term: t("platformAdmin.courses.deleted"), description: fmtApiDateTime(course.deleted_at, lang) }] : []),
+          { key: "created", term: t("platformAdmin.users.created"), description: fmtApiDateTimeShort(course.created_at, lang) },
+          ...(course.unlisted_by_admin_at ? [{ key: "unlisted", term: t("platformAdmin.courses.unlisted"), description: fmtApiDateTimeShort(course.unlisted_by_admin_at, lang) }] : []),
+          ...(course.deleted_at ? [{ key: "deleted", term: t("platformAdmin.courses.deleted"), description: fmtApiDateTimeShort(course.deleted_at, lang) }] : []),
         ]} />
       </Card>
 

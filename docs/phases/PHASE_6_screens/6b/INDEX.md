@@ -482,3 +482,75 @@ ORT pairs (`ort-*-s11a.jpg`) are the committed baselines in `docs/phases/ORT_BAS
 | s6b-lobby-no-attempts-phone-en.jpg | Lobby after the last attempt (F3): "No attempts left" only in My attempts, no second banner | 375x812 | en | 375 |
 | s6b-lobby-no-attempts-phone-ky.jpg | Lobby after the last attempt (F3): "No attempts left" only in My attempts, no second banner | 375x812 | ky | 375 |
 | s6b-lobby-no-attempts-phone-ru.jpg | Lobby after the last attempt (F3): "No attempts left" only in My attempts, no second banner | 375x812 | ru | 375 |
+## S11b staff UX review fixes (branch `phase-6/s11b-uxfix`, 2026-10-25)
+
+Built frontend (`next build` + `next start`, rsync'd copy) against a scratch backend on a copy of the S5c UX-gate
+database; playwright-core + Chrome, phone 375x812 (`isMobile`), desktop 1440x900, ru, timezone Asia/Bishkek.
+Script `s11b.js` (scratch). `scrollWidth` = `document.documentElement.scrollWidth` (375 on every phone shot).
+Files with an `s5b-` / `s5c-` name replace the earlier shot of the same screen (re-shot after the glossary or
+changed here). Checks in the run: the 'Новый вопрос' menu lists the same 7 question types and navigates to
+`/new?type=...` as the old select did; Esc closes it and returns focus; the header area on `/courses` follows
+`?view=` and the Teaching/Learning tab (UX 15).
+
+| File | Screen | Route | Viewport | scrollWidth |
+|---|---|---|---|---|
+| s11b-audit-details-open-desktop-ru.jpg | Audit log: 'Детали' of one entry open in a dialog (formatted JSON) | `/admin/audit-log` | 1440x900 | 1440 |
+| s11b-bank-new-question-menu-desktop-ru.jpg | 'Новый вопрос' menu open: the same seven question types | `/courses/a71d282e-c0fd-4841-b76b-0630880627cc/bank/8b118777-7441-4ea5-85eb-2aa5c88d1ebe` | 1440x900 | 1440 |
+| s11b-bank-new-question-menu-phone-ru.jpg | 'Новый вопрос' menu open: the same seven question types | `/courses/a71d282e-c0fd-4841-b76b-0630880627cc/bank/8b118777-7441-4ea5-85eb-2aa5c88d1ebe` | 375x812 | 375 |
+| s11b-schemes-no-access-desktop-ru.jpg | Grading schemes without access: new text, LinkButton primary + secondary (UX 5) | `/grading-schemes` | 1440x900 | 1440 |
+| s11b-schemes-no-access-phone-ru.jpg | Grading schemes without access: new text, LinkButton primary + secondary (UX 5) | `/grading-schemes` | 375x812 | 375 |
+| s5b-admin-03-org-detail-desktop-ru.jpg | Org detail: outlined 'Приостановить', storage in Б/КБ/МБ, date without seconds (UX 8, 10, 11) | `/admin/organizations/8e4687c7-21b6-4962-9c21-d1f5f36132ee` | 1440x900 | 1440 |
+| s5b-admin-03-org-detail-phone-ru.jpg | Org detail: outlined 'Приостановить', storage in Б/КБ/МБ, date without seconds (UX 8, 10, 11) | `/admin/organizations/8e4687c7-21b6-4962-9c21-d1f5f36132ee` | 375x812 | 375 |
+| s5b-admin-04-org-tab-usage-desktop-ru.jpg | Org detail, tab Использование: storage in localized units (UX 10) | `/admin/organizations/8e4687c7-21b6-4962-9c21-d1f5f36132ee` | 1440x900 | 1440 |
+| s5b-admin-04-org-tab-usage-phone-ru.jpg | Org detail, tab Использование: storage in localized units (UX 10) | `/admin/organizations/8e4687c7-21b6-4962-9c21-d1f5f36132ee` | 375x812 | 375 |
+| s5b-admin-05-teacher-requests-all-desktop-ru.jpg | Teacher requests, tab All: dates without seconds (UX 11) | `/admin/teacher-requests` | 1440x900 | 1440 |
+| s5b-admin-05-teacher-requests-all-phone-ru.jpg | Teacher requests, tab All: dates without seconds (UX 11) | `/admin/teacher-requests` | 375x812 | 375 |
+| s5b-admin-06-users-desktop-ru.jpg | Users: phone section row keeps a peek of the previous tab under the fade (UX 11) | `/admin/users` | 1440x900 | 1440 |
+| s5b-admin-06-users-phone-ru.jpg | Users: phone section row keeps a peek of the previous tab under the fade (UX 11) | `/admin/users` | 375x812 | 375 |
+| s5b-admin-07-user-detail-desktop-ru.jpg | User detail: outlined 'Заблокировать', dates without seconds (UX 8, 11) | `/admin/users/usr_1451905d478d` | 1440x900 | 1440 |
+| s5b-admin-07-user-detail-phone-ru.jpg | User detail: outlined 'Заблокировать', dates without seconds (UX 8, 11) | `/admin/users/usr_1451905d478d` | 375x812 | 375 |
+| s5b-admin-09-course-detail-desktop-ru.jpg | Course detail: outlined 'Удалить', dates without seconds (UX 8, 11) | `/admin/courses/a71d282e-c0fd-4841-b76b-0630880627cc` | 1440x900 | 1440 |
+| s5b-admin-09-course-detail-phone-ru.jpg | Course detail: outlined 'Удалить', dates without seconds (UX 8, 11) | `/admin/courses/a71d282e-c0fd-4841-b76b-0630880627cc` | 375x812 | 375 |
+| s5b-admin-10-audit-log-desktop-ru.jpg | Audit log: 'Детали' disclosure instead of raw JSON, times without seconds (UX 7, 11) | `/admin/audit-log` | 1440x900 | 1440 |
+| s5b-admin-10-audit-log-phone-ru.jpg | Audit log: 'Детали' disclosure instead of raw JSON, times without seconds (UX 7, 11) | `/admin/audit-log` | 375x812 | 375 |
+| s5b-admin-dlg-disable-desktop-ru.jpg | Disable account dialog (opened from the outlined button) | `/admin/users/usr_1451905d478d` | 1440x900 | 1440 |
+| s5b-admin-dlg-disable-phone-ru.jpg | Disable account dialog (opened from the outlined button) | `/admin/users/usr_1451905d478d` | 375x812 | 375 |
+| s5b-admin-dlg-suspend-desktop-ru.jpg | Suspend/resume dialog: no nested quotes, organization name bold in the object box (UX 9) | `/admin/organizations/fd38eb64-dc3b-4c5f-9300-cd4bb25e8bbb` | 1440x900 | 1440 |
+| s5b-admin-dlg-suspend-phone-ru.jpg | Suspend/resume dialog: no nested quotes, organization name bold in the object box (UX 9) | `/admin/organizations/fd38eb64-dc3b-4c5f-9300-cd4bb25e8bbb` | 375x812 | 375 |
+| s5b-auth-login-desktop-ru.jpg | Signed out: /login ('Email' label, re-shot) | `/login` | 1440x900 | 1440 |
+| s5b-auth-login-phone-ru.jpg | Signed out: /login ('Email' label, re-shot) | `/login` | 375x812 | 375 |
+| s5b-org-02-teachers-desktop-ru.jpg | Org teachers and invitations: 'Пригласил(а)' and 'Действует до' columns (UX 12) | `/org/8e4687c7-21b6-4962-9c21-d1f5f36132ee/teachers` | 1440x900 | 1440 |
+| s5b-org-02-teachers-phone-ru.jpg | Org teachers and invitations: 'Пригласил(а)' and 'Действует до' columns (UX 12) | `/org/8e4687c7-21b6-4962-9c21-d1f5f36132ee/teachers` | 375x812 | 375 |
+| s5b-org-04-course-desktop-ru.jpg | Org course summary (re-shot after the glossary) | `/org/8e4687c7-21b6-4962-9c21-d1f5f36132ee/courses/ecb1a978-ab08-4c89-ba96-12fa0c04490f` | 1440x900 | 1440 |
+| s5b-org-04-course-phone-ru.jpg | Org course summary (re-shot after the glossary) | `/org/8e4687c7-21b6-4962-9c21-d1f5f36132ee/courses/ecb1a978-ab08-4c89-ba96-12fa0c04490f` | 375x812 | 375 |
+| s5c-teacher-assessment-detail-desktop-ru.jpg | Assessment overview: points with Russian plural (UX 4) | `/courses/a71d282e-c0fd-4841-b76b-0630880627cc/assessments/5f13238a-55f1-4668-ab30-fddbf844cbb9` | 1440x900 | 1440 |
+| s5c-teacher-assessment-detail-phone-ru.jpg | Assessment overview: points with Russian plural (UX 4) | `/courses/a71d282e-c0fd-4841-b76b-0630880627cc/assessments/5f13238a-55f1-4668-ab30-fddbf844cbb9` | 375x812 | 375 |
+| s5c-teacher-bank-passages-desktop-ru.jpg | Passages list: '{n} вопрос/вопроса/вопросов' plural (UX 4) | `/courses/a71d282e-c0fd-4841-b76b-0630880627cc/bank/8b118777-7441-4ea5-85eb-2aa5c88d1ebe/passages` | 1440x900 | 1440 |
+| s5c-teacher-bank-passages-phone-ru.jpg | Passages list: '{n} вопрос/вопроса/вопросов' plural (UX 4) | `/courses/a71d282e-c0fd-4841-b76b-0630880627cc/bank/8b118777-7441-4ea5-85eb-2aa5c88d1ebe/passages` | 375x812 | 375 |
+| s5c-teacher-bank-questions-desktop-ru.jpg | Bank questions: labelled design-system filters (full width), primary 'Новый вопрос' (UX 1) | `/courses/a71d282e-c0fd-4841-b76b-0630880627cc/bank/8b118777-7441-4ea5-85eb-2aa5c88d1ebe` | 1440x900 | 1440 |
+| s5c-teacher-bank-questions-phone-ru.jpg | Bank questions: labelled design-system filters (full width), primary 'Новый вопрос' (UX 1) | `/courses/a71d282e-c0fd-4841-b76b-0630880627cc/bank/8b118777-7441-4ea5-85eb-2aa5c88d1ebe` | 375x812 | 375 |
+| s5c-teacher-builder-desktop-ru.jpg | Builder: the assessment name is the title, 'Редактирование' the last crumb (UX 3) | `/courses/a71d282e-c0fd-4841-b76b-0630880627cc/assessments/5f13238a-55f1-4668-ab30-fddbf844cbb9/edit` | 1440x900 | 1440 |
+| s5c-teacher-builder-phone-ru.jpg | Builder: the assessment name is the title, 'Редактирование' the last crumb (UX 3) | `/courses/a71d282e-c0fd-4841-b76b-0630880627cc/assessments/5f13238a-55f1-4668-ab30-fddbf844cbb9/edit` | 375x812 | 375 |
+| s5c-teacher-course-home-desktop-ru.jpg | Teacher course home (re-shot after the glossary) | `/courses/a71d282e-c0fd-4841-b76b-0630880627cc` | 1440x900 | 1440 |
+| s5c-teacher-course-home-phone-ru.jpg | Teacher course home (re-shot after the glossary) | `/courses/a71d282e-c0fd-4841-b76b-0630880627cc` | 375x812 | 375 |
+| s5c-teacher-my-courses-desktop-ru.jpg | Teaching tab of a course creator; header area = Преподавание (UX 15) | `/courses` | 1440x900 | 1440 |
+| s5c-teacher-my-courses-phone-ru.jpg | Teaching tab of a course creator; header area = Преподавание (UX 15) | `/courses` | 375x812 | 375 |
+| s5c-teacher-passage-editor-desktop-ru.jpg | Passage editor: breadcrumb 'Тексты' instead of 'Назад к текстам' (UX 2) | `/courses/a71d282e-c0fd-4841-b76b-0630880627cc/bank/p/d0072b72-77ad-42ca-8272-2cf9bd7c1980` | 1440x900 | 1440 |
+| s5c-teacher-passage-editor-phone-ru.jpg | Passage editor: breadcrumb 'Тексты' instead of 'Назад к текстам' (UX 2) | `/courses/a71d282e-c0fd-4841-b76b-0630880627cc/bank/p/d0072b72-77ad-42ca-8272-2cf9bd7c1980` | 375x812 | 375 |
+| s5c-teacher-people-desktop-ru.jpg | People tab (re-shot after the glossary) | `/courses/a71d282e-c0fd-4841-b76b-0630880627cc/people` | 1440x900 | 1440 |
+| s5c-teacher-people-phone-ru.jpg | People tab (re-shot after the glossary) | `/courses/a71d282e-c0fd-4841-b76b-0630880627cc/people` | 375x812 | 375 |
+| s5c-teacher-settings-desktop-ru.jpg | Course settings (re-shot after the glossary) | `/courses/a71d282e-c0fd-4841-b76b-0630880627cc/settings` | 1440x900 | 1440 |
+| s5c-teacher-settings-phone-ru.jpg | Course settings (re-shot after the glossary) | `/courses/a71d282e-c0fd-4841-b76b-0630880627cc/settings` | 375x812 | 375 |
+
+### S11b ORT teacher baselines (`docs/phases/ORT_BASELINE/teacher-*`)
+
+Pairs `ort-<baseline>-s11b-{before,after}.jpg`: `before` = the S7b baseline, `after` = the re-recorded baseline
+(`UPDATE_BASELINES=1`, then a clean run of the whole `ort-visual.spec.ts`: 6 passed, students unchanged; the DOM
+walk `ort.spec.ts`: 2 passed). ORT options, defaults and lock notes are unchanged.
+
+| Baseline | What changed |
+|---|---|
+| `teacher-bank-{phone,desktop}-ru` | Labelled design-system filters (search, type, language, section, topic, difficulty, tag; 2 columns on phones); 'Новый вопрос' is the primary button in the page header (menu with the same question types as the old select) |
+| `teacher-passage-{phone,desktop}-ru` | Breadcrumb 'Тексты' instead of 'Назад к текстам' |
+| `teacher-builder-{phone,desktop}-ru` | Title = the exam name; 'Редактирование' is the last breadcrumb |
+| `teacher-attempts-{phone,desktop}-ru`, `teacher-import-phone-ru`, `teacher-question-comparison-phone-ru` | Below the diff threshold, re-recorded with the rest: on phones the course tab row keeps 56 px of the neighbouring tab visible under the edge fade (UX 11) |

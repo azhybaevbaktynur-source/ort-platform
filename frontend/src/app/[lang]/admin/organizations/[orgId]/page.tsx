@@ -7,10 +7,11 @@ import { TriangleAlert } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { listAuditLog } from "@/lib/lms/admin";
 import {
-  SLUG_RE, formatBytes, getOrganization, getOrganizationUsage, listOrganizationCourses, resumeOrganization,
+  SLUG_RE, getOrganization, getOrganizationUsage, listOrganizationCourses, resumeOrganization,
   suspendOrganization, updateOrganization, type OrganizationAdminRowOut, type OrganizationOut, type OrgUsageOut,
 } from "@/lib/lms/organizations";
-import { fmtApiDateTime } from "@/lib/format";
+import { fmtApiDateTimeShort } from "@/lib/format";
+import { formatBytes } from "@/lib/lms/storage"; // Phase 6b S11b (UX 10): the localized formatter
 import {
   Button, Card, Checkbox, DescriptionList, Dialog, EmptyState, Input, LoadingState, PageHeader, ReasonDialog, StatTile, TabPanel, Tabs, toast,
 } from "@/components/ui";
@@ -86,6 +87,8 @@ export default function AdminOrganizationDetailPage() {
   };
 
   const tabsId = "org-detail";
+  const units: [string, string, string, string] = [t("storage.units.b"), t("storage.units.kb"), t("storage.units.mb"), t("storage.units.gb")];
+  const bytes = (n: number | null | undefined) => (n === null || n === undefined || !Number.isFinite(n) ? "—" : formatBytes(n, lang, units));
   const dash = (v: React.ReactNode) => (v === undefined || v === null || v === "" ? "—" : v);
   return (
     <div>
@@ -97,7 +100,7 @@ export default function AdminOrganizationDetailPage() {
         secondaryActions={
           <>
             <Button variant="secondary" onClick={() => setEditing(true)}>{t("organizations.admin.edit")}</Button>
-            <Button variant={suspended ? "secondary" : "danger"} onClick={() => { setDialogError(null); setStatusDialog(true); }}>
+            <Button variant={suspended ? "secondary" : "dangerOutline"} onClick={() => { setDialogError(null); setStatusDialog(true); }}>
               {t(suspended ? "organizations.admin.resume" : "organizations.admin.suspend")}
             </Button>
           </>
@@ -119,8 +122,8 @@ export default function AdminOrganizationDetailPage() {
               { key: "admins", term: t("organizations.counts.orgAdmins"), description: dash(org.org_admins) },
               { key: "teachers", term: t("organizations.counts.teachers"), description: dash(org.teachers) },
               { key: "courses", term: t("organizations.counts.courses"), description: dash(org.courses) },
-              { key: "storage", term: t("organizations.usage.storage"), description: usage ? formatBytes(usage.storage_bytes, lang) : "—" },
-              { key: "created", term: t("organizations.admin.created"), description: fmtApiDateTime(org.created_at, lang) },
+              { key: "storage", term: t("organizations.usage.storage"), description: usage ? bytes(usage.storage_bytes) : "—" },
+              { key: "created", term: t("organizations.admin.created"), description: fmtApiDateTimeShort(org.created_at, lang) },
               { key: "canCreate", term: t("organizations.fields.teachersCanCreate"), description: org.settings?.teachers_can_create_courses ? t("platformAdmin.yes") : t("platformAdmin.no") },
             ]} />
           </Card>
@@ -137,7 +140,7 @@ export default function AdminOrganizationDetailPage() {
                 <StatTile label={t("organizations.counts.students")} value={usage.students} />
                 <StatTile label={t("organizations.usage.banks")} value={usage.banks} />
                 <StatTile label={t("organizations.usage.questions")} value={usage.questions} />
-                <StatTile label={t("organizations.usage.storage")} value={formatBytes(usage.storage_bytes, lang)} />
+                <StatTile label={t("organizations.usage.storage")} value={bytes(usage.storage_bytes)} />
               </div>
               <p className="mt-3 text-sm text-slate-600">{t("organizations.usage.storageNote")}</p>
             </div>
@@ -151,8 +154,9 @@ export default function AdminOrganizationDetailPage() {
         onSaved={(o) => { setOrg({ ...org, ...o }); setEditing(false); toast.success(t("organizations.admin.saved")); }} />
       <ReasonDialog
         open={statusDialog}
-        title={t(suspended ? "organizations.admin.resumeTitle" : "organizations.admin.suspendTitle", { org: org.name })}
-        effect={t(suspended ? "organizations.admin.resumeBody" : "organizations.admin.suspendBody", { org: org.name })}
+        title={t(suspended ? "organizations.admin.resumeTitle" : "organizations.admin.suspendTitle")}
+        object={org.name}
+        effect={t(suspended ? "organizations.admin.resumeBody" : "organizations.admin.suspendBody")}
         confirmLabel={t(suspended ? "organizations.admin.resume" : "organizations.admin.suspend")}
         tone={suspended ? "primary" : "danger"} busy={busy}
         error={dialogError ? <OrgError error={dialogError} /> : undefined}
@@ -225,7 +229,7 @@ function EditOrganizationDialog({ open, org, onClose, onSaved }: { open: boolean
   };
   const formId = "edit-org-form";
   return (
-    <Dialog open={open} title={t("organizations.admin.editTitle", { org: org.name })} onClose={onClose} busy={busy}
+    <Dialog open={open} title={t("organizations.admin.editTitle")} onClose={onClose} busy={busy}
       footer={
         <>
           <Button variant="secondary" disabled={busy} onClick={onClose}>{t("lms.common.cancel")}</Button>

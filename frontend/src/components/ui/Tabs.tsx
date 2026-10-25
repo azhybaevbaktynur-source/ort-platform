@@ -40,14 +40,18 @@ function ScrollFade({ children, className }: { children: (ref: React.RefObject<H
   );
 }
 
-/** Scroll the tab row (only sideways, never the page) so `el` is visible. */
+/**
+ * Scroll the tab row (only sideways, never the page) so `el` is visible. Phase 6b S11b (UX 11): 56 px of the
+ * neighbouring tab stay visible under the edge fade, so a phone user sees that the row goes on.
+ */
+const REVEAL_PEEK = 56;
 function revealInRow(row: HTMLElement | null, selector: string) {
   const el = row?.querySelector<HTMLElement>(selector);
   if (!row || !el) return;
   const c = row.getBoundingClientRect();
   const r = el.getBoundingClientRect();
-  if (r.left < c.left) row.scrollLeft += r.left - c.left - 32;
-  else if (r.right > c.right) row.scrollLeft += r.right - c.right + 32;
+  if (r.left < c.left + REVEAL_PEEK) row.scrollLeft += r.left - c.left - REVEAL_PEEK;
+  else if (r.right > c.right - REVEAL_PEEK) row.scrollLeft += r.right - c.right + REVEAL_PEEK;
 }
 
 const TAB_BASE =

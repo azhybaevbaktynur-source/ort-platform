@@ -101,7 +101,8 @@ export function UserOrganizationsSection({ user, readOnly }: { user: { id: strin
       )}
       <ConfirmDialog
         open={confirming && !!org}
-        title={t("organizations.adminUser.addTitle", { name, org: org?.name ?? "" })}
+        title={t("organizations.adminUser.addTitle")}
+        object={org?.name}
         effect={t("organizations.adminUser.addBody", { name, org: org?.name ?? "", role: t(`organizations.roles.${role}`) })}
         confirmLabel={t("organizations.adminUser.addToOrg")}
         busy={busy} error={dialogError ? <OrgError error={dialogError} /> : undefined}

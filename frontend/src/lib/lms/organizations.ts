@@ -224,12 +224,3 @@ export function slugify(name: string): string {
   return s.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64).replace(/-+$/g, "");
 }
 export const SLUG_RE = /^[a-z0-9-]{2,64}$/;
-
-export function formatBytes(n: number | null | undefined, locale?: string): string {
-  if (n === null || n === undefined || !Number.isFinite(n)) return "—";
-  const units = ["B", "KB", "MB", "GB"];
-  let v = n;
-  let i = 0;
-  while (v >= 1000 && i < units.length - 1) { v /= 1000; i += 1; }
-  return `${v.toLocaleString(locale, { maximumFractionDigits: i === 0 ? 0 : 1 })} ${units[i]}`;
-}

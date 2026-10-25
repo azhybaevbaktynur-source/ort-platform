@@ -616,7 +616,7 @@
       "deletedBadge": "Deleted"
     },
     "filters": {
-      "search": "Search questions...",
+      "search": "Search questions",
       "type": "Type",
       "language": "Language",
       "section": "Section",
@@ -635,7 +635,6 @@
     "questions": {
       "tab": "Questions ({n})",
       "new": "New question",
-      "pickType": "Choose a type...",
       "newTitle": "New question",
       "empty": "No questions found.",
       "noStem": "(no text)",
@@ -821,10 +820,14 @@
         "history": "History"
       },
       "new": "New passage",
-      "back": "Back to passages",
+      "crumb": "Passages",
       "empty": "No passages yet.",
       "untitled": "Untitled passage",
       "questionCount": "{n} questions",
+      "questionCount_one": "{n} question",
+      "questionCount_few": "{n} questions",
+      "questionCount_many": "{n} questions",
+      "questionCount_other": "{n} questions",
       "title": "Title (optional)",
       "body": "Passage text",
       "lineHelp": "Start a line with [5], [10] and so on to show a line number there. Without markers every fifth line is numbered. Formulas use $...$.",
@@ -891,6 +894,10 @@
       "message": "Message",
       "rowHint": "The row number is the data row in the CSV (the header is not counted), as in manifest.json.",
       "confirm": "Import {count} questions",
+      "confirm_one": "Import {count} question",
+      "confirm_few": "Import {count} questions",
+      "confirm_many": "Import {count} questions",
+      "confirm_other": "Import {count} questions",
       "importing": "Importing: uploading images and saving...",
       "doneTitle": "Import complete",
       "openBank": "Open the bank",
@@ -938,6 +945,10 @@
         "question_edited_locally": "The question was edited after the last import, so your version was kept",
         "question_deleted_skipped": "The question was deleted in the bank, so it was skipped",
         "questions_missing_from_bundle": "{count} previously imported questions from source \"{source_id}\" are not in this file and were left unchanged",
+        "questions_missing_from_bundle_one": "{count} previously imported question from source \"{source_id}\" is not in this file and was left unchanged",
+        "questions_missing_from_bundle_few": "{count} previously imported questions from source \"{source_id}\" are not in this file and were left unchanged",
+        "questions_missing_from_bundle_many": "{count} previously imported questions from source \"{source_id}\" are not in this file and were left unchanged",
+        "questions_missing_from_bundle_other": "{count} previously imported questions from source \"{source_id}\" are not in this file and were left unchanged",
         "storage_error": "The images could not be saved to storage",
         "database_error": "The questions could not be saved, nothing was imported",
         "too_many_issues": "Showing {shown} issues. In total: {errors_total} errors and {warnings_total} warnings."
@@ -1025,6 +1036,10 @@
       "attempts": "Attempts",
       "items": "Questions",
       "points": "{n} points",
+      "points_one": "{n} point",
+      "points_few": "{n} points",
+      "points_many": "{n} points",
+      "points_other": "{n} points",
       "versions": "Published versions",
       "noVersions": "Not published yet."
     },
@@ -1056,7 +1071,6 @@
     },
     "builder": {
       "back": "Overview",
-      "title": "Edit: {title}",
       "readOnly": "This course is concluded, so the assessment is read-only.",
       "settings": "Settings",
       "sections": "Sections",
@@ -1477,6 +1491,10 @@
       "due": "Due",
       "total": "Total",
       "staleN": "{n} grades were computed with older settings. Regrade to apply the current scheme, kept-attempt rule and late policy.",
+      "staleN_one": "{n} grade was computed with older settings. Regrade to apply the current scheme, kept-attempt rule and late policy.",
+      "staleN_few": "{n} grades were computed with older settings. Regrade to apply the current scheme, kept-attempt rule and late policy.",
+      "staleN_many": "{n} grades were computed with older settings. Regrade to apply the current scheme, kept-attempt rule and late policy.",
+      "staleN_other": "{n} grades were computed with older settings. Regrade to apply the current scheme, kept-attempt rule and late policy.",
       "releaseAll": "Release all grades",
       "unreleaseAll": "Hide all grades",
       "unreleaseAutoHint": "Grades of this assessment are released automatically. To hide grades, switch grade release to manual in the assessment settings.",
@@ -2073,16 +2091,16 @@
       "created": "Created",
       "back": "Back to organizations",
       "edit": "Edit",
-      "editTitle": "Edit «{org}»",
+      "editTitle": "Edit organization",
       "saved": "Changes saved.",
       "suspend": "Suspend",
       "resume": "Resume",
-      "suspendTitle": "Suspend «{org}»?",
-      "suspendBody": "All courses of «{org}» become read-only and leave the catalog. Students cannot start exams and nobody can edit. You can resume it later.",
-      "resumeTitle": "Resume «{org}»?",
-      "resumeBody": "The courses of «{org}» can be edited again and published courses return to the catalog.",
-      "suspended": "«{org}» is suspended.",
-      "resumed": "«{org}» is active again.",
+      "suspendTitle": "Suspend this organization?",
+      "suspendBody": "All courses of this organization become read-only and leave the catalog. Students cannot start exams and nobody can edit. You can resume it later.",
+      "resumeTitle": "Resume this organization?",
+      "resumeBody": "The organization's courses can be edited again and published courses return to the catalog.",
+      "suspended": "{org} is suspended.",
+      "resumed": "{org} is active again.",
       "suspendedReason": "Suspended. Reason: {reason}",
       "tabsLabel": "Organization sections",
       "tabs": {
@@ -2117,9 +2135,9 @@
       "addToOrg": "Add to organization",
       "addToOrgHint": "The person gets the chosen role in the organization at once.",
       "role": "Role",
-      "addTitle": "Add {name} to «{org}»?",
-      "addBody": "{name} becomes «{role}» in «{org}». This is recorded in the audit log.",
-      "added": "{name} was added to «{org}».",
+      "addTitle": "Add to the organization?",
+      "addBody": "{name} becomes «{role}» in {org}. This is recorded in the audit log.",
+      "added": "{name} was added to {org}.",
       "orgsLoadFailed": "Could not load the organizations list."
     },
     "members": {
@@ -2236,7 +2254,6 @@
     "allLink": "All teachers and invitations",
     "empty": "No invitations sent yet.",
     "expiresOn": "expires {date}",
-    "sentBy": "Sent by {name} on {date}",
     "sent": "Invitation sent to {email}.",
     "resend": "Send again",
     "resent": "A new invitation was sent to {email}; the old link stops working.",
@@ -2298,7 +2315,8 @@
       "send": "Send invitation",
       "sentHint": "Invitations are valid for 14 days. The person appears in the list after accepting."
     },
-    "sentColumn": "Sent"
+    "invitedByColumn": "Invited by",
+    "validUntilColumn": "Valid until"
   },
   "templates": {
     "field": "Course template",
@@ -2329,7 +2347,7 @@
     "independentTitle": "Independent teacher? Apply",
     "schemesNoAccess": {
       "title": "For teachers only",
-      "body": "Grading schemes are set up by teachers who create courses. Your results are in each course under Grades.",
+      "body": "Grading schemes are available to teachers who can create courses.",
       "back": "Back to my courses"
     },
     "pendingHintAccept": "Valid until {date}. Accept here or with the link in the email.",
