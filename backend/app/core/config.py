@@ -185,6 +185,15 @@ class Settings(BaseSettings):
     PLATFORM_ORG_NAME: str = "Platform"
     PLATFORM_ORG_SLUG: str = "platform"
     # --- Phase 6 S1 end ---
+    # --- Phase 7a S2 begin --- (assignments and hand-ins, docs/phases/PHASE_7A_DESIGN.md 3.5, owner question Q2 b)
+    SUBMISSION_FILE_MAX_BYTES: int = 5 * 1024 * 1024        # student PDF hand-ins (images: ASSET_MAX_UPLOAD_BYTES)
+    SUBMISSION_COURSE_MAX_BYTES: int = 500 * 1024 * 1024    # all student hand-in files of one course
+    SUBMISSION_FILES_PER_ASSIGNMENT_MAX: int = 10           # file hand-ins per student per assignment
+    SUBMISSION_TEXT_MAX_CHARS: int = 20_000
+    SUBMISSION_SUBMIT_RATE_PER_HOUR: int = 60               # hand-ins per user (submission_submit_1h)
+    SUBMISSION_UPLOAD_RATE_PER_HOUR: int = 30               # hand-in and feedback file uploads per user
+    ASSIGNMENT_RUBRIC_MAX_CRITERIA: int = 30
+    # --- Phase 7a S2 end ---
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

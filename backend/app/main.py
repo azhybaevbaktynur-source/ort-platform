@@ -148,6 +148,11 @@ from app.lms.home.router import router as _home_router  # noqa: E402
 
 app.include_router(_home_router, prefix=settings.API_V1_STR)
 # --- Phase 6 S6a end ---
+# --- Phase 7a S2 begin --- (assignments, hand-ins and hand-in files, PHASE_7A_DESIGN 4.1, 4.2)
+from app.lms.assignments.router import router as _assignments_router  # noqa: E402
+
+app.include_router(_assignments_router, prefix=settings.API_V1_STR, tags=["Assignments"])
+# --- Phase 7a S2 end ---
 # Include API v1 router
 app.include_router(api_router, prefix=settings.API_V1_STR)
 register_error_handlers(app)
