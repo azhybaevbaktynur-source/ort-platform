@@ -20,7 +20,7 @@ declare module "./assessmentTypes" {
   }
 }
 
-export const ACCESS_CODE_MIN = 4;
+export const ACCESS_CODE_MIN = 6; // security review 7a (server: 422 access_code_too_short)
 export const ACCESS_CODE_MAX = 32;
 /** Normalized like the server: trimmed, printable ASCII. */
 export function accessCodeIssue(code: string): "too_short" | "too_long" | "invalid_chars" | null {

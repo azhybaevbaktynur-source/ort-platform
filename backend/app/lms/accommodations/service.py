@@ -30,7 +30,7 @@ from app.lms.enrollments.schemas import user_brief
 from app.models.user import User
 
 LIST_MAX = 50
-ACCESS_CODE_MIN, ACCESS_CODE_MAX = 4, 32
+ACCESS_CODE_MIN, ACCESS_CODE_MAX = 6, 32  # security review 7a: at least 6
 OVERRIDE_FIELDS = ("due_at", "available_from", "available_until", "extra_time_percent", "extra_time_s",
                    "extra_attempts", "note")
 
@@ -105,7 +105,7 @@ def effective_for_assessments(db: Session, course_id, user_id: str, assessments:
 # =========================================================================== access code (3.8)
 
 def normalize_access_code(code: Optional[str]) -> Optional[str]:
-    """Trimmed, 4-32 printable ASCII characters; None when the value cannot be a code."""
+    """Trimmed, 6-32 printable ASCII characters; None when the value cannot be a code."""
     if code is None:
         return None
     c = code.strip()
@@ -117,31 +117,40 @@ def normalize_access_code(code: Optional[str]) -> Optional[str]:
 def hash_access_code(code: str) -> str:
     from app.core.security import hash_password
 
+    stripped = (code or "").strip()
+    if len(stripped) < ACCESS_CODE_MIN:  # never echo the value
+        raise ValidationFailed(f"access_code must have at least {ACCESS_CODE_MIN} characters",
+                               code="access_code_too_short", details={"min_length": ACCESS_CODE_MIN})
     norm = normalize_access_code(code)
-    if norm is None:  # the schema validates first; never echo the value
-        raise ValidationFailed("access_code must be 4-32 printable ASCII characters", code="access_code_format",
-                               details=[{"loc": ["access_code"], "msg": "4-32 printable ASCII characters"}])
+    if norm is None:  # the schema validates first
+        raise ValidationFailed("access_code must be 6-32 printable ASCII characters", code="access_code_format",
+                               details=[{"loc": ["access_code"], "msg": "6-32 printable ASCII characters"}])
     return hash_password(norm)
 
 
-def check_access_code(user_id: str, assessment, code: Optional[str]) -> None:
-    """Start gate for students (staff previews and resumes never get here). Missing -> 403 access_code_required;
-    wrong -> one failure counted (`access_code_fail_10m`), 403 access_code_invalid; once the failures reach the
-    limit every try is 429 before the code is even compared, so a correct guess cannot slip through."""
+def check_access_code(user_id: str, assessment, code: Optional[str], ip_hash: Optional[str] = None) -> None:
+    """Start gate for students (staff previews and resumes never get here). Missing -> 403 access_code_required.
+    Every try is counted atomically BEFORE the comparison (security review 7a): per user and assessment 10 / 10 min
+    and 30 / 24 h, per client IP and assessment 100 / 10 min (IP rule, enforced with RATE_LIMIT_IP_ENFORCE); over
+    any limit -> 429 without comparing, so a correct guess cannot slip through and parallel tries cannot race past
+    a read-then-count check. Wrong -> 403 access_code_invalid. ORT preset exams take no code (owner question Q4)."""
     hashed = getattr(assessment, "access_code_hash", None)
-    if hashed is None:
+    if hashed is None or (getattr(assessment, "preset", None) or "none") != "none":
         return
     if code is None or not code.strip():
         raise Forbidden("An access code is required", code="access_code_required")
-    rule = ratelimit.access_code_fail_limit()
-    allowed, retry = ratelimit.peek(user_id, rule)
-    if not allowed:
-        raise RateLimited("Too many requests", details={"retry_after_seconds": retry})
+    key = f"{user_id}:{assessment.id}"
+    hits = [ratelimit.hit(key, ratelimit.access_code_fail_limit()),
+            ratelimit.hit(key, ratelimit.access_code_day_limit())]
+    if ip_hash:
+        hits.append(ratelimit.hit(f"ip:{ip_hash}:{assessment.id}", ratelimit.access_code_ip_limit()))
+    denied = [retry for allowed, retry in hits if not allowed]
+    if denied:
+        raise RateLimited("Too many requests", details={"retry_after_seconds": max(denied)})
     from app.core.security import verify_password
 
     norm = normalize_access_code(code)
     if norm is None or not verify_password(norm, hashed):
-        ratelimit.enforce(user_id, rule)
         raise Forbidden("The access code is not valid", code="access_code_invalid")
 
 
@@ -331,6 +340,9 @@ def set_override(db: Session, ctx: AuthzContext, course: Course, assignment_id, 
     db.flush()
     if old_due != values["due_at"]:
         _recompute_due(db, ctx, a, base, enr, values["due_at"])
+    _audit(db, ctx, "override_set", enr, {  # security review 7a: like accommodations, never the note
+        "assignment_id": str(a.id),
+        **{f: (v.isoformat() if isinstance(v, datetime) else v) for f, v in values.items() if f != "note"}})
     db.commit()
     db.refresh(row)
     return override_out(row, user)
@@ -351,6 +363,7 @@ def clear_override(db: Session, ctx: AuthzContext, course: Course, assignment_id
     db.flush()
     if had_due:
         _recompute_due(db, ctx, a, _base_dates(db, a), enr, None)
+    _audit(db, ctx, "override_cleared", enr, {"assignment_id": str(a.id)})  # security review 7a
     db.commit()
 
 

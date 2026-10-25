@@ -87,6 +87,7 @@ async def test_already_graded_blocks_resubmission(api, db):
     h = (await hand_in(api, w.S, w, a, body_text="v1")).json()
     sub = sub_of(db, a, w.enr)
     sub.graded_item_id, sub.raw_points, sub.state = uuid.UUID(h["id"]), Decimal("5"), "graded"
+    sub.released_at = utcnow()  # security review 7a: only a released grade blocks (test_security_7a)
     db.commit()
     res = await hand_in(api, w.S, w, a, body_text="v2")
     assert res.status_code == 409 and res.json()["error"]["code"] == "already_graded"

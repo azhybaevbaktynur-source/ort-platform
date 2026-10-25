@@ -110,6 +110,10 @@ def update_assessment(db: Session, ctx: AuthzContext, course: Course, aid: uuid.
         from app.lms.accommodations.service import hash_access_code
 
         fields = fields - {"access_code"}
+        if data.access_code is not None and (a.preset or "none") != "none":
+            # Security review 7a / owner question Q4: no access codes on ORT preset exams (the ORT lobby stays as
+            # it is); clearing stays allowed.
+            raise Conflict("Fixed by the course template", code="template_locked", details={"field": "access_code"})
         a.access_code_hash = hash_access_code(data.access_code) if data.access_code is not None else None
     # --- Phase 7a S4 end ---
     # --- Phase 6 S2b begin --- (course template guard, PHASE_6_DESIGN 5.4)
@@ -927,7 +931,7 @@ def lobby(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID) -> sch
         out.time_limit_s = out.time_limit_s + _extra
         for _s in out.sections:
             _s.time_limit_s = _limits.get(int(_s.pos), _s.time_limit_s)
-    out.requires_access_code = (a.access_code_hash is not None
+    out.requires_access_code = (a.access_code_hash is not None and (a.preset or "none") == "none"
                                 and ctx.role_for(course.id) not in ("teacher", "assistant"))
     return out
     # --- Phase 7a S4 end ---

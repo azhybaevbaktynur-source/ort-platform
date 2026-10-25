@@ -191,7 +191,8 @@ export function SettingsPanel({
       <SettingsPanelGrading courseId={courseId} assessmentId={a.id} value={grading} onChange={setGrading}
         currentScheme={a.scheme} defaultLanguage={defaultLanguage} disabled={disabled} schemeLocked={tplLocked} />
       {/* --- Phase 7a S5: access code --- */}
-      <AccessCodeField hasCode={!!a.has_access_code} value={accessCode} onChange={setAccessCode} disabled={disabled} />
+      {/* security review 7a / owner Q4: no access codes on ORT preset exams (the server refuses them) */}
+      {a.preset === "none" && <AccessCodeField hasCode={!!a.has_access_code} value={accessCode} onChange={setAccessCode} disabled={disabled} />}
       <AssessmentError error={error} />
       <div className="flex items-center gap-3">
         <button type="submit" className={btnPrimary} disabled={disabled || busy}>{busy ? t("lms.common.loading") : t("lms.common.save")}</button>

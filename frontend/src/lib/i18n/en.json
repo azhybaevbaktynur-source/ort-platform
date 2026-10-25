@@ -171,6 +171,7 @@
       "asset_not_found": "Image not found.",
       "version_conflict": "Someone else saved a newer version. Reload and try again.",
       "invalid_question_data": "The question content is invalid. Check the answers and try again.",
+      "access_code_too_short": "The access code must have at least 6 characters.",
       "unsupported_type": "This question type is not supported.",
       "asset_not_usable": "This image cannot be used. Upload it again.",
       "image_invalid": "The file is not a supported image. Use PNG, JPEG, GIF or WEBP.",
@@ -3115,7 +3116,7 @@
       "title": "Access code",
       "hint": "Students enter this code before they start. Leave it empty for no code.",
       "label": "Access code",
-      "rules": "4 to 32 characters: Latin letters, digits and signs.",
+      "rules": "6 to 32 characters: Latin letters, digits and signs.",
       "isSet": "A code is set",
       "change": "Change code",
       "clear": "Remove code",
@@ -3126,7 +3127,7 @@
       "hide": "Hide the code",
       "badge": "Access code",
       "issues": {
-        "too_short": "At least 4 characters.",
+        "too_short": "At least 6 characters.",
         "too_long": "At most 32 characters.",
         "invalid_chars": "Use only Latin letters, digits and signs."
       },
