@@ -111,7 +111,9 @@ export async function openSubmissionFile(courseId: string, submissionId: string,
   const type = res.headers.get("content-type") || "";
   if (type.includes("application/json")) {
     const body = (await res.json()) as { url?: string };
-    if (body.url) { window.open(body.url, "_blank", "noopener"); return; }
+    // presigned attachment link (R2): a plain navigation downloads the file without leaving the page and
+    // is not blocked as a pop-up after the awaited fetch
+    if (body.url) { window.location.assign(body.url); return; }
     throw new LmsApiError(500, "unknown", "No file url");
   }
   const blob = await res.blob();

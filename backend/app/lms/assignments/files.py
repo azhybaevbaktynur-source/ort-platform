@@ -13,7 +13,7 @@ from typing import Optional
 
 from fastapi import Request, Response
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from starlette.datastructures import UploadFile
 
@@ -185,10 +185,13 @@ def serve(asset: Asset) -> Response:
     storage = get_blob_storage()
     is_file = asset.kind == "file"
     default_name = "file.pdf" if is_file else "image.webp"
+    # R2: the client fetches this route with its token, so a 302 to the bucket would be a cross-origin fetch
+    # (needs bucket CORS). Return the short-lived link as JSON instead; the browser then opens it as a plain
+    # navigation. Always an attachment, so opening it downloads and never replaces the page.
     url = storage.presigned_get(asset.storage_key, 300, asset.original_filename or default_name,
-                                content_type=asset.mime if is_file else None, attachment=is_file)
+                                content_type=asset.mime, attachment=True)
     if url:
-        return RedirectResponse(url, status_code=302, headers={"Cache-Control": "private, no-store"})
+        return JSONResponse({"url": url}, headers={"Cache-Control": "private, no-store"})
     data = storage.get(asset.storage_key)
     if data is None:
         raise NotFound("File not found", code="asset_not_found")

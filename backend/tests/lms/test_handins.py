@@ -413,3 +413,26 @@ def test_parallel_hand_ins_on_pg(monkeypatch):
     finally:
         s.close()
         eng.dispose()
+
+
+async def test_download_with_presigning_storage_returns_json_url(api, db, monkeypatch):
+    """R2: the route answers JSON {url} (no cross-origin 302 for the token-authenticated fetch), as an attachment."""
+    from app.lms.assignments import files as hand_in_files
+
+    w = world(db)
+    a = make_assignment(db, w.course, w.O, kind="file")
+    up = (await upload_hand_in(w.S, w, a, pdf(), filename="essay.pdf")).json()
+    h = (await hand_in(api, w.S, w, a, asset_id=up["asset_id"])).json()
+    calls = []
+
+    class Presigning:
+        def presigned_get(self, key, ttl, filename, content_type=None, attachment=False):
+            calls.append((ttl, filename, content_type, attachment))
+            return "https://bucket.example/signed?x=1"
+
+    monkeypatch.setattr(hand_in_files, "get_blob_storage", lambda: Presigning())
+    res = await download(api, w.S, w, h["submission_id"], up["asset_id"])
+    assert res.status_code == 200, res.text
+    assert res.json() == {"url": "https://bucket.example/signed?x=1"}
+    assert res.headers["cache-control"] == "private, no-store"
+    assert calls == [(300, "essay.pdf", "application/pdf", True)]
