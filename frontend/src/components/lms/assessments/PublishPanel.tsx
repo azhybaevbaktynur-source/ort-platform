@@ -13,6 +13,10 @@ import { inputCls } from "@/components/lms/content/ui";
 import { AssessmentError } from "./AssessmentError";
 import { IssueList, issuesFromDetails } from "./IssueList";
 import { usePublishFlow } from "./usePublishFlow";
+// --- Phase 7b S4 begin --- (PHASE_7B_DESIGN 10: template badge, upgrade, import format, "Save as template")
+import { TemplateBadge } from "@/components/lms/examTemplates/TemplateBadge";
+import { SaveAsTemplateDialog } from "@/components/lms/examTemplates/SaveAsTemplateDialog";
+// --- Phase 7b S4 end ---
 
 /** True when publishing is the next step (a draft, or published with unpublished changes): the page's one primary action. */
 export function publishIsPrimary(a: Pick<AssessmentStaffOut, "status" | "has_unpublished_changes">): boolean {
@@ -44,6 +48,9 @@ export function PublishPanel({
   const [pBusy, setPBusy] = useState(false);
   const [pError, setPError] = useState<unknown>(null);
   const [pIssues, setPIssues] = useState<Issue[]>([]);
+  // Phase 7b S4: preset (ORT) exams are never templatable (7b-Q1), so ORT builders show no "Save as template".
+  const [saveAsOpen, setSaveAsOpen] = useState(false);
+  const templatable = canEdit && a.preset === "none";
 
   const validate = async () => {
     setVBusy(true);
@@ -84,6 +91,7 @@ export function PublishPanel({
           )}
           <Button variant="secondary" size="sm" loading={pBusy} onClick={() => void preview()}>{t("assessments.publish.preview")}</Button>
           <Button variant="secondary" size="sm" loading={vBusy} onClick={() => void validate()}>{t("assessments.publish.validate")}</Button>
+          {templatable && <Button variant="secondary" size="sm" onClick={() => setSaveAsOpen(true)}>{t("examTemplates.saveAs.action")}</Button>}
           {canEdit && published && (
             <Button variant="secondary" size="sm" disabled={!!flow.busyId} onClick={() => flow.requestUnpublish(a.id, title, a.attempt_counts)}>{t("assessments.publish.unpublish")}</Button>
           )}
@@ -94,6 +102,9 @@ export function PublishPanel({
           )}
         </div>
       </div>
+      {/* --- Phase 7b S4 --- */}
+      {a.exam_template && <TemplateBadge assessment={a} courseId={courseId} canEdit={canEdit} onChanged={onChanged} />}
+      {templatable && <SaveAsTemplateDialog open={saveAsOpen} assessment={a} courseId={courseId} onClose={() => setSaveAsOpen(false)} />}
       <AssessmentError error={pError} />
       <IssueList issues={pIssues} kind="error" />
       <AssessmentError error={vError} />

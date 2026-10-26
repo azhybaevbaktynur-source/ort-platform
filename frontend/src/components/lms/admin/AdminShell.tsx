@@ -50,6 +50,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     { href: `${base}/teacher-requests`, label: t("platformAdmin.nav.teacherRequests"), count: pending },
     { href: `${base}/users`, label: t("platformAdmin.nav.users") },
     { href: `${base}/courses`, label: t("platformAdmin.nav.courses") },
+    { href: `${base}/exam-templates`, label: t("examTemplates.nav.title") }, // Phase 7b S4
     { href: `${base}/audit-log`, label: t("platformAdmin.nav.auditLog") },
     { href: `${base}/storage`, label: t("storage.nav") },
   ];

@@ -952,7 +952,17 @@
         "questions_missing_from_bundle_other": "{count} previously imported questions from source \"{source_id}\" are not in this file and were left unchanged",
         "storage_error": "The images could not be saved to storage",
         "database_error": "The questions could not be saved, nothing was imported",
-        "too_many_issues": "Showing {shown} issues. In total: {errors_total} errors and {warnings_total} warnings."
+        "too_many_issues": "Showing {shown} issues. In total: {errors_total} errors and {warnings_total} warnings.",
+        "section_not_in_template": "The section of a row is not in the template.",
+        "type_not_allowed_in_section": "This question type is not allowed in that section.",
+        "passage_not_allowed": "That section does not allow reading passages.",
+        "type_required": "Give the question type: the section allows several.",
+        "count_below_min": "A section has fewer questions than the template asks for.",
+        "count_above_max": "A section has more questions than the template allows.",
+        "attach_target_mismatch": "The questions can only be added to a draft made from the same template version.",
+        "format_mismatch": "This file does not match the chosen format (for example an ORT file in the general format). Choose the other format.",
+        "not_a_template_assessment": "This assessment was not created from a template.",
+        "unknown_column": "Unknown column: it is ignored."
       }
     }
   },
@@ -1197,7 +1207,8 @@
       "too_many_items": "The assessment has too many questions.",
       "languages_not_in_course": "A language of the assessment is not a course language.",
       "empty_passage": "A reading passage has no questions.",
-      "newer_version": "A question has a newer version in the bank. Publish again to use it."
+      "newer_version": "A question has a newer version in the bank. Publish again to use it.",
+      "too_few_items": "A section has fewer questions than the template asks for."
     }
   },
   "player": {
@@ -3157,6 +3168,268 @@
         "access_code_required": "Enter the access code from your teacher.",
         "access_code_invalid": "The code is wrong. Check it with your teacher and try again."
       }
+    }
+  },
+  "examTemplates": {
+    "nav": {
+      "title": "Exam templates"
+    },
+    "untitled": "Untitled template",
+    "versionShort": "v{n}",
+    "locked": "Locked",
+    "lockedNote": "Fixed by the exam template",
+    "lockedSettings": "Fixed by the exam template: {fields}.",
+    "lockFields": {
+      "navigation": "navigation",
+      "grading_scheme_version_id": "grading scheme",
+      "display_mode": "display",
+      "result_view": "result view"
+    },
+    "scrollingLater": "\"All questions on one page\" comes later; new exams use one question per page.",
+    "scope": {
+      "platform": "Platform",
+      "organization": "Organization",
+      "teacher": "Mine"
+    },
+    "scopeHint": {
+      "platform": "Visible in every course on the platform.",
+      "organization": "Visible in every course of this organization.",
+      "teacher": "Only you can use it, in the courses you teach."
+    },
+    "status": {
+      "draft": "Draft",
+      "published": "Published",
+      "archived": "Archived"
+    },
+    "counts": {
+      "range": "{min}–{max} questions",
+      "min": "at least {min} questions",
+      "max": "up to {max} questions"
+    },
+    "blocks": {
+      "resultViews": {
+        "general": "Standard result",
+        "ort": "ORT result (scaled score)"
+      },
+      "passageDisplays": {
+        "plain": "Plain text",
+        "numbered": "Numbered lines"
+      },
+      "displayModes": {
+        "one_per_page": "One question per page",
+        "scrolling": "All questions on one page (later)"
+      }
+    },
+    "picker": {
+      "startFrom": "Exam template",
+      "blank": "None: start blank",
+      "hint": "A template gives the sections and rules. You add the questions.",
+      "none": "No templates are available in this course yet.",
+      "loading": "Loading templates…",
+      "group": {
+        "platform": "Platform templates",
+        "organization": "Organization templates",
+        "teacher": "My templates"
+      },
+      "sections": "Sections ({n})",
+      "sectionN": "Section {n}",
+      "minutes": "{n} min",
+      "parameter": "Option: {key}",
+      "choose": "Choose…",
+      "after": "After creating, add questions to each section in the builder."
+    },
+    "badge": {
+      "from": "From template \"{title}\", v{n}",
+      "newer": "Newer version available: v{n}"
+    },
+    "upgrade": {
+      "action": "Upgrade",
+      "title": "Move to the newer template version?",
+      "effect": "The sections and rules change from v{from} to v{to}. Questions stay in sections that still exist; questions of removed sections are removed. Questions that break the new rules are listed, not deleted.",
+      "confirm": "Upgrade",
+      "done": "Moved to template version v{n}.",
+      "issues": "Check these questions against the new rules:",
+      "notAllowed": "Only a draft without attempts can move to a newer version."
+    },
+    "importFormat": {
+      "download": "Download import format (CSV)",
+      "downloadVersion": "Download the import format of v{n} (CSV)",
+      "csv": "CSV",
+      "downloaded": "Import format downloaded. Fill in one row per question and import it in the question bank.",
+      "help": "The import format is a CSV file: a header row, then one example row per section. Rows that start with # are skipped. Fill in one row per question."
+    },
+    "saveAs": {
+      "action": "Save as template",
+      "title": "Save as template",
+      "subtitle": "The sections and settings of this exam become a new draft template. The exam itself does not change.",
+      "scope": "Who can use the template",
+      "counts": "Questions per section (optional)",
+      "countsHint": "Leave empty for no limit. Exams made from the template cannot be published outside these limits.",
+      "min": "At least",
+      "max": "At most",
+      "countInvalid": "Enter a whole number from 1 to 10000.",
+      "countOrder": "\"At least\" cannot be more than \"At most\".",
+      "lock": "Lock the structure",
+      "lockHint": "When the template is locked, exams made from it keep its sections, rules, navigation and scheme.",
+      "submit": "Save as draft template",
+      "savedToast": "Template saved as a draft.",
+      "saved": "\"{title}\" is saved as a draft template. Publish it on the templates page to use it.",
+      "open": "Open template",
+      "noOrg": "Your account has no organization to keep templates in. Ask the platform admin."
+    },
+    "list": {
+      "pageTitle": "Exam templates",
+      "intro": {
+        "teacher": "Your own templates. Use them when you create an exam in a course.",
+        "org": "Templates of this organization and of its teachers.",
+        "platform": "All exam templates on the platform."
+      },
+      "new": "New template",
+      "title": "Template",
+      "scope": "Visible to",
+      "status": "Status",
+      "version": "Version",
+      "locked": "Lock",
+      "updated": "Updated",
+      "allStatuses": "All statuses",
+      "allScopes": "All levels",
+      "empty": "No exam templates yet",
+      "emptyFiltered": "No templates match the filters",
+      "emptyHint": {
+        "teacher": "Create one here, or open an exam in a course and choose \"Save as template\".",
+        "org": "Create a template for the whole organization, or promote a teacher's template.",
+        "platform": "Create a template that every course on the platform can use."
+      }
+    },
+    "create": {
+      "title": "New exam template",
+      "submit": "Create and edit",
+      "organization": "Organization",
+      "organizationHint": "The template is kept in this organization."
+    },
+    "fields": {
+      "title": "Template name",
+      "description": "Description",
+      "titleRequired": "Enter a name in at least one language."
+    },
+    "editor": {
+      "general": "General settings",
+      "structure": "Sections and rules",
+      "structureHint": "Edit defaults, sections, parameters and lock scope as JSON. The server checks everything when you save.",
+      "json": "Structure (JSON)",
+      "jsonHint": "Keys: defaults, sections, parameters, lock_scope.",
+      "jsonInvalid": "This is not valid JSON. Check brackets, commas and quotes.",
+      "jsonKeys": "Unknown keys: {keys}. Use only defaults, sections, parameters, lock_scope.",
+      "issues": "{n} problems in the structure",
+      "navigation": "Navigation",
+      "displayMode": "Display",
+      "passageDisplay": "Reading passages",
+      "resultView": "Result page",
+      "courseDefault": "Course default",
+      "scheme": "Grading scheme",
+      "schemeNone": "None: points",
+      "schemeCurrent": "Current scheme",
+      "schemeScope": {
+        "system": "system",
+        "mine": "mine"
+      },
+      "schemeHintTeacher": "System schemes or your own.",
+      "schemeHintShared": "Shared templates can use system schemes only.",
+      "save": "Save draft",
+      "saved": "Draft saved.",
+      "unsaved": "You have unsaved changes.",
+      "conflict": "Someone else saved this template meanwhile. Reload to get the latest draft (your changes here are lost).",
+      "reload": "Reload",
+      "more": "More actions",
+      "currentVersion": "Published version: v{n}",
+      "noVersion": "Not published yet",
+      "fromVersion": "Editing starts from v{n}. Saving creates a new draft; exams keep their version.",
+      "draftPending": "A saved draft is waiting to be published.",
+      "archivedNote": "This template is archived: it is hidden from course pickers and cannot be changed. Exams made from it keep working.",
+      "notFound": "Template not found"
+    },
+    "publish": {
+      "action": "Publish",
+      "title": "Publish the template?",
+      "effect": "The draft becomes version v{n}. New exams use it; exams made earlier keep their version.",
+      "done": "Published as v{n}."
+    },
+    "archive": {
+      "action": "Archive",
+      "title": "Archive the template?",
+      "effect": "The template disappears from course pickers and cannot be changed or restored. Exams made from it keep working.",
+      "menuHint": "Hide from pickers for good",
+      "done": "Template archived."
+    },
+    "lock": {
+      "action": "Lock",
+      "title": "Lock the template?",
+      "effect": "New exams made from it keep the fixed structure (the lock scope). Exams made earlier do not change.",
+      "menuHint": "Fix the structure of new exams",
+      "reason": "Reason",
+      "done": "Template locked."
+    },
+    "unlock": {
+      "action": "Unlock",
+      "title": "Unlock the template?",
+      "effect": "New exams made from it can change their structure. Exams made earlier stay locked.",
+      "menuHint": "Let new exams change the structure",
+      "done": "Template unlocked."
+    },
+    "promote": {
+      "action": "Move to the organization",
+      "title": "Move the template to the organization?",
+      "effect": "It becomes an organization template: every course of the organization can use it, and org admins manage it. The teacher no longer owns it. Exams made from it do not change.",
+      "menuHint": "Make it an organization template",
+      "done": "The template now belongs to the organization."
+    },
+    "import": {
+      "validateAgainst": "Check against a template exam",
+      "validateHint": "Rows are checked against the sections and rules of this draft exam's template.",
+      "noValidation": "Don't check",
+      "attach": "Add the imported questions to this exam",
+      "attachHint": "Each question goes to the section named in its row. Nothing is saved if anything fails."
+    },
+    "noAccess": {
+      "title": "Exam templates are for teachers",
+      "body": "Templates are made and used by teachers. If you teach, ask for teacher access first.",
+      "back": "Back to my courses"
+    },
+    "errors": {
+      "template_not_found": "This template does not exist or is not available to you.",
+      "template_not_published": "This template has no published version yet.",
+      "template_archived": "This template is archived. It can no longer be used or changed.",
+      "spec_invalid": "The template structure has errors. See the list below.",
+      "nothing_to_publish": "There is no draft to publish. Change and save the template first.",
+      "draft_conflict": "Someone else saved this template meanwhile. Reload to see the latest draft.",
+      "template_locked": "This setting is fixed by the template.",
+      "template_locked_exam": "This setting is fixed by the exam template. Ask the template owner to unlock it.",
+      "preset_template_exclusive": "Choose either an ORT preset or a template, not both.",
+      "preset_not_templatable": "ORT exams cannot be saved as templates.",
+      "parameter_missing": "Choose a value for every template option.",
+      "parameter_invalid": "One of the chosen template options is not allowed.",
+      "display_mode_not_available": "The scrolling display is not available yet. Use one question per page.",
+      "importer_profile_reserved": "The ORT import format belongs to the ORT course template and cannot be used here.",
+      "scheme_not_shareable": "This grading scheme is private. Shared templates can use system schemes only.",
+      "template_upgrade_not_allowed": "Only drafts without attempts can move to a newer template version.",
+      "not_a_template_assessment": "This assessment was not created from a template.",
+      "scope_not_allowed": "You cannot create or move templates at this level. Ask your organization admin.",
+      "section_not_in_template": "The section of a row is not in the template.",
+      "type_not_allowed_in_section": "This question type is not allowed in that section.",
+      "passage_not_allowed": "That section does not allow reading passages.",
+      "type_required": "Give the question type: the section allows several.",
+      "count_below_min": "A section has fewer questions than the template asks for.",
+      "count_above_max": "A section has more questions than the template allows.",
+      "attach_target_mismatch": "The questions can only be added to a draft made from the same template version.",
+      "format_mismatch": "The file does not match the chosen format. Choose the other format."
+    },
+    "versions": {
+      "title": "Versions",
+      "version": "Version",
+      "published": "Published",
+      "sections": "Sections",
+      "importFormat": "Import format",
+      "empty": "No published versions yet. Publish the draft to create v1."
     }
   }
 }
