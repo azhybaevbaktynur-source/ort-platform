@@ -42,6 +42,9 @@ from app.lms.assignments import sync as assignment_sync  # --- Phase 7a S1 --- (
 from app.lms.templates import base as tpl_fields
 from app.lms.templates import service as tpl
 # --- Phase 6 S2b end ---
+# --- Phase 7b S2 begin --- (exam template structure locks wrap the 6a guard, PHASE_7B_DESIGN 5.4)
+from app.lms.exam_templates import locks as _locks
+# --- Phase 7b S2 end ---
 
 _ZERO = Decimal("0")
 
@@ -66,6 +69,22 @@ def _commit(db: Session, a: Assessment) -> None:
 
 def create_assessment(db: Session, ctx: AuthzContext, course: Course, data: sch.AssessmentCreateIn) -> Assessment:
     require_course(ctx, A.CONTENT_MANAGE, course)
+    # --- Phase 7b S2 begin --- (PHASE_7B_DESIGN 5.3 / 9.1: the template branch; `preset` and a template never mix.
+    # The ORT preset path below is untouched: a template assessment always has preset 'none'.)
+    if data.exam_template_id is not None or data.exam_template_version_id is not None:
+        if data.preset != "none":
+            raise ValidationFailed("preset and exam_template_* are mutually exclusive",
+                                   code="preset_template_exclusive",
+                                   details=[{"loc": ["preset"], "msg": "mutually exclusive with exam_template_*"}])
+        from app.lms.exam_templates import instantiate as _inst
+
+        _t, version = _inst.resolve_version(db, ctx, course, template_id=data.exam_template_id,
+                                            version_id=data.exam_template_version_id)
+        a = _inst.instantiate(db, ctx, course, version, data.parameters or {}, title=data.title,
+                              description=data.description, languages=list(data.languages))
+        db.commit()
+        return a
+    # --- Phase 7b S2 end ---
     # --- Phase 6 S2b begin --- (course template guard, PHASE_6_DESIGN 5.2)
     tpl.assert_preset_allowed(course, data.preset)
     # --- Phase 6 S2b end ---
@@ -117,10 +136,11 @@ def update_assessment(db: Session, ctx: AuthzContext, course: Course, aid: uuid.
         a.access_code_hash = hash_access_code(data.access_code) if data.access_code is not None else None
     # --- Phase 7a S4 end ---
     # --- Phase 6 S2b begin --- (course template guard, PHASE_6_DESIGN 5.4)
+    # --- Phase 7b S2 --- (the exam-template lock wraps the 6a guard; preset exams take the 6a branch only)
     if "navigation" in fields and data.navigation != a.navigation:
-        tpl.assert_not_locked(course, tpl_fields.LOCK_NAVIGATION, preset=a.preset, actor_id=ctx.user.id)
+        _locks.assert_structure_unlocked(db, course, a, tpl_fields.LOCK_NAVIGATION, actor_id=ctx.user.id)
     if "grading_scheme_version_id" in fields and data.grading_scheme_version_id != a.grading_scheme_version_id:
-        tpl.assert_not_locked(course, tpl_fields.LOCK_SCHEME_VERSION, preset=a.preset, actor_id=ctx.user.id)
+        _locks.assert_structure_unlocked(db, course, a, tpl_fields.LOCK_SCHEME_VERSION, actor_id=ctx.user.id)
     # --- Phase 6 S2b end ---
     if "languages" in fields and set(data.languages) - set(course.languages or []):
         raise ValidationFailed("Languages must be a subset of the course languages", code="languages_not_in_course")
@@ -206,7 +226,8 @@ def add_section(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID,
                 data: sch.SectionIn) -> AssessmentSection:
     a = _manage(db, ctx, course, aid)
     # --- Phase 6 S2b begin --- (course template guard, PHASE_6_DESIGN 5.4)
-    tpl.assert_not_locked(course, tpl_fields.LOCK_SECTION_ADD_REMOVE, preset=a.preset, actor_id=ctx.user.id)
+    # --- Phase 7b S2 --- (exam-template lock wraps the 6a guard)
+    _locks.assert_structure_unlocked(db, course, a, tpl_fields.LOCK_SECTION_ADD_REMOVE, actor_id=ctx.user.id)
     # --- Phase 6 S2b end ---
     sections = repo.load_sections(db, a.id)
     if len(sections) >= settings.ASSESSMENT_MAX_SECTIONS:
@@ -230,14 +251,15 @@ def update_section(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUI
     if "key" in fields and old_lock is not None and data.key != s.key:
         raise ValidationFailed("The ORT preset fixes the key of this section", code="preset_rule_locked")
     # --- Phase 6 S2b begin --- (course template guard, PHASE_6_DESIGN 5.4)
+    # --- Phase 7b S2 --- (exam-template lock wraps the 6a guard; unchanged values still pass)
     if "key" in fields and data.key != s.key:
-        tpl.assert_not_locked(course, tpl_fields.LOCK_SECTION_KEY, preset=a.preset, actor_id=ctx.user.id)
+        _locks.assert_structure_unlocked(db, course, a, tpl_fields.LOCK_SECTION_KEY, actor_id=ctx.user.id)
     if "time_limit_s" in fields and data.time_limit_s != s.time_limit_s:
-        tpl.assert_not_locked(course, tpl_fields.LOCK_SECTION_TIME_LIMIT, preset=a.preset, actor_id=ctx.user.id)
-    if ("rules" in fields and tpl.is_locked(course, tpl_fields.LOCK_SECTION_RULES, preset=a.preset,
-                                            actor_id=ctx.user.id)
+        _locks.assert_structure_unlocked(db, course, a, tpl_fields.LOCK_SECTION_TIME_LIMIT, actor_id=ctx.user.id)
+    if ("rules" in fields and _locks.is_structure_locked(db, course, a, tpl_fields.LOCK_SECTION_RULES,
+                                                         actor_id=ctx.user.id)
             and _section_rules(a, data.key if "key" in fields else s.key, data.rules) != dict(s.rules or {})):
-        tpl.assert_not_locked(course, tpl_fields.LOCK_SECTION_RULES, preset=a.preset, actor_id=ctx.user.id)
+        _locks.assert_structure_unlocked(db, course, a, tpl_fields.LOCK_SECTION_RULES, actor_id=ctx.user.id)
     # --- Phase 6 S2b end ---
     if "key" in fields:
         s.key = data.key
@@ -257,7 +279,8 @@ def delete_section(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUI
     a = _manage(db, ctx, course, aid)
     s = repo.load_section(db, a.id, section_id)
     # --- Phase 6 S2b begin --- (course template guard, PHASE_6_DESIGN 5.4)
-    tpl.assert_not_locked(course, tpl_fields.LOCK_SECTION_ADD_REMOVE, preset=a.preset, actor_id=ctx.user.id)
+    # --- Phase 7b S2 --- (exam-template lock wraps the 6a guard)
+    _locks.assert_structure_unlocked(db, course, a, tpl_fields.LOCK_SECTION_ADD_REMOVE, actor_id=ctx.user.id)
     # --- Phase 6 S2b end ---
     if db.execute(select(AssessmentItem.id).where(AssessmentItem.section_id == s.id).limit(1)).first():
         raise Conflict("The section still has items", code="section_not_empty")
@@ -274,8 +297,8 @@ def reorder_sections(db: Session, ctx: AuthzContext, course: Course, aid: uuid.U
     if len(section_ids) != len(set(section_ids)) or {s.id for s in sections} != set(section_ids):
         raise ValidationFailed("section_ids must be exactly the current sections", code="order_mismatch")
     # --- Phase 6 S2b begin --- (course template guard, PHASE_6_DESIGN 5.4)
-    if [x.id for x in sections] != list(section_ids):
-        tpl.assert_not_locked(course, tpl_fields.LOCK_SECTION_ORDER, preset=a.preset, actor_id=ctx.user.id)
+    if [x.id for x in sections] != list(section_ids):  # --- Phase 7b S2 --- (exam-template lock wraps 6a)
+        _locks.assert_structure_unlocked(db, course, a, tpl_fields.LOCK_SECTION_ORDER, actor_id=ctx.user.id)
     # --- Phase 6 S2b end ---
     by_id = {s.id: s for s in sections}
     _renumber([by_id[i] for i in section_ids])

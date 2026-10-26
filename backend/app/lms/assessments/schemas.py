@@ -44,6 +44,19 @@ class AssessmentCreateIn(_In):
     preset: Preset = "none"
     languages: list[Lang] = Field(min_length=1, max_length=3)
     subject_key: Optional[str] = Field(default=None, max_length=40)
+    # --- Phase 7b S2 begin --- (PHASE_7B_DESIGN 9.1: create from an exam template; `preset` must stay 'none',
+    # checked in the builder as 422 `preset_template_exclusive`; `subject_key` only with ort_subject, unchanged)
+    exam_template_id: Optional[uuid.UUID] = None
+    exam_template_version_id: Optional[uuid.UUID] = None
+    parameters: Optional[dict[str, str]] = None
+
+    @field_validator("parameters")
+    @classmethod
+    def _parameters(cls, v):
+        if v is not None and (len(v) > 5 or any(len(k) > 40 or len(val) > 40 for k, val in v.items())):
+            raise ValueError("parameters: at most 5 entries of short keys and values")
+        return v
+    # --- Phase 7b S2 end ---
 
     @model_validator(mode="after")
     def _v(self):

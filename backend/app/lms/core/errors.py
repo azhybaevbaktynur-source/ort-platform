@@ -12,6 +12,9 @@ from fastapi.responses import JSONResponse
 LMS_PATH_PREFIXES = ("/api/v1/me", "/api/v1/courses", "/api/v1/platform", "/api/v1/assets", "/api/v1/media",
                      "/api/v1/attempts", "/api/v1/internal", "/api/v1/grading-schemes",
                      "/api/v1/org", "/api/v1/invitations")  # Phase 6 S1 (org admin) and S3 (invitations)
+# --- Phase 7b S2 begin --- (exam templates, PHASE_7B_DESIGN 9.1)
+LMS_PATH_PREFIXES = LMS_PATH_PREFIXES + ("/api/v1/exam-templates",)
+# --- Phase 7b S2 end ---
 
 # Phase 4 error codes (design section 5); every one needs an `lms.errors.*` i18n key in en/ky/ru.
 PHASE4_ERROR_CODES = (

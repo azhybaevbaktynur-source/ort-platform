@@ -219,3 +219,39 @@ def start_preview(course_id: uuid.UUID, assessment_id: uuid.UUID, data: Optional
     state, _created = engine.start_attempt(
         ctx.db, ctx, course, assessment_id, StartIn(language=data.language if data else None), now=clock.now())
     return state
+
+
+# --- Phase 7b S2 begin --- (exam templates, PHASE_7B_DESIGN 5.4, 5.5, 9.1)
+from fastapi import Request  # noqa: E402
+
+from app.lms.exam_templates import instantiate as _tpl_inst  # noqa: E402
+from app.lms.exam_templates import locks as _tpl_locks  # noqa: E402
+from app.lms.exam_templates import save_as as _tpl_save_as  # noqa: E402
+from app.lms.exam_templates import schemas as _tsch  # noqa: E402
+from app.lms.exam_templates import service as _tpl_svc  # noqa: E402
+
+
+@router.post("/{course_id}/assessments/{assessment_id}/save-as-template", status_code=201,
+             response_model=_tsch.ExamTemplateOut)
+def save_as_template(course_id: uuid.UUID, assessment_id: uuid.UUID, data: _tsch.SaveAsTemplateIn, request: Request,
+                     ctx: AuthzContext = Depends(get_authz)):
+    course = _course(ctx, course_id)
+    t = _tpl_save_as.save_as_template(ctx.db, ctx, course, assessment_id, data, request=request)
+    return _tpl_svc.manage_out(ctx, t, None)
+
+
+@router.post("/{course_id}/assessments/{assessment_id}/template-upgrade", response_model=_tsch.TemplateUpgradeOut)
+def template_upgrade(course_id: uuid.UUID, assessment_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
+    course = _course(ctx, course_id)
+    a, issues = _tpl_inst.upgrade_to_latest(ctx.db, ctx, course, assessment_id)
+    return _tsch.TemplateUpgradeOut(assessment=_staff(ctx, a), issues=[sch.IssueOut(**i.as_dict()) for i in issues])
+
+
+@router.post("/{course_id}/assessments/{assessment_id}/structure-unlock", response_model=sch.AssessmentStaffOut)
+def structure_unlock(course_id: uuid.UUID, assessment_id: uuid.UUID, request: Request,
+                     data: Optional[_tsch.ReasonIn] = None, ctx: AuthzContext = Depends(get_authz)):
+    course = _course(ctx, course_id)
+    a = _tpl_locks.structure_unlock(ctx.db, ctx, course, assessment_id, reason=data.reason if data else None,
+                                    request=request)
+    return _staff(ctx, a)
+# --- Phase 7b S2 end ---

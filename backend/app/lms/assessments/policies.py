@@ -23,3 +23,11 @@ ASSESSMENT_POLICIES: dict[tuple[str, str], str] = {
     ("GET", f"{_A}/versions"): "course:content.read_admin",
     ("POST", f"{_A}/preview"): "course:content.manage",
 }
+
+# --- Phase 7b S2 begin --- (exam templates, PHASE_7B_DESIGN 9.1)
+ASSESSMENT_POLICIES.update({
+    ("POST", f"{_A}/save-as-template"): "course:content.manage",   # + exam_templates.scopes.can_create (chosen scope)
+    ("POST", f"{_A}/template-upgrade"): "course:content.manage",   # draft without attempts only
+    ("POST", f"{_A}/structure-unlock"): "course:content.manage",   # + scopes.can_manage(template), audited
+})
+# --- Phase 7b S2 end ---
