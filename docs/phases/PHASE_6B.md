@@ -45,3 +45,9 @@ UX gate: `docs/phases/PHASE_6_screens/6b/` (INDEX.md, sections S5a, S5b, S5c, S6
 
 - P8 (above).
 - Neon branch limit (10) reached; deleting old backups needs your OK.
+
+## Post-deploy production check (2026-10-26)
+
+- Render `/health` = 89050a4, Neon at `0008_phase6_organizations` (latest). 6a data unchanged: one organization ("Platform", active) holding both ORT courses (template `ort` v1, locked, owned by the owner's account, demo teacher kept as system co-teacher) and the owner's draft course; 0 courses and 0 banks without an organization (2 banks, both in ORT (Russian)); 0 personal organizations because there is no independent teacher yet (the only approved teacher is the owner, a platform admin); 299 question versions and 3 attempts, as in PHASE_6A.md.
+- Logged-out browser pass on Vercel (phone + desktop): landing, login, register, forgot/reset password, invalid invitation page (en/ky/ru friendly message; the only console entry is the intended 404 of the token lookup), and 15 logged-in routes redirecting to login with `redirect=`. Found and fixed (`4771318`, frontend only): the landing header made `/ru`, `/ky`, `/en` 433–533 px wide on phones; auth pages had no `<h1>`. After the fix 36/36 checks pass at 320/375/414 px.
+- Render deploys only on backend changes; a frontend-only commit leaves `/health` on the previous commit (expected).

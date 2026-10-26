@@ -18,6 +18,7 @@ from app.lms.assessments import repository as repo
 from app.lms.assessments.models import Assessment, AssessmentVersion
 from app.lms.assessments.rules import Issue
 from app.lms.assessments.snapshot import build_snapshot, canonical_hash
+from app.lms.assignments import sync as assignment_sync  # --- Phase 7a S1 --- (quiz assignments mirror, 3.2)
 from app.lms.content.models import BankQuestion
 from app.lms.core import clock
 from app.lms.core.errors import Conflict, ValidationFailed
@@ -95,6 +96,7 @@ def publish(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID, *, c
         a.published_draft_rev = a.draft_rev
         if a.published_at is None:
             a.published_at = clock.now()
+        assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
         db.commit()
         return PublishResult(a, cur, True)
     if cur is not None and not confirm:
@@ -113,6 +115,7 @@ def publish(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID, *, c
     a.status = "published"
     a.published_draft_rev = a.draft_rev
     a.published_at = clock.now()
+    assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
     db.commit()
     return PublishResult(a, v, False)
 
@@ -123,6 +126,7 @@ def unpublish(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID) ->
     if a.status != "published":
         raise Conflict("Assessment is not published", code="not_published")
     a.status = "draft"
+    assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
     db.commit()
     return a
 

@@ -69,7 +69,7 @@ async def test_not_started_vs_missing_matrix(db, api):
     items = {i["assessment_id"]: i for i in body["items"]}
     # not_started rows carry no numbers, exactly like missing ones
     assert set(items[str(rows["fresh"].id)]) == set(items[str(rows["due_passed"].id)]) == {
-        "assessment_id", "title", "state", "due_at"}
+        "assignment_id", "kind", "assessment_id", "title", "state", "due_at"}  # Phase 7a: items are assignments
 
 
 async def test_another_students_attempt_does_not_make_mine_started(db, api):

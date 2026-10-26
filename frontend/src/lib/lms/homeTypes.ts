@@ -13,7 +13,13 @@ export interface HomeInProgressOut {
 }
 
 export interface HomeNextUpOut {
-  assessment_id: string;
+  // --- Phase 7a S5 begin --- (PHASE_7A_DESIGN 3.9: next up lists assignments)
+  /** absent on a backend before Phase 7a (then the row is a quiz with `assessment_id`) */
+  assignment_id?: string;
+  kind?: "none" | "text" | "file" | "quiz";
+  /** quiz rows only */
+  assessment_id?: string | null;
+  // --- Phase 7a S5 end ---
   course_id: string;
   course_title: LocalizedText;
   title: LocalizedText;
@@ -24,7 +30,12 @@ export interface HomeNextUpOut {
 }
 
 export interface HomeResultOut {
-  assessment_id: string;
+  // --- Phase 7a S5 begin --- (released manual grades are listed too)
+  assignment_id?: string;
+  kind?: "none" | "text" | "file" | "quiz";
+  /** quiz results only */
+  assessment_id?: string | null;
+  // --- Phase 7a S5 end ---
   course_id: string;
   course_title: LocalizedText;
   title: LocalizedText;

@@ -57,6 +57,23 @@ def attempt_start_limit() -> Limit:
     return Limit("attempt_start_10m", settings.ATTEMPT_START_RATE_PER_10M, 600)
 
 
+# --- Phase 7a S4 begin --- (PHASE_7A_DESIGN 3.8)
+def access_code_fail_limit() -> Limit:
+    """Quiz access code tries, per user and assessment: 10 per 10 minutes (every try counts, security review 7a)."""
+    return Limit("access_code_fail_10m", 10, 600)
+
+
+def access_code_day_limit() -> Limit:
+    """Quiz access code tries, per user and assessment: 30 per 24 hours."""
+    return Limit("access_code_try_24h", 30, 86400)
+
+
+def access_code_ip_limit() -> Limit:
+    """Quiz access code tries, per client IP and assessment (enforced only with RATE_LIMIT_IP_ENFORCE)."""
+    return Limit("access_code_ip_10m", 100, 600, is_ip_rule=True)
+# --- Phase 7a S4 end ---
+
+
 def grade_item_limit() -> Limit:
     """Phase 3 (P3-28): manual item scoring, per user."""
     return Limit("grade_item_1h", settings.GRADE_ITEM_RATE_PER_HOUR, 3600)

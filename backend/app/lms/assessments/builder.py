@@ -38,6 +38,7 @@ from app.lms.grading.schemes import load_usable_version
 from app.lms.grading.seeds import PRESET_SCHEME_VERSIONS
 from app.models.user import User
 # --- Phase 6 S2b begin --- (course template guards, PHASE_6_DESIGN 5.2 / 5.4)
+from app.lms.assignments import sync as assignment_sync  # --- Phase 7a S1 --- (quiz assignments mirror, 3.2)
 from app.lms.templates import base as tpl_fields
 from app.lms.templates import service as tpl
 # --- Phase 6 S2b end ---
@@ -90,6 +91,9 @@ def create_assessment(db: Session, ctx: AuthzContext, course: Course, data: sch.
         specs = []
     for i, (key, secs) in enumerate(specs, start=1):
         db.add(AssessmentSection(assessment_id=a.id, position=i, key=key, time_limit_s=secs, rules=ort_rules(key)))
+    # --- Phase 7a S1 begin --- (PHASE_7A_DESIGN 2.9: the quiz assignment, same transaction)
+    assignment_sync.ensure_quiz_assignment(db, a, ctx.user.id)
+    # --- Phase 7a S1 end ---
     db.commit()
     return a
 
@@ -101,6 +105,17 @@ def update_assessment(db: Session, ctx: AuthzContext, course: Course, aid: uuid.
         raise Conflict("The assessment was changed by someone else", code="draft_conflict",
                        details={"draft_rev": a.draft_rev})
     fields = data.model_fields_set - {"draft_rev"}
+    # --- Phase 7a S4 begin --- (PHASE_7A_DESIGN 2.7, 3.8: access code -> bcrypt hash; editable under the ORT lock)
+    if "access_code" in fields:
+        from app.lms.accommodations.service import hash_access_code
+
+        fields = fields - {"access_code"}
+        if data.access_code is not None and (a.preset or "none") != "none":
+            # Security review 7a / owner question Q4: no access codes on ORT preset exams (the ORT lobby stays as
+            # it is); clearing stays allowed.
+            raise Conflict("Fixed by the course template", code="template_locked", details={"field": "access_code"})
+        a.access_code_hash = hash_access_code(data.access_code) if data.access_code is not None else None
+    # --- Phase 7a S4 end ---
     # --- Phase 6 S2b begin --- (course template guard, PHASE_6_DESIGN 5.4)
     if "navigation" in fields and data.navigation != a.navigation:
         tpl.assert_not_locked(course, tpl_fields.LOCK_NAVIGATION, preset=a.preset, actor_id=ctx.user.id)
@@ -131,6 +146,7 @@ def update_assessment(db: Session, ctx: AuthzContext, course: Course, aid: uuid.
         setattr(a, f, value)
     if (a.grading_scheme_version_id, a.score_policy, utc(a.due_at)) != before:
         a.grading_changed_at = clock.now()  # drives the gradebook's stale_count (P4-12, P4-15)
+    assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
     _commit(db, a)
     return a
 
@@ -151,6 +167,7 @@ def soft_delete_assessment(db: Session, ctx: AuthzContext, course: Course, aid: 
     if repo.has_open_attempts(db, a.id):
         raise Conflict("Students are taking this assessment", code="attempts_in_progress")
     a.soft_delete(ctx.user.id)
+    assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
     db.commit()
 
 
@@ -160,6 +177,7 @@ def restore_assessment(db: Session, ctx: AuthzContext, course: Course, aid: uuid
     if a.deleted_at is None:
         raise Conflict("Assessment is not deleted", code="not_deleted")
     a.restore()
+    assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
     db.commit()
     return a
 
@@ -706,6 +724,7 @@ def _summary_fields(a: Assessment, totals: dict, counts: dict, version_nos: dict
         current_version_no=version_nos.get(a.published_version_id) if a.published_version_id else None,
         attempt_counts=sch.AttemptCountsOut(**counts.get(a.id, {"in_progress": 0, "submitted": 0})),
         available_from=a.available_from, available_until=a.available_until, deleted_at=a.deleted_at,
+        has_access_code=a.access_code_hash is not None,  # --- Phase 7a S4 ---
     )
 
 
@@ -832,6 +851,11 @@ def list_student(db: Session, ctx: AuthzContext, course: Course, *, cursor: Opti
     mine = _student_attempts(db, ctx.user.id, [a.id for a in assessments])
     briefs = grading_repo.version_briefs(db, [a.grading_scheme_version_id for a in assessments])
     now = clock.now()
+    # --- Phase 7a S6 begin --- (the caller's effective window, due date and attempts: accommodations + overrides)
+    from app.lms.accommodations import service as _acc
+
+    _effs = _acc.effective_for_assessments(db, course.id, ctx.user.id, assessments)
+    # --- Phase 7a S6 end ---
     out = []
     for a, snap, item_count in rows:
         atts = mine[a.id]
@@ -842,11 +866,12 @@ def list_student(db: Session, ctx: AuthzContext, course: Course, *, cursor: Opti
             done = [r for r in atts if r[3] in ("graded", "needs_review") and r[4] is not None]
             if done:
                 last = sch.LastResultOut(raw_score=float(done[-1][4]), points_possible=float(done[-1][5]))
+        _e = _effs[a.id]  # Phase 7a S6: effective values (equal to the assessment's without an exception)
         out.append(sch.AssessmentStudentSummaryOut(
             id=a.id, title=a.title, languages=list(a.languages or []), time_limit_s=_total_limit(snap),
-            item_count=item_count, available_from=a.available_from, available_until=a.available_until,
-            allowed_attempts=a.allowed_attempts, attempts_used=used, in_progress_attempt_id=open_id,
-            last_result=last, due_at=utc(a.due_at),
+            item_count=item_count, available_from=_e.available_from, available_until=_e.available_until,
+            allowed_attempts=_e.allowed_attempts, attempts_used=used, in_progress_attempt_id=open_id,
+            last_result=last, due_at=utc(_e.due_at),
             scheme=sch.scheme_student_ref(briefs.get(a.grading_scheme_version_id))))
     return out, nxt
 
@@ -865,6 +890,17 @@ def lobby(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID) -> sch
     used = sum(1 for r in atts if r[3] != "void")
     open_id = next((r[1] for r in atts if r[3] == "in_progress"), None)
     can_start, reason = _start_state(a, used, open_id, clock.now())
+    # --- Phase 7a S4 begin --- (PHASE_7A_DESIGN 3.4, 3.8: the caller's effective window and attempts, one SELECT;
+    # equal to the assessment's own values without an accommodation or override)
+    from types import SimpleNamespace as _NS
+
+    from app.lms.accommodations import service as _acc
+
+    _eff = _acc.effective_for_assessment(db, course.id, ctx.user.id, a)
+    can_start, reason = _start_state(
+        _NS(status=a.status, available_from=_eff.available_from, available_until=_eff.available_until,
+            allowed_attempts=_eff.allowed_attempts), used, open_id, clock.now())
+    # --- Phase 7a S4 end ---
     # --- Phase 6 S4b begin --- (an org admin may read the lobby but not take the exam: mirror the start route)
     from app.core.authz import can as _authz_can
 
@@ -874,7 +910,7 @@ def lobby(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID) -> sch
         reason = "course_not_active" if ctx.role_for(course.id) == "student" else "not_a_student"
     # --- Phase 6 S4b end ---
     briefs = grading_repo.version_briefs(db, [a.grading_scheme_version_id])
-    return sch.AssessmentLobbyOut(
+    out = sch.AssessmentLobbyOut(  # Phase 7a S4: `out =` so the block below sets the effective values
         id=a.id, title=a.title, description=a.description, languages=list(snap.get("languages") or []),
         sections=[sch.LobbySectionOut(pos=s["pos"], key=s.get("key"), title=s.get("title"),
                                       time_limit_s=s.get("time_limit_s"), item_count=counts.get(s["pos"], 0))
@@ -883,3 +919,19 @@ def lobby(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID) -> sch
         allowed_attempts=a.allowed_attempts, attempts_used=used, available_from=a.available_from,
         available_until=a.available_until, in_progress_attempt_id=open_id, can_start=can_start, reason=reason,
         due_at=utc(a.due_at), scheme=sch.scheme_student_ref(briefs.get(a.grading_scheme_version_id)))
+    # --- Phase 7a S4 begin --- (the caller's own effective values; never the word "override", only the dates)
+    from app.lms.attempts import timing as _timing
+
+    out.allowed_attempts = _eff.allowed_attempts
+    out.available_from, out.available_until, out.due_at = (
+        _eff.available_from, _eff.available_until, utc(_eff.due_at))
+    _extra = _timing.extra_seconds(snap, _eff.extra_time_percent, _eff.extra_time_s)
+    if _extra and out.time_limit_s:
+        _limits = _timing.extended_section_limits(snap, _extra)
+        out.time_limit_s = out.time_limit_s + _extra
+        for _s in out.sections:
+            _s.time_limit_s = _limits.get(int(_s.pos), _s.time_limit_s)
+    out.requires_access_code = (a.access_code_hash is not None and (a.preset or "none") == "none"
+                                and ctx.role_for(course.id) not in ("teacher", "assistant"))
+    return out
+    # --- Phase 7a S4 end ---

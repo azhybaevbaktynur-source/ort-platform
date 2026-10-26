@@ -81,15 +81,30 @@ def _upsert(db: Session):
 
 # ------------------------------------------------------------------ statement 1: grading settings
 
-def load_context(db: Session, assessment_id) -> Any:
-    """Assessment grading settings + the course late policy in one SELECT (no lock)."""
-    return db.execute(
+# --- Phase 7a S3 begin --- (PHASE_7A_DESIGN 3.4: `due_at` = coalesce(override.due_at, assessment.due_at) for one
+# enrollment; without `enrollment_id` the assessment's own due date, as before. Still ONE statement.)
+def load_context(db: Session, assessment_id, enrollment_id=None) -> Any:
+    """Assessment grading settings + the course late policy in one SELECT (no lock). With `enrollment_id`, the
+    student's per-assignment override (A5) replaces `due_at` when it sets one (LEFT JOIN on the quiz assignment's
+    deterministic id, no extra statement)."""
+    from app.lms.assignments.ids import assignment_id_for
+    from app.lms.assignments.models import AssignmentOverride
+
+    AO = AssignmentOverride.__table__
+    due = Assessment.due_at
+    if enrollment_id is not None:
+        due = func.coalesce(AO.c.due_at, Assessment.due_at)
+    stmt = (
         select(Assessment.id.label("assessment_id"), Assessment.course_id, Assessment.score_policy,
-               Assessment.grading_scheme_version_id, Assessment.due_at, Assessment.grade_release,
+               Assessment.grading_scheme_version_id, due.label("due_at"), Assessment.grade_release,
                Assessment.grading_changed_at, Course.late_policy, Course.late_policy_changed_at)
         .join(Course, Course.id == Assessment.course_id)
-        .where(Assessment.id == assessment_id)
-    ).one()
+    )
+    if enrollment_id is not None:
+        stmt = stmt.outerjoin(AO, and_(AO.c.assignment_id == assignment_id_for(assessment_id),
+                                       AO.c.enrollment_id == enrollment_id))
+    return db.execute(stmt.where(Assessment.id == assessment_id)).one()
+# --- Phase 7a S3 end ---
 
 
 # ------------------------------------------------------------------ the one stale definition (Q2)
@@ -147,27 +162,35 @@ def stale_predicate(scheme_version_id, grading_changed_at, late_policy_changed_a
 
 # ------------------------------------------------------------------ statement 2: the submission row lock
 
+# --- Phase 7a S3 begin --- (PHASE_7A_DESIGN 2.3 / 3.5 / 3.6: rows of none/text/file assignments carry
+# `assignment_id` and no `assessment_id`; quiz rows are unchanged, their assignment id is the column default.)
 def placeholder_row(*, course_id, assessment_id, enrollment_id, user_id, kept_policy: str, now: datetime,
-                    computed_at: Optional[datetime] = None) -> dict:
-    """Values of a fresh submissions row before its first computation."""
-    return dict(id=uuid.uuid4(), course_id=course_id, assessment_id=assessment_id, enrollment_id=enrollment_id,
-                user_id=user_id, state="graded", kept_policy=kept_policy, attempts_counted=0, late_seconds=0,
-                late_deduction=ZERO, computed_at=computed_at or now, version=1, created_at=now, updated_at=now)
+                    computed_at: Optional[datetime] = None, assignment_id=None) -> dict:
+    """Values of a fresh submissions row before its first computation. Quiz rows derive `assignment_id`
+    (`assignment_id_for`, the column default); manual rows pass it (here or on the returned dict)."""
+    row = dict(id=uuid.uuid4(), course_id=course_id, assessment_id=assessment_id, enrollment_id=enrollment_id,
+               user_id=user_id, state="graded", kept_policy=kept_policy, attempts_counted=0, late_seconds=0,
+               late_deduction=ZERO, computed_at=computed_at or now, version=1, created_at=now, updated_at=now)
+    if assignment_id is not None:
+        row["assignment_id"] = assignment_id
+    return row
 
 
 def lock_or_create_submission(db: Session, *, course_id, assessment_id, enrollment_id, user_id,
-                              kept_policy: str = "highest", now: Optional[datetime] = None) -> dict:
+                              kept_policy: str = "highest", now: Optional[datetime] = None,
+                              assignment_id=None) -> dict:
     """UPSERT that takes the row lock (PG waits here behind a concurrent writer of the same submission; SQLite
     serializes writers). Returns the current row as a dict (placeholder values on a fresh row until
-    `recompute_submission` writes them in the same transaction)."""
+    `recompute_submission` writes them in the same transaction). Conflict target: (enrollment, assessment) for
+    quiz rows (unchanged), (enrollment, assignment) when `assessment_id` is None."""
     now = now or clock.now()
     ins = _upsert(db)(S).values(**placeholder_row(
         course_id=course_id, assessment_id=assessment_id, enrollment_id=enrollment_id, user_id=user_id,
-        kept_policy=kept_policy, now=now))
-    stmt = ins.on_conflict_do_update(
-        index_elements=[S.c.enrollment_id, S.c.assessment_id], set_={"version": S.c.version},
-    ).returning(*S.c)
+        kept_policy=kept_policy, now=now, assignment_id=assignment_id))
+    target = [S.c.enrollment_id, S.c.assessment_id if assessment_id is not None else S.c.assignment_id]
+    stmt = ins.on_conflict_do_update(index_elements=target, set_={"version": S.c.version}).returning(*S.c)
     return dict(db.execute(stmt).mappings().one())
+# --- Phase 7a S3 end ---
 
 
 # ------------------------------------------------------------------ statement 3: counted attempts
@@ -407,7 +430,7 @@ def on_attempt_scored(db: Session, attempt: Attempt) -> None:
     if attempt.is_preview or attempt.status not in COUNTED:
         return
     now = clock.now()
-    ctx = load_context(db, attempt.assessment_id)                                                     # 1
+    ctx = load_context(db, attempt.assessment_id, attempt.enrollment_id)  # 1 (Phase 7a S3: override-aware due)
     sub = lock_or_create_submission(db, course_id=attempt.course_id, assessment_id=attempt.assessment_id,
                                     enrollment_id=attempt.enrollment_id, user_id=attempt.user_id,
                                     kept_policy=ctx.score_policy, now=now)                            # 2

@@ -21,7 +21,7 @@ export function Card({ title, description, actions, headingLevel = 2, padding = 
     <Tag className={cn("rounded-2xl border border-slate-200 bg-white shadow-sm", padding === "md" && "p-4 sm:p-6", className)} {...rest}>
       {hasHeader && (
         <div className={cn("flex flex-wrap items-start justify-between gap-x-4 gap-y-2", padding === "none" && "px-4 pt-4 sm:px-6 sm:pt-6", children ? "mb-4" : "")}>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 basis-56">
             {title && <H className="text-lg font-semibold leading-7 text-slate-900">{title}</H>}
             {description && <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>}
           </div>

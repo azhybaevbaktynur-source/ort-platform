@@ -25,6 +25,7 @@ from app.db import session as db_session  # noqa: E402
 from app.db.session import Base  # noqa: E402
 import app.models  # noqa: E402,F401
 from app.lms.assessments.models import Assessment  # noqa: E402
+from app.lms.assignments.ids import assignment_id_for  # noqa: E402
 from app.lms.attempts import grading  # noqa: E402
 from app.lms.attempts.models import Attempt  # noqa: E402
 from app.lms.core import clock  # noqa: E402
@@ -148,8 +149,9 @@ def do_excuse(Session, teacher_id, course_id, sub_id, version):
 
 def do_regrade(Session, teacher_id, course_id, assessment_id):
     def run():
-        with Session() as s:
-            return regrade_mod.regrade(s, _ctx(s, teacher_id), s.get(Course, course_id), assessment_id)
+        with Session() as s:  # Phase 7a: regrade addresses the quiz assignment of the assessment
+            return regrade_mod.regrade(s, _ctx(s, teacher_id), s.get(Course, course_id),
+                                       assignment_id_for(assessment_id))
     return run
 
 
@@ -157,7 +159,7 @@ def do_release(Session, teacher_id, course_id, assessment_id, release=True):
     def run():
         with Session() as s:
             fn = actions.release if release else actions.unrelease
-            return fn(s, _ctx(s, teacher_id), s.get(Course, course_id), assessment_id, None)
+            return fn(s, _ctx(s, teacher_id), s.get(Course, course_id), assignment_id_for(assessment_id), None)
     return run
 
 
@@ -316,7 +318,7 @@ def test_regrade_vs_finalize_and_manual_score_no_deadlock(setup_db, Session):
     assert not errors, errors
     # whatever the regrade did not reach is still targeted; a second call finishes
     regrade_mod.regrade(setup_db, _ctx(setup_db, w.ids.teacher), setup_db.get(Course, w.ids.course),
-                        w.ids.assessment)
+                        assignment_id_for(w.ids.assessment))
     rows = assert_consistent(setup_db, w.ids.assessment)
     assert len(rows) == 16 and all(r["scheme_version_id"] == ORT_SUBJECT_V1_ID for r in rows.values())
 
@@ -471,7 +473,7 @@ def test_two_regrades_vs_void_and_engine_submit(setup_db, Session):
     out, errors = run_parallel(fns)
     assert not errors, errors
     regrade_mod.regrade(setup_db, _ctx(setup_db, w.ids.teacher), setup_db.get(Course, w.ids.course),
-                        w.ids.assessment)
+                        assignment_id_for(w.ids.assessment))
     rows = assert_consistent(setup_db, w.ids.assessment)
     assert len(rows) == 24 and all(r["scheme_version_id"] == ORT_SUBJECT_V1_ID for r in rows.values())
     assert sum(r["state"] == "no_attempts" for r in rows.values()) == len(voids)  # their only attempt voided

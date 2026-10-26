@@ -17,6 +17,8 @@ import { OverrideForm } from "./OverrideForm";
 import { SubmissionAttempts } from "./SubmissionAttempts";
 import { EventTimeline } from "./EventTimeline";
 import { ReasonModal } from "./ReasonModal";
+import { ManualWork } from "./ManualWork"; // Phase 7a S5
+import type { AssignmentSubmissionStaffOut } from "@/lib/lms/assignmentTypes"; // Phase 7a S5
 
 export interface PanelTarget {
   submissionId: string;
@@ -29,6 +31,11 @@ export interface PanelTarget {
   labels?: Record<string, SchemeLabelValue> | null;
   /** the assessment's grade release mode: with "auto" a grade cannot be hidden (server 409 grade_release_auto) */
   gradeRelease?: GradeRelease;
+  // --- Phase 7a S5 begin --- (`assessmentId` is the column id, i.e. the assignment id)
+  kind?: "none" | "text" | "file" | "quiz";
+  /** quiz columns: the assessment (attempt links) */
+  quizAssessmentId?: string | null;
+  // --- Phase 7a S5 end ---
 }
 
 type Dialog = null | { kind: "clear" } | { kind: "excuse"; excused: boolean } | { kind: "void"; attempt: SubmissionAttemptOut };
@@ -143,7 +150,9 @@ export function SubmissionPanel({
       if (s) onCell(enrollmentId, assessmentId, cellFromSubmission(s));
     }, true);
 
-  const attemptHref = (id: string) => `/${lang}/courses/${courseId}/assessments/${assessmentId}/attempts/${id}`;
+  // Phase 7a S5: attempt links use the quiz's assessment id (the column id is the assignment id)
+  const attemptHref = (id: string) => `/${lang}/courses/${courseId}/assessments/${target.quizAssessmentId ?? assessmentId}/attempts/${id}`;
+  const isQuiz = !target.kind || target.kind === "quiz";
   const v = sub ? cellView(sub, { due_at: target.dueAt, scheme: { labels: target.labels } }, Date.now()) : null;
   const excused = sub?.state === "excused";
 
@@ -201,8 +210,8 @@ export function SubmissionPanel({
                   <dt className="text-slate-500">{t("gradebook.panel.effective")}</dt>
                   <dd className="font-semibold">{fmtPointsOf(sub.effective_points, sub.points_possible) || "—"}</dd>
                   {fmtPercentile(sub.percentile) && (<><dt className="text-slate-500">{t("gradebook.panel.percentile")}</dt><dd>{fmtPercentile(sub.percentile)}</dd></>)}
-                  <dt className="text-slate-500">{t("gradebook.panel.attemptsCounted")}</dt>
-                  <dd>{sub.attempts_counted}</dd>
+                  {isQuiz && (<><dt className="text-slate-500">{t("gradebook.panel.attemptsCounted")}</dt>
+                  <dd>{sub.attempts_counted}</dd></>)}
                   {sub.released_at && (<><dt className="text-slate-500">{t("gradebook.panel.releasedAt")}</dt><dd>{fmtDateTime(sub.released_at)}</dd></>)}
                 </dl>
                 {sub.has_override && (
@@ -250,11 +259,16 @@ export function SubmissionPanel({
                 </section>
               )}
 
-              <section aria-labelledby={`${titleId}-at`} className="space-y-2 border-t border-slate-100 pt-4">
-                <h3 id={`${titleId}-at`} className="text-sm font-bold text-slate-900">{t("gradebook.panel.attempts")}</h3>
-                <SubmissionAttempts attempts={sub.attempts} labels={target.labels} keptAttemptId={sub.kept_attempt_id} attemptHref={attemptHref} canManage={canManage}
-                  onVoid={(a) => { setDialogError(null); setDialog({ kind: "void", attempt: a }); }} />
-              </section>
+              {isQuiz ? (
+                <section aria-labelledby={`${titleId}-at`} className="space-y-2 border-t border-slate-100 pt-4">
+                  <h3 id={`${titleId}-at`} className="text-sm font-bold text-slate-900">{t("gradebook.panel.attempts")}</h3>
+                  <SubmissionAttempts attempts={sub.attempts ?? []} labels={target.labels} keptAttemptId={sub.kept_attempt_id} attemptHref={attemptHref} canManage={canManage}
+                    onVoid={(a) => { setDialogError(null); setDialog({ kind: "void", attempt: a }); }} />
+                </section>
+              ) : (
+                /* Phase 7a S5: text / file / offline: hand-ins, rubric and feedback, graded on the grading screen */
+                <ManualWork courseId={courseId} assignmentId={assessmentId} enrollmentId={enrollmentId} sub={sub as AssignmentSubmissionStaffOut} />
+              )}
 
               <section aria-labelledby={`${titleId}-ev`} className="space-y-2 border-t border-slate-100 pt-4">
                 <h3 id={`${titleId}-ev`} className="text-sm font-bold text-slate-900">{t("gradebook.events.title")}</h3>

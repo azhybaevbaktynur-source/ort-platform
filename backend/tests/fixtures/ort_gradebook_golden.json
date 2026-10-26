@@ -1,0 +1,136 @@
+{
+  "gradebook": {
+    "column": {
+      "grade_release": "auto",
+      "omit_from_total": false,
+      "points_possible": "150",
+      "released_count": "2",
+      "score_policy": "highest",
+      "stale_count": "0",
+      "submission_count": "2",
+      "title": {
+        "en": "ЦООМО 19",
+        "ru": "ЦООМО 19"
+      },
+      "warnings": []
+    },
+    "rows": [
+      {
+        "cell": {
+          "attempts_counted": "1",
+          "display_value": "222",
+          "effective_points": "131",
+          "has_override": false,
+          "label": null,
+          "late_deduction": "0",
+          "override_points": null,
+          "passed": null,
+          "percentile": "99.2",
+          "points_possible": "150",
+          "raw_points": "131",
+          "state": "graded",
+          "thresholds": {
+            "golden_certificate": true
+          }
+        },
+        "student": "A",
+        "total": {
+          "current_percent": "87.33",
+          "display_value": null,
+          "final_percent": "87.33",
+          "label": null,
+          "passed": null,
+          "warnings": []
+        }
+      },
+      {
+        "cell": {
+          "attempts_counted": "1",
+          "display_value": "119",
+          "effective_points": "50",
+          "has_override": false,
+          "label": null,
+          "late_deduction": "0",
+          "override_points": null,
+          "passed": null,
+          "percentile": "15.1",
+          "points_possible": "150",
+          "raw_points": "50",
+          "state": "graded",
+          "thresholds": {
+            "golden_certificate": false
+          }
+        },
+        "student": "B",
+        "total": {
+          "current_percent": "33.33",
+          "display_value": null,
+          "final_percent": "33.33",
+          "label": null,
+          "passed": null,
+          "warnings": []
+        }
+      }
+    ]
+  },
+  "mine": {
+    "A": {
+      "items": [
+        {
+          "display_value": "222",
+          "effective_points": "131",
+          "label": null,
+          "late_deduction": "0",
+          "passed": null,
+          "percentile": "99.2",
+          "points_possible": "150",
+          "scheme_type": "piecewise_curve",
+          "state": "graded",
+          "thresholds": {
+            "golden_certificate": true
+          },
+          "title": {
+            "en": "ЦООМО 19",
+            "ru": "ЦООМО 19"
+          }
+        }
+      ],
+      "scheme": null,
+      "total": {
+        "display_value": null,
+        "label": null,
+        "passed": null,
+        "percent": "87.33"
+      }
+    },
+    "B": {
+      "items": [
+        {
+          "display_value": "119",
+          "effective_points": "50",
+          "label": null,
+          "late_deduction": "0",
+          "passed": null,
+          "percentile": "15.1",
+          "points_possible": "150",
+          "scheme_type": "piecewise_curve",
+          "state": "graded",
+          "thresholds": {
+            "golden_certificate": false
+          },
+          "title": {
+            "en": "ЦООМО 19",
+            "ru": "ЦООМО 19"
+          }
+        }
+      ],
+      "scheme": null,
+      "total": {
+        "display_value": null,
+        "label": null,
+        "passed": null,
+        "percent": "33.33"
+      }
+    }
+  }
+}

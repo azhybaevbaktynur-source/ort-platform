@@ -109,3 +109,35 @@ def advance(sections: Sequence[SectionState], attempt: Any, now: datetime, grace
         by_pos[pos + 1] = replace(nxt, started_at=dl, deadline_at=nd)
         pos += 1
     return out
+
+
+# --- Phase 7a S4 begin --- (PHASE_7A_DESIGN 3.4: accommodations and overrides; extra_s = 0 changes nothing)
+
+def extra_seconds(snapshot: dict, percent: int, seconds: int) -> int:
+    """Extra time of one attempt: round(total_limit * percent / 100) + seconds. Without a total limit the percent
+    part is 0 (there is nothing to scale)."""
+    total = total_limit_s(snapshot)
+    part = (total * int(percent or 0) + 50) // 100 if total else 0
+    return max(0, part + int(seconds or 0))
+
+
+def extended_section_limits(snapshot: dict, extra_s: int) -> dict[int, Optional[int]]:
+    """Per-section limits scaled by (total + extra_s) / total, floored to whole seconds, the remainder on the last
+    timed section, so the timed sections grow by the same share as the attempt (their sum equals the extended
+    total when the total is the section sum). Untimed sections stay untimed; extra_s = 0 or no total limit returns
+    the snapshot's limits unchanged."""
+    limits = {int(s["pos"]): s.get("time_limit_s") for s in snapshot.get("sections", [])}
+    total = total_limit_s(snapshot)
+    if not extra_s or not total:
+        return limits
+    timed = sorted(p for p, v in limits.items() if v)
+    if not timed:
+        return limits
+    num, den = total + int(extra_s), total
+    out = dict(limits)
+    for p in timed:
+        out[p] = int(limits[p]) * num // den
+    target = sum(int(limits[p]) for p in timed) * num // den
+    out[timed[-1]] += target - sum(out[p] for p in timed)
+    return out
+# --- Phase 7a S4 end ---

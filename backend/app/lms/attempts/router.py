@@ -15,7 +15,7 @@ from app.lms.attempts.schemas import (
     AnswersIn, AttemptStateOut, MyAttemptOut, SaveOut, StartIn, SubmitIn, SubmitOut,
 )
 from app.lms.core import clock
-from app.lms.core.deps import get_lms_user
+from app.lms.core.deps import client_ip_hash, get_lms_user
 from app.lms.core.errors import Conflict, Forbidden, RateLimited, error_body
 from app.lms.courses.service import load_course, require_course
 from app.models.user import User
@@ -27,10 +27,11 @@ router = APIRouter()
 
 @router.post("/courses/{course_id}/assessments/{assessment_id}/attempts", response_model=AttemptStateOut)
 def start_attempt(course_id: uuid.UUID, assessment_id: uuid.UUID, response: Response, background: BackgroundTasks,
-                  data: Optional[StartIn] = None, ctx: AuthzContext = Depends(get_authz)):
+                  request: Request, data: Optional[StartIn] = None, ctx: AuthzContext = Depends(get_authz)):
     course = load_course(ctx.db, course_id)
     require_course(ctx, A.ASSESSMENT_TAKE, course)
-    state, created = engine.start_attempt(ctx.db, ctx, course, assessment_id, data or StartIn(), now=clock.now())
+    state, created = engine.start_attempt(ctx.db, ctx, course, assessment_id, data or StartIn(), now=clock.now(),
+                                          ip_hash=client_ip_hash(request))  # access code IP rule (review 7a)
     response.status_code = 201 if created else 200
     sweep.maybe_schedule_sweep(background)
     return state

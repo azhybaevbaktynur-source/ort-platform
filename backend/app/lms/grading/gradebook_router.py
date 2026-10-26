@@ -1,4 +1,4 @@
-"""Gradebook and student grade reads (design 5; policies in gradebook_policies.py).
+"""Gradebook and student grade reads (design 5; Phase 7a 4.3; policies in gradebook_policies.py).
 
 Pattern: authenticate -> load_course -> require_course -> child loaders scoped by course.id (design 4)."""
 from __future__ import annotations
@@ -20,13 +20,27 @@ router = APIRouter()
 @router.get("/courses/{course_id}/gradebook", response_model=ser.GradebookPageOut)
 def get_gradebook(course_id: uuid.UUID, cursor: Optional[str] = Query(None, max_length=512),
                   limit: Optional[int] = Query(None),
-                  assessment_ids: Optional[list[str]] = Query(None, max_length=100),
+                  assignment_ids: Optional[list[str]] = Query(None, max_length=100),
+                  assessment_ids: Optional[list[str]] = Query(None, max_length=100),  # legacy: quiz columns
                   ctx: AuthzContext = Depends(get_authz)):
     course = load_course(ctx.db, course_id)
     require_course(ctx, A.ATTEMPT_READ_ALL, course)
-    ids = gradebook.parse_assessment_ids(assessment_ids)
-    return gradebook.gradebook_page(ctx.db, ctx, course, cursor=cursor, limit=limit, assessment_ids=ids,
+    ids = gradebook.parse_column_ids(assignment_ids)
+    legacy = gradebook.parse_column_ids(assessment_ids, param="assessment_ids", as_assessments=True)
+    if legacy:
+        ids = (ids or []) + [i for i in legacy if i not in (ids or [])]
+    return gradebook.gradebook_page(ctx.db, ctx, course, cursor=cursor, limit=limit, assignment_ids=ids,
                                     now=clock.now())
+
+
+@router.get("/courses/{course_id}/assignments/{assignment_id}/submissions",
+            response_model=ser.AssignmentSubmissionsPageOut)
+def get_assignment_submissions(course_id: uuid.UUID, assignment_id: uuid.UUID,
+                               cursor: Optional[str] = Query(None, max_length=512),
+                               limit: Optional[int] = Query(None), ctx: AuthzContext = Depends(get_authz)):
+    course = load_course(ctx.db, course_id)
+    require_course(ctx, A.ATTEMPT_READ_ALL, course)
+    return gradebook.assignment_submissions_page(ctx.db, ctx, course, assignment_id, cursor=cursor, limit=limit)
 
 
 @router.get("/courses/{course_id}/submissions/{submission_id}", response_model=ser.SubmissionStaffOut)

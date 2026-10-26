@@ -80,6 +80,13 @@ ROUTE_POLICIES.update({
     ("GET", "/api/v1/me/home"): "authenticated",  # the caller's own enrollments, attempts, grades, invitations
 })
 # --- Phase 6 S6a end ---
+# --- Phase 7a S1 begin --- (assignments, hand-ins, grades: S2/S3 fill ASSIGNMENT_POLICIES; accommodations: S4)
+from app.lms.assignments.policies import ASSIGNMENT_POLICIES  # noqa: E402
+from app.lms.accommodations.policies import ACCOMMODATION_POLICIES  # noqa: E402
+
+ROUTE_POLICIES.update(ASSIGNMENT_POLICIES)
+ROUTE_POLICIES.update(ACCOMMODATION_POLICIES)
+# --- Phase 7a S1 end ---
 
 
 def iter_routes(app):

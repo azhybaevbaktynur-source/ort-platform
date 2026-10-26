@@ -9,6 +9,7 @@ from sqlalchemy import event
 
 from app.core.route_inventory import ROUTE_POLICIES
 from app.db import session as db_session
+from app.lms.assignments.ids import assignment_id_for
 from app.lms.core import clock
 from app.lms.home.schemas import COURSE_KEYS, HOME_KEYS, IN_PROGRESS_KEYS, NEXT_UP_KEYS, RESULT_KEYS
 from app.lms.invitations.service import hash_token, new_token
@@ -402,6 +403,11 @@ def _fill(db, n_courses, n_assessments):
                 make_attempt(db, a, v, s, enrollment=enr)
             elif j % 3 == 1:
                 grade_row(db, a, v, enr, s, j % 10, attempt_no=1)
+            if j == 0:  # Phase 7a S4: overrides and accommodations are LEFT JOINs, never extra statements
+                add_override(db, a, enr, due_at=now() + timedelta(hours=j + 2), extra_attempts=1)
+        add_accommodation(db, c, enr, extra_attempts=1, extra_time_percent=25)
+        hand_in_assignment(db, c, t, "text", due_at=now() + timedelta(days=2))
+        manual_grade(db, hand_in_assignment(db, c, t, "file"), enr, s)
     return s
 
 
@@ -420,3 +426,147 @@ async def test_statement_count_is_fixed(db, api):
         # user, courses (+total, in_progress), next_due, in_progress, next_up, results, attempts, invitations
         assert counts[name] <= 8, "\n".join(st[:120] for st in c.statements)
     assert counts["small"] == counts["big"], counts
+
+
+# ------------------------------------------------------------------ Phase 7a S4: assignments (PHASE_7A_DESIGN 3.9)
+
+def hand_in_assignment(db, c, owner, kind="text", *, published=True, **kw):
+    from sqlalchemy import func, select
+
+    from app.lms.assignments.models import Assignment
+
+    pos = (db.execute(select(func.max(Assignment.position)).where(Assignment.course_id == c.id)).scalar() or 0) + 1
+    a = Assignment(course_id=c.id, kind=kind, title={"en": f"{kind} work"}, points_possible=Decimal("10"),
+                   published=published, position=pos, created_by_id=owner.id, **kw)
+    db.add(a)
+    db.commit()
+    return a
+
+
+def hand_in(db, assignment, enr, user):
+    from app.lms.assignments.models import AssignmentSubmission
+    from app.lms.grading.models import Submission
+
+    sub = Submission(course_id=assignment.course_id, assignment_id=assignment.id, assessment_id=None,
+                     enrollment_id=enr.id, user_id=user.id, state="pending_review", kept_policy="latest",
+                     computed_at=now())
+    db.add(sub)
+    db.flush()
+    db.add(AssignmentSubmission(submission_id=sub.id, assignment_id=assignment.id, enrollment_id=enr.id,
+                                user_id=user.id, attempt_no=1, kind="text", body_text="my essay",
+                                submitted_at=now()))
+    db.commit()
+    return sub
+
+
+def manual_grade(db, assignment, enr, user, *, released=True):
+    from app.lms.grading.models import Submission
+    from app.lms.grading.seeds import PERCENT_V1_ID
+
+    sub = Submission(course_id=assignment.course_id, assignment_id=assignment.id, assessment_id=None,
+                     enrollment_id=enr.id, user_id=user.id, state="graded", kept_policy="latest",
+                     raw_points=Decimal("8"), points_possible=Decimal("10"), effective_points=Decimal("8"),
+                     scheme_version_id=PERCENT_V1_ID, display_value=Decimal("80.00"), computed_at=now(),
+                     released_at=now() if released else None)
+    db.add(sub)
+    db.commit()
+    return sub
+
+
+def add_accommodation(db, c, enr, **kw):
+    from app.lms.accommodations.models import EnrollmentAccommodation
+
+    db.add(EnrollmentAccommodation(enrollment_id=enr.id, course_id=c.id, **kw))
+    db.commit()
+
+
+def add_override(db, a, enr, **kw):
+    from app.lms.assignments.models import AssignmentOverride
+
+    db.add(AssignmentOverride(assignment_id=assignment_id_for(a.id), enrollment_id=enr.id, course_id=a.course_id,
+                              **kw))
+    db.commit()
+
+
+async def test_next_up_lists_hand_in_assignments_until_handed_in(db, api):
+    t = teacher(db)
+    s = make_user(db)
+    c = course(db, t)
+    enr = enroll(db, c, s)
+    n = now()
+    quiz, _ = assessment(db, c, t, due_at=n + timedelta(days=3))
+    text = hand_in_assignment(db, c, t, "text", due_at=n + timedelta(days=1))
+    file = hand_in_assignment(db, c, t, "file", due_at=n + timedelta(days=2))
+    hand_in_assignment(db, c, t, "none", due_at=n + timedelta(hours=1))  # never listed
+    hand_in_assignment(db, c, t, "text", published=False, due_at=n + timedelta(hours=1))
+    hand_in_assignment(db, c, t, "text", available_until=n - timedelta(minutes=1))  # closed
+    gone = hand_in_assignment(db, c, t, "file", due_at=n + timedelta(hours=1))
+    gone.deleted_at = n
+    db.commit()
+    body = await home(api, s)
+    rows = body["next_up"]
+    assert {frozenset(x) for x in rows} == {NEXT_UP_KEYS}
+    assert [x["assignment_id"] for x in rows] == [str(text.id), str(file.id), str(assignment_id_for(quiz.id))]
+    assert [x["kind"] for x in rows] == ["text", "file", "quiz"]
+    assert rows[0]["assessment_id"] is None and rows[0]["attempts_left"] is None
+    assert rows[2]["assessment_id"] == str(quiz.id) and rows[2]["attempts_left"] == 1
+    assert body["courses"][0]["next_due_at"][:16] == (n + timedelta(days=1)).isoformat()[:16]
+    hand_in(db, text, enr, s)
+    rows = (await home(api, s))["next_up"]
+    assert [x["kind"] for x in rows] == ["file", "quiz"]
+
+
+async def test_next_up_uses_own_effective_dates_and_attempts(db, api):
+    t = teacher(db)
+    s, other = make_user(db), make_user(db)
+    c = course(db, t)
+    enr = enroll(db, c, s)
+    enroll(db, c, other)
+    n = now()
+    first, _ = assessment(db, c, t, due_at=n + timedelta(days=1))
+    second, _ = assessment(db, c, t, due_at=n + timedelta(days=2))
+    closed, _ = assessment(db, c, t, available_until=n - timedelta(hours=1))
+    used, uv = assessment(db, c, t, allowed_attempts=1, due_at=n + timedelta(days=4))
+    make_attempt(db, used, uv, s, enrollment=enr, status="graded", submitted_at=n)
+    add_override(db, second, enr, due_at=n + timedelta(hours=1))           # moves ahead for this student only
+    add_override(db, closed, enr, available_until=n + timedelta(days=3))   # reopened for this student only
+    add_accommodation(db, c, enr, extra_attempts=1)                         # one more attempt everywhere
+    mine = (await home(api, s))["next_up"]
+    assert [x["assessment_id"] for x in mine] == [str(second.id), str(first.id), str(used.id)]
+    assert mine[0]["due_at"][:16] == (n + timedelta(hours=1)).isoformat()[:16]
+    assert mine[0]["attempts_left"] == 2 and mine[2]["attempts_left"] == 1
+    theirs = (await home(api, other))["next_up"]
+    assert [x["assessment_id"] for x in theirs] == [str(first.id), str(second.id), str(used.id)]
+    assert theirs[1]["due_at"][:16] == (n + timedelta(days=2)).isoformat()[:16]
+    for a in (first, second, used):
+        a.deleted_at = n
+    db.commit()
+    mine = (await home(api, s))["next_up"]
+    assert [x["assessment_id"] for x in mine] == [str(closed.id)]
+    assert mine[0]["available_until"][:16] == (n + timedelta(days=3)).isoformat()[:16]
+    assert (await home(api, other))["next_up"] == []
+
+
+async def test_latest_results_include_released_manual_grades(db, api):
+    t = teacher(db)
+    s = make_user(db)
+    c = course(db, t)
+    enr = enroll(db, c, s)
+    q, qv = assessment(db, c, t)
+    grade_row(db, q, qv, enr, s, 7)
+    essay = hand_in_assignment(db, c, t, "text")
+    manual_grade(db, essay, enr, s)
+    hidden = hand_in_assignment(db, c, t, "file")
+    manual_grade(db, hidden, enr, s, released=False)
+    unpublished = hand_in_assignment(db, c, t, "none", published=False)
+    manual_grade(db, unpublished, enr, s)
+    body = await home(api, s)
+    res = body["latest_results"]
+    assert [set(x) for x in res] == [RESULT_KEYS, RESULT_KEYS]
+    by_kind = {x["kind"]: x for x in res}
+    assert set(by_kind) == {"quiz", "text"}
+    assert by_kind["text"]["assignment_id"] == str(essay.id) and by_kind["text"]["assessment_id"] is None
+    assert Decimal(by_kind["text"]["display_value"]) == Decimal("80.00") and by_kind["text"]["title"]["en"]
+    assert by_kind["quiz"]["assignment_id"] == str(assignment_id_for(q.id))
+    assert by_kind["quiz"]["assessment_id"] == str(q.id)
+    assert not (set(walk_keys(body)) & FORBIDDEN)
