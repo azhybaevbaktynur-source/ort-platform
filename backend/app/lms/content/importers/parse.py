@@ -11,6 +11,13 @@ from .ort_csv import decode_bytes, parse_row, read_plain_csv
 from .parsed import Issues, ParsedBundle, ParsedPassage, ParsedUpload
 from .schemas import ImportOptions
 
+# --- Phase 7b S3 begin ---
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .general_csv import TemplateProfile
+# --- Phase 7b S3 end ---
+
 
 def _parse_plain_csv(raw: bytes, filename: str, opts: ImportOptions, issues: Issues) -> list[ParsedBundle]:
     if len(raw) > settings.IMPORT_MAX_CSV_BYTES:
@@ -60,7 +67,8 @@ def _parse_plain_csv(raw: bytes, filename: str, opts: ImportOptions, issues: Iss
     return [bundle]
 
 
-def parse_upload(raw: bytes, filename: str, opts: Optional[ImportOptions] = None) -> ParsedUpload:
+def parse_upload(raw: bytes, filename: str, opts: Optional[ImportOptions] = None,
+                 profile: Optional["TemplateProfile"] = None) -> ParsedUpload:  # Phase 7b S3: profile
     """Parse and validate a .zip bundle upload or a plain .csv. Never raises for bad content."""
     opts = opts or ImportOptions()
     issues = Issues()
@@ -70,7 +78,13 @@ def parse_upload(raw: bytes, filename: str, opts: Optional[ImportOptions] = None
         mb = settings.IMPORT_MAX_UPLOAD_BYTES // (1024 * 1024)
         issues.error("zip_too_large", f"The file is larger than {mb} MB.", params={"limit_mb": mb})
         return ParsedUpload(kind, [], issues)
-    bundles = _parse_plain_csv(raw, filename, opts, issues) if is_csv else parse_zip(raw, opts, issues)
+    # --- Phase 7b S3 begin --- (general format first; None = the ORT / legacy parser below, unchanged)
+    from .general_csv import parse_general
+
+    bundles = parse_general(raw, filename, is_csv, opts, profile, issues)
+    if bundles is None:
+        bundles = _parse_plain_csv(raw, filename, opts, issues) if is_csv else parse_zip(raw, opts, issues)
+    # --- Phase 7b S3 end ---
 
     rows = sum(len(b.items) for b in bundles)
     if rows > settings.IMPORT_MAX_ROWS:

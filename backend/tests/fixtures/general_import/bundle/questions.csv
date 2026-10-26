@@ -1,0 +1,4 @@
+external_id,section,type,stem,option_a,option_b,correct_option,image,answers
+g1,unit 1,single_choice,Which figure is red?,Left,Right,A,fig1.png,
+g2,unit 1,true_false,The figure is a square.,,,B,images/fig1.png,
+g3,unit 2,short_text,Type the colour,,,,,red|Red
