@@ -1,6 +1,6 @@
 # Phase 7b: exam templates I (data model, versions, general import format)
 
-**Status**: built and verified on branch `phase-7b` (2026-10-26); deploy and the **owner checkpoint** follow. Design: `docs/phases/EXAM_TEMPLATES_DESIGN.md` (approved) and `docs/phases/PHASE_7B_DESIGN.md`. Decisions: `docs/PRODUCT_DECISIONS.md` "Owner decisions 2026-10-25 (third round)", 7b-Q1, "Phase 7b implementation decisions" K1–K3.
+**Status**: **deployed 2026-10-26** (`main` 77c5b32; Render /health OK; Neon at `0010_phase7b_exam_templates`, verified: ORT exams keep `preset` with no template, 3 assignments, 1 submission, 299 question versions, 4 attempts; Vercel build started — confirm READY). Backup: `backup-2026-10-26-before-phase7b`. **Owner checkpoint: waiting.** Design: `docs/phases/EXAM_TEMPLATES_DESIGN.md` (approved) and `docs/phases/PHASE_7B_DESIGN.md`. Decisions: `docs/PRODUCT_DECISIONS.md` "Owner decisions 2026-10-25 (third round)", 7b-Q1, "Phase 7b implementation decisions" K1–K3.
 
 ## What changed
 
@@ -38,4 +38,4 @@ Rehearsal on the production copy (0007 → 0010 + lifespan): 0008 and 0009 check
 ## Owner items
 
 - Checkpoint review (this phase).
-- Neon: one free branch slot is needed for the pre-7b backup.
+- Neon: six obsolete pre-LMS backup branches deleted with the owner's OK (2026-10-26); 4 backups + production remain.
