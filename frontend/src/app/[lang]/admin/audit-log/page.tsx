@@ -9,7 +9,8 @@ import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
 import { useCursorList } from "@/components/lms/admin/useCursorList";
 import { MoreError, useTableState } from "@/components/lms/admin/ListParts";
 
-const TARGET_TYPES = ["", "user", "course", "teacher_request", "enrollment"];
+// Phase 7b S5: + every target type of the audit CHECK (organizations, invitations, exam templates, assessments)
+const TARGET_TYPES = ["", "user", "course", "teacher_request", "enrollment", "organization", "invitation", "exam_template", "assessment"];
 
 export default function AuditLogPage() {
   const { t } = useTranslation();

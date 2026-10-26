@@ -23,7 +23,8 @@ export function ImportValidationFields({ courseId, value, attach, disabled, onCh
   value: string;
   attach: boolean;
   disabled?: boolean;
-  onChange: (assessmentId: string, attach: boolean) => void;
+  /** `languages`: the chosen exam's languages (S5: the import language should be one of them to attach). */
+  onChange: (assessmentId: string, attach: boolean, languages?: string[]) => void;
 }) {
   const { lang, t } = useTranslation();
   const [rows, setRows] = useState<Summary[] | null>(null);
@@ -45,7 +46,7 @@ export function ImportValidationFields({ courseId, value, attach, disabled, onCh
     <div className="space-y-2">
       <Select label={t("examTemplates.import.validateAgainst")} value={value} disabled={disabled}
         hint={t("examTemplates.import.validateHint")}
-        onChange={(e) => onChange(e.target.value, e.target.value ? attach : false)}>
+        onChange={(e) => onChange(e.target.value, e.target.value ? attach : false, rows.find((r) => r.id === e.target.value)?.languages)}>
         <option value="">{t("examTemplates.import.noValidation")}</option>
         {rows.map((r) => <option key={r.id} value={r.id}>{label(r)}</option>)}
       </Select>

@@ -124,6 +124,37 @@ function BankSummary({ b, done, bankBase }: { b: ImportBankSummary; done: boolea
   );
 }
 
+function AttachedSummary({ attached, bankBase }: { attached: NonNullable<ImportReport["attached"]>; bankBase: string }) {
+  const { t } = useTranslation();
+  const skipped = sum(attached.skipped || {});
+  // the builder's skip codes (item_duplicate, item_language_mismatch, too_many_items, ...) share the lms.errors wording
+  const reason = (code: string) => {
+    const k = `lms.errors.${code}`;
+    const v = t(k);
+    return v === k ? code : v;
+  };
+  const examHref = `${bankBase.replace(/\/bank$/, "")}/assessments/${attached.assessment_id}/edit`;
+  return (
+    <div role="status" className={`${cardCls} space-y-2 border-emerald-200 bg-emerald-50 text-sm text-slate-800`}>
+      <p className="font-semibold">{t("examTemplates.import.attached", { count: attached.added })}</p>
+      {Object.keys(attached.sections || {}).length > 0 && (
+        <ul className="space-y-0.5">
+          {Object.entries(attached.sections).map(([sec, n]) => <li key={sec} className="break-words">{sec}: {n}</li>)}
+        </ul>
+      )}
+      {skipped > 0 && (
+        <div className="text-amber-900">
+          <p>{t("examTemplates.import.attachedSkipped", { count: skipped })}</p>
+          <ul className="list-disc pl-5">
+            {Object.entries(attached.skipped).map(([code, n]) => <li key={code} className="break-words">{reason(code)} ({n})</li>)}
+          </ul>
+        </div>
+      )}
+      <Link href={examHref} className={`${btnSecondary} inline-block`}>{t("examTemplates.import.openExam")}</Link>
+    </div>
+  );
+}
+
 export function ImportReportView({ report, done, bankBase }: { report: ImportReport; done: boolean; bankBase: string }) {
   const { t } = useTranslation();
   return (
@@ -139,6 +170,8 @@ export function ImportReportView({ report, done, bankBase }: { report: ImportRep
           {report.ok ? t("bank.import.okTitle") : t("bank.import.errorTitle", { count: report.errors.length })}
         </div>
       )}
+      {/* --- Phase 7b S5: questions added to a template exam (commit with "Add to this exam") --- */}
+      {done && report.attached && <AttachedSummary attached={report.attached} bankBase={bankBase} />}
       {report.banks.map((b, i) => (
         <BankSummary key={`${b.root}-${b.bank_id ?? i}`} b={b} done={done} bankBase={bankBase} />
       ))}
