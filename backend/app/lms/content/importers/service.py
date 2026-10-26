@@ -173,8 +173,11 @@ def _question_content(c: _Ctx, it: ParsedItem, prev: Optional[dict]) -> dict:
     image = None
     if it.image is not None:
         image = _ref_for(c.images[it.image.source_sha256], prev)
+    # --- Phase 7b S3 begin --- (general format rows may carry max_points; ORT items have none -> 1 as before)
+    pts = getattr(it, "default_points", None)
+    # --- Phase 7b S3 end ---
     return {"type": it.type, "stem": it.stem, "data": it.payload, "explanation": it.explanation,
-            "default_points": 1, "image": image}
+            "default_points": 1 if pts is None else pts, "image": image}
 
 
 def _find_bank(db: Session, c: _Ctx, b: ParsedBundle, lock: bool) -> tuple[Optional[QuestionBank], bool]:
@@ -449,12 +452,14 @@ def _ingest_all(db: Session, actor_id: str, course: Any, images: dict[str, Image
 
 
 def _run(db: Session, actor_id: str, course: Any, raw: Any, filename: str, opts: ImportOptions,
-         write: bool) -> ImportReport:
+         write: bool, target: Any = None) -> ImportReport:  # Phase 7b S3: target (exam template validation)
     with _import_slot():
         raw = _take(raw)
         if opts.allowed_languages is None:
             opts = opts.model_copy(update={"allowed_languages": list(course.languages or [])})
-        up = parse_upload(raw, filename, opts)
+        # --- Phase 7b S3 begin --- (validation profile of an exam template version, PHASE_7B_DESIGN 8)
+        up = parse_upload(raw, filename, opts, profile=target.profile if target is not None else None)
+        # --- Phase 7b S3 end ---
         del raw
         if up.issues.errors:
             return build_report(up)
@@ -473,11 +478,28 @@ def _run(db: Session, actor_id: str, course: Any, raw: Any, filename: str, opts:
                 return build_report(up)
         c = _Ctx(db, actor_id, course, opts, write, images, up.issues, up.kind)
         summaries: list[ImportBankSummary] = []
+        # --- Phase 7b S3 begin --- (attach step: commit only, same transaction)
+        from contextlib import nullcontext
+
+        from app.lms.exam_templates import import_format as ifmt
+
+        attach = write and target is not None and target.attach_id is not None
+        attached = None
+        # --- Phase 7b S3 end ---
         try:
             if write:
                 _ingest_all(db, actor_id, course, images)
-            for b in up.bundles:
-                summaries.append(_process_bundle(c, b))
+            # --- Phase 7b S3 begin ---
+            bases = ifmt.position_bases(db, up, opts) if attach else {}
+            with (ifmt.capture_new_questions(db) if attach else nullcontext([])) as created:
+                for b in up.bundles:
+                    summaries.append(_process_bundle(c, b))
+            if attach:
+                attached = ifmt.attach_imported(db, target, up, summaries, bases, created)
+                if attached.skipped:
+                    up.issues.warning("attach_skipped", f"{sum(attached.skipped.values())} question(s) were not "
+                                      "added to the exam.", params={"skipped": dict(attached.skipped)})
+            # --- Phase 7b S3 end ---
             if write:
                 db.commit()
         except BaseException as exc:
@@ -496,6 +518,12 @@ def _run(db: Session, actor_id: str, course: Any, raw: Any, filename: str, opts:
         rep.banks = summaries
         new = sum(1 for i in images.values() if i.existing is None)
         rep.images_total, rep.images_new, rep.images_existing = len(images), new, len(images) - new
+        # --- Phase 7b S3 begin ---
+        if attached is not None:
+            from .schemas import ImportResult
+
+            return ImportResult(**rep.model_dump(), attached=attached)
+        # --- Phase 7b S3 end ---
         return rep
 
 
@@ -505,7 +533,11 @@ def preview(db: Session, ctx: Any, course: Any, raw: Any, filename: str, opts: I
     from app.lms.templates.service import assert_import_profile_allowed
     assert_import_profile_allowed(course, opts.exam_type)
     # --- Phase 6 S2b end ---
-    rep = _run(db, ctx.user.id, course, raw, filename, opts, write=False)
+    # --- Phase 7b S3 begin --- (exam template validation / attach target, PHASE_7B_DESIGN 8)
+    from app.lms.exam_templates.import_format import resolve_import_target
+    target = resolve_import_target(db, ctx, course, opts)
+    # --- Phase 7b S3 end ---
+    rep = _run(db, ctx.user.id, course, raw, filename, opts, write=False, target=target)
     db.rollback()
     return rep
 
@@ -516,4 +548,8 @@ def commit(db: Session, ctx: Any, course: Any, raw: Any, filename: str, opts: Im
     from app.lms.templates.service import assert_import_profile_allowed
     assert_import_profile_allowed(course, opts.exam_type)
     # --- Phase 6 S2b end ---
-    return _run(db, ctx.user.id, course, raw, filename, opts, write=True)
+    # --- Phase 7b S3 begin --- (exam template validation / attach target, PHASE_7B_DESIGN 8)
+    from app.lms.exam_templates.import_format import resolve_import_target
+    target = resolve_import_target(db, ctx, course, opts)
+    # --- Phase 7b S3 end ---
+    return _run(db, ctx.user.id, course, raw, filename, opts, write=True, target=target)
