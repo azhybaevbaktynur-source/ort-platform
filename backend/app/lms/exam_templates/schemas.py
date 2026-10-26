@@ -102,26 +102,28 @@ class ExamTemplateVersionOut(ExamTemplateVersionBriefOut):
 
 
 class ExamTemplatePickerOut(BaseModel):
-    """Picker payload: the published structure, nothing about drafts or owners (B11: structure only)."""
+    """Picker payload: the published structure (`current_spec`), nothing about drafts or owners (B11)."""
     id: uuid.UUID
     owner_scope: str
+    organization_id: Optional[uuid.UUID] = None
     title: dict
     description: Optional[dict] = None
     status: str
     locked: bool
-    current_version: Optional[ExamTemplateVersionOut] = None
+    current_version_id: Optional[uuid.UUID] = None
+    current_version_no: Optional[int] = None
+    current_spec: Optional[dict] = None
+    created_at: datetime
     updated_at: datetime
 
 
 class ExamTemplateOut(ExamTemplatePickerOut):
     """Management payload (owner, org admin of its org, platform admin)."""
-    organization_id: Optional[uuid.UUID] = None
     owner_user_id: Optional[str] = None
     key: Optional[str] = None
     draft_spec: Optional[dict] = None
     draft_rev: int
     created_by_id: Optional[str] = None
-    created_at: datetime
     can_lock: bool = False       # the caller is the owner (9.2 lock / unlock)
     can_promote: bool = False    # teacher scope and the caller administers its organization
 

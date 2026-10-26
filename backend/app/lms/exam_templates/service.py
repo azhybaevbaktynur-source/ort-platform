@@ -263,17 +263,22 @@ def _current_versions(db: Session, rows: list[ExamTemplate]) -> dict[uuid.UUID, 
     return {v.id: v for v in db.execute(select(ExamTemplateVersion).where(ExamTemplateVersion.id.in_(ids_))).scalars()}
 
 
+def _picker_fields(t: ExamTemplate, cur: Optional[ExamTemplateVersion]) -> dict:
+    return dict(id=t.id, owner_scope=t.owner_scope, organization_id=t.organization_id, title=t.title,
+                description=t.description, status=t.status, locked=bool(t.locked),
+                current_version_id=cur.id if cur else None, current_version_no=cur.version_no if cur else None,
+                current_spec=cur.spec if cur else None, created_at=t.created_at, updated_at=t.updated_at)
+
+
 def picker_out(t: ExamTemplate, cur: Optional[ExamTemplateVersion]) -> sch.ExamTemplatePickerOut:
-    return sch.ExamTemplatePickerOut(id=t.id, owner_scope=t.owner_scope, title=t.title, description=t.description,
-                                     status=t.status, locked=bool(t.locked),
-                                     current_version=version_out(cur) if cur else None, updated_at=t.updated_at)
+    return sch.ExamTemplatePickerOut(**_picker_fields(t, cur))
 
 
 def manage_out(ctx: AuthzContext, t: ExamTemplate, cur: Optional[ExamTemplateVersion]) -> sch.ExamTemplateOut:
     return sch.ExamTemplateOut(
-        **picker_out(t, cur).model_dump(), organization_id=t.organization_id, owner_user_id=t.owner_user_id,
-        key=t.key, draft_spec=t.draft_spec, draft_rev=t.draft_rev, created_by_id=t.created_by_id,
-        created_at=t.created_at, can_lock=scopes.can_lock(ctx, t), can_promote=scopes.can_promote(ctx, t))
+        **_picker_fields(t, cur), owner_user_id=t.owner_user_id, key=t.key, draft_spec=t.draft_spec,
+        draft_rev=t.draft_rev, created_by_id=t.created_by_id, can_lock=scopes.can_lock(ctx, t),
+        can_promote=scopes.can_promote(ctx, t))
 
 
 def out_for(ctx: AuthzContext, t: ExamTemplate):

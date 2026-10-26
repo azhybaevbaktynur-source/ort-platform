@@ -61,7 +61,7 @@ async def test_picker_matrix_and_cross_tenant_404s(db, api):
                         (w.TA, w.cid, i_t["id"]), (w.TA, w.cid, str(uuid.uuid4()))):
         body = await create_from(api, u, cid, tid, status=404)
         assert body["error"]["code"] == "template_not_found"
-    vid = org_t["current_version"]["id"]
+    vid = org_t["current_version_id"]
     body = await create_from(api, w.TC, w.cid2, version_id=vid, status=404)
     assert body["error"]["code"] == "template_not_found"
     body = await create_from(api, w.TA, w.cid, draft["id"], status=422)

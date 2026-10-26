@@ -358,6 +358,8 @@ class AssessmentStaffSummaryOut(BaseModel):
     available_until: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
     has_access_code: bool = False  # --- Phase 7a S4 --- (2.7: the hash itself is never serialized)
+    # --- Phase 7b S2 --- (list rows carry the template reference too, so pickers can offer template exams only)
+    exam_template: Optional["ExamTemplateRefOut"] = None
 
 
 # --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 9.1: the template an assessment was created from)
@@ -390,8 +392,7 @@ class AssessmentStaffOut(AssessmentStaffSummaryOut):
     scheme: Optional[SchemeRefOut] = None
     sections: list[SectionOut]
     warnings: list[dict] = []
-    # --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 9.1)
-    exam_template: Optional[ExamTemplateRefOut] = None
+    # --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 9.1; `exam_template` is inherited from the summary, S2)
     display_mode: str = "one_per_page"
     passage_display: Optional[str] = None
     result_view: Optional[str] = None
@@ -496,3 +497,4 @@ STUDENT_SUMMARY_KEYS = frozenset(AssessmentStudentSummaryOut.model_fields)
 LOBBY_KEYS = frozenset(AssessmentLobbyOut.model_fields)
 
 ItemOut.model_rebuild()
+AssessmentStaffSummaryOut.model_rebuild()  # --- Phase 7b S2 --- (forward ref to ExamTemplateRefOut)

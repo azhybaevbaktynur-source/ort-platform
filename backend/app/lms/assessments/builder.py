@@ -801,7 +801,9 @@ def staff_summaries(db: Session, assessments: list[Assessment]) -> list[sch.Asse
     totals = repo.draft_totals(db, ids)
     counts = repo.attempt_counts(db, ids)
     vnos = _version_nos(db, assessments)
-    return [sch.AssessmentStaffSummaryOut(**_summary_fields(a, totals, counts, vnos)) for a in assessments]
+    refs = exam_template_refs(db, assessments)  # --- Phase 7b S2 ---
+    return [sch.AssessmentStaffSummaryOut(**_summary_fields(a, totals, counts, vnos), exam_template=refs.get(a.id))
+            for a in assessments]
 
 
 def staff_out(db: Session, a: Assessment) -> sch.AssessmentStaffOut:
@@ -847,6 +849,33 @@ def exam_template_ref(db: Session, a: Assessment) -> Optional[sch.ExamTemplateRe
     return sch.ExamTemplateRefOut(template_id=t.id, title=t.title, version_no=v.version_no, version_id=v.id,
                                   latest_version_no=latest.version_no if latest else None, locked_fields=locked)
 # --- Phase 7b S1 end ---
+
+
+# --- Phase 7b S2 begin --- (the same reference for list rows, two queries for the page)
+def exam_template_refs(db: Session, assessments: list[Assessment]) -> dict[uuid.UUID, sch.ExamTemplateRefOut]:
+    from app.lms.exam_templates.ids import expand_lock_scope
+    from app.lms.exam_templates.models import ExamTemplate, ExamTemplateVersion
+
+    vids = list({a.exam_template_version_id for a in assessments if a.exam_template_version_id is not None})
+    if not vids:
+        return {}
+    versions = {v.id: v for v in db.execute(select(ExamTemplateVersion).where(ExamTemplateVersion.id.in_(vids))).scalars()}
+    tids = list({v.template_id for v in versions.values()})
+    templates = {t.id: t for t in db.execute(select(ExamTemplate).where(ExamTemplate.id.in_(tids))).scalars()}
+    latest_ids = [t.current_version_id for t in templates.values() if t.current_version_id]
+    latest_nos = dict(db.execute(select(ExamTemplateVersion.id, ExamTemplateVersion.version_no).where(
+        ExamTemplateVersion.id.in_(latest_ids))).all()) if latest_ids else {}
+    out: dict[uuid.UUID, sch.ExamTemplateRefOut] = {}
+    for a in assessments:
+        v = versions.get(a.exam_template_version_id)
+        t = templates.get(v.template_id) if v is not None else None
+        if v is None or t is None:
+            continue
+        locked = sorted(expand_lock_scope((v.spec or {}).get("lock_scope"))) if a.structure_locked else []
+        out[a.id] = sch.ExamTemplateRefOut(template_id=t.id, title=t.title, version_no=v.version_no, version_id=v.id,
+                                           latest_version_no=latest_nos.get(t.current_version_id), locked_fields=locked)
+    return out
+# --- Phase 7b S2 end ---
 
 
 def list_staff(db: Session, course: Course, *, cursor: Optional[str], limit: Optional[int], deleted: bool):

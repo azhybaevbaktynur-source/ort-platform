@@ -31,7 +31,7 @@ async def test_snapshot_keys_and_attempts_survive_template_changes(db, api):
     row = db.get(Assessment, uuid.UUID(a["id"]))
     snap = db.get(AssessmentVersion, row.published_version_id).snapshot
     assert {k: snap[k] for k in SNAPSHOT_TEMPLATE_KEYS} == {
-        "exam_template_version_id": t["current_version"]["id"], "display_mode": "one_per_page",
+        "exam_template_version_id": t["current_version_id"], "display_mode": "one_per_page",
         "passage_display": "plain", "result_view": "general"}
     # a student takes it
     start = await api.call(w.S, "POST", f"/courses/{w.cid}/assessments/{a['id']}/attempts", json={})
@@ -45,7 +45,7 @@ async def test_snapshot_keys_and_attempts_survive_template_changes(db, api):
     assert (await publish_t(api, w.PA, t["id"])).json()["version"]["version_no"] == 2
     assert (await api.call(w.PA, "POST", f"{T}/{t['id']}/archive")).status_code == 200
     saved = await api.call(w.S, "PUT", f"/attempts/{att1}/answers", json={
-        "answers": [{"position": 1, "response": {"choice": "B"}, "client_ts": 1}]})
+        "answers": [{"position": 1, "response": {"choice_id": "B"}, "client_ts": 1}]})
     assert saved.status_code in (200, 207), saved.text
     submit = await api.call(w.S, "POST", f"/attempts/{att1}/submit", json={})
     assert submit.status_code == 200, submit.text
@@ -57,7 +57,7 @@ async def test_snapshot_keys_and_attempts_survive_template_changes(db, api):
     assert (await api.call(w.S, "GET", f"/attempts/{again.json()['id']}/content")).status_code == 200
     # the assessment row and its snapshot still point to version 1
     db.refresh(row)
-    assert str(row.exam_template_version_id) == t["current_version"]["id"]
-    assert db.get(AssessmentVersion, row.published_version_id).snapshot["exam_template_version_id"] == t["current_version"]["id"]
+    assert str(row.exam_template_version_id) == t["current_version_id"]
+    assert db.get(AssessmentVersion, row.published_version_id).snapshot["exam_template_version_id"] == t["current_version_id"]
     # staff still read the archived template through the assessment
     assert (await api.call(w.TA, "GET", f"{T}/{t['id']}/versions/1")).status_code == 200

@@ -72,7 +72,7 @@ async def test_instantiate_equals_hand_built_rows(db, api):
     db.commit()
     assert rows(db, a["id"]) == rows(db, h["id"])
     row = db.get(Assessment, uuid.UUID(a["id"]))
-    assert row.exam_template_version_id == uuid.UUID(t["current_version"]["id"]) and row.preset == "none"
+    assert row.exam_template_version_id == uuid.UUID(t["current_version_id"]) and row.preset == "none"
     assert row.structure_locked is False and row.description == {"en": "d"} and row.draft_rev == 1
     # the quiz assignment exists in the same transaction, mirrored
     asg = db.get(Assignment, assignment_id_for(row.id))
@@ -121,7 +121,7 @@ async def test_refusals(db, api):
 async def test_pinned_version_and_version_template_mismatch(db, api):
     w = tworld(db)
     t = await published_template(api, w.PA)
-    v1 = t["current_version"]["id"]
+    v1 = t["current_version_id"]
     assert (await api.call(w.PA, "PATCH", f"{T}/{t['id']}", json={
         "draft_rev": t["draft_rev"], "draft_spec": general_spec(navigation="section_forward_only")})).status_code == 200
     v2 = (await publish_t(api, w.PA, t["id"])).json()["version"]["id"]
@@ -149,7 +149,7 @@ async def test_quiz_assignment_from_template_applies_later_fields(db, api):
     b = res.json()
     a = db.get(Assessment, uuid.UUID(b["assessment_id"]))
     assert uuid.UUID(b["id"]) == assignment_id_for(a.id) and b["kind"] == "quiz"
-    assert a.exam_template_version_id == uuid.UUID(t["current_version"]["id"]) and a.preset == "none"
+    assert a.exam_template_version_id == uuid.UUID(t["current_version_id"]) and a.preset == "none"
     assert a.grade_category_id == cat.id and a.omit_from_total is True and a.navigation == "section_forward_only"
     assert b["category_id"] == str(cat.id) and b["assessment"]["status"] == "draft"
     staff = (await api.call(w.TA, "GET", f"/courses/{w.cid}/assessments/{a.id}")).json()

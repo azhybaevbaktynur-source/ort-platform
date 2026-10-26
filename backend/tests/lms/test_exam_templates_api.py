@@ -104,7 +104,7 @@ async def test_create_patch_publish_versions(db, api):
     assert res.status_code == 201, res.text
     t = res.json()
     assert (t["status"], t["draft_rev"], t["owner_scope"], t["locked"]) == ("draft", 1, "platform", False)
-    assert t["draft_spec"]["sections"][0]["key"] == "part_a" and t["current_version"] is None
+    assert t["draft_spec"]["sections"][0]["key"] == "part_a" and t["current_version_id"] is None
     tid = t["id"]
 
     conflict = await api.call(w.PA, "PATCH", f"{T}/{tid}", json={"draft_rev": 7, "title": {"en": "X"}})
@@ -125,7 +125,7 @@ async def test_create_patch_publish_versions(db, api):
     assert body["unchanged"] is False and body["version"]["version_no"] == 1
     assert body["version"]["spec"]["sections"][1]["key"] == "part_b" and body["version"]["spec"]["schema"] == 1
     assert body["template"]["status"] == "published" and body["template"]["draft_spec"] is None
-    assert body["template"]["current_version"]["id"] == body["version"]["id"] and body["template"]["draft_rev"] == 3
+    assert body["template"]["current_version_id"] == body["version"]["id"] and body["template"]["draft_rev"] == 3
     rows = audit_rows(db, ids.AUDIT_PUBLISH, tid)
     assert len(rows) == 1 and rows[0].actor_id == w.PA.id and rows[0].target_type == "exam_template"
     assert rows[0].details == {"version_no": 1, "version_id": body["version"]["id"]}
@@ -172,7 +172,7 @@ async def test_publish_leaves_created_assessments_untouched(db, api):
     w = tworld(db)
     t = await published_template(api, w.PA)
     a = await create_from(api, w.TA, w.cid, t["id"])
-    v1 = t["current_version"]["id"]
+    v1 = t["current_version_id"]
     assert a["exam_template"]["version_id"] == v1 and a["exam_template"]["version_no"] == 1
     p = await api.call(w.PA, "PATCH", f"{T}/{t['id']}", json={"draft_rev": t["draft_rev"],
                                                               "draft_spec": general_spec(result_view="ort")})
@@ -239,7 +239,7 @@ async def test_lock_unlock_promote_are_owner_actions_and_audited(db, api):
     res = await api.call(w.OA, "POST", f"{T}/{tid}/promote", json={"reason": "school-wide"})
     assert res.status_code == 200, res.text
     assert (res.json()["owner_scope"], res.json()["owner_user_id"]) == ("organization", None)
-    assert res.json()["organization_id"] == str(w.org.id) and res.json()["current_version"]["version_no"] == 1
+    assert res.json()["organization_id"] == str(w.org.id) and res.json()["current_version_no"] == 1
     rows = audit_rows(db, ids.AUDIT_PROMOTE, tid)
     assert len(rows) == 1 and rows[0].details["former_owner_user_id"] == w.TA.id and rows[0].reason == "school-wide"
     assert err(await api.call(w.OA, "POST", f"{T}/{tid}/promote")) == "scope_not_allowed"  # already organization
@@ -282,7 +282,7 @@ async def test_list_modes_and_payload_contract(db, api):
     assert {x["id"] for x in items} == {plat["id"], org_t["id"], mine["id"]}
     for x in items:
         assert set(x) == set(PICKER_KEYS) and not (set(x) & MANAGE_ONLY_KEYS)
-        assert x["current_version"]["spec"]["sections"]
+        assert x["current_spec"]["sections"]
     pick = await api.call(w.TA, "GET", T, params={"course_id": w.cid, "scope": "teacher"})
     assert [x["id"] for x in pick.json()["items"]] == [mine["id"]]
     # management mode

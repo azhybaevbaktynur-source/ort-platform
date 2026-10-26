@@ -112,10 +112,10 @@ async def test_upgrade_refusals(db, api):
     assert (await api.call(w.S, "POST", f"{p}/{b['id']}/template-upgrade")).status_code == 403
     assert (await api.call(w.X, "POST", f"{p}/{b['id']}/template-upgrade")).status_code == 404
     assert (await api.call(w.OA, "POST", f"{p}/{b['id']}/template-upgrade")).status_code == 403
-    assert rb.exam_template_version_id == uuid.UUID(t["current_version"]["id"])
+    assert rb.exam_template_version_id == uuid.UUID(t["current_version_id"])
     # a template re-published with the scrolling mode cannot be upgraded to until 8b
     await _bump(api, w, t, general_spec(display_mode="scrolling"))
-    c = await create_from(api, w.TA, w.cid, t["id"], version_id=t["current_version"]["id"])
+    c = await create_from(api, w.TA, w.cid, t["id"], version_id=t["current_version_id"])
     res = await api.call(w.TA, "POST", f"{p}/{c['id']}/template-upgrade")
     assert res.status_code == 422 and err(res) == "display_mode_not_available"
 
