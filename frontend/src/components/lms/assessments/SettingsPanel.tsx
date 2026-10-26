@@ -15,6 +15,7 @@ import { btnPrimary } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { AssessmentError } from "./AssessmentError";
 import { SettingsPanelGrading, type GradingFormValue } from "./SettingsPanelGrading";
 import { fromLocalInput, minToSec, secToMin, toLocalInput } from "./format";
+import { AccessCodeField, accessCodeError } from "@/components/lms/accommodations/AccessCodeField"; // Phase 7a S5
 
 function gradingOf(a: AssessmentStaffOut): GradingFormValue {
   return {
@@ -60,6 +61,10 @@ export function SettingsPanel({
   const [saved, setSaved] = useState(false);
   // --- Phase 6 S4b: locked course template (design §5.4): navigation and grading scheme are fixed ---
   const tplLocked = isAssessmentLocked(useTemplateUi(), a.preset);
+  // --- Phase 7a S5: access code (undefined = unchanged, string = set, null = clear; PHASE_7A_DESIGN 2.7) ---
+  const [accessCode, setAccessCode] = useState<string | null | undefined>(undefined);
+  const accessCodeBad = typeof accessCode === "string" && accessCode.trim() !== "" && !!accessCodeError(accessCode);
+  // --- Phase 7a S5 end ---
 
   // Re-seed when the server copy changes (after reload).
   useEffect(() => {
@@ -69,6 +74,7 @@ export function SettingsPanel({
     setShowCorrect(a.show_correct_answers); setScorePolicy(a.score_policy); setShuffleItems(a.shuffle_items);
     setShuffleChoices(a.shuffle_choices); setFrom(toLocalInput(a.available_from)); setUntil(toLocalInput(a.available_until));
     setGrading(gradingOf(a));
+    setAccessCode(undefined); // Phase 7a S5
   }, [a]);
 
   const toggleLang = (l: Lang) =>
@@ -76,6 +82,7 @@ export function SettingsPanel({
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (accessCodeBad) return; // Phase 7a S5
     setBusy(true);
     setError(null);
     setSaved(false);
@@ -100,6 +107,8 @@ export function SettingsPanel({
         due_at: fromLocalInput(grading.dueAt),
         grade_release: grading.release,
         omit_from_total: grading.omit,
+        // Phase 7a S5: sent only when changed (absent = unchanged)
+        ...(accessCode === null ? { access_code: null } : typeof accessCode === "string" && accessCode.trim() ? { access_code: accessCode.trim() } : {}),
       });
       setSaved(true);
       await onSaved();
@@ -181,6 +190,9 @@ export function SettingsPanel({
       </div>
       <SettingsPanelGrading courseId={courseId} assessmentId={a.id} value={grading} onChange={setGrading}
         currentScheme={a.scheme} defaultLanguage={defaultLanguage} disabled={disabled} schemeLocked={tplLocked} />
+      {/* --- Phase 7a S5: access code --- */}
+      {/* security review 7a / owner Q4: no access codes on ORT preset exams (the server refuses them) */}
+      {a.preset === "none" && <AccessCodeField hasCode={!!a.has_access_code} value={accessCode} onChange={setAccessCode} disabled={disabled} />}
       <AssessmentError error={error} />
       <div className="flex items-center gap-3">
         <button type="submit" className={btnPrimary} disabled={disabled || busy}>{busy ? t("lms.common.loading") : t("lms.common.save")}</button>

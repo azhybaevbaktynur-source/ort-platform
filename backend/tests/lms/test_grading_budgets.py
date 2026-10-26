@@ -118,7 +118,9 @@ def test_release_500_budget(client, db, frozen_clock):
         s = make_user(db)
         enr = enroll(db, w.course, s)
         make_submission(db, w.assessment, enr, computed_at=clock.now())
-    url = f"/api/v1/courses/{w.course.id}/assessments/{w.assessment.id}/grades/release"
+    from app.lms.assignments.ids import assignment_id_for
+
+    url = f"/api/v1/courses/{w.course.id}/assignments/{assignment_id_for(w.assessment.id)}/grades/release"
     with Counter() as c:
         r = client.post(url, json={}, headers=auth(w.teacher))
     assert r.status_code == 200 and r.json() == {"released": 500}

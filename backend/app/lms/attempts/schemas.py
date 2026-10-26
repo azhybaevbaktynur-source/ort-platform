@@ -16,6 +16,8 @@ AttemptStatus = Literal["in_progress", "submitted", "needs_review", "graded", "v
 class StartIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     language: Optional[Lang] = None
+    # --- Phase 7a S4 --- (3.8) quiz access code; never logged, echoed or stored in plain text
+    access_code: Optional[str] = Field(default=None, max_length=64, repr=False)
 
 
 class AnswerIn(BaseModel):

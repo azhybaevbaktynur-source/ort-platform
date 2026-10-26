@@ -8,8 +8,13 @@ import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { leaveCourse } from "@/lib/lms/courses";
-import { listAssessments } from "@/lib/lms/assessments";
-import type { AssessmentStudentSummaryOut } from "@/lib/lms/assessmentTypes";
+// --- Phase 7a S5: the course home reads assignments ---
+import { listAssignments } from "@/lib/lms/assignments";
+import type { AssignmentStudentOut } from "@/lib/lms/assignmentTypes";
+import { templateUi } from "@/lib/lms/templates";
+import { StudentAssignmentCard } from "@/components/lms/assignments/StudentAssignmentCard";
+import { primaryAssignmentId, sortForStudent, studentAssignmentView } from "@/components/lms/assignments/studentAssignment";
+// --- Phase 7a S5 end ---
 import { getMyGrades } from "@/lib/lms/grading";
 import type { MyGradeOut } from "@/lib/lms/gradingTypes";
 import { pickLocalized } from "@/lib/lms/localized";
@@ -17,8 +22,6 @@ import { parseApiDate } from "@/lib/format";
 import { useCourse } from "@/components/lms/CourseContext";
 import { Button, Card, ConfirmDialog, DescriptionList, ErrorState, LinkButton, LoadingState } from "@/components/ui";
 import { useGradeText } from "@/components/lms/results/GradeBadge";
-import { primaryAssessmentId, studentAssessmentView } from "./assessmentStatus";
-import { StudentAssessmentCard } from "./StudentAssessmentCard";
 import { fmtShortDateTime } from "./format";
 import { useErrorText } from "./useErrorText";
 
@@ -29,7 +32,7 @@ export function StudentCourseHome() {
   const errorText = useErrorText();
   const gradeText = useGradeText();
   const base = `/${lang}/courses/${course.id}`;
-  const [items, setItems] = useState<AssessmentStudentSummaryOut[] | null>(null);
+  const [items, setItems] = useState<AssignmentStudentOut[] | null>(null); // Phase 7a S5: assignments
   const [grades, setGrades] = useState<MyGradeOut[]>([]);
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
@@ -42,10 +45,10 @@ export function StudentCourseHome() {
     setError(null);
     try {
       const [page, mine] = await Promise.all([
-        listAssessments(course.id, { limit: 50 }),
+        listAssignments(course.id, { limit: 50 }),
         getMyGrades(course.id).catch(() => null),
       ]);
-      setItems(page.items as AssessmentStudentSummaryOut[]);
+      setItems(page.items as AssignmentStudentOut[]);
       setGrades(mine?.items ?? []);
     } catch (e) {
       setError(e);
@@ -55,14 +58,15 @@ export function StudentCourseHome() {
   }, [course.id]);
   useEffect(() => { void load(); }, [load]);
 
+  // Phase 7a S5: the next assignment (a running quiz first, then the nearest one to start or hand in)
   const next = useMemo(() => {
     if (!items) return null;
-    const byId = Object.fromEntries(grades.map((g) => [g.assessment_id, g]));
     const now = Date.now();
-    const rows = items.map((a) => ({ a, v: studentAssessmentView(a, byId[a.id], now) }));
-    const id = primaryAssessmentId(rows);
-    return rows.find((r) => r.a.id === id) ?? null;
-  }, [items, grades]);
+    const readOnly = !!course.my_enrollment.read_only;
+    const rows = sortForStudent(items).map((a) => ({ a, v: studentAssignmentView(a, now, readOnly) }));
+    const id = primaryAssignmentId(rows);
+    return rows.find((r) => r.a.id === id) ?? (readOnly ? rows[0] ?? null : null);
+  }, [items, course.my_enrollment.read_only]);
 
   const latest = useMemo(() => {
     const graded = grades.filter((g) => g.state === "graded");
@@ -102,13 +106,13 @@ export function StudentCourseHome() {
         ) : !items ? (
           <LoadingState rows={1} />
         ) : next ? (
-          <StudentAssessmentCard as="div" a={next.a} v={next.v} href={base} primary
-            title={pickLocalized(next.a.title, lang, course.default_language) || t("assessments.untitled")} />
+          <StudentAssignmentCard as="div" a={next.a} v={next.v} base={base} primary ort={templateUi(course).key === "ort"}
+            title={pickLocalized(next.a.title, lang, course.default_language) || t("assignments.untitled")} />
         ) : (
           <Card>
             <p className="text-base leading-6 text-slate-700">{items.length ? t("home.next.empty") : t("home.course.noAssessments")}</p>
             {items.length > 0 && (
-              <div className="mt-3"><LinkButton variant="secondary" href={`${base}/assessments`}>{t("home.course.allAssessments")}</LinkButton></div>
+              <div className="mt-3"><LinkButton variant="secondary" href={`${base}/assignments`}>{t("home.course.allAssessments")}</LinkButton></div>
             )}
           </Card>
         )}

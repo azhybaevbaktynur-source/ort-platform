@@ -18,6 +18,7 @@ import { CreateAssessmentDialog } from "./CreateAssessmentDialog";
 import { IssueList } from "./IssueList";
 import { fmtDateTime, fmtPoints } from "./format";
 import { usePublishFlow } from "./usePublishFlow";
+import { KeyRound } from "lucide-react"; // Phase 7a S5
 
 /**
  * Staff assessment list. Phase 6b S5c: design-system PageHeader (one primary: "New assessment"), status Badges,
@@ -121,6 +122,7 @@ export function StaffAssessmentList() {
                       : <Link href={`${base}/${a.id}`} className="break-words font-semibold text-slate-900 hover:text-brand-700">{title}</Link>}
                     <AssessmentStatusBadge status={a.status} />
                     {a.current_version_no !== null && <Badge tone="neutral">{t("assessments.list.version", { n: a.current_version_no })}</Badge>}
+                    {a.has_access_code && <Badge tone="info" icon={<KeyRound aria-hidden="true" />}>{t("accommodations.accessCode.badge")}</Badge> /* Phase 7a S5 */}
                     {a.has_unpublished_changes && a.status === "published" && (
                       <Badge tone="warning">{t("assessments.list.unpublishedChanges")}</Badge>
                     )}

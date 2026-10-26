@@ -25,17 +25,23 @@ class HomeInProgressOut(BaseModel):
 
 
 class HomeNextUpOut(BaseModel):
-    assessment_id: uuid.UUID
+    """Phase 7a (PHASE_7A_DESIGN 3.9): one assignment; quiz rows link to the lobby (`assessment_id`), text/file rows
+    to the submit page (`assignment_id`). Dates are the caller's effective ones (override-aware)."""
+    assignment_id: uuid.UUID
+    kind: str
+    assessment_id: Optional[uuid.UUID] = None  # quiz only
     course_id: uuid.UUID
     course_title: dict
     title: dict
     due_at: Optional[datetime] = None
     available_until: Optional[datetime] = None
-    attempts_left: Optional[int] = None  # None = unlimited attempts
+    attempts_left: Optional[int] = None  # None = unlimited attempts (or a hand-in assignment)
 
 
 class HomeResultOut(BaseModel):
-    assessment_id: uuid.UUID
+    assignment_id: uuid.UUID  # Phase 7a: released quiz results and released manual grades
+    kind: str
+    assessment_id: Optional[uuid.UUID] = None  # quiz only
     course_id: uuid.UUID
     course_title: dict
     title: dict

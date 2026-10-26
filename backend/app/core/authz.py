@@ -34,6 +34,10 @@ class A:
     GRADES_MANAGE = "grades.manage"
     COURSE_TRANSFER = "course.transfer"
     COURSE_LEAVE = "course.leave"
+    # --- Phase 7a S1 begin --- (PHASE_7A_DESIGN 4, 4.5; grants below ROLE_GRANTS)
+    ASSIGNMENT_SUBMIT = "assignment.submit"          # students only; status and suspension gates as assessment.take
+    ACCOMMODATIONS_MANAGE = "accommodations.manage"  # teachers only (Q3 a): not assistants, not org admins
+    # --- Phase 7a S1 end ---
 
 
 ALL_ACTIONS = frozenset(v for k, v in vars(A).items() if not k.startswith("_"))
@@ -45,6 +49,11 @@ ROLE_GRANTS: dict[str, frozenset[str]] = {
         A.COURSE_READ, A.CONTENT_READ, A.ASSESSMENT_TAKE, A.ATTEMPT_READ_OWN, A.GRADES_READ_OWN, A.COURSE_LEAVE,
     }),
 }
+# --- Phase 7a S1 begin --- (staff never hand in; accommodations are teacher-only)
+ROLE_GRANTS["teacher"] = ROLE_GRANTS["teacher"] - {A.ASSIGNMENT_SUBMIT}
+ROLE_GRANTS["assistant"] = ROLE_GRANTS["assistant"] - {A.ASSIGNMENT_SUBMIT, A.ACCOMMODATIONS_MANAGE}
+ROLE_GRANTS["student"] = ROLE_GRANTS["student"] | {A.ASSIGNMENT_SUBMIT}
+# --- Phase 7a S1 end ---
 
 READ_ONLY_ACTIONS = frozenset({
     A.COURSE_READ, A.ROSTER_READ, A.CONTENT_READ, A.CONTENT_READ_ADMIN,

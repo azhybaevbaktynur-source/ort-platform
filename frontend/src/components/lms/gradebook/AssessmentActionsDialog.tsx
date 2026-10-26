@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
 import type { Lang } from "@/lib/lms/types";
-import type { GbAssessmentOut } from "@/lib/lms/gradingTypes";
-import { regradeAssessment, releaseGrades, unreleaseGrades } from "@/lib/lms/grading";
+import type { GbAssignmentOut } from "@/lib/lms/gradingTypes";
+// Phase 7a S5: the column is an assignment; release / unrelease / regrade use the assignment routes.
+import { regradeAssignmentGrades, releaseGrades, unreleaseGrades } from "@/lib/lms/grading";
 import { Modal } from "@/components/lms/assessments/Modal";
 import { SchemeError } from "@/components/lms/grading/schemes/SchemeError";
 import { ScaleText } from "@/components/lms/grading/schemes/SchemeBadges";
@@ -23,7 +24,7 @@ export function AssessmentActionsDialog({
 }: {
   open: boolean;
   courseId: string;
-  assessment: GbAssessmentOut | null;
+  assessment: GbAssignmentOut | null;
   title: string;
   defaultLanguage: Lang;
   canManage: boolean;
@@ -79,7 +80,7 @@ export function AssessmentActionsDialog({
     let end: RegradeEnd | null = null;
     let last: RegradeProgress | null = null;
     try {
-      const r = await runRegrade(() => regradeAssessment(courseId, a.id), (p) => { last = p; setProgress(p); }, () => stopRef.current);
+      const r = await runRegrade(() => regradeAssignmentGrades(courseId, a.id), (p) => { last = p; setProgress(p); }, () => stopRef.current);
       end = r.end;
       last = r.progress;
     } catch (e) {
@@ -95,7 +96,10 @@ export function AssessmentActionsDialog({
     else setNotice({ kind: "warn", text: t("gradebook.actions.regradePaused", { pending: p.pending }) });
   }
 
-  const attemptsHref = `/${lang}/courses/${courseId}/assessments/${a.id}/attempts`;
+  // Phase 7a S5: quiz columns open the attempts list, other kinds the grading screen
+  const attemptsHref = a.kind === "quiz" && a.assessment_id
+    ? `/${lang}/courses/${courseId}/assessments/${a.assessment_id}/attempts`
+    : `/${lang}/courses/${courseId}/assignments/${a.id}/grade`;
   const scheme = a.scheme;
   // auto release: the next scoring or regrade would release again, so the server refuses to hide (409)
   const autoRelease = a.grade_release === "auto";
@@ -107,8 +111,8 @@ export function AssessmentActionsDialog({
           <dd>{t("gradebook.actions.releasedOf", { released: a.released_count, total: a.submission_count })}</dd>
           <dt className="text-slate-500">{t("gradebook.actions.releaseMode")}</dt>
           <dd>{t(`gradebook.releaseMode.${a.grade_release}`)}</dd>
-          <dt className="text-slate-500">{t("gradebook.actions.keptRule")}</dt>
-          <dd>{t(`assessments.scorePolicy.${a.score_policy}`)}</dd>
+          {a.score_policy && (<><dt className="text-slate-500">{t("gradebook.actions.keptRule")}</dt>
+          <dd>{t(`assessments.scorePolicy.${a.score_policy}`)}</dd></>)}
           <dt className="text-slate-500">{t("gradebook.actions.scheme")}</dt>
           <dd className="min-w-0 break-words">
             {scheme ? (
@@ -187,7 +191,9 @@ export function AssessmentActionsDialog({
         <SchemeError error={error} />
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
-          <Link href={attemptsHref} className="font-medium text-brand-700 hover:underline">{t("gradebook.actions.openAttempts")}</Link>
+          <Link href={attemptsHref} className="font-medium text-brand-700 hover:underline">
+            {a.kind === "quiz" ? t("gradebook.actions.openAttempts") : t("assignments.gradebook.openGrading")}
+          </Link>
           <button type="button" disabled={!!busy} onClick={close} className={btnSecondary}>{t("gradebook.close")}</button>
         </div>
       </div>

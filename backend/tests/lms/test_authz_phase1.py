@@ -8,10 +8,14 @@ ALL = frozenset({
     "course.read", "course.update", "course.delete", "course.publish", "roster.read", "roster.manage",
     "content.read", "content.read_admin", "content.manage", "assessment.take", "attempt.read_own",
     "attempt.read_all", "grades.read_own", "grades.manage", "course.transfer", "course.leave",
+    "assignment.submit", "accommodations.manage",  # Phase 7a
 })
-ASSISTANT_PUBLISHED = ALL - {"course.delete", "course.publish", "roster.manage", "course.transfer"}
+TEACHER = ALL - {"assignment.submit"}  # Phase 7a: staff never hand in
+ASSISTANT_PUBLISHED = TEACHER - {"course.delete", "course.publish", "roster.manage", "course.transfer",
+                                 "accommodations.manage"}
 STUDENT_PUBLISHED = frozenset({
     "course.read", "content.read", "assessment.take", "attempt.read_own", "grades.read_own", "course.leave",
+    "assignment.submit",
 })
 READ_ONLY = frozenset({
     "course.read", "roster.read", "content.read", "content.read_admin", "attempt.read_own", "attempt.read_all",
@@ -20,8 +24,8 @@ READ_ONLY = frozenset({
 
 # Explicit expectation table, written independently of decide().
 EXPECTED = {
-    ("teacher", "draft"): ALL,
-    ("teacher", "published"): ALL,
+    ("teacher", "draft"): TEACHER,
+    ("teacher", "published"): TEACHER,
     ("teacher", "concluded"): READ_ONLY | {"course.publish", "course.delete", "course.transfer", "course.leave"},
     ("assistant", "draft"): ASSISTANT_PUBLISHED,
     ("assistant", "published"): ASSISTANT_PUBLISHED,

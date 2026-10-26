@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 
 from app.core.config import settings
 from app.lms.assessments.models import Assessment
+from app.lms.assignments.ids import assignment_id_for
 from app.lms.attempts import grading
 from app.lms.core import clock
 from app.lms.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
@@ -24,6 +25,11 @@ from tests.lms.attempt_support import T0, frozen_clock  # noqa: F401
 from tests.lms.factories import grade_attempt, make_scheme, make_user
 from tests.lms.grading_support import CORRECT, grading_plan, make_world, new_attempt as gw_attempt, slot_of  # noqa: F401
 from tests.lms.s3_support import db  # noqa: F401
+def _aid(w):
+    """Phase 7a: release / unrelease / regrade address the quiz assignment of the world's assessment."""
+    return assignment_id_for(w.assessment.id)
+
+
 from tests.lms.submission_support import (
     TEN, ctx_for, events_of, grades_of, new_attempt, scored, sections_result, submission_of, sworld,
 )
@@ -273,25 +279,25 @@ def test_release_unrelease_idempotent_and_manual_mode(db, frozen_clock):
     assert all(submission_of(db, w, s).released_at is None for s in w.students)
     ctx = ctx_for(db, w.teacher)
     first = submission_of(db, w, w.students[0]).id
-    assert actions.release(db, ctx, w.course, w.assessment.id, [first]).released == 1
-    assert actions.release(db, ctx, w.course, w.assessment.id, None).released == 2
-    assert actions.release(db, ctx, w.course, w.assessment.id, None).released == 0
+    assert actions.release(db, ctx, w.course, _aid(w), [first]).released == 1
+    assert actions.release(db, ctx, w.course, _aid(w), None).released == 2
+    assert actions.release(db, ctx, w.course, _aid(w), None).released == 0
     frozen_clock.advance(1)
-    assert actions.unrelease(db, ctx, w.course, w.assessment.id, None).unreleased == 3
-    assert actions.unrelease(db, ctx, w.course, w.assessment.id, None).unreleased == 0
+    assert actions.unrelease(db, ctx, w.course, _aid(w), None).unreleased == 3
+    assert actions.unrelease(db, ctx, w.course, _aid(w), None).unreleased == 0
     assert [e.event for e in events_of(db, first)] == ["released", "unreleased"]
     scored(db, w, w.students[0], 2, 6)  # manual mode: the hook never releases
     assert submission_of(db, w, w.students[0]).released_at is None
     with pytest.raises(NotFound) as e:
         actions.release(db, ctx, w.course, uuid.uuid4(), None)
-    assert e.value.code == "assessment_not_found"
+    assert e.value.code == "assignment_not_found"
 
 
 def test_release_too_many_ids(db, monkeypatch):
     w = sworld(db)
     monkeypatch.setattr(settings, "GRADES_RELEASE_MAX_IDS", 2)
     with pytest.raises(ValidationFailed) as e:
-        actions.release(db, ctx_for(db, w.teacher), w.course, w.assessment.id, [uuid.uuid4() for _ in range(3)])
+        actions.release(db, ctx_for(db, w.teacher), w.course, _aid(w), [uuid.uuid4() for _ in range(3)])
     assert e.value.code == "too_many_rows"
 
 
@@ -300,7 +306,7 @@ def test_release_chunks(db, frozen_clock, monkeypatch):
     w = sworld(db, n_students=5, grade_release="manual")
     for s in w.students:
         scored(db, w, s, 1, 5)
-    assert actions.release(db, ctx_for(db, w.teacher), w.course, w.assessment.id, None).released == 5
+    assert actions.release(db, ctx_for(db, w.teacher), w.course, _aid(w), None).released == 5
     assert db.scalar(select(func.count()).select_from(GradeEvent).where(GradeEvent.event == "released")) == 5
 
 
@@ -369,14 +375,14 @@ def test_scheme_edit_untouched_until_regrade(db, frozen_clock):
     db.commit()
     sub = submission_of(db, w, w.student)
     assert sub.display_value == D("50") and grades_of(db, [att.id])[att.id].display_value == D("50")
-    out = regrade_mod.regrade(db, ctx_for(db, w.teacher), w.course, w.assessment.id)
+    out = regrade_mod.regrade(db, ctx_for(db, w.teacher), w.course, _aid(w))
     assert out.regraded == 1 and out.pending == 0 and out.scheme_version_id == v2.id
     sub = submission_of(db, w, w.student)
     assert sub.display_value == D("25") and sub.scheme_version_id == v2.id
     assert grades_of(db, [att.id])[att.id].display_value == D("25")
     ev = events_of(db, sub.id)
     assert [e.event for e in ev] == ["regraded"] and ev[0].new["display_value"] == "25"
-    again = regrade_mod.regrade(db, ctx_for(db, w.teacher), w.course, w.assessment.id)
+    again = regrade_mod.regrade(db, ctx_for(db, w.teacher), w.course, _aid(w))
     assert again.regraded == 0 and again.pending == 0
 
 
@@ -400,15 +406,15 @@ def test_regrade_resumable_after_crash_and_capped(db, frozen_clock, monkeypatch)
 
     monkeypatch.setattr(regrade_mod, "insert_events", flaky)
     with pytest.raises(RuntimeError):
-        regrade_mod.regrade(db, ctx, w.course, w.assessment.id)
+        regrade_mod.regrade(db, ctx, w.course, _aid(w))
     db.rollback()
     done = db.scalar(select(func.count()).select_from(Submission).where(Submission.scheme_version_id == PERCENT_V1_ID))
     assert done == 2  # chunk 1 committed, chunk 2 rolled back
     monkeypatch.setattr(regrade_mod, "insert_events", real)
     monkeypatch.setattr(settings, "GRADES_REGRADE_MAX", 2)
-    out = regrade_mod.regrade(db, ctx, w.course, w.assessment.id)
+    out = regrade_mod.regrade(db, ctx, w.course, _aid(w))
     assert out.regraded == 2 and out.pending == 1
-    out = regrade_mod.regrade(db, ctx, w.course, w.assessment.id)
+    out = regrade_mod.regrade(db, ctx, w.course, _aid(w))
     assert out.regraded == 1 and out.pending == 0
     db.expire_all()
     subs_ = db.execute(select(Submission)).scalars().all()
@@ -427,10 +433,10 @@ def test_score_policy_switch_is_d14_regrade(db, frozen_clock):
     a.grading_changed_at = clock.now()
     db.commit()
     assert submission_of(db, w, w.student).kept_attempt_id == a1.id  # unchanged until regrade
-    ctx_row = regrade_mod._context(db, w.course.id, w.assessment.id)
+    ctx_row = regrade_mod._context(db, w.course.id, _aid(w))
     assert regrade_mod.pending_count(db, w.assessment.id, ctx_row) == 1
     db.rollback()
-    out = regrade_mod.regrade(db, ctx_for(db, w.teacher), w.course, w.assessment.id)
+    out = regrade_mod.regrade(db, ctx_for(db, w.teacher), w.course, _aid(w))
     assert out.regraded == 1
     sub = submission_of(db, w, w.student)
     assert sub.kept_policy == "latest" and sub.raw_points == D("3.00")
@@ -439,12 +445,12 @@ def test_score_policy_switch_is_d14_regrade(db, frozen_clock):
 def test_regrade_requires_grades_manage(db):
     w = sworld(db)
     with pytest.raises(Forbidden):
-        regrade_mod.regrade(db, ctx_for(db, w.student), w.course, w.assessment.id)
+        regrade_mod.regrade(db, ctx_for(db, w.student), w.course, _aid(w))
     with pytest.raises(NotFound):  # not enrolled at all: 404
-        regrade_mod.regrade(db, ctx_for(db, make_user(db)), w.course, w.assessment.id)
+        regrade_mod.regrade(db, ctx_for(db, make_user(db)), w.course, _aid(w))
     with pytest.raises(NotFound) as e:
         regrade_mod.regrade(db, ctx_for(db, w.teacher), w.course, uuid.uuid4())
-    assert e.value.code == "assessment_not_found"
+    assert e.value.code == "assignment_not_found"
 
 
 # ------------------------------------------------------------------ routes (design 5)
@@ -490,12 +496,14 @@ def test_routes_happy_path_and_error_shapes(client, db, frozen_clock):
     r = client.put(f"{base}/submissions/{sub.id}/excuse", json={"excused": True, "version": v}, headers=h)
     assert r.status_code == 200 and r.json()["state"] == "excused"
 
-    rel = f"{base}/assessments/{w.assessment.id}/grades"
+    from app.lms.assignments.ids import assignment_id_for
+
+    rel = f"{base}/assignments/{assignment_id_for(w.assessment.id)}/grades"  # Phase 7a: per assignment
     assert client.post(f"{rel}/release", json={"submission_ids": [str(sub.id)]}, headers=h).json() == {"released": 1}
     assert client.post(f"{rel}/release", headers=h).json() == {"released": 0}
     assert client.post(f"{rel}/unrelease", json={}, headers=h).json() == {"unreleased": 1}
-    r = client.post(f"{base}/assessments/{uuid.uuid4()}/grades/release", json={}, headers=h)
-    assert r.status_code == 404 and r.json()["error"]["code"] == "assessment_not_found"
+    r = client.post(f"{base}/assignments/{uuid.uuid4()}/grades/release", json={}, headers=h)
+    assert r.status_code == 404 and r.json()["error"]["code"] == "assignment_not_found"
     r = client.post(f"{rel}/regrade", headers=h)
     assert r.status_code == 200 and r.json() == {"regraded": 0, "pending": 0, "scheme_version_id": str(PERCENT_V1_ID)}
     assert client.post(f"{rel}/regrade", headers=hs).status_code == 403
@@ -538,7 +546,7 @@ def test_regrade_catches_older_attempt_grades_after_hook_recompute(db, frozen_cl
     sub = submission_of(db, w, w.student)
     assert sub.scheme_version_id == scheme.current_version_id
     assert grades_of(db, [a1.id])[a1.id].scheme_version_id == PERCENT_V1_ID  # still the old one
-    out = regrade_mod.regrade(db, ctx_for(db, w.teacher), w.course, w.assessment.id)
+    out = regrade_mod.regrade(db, ctx_for(db, w.teacher), w.course, _aid(w))
     assert out.regraded == 1 and out.pending == 0
     g = grades_of(db, [a1.id, a2.id])
     assert {x.scheme_version_id for x in g.values()} == {scheme.current_version_id}
