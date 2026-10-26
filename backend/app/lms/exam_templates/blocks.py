@@ -10,3 +10,12 @@ NAVIGATIONS = ("free", "section_forward_only")
 IMPORTER_PROFILES = ("general", "ort")
 # The importer profile a spec may name; "ort" is reserved for the ORT course template (4.4).
 SPEC_IMPORTER_PROFILES = ("general",)
+
+
+# --- Phase 7b S2 begin --- (PHASE_7B_DESIGN 7: the catalog endpoint; the SQL lives in service.blocks)
+def catalog(db, ctx):
+    """`GET /exam-templates/blocks` payload for `ctx` (the scheme list is the caller's: system + own)."""
+    from app.lms.exam_templates import service
+
+    return service.blocks(ctx)
+# --- Phase 7b S2 end ---
