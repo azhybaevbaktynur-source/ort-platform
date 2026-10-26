@@ -12,6 +12,9 @@ from .base import (
     ImageRef, QuestionType, ScoreResult, StrictModel, full_or_zero, media_url,
     quantize2, zero_result,
 )
+# --- Phase 7b S3 begin --- (general import format row builders)
+from .base import IMPORT_LETTERS, ImportRowError, import_cell, import_choices, import_letter
+# --- Phase 7b S3 end ---
 
 _ID_RE = re.compile(r"^[A-Za-z0-9_]{1,8}$")
 
@@ -83,6 +86,14 @@ class SingleChoice(QuestionType):
     title_key = "bank.types.single_choice.name"
     supports_passages = True
     import_columns = ('option_a', 'option_b', 'option_c', 'option_d', 'option_e', 'correct_option')
+    # --- Phase 7b S3 begin --- (general import format row builder)
+    def from_import_row(self, raw):
+        choices = import_choices(raw)
+        correct = import_letter(import_cell(raw, "correct_option"))
+        if correct not in {c["id"] for c in choices}:
+            raise ImportRowError("correct_option", "correct_option must be the letter of a filled option.")
+        return {"choices": choices, "correct": correct}
+    # --- Phase 7b S3 end ---
     Data = SingleChoiceData
     Response = SingleChoiceResponse
     STUDENT_KEYS = frozenset({"choices", "shuffle"})
@@ -136,6 +147,21 @@ class MultipleAnswers(QuestionType):
     title_key = "bank.types.multiple_answers.name"
     supports_passages = True
     import_columns = ('option_a', 'option_b', 'option_c', 'option_d', 'option_e', 'correct_option')
+    # --- Phase 7b S3 begin --- (general import format row builder)
+    def from_import_row(self, raw):
+        choices = import_choices(raw)
+        value = import_cell(raw, "correct_option")
+        parts = [p for p in re.split(r"[\s,;|/]+", value) if p]
+        if len(parts) == 1 and len(parts[0]) > 1 and all(ch.upper() in IMPORT_LETTERS for ch in parts[0]):
+            parts = list(parts[0])                       # "ACD"
+        letters = [import_letter(p) for p in parts]
+        ids = {c["id"] for c in choices}
+        if not letters or any(x not in ids for x in letters):
+            raise ImportRowError("correct_option", "correct_option must list the letters of filled options, e.g. A,C.")
+        if len(set(letters)) != len(letters):
+            raise ImportRowError("correct_option", "correct_option lists a letter twice.")
+        return {"choices": choices, "correct": letters}
+    # --- Phase 7b S3 end ---
     Data = MultipleAnswersData
     Response = MultipleAnswersResponse
     STUDENT_KEYS = frozenset({"choices", "shuffle"})
@@ -181,6 +207,19 @@ class TrueFalse(QuestionType):
     title_key = "bank.types.true_false.name"
     supports_passages = True
     import_columns = ('correct_option',)
+    # --- Phase 7b S3 begin --- (general import format row builder)
+    def from_import_row(self, raw):
+        value = import_cell(raw, "correct_option")
+        low = value.casefold()
+        if low in ("true", "t", "1", "да", "ооба"):
+            return {"correct": True}
+        if low in ("false", "f", "0", "нет", "жок"):
+            return {"correct": False}
+        letter = import_letter(value)
+        if letter not in ("A", "B"):
+            raise ImportRowError("correct_option", "correct_option must be A (true) or B (false).")
+        return {"correct": letter == "A"}
+    # --- Phase 7b S3 end ---
     Data = TrueFalseData
     Response = TrueFalseResponse
     STUDENT_KEYS = frozenset()
@@ -224,6 +263,19 @@ class Comparison(QuestionType):
     title_key = "bank.types.comparison.name"
     supports_passages = False
     import_columns = ('column_a', 'column_b', 'correct_option')
+    # --- Phase 7b S3 begin --- (general import format row builder)
+    def from_import_row(self, raw):
+        from app.lms.content.importers.rules import math_section_rule_error
+
+        col_a, col_b = import_cell(raw, "column_a"), import_cell(raw, "column_b")
+        rule = math_section_rule_error("math_1", col_a, col_b)   # both columns required (ORT rule, reused)
+        if rule:
+            raise ImportRowError(rule[0], f"Quantitative comparison needs both columns: {rule[0]} is empty.")
+        correct = import_letter(import_cell(raw, "correct_option"))
+        if correct not in ("A", "B", "C", "D"):
+            raise ImportRowError("correct_option", "Quantitative comparison answers must be A, B, C or D.")
+        return {"column_a": col_a, "column_b": col_b, "correct": correct}
+    # --- Phase 7b S3 end ---
     Data = ComparisonData
     Response = ComparisonResponse
     STUDENT_KEYS = frozenset({"column_a", "column_b"})

@@ -1,0 +1,9 @@
+{
+  "format": "lms-bundle",
+  "format_version": 1,
+  "source_id": "general-demo",
+  "language": "en",
+  "questions_file": "questions.csv",
+  "images_dir": "images",
+  "question_count": 3
+}
