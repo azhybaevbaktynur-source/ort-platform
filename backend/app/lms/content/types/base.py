@@ -75,11 +75,21 @@ def full_or_zero(ok: bool, max_points: Decimal) -> ScoreResult:
     return zero_result(max_points)
 
 
+VALIDATION_DETAILS_MAX = 50
+
+
 def validation_details(exc: ValidationError) -> list[dict]:
-    return [
+    """`{loc, msg}` per error, at most VALIDATION_DETAILS_MAX of them; when there are more, one last entry
+    `{loc: [], msg, truncated: <number left out>}` (security review 7b: bounded error bodies)."""
+    errors = exc.errors(include_url=False, include_context=False, include_input=False)
+    out = [
         {"loc": [str(p) for p in e.get("loc", ())], "msg": str(e.get("msg", ""))}
-        for e in exc.errors()
+        for e in errors[:VALIDATION_DETAILS_MAX]
     ]
+    if len(errors) > VALIDATION_DETAILS_MAX:
+        left = len(errors) - VALIDATION_DETAILS_MAX
+        out.append({"loc": [], "msg": f"{left} more errors are not shown", "truncated": left})
+    return out
 
 
 # --- Phase 7b S3 begin --- (PHASE_7B_DESIGN 8: general import format, per-type row builders `from_import_row`)

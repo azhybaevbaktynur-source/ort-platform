@@ -60,6 +60,8 @@ E_PASSAGE_NOT_ALLOWED = "passage_not_allowed"
 E_TYPE_REQUIRED = "type_required"
 E_COUNT_BELOW_MIN = "count_below_min"
 E_COUNT_ABOVE_MAX = "count_above_max"
+E_TOO_MANY_COLUMNS = "csv_too_many_columns"
+MAX_COLUMNS = 64               # the format has fewer than 30 columns; unknown ones are only warnings
 
 
 def type_columns() -> tuple[str, ...]:
@@ -304,6 +306,11 @@ def parse_rows(header: list[str], records: list[list[str]], bundle: ParsedBundle
                *, broot: Optional[str] = None) -> None:
     """Fill `bundle.items` / `bundle.passages` from header-driven records (comment rows skipped)."""
     c = _RowCtx(issues, bundle.questions_path, broot, bundle.language, profile, image_for)
+    # Security review 7b (H1): a wide header made every row O(header width); refuse it before any per-column work.
+    if len(header) > MAX_COLUMNS:
+        c.error(E_TOO_MANY_COLUMNS, f"The header has {len(header)} columns; the limit is {MAX_COLUMNS}.",
+                limit=MAX_COLUMNS, got=len(header))
+        return
     cols = normalize_header(header)
     seen: set[str] = set()
     for i, h in enumerate(cols):
@@ -319,6 +326,7 @@ def parse_rows(header: list[str], records: list[list[str]], bundle: ParsedBundle
         c.error(E_TYPE_REQUIRED, "The header needs a 'type' column (or choose an exam template to validate against).",
                 column="type")
         return
+    known = [(h, i) for i, h in enumerate(cols) if h in KNOWN_COLUMNS]  # rows read only these cells
     passages: dict[str, ParsedPassage] = {}
     by_ref: dict[str, str] = {}           # "<external_id>#passage" -> passage key
     pending: list[tuple[GeneralItem, str]] = []
@@ -327,8 +335,8 @@ def parse_rows(header: list[str], records: list[list[str]], bundle: ParsedBundle
         if _is_comment(rec):
             continue
         n += 1
-        raw = {h: _CONTROL_RE.sub("", v) for h, v in zip(cols, (rec + [""] * len(cols))[: len(cols)])
-               if h in KNOWN_COLUMNS}
+        width = len(rec)
+        raw = {h: _CONTROL_RE.sub("", rec[i]) if i < width else "" for h, i in known}
         item, ptext, pref, ext = _parse_row(c, raw, n)
         if item is None:
             continue

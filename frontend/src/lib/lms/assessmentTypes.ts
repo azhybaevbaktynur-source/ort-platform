@@ -338,6 +338,8 @@ export interface AssessmentExamTemplateRef {
   latest_version_no: number | null;
   /** Course-template lock field names fixed by the template (`templates/base.py`), e.g. "navigation". */
   locked_fields: string[];
+  /** Phase 7b S6: the template is locked now (the server refuses "Save as template"). */
+  template_locked?: boolean;
 }
 
 export interface AssessmentStaffOut {

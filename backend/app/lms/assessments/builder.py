@@ -78,6 +78,7 @@ def create_assessment(db: Session, ctx: AuthzContext, course: Course, data: sch.
                                    details=[{"loc": ["preset"], "msg": "mutually exclusive with exam_template_*"}])
         from app.lms.exam_templates import instantiate as _inst
 
+        tpl.assert_preset_allowed(course, "none")  # Phase 7b S6 (security review): a template exam is preset none
         _t, version = _inst.resolve_version(db, ctx, course, template_id=data.exam_template_id,
                                             version_id=data.exam_template_version_id)
         a = _inst.instantiate(db, ctx, course, version, data.parameters or {}, title=data.title,
@@ -847,7 +848,8 @@ def exam_template_ref(db: Session, a: Assessment) -> Optional[sch.ExamTemplateRe
     latest = db.get(ExamTemplateVersion, t.current_version_id) if t.current_version_id else None
     locked = sorted(expand_lock_scope((v.spec or {}).get("lock_scope"))) if a.structure_locked else []
     return sch.ExamTemplateRefOut(template_id=t.id, title=t.title, version_no=v.version_no, version_id=v.id,
-                                  latest_version_no=latest.version_no if latest else None, locked_fields=locked)
+                                  latest_version_no=latest.version_no if latest else None, locked_fields=locked,
+                                  template_locked=bool(t.locked))  # Phase 7b S6
 # --- Phase 7b S1 end ---
 
 
@@ -873,7 +875,8 @@ def exam_template_refs(db: Session, assessments: list[Assessment]) -> dict[uuid.
             continue
         locked = sorted(expand_lock_scope((v.spec or {}).get("lock_scope"))) if a.structure_locked else []
         out[a.id] = sch.ExamTemplateRefOut(template_id=t.id, title=t.title, version_no=v.version_no, version_id=v.id,
-                                           latest_version_no=latest_nos.get(t.current_version_id), locked_fields=locked)
+                                           latest_version_no=latest_nos.get(t.current_version_id), locked_fields=locked,
+                                           template_locked=bool(t.locked))  # Phase 7b S6
     return out
 # --- Phase 7b S2 end ---
 
