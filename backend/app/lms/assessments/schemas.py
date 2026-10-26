@@ -105,6 +105,7 @@ class SectionRulesIn(_In):
     allowed_types: Optional[list[str]] = None
     max_items: Optional[int] = Field(default=None, ge=1, le=10_000)
     allow_passages: Optional[bool] = None
+    min_items: Optional[int] = Field(default=None, ge=1, le=10_000)  # --- Phase 7b S1 --- (PHASE_7B_DESIGN 2.4)
 
     @field_validator("allowed_types")
     @classmethod
@@ -112,6 +113,14 @@ class SectionRulesIn(_In):
         if v is not None and (not v or len(set(v)) != len(v) or any(t not in TYPE_NAMES for t in v)):
             raise ValueError("allowed_types must be a non-empty list of known question types")
         return v
+
+    # --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 2.4)
+    @model_validator(mode="after")
+    def _min_max(self):
+        if self.min_items is not None and self.max_items is not None and self.min_items > self.max_items:
+            raise ValueError("min_items must not exceed max_items")
+        return self
+    # --- Phase 7b S1 end ---
 
 
 class SectionIn(_In):
@@ -338,6 +347,17 @@ class AssessmentStaffSummaryOut(BaseModel):
     has_access_code: bool = False  # --- Phase 7a S4 --- (2.7: the hash itself is never serialized)
 
 
+# --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 9.1: the template an assessment was created from)
+class ExamTemplateRefOut(BaseModel):
+    template_id: uuid.UUID
+    title: dict
+    version_no: int
+    version_id: uuid.UUID
+    latest_version_no: Optional[int] = None
+    locked_fields: list[str] = []
+# --- Phase 7b S1 end ---
+
+
 class AssessmentStaffOut(AssessmentStaffSummaryOut):
     description: Optional[dict] = None
     draft_rev: int
@@ -357,6 +377,13 @@ class AssessmentStaffOut(AssessmentStaffSummaryOut):
     scheme: Optional[SchemeRefOut] = None
     sections: list[SectionOut]
     warnings: list[dict] = []
+    # --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 9.1)
+    exam_template: Optional[ExamTemplateRefOut] = None
+    display_mode: str = "one_per_page"
+    passage_display: Optional[str] = None
+    result_view: Optional[str] = None
+    structure_locked: bool = False
+    # --- Phase 7b S1 end ---
 
 
 class IssueOut(BaseModel):

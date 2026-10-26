@@ -77,6 +77,20 @@ class Assessment(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
     # --- Phase 7a S1 begin --- (PHASE_7A_DESIGN 2.7: bcrypt hash of the quiz access code; never serialized)
     access_code_hash: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     # --- Phase 7a S1 end ---
+    # --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 2.3: exam template link and the per-assessment display fields;
+    # NULL passage_display/result_view resolve to the course template's values, as in 6a)
+    exam_template_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("exam_template_versions.id", ondelete="RESTRICT", name="fk_assessments_exam_template_version_id"),
+        nullable=True,
+    )
+    display_mode: Mapped[str] = mapped_column(String(16), nullable=False, default="one_per_page",
+                                              server_default="one_per_page")
+    passage_display: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    result_view: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    structure_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False,
+                                                   server_default=text("false"))
+    # --- Phase 7b S1 end ---
 
     __table_args__ = (
         CheckConstraint("preset IN ('none','ort_main','ort_subject')", name="preset_valid"),
@@ -93,6 +107,13 @@ class Assessment(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
                         name="window_valid"),
         Index("ix_assessments_course_id_deleted_at_position_id", "course_id", "deleted_at", "position", "id"),
         Index("ix_assessments_course_id_status", "course_id", "status"),
+        # --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 2.3)
+        CheckConstraint("display_mode IN ('one_per_page','scrolling')", name="display_mode_valid"),
+        CheckConstraint("passage_display IS NULL OR passage_display IN ('plain','numbered')",
+                        name="passage_display_valid"),
+        CheckConstraint("preset = 'none' OR exam_template_version_id IS NULL", name="preset_template_exclusive"),
+        Index("ix_assessments_exam_template_version_id", "exam_template_version_id"),
+        # --- Phase 7b S1 end ---
     )
 
 

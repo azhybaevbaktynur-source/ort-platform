@@ -89,6 +89,11 @@ class QuestionType(ABC):
     Response: type[BaseModel]
     # Keys that student_view may emit at the top level (allowlist).
     STUDENT_KEYS: frozenset = frozenset()
+    # --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 7: block catalog data; validate/score never read these)
+    title_key: str = ""                       # i18n key of the type's name (frontend en/ky/ru JSON)
+    supports_passages: bool = False           # may sit under a passage (reading-style sections)
+    import_columns: tuple[str, ...] = ()      # type-specific columns of the general import format (EXAM_TEMPLATES 5)
+    # --- Phase 7b S1 end ---
 
     def validate(self, raw: dict) -> dict:
         if not isinstance(raw, dict):

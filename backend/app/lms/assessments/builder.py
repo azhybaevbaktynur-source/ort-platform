@@ -457,6 +457,22 @@ def add_items_bulk(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUI
         qs = [r[0] for r in rows]
         if f and f.tags and len(f.tags) > 1:
             qs = [q for q in qs if all(t in (q.tags or []) for t in f.tags)]
+    # --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 8: the loop lives in _add_questions; attach_questions reuses it)
+    added = _add_questions(db, a, sec, qs, skipped, points=data.points, group_passages=data.group_passages)
+    # --- Phase 7b S1 end ---
+    if added:
+        _commit(db, a)
+    else:
+        db.commit()
+    return sch.BulkAddOut(added=added, skipped=skipped)
+
+
+# --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 8: shared by add_items_bulk (commits) and attach_questions (flush only))
+def _add_questions(db: Session, a: Assessment, sec: AssessmentSection, qs: list[BankQuestion],
+                   skipped: list[sch.SkippedOut], *, points: Optional[Decimal], group_passages: bool) -> int:
+    """Adds `qs` (in order) to `sec`: duplicates, rule/language violations and caps go to `skipped`; consecutive
+    questions of one passage are grouped under its header when `group_passages`. Flushes, never commits; returns the
+    number of questions added."""
     taken = _existing_question_ids(db, a.id)
     groups = list({q.translation_group_id for q in qs if q.translation_group_id})
     members = _load_group_members(db, a.course_id, groups, list(a.languages)) if groups else {}
@@ -486,9 +502,9 @@ def add_items_bulk(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUI
         if total + added >= settings.ASSESSMENT_MAX_ITEMS or (mx and sec_n + added >= mx):
             skipped.append(sch.SkippedOut(question_id=q.id, code="too_many_items"))
             continue
-        pts = data.points if data.points is not None else defaults.get(q.current_version_id, Decimal("1"))
+        pts = points if points is not None else defaults.get(q.current_version_id, Decimal("1"))
         parent = None
-        if data.group_passages and allow_passages and q.passage_id is not None:
+        if group_passages and allow_passages and q.passage_id is not None:
             if q.passage_id == last_pid and last_header is not None:
                 parent = last_header
             else:
@@ -519,11 +535,32 @@ def add_items_bulk(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUI
         taken.add(q.id)
         added += 1
     _flush_unique(db)
+    return added
+
+
+def attach_questions(db: Session, ctx: AuthzContext, course: Course, assessment: Assessment,
+                     section: AssessmentSection, question_ids: list[uuid.UUID]) -> sch.BulkAddOut:
+    """Adds course questions to a section of a draft assessment inside the caller's transaction (the import attach
+    step, PHASE_7B_DESIGN 8): same rules as `add_items_bulk` (default points, passages grouped), flush only; bumps
+    `draft_rev` when something was added. The caller checks the target (draft, same course, template version)."""
+    require_course(ctx, A.CONTENT_MANAGE, course)
+    if assessment.course_id != course.id or section.assessment_id != assessment.id:
+        raise NotFound("Assessment not found", code="assessment_not_found")
+    skipped: list[sch.SkippedOut] = []
+    ids = list(dict.fromkeys(question_ids))
+    found = _load_course_questions(db, course.id, ids)
+    qs = []
+    for i in ids:
+        if i in found:
+            qs.append(found[i])
+        else:
+            skipped.append(sch.SkippedOut(question_id=i, code="question_not_found"))
+    added = _add_questions(db, assessment, section, qs, skipped, points=None, group_passages=True)
     if added:
-        _commit(db, a)
-    else:
-        db.commit()
+        assessment.draft_rev += 1
+        db.flush()
     return sch.BulkAddOut(added=added, skipped=skipped)
+# --- Phase 7b S1 end ---
 
 
 def _block(db: Session, item: AssessmentItem) -> list[AssessmentItem]:
@@ -762,7 +799,31 @@ def staff_out(db: Session, a: Assessment) -> sch.AssessmentStaffOut:
         due_at=utc(a.due_at), grade_release=a.grade_release or "auto", omit_from_total=bool(a.omit_from_total),
         scheme=sch.scheme_ref(briefs.get(a.grading_scheme_version_id)), sections=sec_outs,
         warnings=warnings,
+        # --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 9.1)
+        exam_template=exam_template_ref(db, a), display_mode=a.display_mode or "one_per_page",
+        passage_display=a.passage_display, result_view=a.result_view, structure_locked=bool(a.structure_locked),
+        # --- Phase 7b S1 end ---
     )
+
+
+# --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 9.1)
+def exam_template_ref(db: Session, a: Assessment) -> Optional[sch.ExamTemplateRefOut]:
+    """The template version an assessment was created from (None for blank and preset exams); `locked_fields` are
+    the course-template lock names its version locks while `structure_locked` is set."""
+    if a.exam_template_version_id is None:
+        return None
+    from app.lms.exam_templates.ids import expand_lock_scope
+    from app.lms.exam_templates.models import ExamTemplate, ExamTemplateVersion
+
+    v = db.get(ExamTemplateVersion, a.exam_template_version_id)
+    t = db.get(ExamTemplate, v.template_id) if v is not None else None
+    if v is None or t is None:
+        return None
+    latest = db.get(ExamTemplateVersion, t.current_version_id) if t.current_version_id else None
+    locked = sorted(expand_lock_scope((v.spec or {}).get("lock_scope"))) if a.structure_locked else []
+    return sch.ExamTemplateRefOut(template_id=t.id, title=t.title, version_no=v.version_no, version_id=v.id,
+                                  latest_version_no=latest.version_no if latest else None, locked_fields=locked)
+# --- Phase 7b S1 end ---
 
 
 def list_staff(db: Session, course: Course, *, cursor: Optional[str], limit: Optional[int], deleted: bool):

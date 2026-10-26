@@ -57,6 +57,14 @@ def reset_lms_state() -> None:
         for model in (GradeEvent, CourseGrade, AttemptGrade, Submission):
             conn.execute(delete(model.__table__))
         conn.execute(delete(Assignment.__table__))  # --- Phase 7a S1 --- (after submissions, before assessments)
+        # --- Phase 7b S1 begin --- exam templates: versions reference scheme versions, templates orgs and users
+        from app.lms.exam_templates.models import ExamTemplate, ExamTemplateVersion
+
+        conn.execute(update(Assessment.__table__).values(exam_template_version_id=None))
+        conn.execute(update(ExamTemplate.__table__).values(current_version_id=None))
+        for model in (ExamTemplateVersion, ExamTemplate):
+            conn.execute(delete(model.__table__))
+        # --- Phase 7b S1 end ---
         conn.execute(update(Assessment.__table__).values(grading_scheme_version_id=None, grade_category_id=None))
         conn.execute(update(Course.__table__).values(grading_scheme_version_id=None))
         conn.execute(delete(GradeCategory.__table__))

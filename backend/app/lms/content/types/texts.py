@@ -80,6 +80,10 @@ class NumericResponse(StrictModel):
 
 class Numeric(QuestionType):
     name = "numeric"
+    # --- Phase 7b S1 --- (catalog data, PHASE_7B_DESIGN 7)
+    title_key = "bank.types.numeric.name"
+    supports_passages = True
+    import_columns = ('answer', 'tolerance', 'answer_min', 'answer_max')
     Data = NumericData
     Response = NumericResponse
     STUDENT_KEYS = frozenset()
@@ -145,6 +149,10 @@ class ShortTextResponse(StrictModel):
 
 class ShortText(QuestionType):
     name = "short_text"
+    # --- Phase 7b S1 --- (catalog data, PHASE_7B_DESIGN 7)
+    title_key = "bank.types.short_text.name"
+    supports_passages = True
+    import_columns = ('answers', 'case_sensitive')
     Data = ShortTextData
     Response = ShortTextResponse
     STUDENT_KEYS = frozenset()
@@ -179,6 +187,10 @@ class EssayResponse(StrictModel):
 
 class Essay(QuestionType):
     name = "essay"
+    # --- Phase 7b S1 --- (catalog data, PHASE_7B_DESIGN 7)
+    title_key = "bank.types.essay.name"
+    supports_passages = True
+    import_columns = ('rubric', 'max_points')
     Data = EssayData
     Response = EssayResponse
     STUDENT_KEYS = frozenset({"word_limit"})

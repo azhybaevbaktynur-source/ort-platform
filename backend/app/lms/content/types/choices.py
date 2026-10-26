@@ -79,6 +79,10 @@ class SingleChoiceResponse(StrictModel):
 
 class SingleChoice(QuestionType):
     name = "single_choice"
+    # --- Phase 7b S1 --- (catalog data, PHASE_7B_DESIGN 7)
+    title_key = "bank.types.single_choice.name"
+    supports_passages = True
+    import_columns = ('option_a', 'option_b', 'option_c', 'option_d', 'option_e', 'correct_option')
     Data = SingleChoiceData
     Response = SingleChoiceResponse
     STUDENT_KEYS = frozenset({"choices", "shuffle"})
@@ -128,6 +132,10 @@ class MultipleAnswersResponse(StrictModel):
 
 class MultipleAnswers(QuestionType):
     name = "multiple_answers"
+    # --- Phase 7b S1 --- (catalog data, PHASE_7B_DESIGN 7)
+    title_key = "bank.types.multiple_answers.name"
+    supports_passages = True
+    import_columns = ('option_a', 'option_b', 'option_c', 'option_d', 'option_e', 'correct_option')
     Data = MultipleAnswersData
     Response = MultipleAnswersResponse
     STUDENT_KEYS = frozenset({"choices", "shuffle"})
@@ -169,6 +177,10 @@ class TrueFalseResponse(StrictModel):
 
 class TrueFalse(QuestionType):
     name = "true_false"
+    # --- Phase 7b S1 --- (catalog data, PHASE_7B_DESIGN 7)
+    title_key = "bank.types.true_false.name"
+    supports_passages = True
+    import_columns = ('correct_option',)
     Data = TrueFalseData
     Response = TrueFalseResponse
     STUDENT_KEYS = frozenset()
@@ -208,6 +220,10 @@ class ComparisonResponse(StrictModel):
 
 class Comparison(QuestionType):
     name = "comparison"
+    # --- Phase 7b S1 --- (catalog data, PHASE_7B_DESIGN 7)
+    title_key = "bank.types.comparison.name"
+    supports_passages = False
+    import_columns = ('column_a', 'column_b', 'correct_option')
     Data = ComparisonData
     Response = ComparisonResponse
     STUDENT_KEYS = frozenset({"column_a", "column_b"})

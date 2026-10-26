@@ -27,7 +27,9 @@ class AdminAuditLog(UUIDPKMixin, Base):
     __table_args__ = (
         CheckConstraint(
             # Phase 6: 'organization' (S1: CRUD, suspend/resume, template grants), 'invitation' (S3)
-            "target_type IN ('user','course','teacher_request','enrollment','organization','invitation')",
+            # --- Phase 7b S1 --- 'exam_template' (publish/archive/lock/unlock/promote), 'assessment' (structure_unlock)
+            "target_type IN ('user','course','teacher_request','enrollment','organization','invitation',"
+            "'exam_template','assessment')",
             name="target_type_valid"
         ),
         Index("ix_admin_audit_log_created_at", "created_at", "id"),

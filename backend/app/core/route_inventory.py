@@ -87,6 +87,13 @@ from app.lms.accommodations.policies import ACCOMMODATION_POLICIES  # noqa: E402
 ROUTE_POLICIES.update(ASSIGNMENT_POLICIES)
 ROUTE_POLICIES.update(ACCOMMODATION_POLICIES)
 # --- Phase 7a S1 end ---
+# --- Phase 7b S1 begin --- (exam templates, PHASE_7B_DESIGN 9.1: S2 fills EXAM_TEMPLATE_POLICIES)
+from app.lms.exam_templates.ids import POLICY_NAMES as _EXAM_TEMPLATE_POLICY_NAMES  # noqa: E402
+from app.lms.exam_templates.policies import EXAM_TEMPLATE_POLICIES  # noqa: E402
+
+POLICY_NAMES = POLICY_NAMES | frozenset(_EXAM_TEMPLATE_POLICY_NAMES)
+ROUTE_POLICIES.update(EXAM_TEMPLATE_POLICIES)
+# --- Phase 7b S1 end ---
 
 
 def iter_routes(app):
