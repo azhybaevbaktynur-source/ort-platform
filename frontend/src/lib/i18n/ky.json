@@ -555,7 +555,11 @@
         "user": "Колдонуучу",
         "course": "Курс",
         "teacher_request": "Мугалим өтүнүчү",
-        "enrollment": "Катталуу"
+        "enrollment": "Катталуу",
+        "organization": "Уюм",
+        "invitation": "Чакыруу",
+        "exam_template": "Тест шаблону",
+        "assessment": "Тапшырма"
       },
       "apply": "Колдонуу",
       "empty": "Жазуулар жок."

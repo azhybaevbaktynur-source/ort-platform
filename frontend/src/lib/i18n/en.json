@@ -555,7 +555,11 @@
         "user": "User",
         "course": "Course",
         "teacher_request": "Teacher request",
-        "enrollment": "Enrollment"
+        "enrollment": "Enrollment",
+        "organization": "Organization",
+        "invitation": "Invitation",
+        "exam_template": "Exam template",
+        "assessment": "Assessment"
       },
       "apply": "Apply filters",
       "empty": "No entries."

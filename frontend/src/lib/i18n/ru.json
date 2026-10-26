@@ -555,7 +555,11 @@
         "user": "Пользователь",
         "course": "Курс",
         "teacher_request": "Заявка преподавателя",
-        "enrollment": "Запись на курс"
+        "enrollment": "Запись на курс",
+        "organization": "Организация",
+        "invitation": "Приглашение",
+        "exam_template": "Шаблон теста",
+        "assessment": "Задание"
       },
       "apply": "Применить",
       "empty": "Записей нет."
