@@ -63,6 +63,22 @@ def visible_stmt(user_id: str, course: Course):
     return select(ExamTemplate).where(visible_predicate(user_id, course))
 
 
+def scope_matches(user_id: str, course: Course, t: ExamTemplate) -> bool:
+    """The 5.2 scope predicate for one row, status aside (instantiate reports archived / unpublished separately)."""
+    if t.deleted_at is not None:
+        return False
+    if t.owner_scope == "platform":
+        return True
+    if t.owner_scope == "organization":
+        return t.organization_id is not None and t.organization_id == course.organization_id
+    return t.owner_scope == "teacher" and t.owner_user_id == user_id
+
+
+def visible_in_course(user_id: str, course: Course, t: ExamTemplate) -> bool:
+    """`visible_predicate` for one row: published with a current version and in scope for the course."""
+    return (t.status == "published" and t.current_version_id is not None and scope_matches(user_id, course, t))
+
+
 def is_visible_in(db: Session, user_id: str, course: Course, template_id: uuid.UUID) -> bool:
     return db.execute(select(ExamTemplate.id).where(ExamTemplate.id == template_id,
                                                     visible_predicate(user_id, course))).first() is not None

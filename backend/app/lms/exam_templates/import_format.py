@@ -177,15 +177,10 @@ def csv_filename(template: ExamTemplate, version_no: int, lang: str) -> str:
 # ------------------------------------------------------------------------------------------------ visibility
 
 def visible_in_course(ctx: Any, course: Any, t: ExamTemplate) -> bool:
-    """PHASE_7B_DESIGN 5.2 for one row (published, live; platform, the course's organization, or the caller's own).
-    S2's `scopes.visible_stmt` is the shared statement; this is the same predicate for a single template."""
-    if t.deleted_at is not None or t.status != "published" or t.current_version_id is None:
-        return False
-    if t.owner_scope == "platform":
-        return True
-    if t.owner_scope == "organization":
-        return t.organization_id is not None and t.organization_id == getattr(course, "organization_id", None)
-    return t.owner_scope == "teacher" and t.owner_user_id == ctx.user.id
+    """PHASE_7B_DESIGN 5.2 for one row: S2's `scopes.visible_in_course` (the same rule as `scopes.visible_stmt`)."""
+    from app.lms.exam_templates import scopes
+
+    return scopes.visible_in_course(ctx.user.id, course, t)
 
 
 # ------------------------------------------------------------------------------------------------ import target

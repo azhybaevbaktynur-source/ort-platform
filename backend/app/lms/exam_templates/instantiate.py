@@ -30,17 +30,6 @@ from app.lms.exam_templates.spec import ExamTemplateSpec
 
 # ------------------------------------------------------------------------------------------------ resolving
 
-def _scope_ok(user_id: str, course: Course, t: ExamTemplate) -> bool:
-    """The 5.2 visibility predicate for one row (status aside)."""
-    if t.deleted_at is not None:
-        return False
-    if t.owner_scope == "platform":
-        return True
-    if t.owner_scope == "organization":
-        return t.organization_id == course.organization_id
-    return t.owner_user_id == user_id
-
-
 def resolve_version(db: Session, ctx: AuthzContext, course: Course, *, template_id: Optional[uuid.UUID] = None,
                     version_id: Optional[uuid.UUID] = None) -> tuple[ExamTemplate, ExamTemplateVersion]:
     """The (template, version) a create body names (3.2 rule 1): `exam_template_id` -> the current version (422
@@ -54,7 +43,7 @@ def resolve_version(db: Session, ctx: AuthzContext, course: Course, *, template_
             raise scopes.template_not_found()
         template_id = version.template_id
     t = db.get(ExamTemplate, template_id) if template_id is not None else None
-    if t is None or not _scope_ok(ctx.user.id, course, t):
+    if t is None or not scopes.scope_matches(ctx.user.id, course, t):
         raise scopes.template_not_found()
     if t.status == "archived":
         raise Conflict("The template is archived", code=ids.E_TEMPLATE_ARCHIVED)
@@ -123,7 +112,7 @@ def instantiate(db: Session, ctx: AuthzContext, course: Course, version: ExamTem
     """One transaction, no commit (5.3): assessment row + one section per spec section + the quiz assignment."""
     require_course(ctx, A.CONTENT_MANAGE, course)
     t = db.get(ExamTemplate, version.template_id)
-    if t is None or not _scope_ok(ctx.user.id, course, t):
+    if t is None or not scopes.scope_matches(ctx.user.id, course, t):
         raise scopes.template_not_found()
     if t.status == "archived":
         raise Conflict("The template is archived", code=ids.E_TEMPLATE_ARCHIVED)

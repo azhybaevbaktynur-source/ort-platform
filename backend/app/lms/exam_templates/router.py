@@ -98,10 +98,7 @@ def get_version(template_id: uuid.UUID, version_no: int, ctx: AuthzContext = Dep
     return service.version_out(service.load_version(ctx.db, t, version_no))
 
 
-# --- Phase 7b S3 --- (`GET .../versions/{no}/import-format[?download=csv]`; file and policy owned by S3)
-try:
-    from app.lms.exam_templates.import_format_router import router as import_format_router
-except ImportError:  # S3 not merged yet
-    import_format_router = None
-if import_format_router is not None:
-    router.include_router(import_format_router)
+# --- Phase 7b S3 --- (`GET .../versions/{no}/import-format[?download=csv]`; file owned by S3, policy in policies.py)
+from app.lms.exam_templates.import_format_router import import_format_router  # noqa: E402
+
+router.include_router(import_format_router)

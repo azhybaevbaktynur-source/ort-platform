@@ -19,37 +19,18 @@ from app.lms.core.errors import NotFound
 from app.lms.core.types import SUPPORTED_LANGUAGES
 from app.lms.exam_templates import ids
 from app.lms.exam_templates import import_format as ifmt
-from app.lms.exam_templates.models import ExamTemplate, ExamTemplateVersion
+from app.lms.exam_templates.models import ExamTemplateVersion
 
 import_format_router = APIRouter()
 
 PATH = "/{template_id}/versions/{version_no}/import-format"
 
 
-def can_read(ctx: AuthzContext, t: ExamTemplate) -> bool:
-    """`exam_template_read` for one row without a course context: the template's managers (platform admin; org
-    admins of its organization; its teacher), members of its organization for organization templates, anyone
-    signed in for platform templates (structure only, never questions: B11). S2 owns the shared policy; this is the
-    same rule applied to this route."""
-    if t.deleted_at is not None:
-        return False
-    user = ctx.user
-    if getattr(user, "is_platform_admin", False):
-        return True
-    if t.owner_scope == "platform":
-        return t.status != "draft"
-    if t.owner_scope == "organization":
-        from app.lms.organizations.service import is_active_member
-
-        return t.organization_id is not None and is_active_member(ctx.db, t.organization_id, user.id)
-    return t.owner_user_id == user.id
-
-
 def _load(ctx: AuthzContext, template_id: uuid.UUID, version_no: int):
+    from app.lms.exam_templates import service
+
     db = ctx.db
-    t = db.get(ExamTemplate, template_id)
-    if t is None or not can_read(ctx, t):
-        raise NotFound("Exam template not found", code=ids.E_TEMPLATE_NOT_FOUND)
+    t = service.load_readable(ctx, template_id)  # S2's `exam_template_read` rule (scopes.can_read), 404 otherwise
     v = db.execute(select(ExamTemplateVersion).where(ExamTemplateVersion.template_id == t.id,
                                                      ExamTemplateVersion.version_no == version_no)).scalar_one_or_none()
     if v is None:

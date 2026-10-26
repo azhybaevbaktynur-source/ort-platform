@@ -2,7 +2,7 @@
 delimited block (policy names: `ids.POLICY_*`, listed in `route_inventory.POLICY_NAMES`)."""
 EXAM_TEMPLATE_POLICIES: dict[tuple[str, str], str] = {}
 
-# --- Phase 7b S2 begin --- (PHASE_7B_DESIGN 9.1; the import-format route is listed by S3)
+# --- Phase 7b S2 begin --- (PHASE_7B_DESIGN 9.1)
 from app.lms.exam_templates import ids as _ids  # noqa: E402
 
 _B = "/api/v1/exam-templates"
@@ -20,5 +20,6 @@ EXAM_TEMPLATE_POLICIES.update({
     ("POST", f"{_T}/promote"): _ids.POLICY_MANAGE,      # org admin / platform admin, audited
     ("GET", f"{_T}/versions"): _ids.POLICY_READ,
     ("GET", f"{_T}/versions/{{version_no}}"): _ids.POLICY_READ,
+    ("GET", f"{_T}/versions/{{version_no}}/import-format"): _ids.POLICY_READ,   # S3 router, mounted by S2
 })
 # --- Phase 7b S2 end ---
