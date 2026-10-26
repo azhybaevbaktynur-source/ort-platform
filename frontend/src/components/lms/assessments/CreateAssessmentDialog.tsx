@@ -12,6 +12,10 @@ import { inputCls, labelCls } from "@/components/lms/content/ui";
 import { btnPrimary, btnSecondary } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { AssessmentError } from "./AssessmentError";
 import { Modal } from "./Modal";
+// --- Phase 7b S4 begin --- (PHASE_7B_DESIGN 10: "Start from" an exam template)
+import { TemplatePicker, useTemplatePicker } from "@/components/lms/examTemplates/TemplatePicker";
+import { ExamTemplateError, isExamTemplateErrorCode } from "@/components/lms/examTemplates/ui";
+// --- Phase 7b S4 end ---
 
 export function CreateAssessmentDialog({
   open, courseId, courseLanguages, defaultLanguage, onCreated, onCancel,
@@ -36,6 +40,7 @@ export function CreateAssessmentDialog({
   const [subject, setSubject] = useState<string>(firstSubject);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const picker = useTemplatePicker(courseId, open); // Phase 7b S4
 
   useEffect(() => {
     if (open) { setTitle({}); setPreset("none"); setLanguages([defaultLanguage]); setSubject(firstSubject); setError(null); }
@@ -45,7 +50,7 @@ export function CreateAssessmentDialog({
     setLanguages((cur) => (cur.includes(l) ? (cur.length > 1 ? cur.filter((x) => x !== l) : cur) : courseLanguages.filter((x) => cur.includes(x) || x === l)));
   };
   const cleaned = cleanLocalized(title, courseLanguages);
-  const valid = Object.keys(cleaned).length > 0;
+  const valid = Object.keys(cleaned).length > 0 && picker.valid; // Phase 7b S4: + template parameters chosen
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,7 +58,8 @@ export function CreateAssessmentDialog({
     setBusy(true);
     setError(null);
     try {
-      const a = await createAssessment(courseId, {
+      // Phase 7b S4: a template replaces the preset (preset_template_exclusive)
+      const a = await createAssessment(courseId, picker.active ? { title: cleaned, preset: "none", languages, ...picker.fields() } : {
         title: cleaned, preset, languages, ...(preset === "ort_subject" ? { subject_key: subject } : {}),
       });
       onCreated(a);
@@ -69,7 +75,7 @@ export function CreateAssessmentDialog({
       <form onSubmit={submit} className="space-y-4">
         <LocalizedTextInput label={t("assessments.create.titleLabel")} languages={courseLanguages} defaultLanguage={defaultLanguage}
           value={title} onChange={setTitle} maxLength={200} required />
-        {presets.length > 1 && <fieldset>
+        {presets.length > 1 && !picker.active && <fieldset>
           <legend className={labelCls}>{t("assessments.create.preset")}</legend>
           <div className="space-y-2">
             {presets.map((p) => (
@@ -83,7 +89,7 @@ export function CreateAssessmentDialog({
             ))}
           </div>
         </fieldset>}
-        {preset === "ort_subject" && (
+        {preset === "ort_subject" && !picker.active && (
           <div>
             <label className={labelCls} htmlFor="subject-key">{t("assessments.create.subject")}</label>
             <select id="subject-key" className={inputCls} value={subject} onChange={(e) => setSubject(e.target.value)}>
@@ -91,6 +97,8 @@ export function CreateAssessmentDialog({
             </select>
           </div>
         )}
+        {/* --- Phase 7b S4 --- */}
+        <TemplatePicker picker={picker} disabled={busy} />
         <fieldset>
           <legend className={labelCls}>{t("assessments.create.languages")}</legend>
           <div className="flex flex-wrap gap-3">
@@ -103,7 +111,7 @@ export function CreateAssessmentDialog({
           </div>
           <p className="mt-1 text-xs text-slate-500">{t(ortCourse ? "assessments.create.languagesHint" : "assessments.create.languagesHintGeneral")}</p>
         </fieldset>
-        <AssessmentError error={error} />
+        {isExamTemplateErrorCode((error as { code?: string } | null)?.code) ? <ExamTemplateError error={error} /> : <AssessmentError error={error} />}
         <div className="flex justify-end gap-2">
           <button type="button" className={btnSecondary} disabled={busy} onClick={onCancel}>{t("lms.common.cancel")}</button>
           <button type="submit" className={btnPrimary} disabled={busy || !valid}>{busy ? t("lms.common.loading") : t("assessments.create.submit")}</button>

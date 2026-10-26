@@ -16,6 +16,7 @@ import { cardCls, inputCls, labelCls } from "@/components/lms/content/ui";
 import { btnPrimary, btnSecondary } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { importProfileLabelKey, templateUi } from "@/lib/lms/templates";
 import { ImportReportView } from "./ImportReportView";
+import { ImportValidationFields } from "@/components/lms/examTemplates/ImportValidationFields"; // Phase 7b S4
 
 export function ImportPanel() {
   const { lang, t } = useTranslation();
@@ -36,6 +37,11 @@ export function ImportPanel() {
   const [result, setResult] = useState<ImportReport | null>(null);
   const [busy, setBusy] = useState<"preview" | "commit" | null>(null);
   const [error, setError] = useState<unknown>(null);
+  // --- Phase 7b S4: validation against a template exam (general format only; ORT format unchanged) ---
+  const [validateId, setValidateId] = useState("");
+  const [attach, setAttach] = useState(false);
+  const general = !format;
+  // --- Phase 7b S4 end ---
 
   const isZip = !!file && file.name.toLowerCase().endsWith(".zip");
   const canTarget = !!file && !isZip;
@@ -50,7 +56,10 @@ export function ImportPanel() {
 
   const params = useMemo(() => file && ({
     file, language, examType: format || null, targetBankId: canTarget ? targetBankId || null : null, onConflict,
-  }), [file, language, format, targetBankId, canTarget, onConflict]);
+    // Phase 7b S4
+    assessmentId: general && validateId ? validateId : null,
+    attachToAssessmentId: general && validateId && attach ? validateId : null,
+  }), [file, language, format, targetBankId, canTarget, onConflict, general, validateId, attach]);
 
   const invalidate = () => { setPreview(null); setResult(null); setError(null); };
 
@@ -137,6 +146,12 @@ export function ImportPanel() {
             <p className="mt-1 text-xs text-slate-500">{t(format ? "bank.import.formatOrtNote" : "bank.import.formatGeneralNote")}</p>
           </div>}
         </div>
+
+        {/* --- Phase 7b S4 --- */}
+        {general && (
+          <ImportValidationFields courseId={course.id} value={validateId} attach={attach} disabled={busy !== null}
+            onChange={(id, att) => { setValidateId(id); setAttach(att); invalidate(); }} />
+        )}
 
         <div>
           <label htmlFor="imp-target" className={labelCls}>{t("bank.import.target")}</label>
