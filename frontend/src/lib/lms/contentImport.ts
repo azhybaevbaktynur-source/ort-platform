@@ -58,6 +58,14 @@ export interface ImportParams {
   /** Only for a CSV or a single bundle without manifest; empty = new bank. */
   targetBankId?: string | null;
   onConflict?: ImportConflictPolicy;
+  // --- Phase 7b S4 begin --- (PHASE_7B_DESIGN 8: validation against a template exam, general format only)
+  /** Validate rows against the template version of this draft assessment (`not_a_template_assessment` otherwise). */
+  assessmentId?: string | null;
+  /** Validate against an explicit template version (no assessment). */
+  examTemplateVersionId?: string | null;
+  /** Commit only: add the imported questions to the sections of this draft assessment (same transaction). */
+  attachToAssessmentId?: string | null;
+  // --- Phase 7b S4 end ---
 }
 
 async function post(path: string, p: ImportParams, commit: boolean): Promise<ImportReport> {
@@ -67,6 +75,11 @@ async function post(path: string, p: ImportParams, commit: boolean): Promise<Imp
   if (p.examType) form.append("exam_type", p.examType);
   if (p.targetBankId) form.append("target_bank_id", p.targetBankId);
   if (commit) form.append("on_conflict", p.onConflict ?? "skip");
+  // --- Phase 7b S4 begin ---
+  if (p.assessmentId) form.append("assessment_id", p.assessmentId);
+  if (p.examTemplateVersionId) form.append("exam_template_version_id", p.examTemplateVersionId);
+  if (commit && p.attachToAssessmentId) form.append("attach_to_assessment_id", p.attachToAssessmentId);
+  // --- Phase 7b S4 end ---
   let res: Response;
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {

@@ -16,6 +16,12 @@ import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
 import { fromLocalInput } from "@/components/lms/assessments/format";
 import { Button, Checkbox, Dialog, FieldLabel, Input, Select, cn, focusRing } from "@/components/ui";
 import { AssignmentError, KindIcon, parsePoints } from "./assignmentUi";
+// --- Phase 7b S4 begin --- (PHASE_7B_DESIGN 10: quiz "Start from" an exam template)
+import type { QuizCreateIn } from "@/lib/lms/assignmentTypes";
+import type { TemplateCreateFields } from "@/lib/lms/examTemplateTypes";
+import { TemplatePicker, useTemplatePicker } from "@/components/lms/examTemplates/TemplatePicker";
+import { ExamTemplateError, isExamTemplateErrorCode } from "@/components/lms/examTemplates/ui";
+// --- Phase 7b S4 end ---
 
 const KINDS: AssignmentKind[] = ["text", "file", "none", "quiz"];
 
@@ -45,6 +51,7 @@ export function AssignmentEditorDialog({ open, onCreated, onCancel }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [touched, setTouched] = useState(false);
+  const picker = useTemplatePicker(course.id, open && kind === "quiz"); // Phase 7b S4
 
   useEffect(() => {
     if (open) {
@@ -57,7 +64,7 @@ export function AssignmentEditorDialog({ open, onCreated, onCancel }: {
   const titleOk = Object.keys(cleaned).length > 0;
   const pts = parsePoints(points);
   const pointsOk = kind === "quiz" || (pts !== null && !Number.isNaN(pts) && pts >= 0 && pts <= 10000);
-  const valid = titleOk && pointsOk;
+  const valid = titleOk && pointsOk && (kind !== "quiz" || picker.valid); // Phase 7b S4
 
   const toggleLang = (l: Lang) =>
     setLanguages((cur) => (cur.includes(l) ? (cur.length > 1 ? cur.filter((x) => x !== l) : cur) : courseLanguages.filter((x) => cur.includes(x) || x === l)));
@@ -69,8 +76,12 @@ export function AssignmentEditorDialog({ open, onCreated, onCancel }: {
     setBusy(true);
     setError(null);
     try {
+      // Phase 7b S4: a template replaces the preset (preset_template_exclusive)
+      const quiz: QuizCreateIn & TemplateCreateFields = picker.active
+        ? { preset: "none", languages, ...picker.fields() }
+        : { preset, languages, ...(preset === "ort_subject" ? { subject_key: subject } : {}) };
       const out = await createAssignment(course.id, kind === "quiz"
-        ? { kind, title: cleaned, quiz: { preset, languages, ...(preset === "ort_subject" ? { subject_key: subject } : {}) } }
+        ? { kind, title: cleaned, quiz }
         : { kind, title: cleaned, points_possible: pts, due_at: fromLocalInput(due) });
       onCreated(out);
     } catch (err) {
@@ -121,7 +132,7 @@ export function AssignmentEditorDialog({ open, onCreated, onCancel }: {
           </div>
         ) : (
           <div className="space-y-4">
-            {presets.length > 1 && (
+            {presets.length > 1 && !picker.active && (
               <fieldset>
                 <legend className="text-sm font-medium leading-6 text-slate-800">{t("assessments.create.preset")}</legend>
                 <div className="mt-1 space-y-2">
@@ -137,10 +148,12 @@ export function AssignmentEditorDialog({ open, onCreated, onCancel }: {
                 </div>
               </fieldset>
             )}
-            {preset === "ort_subject" && (
+            {preset === "ort_subject" && !picker.active && (
               <Select label={t("assessments.create.subject")} value={subject} onChange={(e) => setSubject(e.target.value)}
                 options={subjects.map((k) => ({ value: k, label: t(`sections.${k}`) }))} />
             )}
+            {/* --- Phase 7b S4 --- */}
+            <TemplatePicker picker={picker} disabled={busy} />
             <fieldset>
               <FieldLabel>{t("assessments.create.languages")}</FieldLabel>
               <div className="flex flex-wrap gap-x-4">
@@ -153,7 +166,7 @@ export function AssignmentEditorDialog({ open, onCreated, onCancel }: {
             <p className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">{t("assignments.create.quizNext")}</p>
           </div>
         )}
-        <AssignmentError error={error} />
+        {isExamTemplateErrorCode((error as { code?: string } | null)?.code) ? <ExamTemplateError error={error} /> : <AssignmentError error={error} />}
       </form>
     </Dialog>
   );
