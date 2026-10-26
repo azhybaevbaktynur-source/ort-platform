@@ -75,6 +75,10 @@ class ImportAttachSummary(BaseModel):
     added: int = 0
     sections: dict[str, int] = Field(default_factory=dict)   # section label -> questions added
     skipped: dict[str, int] = Field(default_factory=dict)    # skip code -> count (item_duplicate, too_many_items...)
+    # --- Phase 7b S7 --- section label -> 0-based section position (the UI shows the exam's section title);
+    # too_many_items per section: {code, section, position, max, scope: "section" | "exam", count}
+    section_positions: dict[str, int] = Field(default_factory=dict)
+    skip_details: list[dict] = Field(default_factory=list)
 
 
 class ImportResult(ImportReport):

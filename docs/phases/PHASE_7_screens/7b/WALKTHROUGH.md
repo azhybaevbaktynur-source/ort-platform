@@ -1,6 +1,6 @@
-# Phase 7b walkthrough (S5 integration)
+# Phase 7b walkthrough (S5 integration, re-run after the S7 UX fixes)
 
-Date 2026-10-26. Branch `phase-7b-s5-integration` (S1-S4 + the S6 security fixes merged). Scratch backend through `scripts/e2e_backend.sh` (`env -i`, cwd outside `backend/`, fresh SQLite, console email, `LMS_STORAGE_DRIVER=db`, the e2e ORT seed) on 8071; built frontend (`next build` + `next start` in an rsync'd copy) on 3071; playwright-core with system Chrome (headless). Data: platform admin (e2e seed), organization "Школа-гимназия №5" with org admin Гульнара Осмонова and teacher Айбек Маматов, course "Физика 9 класс" with students Нурлан, Мээрим (ru) and Азамат (ky), independent teacher Эрлан Касымов (personal organization). Scripts: `/tmp/agy_p7b_s5w_scripts/` (lib copied from the 7a walkthrough `/tmp/agy_s6w_scripts/`, setup, w1, w3, w9, w11, w14, shots). Each step checks the UI and the API state.
+Date 2026-10-26. Branch `phase-7b-s5-integration` (S1-S4 + the S6 security fixes merged); re-run on `phase-7b-s7-uxfix`. Scratch backend through `scripts/e2e_backend.sh` (`env -i`, cwd outside `backend/`, fresh SQLite, console email, `LMS_STORAGE_DRIVER=db`, the e2e ORT seed) on 8072; built frontend (`next build` + `next start` in an rsync'd copy) on 3072; playwright-core with system Chrome (headless). Data: platform admin (e2e seed), organization "Школа-гимназия №5" with org admin Гульнара Осмонова and teacher Айбек Маматов, course "Физика 9 класс" with students Нурлан, Мээрим (ru) and Азамат (ky), independent teacher Эрлан Касымов (personal organization). Scripts: `/tmp/agy_p7b_s7w_scripts/` (form.js fills the S7 structure form) (lib copied from the 7a walkthrough `/tmp/agy_s6w_scripts/`, setup, w1, w3, w9, w11, w14, shots). Each step checks the UI and the API state.
 
 | # | Step | Result | Evidence |
 |---|---|---|---|
@@ -11,21 +11,21 @@ Date 2026-10-26. Branch `phase-7b-s5-integration` (S1-S4 + the S6 security fixes
 | 3 | teacher creates a quiz assignment from the locked org template (browser picker grouped platform / organization) | PASS | sections=theory:1200,problems:1200 locked=true fields=navigation,section_add_remove,section_key,section_order,section_rules,section_time_limit_s picker=[Нет: начать с нуля / Шаблоны платформы / Контрольная: две части · в1 / Шаблоны организации / Контрольная ра |
 | 4 | locked structure: 'Добавить раздел' greyed with the template note; section key / time limit greyed | PASS | add.disabled=true key.disabled=true limit.disabled=true note="Разделы заданы шаблоном теста: вопросы добавлять можно, а добавлять, удалять и переставлят" |
 | 5 | locked structure: API answers 409 template_locked (add section, navigation, section time limit) | PASS | 409 template_locked:section_add_remove / 409 template_locked:navigation / 409 template_locked:section_time_limit_s |
-| 6 | teacher downloads the import-format CSV (BOM, header, one # example row per section) | PASS | import-format-5-v1.csv header=section,type,stem,option_a,option_b,option_c,option_d,option_e,correct_option,answer,tolerance,answer_min,answer_max,explanation,topic,difficulty,tags,image,external_id rows=#Теория/#Задачи |
+| 6 | teacher downloads the import-format CSV (BOM, header, one # example row per section) | PASS | import-format-kontrolnaia-rabota-shkola-5-v1.csv header=section,type,stem,option_a,option_b,option_c,option_d,option_e,correct_option,answer,tolerance,answer_min,answer_max,explanation,topic,difficulty,tags,image,external_id rows=#Теория/#Задачи |
 | 7 | choosing the exam switches the import language to the exam's language (course default ky, exam ru) | PASS | language=ru |
 | 8 | matching general CSV: preview OK, import adds the questions to the right sections (theory 3, problems 1) | PASS | sections=theory:3,problems:1 done="В задание добавлено вопросов: 4." |
 | 9 | wrong CSV: import blocked with clear errors (section not in template, type not allowed in section) | PASS | codes=section_not_in_template,type_not_allowed_in_section,type_not_allowed_in_section import.disabled=true |
 | 10 | an ORT-format CSV in the general format is refused with format_mismatch (clear message) | PASS | Ошибки (1) Строка Колонка Файл Сообщение — — ort_format.csv Файл не соответствует выбранному формату (например, файл ОРТ в общем формате). Выберите другой формат. Номер строки — строка данных в CSV (з |
-| 11 | teacher publishes the template exam (builder) | PASS | status=published version=1 items=4 |
+| 11 | teacher publishes the template exam (builder) | PASS | status=published version=1 items=4 assignment.publish=409 |
 | | **W9-W10 Student takes it; version 2 published** | | |
-| 12 | student opens the template exam: lobby shows both sections, Start opens the player | PASS | attempt=45cc68e7-f22f-499d-bdab-2652fe8eea66 lobby="Мои курсы Физика 9 класс Физика 9 класс Главная Задания Оценки Преподаватели Назад к заданиям Контрольная №1: механика Лимит времени 40 мин Попытки 0 из 1 Разде" |
-| 13 | student submits and sees the result (all answers right: full score) | PASS | raw=4.00/4.00 page="Мои курсы Физика 9 класс Физика 9 класс Главная Задания Оценки Преподаватели Назад к заданию Результат Баллы 4 / 4 Сдано: 26.10.2026, 10:59:" |
+| 12 | student opens the template exam: lobby shows both sections, Start opens the player | PASS | attempt=1f0bb44b-4aff-42d7-bad4-dcb579c93348 lobby="Мои курсы Физика 9 класс Физика 9 класс Главная Задания Оценки Преподаватели Назад к заданиям Контрольная №1: механика Лимит времени 40 мин Попытки 0 из 1 Разде" |
+| 13 | student submits and sees the result (all answers right: full score) | PASS | raw=4.00/4.00 page="Мои курсы Физика 9 класс Физика 9 класс Главная Задания Оценки Преподаватели Назад к заданию Результат Баллы 4 / 4 Сдано: 26.10.2026, 12:49:" |
 | 14 | org admin publishes version 2 (browser); the existing exam keeps version 1 and shows v2 as newer | PASS | template v=2 exam v=1 latest=2 theory.min=2 |
 | 15 | the attempt started before v2 is unaffected: same sections and items, submits, full score | PASS | start=201 items=4 submit=200 raw=4.00/4.00 |
 | 16 | builder badge: 'Из шаблона … в1', newer v2 available, no Upgrade on a published exam with attempts | PASS | Из шаблона «Контрольная работа (школа №5)», в1 / Есть новая версия: в2 |
 | 17 | a new exam from the template gets version 2 | PASS | v=2 theory.min=3 |
 | | **W11-W13 Save as template, ORT and locked exams, visibility** | | |
-| 18 | teacher saves an existing general quiz as a teacher template (draft; the quiz is unchanged) | PASS | href=/ru/exam-templates/568b5c80-b427-49a4-9351-ce1ccc32d818 scope=teacher status=draft sections=1 min=2 |
+| 18 | teacher saves an existing general quiz as a teacher template (draft; the quiz is unchanged) | PASS | href=/ru/exam-templates/a527d883-f2a2-4e23-ad9d-4189624fb065 scope=teacher status=draft sections=1 min=2 |
 | 19 | teacher publishes the own template; it appears in the teacher's course picker (group 'Мои шаблоны') | PASS | status=published v=1 picker=teacher,organization,platform |
 | 20 | 'Save as template' is absent for the ORT exam (builder) and refused by the API (409 preset_not_templatable) | PASS | buttons=0 api=409 preset_not_templatable |
 | 21 | 'Save as template' is absent for an exam made from a locked template and refused by the API (409 template_locked) | PASS | buttons=0 api=409 template_locked |
@@ -35,8 +35,8 @@ Date 2026-10-26. Branch `phase-7b-s5-integration` (S1-S4 + the S6 security fixes
 | | **W14 ORT (browser, unchanged)** | | |
 | 25 | ORT course: every ORT exam is listed as a quiz assignment (teacher table) | PASS | quiz:ОРТ E2E / quiz:ОРТ E2E staff |
 | 26 | ORT student sees the exam card(s) with 'Экзамен ОРТ' and Start | PASS | Мои курсы ОРТ (на русском) ОРТ (на русском) Главная Задания Оценки Преподаватели Задания ОРТ E2E Не начато Экзамен ОРТ Осталось попыток: 1 Начать ОРТ E2E staff Не начато Экзамен ОРТ Осталось попыток:  |
-| 27 | Start on the card opens the ORT lobby | PASS | /ru/courses/f2a2186b-f8b4-5c06-af1f-7205b865c48f/assessments/66359689-c8f9-44e5-81b8-ba4db7dea639 |
-| 28 | the ORT player opens | PASS | /ru/courses/f2a2186b-f8b4-5c06-af1f-7205b865c48f/attempts/b701c294-c739-4319-97b1-a941830d2983 |
+| 27 | Start on the card opens the ORT lobby | PASS | /ru/courses/f2a2186b-f8b4-5c06-af1f-7205b865c48f/assessments/75226253-8d47-46ad-a3a7-c7a45d6f2d7d |
+| 28 | the ORT player opens | PASS | /ru/courses/f2a2186b-f8b4-5c06-af1f-7205b865c48f/attempts/b84692fa-29a9-47f4-b8db-b3b942b95124 |
 | 29 | ORT result equals the reference attempt with the same answers (raw score, scaled grade, sections) | PASS | raw=4.00 scaled=96.00 ref raw=4.00 scaled=96.00 |
 | 30 | ORT gradebook: the exam is one column (assignment id), the cell carries the scaled grade | PASS | col=ОРТ E2E cell=96.00 label=null |
 | 31 | ORT import page: ORT format preselected, no exam-template validation select (general format only) | PASS | format=full_main validateSelect=0 |
@@ -63,8 +63,17 @@ Date 2026-10-26. Branch `phase-7b-s5-integration` (S1-S4 + the S6 security fixes
 - Audit log filter offers the target types `exam_template`, `assessment`, `organization`, `invitation`.
 - Backend (bug, with test `tests/test_cors_expose_headers.py`): CORS did not expose `Content-Disposition`, so cross-origin downloads lost the server's file name.
 
-## Open (not changed here)
+## S7 UX fixes (re-run of this walkthrough on `phase-7b-s7-uxfix`)
 
-- Result page of a general exam labels sections "Section 1/2" (from keys), not the section titles of the template (pre-7b behaviour of the general result view).
-- `spec_invalid` details are the server's English pydantic messages (the location is shown; translation would need message codes).
-- The import-format file name slugs only ASCII letters of the title (a Cyrillic title gives e.g. `import-format-5-v1.csv`).
+- The template editor has no JSON field any more: a structure form (default settings, section cards with add / remove /
+  move, key from the title under "Advanced", time in minutes, question counts, question types from the block catalog,
+  passages, parameters when the spec has them, lock scope checkboxes). The raw JSON stays behind a collapsed
+  "Advanced (JSON)" disclosure for the platform admin only. W1 and W10 now fill this form in the browser.
+- `spec_invalid` details carry a machine `type` (and `limit`); the UI translates them per field in en/ky/ru and names
+  the section by its title ("Section n" when untitled). No English server text in the UI.
+- Result page of a general exam: section rows show the section titles (result sections carry the snapshot title).
+- Import-format file name: Cyrillic titles are transliterated into the ASCII slug (e.g.
+  `import-format-kontrolnaia-rabota-shkola-5-v1.csv`).
+- Import: type names and the exam's section titles in template issues and in the attach summary; `too_many_items`
+  names the section and its maximum (backend `skip_details`).
+- Template picker: locked structure line, navigation line, description. Save-as dialog: one column on a phone.

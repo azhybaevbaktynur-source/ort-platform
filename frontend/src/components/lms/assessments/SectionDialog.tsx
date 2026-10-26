@@ -83,7 +83,8 @@ export function SectionDialog({
         {!tplLocked && examLocked && <p role="note" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{t("examTemplates.lockedSectionFields")}</p>}
         <div>
           <label className={labelCls} htmlFor="sec-key">{t("assessments.section.key")}</label>
-          <input id="sec-key" list={ui.sectionKeys.length ? "sec-keys" : undefined} className={inputCls} maxLength={40} value={key} disabled={keyLocked} onChange={(e) => setKey(e.target.value)} />
+          <input id="sec-key" list={ui.sectionKeys.length ? "sec-keys" : undefined} className={inputCls} maxLength={40} value={key} disabled={keyLocked} aria-describedby="sec-key-hint" onChange={(e) => setKey(e.target.value)} />
+          <p id="sec-key-hint" className="mt-1 text-xs text-slate-500">{t("assessments.section.keyHint")}</p>{/* Phase 7b S7 */}
           {ui.sectionKeys.length > 0 && <datalist id="sec-keys">{ui.sectionKeys.map((k) => <option key={k} value={k}>{t(`sections.${k}`)}</option>)}</datalist>}
         </div>
         <LocalizedTextInput label={t("assessments.section.titleLabel")} languages={languages} defaultLanguage={defaultLanguage} value={title} onChange={setTitle} maxLength={200} />

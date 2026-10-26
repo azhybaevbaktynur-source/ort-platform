@@ -2,7 +2,8 @@
 
 import React from "react";
 import { useTranslation } from "@/lib/i18n/context";
-import type { AttemptResultOut } from "@/lib/lms/attemptTypes";
+import type { AttemptResultOut, AttemptResultSection } from "@/lib/lms/attemptTypes";
+import { pickLocalized } from "@/lib/lms/localized";
 import type { AttemptGradeOut } from "@/lib/lms/gradingTypes";
 import { fmtDateTime, fmtPoints } from "@/components/lms/assessments/format";
 import { useTemplateUi } from "@/lib/lms/templates";
@@ -10,8 +11,10 @@ import { GradeBadge } from "./GradeBadge";
 import { OrtResultView } from "./OrtResultView";
 
 export function ResultSummary({ result, grade: gradeProp }: { result: AttemptResultOut; grade?: AttemptGradeOut | null }) {
-  const { t } = useTranslation();
+  const { lang, t } = useTranslation();
   const ui = useTemplateUi();
+  // Phase 7b S7: general exams name their sections by title (as the lobby does); ORT keys keep their labels first
+  const sectionTitle = (title: AttemptResultSection["title"]) => (typeof title === "string" ? title : pickLocalized(title ?? null, lang));
   const grade = gradeProp ?? result.grade ?? null;
   const scaled = ui.resultView === "ort" && !!grade && !!grade.sections && grade.sections.length > 0;
   const pending = result.pending_review > 0 ? (
@@ -65,7 +68,7 @@ export function ResultSummary({ result, grade: gradeProp }: { result: AttemptRes
             <tbody>
               {result.sections.map((s, idx) => (
                 <tr key={s.pos} className="border-b border-slate-100">
-                  <td className="py-2 pr-3 font-medium text-slate-900">{s.key && t(`sections.${s.key}`) !== `sections.${s.key}` ? t(`sections.${s.key}`) : t("results.sectionN", { n: idx + 1 })}</td>
+                  <td className="py-2 pr-3 font-medium text-slate-900">{s.key && t(`sections.${s.key}`) !== `sections.${s.key}` ? t(`sections.${s.key}`) : sectionTitle(s.title) || t("results.sectionN", { n: idx + 1 })}</td>
                   <td className="py-2 pr-3">{fmtPoints(s.raw)} / {fmtPoints(s.possible)}</td>
                   <td className="py-2 pr-3">{s.answered}</td>
                   <td className="py-2">{s.correct}</td>

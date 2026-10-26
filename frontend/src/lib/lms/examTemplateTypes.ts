@@ -219,4 +219,9 @@ export type ExamTemplateErrorCode = (typeof EXAM_TEMPLATE_ERROR_CODES)[number];
 export interface SpecIssue {
   loc: (string | number)[];
   msg: string;
+  /** Phase 7b S7: machine error type (pydantic types such as `missing`, `greater_than_equal`, or the spec's
+   * cross-check types such as `duplicate_key`); the UI translates by type, never shows `msg`. */
+  type?: string;
+  /** The numeric bound of a range / length error (`ge`, `le`, `max_length`, ...), or the count left out. */
+  limit?: number;
 }

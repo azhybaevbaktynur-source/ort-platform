@@ -174,10 +174,10 @@ export function SaveAsTemplateDialog({ open, assessment, courseId, onClose }: {
               return (
                 <div key={s.id} className="rounded-xl border border-slate-200 p-3">
                   <p className="break-words text-sm font-medium text-slate-900">{i + 1}. {name}</p>
-                  <div className="mt-2 grid grid-cols-2 gap-3">
-                    <Input label={t("examTemplates.saveAs.min")} inputMode="numeric" optional value={counts[s.position]?.min ?? ""}
+                  <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Input label={t("examTemplates.saveAs.min")} inputMode="numeric" value={counts[s.position]?.min ?? ""}
                       onChange={(e) => setCount(s.position, "min", e.target.value)} />
-                    <Input label={t("examTemplates.saveAs.max")} inputMode="numeric" optional value={counts[s.position]?.max ?? ""}
+                    <Input label={t("examTemplates.saveAs.max")} inputMode="numeric" value={counts[s.position]?.max ?? ""}
                       onChange={(e) => setCount(s.position, "max", e.target.value)} />
                   </div>
                   {err && <p className="mt-1 text-sm text-danger-700">{err}</p>}

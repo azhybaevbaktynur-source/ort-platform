@@ -5,19 +5,65 @@ import Link from "next/link";
 import { AlertCircle, AlertTriangle, CheckCircle2, ImageIcon } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import type { ImportBankSummary, ImportIssue, ImportReport } from "@/lib/lms/contentImport";
+import { questionTypeTitleKey } from "@/lib/lms/blocks";
+import { pickLocalized } from "@/lib/lms/localized";
+import type { Lang, LocalizedText } from "@/lib/lms/types";
 import { cardCls } from "@/components/lms/content/ui";
 import { btnSecondary } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 
 const sum = (o: Record<string, number>) => Object.values(o).reduce((a, n) => a + n, 0);
 
-export function ImportIssues({ issues, kind }: { issues: ImportIssue[]; kind: "error" | "warning" }) {
+// --- Phase 7b S7: names instead of keys for the template issue codes (types by name, sections by the exam's title) ---
+/** One section of the exam chosen for validation (in order). */
+export interface ExamSectionRef {
+  key: string | null;
+  title: LocalizedText | null;
+}
+type SectionNamer = (label: string, position?: number) => string;
+
+/** Section label of the importer (key, title or `section_<n>`) -> the exam section's title ("Раздел n" fallback). */
+export function useSectionNamer(sections: ExamSectionRef[] | null | undefined): SectionNamer {
+  const { lang, t } = useTranslation();
+  return (label: string, position?: number) => {
+    const list = sections ?? [];
+    const low = label.trim().toLowerCase();
+    let i = position !== undefined && position < list.length ? position : list.findIndex((s) => s.key === label);
+    if (i < 0) i = list.findIndex((s) => Object.values(s.title ?? {}).some((v) => (v ?? "").trim().toLowerCase() === low));
+    const m = /^section_(\d+)$/.exec(label);
+    if (i < 0 && m && Number(m[1]) <= list.length) i = Number(m[1]) - 1;
+    if (i < 0) {
+      const k = `sections.${label}`;
+      return t(k) === k ? (m ? t("examTemplates.picker.sectionN", { n: Number(m[1]) }) : label) : t(k);
+    }
+    const s = list[i];
+    const title = pickLocalized(s.title, lang as Lang);
+    if (title) return title;
+    const k = `sections.${s.key ?? ""}`;
+    return s.key ? (t(k) === k ? s.key : t(k)) : t("examTemplates.picker.sectionN", { n: i + 1 });
+  };
+}
+
+/** Codes of the template validation (general format only); their `type` / `allowed` / `section` params get names. */
+const TEMPLATE_CODES = new Set(["type_not_allowed_in_section", "passage_not_allowed", "count_below_min", "count_above_max"]);
+
+export function ImportIssues({ issues, kind, sectionName }: { issues: ImportIssue[]; kind: "error" | "warning"; sectionName?: SectionNamer }) {
   const { t } = useTranslation();
   if (issues.length === 0) return null;
   const isError = kind === "error";
+  const typeName = (ty: unknown) => {
+    const k = questionTypeTitleKey(String(ty));
+    return t(k) === k ? String(ty) : t(k);
+  };
   const text = (issue: ImportIssue) => {
     const key = `bank.import.issues.${issue.code}`;
+    const named = TEMPLATE_CODES.has(issue.code);
     const params = Object.fromEntries(
-      Object.entries(issue.params || {}).map(([k, v]) => [k, Array.isArray(v) ? v.join(", ") : String(v ?? "")]),
+      Object.entries(issue.params || {}).map(([k, v]) => {
+        if (named && k === "type") return [k, typeName(v)];
+        if (named && k === "allowed" && Array.isArray(v)) return [k, v.map(typeName).join(", ")];
+        if (named && k === "section" && sectionName) return [k, sectionName(String(v ?? ""))];
+        return [k, Array.isArray(v) ? v.join(", ") : String(v ?? "")];
+      }),
     );
     const translated = t(key, params);
     // Missing translation or missing params: show the server text.
@@ -124,9 +170,17 @@ function BankSummary({ b, done, bankBase }: { b: ImportBankSummary; done: boolea
   );
 }
 
-function AttachedSummary({ attached, bankBase }: { attached: NonNullable<ImportReport["attached"]>; bankBase: string }) {
+function AttachedSummary({ attached, bankBase, sectionName }: {
+  attached: NonNullable<ImportReport["attached"]>;
+  bankBase: string;
+  sectionName: SectionNamer;
+}) {
   const { t } = useTranslation();
   const skipped = sum(attached.skipped || {});
+  const positions = attached.section_positions ?? {};
+  const name = (label: string) => sectionName(label, positions[label]);
+  // S7: too_many_items names the full section and its maximum (backend `skip_details`)
+  const full = (attached.skip_details ?? []).filter((d) => d.code === "too_many_items");
   // the builder's skip codes (item_duplicate, item_language_mismatch, too_many_items, ...) share the lms.errors wording
   const reason = (code: string) => {
     const k = `lms.errors.${code}`;
@@ -139,14 +193,22 @@ function AttachedSummary({ attached, bankBase }: { attached: NonNullable<ImportR
       <p className="font-semibold">{t("examTemplates.import.attached", { count: attached.added })}</p>
       {Object.keys(attached.sections || {}).length > 0 && (
         <ul className="space-y-0.5">
-          {Object.entries(attached.sections).map(([sec, n]) => <li key={sec} className="break-words">{sec}: {n}</li>)}
+          {Object.entries(attached.sections).map(([sec, n]) => <li key={sec} className="break-words">{name(sec)}: {n}</li>)}
         </ul>
       )}
       {skipped > 0 && (
         <div className="text-amber-900">
           <p>{t("examTemplates.import.attachedSkipped", { count: skipped })}</p>
           <ul className="list-disc pl-5">
-            {Object.entries(attached.skipped).map(([code, n]) => <li key={code} className="break-words">{reason(code)} ({n})</li>)}
+            {Object.entries(attached.skipped).map(([code, n]) => code === "too_many_items" ? (
+              full.length > 0 ? full.map((d) => (
+                <li key={`${code}-${d.position}`} className="break-words">
+                  {d.scope === "exam"
+                    ? t("examTemplates.import.tooManyItemsExam", { max: d.max })
+                    : t("examTemplates.import.tooManyItems", { section: sectionName(d.section, d.position), max: d.max })} ({d.count})
+                </li>
+              )) : <li key={code} className="break-words">{t("examTemplates.import.tooManyItemsGeneric")} ({n})</li>
+            ) : <li key={code} className="break-words">{reason(code)} ({n})</li>)}
           </ul>
         </div>
       )}
@@ -155,8 +217,15 @@ function AttachedSummary({ attached, bankBase }: { attached: NonNullable<ImportR
   );
 }
 
-export function ImportReportView({ report, done, bankBase }: { report: ImportReport; done: boolean; bankBase: string }) {
+export function ImportReportView({ report, done, bankBase, examSections }: {
+  report: ImportReport;
+  done: boolean;
+  bankBase: string;
+  /** Phase 7b S7: sections of the exam chosen for validation (general format), for names in issues. */
+  examSections?: ExamSectionRef[] | null;
+}) {
   const { t } = useTranslation();
+  const sectionName = useSectionNamer(examSections);
   return (
     <div className="space-y-3">
       {done ? (
@@ -171,7 +240,7 @@ export function ImportReportView({ report, done, bankBase }: { report: ImportRep
         </div>
       )}
       {/* --- Phase 7b S5: questions added to a template exam (commit with "Add to this exam") --- */}
-      {done && report.attached && <AttachedSummary attached={report.attached} bankBase={bankBase} />}
+      {done && report.attached && <AttachedSummary attached={report.attached} bankBase={bankBase} sectionName={sectionName} />}
       {report.banks.map((b, i) => (
         <BankSummary key={`${b.root}-${b.bank_id ?? i}`} b={b} done={done} bankBase={bankBase} />
       ))}
@@ -183,8 +252,8 @@ export function ImportReportView({ report, done, bankBase }: { report: ImportRep
           existing: report.images_existing,
         })}
       </div>
-      <ImportIssues issues={report.errors} kind="error" />
-      <ImportIssues issues={report.warnings} kind="warning" />
+      <ImportIssues issues={report.errors} kind="error" sectionName={examSections ? sectionName : undefined} />
+      <ImportIssues issues={report.warnings} kind="warning" sectionName={examSections ? sectionName : undefined} />
       {(report.errors.length > 0 || report.warnings.length > 0) && (
         <p className="text-[11px] text-slate-500">{t("bank.import.rowHint")}</p>
       )}

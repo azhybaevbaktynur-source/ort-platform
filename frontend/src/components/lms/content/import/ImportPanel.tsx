@@ -15,7 +15,8 @@ import { ContentError } from "@/components/lms/content/ContentError";
 import { cardCls, inputCls, labelCls } from "@/components/lms/content/ui";
 import { btnPrimary, btnSecondary } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { importProfileLabelKey, templateUi } from "@/lib/lms/templates";
-import { ImportReportView } from "./ImportReportView";
+import { ImportReportView, type ExamSectionRef } from "./ImportReportView";
+import { getAssessment } from "@/lib/lms/assessments"; // Phase 7b S7
 import { ImportValidationFields } from "@/components/lms/examTemplates/ImportValidationFields"; // Phase 7b S4
 
 export function ImportPanel() {
@@ -42,6 +43,17 @@ export function ImportPanel() {
   const [attach, setAttach] = useState(false);
   const general = !format;
   // --- Phase 7b S4 end ---
+  // --- Phase 7b S7: the chosen exam's sections, so issues and the attach summary name sections by title ---
+  const [examSections, setExamSections] = useState<ExamSectionRef[] | null>(null);
+  useEffect(() => {
+    if (!validateId) { setExamSections(null); return; }
+    let alive = true;
+    getAssessment(course.id, validateId)
+      .then((a) => { if (alive) setExamSections(a.sections.map((s) => ({ key: s.key, title: s.title }))); })
+      .catch(() => { if (alive) setExamSections(null); /* names fall back to the labels */ });
+    return () => { alive = false; };
+  }, [course.id, validateId]);
+  const examRefs = general && validateId ? examSections : null;
 
   const isZip = !!file && file.name.toLowerCase().endsWith(".zip");
   const canTarget = !!file && !isZip;
@@ -94,7 +106,7 @@ export function ImportPanel() {
   if (result) {
     return (
       <div className="space-y-4">
-        <ImportReportView report={result} done bankBase={bankBase} />
+        <ImportReportView report={result} done bankBase={bankBase} examSections={examRefs} />
         <button type="button" onClick={reset} className={btnSecondary}>{t("bank.import.reset")}</button>
       </div>
     );
@@ -196,7 +208,7 @@ export function ImportPanel() {
 
       {preview && (
         <div className="space-y-4">
-          <ImportReportView report={preview} done={false} bankBase={bankBase} />
+          <ImportReportView report={preview} done={false} bankBase={bankBase} examSections={examRefs} />
           <div className="flex flex-col gap-2 sm:flex-row">
             <button type="button" onClick={() => void run("commit")} disabled={!preview.ok || busy !== null}
               className={`${btnPrimary} flex flex-1 items-center justify-center gap-2`}>

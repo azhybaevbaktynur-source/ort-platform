@@ -23,7 +23,7 @@ from app.core.config import settings
 from app.lms.assessments.rules import normalize_rules
 from app.lms.assessments.schemas import Navigation, ResultsPolicy, ScorePolicy
 from app.lms.content.types import TYPE_NAMES
-from app.lms.content.types.base import validation_details
+from app.lms.content.types.base import VALIDATION_DETAILS_MAX
 from app.lms.core.errors import ValidationFailed
 from app.lms.core.types import localized_text
 from app.lms.exam_templates import ids
@@ -189,6 +189,35 @@ def spec_invalid(details: list[dict]) -> ValidationFailed:
     return ValidationFailed("Invalid exam template", code=ids.E_SPEC_INVALID, details=details)
 
 
+# --- Phase 7b S7 begin --- (UX fix: every `spec_invalid` detail carries a machine `type` (pydantic error types plus
+# the cross-check types below) and, for range / length errors, the numeric `limit`, so the UI translates it.)
+_LIMIT_CTX = ("ge", "gt", "le", "lt", "max_length", "min_length")
+
+
+def _spec_details(exc: ValidationError) -> list[dict]:
+    """`{loc, msg, type[, limit]}` per pydantic error (bounded like `validation_details`)."""
+    errors = exc.errors(include_url=False, include_context=True, include_input=False)
+    out = []
+    for e in errors[:VALIDATION_DETAILS_MAX]:
+        d = {"loc": [str(p) for p in e.get("loc", ())], "msg": str(e.get("msg", "")), "type": str(e.get("type", ""))}
+        ctx = e.get("ctx") or {}
+        for k in _LIMIT_CTX:
+            v = ctx.get(k)
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                d["limit"] = v
+                break
+        out.append(d)
+    if len(errors) > VALIDATION_DETAILS_MAX:
+        left = len(errors) - VALIDATION_DETAILS_MAX
+        out.append({"loc": [], "msg": f"{left} more errors are not shown", "truncated": left, "type": "truncated"})
+    return out
+
+
+_RULE_TYPES = {"must not exceed max_items": "min_exceeds_max", "must be a positive integer": "positive_int",
+               "invalid type list": "invalid_types", "must be a boolean": "bool_type"}
+# --- Phase 7b S7 end ---
+
+
 def _cross_checks(spec: ExamTemplateSpec) -> list[dict]:
     """Rules across fields (4.1, 4.2, 4.6); every problem with its `loc`."""
     out: list[dict] = []
@@ -199,39 +228,48 @@ def _cross_checks(spec: ExamTemplateSpec) -> list[dict]:
         except ValidationFailed as exc:
             for d in exc.details or [{"loc": ["rules"], "msg": exc.message}]:
                 loc = [x for x in d.get("loc", []) if x != "rules"]
-                out.append({"loc": ["sections", i, *loc], "msg": d.get("msg", "invalid")})
+                msg = d.get("msg", "invalid")
+                out.append({"loc": ["sections", i, *loc], "msg": msg, "type": _RULE_TYPES.get(msg, "invalid_rule")})
         if sec.key is not None:
             if sec.key in seen:
-                out.append({"loc": ["sections", i, "key"], "msg": f"duplicate section key {sec.key!r}"})
+                out.append({"loc": ["sections", i, "key"], "msg": f"duplicate section key {sec.key!r}",
+                            "type": "duplicate_key"})
             seen.setdefault(sec.key, i)
         if sec.time_limit_s and spec.navigation != "section_forward_only":
             out.append({"loc": ["sections", i, "time_limit_s"],
-                        "msg": "section timers require navigation section_forward_only"})
+                        "msg": "section timers require navigation section_forward_only",
+                        "type": "timer_needs_forward_only"})
     total = spec.defaults.time_limit_s
     if spec.navigation == "section_forward_only" and total:
         secs = sum(s.time_limit_s for s in spec.sections if s.time_limit_s)
         if secs > total:
             out.append({"loc": ["defaults", "time_limit_s"],
-                        "msg": "section time limits exceed the total time limit"})
+                        "msg": "section time limits exceed the total time limit",
+                        "type": "section_times_exceed_total"})
     pkeys: set[str] = set()
     bound: set[int] = set()
     for j, p in enumerate(spec.parameters):
         if p.key in pkeys:
-            out.append({"loc": ["parameters", j, "key"], "msg": f"duplicate parameter key {p.key!r}"})
+            out.append({"loc": ["parameters", j, "key"], "msg": f"duplicate parameter key {p.key!r}",
+                        "type": "duplicate_key"})
         pkeys.add(p.key)
         idx = p.section_index
         if idx >= len(spec.sections):
-            out.append({"loc": ["parameters", j, "binds"], "msg": "binds a section that does not exist"})
+            out.append({"loc": ["parameters", j, "binds"], "msg": "binds a section that does not exist",
+                        "type": "binds_missing_section"})
             continue
         if idx in bound:
-            out.append({"loc": ["parameters", j, "binds"], "msg": "another parameter binds this section"})
+            out.append({"loc": ["parameters", j, "binds"], "msg": "another parameter binds this section",
+                        "type": "binds_taken"})
         bound.add(idx)
         if spec.sections[idx].key is not None:
-            out.append({"loc": ["sections", idx, "key"], "msg": "a parameter-bound section key must be null"})
+            out.append({"loc": ["sections", idx, "key"], "msg": "a parameter-bound section key must be null",
+                        "type": "bound_key_must_be_empty"})
         clash = [o for o in p.options if o in seen]
         if clash:
             out.append({"loc": ["parameters", j, "options"],
-                        "msg": "options collide with fixed section keys: " + ", ".join(clash)})
+                        "msg": "options collide with fixed section keys: " + ", ".join(clash),
+                        "type": "options_collide"})
     return out
 
 
@@ -271,22 +309,22 @@ def _check_scheme(db: Session, spec: ExamTemplateSpec, owner: SpecOwnerLike) -> 
         if row is not None and not teacher:
             # a teacher's private scheme in a template others can see (P7B-2; shared schemes are Phase 9)
             raise ValidationFailed("Only system grading schemes can be used in shared templates",
-                                   code=ids.E_SCHEME_NOT_SHAREABLE, details=[{"loc": loc, "msg": "not shareable"}])
-        raise spec_invalid([{"loc": loc, "msg": "unknown grading scheme version"}])
+                                   code=ids.E_SCHEME_NOT_SHAREABLE, details=[{"loc": loc, "msg": "not shareable", "type": "not_shareable"}])
+        raise spec_invalid([{"loc": loc, "msg": "unknown grading scheme version", "type": "unknown_scheme"}])
 
 
 def parse_spec(spec_dict: Any) -> ExamTemplateSpec:
     """Shape validation and cross-field rules, no DB (422 `spec_invalid` / `importer_profile_reserved`)."""
     if not isinstance(spec_dict, dict):
-        raise spec_invalid([{"loc": [], "msg": "must be an object"}])
+        raise spec_invalid([{"loc": [], "msg": "must be an object", "type": "dict_type"}])
     if spec_dict.get("importer_profile") == "ort":
         raise ValidationFailed("The ORT importer profile belongs to the ORT course template",
                                code=ids.E_IMPORTER_PROFILE_RESERVED,
-                               details=[{"loc": ["importer_profile"], "msg": "reserved"}])
+                               details=[{"loc": ["importer_profile"], "msg": "reserved", "type": "reserved"}])
     try:
         spec = ExamTemplateSpec.model_validate(spec_dict)
     except ValidationError as exc:
-        raise spec_invalid(validation_details(exc)) from None
+        raise spec_invalid(_spec_details(exc)) from None
     problems = _cross_checks(spec)
     if problems:
         raise spec_invalid(problems)

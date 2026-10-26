@@ -131,6 +131,20 @@ def test_formula_injection_guard(db):
     assert safe_cell("plain") == "plain" and safe_cell("") == ""
 
 
+def test_csv_filename_transliterates_cyrillic():  # Phase 7b S7
+    from types import SimpleNamespace
+
+    from app.lms.exam_templates.import_format import csv_filename
+
+    def name(title, lang):
+        return csv_filename(SimpleNamespace(title=title), 3, lang)
+
+    assert name({"ru": "Контрольная работа №1: механика"}, "ru") == "import-format-kontrolnaia-rabota-1-mekhanika-v3.csv"
+    assert name({"ky": "Жыл аягындагы сынак: Өңүгүү"}, "ky") == "import-format-zhyl-aiagyndagy-synak-onguguu-v3.csv"
+    assert name({"ru": "!!!"}, "ru") == "import-format-template-v3.csv"
+    assert name({"ru": "Щ" * 50}, "ru").isascii()
+
+
 # ------------------------------------------------------------------ the route
 
 async def test_route_json_and_csv(db):
@@ -146,8 +160,8 @@ async def test_route_json_and_csv(db):
     assert res.headers["x-content-type-options"] == "nosniff"
     assert res.content.startswith(b"\xef\xbb\xbf") and rows_of(res.content)[0][:3] == ["section", "type", "stem"]
     assert len(rows_of(res.content)) == 4
-    res = await get(teacher, t, download="csv", lang="ru")      # Cyrillic title: ASCII fallback slug
-    assert 'filename="import-format-template-v1.csv"' in res.headers["content-disposition"]
+    res = await get(teacher, t, download="csv", lang="ru")      # Cyrillic title: transliterated ASCII slug (S7)
+    assert 'filename="import-format-ekzamen-v1.csv"' in res.headers["content-disposition"]
     assert (await get(teacher, t, download="xlsx")).status_code == 422
     assert (await get(teacher, t, download="csv", lang="de")).status_code == 422
     res = await get(teacher, t, version_no=2)

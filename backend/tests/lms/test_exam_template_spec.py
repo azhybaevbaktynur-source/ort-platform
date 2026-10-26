@@ -382,3 +382,42 @@ def test_spec_input_is_not_mutated():
     before = copy.deepcopy(raw)
     parse_spec(raw)
     assert raw == before
+
+
+# --- Phase 7b S7 begin --- (UX fix: `spec_invalid` details carry a machine `type` and the numeric `limit`)
+def _by_loc(exc: ValidationFailed) -> dict:
+    return {tuple(d["loc"]): d for d in exc.details or []}
+
+
+def test_issue_details_carry_type_and_limit():
+    spec = general_spec()
+    spec["defaults"]["time_limit_s"] = 30                              # ge=60
+    spec["sections"][0]["max_items"] = 0                               # ge=1
+    spec["sections"][1]["extra"] = 1                                   # extra="forbid"
+    del spec["sections"][1]["allowed_types"]                           # required
+    spec["navigation"] = "sideways"                                    # literal
+    d = _by_loc(_err(spec))
+    tl, mx = d[("defaults", "time_limit_s")], d[("sections", "0", "max_items")]
+    assert tl["type"] == "greater_than_equal" and tl["limit"] == 60
+    assert mx["type"] == "greater_than_equal" and mx["limit"] == 1
+    assert d[("sections", "1", "extra")]["type"] == "extra_forbidden"
+    assert d[("sections", "1", "allowed_types")]["type"] == "missing"
+    assert d[("navigation",)]["type"] == "literal_error" and "limit" not in d[("navigation",)]
+    assert all(set(x) <= {"loc", "msg", "type", "limit"} for x in d.values())
+
+
+def test_cross_check_details_carry_type():
+    spec = general_spec()
+    spec["sections"][1]["key"] = "part_a"
+    spec["sections"][0]["time_limit_s"] = 600
+    spec["sections"][0]["min_items"] = 11                              # max_items is 10
+    d = _by_loc(_err(spec))
+    assert d[("sections", 1, "key")]["type"] == "duplicate_key"
+    assert d[("sections", 0, "time_limit_s")]["type"] == "timer_needs_forward_only"
+    assert d[("sections", 0, "min_items")]["type"] == "min_exceeds_max"
+    spec = general_spec(navigation="section_forward_only")
+    spec["sections"][0]["time_limit_s"] = spec["sections"][1]["time_limit_s"] = 3000
+    assert _by_loc(_err(spec))[("defaults", "time_limit_s")]["type"] == "section_times_exceed_total"
+    spec = general_spec(parameters=[_param()])
+    assert _by_loc(_err(spec))[("sections", 0, "key")]["type"] == "bound_key_must_be_empty"
+# --- Phase 7b S7 end ---
