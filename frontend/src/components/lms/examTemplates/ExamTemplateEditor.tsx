@@ -113,14 +113,15 @@ export function ExamTemplateEditor({ area, templateId, crumbs }: {
     return () => { alive = false; };
   }, []);
 
-  const fetchVersions = useCallback((cursor: string | null) => listExamTemplateVersions(templateId, { cursor, limit: 20 }), [templateId]);
+  const fetchVersions = useCallback(() => listExamTemplateVersions(templateId), [templateId]);
   const versions = useCursorList(fetchVersions);
   const vState = useTableState(versions);
 
   const name = tpl ? pickLocalized(tpl.title, lang) || t("examTemplates.untitled") : "";
   const readOnly = !tpl || tpl.status === "archived" || (area.kind === "org" && !!area.readOnly);
-  const canLock = !!tpl && (area.kind === "platform" || (area.kind === "org" ? tpl.owner_scope === "organization" : tpl.owner_scope === "teacher"));
-  const canPromote = !!tpl && area.kind !== "teacher" && tpl.owner_scope === "teacher";
+  // S5: the server says who may lock (the owner) and promote (org admin of a teacher template's organization).
+  const canLock = !!tpl?.can_lock;
+  const canPromote = !!tpl?.can_promote;
   const hasDraft = !!tpl?.draft_spec;
 
   const update = <K extends keyof Form>(k: K, v: Form[K]) => {
@@ -178,7 +179,8 @@ export function ExamTemplateEditor({ area, templateId, crumbs }: {
     setActionBusy(true);
     setActionError(null);
     try {
-      const out = a === "publish" ? await publishExamTemplate(tpl.id)
+      const published = a === "publish" ? await publishExamTemplate(tpl.id) : null;
+      const out = published ? published.template
         : a === "archive" ? await archiveExamTemplate(tpl.id)
           : a === "lock" ? await lockExamTemplate(tpl.id, reason)
             : a === "unlock" ? await unlockExamTemplate(tpl.id, reason)
@@ -186,7 +188,9 @@ export function ExamTemplateEditor({ area, templateId, crumbs }: {
       await seed(out);
       setAction(null);
       if (a === "publish") void versions.reload();
-      toast.success(a === "publish" ? t("examTemplates.publish.done", { n: out.current_version_no ?? 1 }) : t(`examTemplates.${a}.done`));
+      toast.success(published
+        ? t(published.unchanged ? "examTemplates.publish.unchanged" : "examTemplates.publish.done", { n: published.version.version_no })
+        : t(`examTemplates.${a}.done`));
     } catch (e) {
       setActionError(e);
       if (a === "publish") setIssues(specIssuesOf(e));

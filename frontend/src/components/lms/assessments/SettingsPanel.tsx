@@ -196,7 +196,7 @@ export function SettingsPanel({
         {check("as-shuf-c", t("assessments.settings.shuffleChoices"), shuffleChoices, setShuffleChoices)}
       </div>
       <SettingsPanelGrading courseId={courseId} assessmentId={a.id} value={grading} onChange={setGrading}
-        currentScheme={a.scheme} defaultLanguage={defaultLanguage} disabled={disabled} schemeLocked={tplLocked} />
+        currentScheme={a.scheme} defaultLanguage={defaultLanguage} disabled={disabled} schemeLocked={tplLocked || examLocks.has("grading_scheme_version_id") /* Phase 7b S5 */} />
       {/* --- Phase 7b S4 --- */}
       {examLockNames.length > 0 && (
         <p role="note" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">

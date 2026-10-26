@@ -42,7 +42,7 @@ export function TemplateBadge({ assessment, courseId, canEdit, onChanged }: {
     setError(null);
     try {
       const out = await upgradeAssessmentTemplate(courseId, a.id);
-      const found = Array.isArray(out?.issues) ? out.issues : [];
+      const found = out.issues ?? [];
       setIssues(found);
       setConfirm(false);
       toast.success(t("examTemplates.upgrade.done", { n: ref.latest_version_no ?? ref.version_no }));

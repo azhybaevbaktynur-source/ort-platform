@@ -76,9 +76,10 @@ export function AssignmentEditorDialog({ open, onCreated, onCancel }: {
     setBusy(true);
     setError(null);
     try {
-      // Phase 7b S4: a template replaces the preset (preset_template_exclusive)
+      // Phase 7b S4: a template replaces the preset (preset_template_exclusive). S5: the assignments route refuses any
+      // `preset` next to exam_template_* (even "none"), so the template body carries no preset at all.
       const quiz: QuizCreateIn & TemplateCreateFields = picker.active
-        ? { preset: "none", languages, ...picker.fields() }
+        ? { languages, ...picker.fields() }
         : { preset, languages, ...(preset === "ort_subject" ? { subject_key: subject } : {}) };
       const out = await createAssignment(course.id, kind === "quiz"
         ? { kind, title: cleaned, quiz }

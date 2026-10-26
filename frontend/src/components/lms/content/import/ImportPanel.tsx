@@ -150,7 +150,14 @@ export function ImportPanel() {
         {/* --- Phase 7b S4 --- */}
         {general && (
           <ImportValidationFields courseId={course.id} value={validateId} attach={attach} disabled={busy !== null}
-            onChange={(id, att) => { setValidateId(id); setAttach(att); invalidate(); }} />
+            onChange={(id, att, langs) => {
+              setValidateId(id); setAttach(att); invalidate();
+              // S5: questions are attached only in the exam's languages; default the import language to one of them
+              if (langs && langs.length && !langs.includes(language)) {
+                const next = langs.find((l) => course.languages.includes(l as Lang));
+                if (next) setLanguage(next as Lang);
+              }
+            }} />
         )}
 
         <div>

@@ -87,8 +87,9 @@ export function SaveAsTemplateDialog({ open, assessment, courseId, onClose }: {
     if (!valid) return;
     setBusy(true);
     setError(null);
+    // S5: the backend's `position` is the 1-based ordinal of the section (index + 1), not the row's position value.
     const sections_counts: SectionCountsIn[] = a.sections
-      .map((s) => ({ position: s.position, min_items: parseCount(counts[s.position]?.min ?? ""), max_items: parseCount(counts[s.position]?.max ?? "") }))
+      .map((s, i) => ({ position: i + 1, min_items: parseCount(counts[s.position]?.min ?? ""), max_items: parseCount(counts[s.position]?.max ?? "") }))
       .filter((c) => c.min_items !== null || c.max_items !== null);
     try {
       const out = await saveAsTemplate(courseId, a.id, {

@@ -7,6 +7,7 @@ import { addSection, deleteSection, getAssessment, reorderSections, updateSectio
 import { isStaffAssessment, type AssessmentStaffOut, type SectionIn, type SectionOut } from "@/lib/lms/assessmentTypes";
 import { pickLocalized } from "@/lib/lms/localized";
 import { isAssessmentLocked, useTemplateUi } from "@/lib/lms/templates";
+import { templateLockedFields } from "@/lib/lms/assessmentTypes"; // Phase 7b S5
 import { useCourse } from "@/components/lms/CourseContext";
 import { StaffGate, useCanEditContent } from "@/components/lms/content/StaffGate";
 import { useTabCrumbs } from "@/components/lms/course/StaffCourseUi"; // Phase 6b S5c
@@ -63,7 +64,13 @@ function Builder() {
   const sectionIds = a?.sections.map((s) => s.id) ?? [];
   const moveSection = (from: number, to: number) => void reorder(moveIndex(sectionIds, from, to));
   // --- Phase 6 S4b: a locked course template fixes the sections (add, delete, reorder), design §5.4 ---
-  const structureLocked = !!a && isAssessmentLocked(ui, a.preset);
+  const courseLocked = !!a && isAssessmentLocked(ui, a.preset);
+  // --- Phase 7b S5: a locked exam template fixes the sections too (empty set for blank and preset exams) ---
+  const examLocks = a ? templateLockedFields(a) : new Set<string>();
+  const examStructureLocked = examLocks.has("section_add_remove") || examLocks.has("section_order");
+  const structureLocked = courseLocked || examStructureLocked;
+  const lockedNote = courseLocked ? t("templates.lockedNote") : t("examTemplates.lockedSections");
+  // --- Phase 7b S5 end ---
   const drag = useDragReorder(moveSection, canEdit && !structureLocked);
   const aTitle = a ? pickLocalized(a.title, lang, course.default_language) || t("assessments.untitled") : "";
   const crumbs = useTabCrumbs("assessments", [
@@ -110,7 +117,7 @@ function Builder() {
 
   const title = aTitle;
   const addSectionBtn = canEdit ? (
-    <Button variant="secondary" disabled={structureLocked} title={structureLocked ? t("templates.lockedNote") : undefined}
+    <Button variant="secondary" disabled={structureLocked} title={structureLocked ? lockedNote : undefined}
       onClick={() => { setSecError(null); setSectionDlg({ section: null }); }}>{t("assessments.section.add")}</Button>
   ) : undefined;
   return (
@@ -131,7 +138,7 @@ function Builder() {
         <h2 className="text-lg font-semibold text-slate-900">{t("assessments.builder.sections")}</h2>
         {addSectionBtn}
       </div>
-      {canEdit && structureLocked && <p role="note" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{t("templates.lockedNote")}</p>}
+      {canEdit && structureLocked && <p role="note" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{lockedNote}</p>}
       <AssessmentError error={actionError} />
       {a.sections.length === 0 && <EmptyState title={t("assessments.builder.noSections")} action={addSectionBtn} />}
       <div className="space-y-4">

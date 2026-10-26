@@ -5,8 +5,8 @@ import { LmsApiError, lmsFetch } from "./client";
 import type { Lang, PageOut } from "./types";
 import type { AssessmentStaffOut, Issue } from "./assessmentTypes";
 import type {
-  BlocksOut, ExamTemplateCreateIn, ExamTemplateListParams, ExamTemplateOut, ExamTemplatePatchIn, ExamTemplateVersionOut,
-  ImportFormatOut, SaveAsTemplateIn,
+  BlocksOut, ExamTemplateCreateIn, ExamTemplateListParams, ExamTemplateOut, ExamTemplatePatchIn, ExamTemplatePublishOut,
+  ExamTemplateVersionOut, ImportFormatOut, SaveAsTemplateIn,
 } from "./examTemplateTypes";
 
 const e = encodeURIComponent;
@@ -21,7 +21,8 @@ export const createExamTemplate = (body: ExamTemplateCreateIn) => lmsFetch<ExamT
 export const getExamTemplate = (id: string) => lmsFetch<ExamTemplateOut>(one(id));
 export const patchExamTemplate = (id: string, body: ExamTemplatePatchIn) =>
   lmsFetch<ExamTemplateOut>(one(id), { method: "PATCH", body });
-export const publishExamTemplate = (id: string) => lmsFetch<ExamTemplateOut>(`${one(id)}/publish`, { method: "POST", body: {} });
+/** Returns `{template, version, unchanged}` (S5: the backend shape; `unchanged` = identical draft, no new version). */
+export const publishExamTemplate = (id: string) => lmsFetch<ExamTemplatePublishOut>(`${one(id)}/publish`, { method: "POST", body: {} });
 export const archiveExamTemplate = (id: string) => lmsFetch<ExamTemplateOut>(`${one(id)}/archive`, { method: "POST", body: {} });
 export const lockExamTemplate = (id: string, reason: string) =>
   lmsFetch<ExamTemplateOut>(`${one(id)}/lock`, { method: "POST", body: reason ? { reason } : {} });
@@ -29,8 +30,9 @@ export const unlockExamTemplate = (id: string, reason: string) =>
   lmsFetch<ExamTemplateOut>(`${one(id)}/unlock`, { method: "POST", body: reason ? { reason } : {} });
 export const promoteExamTemplate = (id: string) => lmsFetch<ExamTemplateOut>(`${one(id)}/promote`, { method: "POST", body: {} });
 
-export const listExamTemplateVersions = (id: string, opts: { cursor?: string | null; limit?: number } = {}) =>
-  lmsFetch<PageOut<ExamTemplateVersionOut>>(`${one(id)}/versions`, { params: { cursor: opts.cursor, limit: opts.limit } });
+/** The backend returns every version as a plain list (newest first); wrapped as one page for the cursor lists. */
+export const listExamTemplateVersions = (id: string): Promise<PageOut<ExamTemplateVersionOut>> =>
+  lmsFetch<ExamTemplateVersionOut[]>(`${one(id)}/versions`).then((items) => ({ items, next_cursor: null }));
 export const getExamTemplateVersion = (id: string, versionNo: number) =>
   lmsFetch<ExamTemplateVersionOut>(`${one(id)}/versions/${e(String(versionNo))}`);
 export const getImportFormat = (id: string, versionNo: number) =>
@@ -77,9 +79,9 @@ export const saveAsTemplate = (courseId: string, assessmentId: string, body: Sav
   lmsFetch<ExamTemplateOut>(`${asm(courseId, assessmentId)}/save-as-template`, { method: "POST", body });
 
 /** Upgrade a draft without attempts to the template's latest version; rules violations come back as issues. */
-export interface TemplateUpgradeOut extends Partial<AssessmentStaffOut> {
-  assessment?: AssessmentStaffOut;
-  issues?: Issue[];
+export interface TemplateUpgradeOut {
+  assessment: AssessmentStaffOut;
+  issues: Issue[];
 }
 export const upgradeAssessmentTemplate = (courseId: string, assessmentId: string) =>
   lmsFetch<TemplateUpgradeOut>(`${asm(courseId, assessmentId)}/template-upgrade`, { method: "POST", body: {} });

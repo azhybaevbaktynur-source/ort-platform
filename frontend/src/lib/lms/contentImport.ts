@@ -39,6 +39,16 @@ export interface ImportBankSummary {
   images: number;
 }
 
+// --- Phase 7b S5 --- (`ImportResult.attached` of the backend: the commit-only attach step)
+export interface ImportAttachSummary {
+  assessment_id: string;
+  added: number;
+  /** section label -> questions added */
+  sections: Record<string, number>;
+  /** skip code (item_duplicate, too_many_items, ...) -> count */
+  skipped: Record<string, number>;
+}
+
 export interface ImportReport {
   ok: boolean;
   committed: boolean;
@@ -48,6 +58,7 @@ export interface ImportReport {
   images_total: number;
   images_new: number;
   images_existing: number;
+  attached?: ImportAttachSummary | null; // Phase 7b S5
 }
 
 export interface ImportParams {

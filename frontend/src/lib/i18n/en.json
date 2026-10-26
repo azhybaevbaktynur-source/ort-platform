@@ -953,16 +953,21 @@
         "storage_error": "The images could not be saved to storage",
         "database_error": "The questions could not be saved, nothing was imported",
         "too_many_issues": "Showing {shown} issues. In total: {errors_total} errors and {warnings_total} warnings.",
-        "section_not_in_template": "The section of a row is not in the template.",
-        "type_not_allowed_in_section": "This question type is not allowed in that section.",
+        "section_not_in_template": "Section \"{section}\" is not a section of the exam template. Use a section name or key from the import format.",
+        "type_not_allowed_in_section": "Type \"{type}\" is not allowed in section \"{section}\". Allowed: {allowed}.",
         "passage_not_allowed": "That section does not allow reading passages.",
         "type_required": "Give the question type: the section allows several.",
-        "count_below_min": "A section has fewer questions than the template asks for.",
-        "count_above_max": "A section has more questions than the template allows.",
+        "count_below_min": "Section \"{section}\" has {count} questions in this file; the template asks for at least {min}.",
+        "count_above_max": "Section \"{section}\" has {count} questions in this file; the template allows at most {max}.",
         "attach_target_mismatch": "The questions can only be added to a draft made from the same template version.",
         "format_mismatch": "This file does not match the chosen format (for example an ORT file in the general format). Choose the other format.",
         "not_a_template_assessment": "This assessment was not created from a template.",
-        "unknown_column": "Unknown column: it is ignored."
+        "unknown_column": "Unknown column: it is ignored.",
+        "csv_header_duplicate": "This column appears twice in the header. Keep one.",
+        "external_id_missing": "{count} rows have no external_id: they are added again on every re-import.",
+        "passage_ref_unknown": "passage_ref \"{passage_ref}\" does not name a row with passage_text.",
+        "type_unknown": "Unknown question type \"{type}\".",
+        "attach_skipped": "Some questions were saved to the bank but not added to the exam (see the reasons above)."
       }
     }
   },
@@ -3352,7 +3357,8 @@
       "action": "Publish",
       "title": "Publish the template?",
       "effect": "The draft becomes version v{n}. New exams use it; exams made earlier keep their version.",
-      "done": "Published as v{n}."
+      "done": "Published as v{n}.",
+      "unchanged": "Nothing changed since v{n}: no new version."
     },
     "archive": {
       "action": "Archive",
@@ -3388,7 +3394,10 @@
       "validateHint": "Rows are checked against the sections and rules of this draft exam's template.",
       "noValidation": "Don't check",
       "attach": "Add the imported questions to this exam",
-      "attachHint": "Each question goes to the section named in its row. Nothing is saved if anything fails."
+      "attachHint": "Each question goes to the section named in its row. Nothing is saved if anything fails.",
+      "attached": "{count} questions were added to the exam.",
+      "attachedSkipped": "Not added: {count}. Reasons:",
+      "openExam": "Open the exam"
     },
     "noAccess": {
       "title": "Exam templates are for teachers",
@@ -3430,6 +3439,8 @@
       "sections": "Sections",
       "importFormat": "Import format",
       "empty": "No published versions yet. Publish the draft to create v1."
-    }
+    },
+    "lockedSections": "The sections are fixed by the exam template: you can add questions, but not add, remove or reorder sections.",
+    "lockedSectionFields": "Some fields of this section are fixed by the exam template (greyed out). Titles and instructions stay editable."
   }
 }

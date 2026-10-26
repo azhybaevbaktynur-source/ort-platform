@@ -63,7 +63,6 @@ export interface ExamTemplateOut {
   id: string;
   owner_scope: ExamTemplateScope;
   organization_id: string | null;
-  organization_name?: string | null;
   title: LocalizedText;
   description: LocalizedText | null;
   status: ExamTemplateStatus;
@@ -77,6 +76,21 @@ export interface ExamTemplateOut {
   current_spec?: ExamTemplateSpec | null;
   created_at: string;
   updated_at: string;
+  /** Management payloads only (`ExamTemplateOut` of the backend; absent in picker rows). */
+  owner_user_id?: string | null;
+  key?: string | null;
+  created_by_id?: string | null;
+  /** The caller is the template's owner (lock / unlock). */
+  can_lock?: boolean;
+  /** Teacher template and the caller administers its organization (promote). */
+  can_promote?: boolean;
+}
+
+/** `POST /exam-templates/{id}/publish`: `unchanged` when the draft equals the current version (nothing published). */
+export interface ExamTemplatePublishOut {
+  template: ExamTemplateOut;
+  version: ExamTemplateVersionOut;
+  unchanged: boolean;
 }
 
 export interface ExamTemplateVersionOut {
@@ -87,6 +101,7 @@ export interface ExamTemplateVersionOut {
   spec_hash: string;
   grading_scheme_version_id: string | null;
   published_at: string;
+  published_by_id?: string | null;
 }
 
 export interface ExamTemplateCreateIn {
@@ -121,9 +136,12 @@ export interface BlockQuestionTypeOut {
   import_columns: string[];
 }
 export interface BlockSchemeVersionOut {
+  /** The scheme's current version id (what `scoring.grading_scheme_version_id` takes). */
   id: string;
+  scheme_id: string;
   title: LocalizedText | string;
   type: string;
+  version_no: number;
   scope: "system" | "mine";
 }
 export interface BlocksOut {
@@ -133,14 +151,18 @@ export interface BlocksOut {
   display_modes: string[];
   navigations: string[];
   importer_profiles: string[];
+  lock_scope_keys: string[];
   scheme_versions: BlockSchemeVersionOut[];
 }
 
 // ---- Import format (design 8) ----
 export interface ImportFormatSectionOut {
-  key: string | null;
-  title: LocalizedText | null;
+  /** 0-based order of the template's sections. */
   position: number;
+  key: string | null;
+  /** Parameter options when the key is chosen at create (any of them is accepted in the `section` column). */
+  options: string[];
+  title: LocalizedText | null;
   allowed_types: string[];
   allow_passages: boolean;
   min_items: number | null;
@@ -149,13 +171,18 @@ export interface ImportFormatSectionOut {
 }
 export interface ImportFormatOut {
   template_id: string;
+  version_id: string;
   version_no: number;
+  format: string;
+  format_version: number;
   header: string[];
+  passage_columns: string[];
   sections: ImportFormatSectionOut[];
 }
 
 // ---- Assessment-bound actions (design 5.5, 9.1) ----
 export interface SectionCountsIn {
+  /** 1-based ordinal of the section in the exam (the n-th section). */
   position: number;
   min_items?: number | null;
   max_items?: number | null;
