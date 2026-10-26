@@ -42,6 +42,9 @@ from app.lms.assignments import sync as assignment_sync  # --- Phase 7a S1 --- (
 from app.lms.templates import base as tpl_fields
 from app.lms.templates import service as tpl
 # --- Phase 6 S2b end ---
+# --- Phase 7b S2 begin --- (exam template structure locks wrap the 6a guard, PHASE_7B_DESIGN 5.4)
+from app.lms.exam_templates import locks as _locks
+# --- Phase 7b S2 end ---
 
 _ZERO = Decimal("0")
 
@@ -66,6 +69,23 @@ def _commit(db: Session, a: Assessment) -> None:
 
 def create_assessment(db: Session, ctx: AuthzContext, course: Course, data: sch.AssessmentCreateIn) -> Assessment:
     require_course(ctx, A.CONTENT_MANAGE, course)
+    # --- Phase 7b S2 begin --- (PHASE_7B_DESIGN 5.3 / 9.1: the template branch; `preset` and a template never mix.
+    # The ORT preset path below is untouched: a template assessment always has preset 'none'.)
+    if data.exam_template_id is not None or data.exam_template_version_id is not None:
+        if data.preset != "none":
+            raise ValidationFailed("preset and exam_template_* are mutually exclusive",
+                                   code="preset_template_exclusive",
+                                   details=[{"loc": ["preset"], "msg": "mutually exclusive with exam_template_*"}])
+        from app.lms.exam_templates import instantiate as _inst
+
+        tpl.assert_preset_allowed(course, "none")  # Phase 7b S6 (security review): a template exam is preset none
+        _t, version = _inst.resolve_version(db, ctx, course, template_id=data.exam_template_id,
+                                            version_id=data.exam_template_version_id)
+        a = _inst.instantiate(db, ctx, course, version, data.parameters or {}, title=data.title,
+                              description=data.description, languages=list(data.languages))
+        db.commit()
+        return a
+    # --- Phase 7b S2 end ---
     # --- Phase 6 S2b begin --- (course template guard, PHASE_6_DESIGN 5.2)
     tpl.assert_preset_allowed(course, data.preset)
     # --- Phase 6 S2b end ---
@@ -117,10 +137,11 @@ def update_assessment(db: Session, ctx: AuthzContext, course: Course, aid: uuid.
         a.access_code_hash = hash_access_code(data.access_code) if data.access_code is not None else None
     # --- Phase 7a S4 end ---
     # --- Phase 6 S2b begin --- (course template guard, PHASE_6_DESIGN 5.4)
+    # --- Phase 7b S2 --- (the exam-template lock wraps the 6a guard; preset exams take the 6a branch only)
     if "navigation" in fields and data.navigation != a.navigation:
-        tpl.assert_not_locked(course, tpl_fields.LOCK_NAVIGATION, preset=a.preset, actor_id=ctx.user.id)
+        _locks.assert_structure_unlocked(db, course, a, tpl_fields.LOCK_NAVIGATION, actor_id=ctx.user.id)
     if "grading_scheme_version_id" in fields and data.grading_scheme_version_id != a.grading_scheme_version_id:
-        tpl.assert_not_locked(course, tpl_fields.LOCK_SCHEME_VERSION, preset=a.preset, actor_id=ctx.user.id)
+        _locks.assert_structure_unlocked(db, course, a, tpl_fields.LOCK_SCHEME_VERSION, actor_id=ctx.user.id)
     # --- Phase 6 S2b end ---
     if "languages" in fields and set(data.languages) - set(course.languages or []):
         raise ValidationFailed("Languages must be a subset of the course languages", code="languages_not_in_course")
@@ -206,7 +227,8 @@ def add_section(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID,
                 data: sch.SectionIn) -> AssessmentSection:
     a = _manage(db, ctx, course, aid)
     # --- Phase 6 S2b begin --- (course template guard, PHASE_6_DESIGN 5.4)
-    tpl.assert_not_locked(course, tpl_fields.LOCK_SECTION_ADD_REMOVE, preset=a.preset, actor_id=ctx.user.id)
+    # --- Phase 7b S2 --- (exam-template lock wraps the 6a guard)
+    _locks.assert_structure_unlocked(db, course, a, tpl_fields.LOCK_SECTION_ADD_REMOVE, actor_id=ctx.user.id)
     # --- Phase 6 S2b end ---
     sections = repo.load_sections(db, a.id)
     if len(sections) >= settings.ASSESSMENT_MAX_SECTIONS:
@@ -230,14 +252,15 @@ def update_section(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUI
     if "key" in fields and old_lock is not None and data.key != s.key:
         raise ValidationFailed("The ORT preset fixes the key of this section", code="preset_rule_locked")
     # --- Phase 6 S2b begin --- (course template guard, PHASE_6_DESIGN 5.4)
+    # --- Phase 7b S2 --- (exam-template lock wraps the 6a guard; unchanged values still pass)
     if "key" in fields and data.key != s.key:
-        tpl.assert_not_locked(course, tpl_fields.LOCK_SECTION_KEY, preset=a.preset, actor_id=ctx.user.id)
+        _locks.assert_structure_unlocked(db, course, a, tpl_fields.LOCK_SECTION_KEY, actor_id=ctx.user.id)
     if "time_limit_s" in fields and data.time_limit_s != s.time_limit_s:
-        tpl.assert_not_locked(course, tpl_fields.LOCK_SECTION_TIME_LIMIT, preset=a.preset, actor_id=ctx.user.id)
-    if ("rules" in fields and tpl.is_locked(course, tpl_fields.LOCK_SECTION_RULES, preset=a.preset,
-                                            actor_id=ctx.user.id)
+        _locks.assert_structure_unlocked(db, course, a, tpl_fields.LOCK_SECTION_TIME_LIMIT, actor_id=ctx.user.id)
+    if ("rules" in fields and _locks.is_structure_locked(db, course, a, tpl_fields.LOCK_SECTION_RULES,
+                                                         actor_id=ctx.user.id)
             and _section_rules(a, data.key if "key" in fields else s.key, data.rules) != dict(s.rules or {})):
-        tpl.assert_not_locked(course, tpl_fields.LOCK_SECTION_RULES, preset=a.preset, actor_id=ctx.user.id)
+        _locks.assert_structure_unlocked(db, course, a, tpl_fields.LOCK_SECTION_RULES, actor_id=ctx.user.id)
     # --- Phase 6 S2b end ---
     if "key" in fields:
         s.key = data.key
@@ -257,7 +280,8 @@ def delete_section(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUI
     a = _manage(db, ctx, course, aid)
     s = repo.load_section(db, a.id, section_id)
     # --- Phase 6 S2b begin --- (course template guard, PHASE_6_DESIGN 5.4)
-    tpl.assert_not_locked(course, tpl_fields.LOCK_SECTION_ADD_REMOVE, preset=a.preset, actor_id=ctx.user.id)
+    # --- Phase 7b S2 --- (exam-template lock wraps the 6a guard)
+    _locks.assert_structure_unlocked(db, course, a, tpl_fields.LOCK_SECTION_ADD_REMOVE, actor_id=ctx.user.id)
     # --- Phase 6 S2b end ---
     if db.execute(select(AssessmentItem.id).where(AssessmentItem.section_id == s.id).limit(1)).first():
         raise Conflict("The section still has items", code="section_not_empty")
@@ -274,8 +298,8 @@ def reorder_sections(db: Session, ctx: AuthzContext, course: Course, aid: uuid.U
     if len(section_ids) != len(set(section_ids)) or {s.id for s in sections} != set(section_ids):
         raise ValidationFailed("section_ids must be exactly the current sections", code="order_mismatch")
     # --- Phase 6 S2b begin --- (course template guard, PHASE_6_DESIGN 5.4)
-    if [x.id for x in sections] != list(section_ids):
-        tpl.assert_not_locked(course, tpl_fields.LOCK_SECTION_ORDER, preset=a.preset, actor_id=ctx.user.id)
+    if [x.id for x in sections] != list(section_ids):  # --- Phase 7b S2 --- (exam-template lock wraps 6a)
+        _locks.assert_structure_unlocked(db, course, a, tpl_fields.LOCK_SECTION_ORDER, actor_id=ctx.user.id)
     # --- Phase 6 S2b end ---
     by_id = {s.id: s for s in sections}
     _renumber([by_id[i] for i in section_ids])
@@ -457,6 +481,22 @@ def add_items_bulk(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUI
         qs = [r[0] for r in rows]
         if f and f.tags and len(f.tags) > 1:
             qs = [q for q in qs if all(t in (q.tags or []) for t in f.tags)]
+    # --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 8: the loop lives in _add_questions; attach_questions reuses it)
+    added = _add_questions(db, a, sec, qs, skipped, points=data.points, group_passages=data.group_passages)
+    # --- Phase 7b S1 end ---
+    if added:
+        _commit(db, a)
+    else:
+        db.commit()
+    return sch.BulkAddOut(added=added, skipped=skipped)
+
+
+# --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 8: shared by add_items_bulk (commits) and attach_questions (flush only))
+def _add_questions(db: Session, a: Assessment, sec: AssessmentSection, qs: list[BankQuestion],
+                   skipped: list[sch.SkippedOut], *, points: Optional[Decimal], group_passages: bool) -> int:
+    """Adds `qs` (in order) to `sec`: duplicates, rule/language violations and caps go to `skipped`; consecutive
+    questions of one passage are grouped under its header when `group_passages`. Flushes, never commits; returns the
+    number of questions added."""
     taken = _existing_question_ids(db, a.id)
     groups = list({q.translation_group_id for q in qs if q.translation_group_id})
     members = _load_group_members(db, a.course_id, groups, list(a.languages)) if groups else {}
@@ -486,9 +526,9 @@ def add_items_bulk(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUI
         if total + added >= settings.ASSESSMENT_MAX_ITEMS or (mx and sec_n + added >= mx):
             skipped.append(sch.SkippedOut(question_id=q.id, code="too_many_items"))
             continue
-        pts = data.points if data.points is not None else defaults.get(q.current_version_id, Decimal("1"))
+        pts = points if points is not None else defaults.get(q.current_version_id, Decimal("1"))
         parent = None
-        if data.group_passages and allow_passages and q.passage_id is not None:
+        if group_passages and allow_passages and q.passage_id is not None:
             if q.passage_id == last_pid and last_header is not None:
                 parent = last_header
             else:
@@ -519,11 +559,32 @@ def add_items_bulk(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUI
         taken.add(q.id)
         added += 1
     _flush_unique(db)
+    return added
+
+
+def attach_questions(db: Session, ctx: AuthzContext, course: Course, assessment: Assessment,
+                     section: AssessmentSection, question_ids: list[uuid.UUID]) -> sch.BulkAddOut:
+    """Adds course questions to a section of a draft assessment inside the caller's transaction (the import attach
+    step, PHASE_7B_DESIGN 8): same rules as `add_items_bulk` (default points, passages grouped), flush only; bumps
+    `draft_rev` when something was added. The caller checks the target (draft, same course, template version)."""
+    require_course(ctx, A.CONTENT_MANAGE, course)
+    if assessment.course_id != course.id or section.assessment_id != assessment.id:
+        raise NotFound("Assessment not found", code="assessment_not_found")
+    skipped: list[sch.SkippedOut] = []
+    ids = list(dict.fromkeys(question_ids))
+    found = _load_course_questions(db, course.id, ids)
+    qs = []
+    for i in ids:
+        if i in found:
+            qs.append(found[i])
+        else:
+            skipped.append(sch.SkippedOut(question_id=i, code="question_not_found"))
+    added = _add_questions(db, assessment, section, qs, skipped, points=None, group_passages=True)
     if added:
-        _commit(db, a)
-    else:
-        db.commit()
+        assessment.draft_rev += 1
+        db.flush()
     return sch.BulkAddOut(added=added, skipped=skipped)
+# --- Phase 7b S1 end ---
 
 
 def _block(db: Session, item: AssessmentItem) -> list[AssessmentItem]:
@@ -741,7 +802,9 @@ def staff_summaries(db: Session, assessments: list[Assessment]) -> list[sch.Asse
     totals = repo.draft_totals(db, ids)
     counts = repo.attempt_counts(db, ids)
     vnos = _version_nos(db, assessments)
-    return [sch.AssessmentStaffSummaryOut(**_summary_fields(a, totals, counts, vnos)) for a in assessments]
+    refs = exam_template_refs(db, assessments)  # --- Phase 7b S2 ---
+    return [sch.AssessmentStaffSummaryOut(**_summary_fields(a, totals, counts, vnos), exam_template=refs.get(a.id))
+            for a in assessments]
 
 
 def staff_out(db: Session, a: Assessment) -> sch.AssessmentStaffOut:
@@ -762,7 +825,60 @@ def staff_out(db: Session, a: Assessment) -> sch.AssessmentStaffOut:
         due_at=utc(a.due_at), grade_release=a.grade_release or "auto", omit_from_total=bool(a.omit_from_total),
         scheme=sch.scheme_ref(briefs.get(a.grading_scheme_version_id)), sections=sec_outs,
         warnings=warnings,
+        # --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 9.1)
+        exam_template=exam_template_ref(db, a), display_mode=a.display_mode or "one_per_page",
+        passage_display=a.passage_display, result_view=a.result_view, structure_locked=bool(a.structure_locked),
+        # --- Phase 7b S1 end ---
     )
+
+
+# --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 9.1)
+def exam_template_ref(db: Session, a: Assessment) -> Optional[sch.ExamTemplateRefOut]:
+    """The template version an assessment was created from (None for blank and preset exams); `locked_fields` are
+    the course-template lock names its version locks while `structure_locked` is set."""
+    if a.exam_template_version_id is None:
+        return None
+    from app.lms.exam_templates.ids import expand_lock_scope
+    from app.lms.exam_templates.models import ExamTemplate, ExamTemplateVersion
+
+    v = db.get(ExamTemplateVersion, a.exam_template_version_id)
+    t = db.get(ExamTemplate, v.template_id) if v is not None else None
+    if v is None or t is None:
+        return None
+    latest = db.get(ExamTemplateVersion, t.current_version_id) if t.current_version_id else None
+    locked = sorted(expand_lock_scope((v.spec or {}).get("lock_scope"))) if a.structure_locked else []
+    return sch.ExamTemplateRefOut(template_id=t.id, title=t.title, version_no=v.version_no, version_id=v.id,
+                                  latest_version_no=latest.version_no if latest else None, locked_fields=locked,
+                                  template_locked=bool(t.locked))  # Phase 7b S6
+# --- Phase 7b S1 end ---
+
+
+# --- Phase 7b S2 begin --- (the same reference for list rows, two queries for the page)
+def exam_template_refs(db: Session, assessments: list[Assessment]) -> dict[uuid.UUID, sch.ExamTemplateRefOut]:
+    from app.lms.exam_templates.ids import expand_lock_scope
+    from app.lms.exam_templates.models import ExamTemplate, ExamTemplateVersion
+
+    vids = list({a.exam_template_version_id for a in assessments if a.exam_template_version_id is not None})
+    if not vids:
+        return {}
+    versions = {v.id: v for v in db.execute(select(ExamTemplateVersion).where(ExamTemplateVersion.id.in_(vids))).scalars()}
+    tids = list({v.template_id for v in versions.values()})
+    templates = {t.id: t for t in db.execute(select(ExamTemplate).where(ExamTemplate.id.in_(tids))).scalars()}
+    latest_ids = [t.current_version_id for t in templates.values() if t.current_version_id]
+    latest_nos = dict(db.execute(select(ExamTemplateVersion.id, ExamTemplateVersion.version_no).where(
+        ExamTemplateVersion.id.in_(latest_ids))).all()) if latest_ids else {}
+    out: dict[uuid.UUID, sch.ExamTemplateRefOut] = {}
+    for a in assessments:
+        v = versions.get(a.exam_template_version_id)
+        t = templates.get(v.template_id) if v is not None else None
+        if v is None or t is None:
+            continue
+        locked = sorted(expand_lock_scope((v.spec or {}).get("lock_scope"))) if a.structure_locked else []
+        out[a.id] = sch.ExamTemplateRefOut(template_id=t.id, title=t.title, version_no=v.version_no, version_id=v.id,
+                                           latest_version_no=latest_nos.get(t.current_version_id), locked_fields=locked,
+                                           template_locked=bool(t.locked))  # Phase 7b S6
+    return out
+# --- Phase 7b S2 end ---
 
 
 def list_staff(db: Session, course: Course, *, cursor: Optional[str], limit: Optional[int], deleted: bool):

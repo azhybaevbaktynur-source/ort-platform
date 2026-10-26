@@ -142,6 +142,8 @@ export interface AttemptResultSection {
   possible: number | string;
   answered: number;
   correct: number;
+  /** Phase 7b S7: the section title of the attempt's snapshot (null when untitled). */
+  title?: string | LocalizedText | null;
 }
 
 export interface AttemptResultOut {

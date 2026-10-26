@@ -18,7 +18,7 @@ WRONG = {"sc": {"choice_id": "A"}, "num": {"value": "1"}, "st": {"text": "x"}, "
 T0 = clock.now()
 
 RESULT_KEYS = {"raw_score", "points_possible", "sections", "pending_review", "submitted_at", "grade"}
-SECTION_KEYS = {"pos", "key", "raw", "possible", "answered", "correct"}
+SECTION_KEYS = {"pos", "key", "raw", "possible", "answered", "correct", "title"}  # title: Phase 7b S7
 ITEM_KEYS = {"position", "section_pos", "question", "passage", "response", "flagged", "correctness", "score",
              "points", "feedback"}
 QUESTION_KEYS = {"id", "type", "language", "stem", "image_url", "points", "data"}
@@ -220,3 +220,18 @@ async def test_concluded_course_results_still_readable(db, api):
 
 async def test_unauthenticated(db, api):
     assert (await api.call(None, "GET", f"/attempts/{uuid.uuid4()}/result")).status_code == 401
+
+
+def test_result_sections_carry_snapshot_titles():  # Phase 7b S7: the general result page shows section titles
+    from types import SimpleNamespace
+
+    from app.lms.attempts import serializers as ser
+
+    sec = {"pos": 1, "key": None, "raw": "1", "possible": "2", "answered": 1, "correct": 1}
+    att = SimpleNamespace(raw_score=1, points_possible=2, result={"sections": [sec, {**sec, "pos": 2}]},
+                          submitted_at=None)
+    plan = SimpleNamespace(snapshot={"sections": [{"pos": 1, "key": None, "title": {"ru": "Теория"}},
+                                                  {"pos": 2, "key": "x", "title": None}]})
+    out = ser.result_out(att, plan)
+    assert [s.title for s in out.sections] == [{"ru": "Теория"}, None]
+    assert [s.title for s in ser.result_out(att).sections] == [None, None]     # no plan: no titles

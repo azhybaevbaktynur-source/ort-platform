@@ -44,6 +44,19 @@ class AssessmentCreateIn(_In):
     preset: Preset = "none"
     languages: list[Lang] = Field(min_length=1, max_length=3)
     subject_key: Optional[str] = Field(default=None, max_length=40)
+    # --- Phase 7b S2 begin --- (PHASE_7B_DESIGN 9.1: create from an exam template; `preset` must stay 'none',
+    # checked in the builder as 422 `preset_template_exclusive`; `subject_key` only with ort_subject, unchanged)
+    exam_template_id: Optional[uuid.UUID] = None
+    exam_template_version_id: Optional[uuid.UUID] = None
+    parameters: Optional[dict[str, str]] = None
+
+    @field_validator("parameters")
+    @classmethod
+    def _parameters(cls, v):
+        if v is not None and (len(v) > 5 or any(len(k) > 40 or len(val) > 40 for k, val in v.items())):
+            raise ValueError("parameters: at most 5 entries of short keys and values")
+        return v
+    # --- Phase 7b S2 end ---
 
     @model_validator(mode="after")
     def _v(self):
@@ -105,6 +118,7 @@ class SectionRulesIn(_In):
     allowed_types: Optional[list[str]] = None
     max_items: Optional[int] = Field(default=None, ge=1, le=10_000)
     allow_passages: Optional[bool] = None
+    min_items: Optional[int] = Field(default=None, ge=1, le=10_000)  # --- Phase 7b S1 --- (PHASE_7B_DESIGN 2.4)
 
     @field_validator("allowed_types")
     @classmethod
@@ -112,6 +126,14 @@ class SectionRulesIn(_In):
         if v is not None and (not v or len(set(v)) != len(v) or any(t not in TYPE_NAMES for t in v)):
             raise ValueError("allowed_types must be a non-empty list of known question types")
         return v
+
+    # --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 2.4)
+    @model_validator(mode="after")
+    def _min_max(self):
+        if self.min_items is not None and self.max_items is not None and self.min_items > self.max_items:
+            raise ValueError("min_items must not exceed max_items")
+        return self
+    # --- Phase 7b S1 end ---
 
 
 class SectionIn(_In):
@@ -336,6 +358,20 @@ class AssessmentStaffSummaryOut(BaseModel):
     available_until: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
     has_access_code: bool = False  # --- Phase 7a S4 --- (2.7: the hash itself is never serialized)
+    # --- Phase 7b S2 --- (list rows carry the template reference too, so pickers can offer template exams only)
+    exam_template: Optional["ExamTemplateRefOut"] = None
+
+
+# --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 9.1: the template an assessment was created from)
+class ExamTemplateRefOut(BaseModel):
+    template_id: uuid.UUID
+    title: dict
+    version_no: int
+    version_id: uuid.UUID
+    latest_version_no: Optional[int] = None
+    locked_fields: list[str] = []
+    template_locked: bool = False  # Phase 7b S6: the template is locked now ("Save as template" is refused)
+# --- Phase 7b S1 end ---
 
 
 class AssessmentStaffOut(AssessmentStaffSummaryOut):
@@ -357,6 +393,12 @@ class AssessmentStaffOut(AssessmentStaffSummaryOut):
     scheme: Optional[SchemeRefOut] = None
     sections: list[SectionOut]
     warnings: list[dict] = []
+    # --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 9.1; `exam_template` is inherited from the summary, S2)
+    display_mode: str = "one_per_page"
+    passage_display: Optional[str] = None
+    result_view: Optional[str] = None
+    structure_locked: bool = False
+    # --- Phase 7b S1 end ---
 
 
 class IssueOut(BaseModel):
@@ -456,3 +498,4 @@ STUDENT_SUMMARY_KEYS = frozenset(AssessmentStudentSummaryOut.model_fields)
 LOBBY_KEYS = frozenset(AssessmentLobbyOut.model_fields)
 
 ItemOut.model_rebuild()
+AssessmentStaffSummaryOut.model_rebuild()  # --- Phase 7b S2 --- (forward ref to ExamTemplateRefOut)

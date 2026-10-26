@@ -11,6 +11,9 @@ from starlette.datastructures import UploadFile
 from app.core.authz import A, AuthzContext, get_authz
 from app.core.config import settings
 from app.lms.content.importers import ImportOptions, ImportReport
+from app.lms.content.importers.schemas import ImportResult  # Phase 7b S3 (report + attach summary)
+from fastapi.encoders import jsonable_encoder  # Phase 7b S3
+from fastapi.responses import JSONResponse  # Phase 7b S3
 from app.lms.content.importers import service as isvc
 from app.lms.core import ratelimit
 from app.lms.core.errors import LMSError, ValidationFailed
@@ -33,6 +36,11 @@ _FORM_OPENAPI = {
             "exam_type": {"type": "string", "enum": ["full_main", "subject", "practice_bank"]},
             "target_bank_id": {"type": "string", "format": "uuid"},
             "on_conflict": {"type": "string", "enum": ["skip", "overwrite"], "default": "skip"},
+            # --- Phase 7b S3 begin --- (general format validated against an exam template, PHASE_7B_DESIGN 8)
+            "exam_template_version_id": {"type": "string", "format": "uuid"},
+            "assessment_id": {"type": "string", "format": "uuid"},
+            "attach_to_assessment_id": {"type": "string", "format": "uuid"},
+            # --- Phase 7b S3 end ---
         },
     }}}}
 }
@@ -74,7 +82,22 @@ def _options(form, commit: bool) -> ImportOptions:
     if on_conflict not in ("skip", "overwrite"):
         raise ValidationFailed("invalid on_conflict", code="validation_failed",
                                details=[{"loc": ["on_conflict"], "msg": "invalid on_conflict"}])
-    return ImportOptions(exam_type=exam_type, language=language, on_conflict=on_conflict, target_bank_id=target)
+    # --- Phase 7b S3 begin --- (exam template validation / attach, PHASE_7B_DESIGN 8)
+    extra: dict = {}
+    for name in ("exam_template_version_id", "assessment_id", "attach_to_assessment_id"):
+        value = str(form.get(name) or "") or None
+        if value:
+            try:
+                extra[name] = str(uuid.UUID(value))
+            except ValueError:
+                raise ValidationFailed(f"invalid {name}", code="validation_failed",
+                                       details=[{"loc": [name], "msg": "invalid uuid"}]) from None
+    if extra and exam_type is not None:
+        raise ValidationFailed("Exam template validation uses the general format, not the ORT format",
+                               code="format_mismatch", details=[{"loc": ["exam_type"], "msg": "not allowed"}])
+    return ImportOptions(exam_type=exam_type, language=language, on_conflict=on_conflict, target_bank_id=target,
+                         **extra)
+    # --- Phase 7b S3 end ---
 
 
 async def _handle(course_id: uuid.UUID, request: Request, ctx: AuthzContext, commit: bool) -> ImportReport:
@@ -85,7 +108,7 @@ async def _handle(course_id: uuid.UUID, request: Request, ctx: AuthzContext, com
     if int(cl) > cap + 64 * 1024:
         raise _too_large()
     course = await run_in_threadpool(_prepare, ctx, course_id)
-    form = await request.form(max_files=1, max_fields=8, max_part_size=1024)
+    form = await request.form(max_files=1, max_fields=11, max_part_size=1024)  # Phase 7b S3: 8 -> 11
     try:
         file = form.get("file")
         if not isinstance(file, UploadFile):
@@ -107,7 +130,12 @@ async def _handle(course_id: uuid.UUID, request: Request, ctx: AuthzContext, com
     finally:
         await form.close()
     fn = isvc.commit if commit else isvc.preview
-    return await run_in_threadpool(fn, ctx.db, ctx, course, holder, filename, opts)
+    # --- Phase 7b S3 begin --- (an attach step adds `attached`; every other report keeps the ImportReport shape)
+    rep = await run_in_threadpool(fn, ctx.db, ctx, course, holder, filename, opts)
+    if isinstance(rep, ImportResult):
+        return JSONResponse(jsonable_encoder(rep))
+    return rep
+    # --- Phase 7b S3 end ---
 
 
 @router.post("/{course_id}/imports/preview", response_model=ImportReport, openapi_extra=_FORM_OPENAPI)

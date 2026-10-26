@@ -136,6 +136,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Phase 7b S5: the frontend (another origin) reads the server's file name of downloads (import-format CSV)
+    expose_headers=["Content-Disposition"],
 )
 
 # --- Phase 6 S2b begin --- (GET /courses/templates; before api_router so it wins over /courses/{course_id})

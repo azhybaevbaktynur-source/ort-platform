@@ -16,6 +16,7 @@ import { AssessmentError } from "./AssessmentError";
 import { SettingsPanelGrading, type GradingFormValue } from "./SettingsPanelGrading";
 import { fromLocalInput, minToSec, secToMin, toLocalInput } from "./format";
 import { AccessCodeField, accessCodeError } from "@/components/lms/accommodations/AccessCodeField"; // Phase 7a S5
+import { templateLockedFields } from "@/lib/lms/assessmentTypes"; // Phase 7b S4
 
 function gradingOf(a: AssessmentStaffOut): GradingFormValue {
   return {
@@ -61,6 +62,12 @@ export function SettingsPanel({
   const [saved, setSaved] = useState(false);
   // --- Phase 6 S4b: locked course template (design §5.4): navigation and grading scheme are fixed ---
   const tplLocked = isAssessmentLocked(useTemplateUi(), a.preset);
+  // --- Phase 7b S4: an exam template's lock scope fixes some settings (empty for blank and preset exams) ---
+  const examLocks = templateLockedFields(a);
+  const navLocked = tplLocked || examLocks.has("navigation");
+  const examLockNames = ["navigation", "grading_scheme_version_id", "display_mode", "result_view"]
+    .filter((f) => examLocks.has(f)).map((f) => t(`examTemplates.lockFields.${f}`));
+  // --- Phase 7b S4 end ---
   // --- Phase 7a S5: access code (undefined = unchanged, string = set, null = clear; PHASE_7A_DESIGN 2.7) ---
   const [accessCode, setAccessCode] = useState<string | null | undefined>(undefined);
   const accessCodeBad = typeof accessCode === "string" && accessCode.trim() !== "" && !!accessCodeError(accessCode);
@@ -164,11 +171,11 @@ export function SettingsPanel({
         </div>
         <div>
           <label className={labelCls} htmlFor="as-nav">{t("assessments.settings.navigation")}</label>
-          <select id="as-nav" className={inputCls} disabled={disabled || tplLocked} value={navigation} onChange={(e) => setNavigation(e.target.value as Navigation)}>
+          <select id="as-nav" className={inputCls} disabled={disabled || navLocked} value={navigation} onChange={(e) => setNavigation(e.target.value as Navigation)}>
             <option value="free">{t("assessments.navigation.free")}</option>
             <option value="section_forward_only">{t("assessments.navigation.section_forward_only")}</option>
           </select>
-          {tplLocked && <p className="mt-1 text-xs text-slate-500">{t("templates.lockedNote")}</p>}
+          {navLocked && <p className="mt-1 text-xs text-slate-500">{t(tplLocked ? "templates.lockedNote" : "examTemplates.lockedNote")}</p>}
         </div>
         <div>
           <label className={labelCls} htmlFor="as-results">{t("assessments.settings.resultsPolicy")}</label>
@@ -189,7 +196,13 @@ export function SettingsPanel({
         {check("as-shuf-c", t("assessments.settings.shuffleChoices"), shuffleChoices, setShuffleChoices)}
       </div>
       <SettingsPanelGrading courseId={courseId} assessmentId={a.id} value={grading} onChange={setGrading}
-        currentScheme={a.scheme} defaultLanguage={defaultLanguage} disabled={disabled} schemeLocked={tplLocked} />
+        currentScheme={a.scheme} defaultLanguage={defaultLanguage} disabled={disabled} schemeLocked={tplLocked || examLocks.has("grading_scheme_version_id") /* Phase 7b S5 */} />
+      {/* --- Phase 7b S4 --- */}
+      {examLockNames.length > 0 && (
+        <p role="note" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+          {t("examTemplates.lockedSettings", { fields: examLockNames.join(", ") })}
+        </p>
+      )}
       {/* --- Phase 7a S5: access code --- */}
       {/* security review 7a / owner Q4: no access codes on ORT preset exams (the server refuses them) */}
       {a.preset === "none" && <AccessCodeField hasCode={!!a.has_access_code} value={accessCode} onChange={setAccessCode} disabled={disabled} />}
