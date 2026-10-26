@@ -75,7 +75,9 @@ def _archived(t: ExamTemplate) -> Conflict:
 
 # ------------------------------------------------------------------------------------------------ create / patch
 
-def create(ctx: AuthzContext, data: sch.ExamTemplateCreateIn) -> ExamTemplate:
+def create(ctx: AuthzContext, data: sch.ExamTemplateCreateIn, *, request: Optional[Request] = None,
+           audit_action: Optional[str] = None, audit_details: Optional[dict] = None) -> ExamTemplate:
+    """Platform templates are audited (`exam_template.create`); `save_as.py` passes its own action for every scope."""
     db = ctx.db
     scopes.assert_can_create(ctx, data.owner_scope, data.organization_id)
     owner_user_id = ctx.user.id if data.owner_scope == "teacher" else None
@@ -86,11 +88,22 @@ def create(ctx: AuthzContext, data: sch.ExamTemplateCreateIn) -> ExamTemplate:
                      title=dict(data.title), description=dict(data.description) if data.description else None,
                      status="draft", locked=False, draft_spec=draft, draft_rev=1, created_by_id=ctx.user.id)
     db.add(t)
+    # --- Phase 7b S6 begin --- (security review 7b: audit)
+    action = audit_action or (ids.AUDIT_CREATE if data.owner_scope == "platform" else None)
+    if action is not None:
+        db.flush()
+        audit.record(db, actor=ctx.user, action=action, target_type=ids.AUDIT_TARGET_EXAM_TEMPLATE,
+                     target_id=str(t.id), request=request,
+                     details={"owner_scope": data.owner_scope,
+                              "organization_id": str(data.organization_id) if data.organization_id else None,
+                              **(audit_details or {})})
+    # --- Phase 7b S6 end ---
     db.commit()
     return t
 
 
-def patch(ctx: AuthzContext, template_id: uuid.UUID, data: sch.ExamTemplatePatchIn) -> ExamTemplate:
+def patch(ctx: AuthzContext, template_id: uuid.UUID, data: sch.ExamTemplatePatchIn, *,
+          request: Optional[Request] = None) -> ExamTemplate:
     db = ctx.db
     t = _manage(ctx, template_id)
     if t.status == "archived":
@@ -107,6 +120,12 @@ def patch(ctx: AuthzContext, template_id: uuid.UUID, data: sch.ExamTemplatePatch
         t.description = dict(data.description) if data.description is not None else None
     t.draft_rev += 1
     t.updated_at = utcnow()
+    # --- Phase 7b S6 begin --- (security review 7b: platform template drafts are audited)
+    if t.owner_scope == "platform":
+        audit.record(db, actor=ctx.user, action=ids.AUDIT_UPDATE, target_type=ids.AUDIT_TARGET_EXAM_TEMPLATE,
+                     target_id=str(t.id), request=request,
+                     details={"fields": sorted(fields), "draft_rev": t.draft_rev})
+    # --- Phase 7b S6 end ---
     db.commit()
     return t
 

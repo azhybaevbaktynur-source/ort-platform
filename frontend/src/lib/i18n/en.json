@@ -926,6 +926,7 @@
         "csv_not_utf8": "The CSV file is not UTF-8 encoded",
         "csv_unreadable": "The CSV file could not be read",
         "csv_too_large": "The CSV file is larger than {limit_mb} MB",
+        "csv_too_many_columns": "The CSV header has {got} columns; the limit is {limit}",
         "csv_header_mismatch": "The CSV header must consist of exactly the 15 platform columns",
         "csv_field_count": "The row has {got} fields instead of 15",
         "row_invalid": "The row is invalid",

@@ -370,6 +370,7 @@ class ExamTemplateRefOut(BaseModel):
     version_id: uuid.UUID
     latest_version_no: Optional[int] = None
     locked_fields: list[str] = []
+    template_locked: bool = False  # Phase 7b S6: the template is locked now ("Save as template" is refused)
 # --- Phase 7b S1 end ---
 
 

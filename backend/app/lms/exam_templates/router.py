@@ -35,8 +35,8 @@ def block_catalog(ctx: AuthzContext = Depends(get_authz)):
 
 
 @router.post("", status_code=201, response_model=sch.ExamTemplateOut)
-def create_template(data: sch.ExamTemplateCreateIn, ctx: AuthzContext = Depends(get_authz)):
-    t = service.create(ctx, data)
+def create_template(data: sch.ExamTemplateCreateIn, request: Request, ctx: AuthzContext = Depends(get_authz)):
+    t = service.create(ctx, data, request=request)
     return service.manage_out(ctx, t, None)
 
 
@@ -46,8 +46,9 @@ def get_template(template_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz))
 
 
 @router.patch("/{template_id}", response_model=sch.ExamTemplateOut)
-def patch_template(template_id: uuid.UUID, data: sch.ExamTemplatePatchIn, ctx: AuthzContext = Depends(get_authz)):
-    t = service.patch(ctx, template_id, data)
+def patch_template(template_id: uuid.UUID, data: sch.ExamTemplatePatchIn, request: Request,
+                   ctx: AuthzContext = Depends(get_authz)):
+    t = service.patch(ctx, template_id, data, request=request)
     return service.manage_out(ctx, t, service.current_version(ctx.db, t))
 
 

@@ -50,7 +50,8 @@ export function PublishPanel({
   const [pIssues, setPIssues] = useState<Issue[]>([]);
   // Phase 7b S4: preset (ORT) exams are never templatable (7b-Q1), so ORT builders show no "Save as template".
   const [saveAsOpen, setSaveAsOpen] = useState(false);
-  const templatable = canEdit && a.preset === "none";
+  // Phase 7b S6 (decision L5): a structure fixed by a locked template is never copied into a new template.
+  const templatable = canEdit && a.preset === "none" && !a.structure_locked && !a.exam_template?.template_locked;
 
   const validate = async () => {
     setVBusy(true);

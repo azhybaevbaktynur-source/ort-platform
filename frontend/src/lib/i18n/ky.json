@@ -926,6 +926,7 @@
         "csv_not_utf8": "CSV файлы UTF-8 коддолушунда эмес",
         "csv_unreadable": "CSV файлын окуу мүмкүн болгон жок",
         "csv_too_large": "CSV файлы {limit_mb} МБдан чоң",
+        "csv_too_many_columns": "CSV башында {got} мамыча бар; эң көбү {limit} болушу керек",
         "csv_header_mismatch": "CSVнин баш сабы платформанын так 15 тилкесинен турушу керек",
         "csv_field_count": "Катарда 15 эмес, {got} талаа бар",
         "row_invalid": "Катар туура эмес",

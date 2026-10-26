@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, Valida
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.lms.assessments.rules import normalize_rules
 from app.lms.assessments.schemas import Navigation, ResultsPolicy, ScorePolicy
 from app.lms.content.types import TYPE_NAMES
@@ -31,7 +32,7 @@ from app.lms.exam_templates.blocks import DISPLAY_MODES, PASSAGE_DISPLAYS, RESUL
 SECTION_KEY_PATTERN = r"^[a-z0-9_]{1,40}$"
 _KEY_RE = re.compile(SECTION_KEY_PATTERN)
 _BINDS_RE = re.compile(r"^sections\[(\d+)\]\.key$")
-MAX_SECTIONS = 50
+MAX_SECTIONS = settings.ASSESSMENT_MAX_SECTIONS  # security review 7b: never more than an assessment may hold
 MAX_PARAMETERS = 5
 MAX_PARAMETER_OPTIONS = 50
 

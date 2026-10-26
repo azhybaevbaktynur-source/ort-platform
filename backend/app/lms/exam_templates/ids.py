@@ -62,6 +62,13 @@ AUDIT_UNLOCK = "exam_template.unlock"
 AUDIT_PROMOTE = "exam_template.promote"
 AUDIT_STRUCTURE_UNLOCK = "assessment.structure_unlock"
 AUDIT_ACTIONS = (AUDIT_PUBLISH, AUDIT_ARCHIVE, AUDIT_LOCK, AUDIT_UNLOCK, AUDIT_PROMOTE, AUDIT_STRUCTURE_UNLOCK)
+# --- Phase 7b S6 begin --- (security review 7b: platform template drafts, save as template, instantiate)
+AUDIT_CREATE = "exam_template.create"            # platform scope only
+AUDIT_UPDATE = "exam_template.update"            # platform scope only (draft patch)
+AUDIT_SAVE_AS = "exam_template.save_as"          # every scope: an assessment's structure copied into a template
+AUDIT_INSTANTIATE = "assessment.from_template"   # target the new assessment
+AUDIT_ACTIONS = AUDIT_ACTIONS + (AUDIT_CREATE, AUDIT_UPDATE, AUDIT_SAVE_AS, AUDIT_INSTANTIATE)
+# --- Phase 7b S6 end ---
 
 # ------------------------------------------------------------------ snapshot (6): additive keys, values from the
 # assessment row (None stays None); SNAPSHOT_SCHEMA is unchanged.
