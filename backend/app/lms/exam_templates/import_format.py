@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import event, func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.lms.content.importers.general_csv import (
     COMMON_COLUMNS, GENERAL_FORMAT, GENERAL_FORMAT_VERSION, PASSAGE_COLUMNS, ProfileSection, TemplateProfile,
     type_columns,
@@ -168,9 +169,24 @@ def csv_for(fmt: ImportFormatOut, lang: str) -> bytes:
     return ("﻿" + buf.getvalue()).encode("utf-8")
 
 
+# --- Phase 7b S7 begin --- (UX fix: Cyrillic titles (ru / ky) are transliterated into the ASCII file name slug)
+_TRANSLIT = {
+    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e", "ж": "zh", "з": "z", "и": "i", "й": "i",
+    "к": "k", "л": "l", "м": "m", "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u", "ф": "f",
+    "х": "kh", "ц": "ts", "ч": "ch", "ш": "sh", "щ": "shch", "ъ": "", "ы": "y", "ь": "", "э": "e", "ю": "iu",
+    "я": "ia", "ң": "ng", "ө": "o", "ү": "u",
+}
+
+
+def transliterate(text: str) -> str:
+    """Lower-case Latin rendering of a ru / ky text (other characters unchanged)."""
+    return "".join(_TRANSLIT.get(ch, ch) for ch in text.lower())
+# --- Phase 7b S7 end ---
+
+
 def csv_filename(template: ExamTemplate, version_no: int, lang: str) -> str:
     title = _title(template.title, lang) or ""
-    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:40].strip("-") or "template"
+    slug = re.sub(r"[^a-z0-9]+", "-", transliterate(title)).strip("-")[:40].strip("-") or "template"
     return f"import-format-{slug}-v{version_no}.csv"
 
 
@@ -336,6 +352,14 @@ def attach_imported(db: Session, target: ImportTarget, up: Any, summaries: list,
         label = target.labels.get(idx) or f"section_{idx + 1}"
         out.added += res.added
         out.sections[label] = out.sections.get(label, 0) + res.added
+        out.section_positions.setdefault(label, idx)  # Phase 7b S7
         for sk in res.skipped:
             out.skipped[sk.code] = out.skipped.get(sk.code, 0) + 1
+        # --- Phase 7b S7: which cap a too_many_items skip hit (the section's max_items or the exam's limit) ---
+        full = sum(1 for sk in res.skipped if sk.code == "too_many_items")
+        if full:
+            mx = (sections[idx].rules or {}).get("max_items")
+            out.skip_details.append({"code": "too_many_items", "section": label, "position": idx,
+                                     "max": mx or settings.ASSESSMENT_MAX_ITEMS,
+                                     "scope": "section" if mx else "exam", "count": full})
     return out

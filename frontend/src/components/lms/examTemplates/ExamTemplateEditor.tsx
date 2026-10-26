@@ -1,9 +1,9 @@
 "use client";
 
-// Phase 7b S4: plain template editor (PHASE_7B_DESIGN 10; no visual constructor until 8b): structured header fields +
-// a JSON field for defaults / sections / parameters / lock_scope validated by the server (`spec_invalid` details shown
-// under the field), Save (draft_rev conflict), Publish, Archive, Lock/Unlock (reason), Promote, Versions with the
-// import-format download per version.
+// Phase 7b S4: template editor (PHASE_7B_DESIGN 10; no drag-and-drop constructor until 8b): structured header fields,
+// Save (draft_rev conflict), Publish, Archive, Lock/Unlock (reason), Promote, Versions with the import-format download
+// per version. S7 (UX fix): the structure is a form (`SpecForm`: defaults, section cards, parameters, lock scope;
+// raw JSON only for the platform admin), server `spec_invalid` details translated under the matching field.
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Archive, Download, TriangleAlert } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
@@ -21,39 +21,25 @@ import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
 import { useCursorList } from "@/components/lms/admin/useCursorList";
 import { MoreError, useTableState } from "@/components/lms/admin/ListParts";
 import {
-  Button, Card, ConfirmDialog, ErrorState, LoadingState, MenuButton, PageHeader, ReasonDialog, Select, Table, Textarea, toast,
+  Button, Card, ConfirmDialog, ErrorState, LoadingState, MenuButton, PageHeader, ReasonDialog, Select, Table, toast,
   type Breadcrumb, type MenuItem, type TableColumn,
 } from "@/components/ui";
 import { STARTER_SPEC } from "./ExamTemplatesPage";
 import {
-  ExamTemplateError, LockedBadge, ScopeBadge, TemplateStatusBadge, locText, specIssuesOf, useExamTemplateErrorText, type TemplateArea,
+  ExamTemplateError, LockedBadge, ScopeBadge, TemplateStatusBadge, locStartsWith, specIssuesOf, useExamTemplateErrorText, useSpecIssueText,
+  type TemplateArea,
 } from "./ui";
-
-const JSON_KEYS = ["defaults", "sections", "parameters", "lock_scope"] as const;
+import { SpecForm } from "./SpecForm";
+import { draftOf, specOf, type SpecDraft } from "./specDraft";
 
 interface Form {
   title: LocalizedText;
   description: LocalizedText;
-  navigation: Navigation;
-  displayMode: string;
-  passageDisplay: string;
-  resultView: string;
-  schemeId: string;
-  json: string;
+  spec: SpecDraft;
 }
 
 function formOf(tpl: ExamTemplateOut, spec: ExamTemplateSpec): Form {
-  const rest = { defaults: spec.defaults ?? {}, sections: spec.sections ?? [], parameters: spec.parameters ?? [], lock_scope: spec.lock_scope ?? [] };
-  return {
-    title: tpl.title ?? {},
-    description: tpl.description ?? {},
-    navigation: spec.navigation ?? "free",
-    displayMode: spec.display_mode ?? "one_per_page",
-    passageDisplay: spec.passage_display ?? "",
-    resultView: spec.result_view ?? "",
-    schemeId: spec.scoring?.grading_scheme_version_id ?? "",
-    json: JSON.stringify(rest, null, 2),
-  };
+  return { title: tpl.title ?? {}, description: tpl.description ?? {}, spec: draftOf(spec) };
 }
 
 type Action = "publish" | "archive" | "lock" | "unlock" | "promote";
@@ -75,7 +61,6 @@ export function ExamTemplateEditor({ area, templateId, crumbs }: {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<unknown>(null);
   const [issues, setIssues] = useState<SpecIssue[]>([]);
-  const [jsonError, setJsonError] = useState<string | null>(null);
   const [action, setAction] = useState<Action | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState<unknown>(null);
@@ -94,7 +79,6 @@ export function ExamTemplateEditor({ area, templateId, crumbs }: {
     setForm(formOf(x, s));
     setDirty(false);
     setIssues([]);
-    setJsonError(null);
   }, []);
 
   const load = useCallback(async () => {
@@ -124,35 +108,31 @@ export function ExamTemplateEditor({ area, templateId, crumbs }: {
   const canPromote = !!tpl?.can_promote;
   const hasDraft = !!tpl?.draft_spec;
 
-  const update = <K extends keyof Form>(k: K, v: Form[K]) => {
+  const update = <K extends "title" | "description">(k: K, v: Form[K]) => {
     setForm((f) => (f ? { ...f, [k]: v } : f));
     setDirty(true);
   };
+  const updateSpec = useCallback((fn: (d: SpecDraft) => SpecDraft) => {
+    setForm((f) => (f ? { ...f, spec: fn(f.spec) } : f));
+    setDirty(true);
+  }, []);
+  const setSpecField = <K extends "navigation" | "displayMode" | "passageDisplay" | "resultView" | "schemeId">(k: K, v: SpecDraft[K]) =>
+    updateSpec((d) => ({ ...d, [k]: v }));
 
-  const buildSpec = (): ExamTemplateSpec | null => {
-    if (!form || !baseSpec) return null;
-    let parsed: unknown;
-    try { parsed = JSON.parse(form.json); } catch { setJsonError(t("examTemplates.editor.jsonInvalid")); return null; }
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) { setJsonError(t("examTemplates.editor.jsonInvalid")); return null; }
-    const extra = Object.keys(parsed as object).filter((k) => !(JSON_KEYS as readonly string[]).includes(k));
-    if (extra.length) { setJsonError(t("examTemplates.editor.jsonKeys", { keys: extra.join(", ") })); return null; }
-    setJsonError(null);
-    return {
-      schema: baseSpec.schema ?? 1,
-      importer_profile: baseSpec.importer_profile ?? "general",
-      navigation: form.navigation,
-      display_mode: form.displayMode as ExamTemplateSpec["display_mode"],
-      passage_display: (form.passageDisplay || null) as ExamTemplateSpec["passage_display"],
-      result_view: (form.resultView || null) as ExamTemplateSpec["result_view"],
-      scoring: form.schemeId ? { grading_scheme_version_id: form.schemeId } : null,
-      ...(parsed as Pick<ExamTemplateSpec, "defaults" | "sections" | "parameters" | "lock_scope">),
-    };
+  // S7: "Раздел «Теория»" in issue locations and selects ("Раздел 2" when untitled)
+  const sectionName = useCallback((i: number) => {
+    const s = form?.spec.sections[i];
+    return pickLocalized(s?.title, lang) || t("examTemplates.picker.sectionN", { n: i + 1 });
+  }, [form?.spec.sections, lang, t]);
+  const issueText = useSpecIssueText(sectionName);
+  const topIssue = (k: string) => {
+    const hit = issues.filter((i) => locStartsWith(i.loc, [k]));
+    return hit.length ? Array.from(new Set(hit.map(issueText.what))).join(" ") : undefined;
   };
 
   const save = async () => {
-    if (!tpl || !form) return;
-    const spec = buildSpec();
-    if (!spec) return;
+    if (!tpl || !form || !baseSpec) return;
+    const spec = specOf(form.spec);
     const title = cleanLocalized(form.title, LMS_LANGS);
     if (Object.keys(title).length === 0) { setSaveError({ code: "title_required" }); return; }
     const description = cleanLocalized(form.description, LMS_LANGS);
@@ -168,7 +148,9 @@ export function ExamTemplateEditor({ area, templateId, crumbs }: {
     } catch (e) {
       setSaveError(e);
       setIssues(specIssuesOf(e));
-      if ((e as { code?: string }).code === "draft_conflict") toast.error(t("examTemplates.errors.draft_conflict"));
+      const code = (e as { code?: string }).code;
+      if (code === "draft_conflict") toast.error(t("examTemplates.errors.draft_conflict"));
+      else if (specIssuesOf(e).length) toast.error(t("examTemplates.editor.issues", { n: specIssuesOf(e).length }));
     } finally {
       setSaving(false);
     }
@@ -205,9 +187,10 @@ export function ExamTemplateEditor({ area, templateId, crumbs }: {
       value: s.id,
       label: `${typeof s.title === "string" ? s.title : pickLocalized(s.title, lang) || s.id} · ${t(`examTemplates.editor.schemeScope.${s.scope}`)}`,
     }));
-    if (form?.schemeId && !rows.some((s) => s.id === form.schemeId)) opts.unshift({ value: form.schemeId, label: t("examTemplates.editor.schemeCurrent") });
+    const current = form?.spec.schemeId;
+    if (current && !rows.some((s) => s.id === current)) opts.unshift({ value: current, label: t("examTemplates.editor.schemeCurrent") });
     return [{ value: "", label: t("examTemplates.editor.schemeNone") }, ...opts];
-  }, [blocks, form?.schemeId, lang, t]);
+  }, [blocks, form?.spec.schemeId, lang, t]);
 
   if (loadError && !tpl) {
     const status = (loadError as { status?: number }).status;
@@ -277,37 +260,35 @@ export function ExamTemplateEditor({ area, templateId, crumbs }: {
           onChange={(v) => update("title", v)} maxLength={200} required disabled={readOnly} />
         <LocalizedTextInput label={t("examTemplates.fields.description")} languages={LMS_LANGS} defaultLanguage={lang} value={form.description}
           onChange={(v) => update("description", v)} maxLength={2000} multiline disabled={readOnly} />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Select label={t("examTemplates.editor.navigation")} value={form.navigation} disabled={readOnly}
-            onChange={(e) => update("navigation", e.target.value as Navigation)}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Select label={t("examTemplates.editor.navigation")} value={form.spec.navigation} disabled={readOnly} error={topIssue("navigation")}
+            onChange={(e) => setSpecField("navigation", e.target.value as Navigation)}
             options={NAVIGATIONS.map((n) => ({ value: n, label: t(`assessments.navigation.${n}`) }))} />
-          <Select label={t("examTemplates.editor.displayMode")} value={form.displayMode} disabled={readOnly}
-            hint={t("examTemplates.scrollingLater")} onChange={(e) => update("displayMode", e.target.value)}
+          <Select label={t("examTemplates.editor.displayMode")} value={form.spec.displayMode} disabled={readOnly} error={topIssue("display_mode")}
+            hint={t("examTemplates.scrollingLater")} onChange={(e) => setSpecField("displayMode", e.target.value)}
             options={DISPLAY_MODES.map((m) => ({ value: m, label: t(`examTemplates.blocks.displayModes.${m}`), disabled: !AVAILABLE_DISPLAY_MODES.includes(m) }))} />
-          <Select label={t("examTemplates.editor.passageDisplay")} value={form.passageDisplay} disabled={readOnly}
-            onChange={(e) => update("passageDisplay", e.target.value)}
+          <Select label={t("examTemplates.editor.passageDisplay")} value={form.spec.passageDisplay} disabled={readOnly} error={topIssue("passage_display")}
+            onChange={(e) => setSpecField("passageDisplay", e.target.value)}
             options={[{ value: "", label: t("examTemplates.editor.courseDefault") }, ...PASSAGE_DISPLAYS.map((p) => ({ value: p, label: t(passageRenderers[p].titleKey) }))]} />
-          <Select label={t("examTemplates.editor.resultView")} value={form.resultView} disabled={readOnly}
-            onChange={(e) => update("resultView", e.target.value)}
+          <Select label={t("examTemplates.editor.resultView")} value={form.spec.resultView} disabled={readOnly} error={topIssue("result_view")}
+            onChange={(e) => setSpecField("resultView", e.target.value)}
             options={[{ value: "", label: t("examTemplates.editor.courseDefault") }, ...RESULT_VIEWS.map((r) => ({ value: r, label: t(resultViews[r].titleKey) }))]} />
-          <Select label={t("examTemplates.editor.scheme")} value={form.schemeId} disabled={readOnly} containerClassName="sm:col-span-2"
+          <Select label={t("examTemplates.editor.scheme")} value={form.spec.schemeId} disabled={readOnly} containerClassName="sm:col-span-2"
             hint={t(tpl.owner_scope === "teacher" ? "examTemplates.editor.schemeHintTeacher" : "examTemplates.editor.schemeHintShared")}
-            onChange={(e) => update("schemeId", e.target.value)} options={schemeOptions} />
+            error={topIssue("scoring")} onChange={(e) => setSpecField("schemeId", e.target.value)} options={schemeOptions} />
         </div>
       </Card>
 
-      <Card className="space-y-3">
-        <h2 className="text-lg font-semibold text-slate-900">{t("examTemplates.editor.structure")}</h2>
-        <p className="text-sm text-slate-600">{t("examTemplates.editor.structureHint")}</p>
-        <Textarea label={t("examTemplates.editor.json")} value={form.json} disabled={readOnly} rows={18} spellCheck={false}
-          className="font-mono text-sm" error={jsonError ?? undefined} hint={t("examTemplates.editor.jsonHint")}
-          onChange={(e) => { update("json", e.target.value); setJsonError(null); }} />
+      <SpecForm draft={form.spec} update={updateSpec} readOnly={readOnly} issues={issues} blocks={blocks}
+        platform={area.kind === "platform"} sectionName={sectionName} />
+
+      <div className="space-y-3">
         {issues.length > 0 && (
           <div role="alert" className="rounded-xl border border-danger-200 bg-danger-50 px-3.5 py-3 text-sm text-danger-800">
             <p className="flex items-center gap-2 font-semibold"><TriangleAlert className="h-4 w-4" aria-hidden="true" />{t("examTemplates.editor.issues", { n: issues.length })}</p>
             <ul className="mt-2 space-y-1">
               {issues.map((i, idx) => (
-                <li key={idx} className="break-words"><span className="font-mono">{locText(i.loc)}</span>: {i.msg}</li>
+                <li key={idx} className="break-words"><span className="font-medium">{issueText.where(i.loc)}</span>: {issueText.what(i)}</li>
               ))}
             </ul>
           </div>
@@ -318,7 +299,13 @@ export function ExamTemplateEditor({ area, templateId, crumbs }: {
         ) : (saveError as { code?: string } | null)?.code === "title_required" ? (
           <p role="alert" className="text-sm text-danger-700">{t("examTemplates.fields.titleRequired")}</p>
         ) : issues.length === 0 && <ExamTemplateError error={saveError} />}
-      </Card>
+        {!readOnly && dirty && (
+          <div className="flex flex-wrap items-center gap-3">
+            {saveButton}
+            <p className="text-sm font-medium text-warning-900">{t("examTemplates.editor.unsaved")}</p>
+          </div>
+        )}
+      </div>
 
       <section aria-labelledby="tpl-versions" className="space-y-3">
         <h2 id="tpl-versions" className="text-lg font-semibold text-slate-900">{t("examTemplates.versions.title")}</h2>

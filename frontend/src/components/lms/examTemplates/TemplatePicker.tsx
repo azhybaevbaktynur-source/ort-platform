@@ -3,6 +3,7 @@
 // Phase 7b S4: "Start from" in the create dialogs (PHASE_7B_DESIGN 10): Blank + the exam templates visible in the
 // course (grouped platform / organization / mine), a read-only section summary and one select per parameter.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, Lock, Shuffle } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { getExamTemplateVersion, listExamTemplates } from "@/lib/lms/examTemplates";
 import type { ExamTemplateOut, ExamTemplateScope, ExamTemplateSpec, SpecSection, TemplateCreateFields } from "@/lib/lms/examTemplateTypes";
@@ -166,6 +167,8 @@ function TemplateSummary({ picker, disabled }: { picker: TemplatePickerState; di
   if (specLoading) return <div role="status" aria-label={t("lms.common.loading")} className="space-y-2"><Skeleton className="h-5 w-2/3" /><Skeleton className="h-5 w-1/2" /></div>;
   if (specError) return <ExamTemplateError error={specError} onRetry={() => picker.selected && picker.select(picker.selected.id)} />;
   if (!spec) return null;
+  const description = pickLocalized(picker.selected?.description ?? null, lang);
+  const forward = spec.navigation === "section_forward_only";
   const params = spec.parameters ?? [];
   const bound = new Map<number, string>();
   for (const prm of params) {
@@ -180,6 +183,21 @@ function TemplateSummary({ picker, disabled }: { picker: TemplatePickerState; di
           options={prm.options.map((o) => ({ value: o, label: keyLabel(t, o) }))} />
       ))}
       <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+        {/* --- Phase 7b S7: description, lock and navigation of the chosen template --- */}
+        {description && <p className="mb-2 whitespace-pre-line break-words text-sm text-slate-700">{description}</p>}
+        <ul className="mb-2 space-y-1 text-sm text-slate-700">
+          {picker.selected?.locked && (
+            <li className="flex items-start gap-2">
+              <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-600" aria-hidden="true" />{t("examTemplates.picker.lockedLine")}
+            </li>
+          )}
+          <li className="flex items-start gap-2">
+            {forward
+              ? <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-600" aria-hidden="true" />
+              : <Shuffle className="mt-0.5 h-4 w-4 shrink-0 text-slate-600" aria-hidden="true" />}
+            {t(forward ? "examTemplates.picker.navForward" : "examTemplates.picker.navFree")}
+          </li>
+        </ul>
         <p className="text-sm font-medium text-slate-800">{t("examTemplates.picker.sections", { n: spec.sections.length })}</p>
         <ol className="mt-1 space-y-1.5 text-sm text-slate-700">
           {spec.sections.map((s, i) => (

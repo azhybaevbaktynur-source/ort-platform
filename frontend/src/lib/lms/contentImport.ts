@@ -47,6 +47,10 @@ export interface ImportAttachSummary {
   sections: Record<string, number>;
   /** skip code (item_duplicate, too_many_items, ...) -> count */
   skipped: Record<string, number>;
+  /** Phase 7b S7: section label -> 0-based section position in the exam */
+  section_positions?: Record<string, number>;
+  /** Phase 7b S7: which cap a too_many_items skip hit (`scope` "section": its max_items; "exam": the exam limit) */
+  skip_details?: { code: string; section: string; position: number; max: number; scope: "section" | "exam"; count: number }[];
 }
 
 export interface ImportReport {

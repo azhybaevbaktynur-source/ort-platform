@@ -217,7 +217,7 @@ async def test_attach_adds_questions_to_matching_sections(w, db):
     rep = res.json()
     assert rep["ok"] and rep["committed"] and rep["warnings"] == []
     assert rep["attached"] == {"assessment_id": str(w.exam.id), "added": 4, "sections": {"mc": 2, "open": 2},
-                               "skipped": {}}
+                               "skipped": {}, "section_positions": {"mc": 0, "open": 1}, "skip_details": []}
     from app.lms.assessments.repository import load_sections
 
     secs = load_sections(db, w.exam.id)
@@ -250,6 +250,15 @@ async def test_attach_new_rows_without_external_id(w, db):
                      attach_to_assessment_id=str(w.exam.id), target_bank_id=bank_id)).json()
     assert rep["ok"] and rep["attached"]["added"] == 1 and rep["attached"]["skipped"] == {}
     assert len([r for r in items(db, w.exam) if r.kind == "question"]) == 4
+
+
+async def test_attach_full_section_names_section_and_max(w, db):  # Phase 7b S7
+    text = f"{H}\n" + "".join(f"mc,,Q{i},x,y,A,,,,f{i}\n" for i in range(4))   # mc allows at most 3
+    rep = (await imp(w.O, w.cid, text.encode(), "q.csv", language="en", attach_to_assessment_id=str(w.exam.id))).json()
+    assert rep["ok"] and rep["attached"]["added"] == 3 and rep["attached"]["skipped"] == {"too_many_items": 1}
+    assert rep["attached"]["skip_details"] == [{"code": "too_many_items", "section": "mc", "position": 0, "max": 3,
+                                                "scope": "section", "count": 1}]
+    assert rep["attached"]["section_positions"] == {"mc": 0}
 
 
 async def test_attach_preview_writes_nothing(w, db):
