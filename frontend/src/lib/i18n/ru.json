@@ -926,6 +926,7 @@
         "csv_not_utf8": "CSV-файл не в кодировке UTF-8",
         "csv_unreadable": "Не удалось прочитать CSV-файл",
         "csv_too_large": "CSV-файл больше {limit_mb} МБ",
+        "csv_too_many_columns": "В заголовке CSV {got} столбцов; допускается не больше {limit}",
         "csv_header_mismatch": "Заголовок CSV должен состоять ровно из 15 колонок платформы",
         "csv_field_count": "В строке {got} полей вместо 15",
         "row_invalid": "Строка заполнена неверно",

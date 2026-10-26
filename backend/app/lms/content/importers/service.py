@@ -451,12 +451,48 @@ def _ingest_all(db: Session, actor_id: str, course: Any, images: dict[str, Image
         info.encoded = None
 
 
+# --- Phase 7b S6 begin --- (security review 7b: header-width guard before any parser runs)
+CSV_MAX_COLUMNS = 256
+
+
+def _too_wide_csv(raw: Any, filename: str) -> Optional[ParsedUpload]:
+    """A plain CSV whose header row has more than CSV_MAX_COLUMNS cells -> a failed `ParsedUpload`, else None.
+
+    Every row parser is O(header width) per row (the ORT parser pads each row to the header), so a 10,000-column
+    header with many rows burns CPU. The header is read lazily (only its own bytes are decoded); commas and quotes
+    are ASCII, so the count is the same for the utf-8 and the latin-1 reading of the parsers. Zip bundles are
+    covered by their parsers (the ORT bundle header must be exact; the general format caps its own header)."""
+    if not (filename or "").lower().endswith(".csv") or not isinstance(raw, (bytes, bytearray)):
+        return None
+    import csv
+    import io
+
+    try:
+        stream = io.TextIOWrapper(io.BytesIO(raw), encoding="utf-8-sig", errors="replace", newline="")
+        header = next(csv.reader(stream), None) or []
+    except csv.Error:
+        return None  # the parser reports csv_unreadable as before
+    if len(header) <= CSV_MAX_COLUMNS:
+        return None
+    issues = Issues()
+    issues.error("csv_too_many_columns", f"The CSV header has {len(header)} columns; the limit is {CSV_MAX_COLUMNS}.",
+                 file=filename, params={"limit": CSV_MAX_COLUMNS, "got": len(header)})
+    issues.finalize()
+    return ParsedUpload("csv", [], issues)
+# --- Phase 7b S6 end ---
+
+
 def _run(db: Session, actor_id: str, course: Any, raw: Any, filename: str, opts: ImportOptions,
          write: bool, target: Any = None) -> ImportReport:  # Phase 7b S3: target (exam template validation)
     with _import_slot():
         raw = _take(raw)
         if opts.allowed_languages is None:
             opts = opts.model_copy(update={"allowed_languages": list(course.languages or [])})
+        # --- Phase 7b S6 begin --- (security review 7b: one header-width guard for every plain CSV import, ORT too)
+        wide = _too_wide_csv(raw, filename)
+        if wide is not None:
+            return build_report(wide)
+        # --- Phase 7b S6 end ---
         # --- Phase 7b S3 begin --- (validation profile of an exam template version, PHASE_7B_DESIGN 8)
         up = parse_upload(raw, filename, opts, profile=target.profile if target is not None else None)
         # --- Phase 7b S3 end ---

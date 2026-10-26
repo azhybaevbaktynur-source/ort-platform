@@ -139,6 +139,13 @@ def instantiate(db: Session, ctx: AuthzContext, course: Course, version: ExamTem
         db.add(AssessmentSection(assessment_id=a.id, **vals))
     db.flush()
     assignment_sync.ensure_quiz_assignment(db, a, ctx.user.id)  # 7a: same transaction
+    # --- Phase 7b S6 begin --- (security review 7b: instantiating is audited, in the caller's transaction)
+    from app.lms.audit import service as audit
+
+    audit.record(db, actor=ctx.user, action=ids.AUDIT_INSTANTIATE, target_type=ids.AUDIT_TARGET_ASSESSMENT,
+                 target_id=str(a.id), details={"course_id": str(course.id), "template_id": str(t.id),
+                                               "version_id": str(version.id), "version_no": version.version_no})
+    # --- Phase 7b S6 end ---
     return a
 
 
@@ -218,6 +225,12 @@ def upgrade_to_latest(db: Session, ctx: AuthzContext, course: Course, assessment
         raise ValidationFailed("The assessment was not created from a template", code=ids.E_NOT_A_TEMPLATE_ASSESSMENT)
     cur = db.get(ExamTemplateVersion, a.exam_template_version_id)
     t = db.get(ExamTemplate, cur.template_id) if cur is not None else None
+    # Security review 7b (M): the `resolve_version` checks before anything changes (out of scope or deleted 404,
+    # archived 409), so an upgrade never pulls a version the caller could not instantiate.
+    if t is None or not scopes.scope_matches(ctx.user.id, course, t):
+        raise scopes.template_not_found()
+    if t.status == "archived":
+        raise Conflict("The template is archived", code=ids.E_TEMPLATE_ARCHIVED)
     latest = db.get(ExamTemplateVersion, t.current_version_id) if t is not None and t.current_version_id else None
     if (a.status != "draft" or a.published_version_id is not None or latest is None or latest.id == cur.id
             or _attempt_count(db, a.id) > 0):
