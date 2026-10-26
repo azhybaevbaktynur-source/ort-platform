@@ -40,6 +40,8 @@ class AttemptResultSectionOut(BaseModel):
     possible: Decimal
     answered: int
     correct: int
+    # Phase 7b S7: the section title of the attempt's snapshot (LocalizedText; None when untitled / unknown)
+    title: Optional[Any] = None
 
 
 class AttemptResultOut(BaseModel):
@@ -124,9 +126,12 @@ def result_out(attempt, plan=None) -> Optional[AttemptResultOut]:
     """Totals of a finalized attempt from the stored columns (no DB access); None while in progress."""
     if attempt.raw_score is None or not attempt.result:
         return None
+    # Phase 7b S7: section titles from the attempt's snapshot (the plan), when the caller has it
+    titles = {int(s["pos"]): s.get("title") for s in (plan.snapshot.get("sections", []) if plan is not None else [])}
     return AttemptResultOut(
         raw_score=attempt.raw_score, points_possible=attempt.points_possible,
-        sections=[AttemptResultSectionOut(**s) for s in attempt.result.get("sections", [])],
+        sections=[AttemptResultSectionOut(**{**s, "title": titles.get(int(s["pos"]))})
+                  for s in attempt.result.get("sections", [])],
         pending_review=int(attempt.result.get("pending_review", 0)), submitted_at=attempt.submitted_at,
     )
 

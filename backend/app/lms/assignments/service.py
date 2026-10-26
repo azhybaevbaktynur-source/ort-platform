@@ -125,8 +125,42 @@ def _create_quiz(db: Session, ctx: AuthzContext, course: Course, data: sch.Assig
     if q.uses_template():
         if q.preset is not None:
             raise _bad("quiz", "preset and exam_template_* are mutually exclusive", "preset_template_exclusive")
-        # 7b hook (3.1): exam_templates.service.instantiate(...) plugs in here and calls ensure_quiz_assignment
-        raise _bad("quiz", "Exam templates are not available yet", "exam_templates_not_available")
+        # --- Phase 7b S2 begin --- (the 7b hook of 3.1: instantiate + quiz assignment + the `later` settings in one
+        # transaction; security review 7b: the builder's update commits it all or nothing is written)
+        if "points_possible" in fields and data.points_possible is not None:
+            raise _bad("points_possible", "A quiz takes its points from the published version",
+                       "quiz_field_not_editable")
+        if q.exam_template_id is None and q.exam_template_version_id is None:
+            raise _bad("quiz", "exam_template_id or exam_template_version_id is required", "template_not_found")
+        from app.lms.exam_templates import instantiate as _inst
+        from app.lms.exam_templates.spec import ExamTemplateSpec as _Spec
+
+        tpl.assert_preset_allowed(course, "none")  # security review 7b: a template exam is a `none` preset exam
+        later = {f: getattr(data, f) for f in QUIZ_FIELDS if f in fields and f not in ("title", "description")}
+        _check_refs(db, ctx, course, category_id=later.get("category_id"),
+                    scheme_version_id=later.get("grading_scheme_version_id"))
+        template, version = _inst.resolve_version(db, ctx, course, template_id=q.exam_template_id,
+                                                  version_id=q.exam_template_version_id)
+        if ("grading_scheme_version_id" in later and template.locked
+                and later["grading_scheme_version_id"] != version.grading_scheme_version_id
+                and tpl_fields.LOCK_SCHEME_VERSION in _Spec.model_validate(version.spec).locked_fields()):
+            raise Conflict("Fixed by the exam template", code="template_locked",
+                           details={"field": tpl_fields.LOCK_SCHEME_VERSION, "source": "exam_template"})
+        try:
+            a = _inst.instantiate(db, ctx, course, version, q.parameters or {}, title=data.title,
+                                  description=data.description, languages=list(q.languages))
+            if later:  # update_assessment commits the assessment, its sections and assignment with these settings
+                builder.update_assessment(db, ctx, course, a.id, asch.AssessmentUpdateIn(
+                    draft_rev=a.draft_rev, **{QUIZ_FIELDS[f]: v for f, v in later.items()}))
+            else:
+                db.commit()
+        except BaseException:
+            db.rollback()  # no orphan assessment when a later setting is refused (e.g. an invalid window)
+            raise
+        row = db.get(Assignment, assignment_id_for(a.id))
+        db.refresh(row)
+        return row
+        # --- Phase 7b S2 end ---
     if "points_possible" in fields and data.points_possible is not None:
         raise _bad("points_possible", "A quiz takes its points from the published version",
                    "quiz_field_not_editable")

@@ -134,7 +134,7 @@ def staff_attempt_out(db: Session, attempt: Attempt) -> ser.AttemptStaffOut:
     summary = ser.staff_summary(attempt, (user.display_name or user.email) if user else None, grade)
     return ser.AttemptStaffOut(
         **summary.model_dump(), assessment_id=attempt.assessment_id,
-        submission_id=gradebook.submission_id_for(db, attempt), result=ser.result_out(attempt),
+        submission_id=gradebook.submission_id_for(db, attempt), result=ser.result_out(attempt, plan),  # S7: titles
         items=build_review(db, attempt, items, plan, with_keys=True, staff=True),
     )
 

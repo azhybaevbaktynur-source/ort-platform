@@ -1,0 +1,10 @@
+section,type,stem,option_a,option_b,option_c,option_d,option_e,correct_option,column_a,column_b,answer,tolerance,answer_min,answer_max,answers,case_sensitive,rubric,max_points,explanation,topic,difficulty,tags,image_url,external_id,passage_text,passage_ref
+# a comment row: ignored by the parser,,,,,,,,,,,,,,,,,,,,,,,,,,
+part_a,single_choice,Capital of Kyrgyzstan?,Osh,Bishkek,Naryn,,,B,,,,,,,,,,,Bishkek is the capital.,Geography,easy,"geo, capitals",,sc1,,
+part_a,multiple_answers,Pick the prime numbers,2,4,5,9,,"A,C",,,,,,,,,,,,Numbers,medium,,,ma1,,
+part_a,true_false,The Earth is round.,,,,,,A,,,,,,,,,,,,,,,,tf1,,
+part_a,comparison,,,,,,,B,2+2,5,,,,,,,,,,,,,,cmp1,,
+part_b,numeric,What is 6 x 7?,,,,,,,,,42,0.5,,,,,,,,,hard,,,num1,"A short passage about numbers.",
+part_b,numeric,Pick a number between 1 and 10,,,,,,,,,,,1,10,,,,,,,,,,num2,,num1#passage
+part_b,short_text,Name the largest lake in Kyrgyzstan,,,,,,,,,,,,,Issyk-Kul|Ysyk-Kol,false,,,,,,,,st1,,num1
+part_b,essay,Describe your city,,,,,,,,,,,,,,,Mention three places,5,,,,,,es1,,

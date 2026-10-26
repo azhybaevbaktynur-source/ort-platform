@@ -47,8 +47,7 @@ async def test_create_text_assignment_defaults(api, db):
     ({"kind": "text"}, "points_possible_required"),
     ({"kind": "file", "points_possible": 5, "quiz": {"languages": ["en"]}}, "quiz_body_forbidden"),
     ({"kind": "quiz"}, "quiz_body_required"),
-    ({"kind": "quiz", "quiz": {"languages": ["en"], "exam_template_id": str(uuid.uuid4())}},
-     "exam_templates_not_available"),
+    # --- Phase 7b S2 --- an unknown template is a 404 `template_not_found` now (tests/lms/test_exam_template_instantiate.py)
     ({"kind": "quiz", "quiz": {"languages": ["en"], "preset": "none", "exam_template_id": str(uuid.uuid4())}},
      "preset_template_exclusive"),
     ({"kind": "quiz", "points_possible": 5, "quiz": {"languages": ["en"]}}, "quiz_field_not_editable"),

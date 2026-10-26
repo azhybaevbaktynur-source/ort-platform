@@ -39,6 +39,20 @@ export interface ImportBankSummary {
   images: number;
 }
 
+// --- Phase 7b S5 --- (`ImportResult.attached` of the backend: the commit-only attach step)
+export interface ImportAttachSummary {
+  assessment_id: string;
+  added: number;
+  /** section label -> questions added */
+  sections: Record<string, number>;
+  /** skip code (item_duplicate, too_many_items, ...) -> count */
+  skipped: Record<string, number>;
+  /** Phase 7b S7: section label -> 0-based section position in the exam */
+  section_positions?: Record<string, number>;
+  /** Phase 7b S7: which cap a too_many_items skip hit (`scope` "section": its max_items; "exam": the exam limit) */
+  skip_details?: { code: string; section: string; position: number; max: number; scope: "section" | "exam"; count: number }[];
+}
+
 export interface ImportReport {
   ok: boolean;
   committed: boolean;
@@ -48,6 +62,7 @@ export interface ImportReport {
   images_total: number;
   images_new: number;
   images_existing: number;
+  attached?: ImportAttachSummary | null; // Phase 7b S5
 }
 
 export interface ImportParams {
@@ -58,6 +73,14 @@ export interface ImportParams {
   /** Only for a CSV or a single bundle without manifest; empty = new bank. */
   targetBankId?: string | null;
   onConflict?: ImportConflictPolicy;
+  // --- Phase 7b S4 begin --- (PHASE_7B_DESIGN 8: validation against a template exam, general format only)
+  /** Validate rows against the template version of this draft assessment (`not_a_template_assessment` otherwise). */
+  assessmentId?: string | null;
+  /** Validate against an explicit template version (no assessment). */
+  examTemplateVersionId?: string | null;
+  /** Commit only: add the imported questions to the sections of this draft assessment (same transaction). */
+  attachToAssessmentId?: string | null;
+  // --- Phase 7b S4 end ---
 }
 
 async function post(path: string, p: ImportParams, commit: boolean): Promise<ImportReport> {
@@ -67,6 +90,11 @@ async function post(path: string, p: ImportParams, commit: boolean): Promise<Imp
   if (p.examType) form.append("exam_type", p.examType);
   if (p.targetBankId) form.append("target_bank_id", p.targetBankId);
   if (commit) form.append("on_conflict", p.onConflict ?? "skip");
+  // --- Phase 7b S4 begin ---
+  if (p.assessmentId) form.append("assessment_id", p.assessmentId);
+  if (p.examTemplateVersionId) form.append("exam_template_version_id", p.examTemplateVersionId);
+  if (commit && p.attachToAssessmentId) form.append("attach_to_assessment_id", p.attachToAssessmentId);
+  // --- Phase 7b S4 end ---
   let res: Response;
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {

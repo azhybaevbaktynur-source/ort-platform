@@ -71,3 +71,8 @@ api_router.include_router(_org_router, prefix="/org", tags=["Organizations"])
 api_router.include_router(_me_orgs_router, prefix="/me", tags=["Me"])
 api_router.include_router(_platform_orgs_router, prefix="/platform", tags=["Platform Admin"])
 # --- Phase 6 S1 end ---
+# --- Phase 7b S2 begin --- (exam templates, PHASE_7B_DESIGN 3 / 9.1)
+from app.lms.exam_templates.router import router as _exam_templates_router  # noqa: E402
+
+api_router.include_router(_exam_templates_router, prefix="/exam-templates", tags=["Exam Templates"])
+# --- Phase 7b S2 end ---

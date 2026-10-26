@@ -260,6 +260,10 @@ def build_snapshot(db: Session, assessment: Assessment, *, now: Optional[datetim
             issues.append(Issue("empty_section", pos))
         if rules.get("max_items") and sec_count > rules["max_items"]:
             issues.append(Issue("too_many_items", pos))
+        # --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 2.4, P7B-4: an error at publish like too_many_items)
+        if rules.get("min_items") and sec_count < rules["min_items"]:
+            issues.append(Issue("too_few_items", pos))
+        # --- Phase 7b S1 end ---
         total_items += sec_count
     if total_items > settings.ASSESSMENT_MAX_ITEMS:
         issues.append(Issue("too_many_items"))
@@ -279,4 +283,24 @@ def build_snapshot(db: Session, assessment: Assessment, *, now: Optional[datetim
         "shuffle_choices": bool(assessment.shuffle_choices), "item_count": item_count,
         "points_possible": points_str(points), "sections": out_sections, "slots": slots,
     }
+    # --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 6: additive keys, SNAPSHOT_SCHEMA unchanged; the engine and the
+    # player cache read only the keys they know, so attempts behave exactly as before)
+    snapshot.update(template_snapshot_keys(assessment))
+    # --- Phase 7b S1 end ---
     return snapshot, issues
+
+
+# --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 6)
+def template_snapshot_keys(assessment: Assessment) -> dict:
+    """The four exam-template keys of a snapshot (ids.SNAPSHOT_TEMPLATE_KEYS), from the assessment row."""
+    from app.lms.exam_templates.ids import SNAPSHOT_TEMPLATE_KEYS
+
+    tv = getattr(assessment, "exam_template_version_id", None)
+    values = {
+        "exam_template_version_id": str(tv) if tv is not None else None,
+        "display_mode": getattr(assessment, "display_mode", None) or "one_per_page",
+        "passage_display": getattr(assessment, "passage_display", None),
+        "result_view": getattr(assessment, "result_view", None),
+    }
+    return {k: values[k] for k in SNAPSHOT_TEMPLATE_KEYS}
+# --- Phase 7b S1 end ---

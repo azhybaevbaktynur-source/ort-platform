@@ -321,4 +321,43 @@ export const ISSUE_CODES = [
   "no_sections", "empty_section", "unresolved_language", "question_deleted", "type_not_allowed", "passage_mismatch",
   "pick_pool_too_small", "section_limit_in_free_navigation", "section_limits_exceed_total", "after_close_needs_until",
   "too_many_items", "languages_not_in_course", "empty_passage", "newer_version",
+  "too_few_items", // Phase 7b S4 (P7B-4)
 ] as const;
+
+// --- Phase 7b S4 begin --- (PHASE_7B_DESIGN 2.3, 2.4, 9.1; interface merging keeps the Phase 3 declarations intact)
+export interface SectionRules {
+  min_items?: number;
+}
+
+/** `exam_template` of a staff assessment created from an exam template (null for blank and preset exams). */
+export interface AssessmentExamTemplateRef {
+  template_id: string;
+  title: LocalizedText;
+  version_no: number;
+  version_id: string;
+  latest_version_no: number | null;
+  /** Course-template lock field names fixed by the template (`templates/base.py`), e.g. "navigation". */
+  locked_fields: string[];
+  /** Phase 7b S6: the template is locked now (the server refuses "Save as template"). */
+  template_locked?: boolean;
+}
+
+export interface AssessmentStaffOut {
+  exam_template?: AssessmentExamTemplateRef | null;
+  display_mode?: string;
+  passage_display?: string | null;
+  result_view?: string | null;
+  structure_locked?: boolean;
+}
+
+export interface AssessmentCreateIn {
+  exam_template_id?: string;
+  exam_template_version_id?: string;
+  parameters?: Record<string, string>;
+}
+
+/** Lock fields of a template exam that are fixed right now (empty for blank and preset exams). */
+export function templateLockedFields(a: Pick<AssessmentStaffOut, "exam_template" | "structure_locked">): Set<string> {
+  return new Set(a.structure_locked && a.exam_template ? a.exam_template.locked_fields : []);
+}
+// --- Phase 7b S4 end ---

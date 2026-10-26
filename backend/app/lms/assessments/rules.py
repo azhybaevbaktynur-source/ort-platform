@@ -24,6 +24,7 @@ ORT_SECTION_RULES: dict[str, dict] = {
     **{k: {"allowed_types": ["single_choice"], "allow_passages": False} for k in ORT_SUBJECT_KEYS},
 }
 RULE_KEYS = frozenset({"allowed_types", "max_items", "allow_passages"})
+RULE_KEYS = RULE_KEYS | {"min_items"}  # --- Phase 7b S1 --- (PHASE_7B_DESIGN 2.4; ORT rules never set counts)
 ORT_PRESETS = ("ort_main", "ort_subject")
 
 
@@ -65,6 +66,17 @@ def normalize_rules(rules: Optional[dict]) -> dict:
             raise ValidationFailed("Invalid section rules",
                                    details=[{"loc": ["rules", "max_items"], "msg": "must be a positive integer"}])
         out["max_items"] = mx
+    # --- Phase 7b S1 begin --- (PHASE_7B_DESIGN 2.4: min_items like max_items, and min <= max when both are set)
+    mn = rules.get("min_items")
+    if mn is not None:
+        if isinstance(mn, bool) or not isinstance(mn, int) or mn < 1:
+            raise ValidationFailed("Invalid section rules",
+                                   details=[{"loc": ["rules", "min_items"], "msg": "must be a positive integer"}])
+        if mx is not None and mn > mx:
+            raise ValidationFailed("Invalid section rules",
+                                   details=[{"loc": ["rules", "min_items"], "msg": "must not exceed max_items"}])
+        out["min_items"] = mn
+    # --- Phase 7b S1 end ---
     ap = rules.get("allow_passages")
     if ap is not None:
         if not isinstance(ap, bool):

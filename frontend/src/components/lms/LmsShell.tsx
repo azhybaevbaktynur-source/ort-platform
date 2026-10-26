@@ -51,6 +51,7 @@ function areaFromUrl(rest: string, view: string | null, coursesDefault: AreaKey 
   if (rest === "/admin" || rest.startsWith("/admin/")) return "platform";
   if (rest === "/org" || rest.startsWith("/org/")) return "organization";
   if (rest.startsWith("/grading-schemes") || rest === "/courses/new" || rest === "/courses/trash") return "teaching";
+  if (rest.startsWith("/exam-templates")) return "teaching"; // Phase 7b S4
   if (rest === "/courses") {
     if (view === "teaching" || view === "learning") return view;
     return coursesDefault;
@@ -136,6 +137,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
       const sections = [{ href: `${base}/courses?view=teaching`, label: t("shell.teaching.courses"), active: rest === "/courses" && urlArea === "teaching" }];
       if (canCreate) sections.push({ href: `${base}/courses/new`, label: t("lms.nav.create"), active: rest === "/courses/new" });
       if (canCreate || isAdmin) sections.push({ href: `${base}/grading-schemes`, label: t("lms.nav.gradingSchemes"), active: rest.startsWith("/grading-schemes") });
+      sections.push({ href: `${base}/exam-templates`, label: t("examTemplates.nav.title"), active: rest.startsWith("/exam-templates") }); // Phase 7b S4
       list.push({ key: "teaching", label: t("shell.areas.teaching"), href: `${base}/courses?view=teaching`, icon: <Presentation />, sections });
     }
     if (orgs.length === 1) {

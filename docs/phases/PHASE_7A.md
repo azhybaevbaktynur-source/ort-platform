@@ -1,6 +1,6 @@
 # Phase 7a: assignments and the general gradebook
 
-**Status**: built and verified on branch `phase-7a` (2026-10-26); deploy follows (no owner checkpoint for 7a; the next checkpoint is after 7b). Design: `docs/phases/PHASE_7A_DESIGN.md`. Open owner questions with the defaults in effect: `docs/PRODUCT_DECISIONS.md` "Phase 7a: open owner questions" (Q1–Q6).
+**Status**: **deployed 2026-10-26** (`main` 95b040f; Render /health OK; Neon at `0009_phase7a_assignments`, verified: 3 assessments with 3 quiz assignments, the one real submission on its assignment with unchanged values, 299 question versions, 4 attempts). Backup: Neon branch `backup-2026-10-26-before-phase7a` (after deleting `rehearsal-2026-10-23-phase5`, owner OK). No owner checkpoint for 7a; the next one is after 7b. Design: `docs/phases/PHASE_7A_DESIGN.md`. Open owner questions with the defaults in effect: `docs/PRODUCT_DECISIONS.md` "Phase 7a: open owner questions" (Q1–Q6).
 
 ## What changed
 

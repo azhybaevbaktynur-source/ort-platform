@@ -9,6 +9,9 @@ from pydantic import Field, field_validator, model_validator
 
 from app.lms.content.richtext import ChoiceText
 from .base import QuestionType, ScoreResult, StrictModel, full_or_zero, zero_result
+# --- Phase 7b S3 begin --- (general import format row builders)
+from .base import ImportRowError, import_bool, import_cell
+# --- Phase 7b S3 end ---
 
 
 def parse_decimal(raw) -> Decimal:
@@ -80,6 +83,41 @@ class NumericResponse(StrictModel):
 
 class Numeric(QuestionType):
     name = "numeric"
+    # --- Phase 7b S1 --- (catalog data, PHASE_7B_DESIGN 7)
+    title_key = "bank.types.numeric.name"
+    supports_passages = True
+    import_columns = ('answer', 'tolerance', 'answer_min', 'answer_max')
+    # --- Phase 7b S3 begin --- (general import format row builder)
+    def from_import_row(self, raw):
+        def num(column: str, value: str) -> str:
+            try:
+                return str(parse_decimal(value))
+            except ValueError as e:
+                raise ImportRowError(column, f"{column}: {e}.") from None
+
+        answers: list[dict] = []
+        values = [v.strip() for v in import_cell(raw, "answer").split("|") if v.strip()]
+        tol = import_cell(raw, "tolerance")
+        margin = num("tolerance", tol) if tol else "0"
+        if Decimal(margin) < 0:
+            raise ImportRowError("tolerance", "tolerance must be >= 0.")
+        for v in values:
+            answers.append({"kind": "exact", "value": num("answer", v), "margin": margin})
+        lo, hi = import_cell(raw, "answer_min"), import_cell(raw, "answer_max")
+        if lo or hi:
+            if not (lo and hi):
+                raise ImportRowError("answer_min" if not lo else "answer_max",
+                                     "answer_min and answer_max must both be filled.")
+            a, b = num("answer_min", lo), num("answer_max", hi)
+            if Decimal(a) > Decimal(b):
+                raise ImportRowError("answer_min", "answer_min must be <= answer_max.")
+            answers.append({"kind": "range", "min": a, "max": b})
+        if not answers:
+            raise ImportRowError("answer", "answer (or answer_min and answer_max) is required.")
+        if len(answers) > 10:
+            raise ImportRowError("answer", "At most 10 accepted answers.")
+        return {"answers": answers}
+    # --- Phase 7b S3 end ---
     Data = NumericData
     Response = NumericResponse
     STUDENT_KEYS = frozenset()
@@ -145,6 +183,19 @@ class ShortTextResponse(StrictModel):
 
 class ShortText(QuestionType):
     name = "short_text"
+    # --- Phase 7b S1 --- (catalog data, PHASE_7B_DESIGN 7)
+    title_key = "bank.types.short_text.name"
+    supports_passages = True
+    import_columns = ('answers', 'case_sensitive')
+    # --- Phase 7b S3 begin --- (general import format row builder)
+    def from_import_row(self, raw):
+        answers = [a.strip() for a in import_cell(raw, "answers").split("|") if a.strip()]
+        if not answers:
+            raise ImportRowError("answers", "answers is required (accepted forms separated by |).")
+        if len(answers) > 20:
+            raise ImportRowError("answers", "At most 20 accepted answers.")
+        return {"answers": answers, "case_sensitive": import_bool(raw, "case_sensitive")}
+    # --- Phase 7b S3 end ---
     Data = ShortTextData
     Response = ShortTextResponse
     STUDENT_KEYS = frozenset()
@@ -179,6 +230,15 @@ class EssayResponse(StrictModel):
 
 class Essay(QuestionType):
     name = "essay"
+    # --- Phase 7b S1 --- (catalog data, PHASE_7B_DESIGN 7)
+    title_key = "bank.types.essay.name"
+    supports_passages = True
+    import_columns = ('rubric', 'max_points')
+    # --- Phase 7b S3 begin --- (general import format row builder)
+    def from_import_row(self, raw):
+        rubric = import_cell(raw, "rubric")
+        return {"rubric_note": rubric} if rubric else {}
+    # --- Phase 7b S3 end ---
     Data = EssayData
     Response = EssayResponse
     STUDENT_KEYS = frozenset({"word_limit"})

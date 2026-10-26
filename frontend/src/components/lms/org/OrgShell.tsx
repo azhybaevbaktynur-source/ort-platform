@@ -63,6 +63,8 @@ export function OrgShell({ children }: { children: React.ReactNode }) {
     { href: base, label: t("organizations.org.nav.overview"), active: pathname === base },
     { href: `${base}/teachers`, label: t("organizations.org.nav.teachers"), active: pathname.startsWith(`${base}/teachers`) },
     { href: `${base}/courses`, label: t("organizations.org.nav.courses"), active: pathname.startsWith(`${base}/courses`) },
+    // --- Phase 7b S4 ---
+    { href: `${base}/exam-templates`, label: t("examTemplates.nav.title"), active: pathname.startsWith(`${base}/exam-templates`) },
   ];
   const readOnly = org.status === "suspended";
   const crumbs = (...rest: Breadcrumb[]): Breadcrumb[] => [{ label: org.name, href: base }, ...rest];
