@@ -348,3 +348,11 @@ From `phases/PHASE_7A_DESIGN.md` §8. Work continues with the interim default; t
 | Q5 | Homework (text / file / oral) assignments inside the two ORT courses | **Not allowed** (UI hides "New assignment", the API refuses non-quiz assignments in ORT-template courses); the ORT exam appears as its quiz assignment | Keep the ORT courses exam-only unless the owner wants homework there |
 | Q6 | ORT staff gradebook "total" percent column (meaningless next to the scaled score) | **Unchanged** (as before 7a) | Hide it, or show the scaled score instead |
 | 7b-Q1 | "Save as template" on ORT preset exams | **Refused** (`preset_not_templatable`), so the ORT structure spreads only through the granted ORT course template | Keep refused; allowing it is a one-line switch |
+
+## Phase 7b implementation decisions (agent, 2026-10-26)
+
+| # | Topic | Decision |
+|---|---|---|
+| K1 | Copying locked structures | "Save as template" is refused for an exam built from a locked template (or with a locked structure), so a locked structure cannot be copied into an unlocked template (security review 7b, L5). |
+| K2 | CSV column cap | The general importer refuses more than 64 columns; every CSV import (ORT included) refuses more than 256 header columns in the shared import service. ORT importer files are unchanged and the golden ORT imports are identical (no real ORT file comes close). |
+| K3 | Org template editing | The creator of an organization template may edit its drafts while the organization allows teachers to publish org templates; locking stays with the org admins. |
