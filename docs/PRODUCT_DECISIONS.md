@@ -417,3 +417,31 @@ Implementation decisions:
 | P8A-7 | Locked items carry no destination (no link, no URL as title). |
 | P8A-8 | A requirement on an unpublished target does not count; the outline editor warns the teacher at module level and before publishing such a module. |
 | P8A-9 | No announcement emails in 8a; `/me/home` shows the latest three and the "up next" strip reads stored progress only (bounded scan of 100 modules). |
+
+## Phase 8b decisions (agent, 2026-10-28)
+
+Design: `phases/PHASE_8B_DESIGN.md` (§15, §16). Owner questions with the defaults in effect (listed at the checkpoint after 8b):
+
+| # | Question | Default in effect |
+|---|---|---|
+| 8b-Q1 | Where sample questions of a template live | **One hidden sandbox course per template** (`courses.sandbox_for_template_id`, migration 0013); never published, listed or joinable. |
+| 8b-Q2 | Who may run a preview | **Managers of the template only** (rechecked on every request); teachers who can only pick a template see its structure. |
+| 8b-Q3 | Scrolling mode window | **30 items, one section at a time.** |
+| 8b-Q4 | Constructor saving | **Autosave** of valid drafts (1.5 s); invalid drafts stay local with a visible status. |
+| 8b-Q5 | ORT-style scaled result page on general quizzes | **Allowed** (shows "no scaled score" when the scheme has none). |
+| 8b-Q6 | Move ORT onto the constructor | **No**: ORT stays on its presets (B1). |
+
+Implementation decisions:
+
+| # | Decision |
+|---|---|
+| P8B-1 | Sandbox staff are the template's managers, enrolled lazily; access is rechecked against `can_manage` on every request (the enrollment is only a cache). |
+| P8B-2 | Preview attempts reuse the staff preview path (`is_preview`); never graded, never in gradebooks, module progress or the student home; at most 20 finished previews per author per template. |
+| P8B-3 | The sample quiz mirrors the draft by position, keeps items, drops min/max counts. |
+| P8B-4 | `passage_display` is governed by the `result_view` lock key. |
+| P8B-5 | Scrolling mode: windows of 30, viewport-tracked current item; engine and autosave unchanged. |
+| P8B-6 | Renderers come from the attempt/result payloads with a server-side course-template fallback (ORT resolves to one per page, numbered passages, ORT result). |
+| P8B-7 | Spec diff is computed on request; sections matched by key, then position (0-based in paths). |
+| P8B-8 | Sample questions are never copied into exams created from a template (templates share structure only). |
+| P8B-9 | Inside a sandbox course everything except editing the sample quiz and previewing is refused (409 `sandbox_course`): publishing, new assessments, transfer, restore, modules/pages/files/announcements writes, staff changes, joins. |
+| P8B-10 | The player's `?return=` accepts only same-site `/<lang>/…` paths. |
