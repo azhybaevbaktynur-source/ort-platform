@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.authz import A, AuthzContext
 from app.lms.audit import service as audit
-from app.lms.core.errors import Conflict, ValidationFailed
+from app.lms.core.errors import Conflict, NotFound, ValidationFailed
 from app.lms.core.models import utcnow
 from app.lms.core.pagination import paginate
 from app.lms.courses import service as course_svc
@@ -238,6 +238,11 @@ def promote(ctx: AuthzContext, template_id: uuid.UUID, *, reason: Optional[str] 
                  target_id=str(t.id), reason=reason,
                  details={"from": "teacher", "to": "organization", "former_owner_user_id": former,
                           "organization_id": str(t.organization_id)}, request=request)
+    # --- Phase 8b S2 begin --- (PHASE_8B_DESIGN 5.1: sandbox staff follow the manager set; same transaction)
+    from app.lms.exam_templates import sandbox as _sandbox
+
+    _sandbox.sync_staff(db, t)
+    # --- Phase 8b S2 end ---
     db.commit()
     return t
 
@@ -293,11 +298,36 @@ def picker_out(t: ExamTemplate, cur: Optional[ExamTemplateVersion]) -> sch.ExamT
     return sch.ExamTemplatePickerOut(**_picker_fields(t, cur))
 
 
-def manage_out(ctx: AuthzContext, t: ExamTemplate, cur: Optional[ExamTemplateVersion]) -> sch.ExamTemplateOut:
+_UNSET = object()
+
+
+def _unpublished_changes(t: ExamTemplate, cur: Optional[ExamTemplateVersion]) -> Optional[int]:
+    """Phase 8b S2: number of diff entries draft vs current version; None without a version, 0 without a draft."""
+    if cur is None:
+        return None
+    if t.draft_spec is None:
+        return 0
+    from pydantic import ValidationError
+
+    from app.lms.exam_templates import diff
+
+    try:
+        return diff.count_changes(cur.spec, t.draft_spec)
+    except (ValidationError, ValueError):  # a draft the current spec shape cannot read: unknown
+        return None
+
+
+def manage_out(ctx: AuthzContext, t: ExamTemplate, cur: Optional[ExamTemplateVersion], *,
+               sandbox_ref=_UNSET) -> sch.ExamTemplateOut:
+    # --- Phase 8b S2 --- (`sandbox`, `unpublished_changes`: managers only, PHASE_8B_DESIGN 6.1)
+    if sandbox_ref is _UNSET:
+        from app.lms.exam_templates import sandbox as _sandbox
+
+        sandbox_ref = _sandbox.sandbox_ref(ctx.db, t.id)
     return sch.ExamTemplateOut(
         **_picker_fields(t, cur), owner_user_id=t.owner_user_id, key=t.key, draft_spec=t.draft_spec,
         draft_rev=t.draft_rev, created_by_id=t.created_by_id, can_lock=scopes.can_lock(ctx, t),
-        can_promote=scopes.can_promote(ctx, t))
+        can_promote=scopes.can_promote(ctx, t), sandbox=sandbox_ref, unpublished_changes=_unpublished_changes(t, cur))
 
 
 def out_for(ctx: AuthzContext, t: ExamTemplate):
@@ -309,7 +339,48 @@ def list_out(ctx: AuthzContext, rows: list[ExamTemplate], picker: bool) -> list:
     cur = _current_versions(ctx.db, rows)
     if picker:
         return [picker_out(t, cur.get(t.current_version_id)) for t in rows]
-    return [manage_out(ctx, t, cur.get(t.current_version_id)) for t in rows]
+    from app.lms.exam_templates import sandbox as _sandbox  # Phase 8b S2: one query for the page
+
+    refs = _sandbox.sandbox_refs(ctx.db, [t.id for t in rows])
+    return [manage_out(ctx, t, cur.get(t.current_version_id), sandbox_ref=refs.get(t.id)) for t in rows]
+
+
+# --- Phase 8b S2 begin --- (PHASE_8B_DESIGN 5.2, 6.1: `GET .../diff?from=<no>&to=<no|draft>`)
+
+def _version_or_404(db: Session, t: ExamTemplate, version_no: int) -> ExamTemplateVersion:
+    v = db.execute(select(ExamTemplateVersion).where(ExamTemplateVersion.template_id == t.id,
+                                                     ExamTemplateVersion.version_no == version_no)).scalar_one_or_none()
+    if v is None:
+        raise NotFound("Template version not found", code=ids.E_VERSION_NOT_FOUND)
+    return v
+
+
+def spec_diff_out(ctx: AuthzContext, template_id: uuid.UUID, from_no: int, to: str) -> sch.SpecDiffOut:
+    """Readers compare versions; `to=draft` needs `can_manage` (else 404, the draft's existence is not revealed)
+    and a draft (else 422 `diff_target_invalid`). Only paths and values of the two specs come back."""
+    from app.lms.exam_templates import diff
+
+    db = ctx.db
+    t = load_readable(ctx, template_id)
+    before = _version_or_404(db, t, from_no).spec
+    if to == "draft":
+        if not scopes.can_manage(ctx, t):
+            raise scopes.template_not_found()
+        if t.draft_spec is None:
+            raise ValidationFailed("The template has no draft to compare", code=ids.E_DIFF_TARGET_INVALID,
+                                   details=[{"loc": ["to"], "msg": "no draft"}])
+        after = t.draft_spec
+        to_end: sch.DiffEnd = "draft"
+    else:
+        try:
+            to_end = int(to)
+        except (TypeError, ValueError):
+            raise ValidationFailed("to must be a version number or 'draft'", code=ids.E_DIFF_TARGET_INVALID,
+                                   details=[{"loc": ["to"], "msg": "version number or 'draft'"}]) from None
+        after = _version_or_404(db, t, to_end).spec
+    changes = diff.spec_diff(before, after)
+    return sch.SpecDiffOut(from_=from_no, to=to_end, changes=changes, summary=diff.summary(changes))
+# --- Phase 8b S2 end ---
 
 
 # ------------------------------------------------------------------------------------------------ block catalog (7)

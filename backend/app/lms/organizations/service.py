@@ -406,6 +406,7 @@ def join_as_teacher(db: Session, actor: User, org: Organization, course_id: uuid
     course = course_svc.load_course(db, course_id)
     if course.organization_id != org.id:
         raise course_svc.not_found_course()
+    course_svc.assert_not_sandbox(course)  # Phase 8b S2: sandbox staff = the template's managers (409 sandbox_course)
     course_svc.lock_course(db, course)
     if course.status == "concluded":
         raise Conflict("The course is concluded", code="course_concluded")
