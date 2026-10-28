@@ -65,6 +65,13 @@ def get_assessment(course_id: uuid.UUID, assessment_id: uuid.UUID, ctx: AuthzCon
     course_svc.require_course(ctx, A.CONTENT_READ, course)
     if _is_staff(ctx, course):
         return _staff(ctx, repo.load_assessment(ctx.db, course.id, assessment_id))
+    # --- Phase 8a fix1 --- (PHASE_8A_DESIGN 6.5: the lobby of a quiz in a locked module answers 423
+    # `module_locked`, same gate and ORT preset exemption as `attempts.engine.start`; staff never reach here)
+    from app.lms.assignments.ids import assignment_id_for
+    from app.lms.modules import gate
+
+    a = repo.load_assessment(ctx.db, course.id, assessment_id)
+    gate.require_access(ctx.db, ctx, course, assignment=assignment_id_for(a.id), preset=a.preset)
     return builder.lobby(ctx.db, ctx, course, assessment_id)
 
 

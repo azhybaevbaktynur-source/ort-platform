@@ -348,6 +348,8 @@ def compute(structure: Structure, mem: Memory, now: datetime) -> Evaluation:
         # ---- step 4: requirements (visible items only)
         evals: list[ItemEval] = []
         flags, hypothetical, any_met = [], [], False
+        undone_marks: list = []  # latest marked_done time of each mark_done item that is now unchecked
+        done_marks: list = []    # ... and of each one that is checked
         grades_seen = None
         for r in rows:
             ie = ItemEval(row=r)
@@ -362,6 +364,10 @@ def compute(structure: Structure, mem: Memory, now: datetime) -> Evaluation:
             if r.req_type == "mark_done":
                 ie.met = now_met  # the one non-monotone flag: the student's own checkbox
                 hypothetical.append(now_met or mem.facts.ever_done(r.id) or mem_met)
+                if now_met:
+                    done_marks.append(mem.facts.marked_at.get(r.id))
+                elif mem.facts.ever_done(r.id) or mem_met:
+                    undone_marks.append(mem.facts.marked_at.get(r.id))
             else:
                 ie.met = bool(mem_met or now_met)
                 hypothetical.append(ie.met)
@@ -380,8 +386,13 @@ def compute(structure: Structure, mem: Memory, now: datetime) -> Evaluation:
         else:
             computed = UNLOCKED
         if stored_rank == COMPLETED and computed < COMPLETED:
-            # undo of a mark_done that carried the completion: back to started; otherwise the memory keeps it
-            final = max(computed, STARTED) if is_open and _completion(m.completion_mode, hypothetical) else COMPLETED
+            # undo of a mark_done that carried the completion: back to started; otherwise the memory keeps it.
+            # "Carried" = the undone checkbox was ticked no later than the stored completion (a box ticked and
+            # unticked after the module was already completed never lowers it).
+            done_at = (stored or {}).get("completed_at")
+            carried = any(at is None or done_at is None or at <= done_at for at in undone_marks)
+            undo = is_open and carried and _completion(m.completion_mode, hypothetical)
+            final = max(computed, STARTED) if undo else COMPLETED
         else:
             final = max(stored_rank, computed) if course_open else computed
         me.state = STATES[final]
@@ -389,7 +400,9 @@ def compute(structure: Structure, mem: Memory, now: datetime) -> Evaluation:
         if final >= UNLOCKED:
             me.unlocked_at = (stored or {}).get("unlocked_at") or now
         if final == COMPLETED:
-            me.completed_at = (stored or {}).get("completed_at") or now
+            # a fresh completion is never earlier than the fact that carried it (a done fact may sit a few
+            # microseconds after `now`, see facts.set_done), so the undo check above compares like with like
+            me.completed_at = (stored or {}).get("completed_at") or _max(now, *done_marks)
         # ---- step 6: sequential
         if final == LOCKED:
             for ie in evals:

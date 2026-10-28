@@ -17,6 +17,7 @@ import { PublishPanel, publishIsPrimary } from "@/components/lms/assessments/Pub
 import { sectionName } from "@/components/lms/assessments/SectionCard";
 import { fmtDateTime, fmtPoints } from "@/components/lms/assessments/format";
 import { MyAttemptsPanel } from "@/components/lms/home/MyAttemptsPanel"; // Phase 6 S6b
+import { LockedState, isModuleLocked } from "@/components/lms/pages/ApiError"; // Phase 8a fix1
 
 export default function AssessmentPage() {
   const { lang, t } = useTranslation();
@@ -45,6 +46,15 @@ export default function AssessmentPage() {
   const staffTitle = data && isStaffAssessment(data) ? pickLocalized(data.title, lang, course.default_language) || t("assessments.untitled") : "";
   const crumbs = useTabCrumbs("assessments", [{ label: staffTitle || t("lms.common.loading") }], course.id);
 
+  // Phase 8a fix1 (M2): the lobby of a quiz in a locked module answers 423 `module_locked` for students
+  if (error && !data && isModuleLocked(error)) {
+    return (
+      <div className="space-y-4">
+        <Link href={base} className="inline-flex min-h-11 items-center text-sm font-medium text-brand-700 hover:underline sm:min-h-0">{t("assessments.backToList")}</Link>
+        <LockedState error={error} courseId={course.id} />
+      </div>
+    );
+  }
   if (error && !data) return <AssessmentError error={error} onRetry={() => void load()} />;
   if (!data) return <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p>;
   // --- Phase 6 S6b begin --- (UX S1: "My attempts" with the result link; first after the last attempt)

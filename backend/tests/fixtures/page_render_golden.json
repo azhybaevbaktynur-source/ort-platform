@@ -133,5 +133,20 @@
     "name": "katex_multiline_display",
     "md": "$$\na_1\n+ b_2\n$$",
     "html": "<p>$$\na_1\n+ b_2\n$$</p>"
+  },
+  {
+    "name": "footnotes_and_fragments",
+    "md": "Claim[^1] and [see below](#notes).\n\n[^1]: Source.",
+    "html": "<p>Claim<sup id=\"fnref:1\"><a href=\"#fn:1\" rel=\"noopener noreferrer\">1</a></sup> and <a href=\"#notes\" rel=\"noopener noreferrer\">see below</a>.</p>\n\n<hr>\n<ol>\n<li id=\"fn:1\">\n<p>Source.&nbsp;<a href=\"#fnref:1\" title=\"Jump back to footnote 1 in the text\" rel=\"noopener noreferrer\">↩</a></p>\n</li>\n</ol>"
+  },
+  {
+    "name": "fragment_vectors",
+    "md": "[b](<# x>)\n\n[c](#a/b)\n\n[d](#)\n\n<a href=\"#&#x6a;s\" onclick=\"x\">e</a>\n\n<a href=\"#//evil.example\">f</a>\n\n<a href='#x\" onmouseover=\"alert(1)'>g</a>",
+    "html": "<p><a rel=\"noopener noreferrer\">b</a></p>\n<p><a rel=\"noopener noreferrer\">c</a></p>\n<p><a rel=\"noopener noreferrer\">d</a></p>\n<p><a href=\"#js\" rel=\"noopener noreferrer\">e</a></p>\n<p><a rel=\"noopener noreferrer\">f</a></p>\n<p><a rel=\"noopener noreferrer\">g</a></p>"
+  },
+  {
+    "name": "id_attribute_vectors",
+    "md": "<p id=\"fn:1\">p</p> <li id=\"location\">l</li> <sup id=\"fnref:1\" onclick=\"x\">s</sup> <sup id=\"fn:<b>\">t</sup> <h2 id=\"fn:2\">h</h2>",
+    "html": "<p>p</p>\n<li>l</li>\n<p><sup id=\"fnref:1\">s</sup> <sup>t</sup> <br>\n</p><h2>h</h2>\n<p></p>"
   }
 ]
