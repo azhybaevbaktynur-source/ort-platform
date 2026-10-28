@@ -356,3 +356,38 @@ From `phases/PHASE_7A_DESIGN.md` §8. Work continues with the interim default; t
 | K1 | Copying locked structures | "Save as template" is refused for an exam built from a locked template (or with a locked structure), so a locked structure cannot be copied into an unlocked template (security review 7b, L5). |
 | K2 | CSV column cap | The general importer refuses more than 64 columns; every CSV import (ORT included) refuses more than 256 header columns in the shared import service. ORT importer files are unchanged and the golden ORT imports are identical (no real ORT file comes close). |
 | K3 | Org template editing | The creator of an organization template may edit its drafts while the organization allows teachers to publish org templates; locking stays with the org admins. |
+
+## Owner decisions 2026-10-28: Phase 7c quiz editor (answers to `phases/PHASE_7C_PROPOSAL.md` §7)
+
+Trigger: the owner's Canvas screenshots (`docs/example_canvas_quiz/`). Writing questions only in the Bank tab and then adding them to a quiz was too cumbersome. Teachers now write questions inside the quiz.
+
+| # | Topic | Decision |
+|---|---|---|
+| 7c-1 | Data model | **One store, no copies.** A question written in a quiz is a normal `bank_questions` row in the quiz's own **quiz bank** (`question_banks.assessment_id`). No separate quiz-question table. Shared banks are reused by link. |
+| 7c-2 | Editing a question used in other quizzes | One dialog: **"Update in all N quizzes"** or **"Change only in this quiz"** (copies the question into this quiz's bank and repoints this item). The dialog says that published quizzes change only after they are republished. If the teacher cannot edit the source bank, only "Change only in this quiz" is offered. Used only here: no question. |
+| 7c-3 | Quiz banks in the Bank tab | Visible, grouped under **"Quiz banks"** with the quiz name. |
+| 7c-4 | Saving | **Hybrid.** Typing autosaves a **draft per card** (nothing is lost if the browser closes). A **question version** is created only when the card is closed or "Done" is clicked; the scope question (7c-2) is asked at that moment, once. No version per autosave. |
+| 7c-5 | Changing a question's type | Allowed in the card. If the question is used in another quiz or in any published version, a type change always creates a **new question in this quiz only** (the old question is untouched). |
+| 7c-6 | Sections | A new quiz has one hidden default section. When the teacher adds a second section, the existing questions visibly become **"Section 1"**. |
+| 7c-7 | New question types (matching, fill-in-the-blank, ordering) | Not in 7c; **Phase 10**. When added they appear in the 7c type dropdown and in the 7b general import format. |
+| 7c-8 | ORT | ORT screens unchanged (bank, import, exam screens, player, scoring). ORT review and UX gate as usual. |
+| 7c-9 | Order | **7c before 8a**; then 8a, 8b. Next owner checkpoint: after 8b. The owner's "yes" on 2026-10-28 also closes the checkpoint after 7b. |
+
+## Phase 7c implementation decisions (agent, 2026-10-28)
+
+Design: `phases/PHASE_7C_DESIGN.md` (§14 P7C-1…P7C-11, §16 amendment). The ones a reader should know:
+
+| # | Topic | Decision |
+|---|---|---|
+| P7C-1 | Drafts | Own table `question_drafts` (one per card; a new card is a draft with `item_id NULL` and a position hint). Question, version and item are created together on the first valid "Done". Autosave never bumps the quiz `draft_rev`; "Done" does. |
+| P7C-3 | Publishing with unfinished drafts | Allowed with a warning (`unfinished_drafts`); a card with a draft publishes its last finished version. |
+| P7C-4 | Hidden default section | Presentation rule (one untitled, unkeyed, rule-less section on a non-preset quiz), created lazily; no schema. The general student player shows the quiz title instead of "Section 1" for it. |
+| P7C-5 | "Used in N quizzes" | Counts live assessments with an item (passage children included) using the question; random picks do not count. "Published anywhere" is read from published snapshots (bounded scan) and survives unpublish. |
+| P7C-6 | Passage children | A passage question used elsewhere can only be edited with "all" ("only this quiz" would break the passage block). |
+| P7C-7 | Type change in a translation group | Always "only this quiz" (keeps groups type-homogeneous). |
+| P7C-8 (amended) | Quiz bank privacy | A quiz bank is private to its quiz (Moodle 5 model; `quiz_bank_private`): no other quiz can link its questions, passages or picks, and translation links never cross a quiz-bank boundary. Reuse goes through "Move/copy to a shared bank". "Find questions" lists shared banks only. Reason: otherwise deleting quiz A would silently break quiz B. |
+| P7C-10 | `can_edit_bank` | True for every course bank in 7c; the Phase 9 extension point for org-shared banks. |
+| P7C-11 | Type change in the Bank tab | The Bank-tab editor keeps its type lock; the quiz card is the place to change a type. |
+| P7C-12 | ORT | ORT preset exams refuse quiz-editor writes (409 `template_locked`) and keep `SectionBuilder` (today's builder, moved verbatim). A teacher may still make a non-ORT quiz inside an ORT course with the quiz editor. |
+| P7C-13 | Language of an existing card | Locked (422 `language_locked`); other languages are separate questions (translation groups). |
+| P7C-14 | Answer key in the editor | Collapsed cards show a staff-only `correct_summary`; never present in student payloads. |

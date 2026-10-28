@@ -165,6 +165,53 @@ def seeded_attempt(api: Api, token: str, cid: str, aid: str) -> str:
     return tid
 
 
+# --- Phase 7c S5 begin --- (quiz editor walk, frontend/e2e/quiz-editor.spec.ts; written after every ORT row, so the
+# ORT data and screens are exactly as before)
+def sc(stem: str, right: str, wrong: str) -> dict:
+    return {"type": "single_choice", "language": "ru", "stem": stem, "explanation": None,
+            "data": {"choices": [{"id": "A", "text": wrong}, {"id": "B", "text": right}], "correct": "B"}}
+
+
+def seed_quiz_editor(api: Api, log: Path, admin_tok: str) -> dict:
+    """A general course (not ORT) of an approved teacher: a shared bank with two questions, quiz "Квиз Б" that
+    already uses both (published, so "the second quiz is unchanged" can be checked), an empty quiz "Квиз А" for the
+    walk, and one enrolled student."""
+    teacher = register(api, log, "e2e-teacher@example.com", "E2E Teacher")
+    tp = profile(api, teacher["token"])
+    api.call("POST", f"/platform/users/{tp['id']}/teacher-status", admin_tok, {"status": "approved"})
+    teacher["profile"] = profile(api, teacher["token"])
+    tok = teacher["token"]
+    title = {"ru": "Общий курс E2E", "ky": "Жалпы курс E2E", "en": "General course E2E"}
+    course = api.call("POST", "/courses", tok, {"title": title, "languages": ["ru", "ky", "en"], "default_language": "ru"})
+    cid = course["id"]
+    api.call("POST", f"/courses/{cid}/publish", tok, {})
+    bank = api.call("POST", f"/courses/{cid}/banks", tok, {"title": "Общий банк", "default_language": "ru"})
+    shared = [
+        api.call("POST", f"/courses/{cid}/banks/{bank['id']}/questions", tok, sc("Столица Кыргызстана?", "Бишкек", "Ош")),
+        api.call("POST", f"/courses/{cid}/banks/{bank['id']}/questions", tok, sc("Сколько будет 3 + 4?", "7", "8")),
+    ]
+
+    def quiz(name: str) -> dict:
+        return api.call("POST", f"/courses/{cid}/assessments", tok, {
+            "title": {"ru": name, "ky": name, "en": name}, "preset": "none", "languages": ["ru"]})
+
+    quiz_a = quiz("Квиз А")
+    quiz_b = quiz("Квиз Б")
+    base_b = f"/courses/{cid}/assessments/{quiz_b['id']}"
+    sec = api.call("POST", f"{base_b}/sections", tok, {})
+    api.call("POST", f"{base_b}/sections/{sec['id']}/items/bulk", tok, {"question_ids": [q["id"] for q in shared]})
+    pub_b = api.call("POST", f"{base_b}/publish", tok, {})
+    student = register(api, log, "e2e-quiz-student@example.com", "Quiz Student")
+    student["profile"] = profile(api, student["token"])
+    api.call("POST", "/courses/join", student["token"], {"code": course["join_code"]})
+    return {
+        "course_id": cid, "bank_id": bank["id"], "shared_question_ids": [q["id"] for q in shared],
+        "quiz_a": quiz_a["id"], "quiz_b": quiz_b["id"], "quiz_b_version": pub_b["version"]["version_no"],
+        "teacher": teacher, "student": student,
+    }
+# --- Phase 7c S5 end ---
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--api", required=True)
@@ -233,7 +280,10 @@ def main() -> int:
         students[key] = s
     staff_attempt = seeded_attempt(api, students["staff-seed"]["token"], cid, staff_exam["id"])
 
+    quiz_editor = seed_quiz_editor(api, log, tok)  # Phase 7c S5 (after every ORT row)
+
     seed = {
+        "quiz_editor": quiz_editor,
         "api": args.api, "course_id": cid, "bank_id": bank_id, "exam": exam, "staff_exam": staff_exam,
         "picks": picks, "keys": keys, "comparison_question_id": comparison_qid, "passage_id": passage_id,
         "staff_attempt_id": staff_attempt, "admin": admin, "students": students,

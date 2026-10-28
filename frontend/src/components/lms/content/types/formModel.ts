@@ -4,6 +4,7 @@ import type {
   QuestionContentIn, QuestionMetaIn, QuestionStaffOut, QuestionType, ShortTextData, SingleChoiceData, TrueFalseData,
   ComparisonData, VersionOut,
 } from "@/lib/lms/contentTypes";
+import type { CardPayload } from "@/lib/lms/quizEditorTypes"; // Phase 7c S3
 
 export interface ChoiceForm { id: string; text: string; image: ImageOut | null }
 export interface NumericForm { kind: "exact" | "range"; value: string; margin: string; min: string; max: string }
@@ -166,3 +167,79 @@ export function validateForm(f: QuestionForm): string | null {
   if (f.type === "short_text" && f.shortAnswers.split("\n").every((s) => !s.trim())) return "bank.editor.errAnswers";
   return null;
 }
+
+// --- Phase 7c S3 begin --- (PHASE_7C_DESIGN 8.4: quiz editor card payloads; pure additions)
+
+/** Draft payload of a quiz card. Half-typed values are allowed (drafts are validated only at "Done"). */
+export function payloadFromForm(f: QuestionForm): CardPayload {
+  const n = Number(f.points);
+  const points = f.points.trim() !== "" && Number.isFinite(n) && n >= 0 && n <= 1000 ? n : 0;
+  const content = contentFromForm(f);
+  return {
+    type: content.type, language: f.language, stem: content.stem, data: content.data as unknown as Record<string, unknown>,
+    explanation: content.explanation ?? null, default_points: points, image_asset_id: content.image_asset_id ?? null,
+    points, meta: metaFromForm(f),
+  };
+}
+
+const str = (v: unknown): string => (typeof v === "string" ? v : typeof v === "number" ? String(v) : "");
+const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+
+/** Form of a draft payload. `imageOf` turns an asset id into an image (its url may be "" when unknown). */
+export function formFromPayload(p: CardPayload, imageOf: (assetId: string) => ImageOut | null = () => null): QuestionForm {
+  const f = emptyForm(p.type, p.language);
+  const d = (p.data || {}) as Record<string, unknown>;
+  const img = (id: unknown) => (typeof id === "string" && id ? imageOf(id) : null);
+  f.stem = p.stem || "";
+  f.explanation = p.explanation || "";
+  f.points = String(p.points ?? 1);
+  f.image = img(p.image_asset_id);
+  f.topic = p.meta?.topic || "";
+  f.section = p.meta?.section || "";
+  f.difficulty = p.meta?.difficulty || "";
+  f.tags = (p.meta?.tags || []).join(", ");
+  f.passageId = p.meta?.passage_id || "";
+  const choices = arr(d.choices).map((c) => {
+    const o = (c || {}) as Record<string, unknown>;
+    return { id: str(o.id), text: str(o.text), image: img(o.image_asset_id) };
+  }).filter((c) => c.id);
+  switch (p.type) {
+    case "single_choice":
+      if (choices.length) f.choices = choices;
+      f.correctSingle = str(d.correct);
+      f.shuffle = !!d.shuffle;
+      break;
+    case "multiple_answers":
+      if (choices.length) f.choices = choices;
+      f.correctMulti = arr(d.correct).map(str).filter(Boolean);
+      f.shuffle = !!d.shuffle;
+      f.scoring = d.scoring === "partial" ? "partial" : "all_or_nothing";
+      break;
+    case "true_false": f.tf = d.correct !== false; break;
+    case "comparison":
+      f.columnA = str(d.column_a);
+      f.columnB = str(d.column_b);
+      if (["A", "B", "C", "D"].includes(str(d.correct))) f.compCorrect = str(d.correct) as ComparisonChoice;
+      break;
+    case "numeric": {
+      const answers = arr(d.answers).map((x): NumericForm => {
+        const o = (x || {}) as Record<string, unknown>;
+        return o.kind === "range"
+          ? { ...blankNumeric(), kind: "range", min: str(o.min), max: str(o.max) }
+          : { ...blankNumeric(), kind: "exact", value: str(o.value), margin: str(o.margin) || "0" };
+      });
+      if (answers.length) f.numeric = answers;
+      break;
+    }
+    case "short_text":
+      f.shortAnswers = arr(d.answers).map(str).join("\n");
+      f.caseSensitive = !!d.case_sensitive;
+      break;
+    case "essay":
+      f.wordLimit = typeof d.word_limit === "number" && d.word_limit > 0 ? String(d.word_limit) : "";
+      f.rubric = str(d.rubric_note);
+      break;
+  }
+  return f;
+}
+// --- Phase 7c S3 end ---

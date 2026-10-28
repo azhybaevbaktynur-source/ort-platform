@@ -14,6 +14,8 @@ import { AssessmentError } from "./AssessmentError";
 import { Modal } from "./Modal";
 import { minToSec, secToMin } from "./format";
 
+const orNull = (v: LocalizedText): LocalizedText | null => (Object.keys(v).length ? v : null);
+
 /** Add or edit a section: key, titles, instructions, time limit and rules. */
 export function SectionDialog({
   open, section, assessment, languages, defaultLanguage, busy, error, onSubmit, onCancel,
@@ -69,8 +71,9 @@ export function SectionDialog({
     // Phase 7b S5: fields fixed by an exam template are not sent (the server answers 409 template_locked on a change)
     onSubmit({
       ...(examLocks.has("section_key") ? {} : { key: key.trim() || null }),
-      title: cleanLocalized(title, languages),
-      instructions: cleanLocalized(instructions, languages),
+      // Phase 7c S5: an empty title or instruction is sent as null (the API refuses `{}`: at least one translation)
+      title: orNull(cleanLocalized(title, languages)),
+      instructions: orNull(cleanLocalized(instructions, languages)),
       ...(examLocks.has("section_time_limit_s") ? {} : { time_limit_s: minToSec(limit) }),
       ...(rulesLocked ? {} : { rules }),
     });

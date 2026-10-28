@@ -392,9 +392,20 @@ def create_bank(db: Session, ctx: AuthzContext, course, data: BankCreateIn) -> Q
     return bank
 
 
+# --- Phase 7c S2 begin --- (PHASE_7C_DESIGN 5.1: a quiz bank is deleted, restored and titled by its quiz)
+def _refuse_quiz_bank(bank: QuestionBank) -> None:
+    if bank.assessment_id is not None:
+        from app.lms.quiz_editor.ids import E_QUIZ_BANK_FOLLOWS_QUIZ
+
+        raise Conflict("This bank belongs to a quiz and follows it", code=E_QUIZ_BANK_FOLLOWS_QUIZ)
+# --- Phase 7c S2 end ---
+
+
 def update_bank(db: Session, ctx: AuthzContext, course, bank_id: uuid.UUID, data: BankUpdateIn) -> QuestionBank:
     bank = repo.load_bank(db, course.id, bank_id, for_update=True)
     fields = data.model_fields_set
+    if "title" in fields:  # --- Phase 7c S2 --- (the quiz bank title follows the quiz, Q3)
+        _refuse_quiz_bank(bank)
     if "title" in fields and data.title is not None:
         bank.title = data.title.strip()
     if "description" in fields:
@@ -408,6 +419,7 @@ def update_bank(db: Session, ctx: AuthzContext, course, bank_id: uuid.UUID, data
 
 def soft_delete_bank(db: Session, ctx: AuthzContext, course, bank_id: uuid.UUID) -> None:
     bank = repo.load_bank(db, course.id, bank_id, include_deleted=True, for_update=True)
+    _refuse_quiz_bank(bank)  # --- Phase 7c S2 ---
     if bank.deleted_at is not None:
         raise Conflict("Bank already deleted", code="already_deleted")
     bank.soft_delete(ctx.user.id)
@@ -416,6 +428,7 @@ def soft_delete_bank(db: Session, ctx: AuthzContext, course, bank_id: uuid.UUID)
 
 def restore_bank(db: Session, ctx: AuthzContext, course, bank_id: uuid.UUID) -> QuestionBank:
     bank = repo.load_bank(db, course.id, bank_id, include_deleted=True, for_update=True)
+    _refuse_quiz_bank(bank)  # --- Phase 7c S2 ---
     if bank.deleted_at is None:
         raise Conflict("Bank is not deleted", code="not_deleted")
     if bank.source_id:
@@ -601,6 +614,18 @@ def _group_member_languages(db: Session, group_id: uuid.UUID, exclude: Optional[
     return set(db.execute(stmt).scalars())
 
 
+def _assert_no_quiz_bank_crossing(db: Session, bank_a, bank_b) -> None:
+    """PHASE_7C_DESIGN 16 (H1): translation links never cross a quiz bank boundary. Two questions in different banks
+    may be variants of each other only when neither bank is a quiz bank (`assessment_id` set); variants inside one
+    quiz bank stay allowed. Otherwise another quiz could pick up a private question as its language variant."""
+    if bank_a.id == bank_b.id:
+        return
+    if bank_a.assessment_id is not None or bank_b.assessment_id is not None:
+        raise ValidationFailed("Questions of a quiz cannot be linked with questions outside that quiz",
+                               code="quiz_bank_private",
+                               details=[{"loc": ["bank_id"], "msg": "quiz_bank_private"}])
+
+
 def add_translation(db: Session, ctx: AuthzContext, course, question_id: uuid.UUID,
                     data: TranslationCreateIn) -> BankQuestion:
     actor = ctx.user
@@ -611,6 +636,7 @@ def add_translation(db: Session, ctx: AuthzContext, course, question_id: uuid.UU
     for bid in sorted({src.bank_id, bank.id}, key=str):
         _lock_bank(db, bank if bid == bank.id else db.get(QuestionBank, bid))
     src = repo.load_question(db, course.id, question_id, for_update=True)
+    _assert_no_quiz_bank_crossing(db, db.get(QuestionBank, src.bank_id), bank)
     _check_language(course, data.language)
     if data.language == src.language:
         raise Conflict("Variant language equals the source language", code="translation_language_taken")
@@ -641,6 +667,7 @@ def link_translation(db: Session, ctx: AuthzContext, course, question_id: uuid.U
         raise Conflict("Cannot link a question to itself", code="translation_scope_mismatch")
     loaded = {i: repo.load_question(db, course.id, i, for_update=True) for i in sorted({question_id, other_id}, key=str)}
     q, other = loaded[question_id], loaded[other_id]
+    _assert_no_quiz_bank_crossing(db, db.get(QuestionBank, q.bank_id), db.get(QuestionBank, other.bank_id))
     if q.type != other.type:
         raise Conflict("Variants must have the same type", code="translation_type_mismatch")
     if q.language == other.language:

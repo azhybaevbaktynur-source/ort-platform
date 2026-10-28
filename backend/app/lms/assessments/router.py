@@ -29,7 +29,13 @@ def _is_staff(ctx: AuthzContext, course) -> bool:
 
 
 def _staff(ctx: AuthzContext, a):
-    return builder.staff_out(ctx.db, a)
+    # --- Phase 7c S2 --- (PHASE_7C_DESIGN 5.2: drafts only for content.read_admin; org admins get none)
+    from app.core.authz import can
+    from app.lms.courses.models import Course
+
+    course = ctx.db.get(Course, a.course_id)
+    read_admin = course is not None and can(ctx, A.CONTENT_READ_ADMIN, course)
+    return builder.staff_out(ctx.db, a, include_drafts=read_admin, include_answers=read_admin)  # S5: answers
 
 
 # ------------------------------------------------------------------ assessments

@@ -98,6 +98,13 @@ class PassageUpdateIn(In):
 
 # ------------------------------------------------------------------ outputs
 
+# --- Phase 7c S1 begin --- (the quiz of a quiz bank, PHASE_7C_DESIGN 6.1)
+class BankAssessmentOut(BaseModel):
+    id: uuid.UUID
+    title: dict
+# --- Phase 7c S1 end ---
+
+
 class BankOut(BaseModel):
     id: uuid.UUID
     title: str
@@ -109,15 +116,23 @@ class BankOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     deleted_at: Optional[datetime]
+    # --- Phase 7c S1 begin --- (PHASE_7C_DESIGN 6.1: the quiz of a quiz bank; None = shared bank)
+    assessment: Optional[BankAssessmentOut] = None
+    # --- Phase 7c S1 end ---
 
 
+# --- Phase 7c S1 begin ---
 def bank_out(row) -> BankOut:
-    bank, qc, pc = row
+    """Row of `repository.bank_rows_stmt`: (bank, question count, passage count, quiz title or None)."""
+    bank, qc, pc, a_title = row
+    assessment = (BankAssessmentOut(id=bank.assessment_id, title=a_title or {})
+                  if bank.assessment_id is not None else None)
     return BankOut(
         id=bank.id, title=bank.title, description=bank.description, source_id=bank.source_id,
         default_language=bank.default_language, question_count=qc or 0, passage_count=pc or 0,
-        created_at=bank.created_at, updated_at=bank.updated_at, deleted_at=bank.deleted_at,
+        created_at=bank.created_at, updated_at=bank.updated_at, deleted_at=bank.deleted_at, assessment=assessment,
     )
+# --- Phase 7c S1 end ---
 
 
 class ImageOut(BaseModel):

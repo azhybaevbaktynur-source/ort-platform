@@ -85,6 +85,8 @@ export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {
       <p className="rounded-xl bg-slate-50 px-3.5 py-2 text-sm text-slate-700">
         {lobby.navigation === "section_forward_only" ? t("assessments.lobby.forwardOnly") : t("assessments.lobby.freeNav")}
       </p>
+      {/* Phase 7c UX: one untitled, unkeyed section (the quiz editor's hidden default section) has nothing to list. */}
+      {!(lobby.sections.length === 1 && !pickLocalized(lobby.sections[0].title, lang, course.default_language) && !lobby.sections[0].key) && (
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <h3 className="mb-2 text-sm font-semibold text-slate-900">{t("assessments.lobby.sections")}</h3>
         <ol className="space-y-1 text-sm">
@@ -102,6 +104,7 @@ export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {
           })}
         </ol>
       </div>
+      )}
       {!resume && lobby.languages.length > 1 && (
         <Select id="lobby-lang" label={t("assessments.lobby.language")} value={language}
           onChange={(e) => setLanguage(e.target.value as Lang)}

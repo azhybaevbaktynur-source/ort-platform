@@ -307,6 +307,12 @@ class ItemQuestionOut(BaseModel):
     stem_excerpt: str
     deleted: bool
     newer_version_available: bool
+    # --- Phase 7c S1 begin --- (PHASE_7C_DESIGN 6.1; defaults here, S2 computes them in `_tree_out`)
+    bank_kind: Literal["quiz", "shared"] = "shared"
+    used_elsewhere: int = 0
+    # --- Phase 7c S1 end ---
+    # --- Phase 7c S5 --- (staff only, `content.read_admin`: the correct answer(s) in one line; quiz_editor/summary.py)
+    correct_summary: Optional[str] = None
 
 
 class ItemPassageOut(BaseModel):
@@ -330,6 +336,7 @@ class ItemOut(BaseModel):
     passage: Optional[ItemPassageOut] = None
     children: Optional[list["ItemOut"]] = None
     pick: Optional[ItemPickOut] = None
+    has_draft: bool = False  # --- Phase 7c S1 --- (a draft exists for this card; S2 sets it for content readers)
 
 
 class SectionOut(BaseModel):
@@ -374,6 +381,11 @@ class ExamTemplateRefOut(BaseModel):
 # --- Phase 7b S1 end ---
 
 
+# --- Phase 7c S1 begin --- (below ItemOut on purpose: quiz_editor.schemas imports ItemOut, see its docstring)
+from app.lms.quiz_editor.schemas import DraftOut  # noqa: E402
+# --- Phase 7c S1 end ---
+
+
 class AssessmentStaffOut(AssessmentStaffSummaryOut):
     description: Optional[dict] = None
     draft_rev: int
@@ -399,6 +411,9 @@ class AssessmentStaffOut(AssessmentStaffSummaryOut):
     result_view: Optional[str] = None
     structure_locked: bool = False
     # --- Phase 7b S1 end ---
+    # --- Phase 7c S1 begin --- (PHASE_7C_DESIGN 5.2: the quiz's card drafts; [] for readers without read_admin, S2)
+    drafts: list[DraftOut] = []
+    # --- Phase 7c S1 end ---
 
 
 class IssueOut(BaseModel):
