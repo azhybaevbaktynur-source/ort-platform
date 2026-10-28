@@ -478,6 +478,12 @@ test.describe("modules walk (ru)", () => {
       unlock_at: new Date(Date.UTC(2026, 11, 15, 9, 0)).toISOString(),
     });
     await api(md.teacher, "POST", `/courses/${cid}/modules/${m4.id}/items`, { kind: "page", page_id: later.id, published: true, requirement: { type: "view" } });
+    // a fifth module, open and untouched (the "unlocked" badge next to completed, in progress and locked)
+    const extra = await api(md.teacher, "POST", `/courses/${cid}/pages`, { title: "Задачи для практики", language: "ru", body_md: "Решите задачи $1$–$5$.", published: true });
+    const m5 = await api(md.teacher, "POST", `/courses/${cid}/modules`, {
+      title: { ru: "Модуль 5. Практика", ky: "5-модуль. Практика", en: "Module 5. Practice" }, published: true,
+    });
+    await api(md.teacher, "POST", `/courses/${cid}/modules/${m5.id}/items`, { kind: "page", page_id: extra.id, published: true, requirement: { type: "view" } });
     // a second PDF in a folder, so the files list shows a group
     const form = new FormData();
     form.append("file", new Blob([PDF], { type: "application/pdf" }), "tasks.pdf");
