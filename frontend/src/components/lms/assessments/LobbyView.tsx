@@ -12,6 +12,7 @@ import { Button, DescriptionList, Input, Select, type DescriptionItem } from "@/
 import { startAttemptWithCode } from "@/lib/lms/accommodations"; // Phase 7a S5
 import { fmtDuration } from "@/components/lms/home/format";
 import { AssessmentError } from "./AssessmentError";
+import { LockedState, isModuleLocked } from "@/components/lms/pages/ApiError"; // Phase 8a fix1
 import { fmtDateTime } from "./format";
 
 const KNOWN_REASONS = new Set<string>(LOBBY_REASONS);
@@ -110,7 +111,9 @@ export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {
           onChange={(e) => setLanguage(e.target.value as Lang)}
           options={lobby.languages.map((l) => ({ value: l, label: t(`courses.languages.${l}`) }))} />
       )}
-      {!codeError && <AssessmentError error={error} />}
+      {!codeError && (isModuleLocked(error)
+        ? <LockedState error={error} courseId={course.id} compact />
+        : <AssessmentError error={error} />)}
       {resume ? (
         <div className="sticky bottom-3 z-10 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
           <Button className="w-full sm:w-auto" onClick={() => router.push(player(resume))}>{t("assessments.student.resume")}</Button>

@@ -263,7 +263,10 @@ def _pending_invitations(db: Session, user: User, now: datetime) -> int:
 
 
 # --- Phase 8a S3 begin --- (PHASE_8A_DESIGN 5.4, 6.7: two more statements for the modules strip, one for news)
-MODULES_SCAN_MAX = 100  # open modules read for the strip (bounded; at most MODULES_NEXT_MAX rows are returned)
+# Open modules read for the strip (bounded; at most MODULES_NEXT_MAX rows are returned). Known limit (design 6.7):
+# ordered by course id, so a student with more than 100 open modules across courses may see no strip entry for the
+# courses past the bound; accepted (the course's own Modules page is always complete).
+MODULES_SCAN_MAX = 100
 
 
 def _modules_next(db: Session, uid: str) -> list[sch.HomeModuleNextOut]:

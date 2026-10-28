@@ -5,7 +5,8 @@ with the allowlist of `pages/ids.py`. The sanitizer, not the Markdown library, i
 source is allowed through Markdown and stripped by `nh3` (unknown tags lose their tag, `script`/`style`/`svg`/... lose
 their content too; every attribute outside the allowlist is dropped).
 
-URL rules (attribute filter): `a[href]` only `http`, `https`, `mailto` or a site-relative `/path` (never `//host`);
+URL rules (attribute filter): `a[href]` only `http`, `https`, `mailto`, a site-relative `/path` (never `//host`) or a
+same-page `#name` fragment (footnotes; `sup[id]`/`li[id]` keep only footnote ids `fn:...`/`fnref:...`);
 `img[src]` only our media route (`/api/v1/media/`) or `R2_PUBLIC_BASE_URL` (external and `data:` sources are
 dropped); `code[class]` only `language-<name>`. Every link gets `rel="noopener noreferrer"`, absolute `http(s)` links
 also `target="_blank"` (added after cleaning, a fixed attribute only).
@@ -41,6 +42,10 @@ _INLINE_MATH_RE = re.compile(r"(?<![\\$])\$(?![\s$])([^\n$]+?)(?<![\s\\])\$(?!\$
 # nh3 output is normalized (attribute values double-quoted, `"` escaped inside them)
 _A_TAG_RE = re.compile(r'<a\b((?:[^>"]|"[^"]*")*)>')
 _HEADING_MAP = {"h1": "h2", "h5": "h4", "h6": "h4"}
+_FRAGMENT_RE = re.compile(r"^#[A-Za-z0-9_:.-]{1,80}$")
+# `id` survives only as a Markdown footnote anchor (`fn:1`, `fnref:1`, `fnref2:1`) on `sup`/`li`: the targets of the
+# `#fn:...` links. The fixed `fn` prefix with a colon cannot name a global or clobber a form field.
+_FOOTNOTE_ID_RE = re.compile(r"^fn(?:ref\d*)?:[A-Za-z0-9_-]{1,40}$")
 
 
 class _HeadingLevels(Treeprocessor):
@@ -70,6 +75,8 @@ def _href_ok(value: str) -> bool:
     low = v.lower()
     if low.startswith(("http://", "https://", "mailto:")):
         return True
+    if _FRAGMENT_RE.match(v):
+        return True  # same-page anchor (footnotes): `#` + a plain name, nothing that could be a scheme or path
     return v.startswith("/") and not v.startswith("//") and "\\" not in v
 
 
@@ -87,6 +94,8 @@ def _attribute_filter(tag: str, attr: str, value: str) -> Optional[str]:
         return value if _src_ok(value) else None
     if tag == "code" and attr == "class":
         return value if _CODE_CLASS_RE.match(value) else None
+    if attr == "id":
+        return value if _FOOTNOTE_ID_RE.match(value) else None
     if tag == "a" and attr == "target":
         return None  # the server decides (external links only, below)
     return value
