@@ -59,9 +59,10 @@ const TAB_BASE =
 const TAB_ON = "border-brand-600 text-brand-700";
 const TAB_OFF = "border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-900";
 
-function TabCount({ value, active }: { value: React.ReactNode; active: boolean }) {
+function TabCount({ value, active, tone }: { value: React.ReactNode; active: boolean; tone?: "danger" }) {
   return (
-    <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", active ? "bg-brand-100 text-brand-800" : "bg-slate-100 text-slate-700")}>{value}</span>
+    <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold",
+      tone === "danger" ? "bg-danger-100 text-danger-800" : active ? "bg-brand-100 text-brand-800" : "bg-slate-100 text-slate-700")}>{value}</span>
   );
 }
 
@@ -70,6 +71,8 @@ export interface TabItem {
   label: React.ReactNode;
   /** Small count after the label ("12"). */
   count?: React.ReactNode;
+  /** `danger`: the count is a number of problems (red pill). */
+  countTone?: "danger";
   disabled?: boolean;
 }
 
@@ -139,7 +142,7 @@ export function Tabs({ id, label, items, value, onChange, className }: TabsProps
                 className={cn(TAB_BASE, active ? TAB_ON : TAB_OFF, "disabled:cursor-not-allowed disabled:opacity-50", focusRing, "focus-visible:ring-inset focus-visible:ring-offset-0")}
               >
                 {item.label}
-                {item.count !== undefined && <TabCount value={item.count} active={active} />}
+                {item.count !== undefined && <TabCount value={item.count} active={active} tone={item.countTone} />}
               </button>
             );
           })}

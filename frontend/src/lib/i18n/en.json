@@ -3496,10 +3496,12 @@
     "lock": {
       "action": "Lock",
       "title": "Lock the template?",
-      "effect": "New assignments made from it cannot change the sections, times, navigation and scheme. Assignments made earlier do not change.",
       "menuHint": "Fix the structure of new exams",
       "reason": "Reason",
-      "done": "Template locked."
+      "done": "Template locked.",
+      "effectIntro": "In new assignments made from it, teachers cannot change:",
+      "effectNone": "Nothing is ticked in “{where}” yet, so the lock does not fix anything.",
+      "effectEarlier": "Assignments made earlier do not change."
     },
     "unlock": {
       "action": "Unlock",
@@ -3624,7 +3626,7 @@
       "lockScope": "What the lock fixes",
       "lockScopeHint": "When the template is locked (More actions → Lock), the checked items cannot be changed in new assignments made from it.",
       "lockKeys": {
-        "sections": "Sections: adding, removing, order and keys",
+        "sections": "Sections: adding, removing and order",
         "section_time_limit_s": "Section time limits",
         "rules": "Section rules: question types and counts, reading passages",
         "navigation": "Navigation",
@@ -3689,7 +3691,12 @@
         "scoring": "Scoring",
         "display": "Display",
         "sample": "Sample questions",
-        "versions": "Versions"
+        "versions": "Versions",
+        "issues": "{n} problems",
+        "issues_one": "{n} problem",
+        "issues_few": "{n} problems",
+        "issues_many": "{n} problems",
+        "issues_other": "{n} problems"
       },
       "header": {
         "preview": "Preview",
@@ -3698,7 +3705,8 @@
         "unpublished_few": "{n} unpublished changes",
         "unpublished_many": "{n} unpublished changes",
         "unpublished_other": "{n} unpublished changes",
-        "importFormatHint": "The import format of v{n} (CSV)"
+        "importFormatHint": "The import format of v{n} (CSV)",
+        "upToDate": "published, no changes"
       },
       "saveState": {
         "dirty": "Unsaved changes",
@@ -3821,7 +3829,7 @@
     },
     "sandbox": {
       "gateTitle": "Sample questions",
-      "gateBody": "Write a few sample questions to see the template as a student does. They are kept in a hidden practice course.",
+      "gateBody": "Write a few sample questions to see the template as a student does.",
       "note": "Sample questions are only for previewing; they are never part of exams created from this template.",
       "language": "Language of the sample questions",
       "languageHint": "You can add other languages to the questions later.",
@@ -3836,7 +3844,9 @@
       "language": "Language",
       "parameter": "Option: {key}",
       "launch": "Preview as student",
-      "backToTemplate": "Back to the template"
+      "backToTemplate": "Back to the template",
+      "issueLine": "{section}: {text}",
+      "noQuestions": "no questions"
     },
     "diff": {
       "title": "Changes: {from} → {to}",

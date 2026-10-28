@@ -6,7 +6,12 @@ import { useTranslation } from "@/lib/i18n/context";
 import type { QueueSnapshot } from "@/lib/lms/attemptClient";
 import { Button } from "@/components/ui";
 
-export function SaveStatus({ snap, onRetry }: { snap: QueueSnapshot; onRetry?: () => void }) {
+/**
+ * `compact` (Phase 8b UX, scrolling player): below `sm` the calm states (saved, saving) show only their icon, so the
+ * phone header keeps the timer and the "Questions n/48" button on one line; the words stay for screen readers and
+ * as the tooltip. Problem states always keep their words. The one-per-page (ORT) player does not pass it.
+ */
+export function SaveStatus({ snap, onRetry, compact = false }: { snap: QueueSnapshot; onRetry?: () => void; compact?: boolean }) {
   const { t } = useTranslation();
   let icon = <Check className="h-3.5 w-3.5" aria-hidden="true" />;
   let text = t("player.save.saved");
@@ -15,6 +20,7 @@ export function SaveStatus({ snap, onRetry }: { snap: QueueSnapshot; onRetry?: (
   let short: string | null = null;
   let tone = "text-emerald-700 bg-emerald-50 border-emerald-200";
   const retry = snap.status === "offline" || snap.status === "error" || snap.status === "auth";
+  const calm = snap.status === "saved" || snap.status === "saving" || snap.status === "idle";
   if (snap.status === "saving" || (snap.status === "idle" && snap.pending > 0)) {
     icon = <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />;
     text = t("player.save.saving");
@@ -35,9 +41,11 @@ export function SaveStatus({ snap, onRetry }: { snap: QueueSnapshot; onRetry?: (
   }
   return (
     <div className="flex min-w-0 items-center gap-2" role="status" aria-live="polite">
-      <span title={short ? text : undefined} className={`inline-flex min-w-0 items-center gap-1.5 rounded-2xl border px-2.5 py-1 text-xs font-medium leading-4 ${tone}`}>
+      <span title={short || (compact && calm) ? text : undefined} className={`inline-flex min-w-0 items-center gap-1.5 rounded-2xl border px-2.5 py-1 text-xs font-medium leading-4 ${tone}`}>
         <span className="shrink-0">{icon}</span>
-        {short ? (
+        {compact && calm ? (
+          <span className="sr-only sm:not-sr-only">{text}</span>
+        ) : short ? (
           <span className="min-w-0">
             <span aria-hidden="true" className="sm:hidden">{short}</span>
             <span className="sr-only sm:not-sr-only">{text}</span>

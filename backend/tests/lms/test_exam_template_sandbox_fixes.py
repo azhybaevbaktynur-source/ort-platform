@@ -246,3 +246,21 @@ async def test_course_structure_writes_refuse_the_sandbox(db, api):
     # reads stay
     for path in (f"{c}/modules", f"{c}/pages", f"{c}/course-files", f"{c}/announcements"):
         assert (await api.call(w.OA, "GET", path)).status_code == 200, path
+
+
+# ------------------------------------------------------------------------------------------------ 8b UX item 17
+
+async def test_hand_in_assignments_refuse_the_sandbox(db, api):
+    """A sandbox course holds only its sample quiz: text / file / no-submission assignments are 409 there."""
+    from app.lms.assignments.models import Assignment
+
+    w = tworld(db)
+    t = await draft_t(api, w.OA, owner_scope="organization", organization_id=w.org.id)
+    sb = await open_sb(api, w.OA, t["id"], language="en")
+    path = f"/courses/{sb['course_id']}/assignments"
+    for kind in ("text", "file", "none"):
+        res = await api.call(w.OA, "POST", path, json={"title": {"en": "Essay"}, "kind": kind, "points_possible": 10})
+        assert res.status_code == 409 and err(res) == SANDBOX, (kind, res.text)
+    # nothing was written: the sample quiz stays the only assignment of the sandbox
+    kinds = db.execute(select(Assignment.kind).where(Assignment.course_id == uuid.UUID(sb["course_id"]))).scalars().all()
+    assert all(k == "quiz" for k in kinds), kinds

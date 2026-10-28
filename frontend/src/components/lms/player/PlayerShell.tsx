@@ -651,12 +651,14 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
               {forwardOnly ? ` · ${t("player.sectionOf", { n: state.current_section_pos, total: lastSectionPos })}` : ""}
             </p>
           </div>
-          {/* S11a, F7: a problem state (offline, error) may take its own line on phones instead of squeezing to one word per line. */}
+          {/* S11a, F7: a problem state (offline, error) may take its own line on phones instead of squeezing to one word per line.
+              Phase 8b UX: in scrolling mode the save pill is icon-only on phones and the row wraps rather than clipping
+              it if it still does not fit; one-per-page (ORT) keeps its layout. */}
           <div className={cn(
             "flex min-w-0 flex-1 items-center justify-between gap-3 sm:flex-none sm:justify-end",
-            (["offline", "error", "auth", "closed"].includes(snap.status) || deadline === null) && "flex-wrap gap-y-2",
+            (["offline", "error", "auth", "closed"].includes(snap.status) || deadline === null || scrolling) && "flex-wrap gap-y-2",
           )}>
-            <SaveStatus snap={snap} onRetry={() => queueRef.current?.retryNow()} />
+            <SaveStatus snap={snap} onRetry={() => queueRef.current?.retryNow()} compact={scrolling} />
             <div className="ml-auto flex shrink-0 items-center gap-2">
               <DeadlineTimer deadlineMs={deadline} getNowMs={() => clock.now()} onExpire={onTimerExpire}
                 label={forwardOnly ? t("player.timer.sectionLeft") : t("player.timer.left")}
