@@ -5,7 +5,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
-import { createAnnouncement, listAnnouncements, publishAnnouncement, updateAnnouncement } from "@/lib/lms/announcements";
+import { createAnnouncement, getAnnouncement, publishAnnouncement, updateAnnouncement } from "@/lib/lms/announcements";
 import { ANNOUNCEMENT_BODY_MAX, type AnnouncementStaffOut } from "@/lib/lms/pagesTypes";
 import { useCourse } from "@/components/lms/CourseContext";
 import { ContentError } from "@/components/lms/pages/ApiError";
@@ -13,15 +13,13 @@ import { MarkdownField } from "@/components/lms/pages/MarkdownField";
 import { Button, Dialog, EmptyState, Input, LoadingState, PageHeader, Switch, toast } from "@/components/ui";
 
 async function findAnnouncement(courseId: string, id: string): Promise<AnnouncementStaffOut | null> {
-  let cursor: string | null = null;
-  for (let i = 0; i < 20; i++) {
-    const page = await listAnnouncements(courseId, { cursor, limit: 100 });
-    const hit = (page.items as AnnouncementStaffOut[]).find((a) => a.id === id);
-    if (hit) return hit;
-    if (!page.next_cursor) return null;
-    cursor = page.next_cursor;
+  // Phase 8a S5: the single-announcement route (S3); 404 = deleted or not in this course
+  try {
+    return (await getAnnouncement(courseId, id)) as AnnouncementStaffOut;
+  } catch (e) {
+    if ((e as { status?: number }).status === 404) return null;
+    throw e;
   }
-  return null;
 }
 
 export function AnnouncementEditor({ announcementId }: { announcementId?: string }) {
