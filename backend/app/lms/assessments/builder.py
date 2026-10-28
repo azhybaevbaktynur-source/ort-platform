@@ -32,7 +32,7 @@ from app.lms.content.models import BankQuestion, Passage, PassageVersion, Questi
 from app.lms.core import clock
 from app.lms.core.errors import Conflict, NotFound, ValidationFailed
 from app.lms.courses.models import Course
-from app.lms.courses.service import require_course
+from app.lms.courses.service import assert_not_sandbox, require_course
 from app.lms.grading import repository as grading_repo
 from app.lms.grading.schemes import load_usable_version
 from app.lms.grading.seeds import PRESET_SCHEME_VERSIONS
@@ -69,6 +69,7 @@ def _commit(db: Session, a: Assessment) -> None:
 
 def create_assessment(db: Session, ctx: AuthzContext, course: Course, data: sch.AssessmentCreateIn) -> Assessment:
     require_course(ctx, A.CONTENT_MANAGE, course)
+    assert_not_sandbox(course)  # Phase 8b fix L1: the sample quiz is never published; no other assessments
     # --- Phase 7b S2 begin --- (PHASE_7B_DESIGN 5.3 / 9.1: the template branch; `preset` and a template never mix.
     # The ORT preset path below is untouched: a template assessment always has preset 'none'.)
     if data.exam_template_id is not None or data.exam_template_version_id is not None:
@@ -210,6 +211,7 @@ def soft_delete_assessment(db: Session, ctx: AuthzContext, course: Course, aid: 
 
 def restore_assessment(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID) -> Assessment:
     require_course(ctx, A.CONTENT_MANAGE, course)
+    assert_not_sandbox(course)  # Phase 8b fix L1: the sample quiz is never published; no other assessments
     a = load_assessment(db, course.id, aid, for_update=True, include_deleted=True)
     if a.deleted_at is None:
         raise Conflict("Assessment is not deleted", code="not_deleted")

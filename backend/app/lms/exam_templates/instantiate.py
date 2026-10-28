@@ -22,7 +22,7 @@ from app.lms.content.models import BankQuestion
 from app.lms.core import clock
 from app.lms.core.errors import Conflict, ValidationFailed
 from app.lms.courses.models import Course
-from app.lms.courses.service import require_course
+from app.lms.courses.service import assert_not_sandbox, require_course
 from app.lms.exam_templates import ids, scopes
 from app.lms.exam_templates.models import ExamTemplate, ExamTemplateVersion
 from app.lms.exam_templates.spec import ExamTemplateSpec
@@ -266,6 +266,7 @@ def upgrade_to_latest(db: Session, ctx: AuthzContext, course: Course, assessment
     """Draft without attempts only; sections are mapped by position (items of kept sections stay, items of removed
     sections go), rule violations come back as issues. 409 `template_upgrade_not_allowed` otherwise."""
     require_course(ctx, A.CONTENT_MANAGE, course)
+    assert_not_sandbox(course)  # Phase 8b fix L1: the sample quiz is never published; no other assessments
     a = repo.load_assessment(db, course.id, assessment_id, for_update=True)
     if a.exam_template_version_id is None:
         raise ValidationFailed("The assessment was not created from a template", code=ids.E_NOT_A_TEMPLATE_ASSESSMENT)

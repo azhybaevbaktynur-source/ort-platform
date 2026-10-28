@@ -257,7 +257,12 @@ def open_sandbox(ctx: AuthzContext, template_id: uuid.UUID, data: sch.SandboxIn,
                  request: Optional[Request] = None) -> sch.SandboxOut:
     """`POST /exam-templates/{id}/sandbox`: ensure + sync, no attempt. A requested language the sample does not
     have yet is added to it (the Sample tab writes questions in that language)."""
+    from app.lms.core import ratelimit
+
     db = ctx.db
+    uid = ctx.user.id
+    db.rollback()  # end the read transaction before the limiter's own write (SQLite)
+    ratelimit.enforce(f"sandbox_open:{uid}", ratelimit.sandbox_open_limit())  # Phase 8b fix L3
     t = load_managed(ctx, template_id)
     sb = ensure(ctx, t, language=data.language, request=request)
     a = sb.assessment

@@ -278,6 +278,7 @@ def _flush_unique(db: Session, language: str) -> None:
 
 def create_page(db: Session, ctx: AuthzContext, course: Course, data: sch.PageCreateIn) -> Page:
     course_svc.require_course(ctx, A.CONTENT_MANAGE, course)
+    course_svc.assert_not_sandbox(course)  # Phase 8b fix L4: no course structure in a template sandbox
     _check_language(course, data.language)
     title = clean_title(data.title, ids.PAGE_TITLE_MAX)
     body = clean_body(data.body_md, ids.PAGE_BODY_MAX)
@@ -303,6 +304,7 @@ def create_page(db: Session, ctx: AuthzContext, course: Course, data: sch.PageCr
 
 def update_page(db: Session, ctx: AuthzContext, course: Course, page_id: uuid.UUID, data: sch.PageUpdateIn) -> Page:
     course_svc.require_course(ctx, A.CONTENT_MANAGE, course)
+    course_svc.assert_not_sandbox(course)  # Phase 8b fix L4: no course structure in a template sandbox
     fields = data.model_fields_set
     title = clean_title(data.title, ids.PAGE_TITLE_MAX) if "title" in fields else None
     body = clean_body(data.body_md, ids.PAGE_BODY_MAX) if "body_md" in fields else None
@@ -327,6 +329,7 @@ def update_page(db: Session, ctx: AuthzContext, course: Course, page_id: uuid.UU
 
 def delete_page(db: Session, ctx: AuthzContext, course: Course, page_id: uuid.UUID) -> None:
     course_svc.require_course(ctx, A.CONTENT_MANAGE, course)
+    course_svc.assert_not_sandbox(course)  # Phase 8b fix L4: no course structure in a template sandbox
     page = load(db, course, page_id, for_update=True)
     page.soft_delete(ctx.user.id)
     gate.touch_pages(db, [page.id])
@@ -339,6 +342,7 @@ def delete_page(db: Session, ctx: AuthzContext, course: Course, page_id: uuid.UU
 
 def restore_page(db: Session, ctx: AuthzContext, course: Course, page_id: uuid.UUID) -> Page:
     course_svc.require_course(ctx, A.CONTENT_MANAGE, course)
+    course_svc.assert_not_sandbox(course)  # Phase 8b fix L4: no course structure in a template sandbox
     page = load(db, course, page_id, include_deleted=True, for_update=True)
     if page.deleted_at is None:
         return page

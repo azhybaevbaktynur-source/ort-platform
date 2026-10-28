@@ -26,6 +26,10 @@ def _err(res):
 
 def sandbox_world(db):
     org = make_org(db, "Sandbox school")
+    # Phase 8b fix M1: sandbox access is re-checked against `can_manage` on every request, so TA (the template's
+    # creator) manages it through the P7B-3 setting
+    org.settings = {**(org.settings or {}), "teachers_can_publish_org_templates": True}
+    db.commit()
     OA, TA = make_user(db), make_user(db, teacher_status="approved")
     add_member(db, org, OA, "org_admin")
     add_member(db, org, TA, "teacher")

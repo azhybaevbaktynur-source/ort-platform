@@ -135,6 +135,7 @@ def home_strip(db: Session, user_id: str) -> list[sch.AnnouncementHomeOut]:
 
 def create(db: Session, ctx: AuthzContext, course: Course, data: sch.AnnouncementCreateIn) -> Announcement:
     course_svc.require_course(ctx, A.CONTENT_MANAGE, course)
+    course_svc.assert_not_sandbox(course)  # Phase 8b fix L4: no course structure in a template sandbox
     title = clean_title(data.title, ids.ANNOUNCEMENT_TITLE_MAX)
     body = clean_body(data.body_md, ids.ANNOUNCEMENT_BODY_MAX)
     a = Announcement(course_id=course.id, author_id=ctx.user.id, title=title, body_md=body, body_html=render(body),
@@ -147,6 +148,7 @@ def create(db: Session, ctx: AuthzContext, course: Course, data: sch.Announcemen
 def update(db: Session, ctx: AuthzContext, course: Course, announcement_id: uuid.UUID,
            data: sch.AnnouncementUpdateIn) -> Announcement:
     course_svc.require_course(ctx, A.CONTENT_MANAGE, course)
+    course_svc.assert_not_sandbox(course)  # Phase 8b fix L4: no course structure in a template sandbox
     fields = data.model_fields_set
     title = clean_title(data.title, ids.ANNOUNCEMENT_TITLE_MAX) if "title" in fields else None
     body = clean_body(data.body_md, ids.ANNOUNCEMENT_BODY_MAX) if "body_md" in fields else None
@@ -167,6 +169,7 @@ def update(db: Session, ctx: AuthzContext, course: Course, announcement_id: uuid
 
 def publish(db: Session, ctx: AuthzContext, course: Course, announcement_id: uuid.UUID) -> Announcement:
     course_svc.require_course(ctx, A.CONTENT_MANAGE, course)
+    course_svc.assert_not_sandbox(course)  # Phase 8b fix L4: no course structure in a template sandbox
     a = load(db, course, announcement_id, for_update=True)
     if a.published_at is not None:
         raise Conflict("Already published", code=ids.E_ALREADY_PUBLISHED)
@@ -178,6 +181,7 @@ def publish(db: Session, ctx: AuthzContext, course: Course, announcement_id: uui
 
 def soft_delete(db: Session, ctx: AuthzContext, course: Course, announcement_id: uuid.UUID) -> None:
     course_svc.require_course(ctx, A.CONTENT_MANAGE, course)
+    course_svc.assert_not_sandbox(course)  # Phase 8b fix L4: no course structure in a template sandbox
     a = load(db, course, announcement_id, for_update=True)
     a.soft_delete(ctx.user.id)
     db.commit()
