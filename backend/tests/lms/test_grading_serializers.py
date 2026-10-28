@@ -24,7 +24,8 @@ pytestmark = pytest.mark.usefixtures("grading_plan", "no_scored_hooks")
 
 T0 = clock.now()
 NAMES = ["sc", "tf"]  # 3 points, auto-graded only -> status graded
-RESULT_KEYS = {"raw_score", "points_possible", "sections", "pending_review", "submitted_at", "grade"}
+RESULT_KEYS = {"raw_score", "points_possible", "sections", "pending_review", "submitted_at", "grade",
+               "result_view", "passage_display"}  # Phase 8b S1: effective display values (PHASE_8B_DESIGN 6.3)
 GRADE_KEYS = {"scheme_type", "scale_min", "scale_max", "display_value", "label", "percentile", "passed", "thresholds",
               "sections", "is_kept", "released", "labels"}
 GRADED_KEYS = {"assignment_id", "kind", "assessment_id", "title", "state", "display_value", "label", "percentile", "passed", "thresholds",
