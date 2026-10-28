@@ -61,3 +61,38 @@ async def test_running_attempt_unaffected_by_later_commits_republish_picks_new(d
     q1 = db.get(BankQuestion, w.q1.id)
     assert _published_qvs(db, w.aid) == [str(q1.current_version_id), str(new_q2.current_version_id)]
     assert str(q1.current_version_id) != v_q1
+
+
+async def test_drafts_follow_a_moved_item_and_survive_deleting_the_old_section(db, api):
+    """Phase 7c fix1 (M2): moving an item (or a passage with its children) to another section moves the drafts of its
+    cards; deleting the emptied old section then removes only its new-card drafts. The publish warning points at the
+    new section."""
+    from app.lms.quiz_editor.models import QuestionDraft
+    from tests.lms.factories import make_item, make_passage, make_question, make_section
+    from tests.lms.quiz_editor_support import make_quiz_bank
+
+    w = quiz_world(db, link=True)
+    s_b = make_section(db, w.quiz, position=2, key=None, title=None, time_limit_s=None, rules={})
+    qb = make_quiz_bank(db, w, w.quiz)
+    own_p = make_passage(db, qb, w.O)
+    child_q = make_question(db, qb, w.O, passage_id=own_p.id, stem="child")
+    p_item = make_item(db, w.quiz, w.s1, passage=own_p)
+    child = make_item(db, w.quiz, w.s1, question=child_q, parent=p_item)
+    d_item = (await new_draft(api, w, item_id=str(w.items[0].id), payload=staff_payload(db, w.q1, stem="later"))).json()
+    d_child = (await new_draft(api, w, item_id=str(child.id), payload=staff_payload(db, child_q, stem="c2"))).json()
+    d_new = (await new_draft(api, w, section_id=str(w.s1.id))).json()
+    for it_id in (w.items[0].id, w.items[1].id, child.parent_item_id):
+        r = await api.call(w.O, "PATCH", f"{A(w)}/items/{it_id}", json={"section_id": str(s_b.id)})
+        assert r.status_code == 200, r.text
+    v = await api.call(w.O, "POST", f"{A(w)}/validate")
+    assert v.status_code == 200, v.text
+    pos = {x["item_id"]: x["section_pos"] for x in v.json()["warnings"] if x["code"] == "unfinished_drafts"}
+    assert pos == {str(w.items[0].id): 2, str(child.id): 2, None: 1}
+    r = await api.call(w.O, "DELETE", f"{A(w)}/sections/{w.s1.id}")
+    assert r.status_code == 204, r.text
+    db.expire_all()
+    rows = {d.id: d for d in db.execute(select(QuestionDraft).where(QuestionDraft.assessment_id == w.quiz.id)).scalars()}
+    assert set(map(str, rows)) == {d_item["id"], d_child["id"]} and d_new["id"] not in set(map(str, rows))
+    assert all(d.section_id == s_b.id for d in rows.values())
+    r = await commit(api, w, d_item["id"], d_item["draft_rev"])
+    assert r.status_code == 200 and r.json()["applied"] == "in_place", r.text

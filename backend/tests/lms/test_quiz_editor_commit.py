@@ -200,3 +200,29 @@ async def test_pick_items_untouched_by_commit(db, api):
     kinds = [(i.kind, i.position) for i in _top(db, w.s1)]
     assert kinds == [("question", 1), ("question", 2), ("pick", 3), ("question", 4)]
     assert make_question  # imported helper used by other files
+
+
+async def test_existing_card_commit_ignores_meta_passage_id(db, api):
+    """Phase 7c fix1 (M1): `meta.passage_id` of an existing card is ignored; a passage child committed with
+    `passage_id: null` keeps its passage (and a null passage id alone is no change)."""
+    w = quiz_world(db)
+    qb = make_quiz_bank(db, w, w.quiz)
+    own_p = make_passage(db, qb, w.O)
+    r = await create_q(api, w, payload=card(meta={"passage_id": str(own_p.id)}))
+    assert r.status_code == 201, r.text
+    db.expire_all()
+    item = db.get(AssessmentItem, uuid.UUID(r.json()["item"]["id"]))
+    q = db.get(BankQuestion, uuid.UUID(r.json()["question"]["id"]))
+    assert q.passage_id == own_p.id
+    p = staff_payload(db, q)
+    p["meta"] = {**p["meta"], "passage_id": None}
+    _, r = await edit_card(api, w, item, p)
+    assert r.status_code == 200 and r.json()["applied"] == "unchanged", r.text
+    p = staff_payload(db, q, stem="Edited child")
+    p["meta"] = {**p["meta"], "passage_id": None, "tags": ["t1"]}
+    _, r = await edit_card(api, w, item, p)
+    assert r.status_code == 200 and r.json()["applied"] == "in_place", r.text
+    db.expire_all()
+    q = db.get(BankQuestion, q.id)
+    assert q.passage_id == own_p.id and q.tags == ["t1"]
+    assert db.get(QuestionVersion, q.current_version_id).stem == "Edited child"
