@@ -47,6 +47,74 @@ def check_payload(a: Assessment, payload: CardPayloadIn) -> dict:
     return body
 
 
+def _image_ids(body: dict) -> list[tuple[list, Optional[uuid.UUID]]]:
+    """[(loc, asset id or None when not a UUID)] of every image a stored payload refers to (L1): the card image and
+    choice images (`image_asset_id`, or `image.asset_id` as commit reads them)."""
+    out: list[tuple[list, Optional[uuid.UUID]]] = []
+
+    def add(loc: list, raw) -> None:
+        if raw in (None, ""):
+            return
+        try:
+            out.append((loc, uuid.UUID(str(raw))))
+        except ValueError:
+            out.append((loc, None))
+
+    add(["payload", "image_asset_id"], body.get("image_asset_id"))
+    data = body.get("data")
+    choices = data.get("choices") if isinstance(data, dict) else None
+    if isinstance(choices, list):
+        for i, ch in enumerate(choices):
+            if not isinstance(ch, dict):
+                continue
+            if ch.get("image_asset_id") not in (None, ""):
+                add(["payload", "data", "choices", i, "image_asset_id"], ch.get("image_asset_id"))
+            elif isinstance(ch.get("image"), dict):
+                add(["payload", "data", "choices", i, "image", "asset_id"], ch["image"].get("asset_id"))
+    return out
+
+
+def check_images(db: Session, actor: User, body: dict, carried: set) -> None:
+    """L1: every image id of a draft must pass commit's usability rule (`content.service.resolve_refs`: a live image
+    of the actor, or carried). `carried` = the refs of the card's question version plus the ids already stored in this
+    draft (a colleague co-editing the card keeps the images the other editor added). 422 `validation_failed` with the
+    field's loc and msg `asset_not_usable`. One query when everything is usable."""
+    from app.lms.content import service as content_svc
+
+    found = _image_ids(body)
+    if not found:
+        return
+
+    def refuse(loc: list):
+        return ValidationFailed("Image is not usable", code="validation_failed",
+                                details=[{"loc": loc, "msg": "asset_not_usable"}])
+
+    for loc, aid in found:
+        if aid is None:
+            raise refuse(loc)
+    try:
+        content_svc.resolve_refs(db, actor, [aid for _, aid in found], carried=carried)
+        return
+    except ValidationFailed:
+        pass
+    for loc, aid in found:  # failure path only: find the field to point at
+        try:
+            content_svc.resolve_refs(db, actor, [aid], carried=carried)
+        except ValidationFailed:
+            raise refuse(loc) from None
+    raise refuse(found[0][0])  # pragma: no cover
+
+
+def _carried_for(db: Session, base_version_id: Optional[uuid.UUID], *, stored: Optional[dict] = None) -> set:
+    from app.lms.content import service as content_svc
+    from app.lms.content.models import QuestionVersion
+
+    out = content_svc._carried(db.get(QuestionVersion, base_version_id)) if base_version_id else set()
+    if stored:
+        out |= {aid for _, aid in _image_ids(stored) if aid is not None}
+    return out
+
+
 def _names(db: Session, user_ids: Iterable[Optional[str]]) -> dict[str, str]:
     uids = [u for u in set(user_ids) if u]
     if not uids:
@@ -84,19 +152,29 @@ def load_draft(db: Session, a: Assessment, draft_id: uuid.UUID) -> QuestionDraft
 
 
 def remove_drafts(db: Session, *, item_ids: Iterable[uuid.UUID] = (), section_id: Optional[uuid.UUID] = None) -> None:
-    """Builder hook (2.2 lifecycle): drop the drafts of removed items (or of a removed section) and clear position
-    hints pointing at removed items, before the rows go (the FKs are RESTRICT / SET NULL). No commit."""
+    """Builder hook (2.2 lifecycle): drop the drafts of removed items and the new-card drafts of a removed section,
+    and clear position hints pointing at removed items, before the rows go (the FKs are RESTRICT / SET NULL). Drafts of
+    existing cards go only with their item (M2: they follow the item across sections, `move_drafts`). No commit."""
     item_ids = list(item_ids)
     conds = []
     if item_ids:
         conds.append(QuestionDraft.item_id.in_(item_ids))
     if section_id is not None:
-        conds.append(QuestionDraft.section_id == section_id)
+        conds.append((QuestionDraft.section_id == section_id) & QuestionDraft.item_id.is_(None))
     if conds:
         db.execute(delete(QuestionDraft).where(or_(*conds)).execution_options(synchronize_session=False))
     if item_ids:
         db.execute(update(QuestionDraft).where(QuestionDraft.after_item_id.in_(item_ids))
                    .values(after_item_id=None).execution_options(synchronize_session=False))
+
+
+def move_drafts(db: Session, *, item_ids: Iterable[uuid.UUID], section_id: uuid.UUID) -> None:
+    """Builder hook (M2): an item (with its passage children) moved to another section takes its drafts along. No
+    commit."""
+    item_ids = list(item_ids)
+    if item_ids:
+        db.execute(update(QuestionDraft).where(QuestionDraft.item_id.in_(item_ids))
+                   .values(section_id=section_id).execution_options(synchronize_session=False))
 
 
 # ------------------------------------------------------------------ services
@@ -137,12 +215,14 @@ def create_draft(db: Session, ctx: AuthzContext, course, aid: uuid.UUID, data: D
             raise Conflict("This card already has a draft", code=ids.E_DRAFT_EXISTS,
                            details=draft_out(db, existing).model_dump(mode="json"))
         q = db.get(BankQuestion, it.question_id)
+        check_images(db, ctx.user, body, _carried_for(db, q.current_version_id if q is not None else None))
         d = QuestionDraft(assessment_id=a.id, section_id=it.section_id, item_id=it.id, after_item_id=None,
                           base_version_id=q.current_version_id if q is not None else None, payload=body,
                           draft_rev=1, created_by_id=ctx.user.id, updated_by_id=ctx.user.id)
     else:
         section, created_section = target_section(db, a, data.section_id)
         after = resolve_after_item(db, a, section, data.after_item_id)
+        check_images(db, ctx.user, body, set())
         d = QuestionDraft(assessment_id=a.id, section_id=section.id, item_id=None,
                           after_item_id=after.id if after is not None else None, base_version_id=None,
                           payload=body, draft_rev=1, created_by_id=ctx.user.id, updated_by_id=ctx.user.id)
@@ -159,6 +239,11 @@ def update_draft(db: Session, ctx: AuthzContext, course, aid: uuid.UUID, draft_i
     """Single-statement optimistic update (`WHERE draft_rev = :rev`): the loser gets the winner's state."""
     a = _manage(db, ctx, course, aid)
     body = check_payload(a, data.payload)
+    if _image_ids(body):
+        cur = db.execute(select(QuestionDraft.base_version_id, QuestionDraft.payload).where(
+            QuestionDraft.id == draft_id, QuestionDraft.assessment_id == a.id)).first()
+        if cur is not None:  # a missing draft is answered below (404 from the conflict path)
+            check_images(db, ctx.user, body, _carried_for(db, cur.base_version_id, stored=cur.payload))
     res = db.execute(
         update(QuestionDraft)
         .where(QuestionDraft.id == draft_id, QuestionDraft.assessment_id == a.id,

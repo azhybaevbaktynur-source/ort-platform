@@ -163,3 +163,94 @@ async def test_first_use_from_create_and_draft_share_one_bank(db, api):
     r = await api.call(w.O, "POST", f"{A(w)}/drafts/{d['id']}/commit", json={"draft_rev": 1})
     assert r.status_code == 200, r.text
     assert db.scalar(select(func.count()).select_from(QuestionBank).where(QuestionBank.assessment_id == w.quiz.id)) == 1
+
+
+# --- Phase 7c fix1 (H1): translation links never cross a quiz bank boundary (16)
+def _link(w, qid):
+    return f"/courses/{w.cid}/questions/{qid}/translation-link"
+
+
+def _translations(w, qid):
+    return f"/courses/{w.cid}/questions/{qid}/translations"
+
+
+async def test_translation_link_never_crosses_a_quiz_bank(db, api):
+    """Repro: quiz A's private ru question linked as the ru variant of a shared en question would let quiz C (ru)
+    pin quiz A's version. Link, add-translation into a quiz bank and out of one are refused; inside one quiz bank
+    variants stay allowed."""
+    from app.lms.content.models import BankQuestion
+
+    w = quiz_world(db)
+    own_a = make_quiz_bank(db, w, w.quiz)
+    ru_a = make_question(db, own_a, w.O, language="ru", stem="Private ru")
+    r = await api.call(w.O, "POST", _link(w, w.q1.id), json={"question_id": str(ru_a.id)})
+    assert r.status_code == 422 and err(r) == "quiz_bank_private", r.text
+    r = await api.call(w.O, "POST", _link(w, ru_a.id), json={"question_id": str(w.q1.id)})
+    assert r.status_code == 422 and err(r) == "quiz_bank_private", r.text
+    # quiz A's question and quiz B's question: two quiz banks
+    ky_b = make_question(db, make_quiz_bank(db, w, w.quiz2), w.O, language="ky")
+    r = await api.call(w.O, "POST", _link(w, ru_a.id), json={"question_id": str(ky_b.id)})
+    assert r.status_code == 422 and err(r) == "quiz_bank_private", r.text
+    # a translation of a shared question written into a quiz bank, and of a quiz question into a shared bank
+    r = await api.call(w.O, "POST", _translations(w, w.q1.id), json={"language": "ru", "bank_id": str(own_a.id)})
+    assert r.status_code == 422 and err(r) == "quiz_bank_private", r.text
+    r = await api.call(w.O, "POST", _translations(w, ru_a.id), json={"language": "en", "bank_id": str(w.shared.id)})
+    assert r.status_code == 422 and err(r) == "quiz_bank_private", r.text
+    db.expire_all()
+    assert db.get(BankQuestion, w.q1.id).translation_group_id is None
+    assert db.get(BankQuestion, ru_a.id).translation_group_id is None
+    # the same quiz bank on both sides stays allowed
+    r = await api.call(w.O, "POST", _translations(w, ru_a.id), json={"language": "en"})
+    assert r.status_code == 201, r.text
+    ky_a = make_question(db, own_a, w.O, language="ky")
+    r = await api.call(w.O, "POST", _link(w, ky_a.id), json={"question_id": str(ru_a.id)})
+    assert r.status_code == 204, r.text
+    # shared <-> shared unchanged
+    ru_s = make_question(db, w.shared, w.O, language="ru")
+    r = await api.call(w.O, "POST", _link(w, w.q1.id), json={"question_id": str(ru_s.id)})
+    assert r.status_code == 204, r.text
+
+
+async def test_cross_quiz_variant_link_is_ignored_at_add_and_publish(db, api):
+    """Backstop: a link made before the guard (inserted directly) never resolves another quiz's private question as a
+    language variant: adding behaves as "no version in the quiz languages", publishing as `unresolved_language`."""
+    from app.lms.assessments.models import AssessmentVersion
+    from app.lms.content.models import BankQuestion, TranslationGroup
+    from tests.lms.factories import make_assessment
+    from tests.lms.quiz_editor_support import default_section
+
+    w = quiz_world(db)
+    own_a = make_quiz_bank(db, w, w.quiz)
+    ru_a = make_question(db, own_a, w.O, language="ru", stem="Private ru")
+    g = TranslationGroup(course_id=w.course.id, created_by_id=w.O.id)
+    db.add(g)
+    db.flush()
+    w.q1.translation_group_id = g.id
+    ru_a.translation_group_id = g.id
+    db.commit()
+    quiz_c = make_assessment(db, w.course, w.O, title={"en": "Quiz C"}, languages=["ru"])
+    sc = default_section(db, quiz_c)
+    r = await api.call(w.O, "POST", f"{A(w, quiz_c)}/sections/{sc.id}/items",
+                       json={"kind": "question", "question_id": str(w.q1.id)})
+    assert r.status_code == 422 and err(r) == "item_language_mismatch", r.text
+    make_item(db, quiz_c, sc, question=w.q1)  # an item that predates the guard
+    r = await api.call(w.O, "POST", f"{A(w, quiz_c)}/publish", json={})
+    assert r.status_code == 422, r.text
+    assert [(d["code"], d["language"]) for d in r.json()["error"]["details"]] == [("unresolved_language", "ru")]
+    # control: the same variant in a shared bank resolves and is pinned
+    db.expire_all()
+    q_ru = db.get(BankQuestion, ru_a.id)
+    q_ru.bank_id = w.shared.id
+    db.commit()
+    r = await api.call(w.O, "POST", f"{A(w, quiz_c)}/publish", json={})
+    assert r.status_code == 200, r.text
+    snap = db.execute(select(AssessmentVersion).where(AssessmentVersion.assessment_id == quiz_c.id,
+                                                      AssessmentVersion.kind == "published")).scalar_one().snapshot
+    assert snap["slots"]["ru"][0]["qv"] == str(q_ru.current_version_id)
+    # quiz A itself still resolves a variant in its own quiz bank
+    q_ru.bank_id = own_a.id
+    db.get(Assessment, w.quiz.id).languages = ["ru"]
+    db.commit()
+    r = await api.call(w.O, "POST", f"{A(w)}/sections/{w.s1.id}/items",
+                       json={"kind": "question", "question_id": str(w.q1.id)})
+    assert r.status_code == 201, r.text

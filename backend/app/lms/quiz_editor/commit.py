@@ -214,13 +214,14 @@ def commit_draft(db: Session, ctx: AuthzContext, course, aid: uuid.UUID, draft_i
     version_points = payload.points if in_quiz_bank else current.default_points
     n = _prepared(db, ctx, payload, version_points, content_svc._carried(current))
     meta = _clean_meta(payload)
-    passage_id = payload.meta.passage_id
+    # M1: an existing card never moves between passages here; `meta.passage_id` is ignored (always present in the
+    # payload, so passing it on would detach a passage child when it is null)
     type_changed = n["type"] != q.type
     # compared with the hash of the current version's content (recomputed: rows written by older code paths may carry
     # a different stored hash for the same content)
     content_changed = (content_svc.question_content_hash(q.language, n)
                        != content_svc.question_content_hash(q.language, content_svc._version_content(current)))
-    meta_changed = _meta_changed(q, meta, passage_id)
+    meta_changed = _meta_changed(q, meta, q.passage_id)
     points = Decimal(str(payload.points))
 
     if not (content_changed or meta_changed or type_changed):
@@ -229,8 +230,10 @@ def commit_draft(db: Session, ctx: AuthzContext, course, aid: uuid.UUID, draft_i
         b._commit(db, a)
         return a, item, q, "unchanged", False
 
-    u = usage.question_usage(db, course, q, this_assessment_id=a.id)
-    forced_this = type_changed and (u.other_count > 0 or u.published_anywhere or q.translation_group_id is not None)
+    u = usage.question_usage(db, course, q, this_assessment_id=a.id, with_published=False)
+    # M3: the published-snapshot scan runs only for a type change, and only when the cheap checks do not force `this`
+    forced_this = type_changed and (u.other_count > 0 or q.translation_group_id is not None
+                                    or usage.published_pins(db, course.id, q))
     can_update_all = can_edit_bank(ctx, course, bank)
     if forced_this:
         path = "this"
@@ -272,7 +275,7 @@ def commit_draft(db: Session, ctx: AuthzContext, course, aid: uuid.UUID, draft_i
     if meta_changed:
         content_svc._apply_meta(db, course, q, QuestionMetaIn(
             topic=payload.meta.topic, difficulty=payload.meta.difficulty, section=payload.meta.section,
-            tags=list(payload.meta.tags or []), passage_id=passage_id))
+            tags=list(payload.meta.tags or [])))
     if content_changed:
         content_svc.new_question_version(db, q, n, actor_id=ctx.user.id, origin="edit")
     if meta_changed:
