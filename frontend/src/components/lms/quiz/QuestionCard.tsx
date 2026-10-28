@@ -459,7 +459,7 @@ function OpenCard({ ctx, section, item, draft, label, onClosed, actions, childOf
         </div>
       </div>
 
-      <ScopeDialog details={scope?.details ?? null} busy={busy} defaultLanguage={ctx.defaultLanguage}
+      <ScopeDialog details={scope?.details ?? null} busy={busy} defaultLanguage={ctx.defaultLanguage} passageChild={!!childOf}
         onCancel={() => setScope(null)}
         onChoose={(sc) => {
           const s = scope;
