@@ -16,7 +16,9 @@ export function ResultSummary({ result, grade: gradeProp }: { result: AttemptRes
   // Phase 7b S7: general exams name their sections by title (as the lobby does); ORT keys keep their labels first
   const sectionTitle = (title: AttemptResultSection["title"]) => (typeof title === "string" ? title : pickLocalized(title ?? null, lang));
   const grade = gradeProp ?? result.grade ?? null;
-  const scaled = ui.resultView === "ort" && !!grade && !!grade.sections && grade.sections.length > 0;
+  // Phase 8b S3 (PHASE_8B_DESIGN 8.2): the result payload names the view (the server falls back to the course
+  // template, so ORT is "ort"); a payload without the field keeps the course template's choice.
+  const scaled = (result.result_view ?? ui.resultView) === "ort" && !!grade && !!grade.sections && grade.sections.length > 0;
   const pending = result.pending_review > 0 ? (
     <p role="status" className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
       {t("results.pendingReview", { n: result.pending_review })}

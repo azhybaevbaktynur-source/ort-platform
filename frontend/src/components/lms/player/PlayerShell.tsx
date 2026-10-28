@@ -32,6 +32,8 @@ import { Palette, type PaletteGroup } from "./Palette";
 import { SaveStatus } from "./SaveStatus";
 import { ClosedDialog, SectionEndDialog, SubmitDialog, TimeUpDialog } from "./PlayerDialogs";
 import { isAnswered, isTypingTarget, itemPassage, itemQuestion, mergeContent, type ResponseObj } from "./playerUtils";
+import { ScrollingItems, type ScrollRequest } from "./ScrollingItems"; // Phase 8b S3
+import { useReturnPath, withReturn } from "./returnPath"; // Phase 8b S3
 
 type LocalAnswer = { response: ResponseObj; flagged: boolean };
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -75,6 +77,13 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
   const [headerH, setHeaderH] = useState(0);
   const passageRef = useRef<HTMLElement>(null);
   const questionAreaRef = useRef<HTMLDivElement>(null);
+  // --- Phase 8b S3 begin --- (PHASE_8B_DESIGN 8.1, 7.2): scrolling display mode and the `?return=` link
+  const scrollRootRef = useRef<HTMLDivElement>(null);
+  const [scrollReq, setScrollReq] = useState<ScrollRequest | null>(null);
+  const returnPath = useReturnPath(lang);
+  const returnRef = useRef<string | null>(null);
+  returnRef.current = returnPath;
+  // --- Phase 8b S3 end ---
 
   const { me } = useLmsMe();
   const meIdRef = useRef<string | null>(null);
@@ -84,7 +93,8 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
   /** To the result page; body answers the server did not store (B2) ride along as `?unsaved=` for the notice. */
   const goResult = useCallback((out?: SubmitOut | null) => {
     const unsaved = unsavedParam(out?.rejected);
-    router.replace(unsaved ? `${resultHref}?unsaved=${encodeURIComponent(unsaved)}` : resultHref);
+    const href = withReturn(resultHref, returnRef.current); // Phase 8b S3: no `return` (ORT, courses) = unchanged
+    router.replace(unsaved ? `${href}${href.includes("?") ? "&" : "?"}unsaved=${encodeURIComponent(unsaved)}` : href);
   }, [router, resultHref]);
 
   /** Run a request and feed the clock estimator with its `server_now`. */
@@ -358,10 +368,21 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
     setAnswers((prev) => ({ ...prev, [position]: { response: prev[position]?.response ?? null, flagged } }));
   }, []);
 
+  // --- Phase 8b S3 begin --- scrolling mode: moving = scroll to the item and focus it (ScrollingItems), same position
+  const scrolling = state?.display_mode === "scrolling";
+  const scrollToItem = useCallback((position: number) => {
+    setCurrentPos(position);
+    setScrollReq((r) => ({ pos: position, n: (r?.n ?? 0) + 1 }));
+  }, []);
+  // --- Phase 8b S3 end ---
+
   const go = useCallback((delta: number) => {
     const next = visibleItems[Math.min(visibleItems.length - 1, Math.max(0, curIndex + delta))];
-    if (next) setCurrentPos(next.position);
-  }, [visibleItems, curIndex]);
+    if (next) {
+      if (scrolling) scrollToItem(next.position); // Phase 8b S3
+      else setCurrentPos(next.position);
+    }
+  }, [visibleItems, curIndex, scrolling, scrollToItem]);
 
   /** Time-up (or forced) submit: random 0-15 s spread, flush, submit with leftovers, retry until success. */
   const runTimeUpSubmit = useCallback(async () => {
@@ -542,9 +563,10 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
   }, [ready]);
 
   const selectFromSheet = useCallback((position: number) => {
-    setCurrentPos(position);
+    if (scrolling) scrollToItem(position); // Phase 8b S3
+    else setCurrentPos(position);
     setPaletteOpen(false);
-  }, []);
+  }, [scrolling, scrollToItem]);
 
   // S11a, F5: the sheet's own button disappears with the sheet. Open the finish dialog one frame later, from the
   // header button, so the dialog's Cancel returns focus to a live element.
@@ -562,8 +584,8 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
       <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-50 p-4">
         <div className="w-full max-w-md space-y-4">
           <ErrorMessage error={loadError} onRetry={() => void load()} />
-          <Link href={`/${lang}/courses/${courseId}`} className="text-sm font-medium text-brand-700 hover:underline">
-            {t("player.backToCourse")}
+          <Link href={returnPath ?? `/${lang}/courses/${courseId}`} className="text-sm font-medium text-brand-700 hover:underline">
+            {returnPath ? t("player.scrolling.back") : t("player.backToCourse")}
           </Link>
         </div>
       </div>
@@ -619,7 +641,7 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-slate-50">
+    <div ref={scrollRootRef} className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-slate-50">
       <header ref={headerRef} className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2.5">
           <div className="min-w-0 basis-full sm:basis-auto">
@@ -687,6 +709,20 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
 
       <main className="mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 gap-5 px-4 py-5 lg:grid-cols-[minmax(0,1fr)_17rem]">
         <div className="min-w-0 space-y-4">
+          {/* --- Phase 8b S3 --- scrolling display mode (PHASE_8B_DESIGN 8.1); one-per-page (ORT) below is unchanged */}
+          {scrolling ? (
+            sectionError ? (
+              <ErrorMessage error={sectionError} onRetry={() => setSectionRetry((n) => n + 1)} />
+            ) : sectionLoading ? (
+              <LoadingState label={t("player.loading")}><QuestionSkeleton /></LoadingState>
+            ) : (
+              <ScrollingItems state={state} content={content} visibleItems={visibleItems} currentPos={currentPos} answers={answers}
+                onAnswer={onAnswer} onToggleFlag={onToggleFlag} onCurrentChange={setCurrentPos} onNavigate={scrollToItem}
+                scrollRequest={scrollReq} scrollRootRef={scrollRootRef} headerHeight={headerH} stickyTop={stickyTop}
+                passageDisplay={state.passage_display ?? null} instructions={curInstructions} sectionTitle={sectionTitle}
+                forwardOnly={forwardOnly} finishLabel={finishLabel} onFinish={finishPressed} />
+            )
+          ) : (<>
           {curInstructions ? (
             <details className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700" open={curIndex === 0}>
               <summary className="cursor-pointer py-1 font-semibold text-slate-800">{t("player.instructions")}</summary>
@@ -705,7 +741,7 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
               ) : null}
               <div ref={questionAreaRef} style={{ scrollMarginTop: stickyTop + 52 }} className={passage ? "grid grid-cols-1 gap-4 xl:grid-cols-2" : ""}>
                 {passage ? (
-                  <PassagePane ref={passageRef} id={`passage-${passage.id}`} passage={passage} open={passageOpen} scrollMarginTop={stickyTop + 52} />
+                  <PassagePane ref={passageRef} id={`passage-${passage.id}`} passage={passage} open={passageOpen} scrollMarginTop={stickyTop + 52} display={state.passage_display} />
                 ) : null}
                 <ItemView
                   key={curItem.position}
@@ -737,11 +773,13 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
             )}
           </div>
           <p className="hidden text-xs text-slate-500 lg:block">{t("player.shortcuts")}</p>
+          </>)}
         </div>
 
         {/* Desktop: palette and the finish action beside the question. Phones and tablets use the sheet below. */}
-        <aside className="hidden space-y-3 lg:block">
-          <Palette groups={paletteGroups} currentPosition={curItem?.position ?? -1} onSelect={setCurrentPos} />
+        {/* Phase 8b S3: in scrolling mode the palette stays in view while the list scrolls (one-per-page: unchanged) */}
+        <aside className={cn("hidden space-y-3 lg:block", scrolling && "lg:sticky lg:self-start")} style={scrolling ? { top: stickyTop } : undefined}>
+          <Palette groups={paletteGroups} currentPosition={curItem?.position ?? -1} onSelect={scrolling ? scrollToItem : setCurrentPos} />
           <Button variant="secondary" fullWidth onClick={finishPressed} className="border-brand-600 text-brand-700 hover:bg-brand-50">
             {finishLabel}
           </Button>

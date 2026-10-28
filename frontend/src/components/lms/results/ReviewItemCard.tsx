@@ -8,6 +8,7 @@ import { MathRenderer } from "@/components/math/MathRenderer";
 import { TemplatePassage } from "@/components/lms/PlainPassage";
 import type { Correctness, ReviewItemOut, StudentQuestion } from "@/lib/lms/attemptTypes";
 import { fmtPoints } from "@/components/lms/assessments/format";
+import type { PassageDisplay } from "@/lib/lms/blocks";
 
 // Design-system Badge with an icon, so colour is never the only signal (S7b, cross-cutting).
 const TONE: Record<Correctness, BadgeTone> = {
@@ -55,6 +56,7 @@ export function ReviewItemCard({
   maxPoints,
   children,
   viewer = "student",
+  passageDisplay,
 }: {
   item: ReviewItemOut;
   number: number;
@@ -62,6 +64,8 @@ export function ReviewItemCard({
   children?: React.ReactNode;
   /** Phase 6b S5c (UX T12, T22): "staff" labels the answer "Student's answer". Both viewers use the body font (S7b, P7). */
   viewer?: "student" | "staff";
+  /** Phase 8b S3 (PHASE_8B_DESIGN 8.2): renderer from the review payload (`passage_display`); absent = course template. */
+  passageDisplay?: PassageDisplay | null;
 }) {
   const { t } = useTranslation();
   const answerLabel = viewer === "staff" ? t("teaching.studentAnswer") : t("results.yourAnswer");
@@ -88,7 +92,7 @@ export function ReviewItemCard({
       {passage && (
         <details className="rounded-xl border border-slate-200 bg-slate-50 p-3">
           <summary className="cursor-pointer text-sm font-medium text-slate-700">{passage.title || t("results.passage")}</summary>
-          <div className="mt-2"><TemplatePassage text={passage.body} /></div>
+          <div className="mt-2"><TemplatePassage text={passage.body} display={passageDisplay} /></div>
         </details>
       )}
 

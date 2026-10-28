@@ -6,14 +6,19 @@ import { useTranslation } from "@/lib/i18n/context";
 import { TemplatePassage } from "@/components/lms/PlainPassage";
 import { cn, focusRing } from "@/components/ui";
 import type { StudentPassage } from "@/lib/lms/attemptTypes";
+import type { PassageDisplay } from "@/lib/lms/blocks";
 
 /**
  * The reading text. Side by side with the question from `xl`; below that it sits above the question and can be
  * folded away with the sticky `PassageToggle` (S7b, P6), open by default. The text itself (line numbers) is the
  * unchanged `TemplatePassage`.
  */
-export const PassagePane = React.forwardRef<HTMLElement, { passage: StudentPassage; open?: boolean; id?: string; scrollMarginTop?: number }>(
-  function PassagePane({ passage, open = true, id, scrollMarginTop }, ref) {
+export const PassagePane = React.forwardRef<HTMLElement, {
+  passage: StudentPassage; open?: boolean; id?: string; scrollMarginTop?: number;
+  /** Phase 8b S3: renderer from the attempt state (`passage_display`); absent = course template. */
+  display?: PassageDisplay | null;
+}>(
+  function PassagePane({ passage, open = true, id, scrollMarginTop, display }, ref) {
     return (
       <section
         ref={ref}
@@ -29,7 +34,7 @@ export const PassagePane = React.forwardRef<HTMLElement, { passage: StudentPassa
           // eslint-disable-next-line @next/next/no-img-element
           <img src={passage.image_url} alt="" className="mb-3 max-h-72 w-auto rounded-lg" />
         ) : null}
-        <TemplatePassage text={passage.body} />
+        <TemplatePassage text={passage.body} display={display} />
       </section>
     );
   },

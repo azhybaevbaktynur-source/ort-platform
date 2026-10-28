@@ -1177,7 +1177,41 @@
       "showCorrect": "Show correct answers and explanations with the results",
       "shuffleItems": "Shuffle question order",
       "shuffleChoices": "Shuffle answer choices",
-      "saved": "Saved"
+      "saved": "Saved",
+      "display": {
+        "group": "Display",
+        "hint": "How students see the questions and the result. Changes apply after you publish again.",
+        "displayMode": {
+          "label": "Question layout",
+          "options": {
+            "one_per_page": {
+              "title": "One question per page",
+              "body": "Students move between questions with Next and Previous."
+            },
+            "scrolling": {
+              "title": "All questions of a section on one page",
+              "body": "Students scroll through the section, 30 questions at a time."
+            }
+          }
+        },
+        "passageDisplay": {
+          "label": "Reading texts",
+          "inherit": "Course default ({value})",
+          "options": {
+            "plain": "Plain text",
+            "numbered": "Numbered lines"
+          }
+        },
+        "resultView": {
+          "label": "Result page",
+          "inherit": "Course default ({value})",
+          "options": {
+            "general": "Standard result",
+            "ort": "ORT style (scaled score)"
+          },
+          "ortHint": "The scaled score appears only with a scaled grading scheme."
+        }
+      }
     },
     "section": {
       "add": "Add section",
@@ -1407,6 +1441,14 @@
       "show": "Show text",
       "hide": "Hide text",
       "textTitle": "Text: {title}"
+    },
+    "scrolling": {
+      "showNext": "Show the next {n}",
+      "showPrevious": "Show the previous {n}",
+      "nextSection": "Next section",
+      "previousSection": "Previous section",
+      "windowOf": "Questions {from}–{to} of {total}",
+      "back": "Back"
     }
   },
   "grading": {

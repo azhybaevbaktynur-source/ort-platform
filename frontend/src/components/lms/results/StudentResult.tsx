@@ -11,9 +11,12 @@ import { ChevronDown } from "lucide-react";
 import { LinkButton, LoadingState, cn, focusRing } from "@/components/ui";
 import { ResultSummary } from "./ResultSummary";
 import { ReviewItemCard } from "./ReviewItemCard";
+import { useReturnPath, withReturn } from "@/components/lms/player/returnPath";
+import type { PassageDisplay } from "@/lib/lms/blocks";
 
 export function StudentResult({ courseId, attemptId }: { courseId: string; attemptId: string }) {
   const { lang, t } = useTranslation();
+  const returnPath = useReturnPath(lang); // Phase 8b S3
   const [state, setState] = useState<AttemptState | null>(null);
   const [result, setResult] = useState<AttemptResultOut | null>(null);
   const [review, setReview] = useState<ReviewOut | null>(null);
@@ -58,7 +61,10 @@ export function StudentResult({ courseId, attemptId }: { courseId: string; attem
   useEffect(() => { void load(); }, [load]);
 
   const back = `/${lang}/courses/${courseId}/assessments${state ? `/${state.assessment_id}` : ""}`;
-  const backLink = <Link href={back} className="text-sm font-medium text-brand-700 hover:underline">{t("results.back")}</Link>;
+  // Phase 8b S3 (PHASE_8B_DESIGN 7.2): a validated `?return=` (template preview) replaces the back link; absent = today's.
+  const backLink = returnPath
+    ? <Link href={returnPath} className="text-sm font-medium text-brand-700 hover:underline">{t("player.scrolling.back")}</Link>
+    : <Link href={back} className="text-sm font-medium text-brand-700 hover:underline">{t("results.back")}</Link>;
 
   if (loading && !state) return <LoadingState label={t("lms.common.loading")} rows={2} />;
   if (error && !state) return <div className="space-y-3">{backLink}<ErrorMessage error={error} onRetry={() => void load()} /></div>;
@@ -70,7 +76,7 @@ export function StudentResult({ courseId, attemptId }: { courseId: string; attem
         {backLink}
         <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
           <p className="mb-3 font-semibold">{t("results.inProgress")}</p>
-          <LinkButton href={`/${lang}/courses/${courseId}/attempts/${attemptId}`}>{t("results.resume")}</LinkButton>
+          <LinkButton href={withReturn(`/${lang}/courses/${courseId}/attempts/${attemptId}`, returnPath)}>{t("results.resume")}</LinkButton>
         </div>
       </div>
     );
@@ -110,7 +116,9 @@ export function StudentResult({ courseId, attemptId }: { courseId: string; attem
       <ErrorMessage error={error} onRetry={() => void load()} />
       {result && <ResultSummary result={result} />}
       {reviewError ? <ErrorMessage error={reviewError} onRetry={() => void load()} /> : null}
-      {review && review.items.length > 0 && <ReviewList items={review.items} sections={result?.sections ?? []} />}
+      {review && review.items.length > 0 && (
+        <ReviewList items={review.items} sections={result?.sections ?? []} passageDisplay={review.passage_display ?? result?.passage_display ?? null} />
+      )}
       {review && review.items.length === 0 && <p className="text-sm text-slate-500">{t("results.noReview")}</p>}
     </div>
   );
@@ -122,7 +130,12 @@ const MISTAKES = new Set<Correctness>(["incorrect", "partial", "unanswered"]);
  * The answer review (S7b, R4): grouped by section (folding groups, all open), with an optional "only mistakes"
  * filter that is off by default. Every card and its content are unchanged; numbering stays global.
  */
-function ReviewList({ items, sections }: { items: ReviewItemOut[]; sections: AttemptResultOut["sections"] }) {
+function ReviewList({ items, sections, passageDisplay }: {
+  items: ReviewItemOut[];
+  sections: AttemptResultOut["sections"];
+  /** Phase 8b S3: renderer from the review payload (null: course template). */
+  passageDisplay: PassageDisplay | null;
+}) {
   const { t } = useTranslation();
   const [onlyMistakes, setOnlyMistakes] = useState(false);
   const groups = useMemo(() => {
@@ -180,12 +193,12 @@ function ReviewList({ items, sections }: { items: ReviewItemOut[]; sections: Att
                 </span>
               </summary>
               <div className="space-y-4">
-                {shown.map((e) => <ReviewItemCard key={e.item.position} item={e.item} number={e.number} />)}
+                {shown.map((e) => <ReviewItemCard key={e.item.position} item={e.item} number={e.number} passageDisplay={passageDisplay} />)}
               </div>
             </details>
           );
         })
-        : groups.flatMap((g) => g.entries).filter((e) => show(e.item)).map((e) => <ReviewItemCard key={e.item.position} item={e.item} number={e.number} />)}
+        : groups.flatMap((g) => g.entries).filter((e) => show(e.item)).map((e) => <ReviewItemCard key={e.item.position} item={e.item} number={e.number} passageDisplay={passageDisplay} />)}
     </section>
   );
 }
