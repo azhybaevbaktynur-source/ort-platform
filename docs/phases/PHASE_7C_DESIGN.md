@@ -309,7 +309,7 @@ Why: ORT exams are `preset ort_main|ort_subject`, routed to `SectionBuilder` (to
 - **P7C-5** Picks do not count as "uses"; passage children do. "Published anywhere" is computed exactly from published snapshots and survives `unpublish`.
 - **P7C-6** A passage child used elsewhere can only be edited with `all` (`this` refused); shared-passage children without edit rights are read-only in the card.
 - **P7C-7** Type change on a translation-group member takes the `this` path (keeps groups type-homogeneous).
-- **P7C-8** "Find questions" offers shared banks and other quizzes' quiz banks of the same course (one store, nothing hidden); the quiz's own bank is excluded.
+- **P7C-8** (amended §16) Quiz banks are private to their quiz (`quiz_bank_private`); "Find questions" offers shared banks only; reuse goes through move/copy to a shared bank.
 - **P7C-9** Move to a shared bank refuses questions attached to a passage in v1; copy never joins a translation group; quiz banks cannot be deleted or restored directly.
 - **P7C-10** `can_edit_bank` returns true for every course bank in 7c and is the Phase 9 extension point.
 - **P7C-11** The Bank-tab editor keeps its type lock; the card is the only place a type changes.
@@ -323,3 +323,17 @@ Why: ORT exams are `preset ort_main|ort_subject`, routed to `SectionBuilder` (to
 | **Q1** | Find questions from **other quizzes' banks** (P7C-8). Linking across quiz banks means deleting quiz A later makes quiz B's linked card `question_deleted` at its next publish (today's deleted-bank behaviour; the delete confirm will say "N questions of this quiz are used in other quizzes"). | (a) allow, grouped "Quiz banks" in the drawer; (b) shared banks only, teachers copy to a shared bank first. | **(a)**; switching to (b) is one filter in the drawer's bank select. |
 | **Q2** | Publishing with unfinished drafts (P7C-3). | (a) warn and publish; (b) refuse until every card is Done or discarded. | **(a)**. |
 | **Q3** | Quiz bank title in the Bank tab follows the quiz title (join) rather than a teacher-editable bank title. | (a) follow the quiz, rename hidden for quiz banks; (b) allow rename (shown as "<quiz title> · <bank title>"). | **(a)**, simpler and never stale; `PATCH` stays available for description only. |
+
+---
+
+## 16. Orchestrator amendment (2026-10-28, binding for S1–S5)
+
+**Q1 decided as (b), Moodle 5 model: a quiz bank is private to its quiz.** Reason: with (a), soft-deleting quiz A (which soft-deletes its quiz bank) would silently break quiz B's linked cards at B's next publish. Rules:
+- **`quiz_bank_private`** (422, new code in `ids.py`): adding an item (`question`, `passage`, or `pick` with `pick_bank_id`) that references a question/passage/bank whose bank has `assessment_id` **≠ this assessment** is refused. Enforced server-side in one helper **`quiz_banks.assert_bank_usable(bank, a)`**, called from `builder._check_question`, the passage add path, `_pick_values` (pick bank), `add_items_bulk`/`attach_questions`, and `quiz_editor` create/commit. Its own quiz bank is allowed (picks from the quiz's own bank included).
+- `FindQuestionsDrawer` and `AddItemsDialog` (incl. `SectionBuilder`) list **shared banks only** (`listBanks(kind="shared")`); this quiz's own bank stays excluded (its questions are already cards). P7C-8 is replaced by this rule.
+- Reuse path: "Move or copy to a shared bank" (§5.6). After a move the question is in a shared bank and may be linked anywhere; the quiz keeps its item.
+- Consequence for usage (§5.5): quiz-bank questions are normally used only by their quiz, so their edits apply in place without a dialog; the scope dialog appears for shared-bank questions (and for a moved question used by several quizzes).
+- Tests (S2): `test_quiz_editor_quiz_banks.py::test_other_quiz_bank_refused` (question, passage, pick, bulk add, attach) and own-bank pick allowed; drawer list test in the Playwright spec.
+- Q2 = (a) warn and publish; Q3 = (a) title follows the quiz. Both as designed.
+
+**Branches**: phase branch **`phase-7c`** (this doc on it). Slice branches **`phase-7c-s1` … `phase-7c-s4`** created from `origin/phase-7c` (not from the worktree's default HEAD). Merge order: S1 → `phase-7c`, then S2/S3/S4 merge `origin/phase-7c` before handing back.
