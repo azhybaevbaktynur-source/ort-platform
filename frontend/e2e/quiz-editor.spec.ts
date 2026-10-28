@@ -87,7 +87,7 @@ test.describe("quiz editor walk (ru)", () => {
     const aid = /\/assessments\/([0-9a-f-]{36})/.exec(page.url())![1];
     const editUrl = `/${L}/courses/${qe.course_id}/assessments/${aid}/edit`;
     if (!page.url().endsWith("/edit")) await page.goto(editUrl);
-    await expect(page.getByText(t("quizEditor.section.emptyQuiz"))).toBeVisible();
+    await expect(page.getByText(t("quizEditor.section.emptyQuizTitle"))).toBeVisible();
 
     // ---- multiple choice: all seven types offered, Enter adds answers, Backspace removes an empty one, mark correct
     await page.getByRole("button", { name: t("quizEditor.card.addQuestion") }).click();
@@ -106,7 +106,7 @@ test.describe("quiz editor walk (ru)", () => {
     await page.keyboard.press("Backspace");
     await expect(answerField(page, "D")).toHaveCount(0);
     await expect(answerField(page, "C")).toBeFocused();
-    await page.getByRole("radio", { name: t("bank.editor.correct") }).nth(1).check();
+    await page.getByRole("radio", { name: t("quizEditor.card.markCorrect", { letter: "B" }) }).check();
     await done(page);
     await expect(card(page, 1)).toContainText(STEM_1);
     await expect(card(page, 1)).toContainText(`${t("quizEditor.card.correctAnswer")} 4`);
@@ -127,10 +127,21 @@ test.describe("quiz editor walk (ru)", () => {
     await expect(card(page, 4)).toContainText("Париж; Paris");
     await expect(card(page, 5)).not.toContainText(t("quizEditor.card.correctAnswer"));
 
+    // ---- inline validation (UX gate): the error sits under the question text, which gets the focus
+    await openCard(page, 4);
+    await stemField(page).fill("");
+    await page.getByRole("button", { name: t("quizEditor.card.done") }).click();
+    await expect(page.getByText(t("bank.editor.errStem"))).toBeVisible();
+    await expect(page.getByText(t("quizEditor.card.fixFields"))).toBeVisible();
+    await expect(stemField(page)).toBeFocused();
+    await expect(stemField(page)).toHaveAttribute("aria-invalid", "true");
+    await stemField(page).fill("Столица Франции?");
+    await done(page);
+
     // ---- Find questions: shared banks only (the only one is chosen), two shared questions used by Квиз Б
     await page.getByRole("button", { name: t("quizEditor.add.more") }).click();
     await page.getByRole("menuitem", { name: new RegExp(t("quizEditor.add.find")) }).click();
-    const find = page.getByRole("dialog", { name: t("assessments.add.title") });
+    const find = page.getByRole("dialog", { name: t("quizEditor.add.find") });
     const bankSelect = find.getByRole("combobox", { name: t("assessments.add.bank") });
     await expect(bankSelect).toHaveValue(qe.bank_id);
     await expect(bankSelect.locator("option")).toHaveCount(2); // placeholder + "Общий банк" (no quiz banks)
@@ -139,7 +150,7 @@ test.describe("quiz editor walk (ru)", () => {
     await find.getByRole("checkbox").nth(1).check();
     await find.getByRole("button", { name: t("assessments.add.addSelected", { n: 2 }) }).click();
     await expect(find.getByRole("status")).toBeVisible();
-    await find.getByRole("button", { name: t("assessments.add.close") }).last().click();
+    await find.getByRole("button", { name: t("ui.close") }).click();
     await settle(page);
     for (const n of [6, 7]) {
       await expect(card(page, n)).toContainText(t("quizEditor.card.sharedBank"));
@@ -158,6 +169,7 @@ test.describe("quiz editor walk (ru)", () => {
     await settle(page);
     await expect(card(page, 6)).not.toContainText(t("quizEditor.card.sharedBank"));
     await expect(card(page, 6)).not.toContainText(t("quizEditor.card.usedIn", { n: 2 }));
+    await expect(card(page, 6)).toContainText(t("quizEditor.card.quizBank")); // the quiz also has shared-bank cards
 
     await openCard(page, 7);
     await stemField(page).fill("Сколько будет 3 + 4 (во всех тестах)?");
@@ -179,15 +191,23 @@ test.describe("quiz editor walk (ru)", () => {
     await expect(page.getByRole("heading", { name: t("assessments.section.n", { n: 1 }) })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Часть 2" })).toBeVisible();
     await openCard(page, 7);
-    await page.getByRole("combobox", { name: t("assessments.item.moveTo") }).selectOption({ label: "Часть 2" });
+    await page.getByRole("button", { name: t("assessments.item.moveTo") }).click();
+    await page.getByRole("menuitem", { name: "Часть 2" }).click();
+    await expect(stemField(page)).toHaveCount(0); // the card closes first (nothing changed), then moves
     await settle(page);
-    await expect(page.getByRole("region", { name: "Часть 2" }).or(page.locator("section").filter({ has: page.getByRole("heading", { name: "Часть 2" }) })).getByLabel(t("bank.editor.stem"))).toBeVisible();
-    await done(page); // the card stays open in its new section; nothing changed, so Done just closes it
+    await expect(page.locator("section").filter({ has: page.getByRole("heading", { name: "Часть 2" }) }).locator("[data-quiz-item]")).toHaveCount(1);
+    await expect(card(page, 7)).toBeInViewport();
 
-    // ---- close the browser mid-card: the draft is back on reopen
+    // ---- close the tab right after typing (inside the 800 ms debounce): the pending change is sent with keepalive on
+    // the way out (UX gate "no lost keystrokes"), and the draft is back on reopen
     await openCard(page, 1);
     await stemField(page).fill(DRAFT_STEM);
-    await expect(page.getByText(t("quizEditor.card.draftSaved"))).toBeVisible();
+    page.on("dialog", (d) => void d.accept()); // the "leave the page?" prompt while the save is pending
+    await page.close({ runBeforeUnload: true });
+    await expect.poll(async () => {
+      const a = await apiGet(qe.teacher, `/courses/${qe.course_id}/assessments/${aid}`);
+      return (a.drafts ?? []).map((d: { payload: { stem: string } }) => d.payload.stem);
+    }, { timeout: 10_000 }).toContain(DRAFT_STEM);
     await page.context().close();
     page = await teacherPage(browser);
     await page.goto(editUrl);

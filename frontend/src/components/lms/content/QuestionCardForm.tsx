@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
+import { ImagePlus } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import {
   DIFFICULTIES, ORT_SECTIONS, QUESTION_TYPES, type PassageSummaryOut, type QuestionType,
@@ -12,6 +13,20 @@ import { ChoiceFields } from "./types/ChoiceFields";
 import { ComparisonFields, EssayFields, NumericFields, ShortTextFields, TrueFalseFields } from "./types/SimpleFields";
 import type { QuestionForm } from "./types/formModel";
 import { cardCls, inputCls, labelCls } from "./ui";
+import { btnSmall } from "@/components/lms/course/staffUi";
+
+/** Phase 7c UX: where a validation error of the quiz card is shown (values are translated messages). */
+export interface QuestionFormErrors {
+  stem?: string;
+  points?: string;
+  image?: string;
+  /** The per-type answer fields (answers, columns, accepted answers). */
+  answers?: string;
+  /** The i18n key of a client-side answers error (which answer controls are marked invalid). */
+  answersKey?: string;
+  explanation?: string;
+  other?: string;
+}
 
 /**
  * Phase 7c S3 (PHASE_7C_DESIGN 8.4): the body of the question form (type, language, points, stem, image, per-type
@@ -20,7 +35,7 @@ import { cardCls, inputCls, labelCls } from "./ui";
  */
 export function QuestionCardForm({
   form, onChange, disabled, courseId, languages, typeOptions = QUESTION_TYPES, lockType = false, lockLanguage = false,
-  passages = [], showMeta = true, idPrefix = "q", keyboardAnswers = false,
+  passages = [], showMeta = true, idPrefix = "q", keyboardAnswers = false, compact = false, errors = {}, hideLockedLanguage = false,
 }: {
   form: QuestionForm;
   onChange: (patch: Partial<QuestionForm>) => void;
@@ -39,14 +54,36 @@ export function QuestionCardForm({
   idPrefix?: string;
   /** Phase 7c S5: Enter / Backspace manage the answers (the quiz card; off in the Bank tab). */
   keyboardAnswers?: boolean;
+  /** Phase 7c UX (opt-in, the quiz card; default = the Bank tab's rendering): no inner boxes, the preview only for math
+   * or markup, one line per answer, and the question image behind a small "Add image" button. */
+  compact?: boolean;
+  /** Phase 7c UX (the quiz card): validation errors shown under their fields. */
+  errors?: QuestionFormErrors;
+  /** Phase 7c UX (the quiz card): no language row when the language is locked (one-language quiz or existing card). */
+  hideLockedLanguage?: boolean;
 }) {
   const { t } = useTranslation();
   const patch = onChange;
   const fieldProps = { form, onChange: patch, disabled };
   const id = (s: string) => `${idPrefix}-${s}`;
+  const [imageOpen, setImageOpen] = useState(false);
+  const showLanguage = !(hideLockedLanguage && lockLanguage);
+  const box = compact ? "" : cardCls;
+  const err = (k: keyof QuestionFormErrors) => errors[k] || null;
+  const answersErr = err("answers");
+  const choiceTypes = form.type === "single_choice" || form.type === "multiple_answers";
+  const typeFields = (
+    <>
+      {form.type === "true_false" && <TrueFalseFields {...fieldProps} />}
+      {form.type === "comparison" && <ComparisonFields {...fieldProps} />}
+      {form.type === "numeric" && <NumericFields {...fieldProps} />}
+      {form.type === "short_text" && <ShortTextFields {...fieldProps} />}
+      {form.type === "essay" && <EssayFields {...fieldProps} />}
+    </>
+  );
   return (
     <>
-      <div className={`${cardCls} grid gap-3 sm:grid-cols-3`}>
+      <div className={`${box} grid gap-3 ${showLanguage ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
         <div>
           <span className={labelCls}>{t("bank.editor.type")}</span>
           {lockType ? (
@@ -60,34 +97,51 @@ export function QuestionCardForm({
             </select>
           )}
         </div>
-        <div>
-          <label className={labelCls} htmlFor={id("lang")}>{t("bank.editor.language")}</label>
-          {lockLanguage ? (
-            <p className="py-2 text-sm font-semibold text-slate-900">{t(`courses.languages.${form.language}`)}</p>
-          ) : (
-            <select id={id("lang")} className={inputCls} disabled={disabled} value={form.language} onChange={(e) => patch({ language: e.target.value as Lang })}>
-              {languages.map((l) => <option key={l} value={l}>{t(`courses.languages.${l}`)}</option>)}
-            </select>
-          )}
-        </div>
+        {showLanguage && (
+          <div>
+            <label className={labelCls} htmlFor={id("lang")}>{t("bank.editor.language")}</label>
+            {lockLanguage ? (
+              <p className="py-2 text-sm font-semibold text-slate-900">{t(`courses.languages.${form.language}`)}</p>
+            ) : (
+              <select id={id("lang")} className={inputCls} disabled={disabled} value={form.language} onChange={(e) => patch({ language: e.target.value as Lang })}>
+                {languages.map((l) => <option key={l} value={l}>{t(`courses.languages.${l}`)}</option>)}
+              </select>
+            )}
+          </div>
+        )}
         <div>
           <label className={labelCls} htmlFor={id("points")}>{t("bank.editor.points")}</label>
-          <input id={id("points")} type="number" min={0} max={1000} step="0.01" className={inputCls} disabled={disabled} value={form.points}
+          <input id={id("points")} type="number" min={0} max={1000} step="0.01" className={`${inputCls}${err("points") ? " border-red-500" : ""}`} disabled={disabled} value={form.points}
+            aria-invalid={err("points") ? true : undefined} aria-describedby={err("points") ? id("points-err") : undefined}
             onChange={(e) => patch({ points: e.target.value })} />
+          {err("points") && <p id={id("points-err")} className="mt-1 text-sm text-red-700">{err("points")}</p>}
         </div>
       </div>
 
-      <div className={`${cardCls} space-y-4`}>
+      <div className={`${box} space-y-4`}>
         <p className="text-xs text-slate-500">{t(`bank.types.${form.type}.hint`)}</p>
-        <RichTextField label={t("bank.editor.stem")} rows={5} value={form.stem} disabled={disabled} onChange={(v) => patch({ stem: v })} />
-        <ImagePicker courseId={courseId} label={t("bank.editor.image")} value={form.image} disabled={disabled} onChange={(img) => patch({ image: img })} />
-        {(form.type === "single_choice" || form.type === "multiple_answers") && <ChoiceFields courseId={courseId} {...fieldProps} keyboardAnswers={keyboardAnswers} />}
-        {form.type === "true_false" && <TrueFalseFields {...fieldProps} />}
-        {form.type === "comparison" && <ComparisonFields {...fieldProps} />}
-        {form.type === "numeric" && <NumericFields {...fieldProps} />}
-        {form.type === "short_text" && <ShortTextFields {...fieldProps} />}
-        {form.type === "essay" && <EssayFields {...fieldProps} />}
-        <RichTextField label={t("bank.editor.explanation")} rows={3} value={form.explanation} disabled={disabled} onChange={(v) => patch({ explanation: v })} />
+        <RichTextField label={t("bank.editor.stem")} rows={compact ? 3 : 5} value={form.stem} disabled={disabled} onChange={(v) => patch({ stem: v })}
+          {...(compact ? { smartPreview: true, error: err("stem") } : {})} />
+        {compact && !form.image && !imageOpen ? (
+          <button type="button" disabled={disabled} className={btnSmall} onClick={() => setImageOpen(true)}>
+            <ImagePlus className="mr-1 inline h-4 w-4" aria-hidden="true" />{t("quizEditor.card.addImage")}
+          </button>
+        ) : (
+          <ImagePicker courseId={courseId} label={t("bank.editor.image")} value={form.image} disabled={disabled} onChange={(img) => patch({ image: img })} />
+        )}
+        {err("image") && <p className="text-sm text-red-700">{err("image")}</p>}
+        {choiceTypes && <ChoiceFields courseId={courseId} {...fieldProps} keyboardAnswers={keyboardAnswers}
+          {...(compact ? { compact: true, error: errors.answers ?? null, errorKey: errors.answersKey ?? null } : {})} />}
+        {compact && !choiceTypes ? (
+          // The answers' error sits under them; Done focuses their first field (`data-field-invalid`).
+          <div {...(answersErr ? { "data-field-invalid": "" } : {})} className="space-y-1.5">
+            {typeFields}
+            {answersErr && <p className="text-sm text-red-700">{answersErr}</p>}
+          </div>
+        ) : typeFields}
+        <RichTextField label={t("bank.editor.explanation")} rows={3} value={form.explanation} disabled={disabled} onChange={(v) => patch({ explanation: v })}
+          {...(compact ? { smartPreview: true, toolbarOnFocus: true, error: err("explanation") } : {})} />
+        {err("other") && <p className="text-sm text-red-700">{err("other")}</p>}
       </div>
 
       {showMeta && (

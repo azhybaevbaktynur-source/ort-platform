@@ -23,7 +23,7 @@ export interface RowCtx {
 
 /** One top-level or child item. Points edit inline on blur; move/delete go through the API then reload. */
 export function ItemRow({
-  item, ctx, index, count, onMoveBy, dragProps, childOf,
+  item, ctx, index, count, onMoveBy, dragProps, childOf, pickPointsPerQuestion = false,
 }: {
   item: ItemOut;
   ctx: RowCtx;
@@ -32,6 +32,9 @@ export function ItemRow({
   onMoveBy: (delta: number) => void;
   dragProps?: React.HTMLAttributes<HTMLLIElement>;
   childOf?: string;
+  /** Phase 7c UX (opt-in, the quiz editor's random group card): the points read "Points per question" and an empty
+   * field shows the effective default (1). Off in the builder (ORT screens unchanged). */
+  pickPointsPerQuestion?: boolean;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(true);
@@ -112,8 +115,8 @@ export function ItemRow({
         <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
         {item.kind !== "passage" && (
           <label className="flex items-center gap-1.5 text-sm text-slate-600">
-            {t("assessments.item.points")}
-            <input type="number" min={0} max={1000} step="any" className="min-h-11 w-16 rounded-lg border border-slate-300 px-2 py-1 text-base sm:min-h-9 sm:text-sm" disabled={!ctx.canEdit}
+            {pickPointsPerQuestion && item.kind === "pick" ? t("quizEditor.pick.pointsPerQuestion") : t("assessments.item.points")}
+            <input type="number" min={0} max={1000} step="any" {...(pickPointsPerQuestion && item.kind === "pick" ? { placeholder: "1" } : {})} className="min-h-11 w-16 rounded-lg border border-slate-300 px-2 py-1 text-base sm:min-h-9 sm:text-sm" disabled={!ctx.canEdit}
               value={points} onChange={(e) => setPoints(e.target.value)} onBlur={savePoints} />
           </label>
         )}
