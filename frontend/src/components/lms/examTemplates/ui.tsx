@@ -4,6 +4,7 @@
 import React, { useCallback } from "react";
 import { Lock } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
+import { useAuth } from "@/lib/auth-context";
 import { EXAM_TEMPLATE_ERROR_CODES, type ExamTemplateScope, type ExamTemplateStatus, type SpecIssue } from "@/lib/lms/examTemplateTypes";
 import { apiErrorText } from "@/components/lms/org/OrgUi";
 import { Badge, ErrorState, type BadgeTone } from "@/components/ui";
@@ -64,25 +65,28 @@ const ISSUE_TYPES: Record<string, string> = {
   invalid_rule: "invalid_rule", binds_missing_section: "binds_missing_section", binds_taken: "binds_taken",
   bound_key_must_be_empty: "bound_key_must_be_empty", options_collide: "options_collide", unknown_scheme: "unknown_scheme",
   not_shareable: "not_shareable", reserved: "reserved", truncated: "truncated",
+  // Phase 8b S4: client pre-check types (specDraft.precheckDraft)
+  types_required: "types_required", sections_required: "sections_required", title_required: "title_required",
 };
 const RANGE = new Set(["greater_than_equal", "greater_than", "less_than_equal", "less_than"]);
-const SECTION_FIELDS: Record<string, string> = {
+export const SECTION_FIELDS: Record<string, string> = {
   key: "examTemplates.specForm.key", title: "examTemplates.specForm.sectionTitle", instructions: "examTemplates.specForm.instructions",
   time_limit_s: "examTemplates.specForm.timeLimit", min_items: "examTemplates.specForm.minItems", max_items: "examTemplates.specForm.maxItems",
   allowed_types: "examTemplates.specForm.types", allow_passages: "examTemplates.specForm.allowPassages",
   passage_display: "examTemplates.specForm.passageDisplay",
 };
-const DEFAULT_FIELDS: Record<string, string> = {
+export const DEFAULT_FIELDS: Record<string, string> = {
   time_limit_s: "examTemplates.specForm.totalTime", allowed_attempts: "assessments.settings.attempts",
   score_policy: "assessments.settings.scorePolicy", results_policy: "assessments.settings.resultsPolicy",
   show_correct_answers: "assessments.settings.showCorrect", shuffle_items: "assessments.settings.shuffleItems",
   shuffle_choices: "assessments.settings.shuffleChoices",
 };
-const PARAM_FIELDS: Record<string, string> = {
+export const PARAM_FIELDS: Record<string, string> = {
   key: "examTemplates.specForm.paramKey", options: "examTemplates.specForm.paramOptions", binds: "examTemplates.specForm.paramSection",
   kind: "examTemplates.specForm.paramKind",
 };
-const TOP_FIELDS: Record<string, string> = {
+export const TOP_FIELDS: Record<string, string> = {
+  title: "examTemplates.fields.title", description: "examTemplates.fields.description",
   sections: "examTemplates.specForm.sections", defaults: "examTemplates.specForm.defaults", parameters: "examTemplates.specForm.parameters",
   lock_scope: "examTemplates.specForm.lockScope", navigation: "examTemplates.editor.navigation", display_mode: "examTemplates.editor.displayMode",
   passage_display: "examTemplates.editor.passageDisplay", result_view: "examTemplates.editor.resultView", scoring: "examTemplates.editor.scheme",
@@ -128,9 +132,12 @@ export function useSpecIssueText(sectionName: (index: number) => string) {
 // --- Phase 7b S7 end ---
 
 const SCOPE_TONE: Record<ExamTemplateScope, BadgeTone> = { platform: "system", organization: "info", teacher: "neutral" };
-export function ScopeBadge({ scope }: { scope: ExamTemplateScope }) {
+export function ScopeBadge({ scope, ownerId }: { scope: ExamTemplateScope; ownerId?: string | null }) {
   const { t } = useTranslation();
-  return <Badge tone={SCOPE_TONE[scope] ?? "neutral"}>{t(`examTemplates.scope.${scope}`)}</Badge>;
+  const { user } = useAuth();
+  // Phase 8b S5: a teacher template seen by someone else (the org admin) is "Teacher's", not "Mine"
+  const other = scope === "teacher" && !!ownerId && !!user?.uid && ownerId !== user.uid;
+  return <Badge tone={SCOPE_TONE[scope] ?? "neutral"}>{other ? t("examTemplates.scopeTeacherOther") : t(`examTemplates.scope.${scope}`)}</Badge>;
 }
 
 const STATUS_TONE: Record<ExamTemplateStatus, BadgeTone> = { draft: "warning", published: "success", archived: "neutral" };

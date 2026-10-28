@@ -71,6 +71,16 @@ class Course(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
         nullable=True,
     )
     # --- Phase 8a S1 end ---
+    # --- Phase 8b S1 begin --- (exam template sandbox, PHASE_8B_DESIGN 2; NULL for every regular course)
+    sandbox_for_template_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("exam_templates.id", ondelete="SET NULL"), nullable=True
+    )
+
+    @property
+    def is_sandbox(self) -> bool:
+        """The hidden preview course of an exam template (never published, listed or joinable)."""
+        return self.sandbox_for_template_id is not None
+    # --- Phase 8b S1 end ---
 
     __table_args__ = (
         CheckConstraint("grading_total_mode IN ('points','weighted')", name="grading_total_mode_valid"),
@@ -99,6 +109,9 @@ class Course(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
         # --- Phase 8a S1 begin ---
         CheckConstraint("home_kind IN ('modules','page','assignments')", name="home_kind_valid"),
         # --- Phase 8a S1 end ---
+        # --- Phase 8b S1 begin ---
+        UniqueConstraint("sandbox_for_template_id", name="uq_courses_sandbox_for_template_id"),
+        # --- Phase 8b S1 end ---
     )
 
 

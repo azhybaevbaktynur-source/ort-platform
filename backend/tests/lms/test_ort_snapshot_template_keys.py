@@ -3,7 +3,8 @@
 The four `SNAPSHOT_TEMPLATE_KEYS` are purely additive: an ORT exam published through the production seed path gets
 exactly the pre-7b snapshot plus `exam_template_version_id: null, display_mode: "one_per_page", passage_display: null,
 result_view: null`; everything the engine reads from the plan (navigation, section limits, slots) is identical with
-and without them; no student payload of an ORT attempt carries any of them; the seeded exam keeps its 0010 defaults;
+and without them; no student payload of an ORT attempt carries any of them (since 8b the attempt state carries the
+effective `display_mode` / `passage_display`, resolved to one_per_page / numbered); the seeded exam keeps its 0010 defaults;
 a second seed run publishes no new version."""
 from __future__ import annotations
 
@@ -96,8 +97,13 @@ async def test_ort_student_payloads_carry_no_template_keys(db):
     assert content.status_code == 200, content.text
     state = await api.call(student, "GET", f"/attempts/{tid}")
     assert state.status_code == 200, state.text
-    for res in (lobby, st, content, state):
+    for res in (lobby, content):
         leaked = _keys(res.json()) & set(SNAPSHOT_TEMPLATE_KEYS)
         assert not leaked, (res.request.url, leaked)
+    # Phase 8b S1 (PHASE_8B_DESIGN 5.4, 6.3): the attempt state carries exactly the two EFFECTIVE display values,
+    # resolved to what the ORT player renders today; nothing else of the template keys
+    for res in (st, state):
+        assert _keys(res.json()) & set(SNAPSHOT_TEMPLATE_KEYS) == {"display_mode", "passage_display"}
+        assert (res.json()["display_mode"], res.json()["passage_display"]) == ("one_per_page", "numbered")
     assert st.json()["navigation"] == "section_forward_only" and len(st.json()["items"]) == 150
     assert "exam_template_version_id" not in json.dumps(st.json())

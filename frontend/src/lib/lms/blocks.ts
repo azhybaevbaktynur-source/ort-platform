@@ -22,8 +22,8 @@ export type BlockNavigation = (typeof NAVIGATIONS)[number];
 export type ImporterProfile = (typeof IMPORTER_PROFILES)[number];
 export type BlockQuestionType = (typeof QUESTION_TYPES)[number];
 
-/** Display modes a new exam may use today: `scrolling` is accepted in a spec but refused at create until 8b (P7B-1). */
-export const AVAILABLE_DISPLAY_MODES: readonly DisplayMode[] = ["one_per_page"];
+/** Display modes a new exam may use: all of them since 8b (P7B-1 lifted; PHASE_8B_DESIGN invariant 6). */
+export const AVAILABLE_DISPLAY_MODES: readonly DisplayMode[] = DISPLAY_MODES;
 
 /** Result views: the i18n label of each (`examTemplates.blocks.resultViews.*`). The result pages pick their own renderer. */
 export const resultViews: Record<ResultView, { titleKey: string }> = {

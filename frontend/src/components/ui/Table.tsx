@@ -31,6 +31,8 @@ export interface TableColumn<T> {
   mobilePriority?: number;
   /** Leave this column out of the stacked cards (keep only 2-3 key values on phones). */
   hideOnMobile?: boolean;
+  /** Leave this row's value out of its stacked card (an empty value: no "Label —" line on phones). */
+  hideInCard?: (row: T) => boolean;
   /** Row actions (buttons/links): no label in the cards, shown at the bottom of each card. */
   actions?: boolean;
   /** Keep the cell on one line on desktop (dates, numbers). */
@@ -169,9 +171,9 @@ export function Table<T>({
             {rows.map((row, ri) => (
               <li key={rowKey(row)} className={cn("rounded-2xl border border-slate-200 bg-white p-4 shadow-sm", rowClassName?.(row))}>
                 {primary && <div className="break-words text-base font-semibold leading-6 text-slate-900">{primary.cell(row, ri)}</div>}
-                {cardColumns.length > 0 && (
+                {cardColumns.some((c) => !c.hideInCard?.(row)) && (
                   <dl className={cn("space-y-1.5", primary && "mt-2")}>
-                    {cardColumns.map((c) => (
+                    {cardColumns.filter((c) => !c.hideInCard?.(row)).map((c) => (
                       <div key={c.key} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
                         <dt className="text-sm leading-6 text-slate-600">{plainLabel(c)}</dt>
                         <dd className="min-w-0 break-words text-right text-sm leading-6 text-slate-900">{c.cell(row, ri)}</dd>

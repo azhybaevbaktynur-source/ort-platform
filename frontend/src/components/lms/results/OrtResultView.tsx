@@ -5,6 +5,7 @@ import { Award } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import type { AttemptResultSection } from "@/lib/lms/attemptTypes";
 import type { AttemptGradeOut } from "@/lib/lms/gradingTypes";
+import { pickLocalized } from "@/lib/lms/localized";
 import { fmtPoints } from "@/components/lms/assessments/format";
 import { fmtNum, fmtPercentile } from "@/components/lms/grading/schemes/params";
 import { useSchemeLabel } from "@/components/lms/grading/schemes/labels";
@@ -17,8 +18,10 @@ export function OrtResultView({ grade, sections, children }: {
   /** Shown between the scaled grade card and the section table (the raw score line, R3). */
   children?: React.ReactNode;
 }) {
-  const { t } = useTranslation();
+  const { lang, t } = useTranslation();
   const label = useSchemeLabel();
+  // Phase 8b S5: general quizzes with the ORT-style view name their sections by title (ORT keys resolve first)
+  const sectionTitle = (title: AttemptResultSection["title"]) => (typeof title === "string" ? title : pickLocalized(title ?? null, lang));
   const byPos = new Map((grade.sections ?? []).map((s) => [s.pos, s.display_value]));
   const flags = Object.entries(grade.thresholds ?? {}).filter(([, on]) => on).map(([k]) => k);
   return (
@@ -51,7 +54,7 @@ export function OrtResultView({ grade, sections, children }: {
               return (
                 <tr key={s.pos} className="border-b border-slate-100">
                   <td className="py-2 pr-3 font-medium text-slate-900">
-                    {s.key && t(`sections.${s.key}`) !== `sections.${s.key}` ? t(`sections.${s.key}`) : t("results.sectionN", { n: idx + 1 })}
+                    {s.key && t(`sections.${s.key}`) !== `sections.${s.key}` ? t(`sections.${s.key}`) : sectionTitle(s.title) || t("results.sectionN", { n: idx + 1 })}
                   </td>
                   <td className="whitespace-nowrap py-2 pr-3 tabular-nums">{fmtPoints(s.raw)} / {fmtPoints(s.possible)}</td>
                   <td className="whitespace-nowrap py-2 pr-2 text-right font-semibold tabular-nums">{v === undefined || v === null ? "—" : fmtNum(v)}</td>

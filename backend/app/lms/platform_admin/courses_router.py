@@ -15,6 +15,7 @@ from app.lms.core.deps import require_platform_admin
 from app.lms.core.pagination import PageOut
 from app.lms.courses import service as svc
 from app.lms.courses.models import Course
+from app.lms.courses.scopes import regular_courses  # Phase 8b S1
 from app.lms.courses.schemas import (
     AdminCourseOut, AdminTransferIn, OptionalReasonIn, ReasonIn, admin_course_out,
 )
@@ -39,7 +40,7 @@ def list_courses(q: Optional[str] = Query(None, max_length=100),
                  deleted: Optional[bool] = None, owner_id: Optional[str] = Query(None, max_length=64),
                  cursor: Optional[str] = None, limit: int = 25,
                  admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
-    stmt = svc.admin_courses_query()
+    stmt = svc.admin_courses_query().where(regular_courses())  # Phase 8b S1: sandboxes are never listed
     if q:
         needle = "%" + svc.like_escape(q.strip().lower()) + "%"
         stmt = stmt.where(or_(

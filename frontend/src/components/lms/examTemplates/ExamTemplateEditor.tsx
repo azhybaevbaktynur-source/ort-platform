@@ -1,48 +1,36 @@
 "use client";
 
-// Phase 7b S4: template editor (PHASE_7B_DESIGN 10; no drag-and-drop constructor until 8b): structured header fields,
-// Save (draft_rev conflict), Publish, Archive, Lock/Unlock (reason), Promote, Versions with the import-format download
-// per version. S7 (UX fix): the structure is a form (`SpecForm`: defaults, section cards, parameters, lock scope;
-// raw JSON only for the platform admin), server `spec_invalid` details translated under the matching field.
+// Phase 8b S4: the exam template constructor (PHASE_8B_DESIGN 9), replacing the 7b plain form. One page shell with
+// a header (status, Publish, Preview, More) and tabs Structure · Scoring · Display · Sample questions · Versions.
+// The draft autosaves (`useConstructor`); every pick list comes from `GET /exam-templates/blocks`; server
+// `spec_invalid` details show next to their fields and in the issues bar. Shared by the teacher area
+// (/exam-templates/[id]), the organization area and the platform admin area.
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Archive, Download, TriangleAlert } from "lucide-react";
+import { Archive, Lock, RotateCcw } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import {
-  archiveExamTemplate, downloadImportFormat, getExamTemplate, getExamTemplateBlocks, getExamTemplateVersion,
-  listExamTemplateVersions, lockExamTemplate, patchExamTemplate, promoteExamTemplate, publishExamTemplate, unlockExamTemplate,
+  archiveExamTemplate, downloadImportFormat, getExamTemplateBlocks, lockExamTemplate, promoteExamTemplate, publishExamTemplate,
+  unlockExamTemplate,
 } from "@/lib/lms/examTemplates";
-import type { BlocksOut, ExamTemplateOut, ExamTemplateSpec, ExamTemplateVersionOut, SpecIssue } from "@/lib/lms/examTemplateTypes";
-import { AVAILABLE_DISPLAY_MODES, DISPLAY_MODES, NAVIGATIONS, PASSAGE_DISPLAYS, RESULT_VIEWS, passageRenderers, resultViews } from "@/lib/lms/blocks";
-import type { Navigation } from "@/lib/lms/assessmentTypes";
-import { cleanLocalized, pickLocalized } from "@/lib/lms/localized";
-import { LMS_LANGS, type LocalizedText } from "@/lib/lms/types";
-import { fmtDateTime } from "@/components/lms/assessments/format";
-import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
-import { useCursorList } from "@/components/lms/admin/useCursorList";
-import { MoreError, useTableState } from "@/components/lms/admin/ListParts";
+import type { BlocksOut, ExamTemplateOut } from "@/lib/lms/examTemplateTypes";
+import { pickLocalized } from "@/lib/lms/localized";
 import {
-  Button, Card, ConfirmDialog, ErrorState, LoadingState, MenuButton, PageHeader, ReasonDialog, Select, Table, toast,
-  type Breadcrumb, type MenuItem, type TableColumn,
+  Button, ConfirmDialog, ErrorState, LoadingState, PageHeader, ReasonDialog, TabPanel, Tabs, toast, type Breadcrumb,
 } from "@/components/ui";
-import { STARTER_SPEC } from "./ExamTemplatesPage";
-import {
-  ExamTemplateError, LockedBadge, ScopeBadge, TemplateStatusBadge, locStartsWith, specIssuesOf, useExamTemplateErrorText, useSpecIssueText,
-  type TemplateArea,
-} from "./ui";
-import { SpecForm } from "./SpecForm";
-import { draftOf, specOf, type SpecDraft } from "./specDraft";
+import { DraftConflictDialog } from "@/components/lms/quiz/DraftConflictDialog";
+import { useExamTemplateErrorText, useSpecIssueText, type TemplateArea } from "./ui";
+import { ConstructorHeader, type HeaderAction } from "./ConstructorHeader";
+import { IssuesBar } from "./IssuesBar";
+import { StructureTab } from "./StructureTab";
+import { ScoringTab } from "./ScoringTab";
+import { DisplayTab } from "./DisplayTab";
+import { SampleTab, usePreviewLaunch } from "./SampleTab";
+import { VersionsTab } from "./VersionsTab";
+import { fieldId, tabOfLoc, useFieldIssues, type ConstructorTab } from "./parts";
+import { useConstructor } from "./useConstructor";
 
-interface Form {
-  title: LocalizedText;
-  description: LocalizedText;
-  spec: SpecDraft;
-}
-
-function formOf(tpl: ExamTemplateOut, spec: ExamTemplateSpec): Form {
-  return { title: tpl.title ?? {}, description: tpl.description ?? {}, spec: draftOf(spec) };
-}
-
-type Action = "publish" | "archive" | "lock" | "unlock" | "promote";
+const TABS: ConstructorTab[] = ["structure", "scoring", "display", "sample", "versions"];
+type DialogAction = Exclude<HeaderAction, "importFormat">;
 
 export function ExamTemplateEditor({ area, templateId, crumbs }: {
   area: TemplateArea;
@@ -51,312 +39,276 @@ export function ExamTemplateEditor({ area, templateId, crumbs }: {
 }) {
   const { lang, t } = useTranslation();
   const errText = useExamTemplateErrorText();
-  const [tpl, setTpl] = useState<ExamTemplateOut | null>(null);
-  const [baseSpec, setBaseSpec] = useState<ExamTemplateSpec | null>(null);
-  const [fromVersion, setFromVersion] = useState<number | null>(null);
-  const [loadError, setLoadError] = useState<unknown>(null);
+  const areaReadOnly = area.kind === "org" && !!area.readOnly;
+  // Locked or archived templates are read-only (PHASE_8B_DESIGN 9.2); the owner unlocks from the More menu.
+  const readOnlyOf = useCallback((x: ExamTemplateOut) => x.status === "archived" || !!x.locked || areaReadOnly, [areaReadOnly]);
+  const c = useConstructor(templateId, { readOnly: readOnlyOf });
+  const { tpl, draft } = c;
+
   const [blocks, setBlocks] = useState<BlocksOut | null>(null);
-  const [form, setForm] = useState<Form | null>(null);
-  const [dirty, setDirty] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<unknown>(null);
-  const [issues, setIssues] = useState<SpecIssue[]>([]);
-  const [action, setAction] = useState<Action | null>(null);
+  const [blocksError, setBlocksError] = useState<unknown>(null);
+  const [blocksTry, setBlocksTry] = useState(0);
+  const [tab, setTabState] = useState<ConstructorTab>("structure");
+  const [visited, setVisited] = useState<Set<ConstructorTab>>(() => new Set(["structure"]));
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const [action, setAction] = useState<DialogAction | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState<unknown>(null);
+  const [versionsKey, setVersionsKey] = useState(0);
+  const [conflictHidden, setConflictHidden] = useState(false);
+  // Phase 8b UX: one preview action for the header button and the Sample tab
+  const preview = usePreviewLaunch(templateId, draft, c.flush);
+  const [sandboxSeen, setSandboxSeen] = useState(false);
+  const onSandbox = useCallback(() => setSandboxSeen(true), []);
 
-  const seed = useCallback(async (x: ExamTemplateOut) => {
-    let spec: ExamTemplateSpec | null = x.draft_spec ?? null;
-    let from: number | null = null;
-    if (!spec && x.current_version_no != null) {
-      spec = x.current_spec ?? (await getExamTemplateVersion(x.id, x.current_version_no)).spec;
-      from = x.current_version_no;
-    }
-    const s = spec ?? (STARTER_SPEC as ExamTemplateSpec);
-    setTpl(x);
-    setBaseSpec(s);
-    setFromVersion(from);
-    setForm(formOf(x, s));
-    setDirty(false);
-    setIssues([]);
-  }, []);
-
-  const load = useCallback(async () => {
-    setLoadError(null);
-    try {
-      await seed(await getExamTemplate(templateId));
-    } catch (e) {
-      setLoadError(e);
-    }
-  }, [templateId, seed]);
-
-  useEffect(() => { setTpl(null); void load(); }, [load]);
   useEffect(() => {
     let alive = true;
-    getExamTemplateBlocks().then((b) => { if (alive) setBlocks(b); }).catch(() => { /* scheme list is optional */ });
+    setBlocksError(null);
+    getExamTemplateBlocks().then((b) => { if (alive) setBlocks(b); }).catch((e) => { if (alive) setBlocksError(e); });
     return () => { alive = false; };
-  }, []);
+  }, [blocksTry]);
 
-  const fetchVersions = useCallback(() => listExamTemplateVersions(templateId), [templateId]);
-  const versions = useCursorList(fetchVersions);
-  const vState = useTableState(versions);
-
-  const name = tpl ? pickLocalized(tpl.title, lang) || t("examTemplates.untitled") : "";
-  const readOnly = !tpl || tpl.status === "archived" || (area.kind === "org" && !!area.readOnly);
-  // S5: the server says who may lock (the owner) and promote (org admin of a teacher template's organization).
-  const canLock = !!tpl?.can_lock;
-  const canPromote = !!tpl?.can_promote;
-  const hasDraft = !!tpl?.draft_spec;
-
-  const update = <K extends "title" | "description">(k: K, v: Form[K]) => {
-    setForm((f) => (f ? { ...f, [k]: v } : f));
-    setDirty(true);
-  };
-  const updateSpec = useCallback((fn: (d: SpecDraft) => SpecDraft) => {
-    setForm((f) => (f ? { ...f, spec: fn(f.spec) } : f));
-    setDirty(true);
-  }, []);
-  const setSpecField = <K extends "navigation" | "displayMode" | "passageDisplay" | "resultView" | "schemeId">(k: K, v: SpecDraft[K]) =>
-    updateSpec((d) => ({ ...d, [k]: v }));
-
-  // S7: "Раздел «Теория»" in issue locations and selects ("Раздел 2" when untitled)
-  const sectionName = useCallback((i: number) => {
-    const s = form?.spec.sections[i];
-    return pickLocalized(s?.title, lang) || t("examTemplates.picker.sectionN", { n: i + 1 });
-  }, [form?.spec.sections, lang, t]);
-  const issueText = useSpecIssueText(sectionName);
-  const topIssue = (k: string) => {
-    const hit = issues.filter((i) => locStartsWith(i.loc, [k]));
-    return hit.length ? Array.from(new Set(hit.map(issueText.what))).join(" ") : undefined;
-  };
-
-  const save = async () => {
-    if (!tpl || !form || !baseSpec) return;
-    const spec = specOf(form.spec);
-    const title = cleanLocalized(form.title, LMS_LANGS);
-    if (Object.keys(title).length === 0) { setSaveError({ code: "title_required" }); return; }
-    const description = cleanLocalized(form.description, LMS_LANGS);
-    setSaving(true);
-    setSaveError(null);
-    setIssues([]);
+  const setTab = useCallback((next: ConstructorTab) => {
+    setTabState(next);
+    setVisited((v) => (v.has(next) ? v : new Set(v).add(next)));
+    // the tab is kept in the URL so the preview's `return` link lands on the Sample tab
     try {
-      const out = await patchExamTemplate(tpl.id, {
-        draft_rev: tpl.draft_rev ?? 1, title, description: Object.keys(description).length ? description : null, draft_spec: spec,
-      });
-      await seed(out);
-      toast.success(t("examTemplates.editor.saved"));
-    } catch (e) {
-      setSaveError(e);
-      setIssues(specIssuesOf(e));
-      const code = (e as { code?: string }).code;
-      if (code === "draft_conflict") toast.error(t("examTemplates.errors.draft_conflict"));
-      else if (specIssuesOf(e).length) toast.error(t("examTemplates.editor.issues", { n: specIssuesOf(e).length }));
-    } finally {
-      setSaving(false);
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", next);
+      window.history.replaceState(window.history.state, "", url.toString());
+    } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search).get("tab") as ConstructorTab | null;
+      if (q && TABS.includes(q) && q !== "structure") setTab(q);
+    } catch { /* ignore */ }
+  }, [setTab]);
+
+  const sectionName = useCallback((i: number) => {
+    const s = draft?.sections[i];
+    return pickLocalized(s?.title, lang) || t("examTemplates.picker.sectionN", { n: i + 1 });
+  }, [draft?.sections, lang, t]);
+  const { what } = useSpecIssueText(sectionName);
+  const err = useFieldIssues(c.issues, what);
+  const readOnly = !tpl || readOnlyOf(tpl);
+  useEffect(() => { if (c.saveState === "conflict") setConflictHidden(false); }, [c.saveState]);
+  // a template with a single section opens with that section expanded (nothing to choose between)
+  const firstUid = draft?.sections.length === 1 ? draft.sections[0].uid : null;
+  useEffect(() => { if (firstUid) setExpanded((x) => (x.size ? x : new Set([firstUid]))); }, [firstUid]);
+
+  const goTo = useCallback((loc: (string | number)[]) => {
+    setTab(tabOfLoc(loc));
+    if (String(loc[0]) === "sections" && loc[1] !== undefined && /^\d+$/.test(String(loc[1])) && draft) {
+      const s = draft.sections[Number(loc[1])];
+      if (s) setExpanded((x) => new Set(x).add(s.uid));
     }
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      for (let n = loc.length; n > 0; n--) {
+        const el = document.getElementById(fieldId(...loc.slice(0, n)));
+        if (!el) continue;
+        el.scrollIntoView({ block: "center" });
+        const focusable = el.matches("input,select,textarea,button") ? el
+          : el.querySelector<HTMLElement>("input:not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled])");
+        focusable?.focus({ preventScroll: true });
+        return;
+      }
+    }));
+  }, [draft, setTab]);
+
+  const name = tpl ? pickLocalized(c.meta.title, lang) || pickLocalized(tpl.title, lang) || t("examTemplates.untitled") : "";
+  const objectName = <strong className="break-words">{name}</strong>;
+  const hasDraft = !!tpl?.draft_spec;
+  const dirty = c.saveState === "dirty" || c.saveState === "saving" || c.saveState === "invalid" || c.saveState === "error" || c.saveState === "conflict";
+  const canPublish = !readOnly && (hasDraft || dirty) && c.saveState !== "conflict";
+
+  const onHeaderAction = (a: HeaderAction) => {
+    if (a === "importFormat") {
+      if (tpl?.current_version_no == null) return;
+      downloadImportFormat(tpl.id, tpl.current_version_no, lang)
+        .then(() => toast.success(t("examTemplates.importFormat.downloaded")))
+        .catch((e) => toast.error(errText(e)));
+      return;
+    }
+    setActionError(null);
+    setAction(a);
   };
 
-  const run = async (a: Action, reason = "") => {
+  const run = async (a: DialogAction, reason = "") => {
     if (!tpl) return;
     setActionBusy(true);
     setActionError(null);
     try {
+      // unsaved edits go first, so nothing typed is lost by the reload that follows
+      const saved = await c.flush();
+      if (a === "publish" && !saved) {
+        setActionError({ code: "constructor_unsaved" });
+        return;
+      }
       const published = a === "publish" ? await publishExamTemplate(tpl.id) : null;
       const out = published ? published.template
         : a === "archive" ? await archiveExamTemplate(tpl.id)
           : a === "lock" ? await lockExamTemplate(tpl.id, reason)
             : a === "unlock" ? await unlockExamTemplate(tpl.id, reason)
               : await promoteExamTemplate(tpl.id);
-      await seed(out);
+      await c.replace(out);
       setAction(null);
-      if (a === "publish") void versions.reload();
+      if (a === "publish") setVersionsKey((k) => k + 1);
       toast.success(published
-        ? t(published.unchanged ? "examTemplates.publish.unchanged" : "examTemplates.publish.done", { n: published.version.version_no })
+        ? t(published.unchanged ? "examTemplates.constructor.publishUnchanged" : "examTemplates.publish.done", { n: published.version.version_no })
         : t(`examTemplates.${a}.done`));
     } catch (e) {
       setActionError(e);
-      if (a === "publish") setIssues(specIssuesOf(e));
     } finally {
       setActionBusy(false);
     }
   };
+  const actionErrorText = actionError
+    ? ((actionError as { code?: string }).code === "constructor_unsaved" ? t("examTemplates.constructor.publishBlocked") : errText(actionError))
+    : undefined;
 
-  const schemeOptions = useMemo(() => {
-    const rows = blocks?.scheme_versions ?? [];
-    const opts = rows.map((s) => ({
-      value: s.id,
-      label: `${typeof s.title === "string" ? s.title : pickLocalized(s.title, lang) || s.id} · ${t(`examTemplates.editor.schemeScope.${s.scope}`)}`,
-    }));
-    const current = form?.spec.schemeId;
-    if (current && !rows.some((s) => s.id === current)) opts.unshift({ value: current, label: t("examTemplates.editor.schemeCurrent") });
-    return [{ value: "", label: t("examTemplates.editor.schemeNone") }, ...opts];
-  }, [blocks, form?.spec.schemeId, lang, t]);
+  // Phase 8b UX: a tab's count is the number of problems in it (red), not the number of sections
+  const tabItems = useMemo(() => TABS.map((id) => {
+    const n = c.issues.filter((i) => tabOfLoc(i.loc) === id).length;
+    return {
+      id,
+      label: t(`examTemplates.constructor.tabs.${id}`),
+      count: n > 0 && id !== "sample" && id !== "versions" ? (
+        <><span aria-hidden="true">{n}</span><span className="sr-only">{t("examTemplates.constructor.tabs.issues", { n })}</span></>
+      ) : undefined,
+      countTone: "danger" as const,
+    };
+  }), [t, c.issues]);
 
-  if (loadError && !tpl) {
-    const status = (loadError as { status?: number }).status;
+  // Header "Preview": the same launch as the Sample tab; without sample questions yet, or on an error, the Sample tab
+  // shows what is missing.
+  const onPreview = () => {
+    if (!tpl?.sandbox && !sandboxSeen) { setTab("sample"); return; }
+    void preview.launch().then((ok) => { if (!ok) setTab("sample"); });
+  };
+
+  if (c.loadError && !tpl) {
+    const status = (c.loadError as { status?: number }).status;
     return (
       <div>
         <PageHeader title={t("examTemplates.list.pageTitle")} breadcrumbs={crumbs()} />
-        <ErrorState title={status === 404 ? t("examTemplates.editor.notFound") : undefined} message={errText(loadError)} onRetry={status === 404 ? undefined : () => void load()} />
+        <ErrorState title={status === 404 ? t("examTemplates.editor.notFound") : undefined} message={errText(c.loadError)}
+          onRetry={status === 404 ? undefined : () => void c.load()} />
       </div>
     );
   }
-  if (!tpl || !form) return <LoadingState label={t("lms.common.loading")} />;
+  if (!tpl || !draft) return <LoadingState label={t("lms.common.loading")} />;
 
-  const menu: MenuItem[] = [
-    ...(canLock && !tpl.locked ? [{ id: "lock", label: t("examTemplates.lock.action"), description: t("examTemplates.lock.menuHint") }] : []),
-    ...(canLock && tpl.locked ? [{ id: "unlock", label: t("examTemplates.unlock.action"), description: t("examTemplates.unlock.menuHint") }] : []),
-    ...(canPromote ? [{ id: "promote", label: t("examTemplates.promote.action"), description: t("examTemplates.promote.menuHint") }] : []),
-    ...(tpl.status !== "archived" ? [{ id: "archive", label: t("examTemplates.archive.action"), description: t("examTemplates.archive.menuHint") }] : []),
-  ];
-  const publishPrimary = !dirty && hasDraft;
-  const saveButton = (
-    <Button variant={publishPrimary ? "secondary" : "primary"} loading={saving} disabled={readOnly || !dirty} onClick={() => void save()}>
-      {t("examTemplates.editor.save")}
-    </Button>
+  const tabProps = { draft, update: c.update, readOnly, err, sectionName };
+  // Phase 8b UX: the lock dialog lists what the lock fixes (the ticked lock-scope keys, their Display-tab labels)
+  const lockEffect = draft.lockScope.length > 0 ? (
+    <div className="space-y-2">
+      <p>{t("examTemplates.lock.effectIntro")}</p>
+      <ul className="list-disc space-y-0.5 pl-5">
+        {draft.lockScope.map((k) => <li key={k}>{t(`examTemplates.specForm.lockKeys.${k}`)}</li>)}
+      </ul>
+      <p>{t("examTemplates.lock.effectEarlier")}</p>
+    </div>
+  ) : (
+    <div className="space-y-2">
+      <p>{t("examTemplates.lock.effectNone", { where: `${t("examTemplates.constructor.tabs.display")} → ${t("examTemplates.specForm.lockScope")}` })}</p>
+      <p>{t("examTemplates.lock.effectEarlier")}</p>
+    </div>
   );
-  const publishButton = (
-    <Button variant={publishPrimary ? "primary" : "secondary"} disabled={readOnly || dirty || !hasDraft} onClick={() => { setActionError(null); setAction("publish"); }}>
-      {t("examTemplates.publish.action")}
-    </Button>
-  );
+  const blocksGate = (body: (b: BlocksOut) => React.ReactNode) => blocksError && !blocks
+    ? <ErrorState variant="inline" message={t("examTemplates.constructor.blocksError")} onRetry={() => setBlocksTry((n) => n + 1)} />
+    : !blocks ? <LoadingState rows={3} label={t("lms.common.loading")} /> : body(blocks);
 
-  const versionColumns: TableColumn<ExamTemplateVersionOut>[] = [
-    { key: "no", header: t("examTemplates.versions.version"), primary: true, cell: (v) => <span className="font-semibold">{t("examTemplates.versionShort", { n: v.version_no })}</span> },
-    { key: "published", header: t("examTemplates.versions.published"), nowrap: true, cell: (v) => fmtDateTime(v.published_at) },
-    { key: "sections", header: t("examTemplates.versions.sections"), align: "right", cell: (v) => v.spec?.sections?.length ?? "—" },
-    { key: "actions", header: t("examTemplates.versions.importFormat"), actions: true, cell: (v) => <ImportFormatButton templateId={tpl.id} versionNo={v.version_no} /> },
-  ];
-
-  const objectName = <strong className="break-words">{name}</strong>;
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={name}
-        breadcrumbs={crumbs(name)}
-        badge={<span className="inline-flex flex-wrap gap-1.5"><ScopeBadge scope={tpl.owner_scope} /><TemplateStatusBadge status={tpl.status} />{tpl.locked && <LockedBadge />}</span>}
-        description={tpl.current_version_no != null ? t("examTemplates.editor.currentVersion", { n: tpl.current_version_no }) : t("examTemplates.editor.noVersion")}
-        primaryAction={readOnly ? undefined : (publishPrimary ? publishButton : saveButton)}
-        secondaryActions={readOnly ? undefined : (
-          <>
-            {publishPrimary ? saveButton : publishButton}
-            {menu.length > 0 && <MenuButton label={t("examTemplates.editor.more")} items={menu} variant="secondary" align="end" onSelect={(id) => { setActionError(null); setAction(id as Action); }} />}
-          </>
-        )}
-      />
+    <div className="space-y-5">
+      <ConstructorHeader tpl={tpl} name={name} crumbs={crumbs(name)} readOnly={readOnly} saveState={c.saveState}
+        issueCount={c.issues.length} canPublish={canPublish} onAction={onHeaderAction} onPreview={onPreview} previewBusy={preview.busy}
+        onRetrySave={() => (c.saveState === "conflict" ? setConflictHidden(false) : void c.flush())} />
 
-      {tpl.status === "archived" && (
+      {tpl.status === "archived" ? (
         <p role="status" className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
           <Archive className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{t("examTemplates.editor.archivedNote")}
         </p>
-      )}
-      {!readOnly && fromVersion != null && !hasDraft && <p role="note" className="text-sm text-slate-600">{t("examTemplates.editor.fromVersion", { n: fromVersion })}</p>}
-      {!readOnly && dirty && <p role="status" className="text-sm font-medium text-warning-900">{t("examTemplates.editor.unsaved")}</p>}
-      {!readOnly && !dirty && hasDraft && tpl.current_version_no != null && <p role="note" className="text-sm text-slate-600">{t("examTemplates.editor.draftPending")}</p>}
+      ) : tpl.locked ? (
+        <p role="status" className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+          <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          {t(tpl.can_lock ? "examTemplates.constructor.lockedOwner" : "examTemplates.constructor.lockedOther")}
+        </p>
+      ) : areaReadOnly ? (
+        <p role="status" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{t("examTemplates.constructor.readOnlyArea")}</p>
+      ) : null}
 
-      <Card className="space-y-5">
-        <h2 className="text-lg font-semibold text-slate-900">{t("examTemplates.editor.general")}</h2>
-        <LocalizedTextInput label={t("examTemplates.fields.title")} languages={LMS_LANGS} defaultLanguage={lang} value={form.title}
-          onChange={(v) => update("title", v)} maxLength={200} required disabled={readOnly} />
-        <LocalizedTextInput label={t("examTemplates.fields.description")} languages={LMS_LANGS} defaultLanguage={lang} value={form.description}
-          onChange={(v) => update("description", v)} maxLength={2000} multiline disabled={readOnly} />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Select label={t("examTemplates.editor.navigation")} value={form.spec.navigation} disabled={readOnly} error={topIssue("navigation")}
-            onChange={(e) => setSpecField("navigation", e.target.value as Navigation)}
-            options={NAVIGATIONS.map((n) => ({ value: n, label: t(`assessments.navigation.${n}`) }))} />
-          <Select label={t("examTemplates.editor.displayMode")} value={form.spec.displayMode} disabled={readOnly} error={topIssue("display_mode")}
-            hint={t("examTemplates.scrollingLater")} onChange={(e) => setSpecField("displayMode", e.target.value)}
-            options={DISPLAY_MODES.map((m) => ({ value: m, label: t(`examTemplates.blocks.displayModes.${m}`), disabled: !AVAILABLE_DISPLAY_MODES.includes(m) }))} />
-          <Select label={t("examTemplates.editor.passageDisplay")} value={form.spec.passageDisplay} disabled={readOnly} error={topIssue("passage_display")}
-            onChange={(e) => setSpecField("passageDisplay", e.target.value)}
-            options={[{ value: "", label: t("examTemplates.editor.courseDefault") }, ...PASSAGE_DISPLAYS.map((p) => ({ value: p, label: t(passageRenderers[p].titleKey) }))]} />
-          <Select label={t("examTemplates.editor.resultView")} value={form.spec.resultView} disabled={readOnly} error={topIssue("result_view")}
-            onChange={(e) => setSpecField("resultView", e.target.value)}
-            options={[{ value: "", label: t("examTemplates.editor.courseDefault") }, ...RESULT_VIEWS.map((r) => ({ value: r, label: t(resultViews[r].titleKey) }))]} />
-          <Select label={t("examTemplates.editor.scheme")} value={form.spec.schemeId} disabled={readOnly} containerClassName="sm:col-span-2"
-            hint={t(tpl.owner_scope === "teacher" ? "examTemplates.editor.schemeHintTeacher" : "examTemplates.editor.schemeHintShared")}
-            error={topIssue("scoring")} onChange={(e) => setSpecField("schemeId", e.target.value)} options={schemeOptions} />
+      {c.restore && !readOnly && (
+        <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-warning-200 bg-warning-50 px-3.5 py-3 text-sm text-warning-900">
+          <RotateCcw className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span className="min-w-0 flex-1 basis-[14rem]">
+            <span className="block font-semibold">{t("examTemplates.constructor.restoreDraft.title")}</span>
+            {t("examTemplates.constructor.restoreDraft.body")}
+          </span>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={c.acceptRestore}>{t("examTemplates.constructor.restoreDraft.restore")}</Button>
+            <Button size="sm" variant="secondary" onClick={c.discardRestore}>{t("examTemplates.constructor.restoreDraft.discard")}</Button>
+          </div>
         </div>
-      </Card>
+      )}
+      {!readOnly && c.fromVersion != null && !hasDraft && c.saveState === "idle" && (
+        <p role="note" className="text-sm text-slate-600">{t("examTemplates.editor.fromVersion", { n: c.fromVersion })}</p>
+      )}
+      {c.saveState === "error" && <ErrorState variant="inline" message={errText(c.saveError)} onRetry={() => void c.flush()} />}
 
-      <SpecForm draft={form.spec} update={updateSpec} readOnly={readOnly} issues={issues} blocks={blocks}
-        platform={area.kind === "platform"} sectionName={sectionName} />
+      {tab !== "sample" && tab !== "versions" && <IssuesBar issues={c.issues} sectionName={sectionName} onGoTo={goTo} />}
 
-      <div className="space-y-3">
-        {issues.length > 0 && (
-          <div role="alert" className="rounded-xl border border-danger-200 bg-danger-50 px-3.5 py-3 text-sm text-danger-800">
-            <p className="flex items-center gap-2 font-semibold"><TriangleAlert className="h-4 w-4" aria-hidden="true" />{t("examTemplates.editor.issues", { n: issues.length })}</p>
-            <ul className="mt-2 space-y-1">
-              {issues.map((i, idx) => (
-                <li key={idx} className="break-words"><span className="font-medium">{issueText.where(i.loc)}</span>: {issueText.what(i)}</li>
-              ))}
-            </ul>
-          </div>
+      <Tabs id="tpl-constructor" label={t("examTemplates.constructor.tabs.label")} value={tab} onChange={(id) => setTab(id as ConstructorTab)} items={tabItems} />
+
+      <TabPanel tabsId="tpl-constructor" value="structure" hidden={tab !== "structure"}>
+        {blocksGate((b) => (
+          <StructureTab {...tabProps} meta={c.meta} setMeta={c.setMeta} blocks={b} platform={area.kind === "platform"}
+            expanded={expanded} setExpanded={setExpanded} />
+        ))}
+      </TabPanel>
+      <TabPanel tabsId="tpl-constructor" value="scoring" hidden={tab !== "scoring"}>
+        {visited.has("scoring") && blocksGate((b) => <ScoringTab {...tabProps} blocks={b} scope={tpl.owner_scope} />)}
+      </TabPanel>
+      <TabPanel tabsId="tpl-constructor" value="display" hidden={tab !== "display"}>
+        {visited.has("display") && blocksGate((b) => <DisplayTab {...tabProps} blocks={b} />)}
+      </TabPanel>
+      <TabPanel tabsId="tpl-constructor" value="sample" hidden={tab !== "sample"}>
+        {visited.has("sample") && (
+          <SampleTab tpl={tpl} draft={draft} active={tab === "sample"} archived={tpl.status === "archived"} saveState={c.saveState}
+            flush={c.flush} preview={preview} sectionName={sectionName} onSandbox={onSandbox} />
         )}
-        {saveError && (saveError as { code?: string }).code === "draft_conflict" ? (
-          <ErrorState variant="inline" message={t("examTemplates.editor.conflict")}
-            action={<Button variant="secondary" size="sm" onClick={() => void load()}>{t("examTemplates.editor.reload")}</Button>} />
-        ) : (saveError as { code?: string } | null)?.code === "title_required" ? (
-          <p role="alert" className="text-sm text-danger-700">{t("examTemplates.fields.titleRequired")}</p>
-        ) : issues.length === 0 && <ExamTemplateError error={saveError} />}
-        {!readOnly && dirty && (
-          <div className="flex flex-wrap items-center gap-3">
-            {saveButton}
-            <p className="text-sm font-medium text-warning-900">{t("examTemplates.editor.unsaved")}</p>
-          </div>
+      </TabPanel>
+      <TabPanel tabsId="tpl-constructor" value="versions" hidden={tab !== "versions"}>
+        {visited.has("versions") && (
+          <VersionsTab tpl={tpl} blocks={blocks} canDiffDraft={hasDraft && !areaReadOnly} reloadKey={versionsKey} />
         )}
-      </div>
-
-      <section aria-labelledby="tpl-versions" className="space-y-3">
-        <h2 id="tpl-versions" className="text-lg font-semibold text-slate-900">{t("examTemplates.versions.title")}</h2>
-        <p className="text-sm text-slate-600">{t("examTemplates.importFormat.help")}</p>
-        <Table caption={t("examTemplates.versions.title")} columns={versionColumns} rows={versions.items} rowKey={(v) => v.id} {...vState}
-          empty={<p className="px-4 py-6 text-center text-sm text-slate-600">{t("examTemplates.versions.empty")}</p>} />
-        <MoreError list={versions} />
-      </section>
+      </TabPanel>
 
       <ConfirmDialog open={action === "publish"} title={t("examTemplates.publish.title")} object={objectName}
         effect={t("examTemplates.publish.effect", { n: (tpl.current_version_no ?? 0) + 1 })} confirmLabel={t("examTemplates.publish.action")}
-        cancelLabel={t("ui.cancel")} busy={actionBusy} error={actionError ? errText(actionError) : undefined}
+        cancelLabel={t("ui.cancel")} busy={actionBusy} error={actionErrorText}
         onConfirm={() => void run("publish")} onCancel={() => setAction(null)} />
       <ConfirmDialog open={action === "archive"} tone="danger" title={t("examTemplates.archive.title")} object={objectName}
         effect={t("examTemplates.archive.effect")} confirmLabel={t("examTemplates.archive.action")}
-        cancelLabel={t("ui.cancel")} busy={actionBusy} error={actionError ? errText(actionError) : undefined}
+        cancelLabel={t("ui.cancel")} busy={actionBusy} error={actionErrorText}
         onConfirm={() => void run("archive")} onCancel={() => setAction(null)} />
       <ConfirmDialog open={action === "promote"} title={t("examTemplates.promote.title")} object={objectName}
         effect={t("examTemplates.promote.effect")} confirmLabel={t("examTemplates.promote.action")}
-        cancelLabel={t("ui.cancel")} busy={actionBusy} error={actionError ? errText(actionError) : undefined}
+        cancelLabel={t("ui.cancel")} busy={actionBusy} error={actionErrorText}
         onConfirm={() => void run("promote")} onCancel={() => setAction(null)} />
       <ReasonDialog open={action === "lock" || action === "unlock"} optional maxLength={500}
         title={t(action === "unlock" ? "examTemplates.unlock.title" : "examTemplates.lock.title")} object={objectName}
-        effect={t(action === "unlock" ? "examTemplates.unlock.effect" : "examTemplates.lock.effect")}
+        effect={action === "unlock" ? t("examTemplates.unlock.effect") : lockEffect}
         confirmLabel={t(action === "unlock" ? "examTemplates.unlock.action" : "examTemplates.lock.action")}
         reasonLabel={t("examTemplates.lock.reason")}
-        cancelLabel={t("ui.cancel")} busy={actionBusy} error={actionError ? errText(actionError) : undefined}
+        cancelLabel={t("ui.cancel")} busy={actionBusy} error={actionErrorText}
         onConfirm={(reason) => void run(action === "unlock" ? "unlock" : "lock", reason)} onCancel={() => setAction(null)} />
+      <DraftConflictDialog kind={c.saveState === "conflict" && !conflictHidden ? "draft" : null} busy={c.conflictBusy}
+        copy={{
+          title: t("examTemplates.constructor.conflict.title"), body: t("examTemplates.constructor.conflict.body"),
+          takeTheirs: t("examTemplates.constructor.conflict.takeTheirs"), keepMine: t("examTemplates.constructor.conflict.keepMine"),
+        }}
+        onPrimary={() => void c.keepMine()} onSecondary={() => void c.takeTheirs()} onClose={() => setConflictHidden(true)} />
     </div>
-  );
-}
-
-function ImportFormatButton({ templateId, versionNo }: { templateId: string; versionNo: number }) {
-  const { lang, t } = useTranslation();
-  const errText = useExamTemplateErrorText();
-  const [busy, setBusy] = useState(false);
-  const go = async () => {
-    setBusy(true);
-    try {
-      await downloadImportFormat(templateId, versionNo, lang);
-      toast.success(t("examTemplates.importFormat.downloaded"));
-    } catch (e) {
-      toast.error(errText(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <Button variant="secondary" size="sm" loading={busy} leftIcon={<Download className="h-4 w-4" aria-hidden="true" />}
-      aria-label={t("examTemplates.importFormat.downloadVersion", { n: versionNo })} onClick={() => void go()}>
-      {t("examTemplates.importFormat.csv")}
-    </Button>
   );
 }

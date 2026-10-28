@@ -12,6 +12,7 @@ from app.lms.audit.models import AdminAuditLog
 from app.lms.core.errors import Conflict, NotFound
 from app.lms.core.models import utcnow
 from app.lms.courses.models import Course
+from app.lms.courses.scopes import regular_courses  # Phase 8b S1
 from app.lms.enrollments.models import Enrollment
 from app.lms.platform_admin.schemas import (
     AdminUserDetailOut, AdminUserOut, AuditEntryOut, OwnedCourseBrief, TeacherRequestAdminOut, UserBrief,
@@ -127,7 +128,8 @@ def request_out(db: Session, req: TeacherRequest) -> TeacherRequestAdminOut:
 
 def user_detail(db: Session, user: User) -> AdminUserDetailOut:
     courses = db.execute(
-        select(Course).where(Course.owner_id == user.id, Course.deleted_at.is_(None))
+        select(Course).where(Course.owner_id == user.id, Course.deleted_at.is_(None),
+                             regular_courses())  # Phase 8b S1
         .order_by(Course.created_at.desc()).limit(50)
     ).scalars().all()
     active = db.execute(

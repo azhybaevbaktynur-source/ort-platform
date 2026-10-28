@@ -11,11 +11,19 @@ from app.lms.enrollments.models import Enrollment
 from app.models.user import User
 
 
+# --- Phase 8b S1 begin --- (PHASE_8B_DESIGN 5.1: a template's sandbox course is never in any course list)
+def regular_courses():
+    """SQL predicate: not the sandbox (hidden preview course) of an exam template."""
+    return Course.sandbox_for_template_id.is_(None)
+# --- Phase 8b S1 end ---
+
+
 def _visible_predicate(user_id: str):
     return and_(
         Enrollment.user_id == user_id,
         Enrollment.state == "active",
         Course.deleted_at.is_(None),
+        regular_courses(),  # Phase 8b S1
         or_(Enrollment.role.in_(("teacher", "assistant")), Course.status != "draft"),
     )
 
@@ -51,7 +59,7 @@ def my_deleted_courses(user_id: str) -> Select:
         select(Course, User.display_name.label("owner_display_name"), User.email.label("owner_email"))
         .join(User, User.id == Course.owner_id)
         .where(Course.owner_id == user_id, Course.deleted_at.is_not(None),
-               Course.deleted_by_id == user_id)
+               Course.deleted_by_id == user_id, regular_courses())  # Phase 8b S1
     )
 
 
@@ -72,6 +80,7 @@ def catalog_courses(user_id: str) -> Select:
             Course.status == "published", Course.visibility == "catalog", Course.deleted_at.is_(None),
             Course.unlisted_by_admin_at.is_(None), Course.published_at.is_not(None),
             Organization.status == "active", Organization.deleted_at.is_(None),
+            regular_courses(),  # Phase 8b S1
         )
     )
 

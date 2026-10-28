@@ -27,7 +27,8 @@ def test_declared_key_sets():
                                                   "home_kind", "home_page_id", "features"}  # Phase 8a (5.5, 8.2)
     assert set(CourseStaffOut.model_fields) == set(CourseStudentOut.model_fields) | {
         "join_code", "enrollment_mode", "enrollment_limit", "visibility", "unlisted_by_admin",
-        "active_student_count", "owner", "is_owner", "created_at", "updated_at", "published_at", "concluded_at"}
+        "active_student_count", "owner", "is_owner", "created_at", "updated_at", "published_at", "concluded_at",
+        "sandbox_for_template_id"}  # Phase 8b S5 (staff only)
     assert set(StaffPublicOut.model_fields) == {"display_name", "role"}
     assert set(MyEnrollmentOut.model_fields) == {"id", "course_id", "role", "state", "activated_at"}
     assert set(JoinOut.model_fields) == {"course", "enrollment", "already_enrolled"}

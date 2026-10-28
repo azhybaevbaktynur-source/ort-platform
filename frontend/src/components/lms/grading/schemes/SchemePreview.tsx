@@ -5,7 +5,8 @@ import { Check, X } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { previewScheme } from "@/lib/lms/grading";
 import type { SchemeParams, SchemePreviewRow, SchemeType } from "@/lib/lms/gradingTypes";
-import { cardCls, inputCls, labelCls } from "@/components/lms/content/ui";
+import { cardCls, labelCls } from "@/components/lms/content/ui";
+import { Select } from "@/components/ui";
 import { NumInput } from "./fields";
 import { bandLabels, fmtNum, fmtPercentile, previewRaws, stableStringify } from "./params";
 import { SchemeError } from "./SchemeError";
@@ -77,13 +78,17 @@ export function SchemePreview({
           <label htmlFor={`${id}-poss`} className={labelCls}>{t("schemes.preview.possible")}</label>
           <NumInput id={`${id}-poss`} value={possible} onChange={setPossible} />
         </div>
-        <div className="w-40">
-          <label htmlFor={`${id}-mode`} className={labelCls}>{t("schemes.preview.rows")}</label>
-          <select id={`${id}-mode`} className={inputCls} value={useStep ? "step" : "all"} onChange={(e) => setUseStep(e.target.value === "step")}>
-            <option value="all">{t("schemes.preview.everyPoint")}</option>
-            <option value="step">{t("schemes.preview.withStep")}</option>
-          </select>
-        </div>
+        <Select
+          id={`${id}-mode`}
+          containerClassName="w-44"
+          label={t("schemes.preview.rows")}
+          value={useStep ? "step" : "all"}
+          onChange={(e) => setUseStep(e.target.value === "step")}
+          options={[
+            { value: "all", label: t("schemes.preview.everyPoint") },
+            { value: "step", label: t("schemes.preview.withStep") },
+          ]}
+        />
         {useStep && (
           <div className="w-24">
             <label htmlFor={`${id}-step`} className={labelCls}>{t("schemes.preview.step")}</label>
@@ -105,21 +110,31 @@ export function SchemePreview({
               <tr>
                 <th scope="col" className="px-3 py-2 font-medium">{t("schemes.preview.raw")}</th>
                 <th scope="col" className="px-3 py-2 font-medium">{t("schemes.preview.value")}</th>
-                {showLabel && <th scope="col" className="px-3 py-2 font-medium">{t("schemes.preview.label")}</th>}
+                {showLabel && <th scope="col" className="hidden px-3 py-2 font-medium sm:table-cell">{t("schemes.preview.label")}</th>}
                 {showPct && <th scope="col" className="px-3 py-2 font-medium">{t("schemes.preview.percentile")}</th>}
-                {showPassed && <th scope="col" className="px-3 py-2 font-medium">{t("schemes.preview.passed")}</th>}
-                {thresholdKeys.map((k) => <th key={k} scope="col" className="px-3 py-2 font-medium">{labelOf(k)}</th>)}
+                {showPassed && <th scope="col" className="hidden px-3 py-2 font-medium sm:table-cell">{t("schemes.preview.passed")}</th>}
+                {thresholdKeys.map((k) => <th key={k} scope="col" className="hidden px-3 py-2 font-medium sm:table-cell">{labelOf(k)}</th>)}
               </tr>
             </thead>
             <tbody className="tabular-nums">
               {rows.map((r, i) => (
                 <tr key={i} className="border-t border-slate-100">
                   <td className="px-3 py-1.5 text-slate-600">{fmtNum(r.raw)}</td>
-                  <td className="px-3 py-1.5 font-semibold text-slate-900">{fmtNum(r.display_value)}</td>
-                  {showLabel && <td className="px-3 py-1.5">{label(r)}</td>}
+                  <td className="px-3 py-1.5 font-semibold text-slate-900">
+                    {fmtNum(r.display_value)}
+                    {/* Below sm the label / passed / threshold columns are hidden: shown here as small chips. */}
+                    {(showLabel || showPassed || thresholdKeys.length > 0) && (
+                      <span className="mt-1 flex flex-wrap gap-1 font-normal sm:hidden">
+                        {showLabel && label(r) && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{label(r)}</span>}
+                        {showPassed && <YesNoChip name={t("schemes.preview.passed")} v={r.passed} />}
+                        {thresholdKeys.map((k) => <YesNoChip key={k} name={labelOf(k)} v={r.thresholds?.[k] ?? null} />)}
+                      </span>
+                    )}
+                  </td>
+                  {showLabel && <td className="hidden px-3 py-1.5 sm:table-cell">{label(r)}</td>}
                   {showPct && <td className="px-3 py-1.5">{fmtPercentile(r.percentile)}</td>}
-                  {showPassed && <td className="px-3 py-1.5"><YesNo v={r.passed} /></td>}
-                  {thresholdKeys.map((k) => <td key={k} className="px-3 py-1.5"><YesNo v={r.thresholds?.[k] ?? null} /></td>)}
+                  {showPassed && <td className="hidden px-3 py-1.5 sm:table-cell"><YesNo v={r.passed} /></td>}
+                  {thresholdKeys.map((k) => <td key={k} className="hidden px-3 py-1.5 sm:table-cell"><YesNo v={r.thresholds?.[k] ?? null} /></td>)}
                 </tr>
               ))}
             </tbody>
@@ -137,5 +152,19 @@ function YesNo({ v }: { v: boolean | null | undefined }) {
     <span className="inline-flex items-center gap-1 text-emerald-700"><Check className="h-4 w-4" aria-hidden="true" />{t("schemes.preview.yes")}</span>
   ) : (
     <span className="inline-flex items-center gap-1 text-slate-500"><X className="h-4 w-4" aria-hidden="true" />{t("schemes.preview.no")}</span>
+  );
+}
+
+/** Phone-only chip: "<name>: yes/no" (the boolean columns are hidden below sm). */
+function YesNoChip({ name, v }: { name: string; v: boolean | null | undefined }) {
+  const { t } = useTranslation();
+  if (v === null || v === undefined) return null;
+  return (
+    <span
+      className={`inline-flex max-w-full items-start gap-1 rounded-xl px-2 py-0.5 text-xs leading-4 ${v ? "bg-emerald-50 text-emerald-800" : "bg-slate-100 text-slate-600"}`}
+    >
+      {v ? <Check className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" /> : <X className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />}
+      <span className="min-w-0">{name}: {v ? t("schemes.preview.yes") : t("schemes.preview.no")}</span>
+    </span>
   );
 }

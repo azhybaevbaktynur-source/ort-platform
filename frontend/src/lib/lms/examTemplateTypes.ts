@@ -1,5 +1,5 @@
 // Phase 7b S4: TypeScript mirrors of the exam template API (PHASE_7B_DESIGN 4, 5, 7, 9).
-import type { LocalizedText } from "./types";
+import type { Lang, LocalizedText } from "./types";
 import type { DisplayMode, PassageDisplay, ResultView } from "./blocks";
 import type { Navigation, ResultsPolicy, ScorePolicy } from "./assessmentTypes";
 
@@ -84,6 +84,10 @@ export interface ExamTemplateOut {
   can_lock?: boolean;
   /** Teacher template and the caller administers its organization (promote). */
   can_promote?: boolean;
+  /** Phase 8b, managers only: the template's sandbox (sample quiz) once created. */
+  sandbox?: SandboxRef | null;
+  /** Phase 8b, managers only: changes of the draft against the current version (null without a version). */
+  unpublished_changes?: number | null;
 }
 
 /** `POST /exam-templates/{id}/publish`: `unchanged` when the draft equals the current version (nothing published). */
@@ -212,6 +216,8 @@ export const EXAM_TEMPLATE_ERROR_CODES = [
   "template_upgrade_not_allowed", "not_a_template_assessment", "scope_not_allowed",
   "section_not_in_template", "type_not_allowed_in_section", "passage_not_allowed", "type_required",
   "count_below_min", "count_above_max", "attach_target_mismatch", "format_mismatch",
+  "nothing_to_preview", "preview_not_ready", "language_not_in_assessment", "sandbox_course", "diff_target_invalid",
+  "version_not_found",
 ] as const;
 export type ExamTemplateErrorCode = (typeof EXAM_TEMPLATE_ERROR_CODES)[number];
 
@@ -224,4 +230,63 @@ export interface SpecIssue {
   type?: string;
   /** The numeric bound of a range / length error (`ge`, `le`, `max_length`, ...), or the count left out. */
   limit?: number;
+}
+
+// ---- Phase 8b S1: sandbox, preview, diff (PHASE_8B_DESIGN 5.1, 5.2, 6.1) ----
+export interface SandboxRef {
+  course_id: string;
+  assessment_id: string;
+}
+
+/** `POST /exam-templates/{id}/sandbox`. */
+export interface SandboxIn {
+  language?: Lang;
+}
+export interface SandboxOut {
+  course_id: string;
+  assessment_id: string;
+  languages: Lang[];
+  draft_rev: number;
+}
+
+/** `POST /exam-templates/{id}/preview`. */
+export interface PreviewIn {
+  language?: Lang;
+  parameters?: Record<string, string>;
+}
+export interface PreviewIssue {
+  code: string;
+  section_pos?: number | null;
+  item_id?: string | null;
+  language?: string | null;
+}
+export interface PreviewOut {
+  attempt_id: string;
+  course_id: string;
+  assessment_id: string;
+  language: Lang;
+  issues: PreviewIssue[];
+}
+
+/** `GET /exam-templates/{id}/diff?from=<no>&to=<no|draft>`. */
+export type SpecDiffEnd = number | "draft";
+export type SpecChangeKind = "added" | "removed" | "changed";
+export interface SpecChange {
+  path: string;
+  kind: SpecChangeKind;
+  before?: unknown;
+  after?: unknown;
+  section?: { key: string | null; position: number; title: LocalizedText | null } | null;
+}
+export interface SpecDiffSummary {
+  sections_added: number;
+  sections_removed: number;
+  sections_changed: number;
+  fields_changed: number;
+}
+export interface SpecDiffOut {
+  from: SpecDiffEnd;
+  to: SpecDiffEnd;
+  changes: SpecChange[];
+  summary: SpecDiffSummary;
 }

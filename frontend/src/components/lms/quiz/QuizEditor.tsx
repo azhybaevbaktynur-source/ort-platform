@@ -70,7 +70,11 @@ function readdBody(item: ItemOut): ItemCreateIn | null {
  * reference: Canvas "Questions" tab). Tabs: Questions (cards), Settings, Preview. One card is open at a time; typing
  * autosaves a draft, "Done" (or closing a valid card) saves a version; the publish bar sits on top.
  */
-export function QuizEditor({ initial }: { initial: AssessmentStaffOut }) {
+export function QuizEditor({ initial, mode = "course" }: {
+  initial: AssessmentStaffOut;
+  /** Phase 8b S4: "sandbox" = the exam template constructor's Sample tab (cards only, see the block below). */
+  mode?: "course" | "sandbox";
+}) {
   const { lang, t } = useTranslation();
   const { course } = useCourse();
   const router = useRouter();
@@ -326,6 +330,46 @@ export function QuizEditor({ initial }: { initial: AssessmentStaffOut }) {
       setTab(id as TabId);
     })();
   };
+
+  // --- Phase 8b S4 begin --- (PHASE_8B_DESIGN 9.1: `mode="sandbox"` in the exam template constructor. Cards only:
+  // the sections mirror the template (read-only headers, no add/remove/move/edit); no publish bar, Settings, Preview
+  // or Save as template. The sample quiz is never published; previews start from the constructor.)
+  if (mode === "sandbox") {
+    return (
+      <div className="space-y-4">
+        <QuizError error={actionError} />
+        {a.sections.length === 0 ? (
+          <EmptyState icon={<ListChecks />} title={t("quizEditor.section.emptyQuizTitle")} description={t("quizEditor.section.emptyQuizBody")}
+            action={canEdit ? <AddAtEnd ops={ops} section={null} primary /> : undefined} />
+        ) : a.sections.map((s, i) => (
+          <section key={s.id} aria-label={secName(s)} className={showHeaders ? "space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3" : "space-y-3"}>
+            {showHeaders && (
+              <div className="min-w-0">
+                <h2 className="break-words text-lg font-semibold text-slate-900">{secName(s)}</h2>
+                {!!s.rules.allowed_types?.length && (
+                  <p className="text-sm text-slate-600">{s.rules.allowed_types.map((q) => t(`bank.types.${q}.name`)).join(", ")}</p>
+                )}
+              </div>
+            )}
+            <QuizSectionBlock ctx={ctx} ops={ops} section={s} index={i} count={a.sections.length} showHeader={false} labels={labels}
+              structureLocked lockedNote={lockedNote} onEdit={() => undefined} onDelete={() => undefined} onMoveBy={() => undefined} />
+          </section>
+        ))}
+        {find && (
+          <FindQuestionsDrawer open courseId={course.id} assessmentId={aid} sectionId={find.sectionId} tab={find.tab}
+            onClose={() => setFind(null)} onAdded={onFindAdded} />
+        )}
+        {undo && (
+          <div role="status" data-quiz-keep-open
+            className="fixed inset-x-4 bottom-4 z-40 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-lg sm:left-auto sm:right-6 sm:w-96">
+            <span className="min-w-0 flex-1 text-sm text-slate-800">{t("quizEditor.card.deleted")}</span>
+            <Button variant="secondary" size="sm" loading={undoBusy} onClick={() => void runUndo()}>{t("quizEditor.card.undo")}</Button>
+          </div>
+        )}
+      </div>
+    );
+  }
+  // --- Phase 8b S4 end ---
 
   return (
     <div className="space-y-4">

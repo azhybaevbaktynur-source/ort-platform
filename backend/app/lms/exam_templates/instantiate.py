@@ -22,7 +22,7 @@ from app.lms.content.models import BankQuestion
 from app.lms.core import clock
 from app.lms.core.errors import Conflict, ValidationFailed
 from app.lms.courses.models import Course
-from app.lms.courses.service import require_course
+from app.lms.courses.service import assert_not_sandbox, require_course
 from app.lms.exam_templates import ids, scopes
 from app.lms.exam_templates.models import ExamTemplate, ExamTemplateVersion
 from app.lms.exam_templates.spec import ExamTemplateSpec
@@ -81,13 +81,6 @@ def resolve_parameters(spec: ExamTemplateSpec, parameters: Optional[dict]) -> di
     return out
 
 
-def _assert_display_mode(spec: ExamTemplateSpec) -> None:
-    if spec.display_mode == "scrolling":  # P7B-1: accepted in specs, built in 8b
-        raise ValidationFailed("The scrolling display mode is not available yet",
-                               code=ids.E_DISPLAY_MODE_NOT_AVAILABLE,
-                               details=[{"loc": ["display_mode"], "msg": "not available"}])
-
-
 def section_values(spec: ExamTemplateSpec, keys: dict[int, str]) -> list[dict]:
     """The `assessment_sections` column values of a spec, in order (position 1..n); rules as the builder stores them
     (`normalize_rules`, `None` dropped)."""
@@ -117,7 +110,6 @@ def instantiate(db: Session, ctx: AuthzContext, course: Course, version: ExamTem
     if t.status == "archived":
         raise Conflict("The template is archived", code=ids.E_TEMPLATE_ARCHIVED)
     spec = ExamTemplateSpec.model_validate(version.spec)
-    _assert_display_mode(spec)
     if set(languages) - set(course.languages or []):
         raise ValidationFailed("Languages must be a subset of the course languages", code="languages_not_in_course")
     keys = resolve_parameters(spec, parameters)
@@ -220,11 +212,61 @@ def _rule_issues(db: Session, a: Assessment, sections: list[AssessmentSection]) 
     return issues
 
 
+# --- Phase 8b S2 begin --- (PHASE_8B_DESIGN 5.1: the by-position mapping of `upgrade_to_latest`, shared with the
+# template sandbox's `sync`; the upgrade's behaviour is unchanged, its tests prove it)
+
+def apply_spec(db: Session, a: Assessment, spec: ExamTemplateSpec, keys: dict[int, str], *,
+               version: Optional[ExamTemplateVersion], counts: bool = True) -> tuple[list[AssessmentSection], bool]:
+    """Write a spec onto an existing assessment in the caller's transaction (no commit): the structure columns
+    (`exam_template_version_id` only when `version` is given; the scheme from `spec.scoring` otherwise) and the
+    sections mapped by position (rows of kept sections are updated, so their items stay; items of removed sections
+    are deleted; new sections are added). `counts=False` drops `min_items` / `max_items` from the rules (sample
+    quizzes, invariant 3). Returns (sections in order, whether anything changed)."""
+    old = repo.load_sections(db, a.id)
+    if version is not None:
+        values = structure_values(spec, version)
+    else:
+        values = dict(navigation=spec.navigation, display_mode=spec.display_mode,
+                      passage_display=spec.passage_display, result_view=spec.result_view,
+                      grading_scheme_version_id=spec.scheme_version_id)
+    changed = False
+    for k, v in values.items():
+        if getattr(a, k) != v:
+            setattr(a, k, v)
+            changed = True
+    wanted = section_values(spec, keys)
+    if not counts:
+        for vals in wanted:
+            vals["rules"] = {k: v for k, v in (vals["rules"] or {}).items()
+                             if k not in ids.SANDBOX_DROPPED_RULE_KEYS}
+    kept: list[AssessmentSection] = []
+    for i, vals in enumerate(wanted):
+        if i < len(old):
+            s = old[i]
+            for k, v in vals.items():
+                if getattr(s, k) != v:
+                    setattr(s, k, v)
+                    changed = True
+        else:
+            s = AssessmentSection(assessment_id=a.id, **vals)
+            db.add(s)
+            changed = True
+        kept.append(s)
+    for s in old[len(wanted):]:
+        _delete_section_items(db, s)
+        db.delete(s)
+        changed = True
+    db.flush()
+    return kept, changed
+# --- Phase 8b S2 end ---
+
+
 def upgrade_to_latest(db: Session, ctx: AuthzContext, course: Course, assessment_id: uuid.UUID
                       ) -> tuple[Assessment, list[Issue]]:
     """Draft without attempts only; sections are mapped by position (items of kept sections stay, items of removed
     sections go), rule violations come back as issues. 409 `template_upgrade_not_allowed` otherwise."""
     require_course(ctx, A.CONTENT_MANAGE, course)
+    assert_not_sandbox(course)  # Phase 8b fix L1: the sample quiz is never published; no other assessments
     a = repo.load_assessment(db, course.id, assessment_id, for_update=True)
     if a.exam_template_version_id is None:
         raise ValidationFailed("The assessment was not created from a template", code=ids.E_NOT_A_TEMPLATE_ASSESSMENT)
@@ -242,27 +284,10 @@ def upgrade_to_latest(db: Session, ctx: AuthzContext, course: Course, assessment
         raise Conflict("Only a draft without attempts on an older version can be upgraded",
                        code=ids.E_TEMPLATE_UPGRADE_NOT_ALLOWED)
     spec = ExamTemplateSpec.model_validate(latest.spec)
-    _assert_display_mode(spec)
     old = repo.load_sections(db, a.id)
     keys = _reapply_parameters(spec, old)
     before_scheme = a.grading_scheme_version_id
-    for k, v in structure_values(spec, latest).items():
-        setattr(a, k, v)
-    wanted = section_values(spec, keys)
-    kept: list[AssessmentSection] = []
-    for i, vals in enumerate(wanted):
-        if i < len(old):
-            s = old[i]
-            for k, v in vals.items():
-                setattr(s, k, v)
-        else:
-            s = AssessmentSection(assessment_id=a.id, **vals)
-            db.add(s)
-        kept.append(s)
-    for s in old[len(wanted):]:
-        _delete_section_items(db, s)
-        db.delete(s)
-    db.flush()
+    kept, _changed = apply_spec(db, a, spec, keys, version=latest)  # Phase 8b S2: shared with sandbox.sync
     issues = _rule_issues(db, a, kept)
     if a.grading_scheme_version_id != before_scheme:
         a.grading_changed_at = clock.now()

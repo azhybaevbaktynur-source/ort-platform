@@ -238,6 +238,141 @@ def seed_modules(api: Api, log: Path, admin_tok: str, ort_course_id: str) -> dic
 # --- Phase 8a S5 end ---
 
 
+# --- Phase 8b S3 begin --- (scrolling display mode, frontend/e2e/scrolling-player.spec.ts; written after every ORT,
+# quiz-editor and modules row, so those rows and screens are exactly as before)
+SCROLL_STUDENTS = ["walk", "phone", "forward", "page", "base", "shots"]
+
+
+def seed_scrolling(api: Api, log: Path, admin_tok: str) -> dict:
+    """A general course (ru, ky, en) of a third approved teacher with three published quizzes:
+    - "Длинный тест E2E": scrolling, free navigation, 60 min, numbered passages; section 1 has 45 single-choice
+      questions (windowing), section 2 a passage with two questions and one plain question;
+    - "Пошаговый тест E2E": scrolling, forward-only, two sections of two questions, 10 min each;
+    - "Постраничный тест E2E": one question per page (the default), three questions.
+    Six enrolled students (one per spec test, so no test depends on another)."""
+    teacher = register(api, log, "e2e-scroll-teacher@example.com", "Scroll Teacher")
+    tp = profile(api, teacher["token"])
+    api.call("POST", f"/platform/users/{tp['id']}/teacher-status", admin_tok, {"status": "approved"})
+    teacher["profile"] = profile(api, teacher["token"])
+    tok = teacher["token"]
+    title = {"ru": "Курс прокрутки E2E", "ky": "Жылдыруу курсу E2E", "en": "Scrolling course E2E"}
+    course = api.call("POST", "/courses", tok, {"title": title, "languages": ["ru", "ky", "en"], "default_language": "ru"})
+    cid = course["id"]
+    api.call("POST", f"/courses/{cid}/publish", tok, {})
+    bank = api.call("POST", f"/courses/{cid}/banks", tok, {"title": "Банк прокрутки", "default_language": "ru"})
+    qpath = f"/courses/{cid}/banks/{bank['id']}/questions"
+
+    def question(stem: str, right: str, wrong: str, passage_id: str | None = None) -> str:
+        body = sc(stem, right, wrong)
+        if passage_id:
+            body["passage_id"] = passage_id
+        return api.call("POST", qpath, tok, body)["id"]
+
+    def quiz(name: str, settings: dict) -> tuple[str, str]:
+        a = api.call("POST", f"/courses/{cid}/assessments", tok, {
+            "title": {"ru": name, "ky": name, "en": name}, "preset": "none", "languages": ["ru"]})
+        api.call("PATCH", f"/courses/{cid}/assessments/{a['id']}", tok, {"draft_rev": a["draft_rev"], **settings})
+        return a["id"], f"/courses/{cid}/assessments/{a['id']}"
+
+    def section(base: str, name: str, time_limit_s: int | None = None) -> str:
+        body: dict = {"title": {"ru": name, "ky": name, "en": name}}
+        if time_limit_s:
+            body["time_limit_s"] = time_limit_s
+        return api.call("POST", f"{base}/sections", tok, body)["id"]
+
+    # the long quiz: 45 + (passage 2 + 1)
+    long_id, base = quiz("Длинный тест E2E", {"display_mode": "scrolling", "passage_display": "numbered",
+                                             "time_limit_s": 3600, "show_correct_answers": True})
+    s1 = section(base, "Часть 1")
+    long_q = [question(f"Вопрос {i}: сколько будет {i} + 1?", str(i + 1), str(i + 2)) for i in range(1, 46)]
+    api.call("POST", f"{base}/sections/{s1}/items/bulk", tok, {"question_ids": long_q})
+    s2 = section(base, "Часть 2")
+    passage = api.call("POST", f"/courses/{cid}/banks/{bank['id']}/passages", tok, {
+        "language": "ru", "title": "Текст о горах",
+        "body": "Горы Тянь-Шаня тянутся на тысячи километров.\nВысочайшая вершина — пик Победы.\n"
+                "Летом на пастбищах пасут скот.\nЗимой в горах много снега.\nРеки начинаются у ледников.\n"
+                "Озеро Иссык-Куль не замерзает зимой."})
+    pq = [question("Как называется высочайшая вершина?", "Пик Победы", "Хан-Тенгри", passage["id"]),
+          question("Что делают летом на пастбищах?", "Пасут скот", "Сеют рис", passage["id"])]
+    api.call("POST", f"{base}/sections/{s2}/items", tok, {"kind": "passage", "passage_id": passage["id"], "question_ids": pq})
+    api.call("POST", f"{base}/sections/{s2}/items", tok,
+             {"kind": "question", "question_id": question("Столица Кыргызстана?", "Бишкек", "Ош")})
+    api.call("POST", f"{base}/publish", tok, {})
+
+    # the forward-only quiz
+    fwd_id, base = quiz("Пошаговый тест E2E", {"display_mode": "scrolling", "navigation": "section_forward_only"})
+    for n in (1, 2):
+        sid = section(base, f"Этап {n}", 600)
+        qs = [question(f"Этап {n}, вопрос {i}: {n} × {i}?", str(n * i), str(n * i + 1)) for i in (1, 2)]
+        api.call("POST", f"{base}/sections/{sid}/items/bulk", tok, {"question_ids": qs})
+    api.call("POST", f"{base}/publish", tok, {})
+
+    # the one-per-page quiz (default display)
+    page_id, base = quiz("Постраничный тест E2E", {})
+    sid = section(base, "Часть 1")
+    qs = [question(f"Страница, вопрос {i}: {i} + {i}?", str(2 * i), str(2 * i + 1)) for i in (1, 2, 3)]
+    api.call("POST", f"{base}/sections/{sid}/items/bulk", tok, {"question_ids": qs})
+    api.call("POST", f"{base}/publish", tok, {})
+
+    students = {}
+    for key in SCROLL_STUDENTS:
+        s = register(api, log, f"e2e-scroll-{key}@example.com", f"Scroll {key}")
+        s["profile"] = profile(api, s["token"])
+        api.call("POST", "/courses/join", s["token"], {"code": course["join_code"]})
+        students[key] = s
+    return {"course_id": cid, "long_quiz": long_id, "forward_quiz": fwd_id, "page_quiz": page_id,
+            "teacher": teacher, "students": students}
+# --- Phase 8b S3 end ---
+
+
+# --- Phase 8b S5 begin --- (exam-template constructor walk, frontend/e2e/exam-constructor.spec.ts; written after every
+# other row, so the ORT, quiz-editor, modules and scrolling rows and screens are exactly as before)
+def seed_constructor(api: Api, log: Path, admin_tok: str) -> dict:
+    """An organization "Школа E2E" with an org admin and an approved teacher member; the teacher's published course
+    "Курс школы E2E" (ru, ky, en) in that organization with two enrolled students; and a published teacher-scope
+    template "Шаблон учителя E2E" of that teacher (the org admin promotes it in the walk). The organization template
+    itself is designed in the browser by the walk."""
+    org = api.call("POST", "/platform/organizations", admin_tok, {"name": "Школа E2E", "slug": "e2e-school",
+                                                                    "settings": {"teachers_can_create_courses": True}})
+    oid = org["id"]
+
+    def person(email: str, name: str, *, teacher: bool) -> dict:
+        u = register(api, log, email, name)
+        if teacher:
+            uid = profile(api, u["token"])["id"]
+            api.call("POST", f"/platform/users/{uid}/teacher-status", admin_tok, {"status": "approved"})
+        u["profile"] = profile(api, u["token"])
+        return u
+
+    org_admin = person("e2e-org-admin@example.com", "Org Admin", teacher=False)
+    api.call("POST", f"/platform/organizations/{oid}/members", admin_tok,
+             {"user_id": org_admin["profile"]["id"], "role": "org_admin"})
+    teacher = person("e2e-org-teacher@example.com", "School Teacher", teacher=True)
+    api.call("POST", f"/platform/organizations/{oid}/members", admin_tok,
+             {"user_id": teacher["profile"]["id"], "role": "teacher"})
+    tok = teacher["token"]
+    title = {"ru": "Курс школы E2E", "ky": "Мектеп курсу E2E", "en": "School course E2E"}
+    course = api.call("POST", "/courses", tok, {"title": title, "languages": ["ru", "ky", "en"],
+                                                 "default_language": "ru", "organization_id": oid})
+    cid = course["id"]
+    api.call("POST", f"/courses/{cid}/publish", tok, {})
+    students = {}
+    for key in ("walk", "phone"):
+        s = person(f"e2e-constructor-{key}@example.com", f"Constructor {key}", teacher=False)
+        api.call("POST", "/courses/join", s["token"], {"code": course["join_code"]})
+        students[key] = s
+
+    name = "Шаблон учителя E2E"
+    tt = api.call("POST", "/exam-templates", tok, {
+        "owner_scope": "teacher", "organization_id": oid, "title": {"ru": name, "ky": name, "en": name},
+        "draft_spec": {"schema": 1, "parameters": [], "lock_scope": [],
+                       "sections": [{"key": None, "title": {"ru": "Часть 1"}, "allowed_types": ["single_choice"]}]}})
+    api.call("POST", f"/exam-templates/{tt['id']}/publish", tok, {})
+    return {"organization_id": oid, "course_id": cid, "join_code": course["join_code"], "org_admin": org_admin,
+            "teacher": teacher, "students": students, "teacher_template_id": tt["id"]}
+# --- Phase 8b S5 end ---
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--api", required=True)
@@ -308,10 +443,14 @@ def main() -> int:
 
     quiz_editor = seed_quiz_editor(api, log, tok)  # Phase 7c S5 (after every ORT row)
     modules = seed_modules(api, log, tok, cid)  # Phase 8a S5 (after every ORT and quiz-editor row)
+    scrolling = seed_scrolling(api, log, tok)  # Phase 8b S3 (after every ORT, quiz-editor and modules row)
+    exam_constructor = seed_constructor(api, log, tok)  # Phase 8b S5 (after every other row)
 
     seed = {
         "quiz_editor": quiz_editor,
         "modules": modules,
+        "scrolling": scrolling,
+        "exam_constructor": exam_constructor,
         "api": args.api, "course_id": cid, "bank_id": bank_id, "exam": exam, "staff_exam": staff_exam,
         "picks": picks, "keys": keys, "comparison_question_id": comparison_qid, "passage_id": passage_id,
         "staff_attempt_id": staff_attempt, "admin": admin, "students": students,

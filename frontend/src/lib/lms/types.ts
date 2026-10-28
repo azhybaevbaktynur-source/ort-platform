@@ -102,6 +102,8 @@ export interface CourseStaffOut extends CourseStudentOut {
   updated_at: string;
   published_at: string | null;
   concluded_at: string | null;
+  /** Phase 8b S5: set when the course is an exam template's hidden sandbox (sample quiz + previews). */
+  sandbox_for_template_id?: string | null;
 }
 
 /** Either serializer; discriminate with `isStaffCourse`. */
