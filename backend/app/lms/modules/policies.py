@@ -32,3 +32,8 @@ PLANNED_POLICIES: dict[tuple[str, str], str] = {
     ("POST", f"{_I}/done"): "course:progress.record+ratelimit",
     ("GET", f"{_C}/modules/progress/{{enrollment_id}}"): "course:attempt.read_all",
 }
+
+
+# --- Phase 8a S2 begin --- (the router is mounted in app/api/v1/router.py: the planned entries become real)
+MODULE_POLICIES.update(PLANNED_POLICIES)
+# --- Phase 8a S2 end ---

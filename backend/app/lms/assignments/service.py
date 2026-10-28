@@ -207,6 +207,12 @@ def update_assignment(db: Session, ctx: AuthzContext, course: Course, assignment
                 if "grading_scheme_version_id" in fields and data.grading_scheme_version_id != a.grading_scheme_version_id
                 else None)
     now = clock.now()
+    # --- Phase 8a S2 begin --- (PHASE_8A_DESIGN 6.4: a publish change re-checks the modules that contain it)
+    if "published" in fields and bool(data.published) != bool(a.published):
+        from app.lms.modules import gate
+
+        gate.touch_assignment(db, [a.id])
+    # --- Phase 8a S2 end ---
     for f in fields:
         v = getattr(data, f)
         if f in ("due_at", "available_from", "available_until"):
@@ -243,9 +249,20 @@ def delete_assignment(db: Session, ctx: AuthzContext, course: Course, assignment
     a = load(db, course, assignment_id)
     if a.kind == "quiz":
         builder.soft_delete_assessment(db, ctx, course, a.assessment_id)
+        _touch_modules(db, a.id)  # Phase 8a S2
         return
     a.soft_delete(ctx.user.id)
+    _touch_modules(db, a.id, commit=False)  # Phase 8a S2
     db.commit()
+
+
+# --- Phase 8a S2 begin --- (PHASE_8A_DESIGN 6.4: delete/restore/publish bump the modules that contain the assignment)
+def _touch_modules(db: Session, assignment_id: uuid.UUID, *, commit: bool = True) -> None:
+    from app.lms.modules import gate
+
+    if gate.touch_assignment(db, [assignment_id]) and commit:
+        db.commit()
+# --- Phase 8a S2 end ---
 
 
 def restore_assignment(db: Session, ctx: AuthzContext, course: Course, assignment_id: uuid.UUID) -> Assignment:
@@ -255,9 +272,11 @@ def restore_assignment(db: Session, ctx: AuthzContext, course: Course, assignmen
         raise Conflict("Assignment is not deleted", code="not_deleted")
     if a.kind == "quiz":
         builder.restore_assessment(db, ctx, course, a.assessment_id)
+        _touch_modules(db, a.id)  # Phase 8a S2
         db.refresh(a)
         return a
     a.restore()
+    _touch_modules(db, a.id, commit=False)  # Phase 8a S2
     db.commit()
     return a
 
@@ -543,6 +562,11 @@ def _grade_out(db: Session, sub: Optional[Submission], visible: bool = True) -> 
 def student_detail(db: Session, ctx: AuthzContext, course: Course, assignment_id: uuid.UUID
                    ) -> sch.AssignmentStudentDetailOut:
     a = handins.load_visible(db, course, assignment_id)
+    # --- Phase 8a S2 begin --- (PHASE_8A_DESIGN 6.5: 423 `module_locked` while every module item with it is locked)
+    from app.lms.modules import gate
+
+    gate.require_access(db, ctx, course, assignment=a)
+    # --- Phase 8a S2 end ---
     enr = _student_enrollment(db, ctx, course)
     now = clock.now()
     mine = _Mine(db, enr, ctx.user.id, [a], now)
