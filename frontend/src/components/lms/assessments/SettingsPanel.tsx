@@ -17,6 +17,14 @@ import { SettingsPanelGrading, type GradingFormValue } from "./SettingsPanelGrad
 import { fromLocalInput, minToSec, secToMin, toLocalInput } from "./format";
 import { AccessCodeField, accessCodeError } from "@/components/lms/accommodations/AccessCodeField"; // Phase 7a S5
 import { templateLockedFields } from "@/lib/lms/assessmentTypes"; // Phase 7b S4
+import { DISPLAY_MODES, PASSAGE_DISPLAYS, RESULT_VIEWS, type DisplayMode, type PassageDisplay, type ResultView } from "@/lib/lms/blocks"; // Phase 8b S3
+import { Select, cn } from "@/components/ui"; // Phase 8b S3
+
+// --- Phase 8b S3 begin --- (PHASE_8B_DESIGN 8.3): stored display values; "" = inherit from the course (null)
+const asDisplayMode = (v: string | undefined): DisplayMode => (DISPLAY_MODES as readonly string[]).includes(v ?? "") ? (v as DisplayMode) : "one_per_page";
+const asPassageDisplay = (v: string | null | undefined): PassageDisplay | "" => (PASSAGE_DISPLAYS as readonly string[]).includes(v ?? "") ? (v as PassageDisplay) : "";
+const asResultView = (v: string | null | undefined): ResultView | "" => (RESULT_VIEWS as readonly string[]).includes(v ?? "") ? (v as ResultView) : "";
+// --- Phase 8b S3 end ---
 
 function gradingOf(a: AssessmentStaffOut): GradingFormValue {
   return {
@@ -68,6 +76,17 @@ export function SettingsPanel({
   const examLockNames = ["navigation", "grading_scheme_version_id", "display_mode", "result_view"]
     .filter((f) => examLocks.has(f)).map((f) => t(`examTemplates.lockFields.${f}`));
   // --- Phase 7b S4 end ---
+  // --- Phase 8b S3 begin --- display group (PHASE_8B_DESIGN 8.3, 5.3): general exams only; ORT presets never see it
+  // (and the server answers 409 template_locked for them). The template's lock scope greys out its fields:
+  // `display_mode` alone, `result_view` also governs the passage display (P8B-4).
+  const courseUi = useTemplateUi();
+  const showDisplay = a.preset === "none";
+  const [displayMode, setDisplayMode] = useState<DisplayMode>(asDisplayMode(a.display_mode));
+  const [passageDisplay, setPassageDisplay] = useState<PassageDisplay | "">(asPassageDisplay(a.passage_display));
+  const [resultView, setResultView] = useState<ResultView | "">(asResultView(a.result_view));
+  const displayModeLocked = examLocks.has("display_mode");
+  const resultViewLocked = examLocks.has("result_view");
+  // --- Phase 8b S3 end ---
   // --- Phase 7a S5: access code (undefined = unchanged, string = set, null = clear; PHASE_7A_DESIGN 2.7) ---
   const [accessCode, setAccessCode] = useState<string | null | undefined>(undefined);
   const accessCodeBad = typeof accessCode === "string" && accessCode.trim() !== "" && !!accessCodeError(accessCode);
@@ -82,6 +101,8 @@ export function SettingsPanel({
     setShuffleChoices(a.shuffle_choices); setFrom(toLocalInput(a.available_from)); setUntil(toLocalInput(a.available_until));
     setGrading(gradingOf(a));
     setAccessCode(undefined); // Phase 7a S5
+    // Phase 8b S3
+    setDisplayMode(asDisplayMode(a.display_mode)); setPassageDisplay(asPassageDisplay(a.passage_display)); setResultView(asResultView(a.result_view));
   }, [a]);
 
   const toggleLang = (l: Lang) =>
@@ -116,6 +137,8 @@ export function SettingsPanel({
         omit_from_total: grading.omit,
         // Phase 7a S5: sent only when changed (absent = unchanged)
         ...(accessCode === null ? { access_code: null } : typeof accessCode === "string" && accessCode.trim() ? { access_code: accessCode.trim() } : {}),
+        // Phase 8b S3: general exams only (unchanged values pass the lock guards)
+        ...(showDisplay ? { display_mode: displayMode, passage_display: passageDisplay || null, result_view: resultView || null } : {}),
       });
       setSaved(true);
       await onSaved();
@@ -195,6 +218,56 @@ export function SettingsPanel({
         {check("as-shuf-i", t("assessments.settings.shuffleItems"), shuffleItems, setShuffleItems)}
         {check("as-shuf-c", t("assessments.settings.shuffleChoices"), shuffleChoices, setShuffleChoices)}
       </div>
+      {/* --- Phase 8b S3: display group (general exams) --- */}
+      {showDisplay && (
+        <fieldset disabled={disabled} className="space-y-4 rounded-xl border border-slate-200 p-4">
+          <legend className="px-1 text-sm font-semibold text-slate-900">{t("assessments.settings.display.group")}</legend>
+          <p className="text-xs text-slate-600">{t("assessments.settings.display.hint")}</p>
+          <fieldset disabled={displayModeLocked}>
+            <legend className={labelCls}>{t("assessments.settings.display.displayMode.label")}</legend>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {DISPLAY_MODES.map((m) => (
+                <label key={m} className={cn(
+                  "flex min-h-11 gap-3 rounded-xl border p-3",
+                  displayMode === m ? "border-brand-600 bg-brand-50/40" : "border-slate-300 bg-white",
+                  displayModeLocked || disabled ? "cursor-not-allowed opacity-70" : "cursor-pointer hover:border-brand-300",
+                )}>
+                  <input type="radio" name="as-display-mode" value={m} checked={displayMode === m} onChange={() => setDisplayMode(m)} className="mt-1 shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-slate-900">{t(`assessments.settings.display.displayMode.options.${m}.title`)}</span>
+                    <span className="block text-xs text-slate-600">{t(`assessments.settings.display.displayMode.options.${m}.body`)}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            {displayModeLocked && <p className="mt-1 text-xs text-slate-500">{t("examTemplates.lockedNote")}</p>}
+          </fieldset>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Select id="as-passage-display" label={t("assessments.settings.display.passageDisplay.label")}
+              disabled={disabled || resultViewLocked} value={passageDisplay}
+              onChange={(e) => setPassageDisplay(e.target.value as PassageDisplay | "")}
+              hint={resultViewLocked ? t("examTemplates.lockedNote") : undefined}
+              options={[
+                { value: "", label: t("assessments.settings.display.passageDisplay.inherit", { value: t(`assessments.settings.display.passageDisplay.options.${courseUi.passageDisplay}`) }) },
+                ...PASSAGE_DISPLAYS.map((p) => ({ value: p, label: t(`assessments.settings.display.passageDisplay.options.${p}`) })),
+              ]} />
+            <Select id="as-result-view" label={t("assessments.settings.display.resultView.label")}
+              disabled={disabled || resultViewLocked} value={resultView}
+              onChange={(e) => setResultView(e.target.value as ResultView | "")}
+              hint={((resultView || courseUi.resultView) === "ort" || resultViewLocked) ? (
+                <>
+                  {(resultView || courseUi.resultView) === "ort" && t("assessments.settings.display.resultView.ortHint")}
+                  {(resultView || courseUi.resultView) === "ort" && resultViewLocked ? " " : null}
+                  {resultViewLocked && t("examTemplates.lockedNote")}
+                </>
+              ) : undefined}
+              options={[
+                { value: "", label: t("assessments.settings.display.resultView.inherit", { value: t(`assessments.settings.display.resultView.options.${courseUi.resultView}`) }) },
+                ...RESULT_VIEWS.map((v) => ({ value: v, label: t(`assessments.settings.display.resultView.options.${v}`) })),
+              ]} />
+          </div>
+        </fieldset>
+      )}
       <SettingsPanelGrading courseId={courseId} assessmentId={a.id} value={grading} onChange={setGrading}
         currentScheme={a.scheme} defaultLanguage={defaultLanguage} disabled={disabled} schemeLocked={tplLocked || examLocks.has("grading_scheme_version_id") /* Phase 7b S5 */} />
       {/* --- Phase 7b S4 --- */}

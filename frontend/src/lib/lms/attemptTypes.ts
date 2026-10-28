@@ -2,6 +2,7 @@
 import type { Lang, LocalizedText } from "./types";
 import type { QuestionType, StudentChoiceOut } from "./contentTypes";
 import type { AttemptGradeOut } from "./gradingTypes";
+import type { DisplayMode, PassageDisplay, ResultView } from "./blocks";
 
 export type { AttemptGradeOut };
 
@@ -89,6 +90,9 @@ export interface AttemptState {
   /** pick items: fragments not present in the shared payload, keyed by qv (forward-only: sections up to the current one) */
   extra_questions?: Record<string, StudentQuestion>;
   results_available: boolean;
+  /** Phase 8b: effective display values (the server resolves NULL to the course template's; ORT: one_per_page/numbered). */
+  display_mode?: DisplayMode;
+  passage_display?: PassageDisplay;
 }
 
 export interface ContentSection {
@@ -154,6 +158,9 @@ export interface AttemptResultOut {
   submitted_at: string | null;
   /** Phase 4: server-sent grade, only when visible to the student (previews: computed inline). */
   grade?: AttemptGradeOut | null;
+  /** Phase 8b: effective result view and passage display (ORT: "ort" / "numbered"). */
+  result_view?: ResultView;
+  passage_display?: PassageDisplay;
 }
 
 /** Why a submit-body answer was not stored (B2). Autosave error codes plus `deadline` and `already_submitted`. */
@@ -217,4 +224,7 @@ export interface ReviewItemOut {
 }
 export interface ReviewOut {
   items: ReviewItemOut[];
+  /** Phase 8b: effective result view and passage display. */
+  result_view?: ResultView;
+  passage_display?: PassageDisplay;
 }

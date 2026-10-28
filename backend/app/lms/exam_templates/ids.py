@@ -103,3 +103,31 @@ POLICY_CREATE = "exam_template_create"
 POLICY_MANAGE = "exam_template_manage"
 POLICY_READ = "exam_template_read"
 POLICY_NAMES = (POLICY_CREATE, POLICY_MANAGE, POLICY_READ)
+
+# --- Phase 8b S1 begin --- (PHASE_8B_DESIGN 5.1, 5.5: sandbox, preview, diff)
+E_NOTHING_TO_PREVIEW = "nothing_to_preview"                    # 422 (no draft and no version)
+E_PREVIEW_NOT_READY = "preview_not_ready"                      # 422, details.issues (publish issues of the sample)
+E_LANGUAGE_NOT_IN_ASSESSMENT = "language_not_in_assessment"    # 422
+E_SANDBOX_COURSE = "sandbox_course"                            # 409 (course routes refuse a template's sandbox)
+E_DIFF_TARGET_INVALID = "diff_target_invalid"                  # 422 (to=draft without a draft)
+E_VERSION_NOT_FOUND = "version_not_found"                      # 404 (diff: unknown version number)
+# E_DISPLAY_MODE_NOT_AVAILABLE stays in ERROR_CODES for one phase (old clients); 8b never raises it.
+ERROR_CODES = ERROR_CODES + (E_NOTHING_TO_PREVIEW, E_PREVIEW_NOT_READY, E_LANGUAGE_NOT_IN_ASSESSMENT,
+                             E_SANDBOX_COURSE, E_DIFF_TARGET_INVALID, E_VERSION_NOT_FOUND)
+
+AUDIT_SANDBOX_CREATE = "exam_template.sandbox_create"
+AUDIT_PREVIEW = "exam_template.preview"          # platform scope only, like AUDIT_UPDATE
+AUDIT_ACTIONS = AUDIT_ACTIONS + (AUDIT_SANDBOX_CREATE, AUDIT_PREVIEW)
+
+# A sandbox staff enrollment reuses an existing `enrollments.source` value (no CHECK change).
+SANDBOX_ENROLLMENT_SOURCE = "staff_add"
+# Sample sections carry type and passage rules but never item counts (invariant 3).
+SANDBOX_DROPPED_RULE_KEYS = ("min_items", "max_items")
+
+# The preview route starts an attempt (the existing `attempt_start_limit` applies).
+POLICY_MANAGE_RATELIMIT = "exam_template_manage+ratelimit"
+POLICY_NAMES = POLICY_NAMES + (POLICY_MANAGE_RATELIMIT,)
+# --- Phase 8b S1 end ---
+
+# Phase 8b fix L3: `POST /exam-templates/{id}/sandbox` (ensure + sync), per user (`ratelimit.sandbox_open_limit`)
+SANDBOX_OPEN_RATE_PER_HOUR = 120

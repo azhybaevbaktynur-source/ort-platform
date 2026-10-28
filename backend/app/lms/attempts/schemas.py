@@ -78,6 +78,10 @@ class AttemptStateOut(BaseModel):
     content_etag: str
     extra_questions: Optional[dict[str, Any]] = None
     results_available: bool
+    # --- Phase 8b S1 begin --- (PHASE_8B_DESIGN 5.4: effective values, never NULL; attempts/display.py)
+    display_mode: Literal["one_per_page", "scrolling"] = "one_per_page"
+    passage_display: Literal["plain", "numbered"] = "plain"
+    # --- Phase 8b S1 end ---
 
 
 class SaveOut(BaseModel):

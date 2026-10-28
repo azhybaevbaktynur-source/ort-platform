@@ -294,9 +294,10 @@ def remove_member(db: Session, actor: User, org: Organization, user_id: str, rea
 def org_courses_query(organization_id: uuid.UUID, *, deleted: bool = False) -> Select:
     """Rows of (Course, owner User, active_student_count) for one organization."""
     from app.lms.courses.models import Course
+    from app.lms.courses.scopes import regular_courses  # Phase 8b S1
     from app.lms.courses.service import admin_courses_query
 
-    stmt = admin_courses_query().where(Course.organization_id == organization_id)
+    stmt = admin_courses_query().where(Course.organization_id == organization_id, regular_courses())
     return stmt.where(Course.deleted_at.is_not(None) if deleted else Course.deleted_at.is_(None))
 
 
@@ -305,6 +306,7 @@ def usage(db: Session, org: Organization) -> dict:
     approximation, design 2.1; exact attribution in Phase 9)."""
     from app.lms.content.models import BankQuestion, QuestionBank
     from app.lms.courses.models import Course
+    from app.lms.courses.scopes import regular_courses  # Phase 8b S1
     from app.lms.enrollments.models import Enrollment
     from app.lms.files.models import Asset
 
@@ -313,7 +315,8 @@ def usage(db: Session, org: Organization) -> dict:
     roles = dict(db.execute(select(OrganizationMember.role, func.count()).where(
         OrganizationMember.organization_id == org.id, OrganizationMember.state == "active")
         .group_by(OrganizationMember.role)).all())
-    courses = select(Course.id).where(Course.organization_id == org.id, Course.deleted_at.is_(None))
+    courses = select(Course.id).where(Course.organization_id == org.id, Course.deleted_at.is_(None),
+                                      regular_courses())  # Phase 8b S1: sandboxes are not counted
     banks = select(QuestionBank.id).where(QuestionBank.organization_id == org.id, QuestionBank.deleted_at.is_(None))
     return dict(
         organization_id=org.id,
@@ -403,6 +406,7 @@ def join_as_teacher(db: Session, actor: User, org: Organization, course_id: uuid
     course = course_svc.load_course(db, course_id)
     if course.organization_id != org.id:
         raise course_svc.not_found_course()
+    course_svc.assert_not_sandbox(course)  # Phase 8b S2: sandbox staff = the template's managers (409 sandbox_course)
     course_svc.lock_course(db, course)
     if course.status == "concluded":
         raise Conflict("The course is concluded", code="course_concluded")

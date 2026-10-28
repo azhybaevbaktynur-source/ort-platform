@@ -52,6 +52,12 @@ def test_ts_arrays_equal_backend(name, expected):
     assert arrays[name] == tuple(expected)
 
 
+def test_available_display_modes_equal_display_modes():
+    """Phase 8b S1 (PHASE_8B_DESIGN invariant 6): every display mode is available since P7B-1 was lifted."""
+    src = BLOCKS_TS.read_text(encoding="utf-8")
+    assert re.search(r"export const AVAILABLE_DISPLAY_MODES: readonly DisplayMode\[\] = DISPLAY_MODES;", src)
+
+
 def test_ts_maps_cover_every_key():
     src = BLOCKS_TS.read_text(encoding="utf-8")
     for map_name, keys in (("resultViews", blocks.RESULT_VIEWS), ("passageRenderers", blocks.PASSAGE_DISPLAYS)):

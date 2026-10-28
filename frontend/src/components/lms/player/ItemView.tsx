@@ -36,7 +36,10 @@ export function ItemView({
   disabled,
   onChange,
   onToggleFlag,
+  headingId,
 }: {
+  /** Phase 8b S3: id of the "Question n of N" heading (scrolling list: `item-<pos>-h`); default `q-<question id>-h`. */
+  headingId?: string;
   question: StudentQuestion;
   choiceOrder: string[] | null;
   number: number;
@@ -49,11 +52,12 @@ export function ItemView({
 }) {
   const { t } = useTranslation();
   const r = (response ?? {}) as Record<string, unknown>;
+  const hId = headingId ?? `q-${question.id}-h`;
 
   return (
-    <article className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs md:p-7" aria-labelledby={`q-${question.id}-h`}>
+    <article className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs md:p-7" aria-labelledby={hId}>
       <header className="flex items-center justify-between border-b border-slate-100 pb-4">
-        <h2 id={`q-${question.id}-h`} className="rounded-lg bg-brand-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-brand-700">
+        <h2 id={hId} className="rounded-lg bg-brand-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-brand-700">
           {t("player.questionOf", { n: number, total })}
         </h2>
         <button

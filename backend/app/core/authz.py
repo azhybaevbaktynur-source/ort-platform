@@ -132,7 +132,7 @@ def enrollment_role_resolver(db: Session, user_id: str) -> Callable:
         # Phase 6 S1: the organization status comes with the role (same statement), so the suspension gate
         # costs enrolled users no extra query on the hot paths (attempt start, autosave).
         row = db.execute(
-            select(Enrollment.role, Organization.status)
+            select(Enrollment.role, Organization.status, Course.sandbox_for_template_id)
             .join(Course, Course.id == Enrollment.course_id)
             .join(Organization, Organization.id == Course.organization_id)
             .where(Enrollment.course_id == course_id, Enrollment.user_id == user_id, Enrollment.state == "active")
@@ -140,9 +140,11 @@ def enrollment_role_resolver(db: Session, user_id: str) -> Callable:
         if row is None:
             return None
         resolve.org_status[_norm(course_id)] = row[1]
+        resolve.sandbox[_norm(course_id)] = row[2]  # Phase 8b fix M1: same statement, no extra query
         return row[0]
 
     resolve.org_status = {}
+    resolve.sandbox = {}
     return resolve
 
 
@@ -162,6 +164,7 @@ class AuthzContext:
         self.role_resolver = role_resolver
         self.allow_platform_admin = allow_platform_admin
         self.org_cache: dict = {}  # Phase 6 S1: organization_id -> (status, deleted, is_org_admin)
+        self.sandbox_cache: dict = {}  # Phase 8b fix M1: sandbox course_id -> caller manages its template
 
     # --- Phase 6 S1 begin --- (organizations, PHASE_6_DESIGN 2.2)
     def _org(self, organization_id):
@@ -198,6 +201,23 @@ class AuthzContext:
         return self._org(organization_id)[0] == "suspended"
     # --- Phase 6 S1 end ---
 
+    # --- Phase 8b fix M1 begin --- (PHASE_8B_DESIGN 5.1: a sandbox enrollment is a cache of the template's
+    # manager set; every request re-checks `exam_templates.scopes.can_manage` from DB state, only for sandboxes)
+    def sandbox_ok(self, course_id, template_id) -> bool:
+        """True for regular courses (no query) and for platform admins; for a template's sandbox course, whether
+        the caller manages the template now (one template read per course per request)."""
+        if template_id is None or getattr(self.user, "is_platform_admin", False):
+            return True
+        key = _norm(course_id)
+        if key not in self.sandbox_cache:
+            from app.lms.exam_templates.models import ExamTemplate
+            from app.lms.exam_templates.scopes import can_manage
+
+            t = self.db.get(ExamTemplate, template_id)
+            self.sandbox_cache[key] = t is not None and can_manage(self, t)
+        return self.sandbox_cache[key]
+    # --- Phase 8b fix M1 end ---
+
     @property
     def is_platform_admin(self) -> bool:
         return bool(self.allow_platform_admin and getattr(self.user, "is_platform_admin", False))
@@ -205,11 +225,16 @@ class AuthzContext:
     def role_for(self, course_id) -> Optional[str]:
         course_id = _norm(course_id)
         if course_id not in self.enrollment_cache:
-            self.enrollment_cache[course_id] = self.role_resolver(course_id)
+            role = self.role_resolver(course_id)
+            tid = getattr(self.role_resolver, "sandbox", {}).get(course_id)  # Phase 8b fix M1
+            if role is not None and tid is not None and not self.sandbox_ok(course_id, tid):
+                role = None
+            self.enrollment_cache[course_id] = role
         return self.enrollment_cache[course_id]
 
     def prefetch(self, course_ids: Iterable) -> None:
         """Fill the role cache for several courses with one IN query."""
+        from app.lms.courses.models import Course
         from app.lms.enrollments.models import Enrollment
 
         ids = list(dict.fromkeys(_norm(c) for c in course_ids))
@@ -217,11 +242,12 @@ class AuthzContext:
         if not ids:
             return
         rows = self.db.execute(
-            select(Enrollment.course_id, Enrollment.role).where(
+            select(Enrollment.course_id, Enrollment.role, Course.sandbox_for_template_id)
+            .join(Course, Course.id == Enrollment.course_id).where(
                 Enrollment.course_id.in_(ids), Enrollment.user_id == self.user.id, Enrollment.state == "active"
             )
         ).all()
-        found = {cid: role for cid, role in rows}
+        found = {cid: (role if self.sandbox_ok(cid, tid) else None) for cid, role, tid in rows}  # Phase 8b fix M1
         for cid in ids:
             self.enrollment_cache[cid] = found.get(cid)
 
@@ -232,6 +258,8 @@ def get_authz(user=Depends(get_lms_user), db: Session = Depends(get_db)) -> Auth
 
 def can(ctx: AuthzContext, action: str, course) -> bool:
     if getattr(course, "deleted_at", None) is not None:
+        return False
+    if not ctx.sandbox_ok(course.id, getattr(course, "sandbox_for_template_id", None)):  # Phase 8b fix M1
         return False
     org_id = getattr(course, "organization_id", None)
     role = ctx.role_for(course.id)
@@ -247,6 +275,8 @@ def can(ctx: AuthzContext, action: str, course) -> bool:
 
 def require(ctx: AuthzContext, action: str, course) -> None:
     if getattr(course, "deleted_at", None) is not None:
+        raise NotFound("Course not found")
+    if not ctx.sandbox_ok(course.id, getattr(course, "sandbox_for_template_id", None)):  # Phase 8b fix M1
         raise NotFound("Course not found")
     if can(ctx, action, course):
         return

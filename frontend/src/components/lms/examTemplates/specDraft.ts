@@ -1,9 +1,10 @@
 // Phase 7b S7 (UX fix): the template spec as form state and back. Untouched values round-trip exactly: every
 // field keeps the spec's own value while the form shows the same thing (seconds in the spec, minutes in the form).
-import type { ExamTemplateSpec, LockScopeKey, SpecDefaults, SpecParameter, SpecSection } from "@/lib/lms/examTemplateTypes";
+import type { ExamTemplateSpec, LockScopeKey, SpecDefaults, SpecIssue, SpecParameter, SpecSection } from "@/lib/lms/examTemplateTypes";
 import type { Navigation, ResultsPolicy, ScorePolicy } from "@/lib/lms/assessmentTypes";
 import { cleanLocalized } from "@/lib/lms/localized";
 import { LMS_LANGS, type LocalizedText } from "@/lib/lms/types";
+import { DEFAULT_DISPLAY_MODE, DEFAULT_NAVIGATION } from "@/lib/lms/examTemplates";
 
 const BIND_RE = /^sections\[(\d+)\]\.key$/;
 let seq = 0;
@@ -64,6 +65,9 @@ function textOut(v: LocalizedText, base: LocalizedText | null | undefined): Loca
 
 /** NaN cannot travel as JSON: send it as the typed text so the server reports a type error under the field. */
 const jsonNum = (n: number | null, raw: string): number | string | null => (Number.isNaN(n) ? raw : n);
+
+/** Parameter options typed one per line (commas also separate, as in 7b). */
+export const splitOptions = (v: string) => v.split(/[\n,]/).map((o) => o.trim()).filter(Boolean);
 
 // ---------------------------------------------------------------- form types
 export interface SectionDraft {
@@ -144,12 +148,12 @@ export function draftOf(spec: ExamTemplateSpec): SpecDraft {
   const parameters = (spec.parameters ?? []).map((p): ParameterDraft => {
     const m = BIND_RE.exec(p.binds ?? "");
     const target = m ? sections[Number(m[1])] : undefined;
-    return { uid: uid(), base: p, key: p.key, options: (p.options ?? []).join(", "), section: target?.uid ?? "" };
+    return { uid: uid(), base: p, key: p.key, options: (p.options ?? []).join("\n"), section: target?.uid ?? "" };
   });
   return {
     base: spec,
-    navigation: spec.navigation ?? "free",
-    displayMode: spec.display_mode ?? "one_per_page",
+    navigation: spec.navigation ?? DEFAULT_NAVIGATION,
+    displayMode: spec.display_mode ?? DEFAULT_DISPLAY_MODE,
     passageDisplay: spec.passage_display ?? "",
     resultView: spec.result_view ?? "",
     schemeId: spec.scoring?.grading_scheme_version_id ?? "",
@@ -236,7 +240,7 @@ export function specOf(d: SpecDraft): ExamTemplateSpec {
     defaults: defaultsOut(d.defaults),
     sections: d.sections.map((s) => sectionOut(s, bound.has(s.uid))),
     parameters: d.parameters.map((p): SpecParameter => {
-      const options = p.options.split(",").map((o) => o.trim()).filter(Boolean);
+      const options = splitOptions(p.options);
       const i = index.get(p.section);
       const binds = i === undefined ? "" : `sections[${i}].key`;
       const sameOptions = p.base && JSON.stringify(p.base.options) === JSON.stringify(options);
@@ -245,3 +249,47 @@ export function specOf(d: SpecDraft): ExamTemplateSpec {
     lock_scope: [...d.lockScope],
   };
 }
+
+// --- Phase 8b S4 begin --- (PHASE_8B_DESIGN 9.2: client pre-check; autosave runs only when it finds nothing)
+const KEY_RE = /^[a-z0-9_]{1,40}$/;
+
+/**
+ * Problems that keep the draft from being sent (it stays local, mirrored to sessionStorage). Same `SpecIssue` shape
+ * and machine types as the server's `spec_invalid` details, so the same translated text shows under the same field.
+ * Everything else (ranges, cross checks, schemes) is left to the server validator.
+ */
+export function precheckDraft(d: SpecDraft): SpecIssue[] {
+  const out: SpecIssue[] = [];
+  const push = (loc: (string | number)[], type: string) => out.push({ loc, msg: "", type });
+  const decimal = (raw: string, loc: (string | number)[]) => {
+    const s = raw.trim().replace(",", ".");
+    if (s && !Number.isFinite(Number(s))) push(loc, "type");
+  };
+  const whole = (raw: string, loc: (string | number)[]) => {
+    const s = raw.trim();
+    if (s && !Number.isInteger(Number(s))) push(loc, "int_type");
+  };
+  const bound = boundSections(d);
+  if (d.sections.length === 0) push(["sections"], "sections_required");
+  d.sections.forEach((s, i) => {
+    if (s.types.length === 0) push(["sections", i, "allowed_types"], "types_required");
+    const key = sectionKey(s, bound.has(s.uid));
+    if (key && !KEY_RE.test(key)) push(["sections", i, "key"], "string_pattern_mismatch");
+    decimal(s.timeMin, ["sections", i, "time_limit_s"]);
+    whole(s.minItems, ["sections", i, "min_items"]);
+    whole(s.maxItems, ["sections", i, "max_items"]);
+  });
+  d.parameters.forEach((p, j) => {
+    const key = p.key.trim();
+    if (!key) push(["parameters", j, "key"], "missing");
+    else if (!KEY_RE.test(key)) push(["parameters", j, "key"], "string_pattern_mismatch");
+    const options = splitOptions(p.options);
+    if (options.length === 0) push(["parameters", j, "options"], "missing");
+    else if (options.some((o) => !KEY_RE.test(o))) push(["parameters", j, "options"], "string_pattern_mismatch");
+    if (!p.section) push(["parameters", j, "binds"], "binds_missing_section");
+  });
+  decimal(d.defaults.timeMin, ["defaults", "time_limit_s"]);
+  if (!d.defaults.unlimited) whole(d.defaults.attempts, ["defaults", "allowed_attempts"]);
+  return out;
+}
+// --- Phase 8b S4 end ---

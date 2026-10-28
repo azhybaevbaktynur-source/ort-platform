@@ -6,8 +6,9 @@ import type { Lang, PageOut } from "./types";
 import type { AssessmentStaffOut, Issue } from "./assessmentTypes";
 import type {
   BlocksOut, ExamTemplateCreateIn, ExamTemplateListParams, ExamTemplateOut, ExamTemplatePatchIn, ExamTemplatePublishOut,
-  ExamTemplateVersionOut, ImportFormatOut, SaveAsTemplateIn,
+  ExamTemplateVersionOut, ImportFormatOut, PreviewIn, PreviewOut, SandboxIn, SandboxOut, SaveAsTemplateIn, SpecDiffEnd, SpecDiffOut,
 } from "./examTemplateTypes";
+import type { BlockNavigation, BlockQuestionType, DisplayMode } from "./blocks";
 
 const e = encodeURIComponent;
 const base = "/exam-templates";
@@ -87,3 +88,29 @@ export const upgradeAssessmentTemplate = (courseId: string, assessmentId: string
   lmsFetch<TemplateUpgradeOut>(`${asm(courseId, assessmentId)}/template-upgrade`, { method: "POST", body: {} });
 export const unlockAssessmentStructure = (courseId: string, assessmentId: string) =>
   lmsFetch<AssessmentStaffOut>(`${asm(courseId, assessmentId)}/structure-unlock`, { method: "POST", body: {} });
+
+// --- Phase 8b S4 begin --- (PHASE_8B_DESIGN 6.1, 7, 9: sandbox, preview, diff; constructor constants)
+/** Ensure (and sync from the stored draft) the template's sandbox course + sample quiz; idempotent, no attempt. */
+export const ensureTemplateSandbox = (id: string, body: SandboxIn = {}) =>
+  lmsFetch<SandboxOut>(`${one(id)}/sandbox`, { method: "POST", body });
+/** Start a staff preview attempt of the sample quiz in the real player. */
+export const startTemplatePreview = (id: string, body: PreviewIn = {}) =>
+  lmsFetch<PreviewOut>(`${one(id)}/preview`, { method: "POST", body });
+/** Computed diff between two versions, or a version and the draft (`to = "draft"`, managers only). */
+export const getTemplateDiff = (id: string, from: SpecDiffEnd, to: SpecDiffEnd) =>
+  lmsFetch<SpecDiffOut>(`${one(id)}/diff`, { params: { from: String(from), to: String(to) } });
+
+/**
+ * The few block keys the constructor reasons about (it never lists them: every pick list comes from
+ * `GET /exam-templates/blocks`). Kept here, typed against `blocks.ts`, so `components/lms/examTemplates/**` holds no
+ * literal block key (`backend/tests/lms/test_constructor_blocks_contract.py`). The values equal the server defaults.
+ */
+export const DEFAULT_NAVIGATION: BlockNavigation = "free";
+export const FORWARD_ONLY_NAVIGATION: BlockNavigation = "section_forward_only";
+export const DEFAULT_DISPLAY_MODE: DisplayMode = "one_per_page";
+/** Types a new section leaves unchecked (ORT's comparison type; the author can still tick it). */
+export const NEW_SECTION_EXCLUDED_TYPES: readonly BlockQuestionType[] = ["comparison"];
+
+/** sessionStorage key of the constructor's crash-safety mirror (PHASE_8B_DESIGN 9.2). */
+export const templateDraftStorageKey = (id: string) => `examTemplateDraft:${id}`;
+// --- Phase 8b S4 end ---

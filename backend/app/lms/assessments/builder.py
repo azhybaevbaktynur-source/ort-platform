@@ -32,7 +32,7 @@ from app.lms.content.models import BankQuestion, Passage, PassageVersion, Questi
 from app.lms.core import clock
 from app.lms.core.errors import Conflict, NotFound, ValidationFailed
 from app.lms.courses.models import Course
-from app.lms.courses.service import require_course
+from app.lms.courses.service import assert_not_sandbox, require_course
 from app.lms.grading import repository as grading_repo
 from app.lms.grading.schemes import load_usable_version
 from app.lms.grading.seeds import PRESET_SCHEME_VERSIONS
@@ -69,6 +69,7 @@ def _commit(db: Session, a: Assessment) -> None:
 
 def create_assessment(db: Session, ctx: AuthzContext, course: Course, data: sch.AssessmentCreateIn) -> Assessment:
     require_course(ctx, A.CONTENT_MANAGE, course)
+    assert_not_sandbox(course)  # Phase 8b fix L1: the sample quiz is never published; no other assessments
     # --- Phase 7b S2 begin --- (PHASE_7B_DESIGN 5.3 / 9.1: the template branch; `preset` and a template never mix.
     # The ORT preset path below is untouched: a template assessment always has preset 'none'.)
     if data.exam_template_id is not None or data.exam_template_version_id is not None:
@@ -143,6 +144,14 @@ def update_assessment(db: Session, ctx: AuthzContext, course: Course, aid: uuid.
     if "grading_scheme_version_id" in fields and data.grading_scheme_version_id != a.grading_scheme_version_id:
         _locks.assert_structure_unlocked(db, course, a, tpl_fields.LOCK_SCHEME_VERSION, actor_id=ctx.user.id)
     # --- Phase 6 S2b end ---
+    # --- Phase 8b S1 begin --- (PHASE_8B_DESIGN 5.3, P8B-4: passage display is governed by the result-view lock;
+    # ORT preset exams answer 409 `template_locked` through the 6a branch, as for `navigation`)
+    if "display_mode" in fields and data.display_mode != a.display_mode:
+        _locks.assert_structure_unlocked(db, course, a, tpl_fields.LOCK_DISPLAY_MODE, actor_id=ctx.user.id)
+    for f in ("passage_display", "result_view"):
+        if f in fields and getattr(data, f) != getattr(a, f):
+            _locks.assert_structure_unlocked(db, course, a, tpl_fields.LOCK_RESULT_VIEW, actor_id=ctx.user.id)
+    # --- Phase 8b S1 end ---
     if "languages" in fields and set(data.languages) - set(course.languages or []):
         raise ValidationFailed("Languages must be a subset of the course languages", code="languages_not_in_course")
     frm = utc(data.available_from) if "available_from" in fields else utc(a.available_from)
@@ -185,6 +194,9 @@ def _check_grading_refs(db: Session, ctx: AuthzContext, course: Course, a: Asses
 
 def soft_delete_assessment(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID) -> None:
     a = _manage(db, ctx, course, aid)
+    from app.lms.courses.service import assert_not_sandbox  # Phase 8b S1: the sample quiz stays (design 5.1)
+
+    assert_not_sandbox(course)
     if repo.has_open_attempts(db, a.id):
         raise Conflict("Students are taking this assessment", code="attempts_in_progress")
     a.soft_delete(ctx.user.id)
@@ -199,6 +211,7 @@ def soft_delete_assessment(db: Session, ctx: AuthzContext, course: Course, aid: 
 
 def restore_assessment(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID) -> Assessment:
     require_course(ctx, A.CONTENT_MANAGE, course)
+    assert_not_sandbox(course)  # Phase 8b fix L1: the sample quiz is never published; no other assessments
     a = load_assessment(db, course.id, aid, for_update=True, include_deleted=True)
     if a.deleted_at is None:
         raise Conflict("Assessment is not deleted", code="not_deleted")

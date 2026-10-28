@@ -7,7 +7,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field, SerializeAsAny
 
@@ -52,6 +52,10 @@ class AttemptResultOut(BaseModel):
     submitted_at: Optional[datetime] = None
     # Phase 4 (design 5): students only once released (P4-11); previews inline; staff always.
     grade: Optional[AttemptGradeOut] = None
+    # --- Phase 8b S1 begin --- (PHASE_8B_DESIGN 5.4: effective values from attempts/display.py)
+    result_view: Literal["general", "ort"] = "general"
+    passage_display: Literal["plain", "numbered"] = "plain"
+    # --- Phase 8b S1 end ---
 
 
 class VoidResultOut(BaseModel):
@@ -81,6 +85,10 @@ class ReviewItemKeyedOut(ReviewItemOut):
 class ReviewOut(BaseModel):
     # SerializeAsAny: keyed items keep their `key`/`explanation`; plain items never have the fields at all
     items: list[SerializeAsAny[ReviewItemOut]]
+    # --- Phase 8b S1 begin --- (PHASE_8B_DESIGN 5.4)
+    result_view: Literal["general", "ort"] = "general"
+    passage_display: Literal["plain", "numbered"] = "plain"
+    # --- Phase 8b S1 end ---
 
 
 class StaffReviewItem(ReviewItemKeyedOut):
@@ -122,8 +130,9 @@ class ScoreIn(BaseModel):
 
 # ------------------------------------------------------------------ builders
 
-def result_out(attempt, plan=None) -> Optional[AttemptResultOut]:
-    """Totals of a finalized attempt from the stored columns (no DB access); None while in progress."""
+def result_out(attempt, plan=None, display=None) -> Optional[AttemptResultOut]:
+    """Totals of a finalized attempt from the stored columns (no DB access); None while in progress.
+    `display`: the attempt's `EffectiveDisplay` (Phase 8b S1); None keeps the general defaults."""
     if attempt.raw_score is None or not attempt.result:
         return None
     # Phase 7b S7: section titles from the attempt's snapshot (the plan), when the caller has it
@@ -133,7 +142,16 @@ def result_out(attempt, plan=None) -> Optional[AttemptResultOut]:
         sections=[AttemptResultSectionOut(**{**s, "title": titles.get(int(s["pos"]))})
                   for s in attempt.result.get("sections", [])],
         pending_review=int(attempt.result.get("pending_review", 0)), submitted_at=attempt.submitted_at,
+        **_display_fields(display),  # Phase 8b S1
     )
+
+
+# --- Phase 8b S1 begin ---
+def _display_fields(display) -> dict:
+    if display is None:
+        return {}
+    return {"result_view": display.result_view, "passage_display": display.passage_display}
+# --- Phase 8b S1 end ---
 
 
 def pending_count(attempt) -> int:

@@ -216,6 +216,10 @@ export interface AssessmentUpdateIn extends AssessmentGradingUpdate {
   show_correct_answers?: boolean;
   available_from?: string | null;
   available_until?: string | null;
+  /** Phase 8b: display settings of a general exam (null passage display / result view = inherit from the course). */
+  display_mode?: "one_per_page" | "scrolling";
+  passage_display?: "plain" | "numbered" | null;
+  result_view?: "general" | "ort" | null;
 }
 
 export interface SectionIn {

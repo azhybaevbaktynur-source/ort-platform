@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -126,6 +126,10 @@ class ExamTemplateOut(ExamTemplatePickerOut):
     created_by_id: Optional[str] = None
     can_lock: bool = False       # the caller is the owner (9.2 lock / unlock)
     can_promote: bool = False    # teacher scope and the caller administers its organization
+    # --- Phase 8b S1 begin --- (PHASE_8B_DESIGN 6.1; filled by S2 in `manage_out`, managers only)
+    sandbox: Optional["SandboxRefOut"] = None
+    unpublished_changes: Optional[int] = None  # diff count draft vs current version; None without a version
+    # --- Phase 8b S1 end ---
 
 
 class ExamTemplatePublishOut(BaseModel):
@@ -168,6 +172,87 @@ class BlocksOut(BaseModel):
 class TemplateUpgradeOut(BaseModel):
     assessment: AssessmentStaffOut
     issues: list[IssueOut]
+
+
+# --- Phase 8b S1 begin --- (PHASE_8B_DESIGN 5.1, 5.2, 6.1: sandbox, preview, diff shapes; routes filled by S2)
+Lang = Literal["en", "ky", "ru"]
+
+
+class SandboxRefOut(BaseModel):
+    """`ExamTemplateOut.sandbox` (managers only): where the Sample tab mounts the 7c quiz editor."""
+    course_id: uuid.UUID
+    assessment_id: uuid.UUID
+
+
+class SandboxIn(_In):
+    language: Optional[Lang] = None
+
+
+class SandboxOut(BaseModel):
+    """`POST /exam-templates/{id}/sandbox` (ensure + sync, no attempt)."""
+    course_id: uuid.UUID
+    assessment_id: uuid.UUID
+    languages: list[str]
+    draft_rev: int
+
+
+class PreviewIn(_In):
+    language: Optional[Lang] = None
+    parameters: Optional[dict[str, str]] = None
+
+    @model_validator(mode="after")
+    def _parameters(self):
+        p = self.parameters
+        if p is not None and (len(p) > 5 or any(len(k) > 40 or len(v) > 40 for k, v in p.items())):
+            raise ValueError("parameters: at most 5 entries of short keys and values")
+        return self
+
+
+class PreviewOut(BaseModel):
+    """`POST /exam-templates/{id}/preview`: the staff preview attempt to open in the real player."""
+    attempt_id: uuid.UUID
+    course_id: uuid.UUID
+    assessment_id: uuid.UUID
+    language: str
+    issues: list[IssueOut] = Field(default_factory=list)
+
+
+class SpecChangeSectionOut(BaseModel):
+    key: Optional[str] = None
+    position: int
+    title: Optional[dict] = None
+
+
+class SpecChange(BaseModel):
+    """One difference between two normalized specs (`diff.spec_diff`, pure; computed, never stored)."""
+    path: str
+    kind: Literal["added", "removed", "changed"]
+    before: Optional[Any] = None
+    after: Optional[Any] = None
+    section: Optional[SpecChangeSectionOut] = None
+
+
+class SpecDiffSummaryOut(BaseModel):
+    sections_added: int = 0
+    sections_removed: int = 0
+    sections_changed: int = 0
+    fields_changed: int = 0
+
+
+DiffEnd = int | Literal["draft"]
+
+
+class SpecDiffOut(BaseModel):
+    """`GET /exam-templates/{id}/diff?from=<no>&to=<no|draft>`: only paths and values of the two specs."""
+    model_config = ConfigDict(populate_by_name=True)
+    from_: DiffEnd = Field(alias="from")
+    to: DiffEnd
+    changes: list[SpecChange]
+    summary: SpecDiffSummaryOut
+
+
+ExamTemplateOut.model_rebuild()
+# --- Phase 8b S1 end ---
 
 
 PICKER_KEYS = frozenset(ExamTemplatePickerOut.model_fields)

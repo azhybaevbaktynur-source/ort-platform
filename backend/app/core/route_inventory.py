@@ -110,6 +110,12 @@ ROUTE_POLICIES.update(PAGE_POLICIES)
 ROUTE_POLICIES.update(COURSE_FILE_POLICIES)
 ROUTE_POLICIES.update(ANNOUNCEMENT_POLICIES)
 # --- Phase 8a S1 end ---
+# --- Phase 8b S1 begin --- (PHASE_8B_DESIGN 6.1: no new route in S1; the preview policy name is registered here and
+# S2 moves `exam_templates.policies.PLANNED_POLICIES` into EXAM_TEMPLATE_POLICIES when it mounts the routes)
+from app.lms.exam_templates.ids import POLICY_NAMES as _EXAM_TEMPLATE_POLICY_NAMES_8B  # noqa: E402
+
+POLICY_NAMES = POLICY_NAMES | frozenset(_EXAM_TEMPLATE_POLICY_NAMES_8B)
+# --- Phase 8b S1 end ---
 
 
 def iter_routes(app):

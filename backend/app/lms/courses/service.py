@@ -71,6 +71,17 @@ def lock_course(db: Session, course: Course) -> Course:
     return course
 
 
+# --- Phase 8b S1 begin --- (PHASE_8B_DESIGN 5.1: a template's sandbox course is reachable only through assessment,
+# quiz-editor, attempt and bank routes; every course-level write refuses it)
+SANDBOX_COURSE = "sandbox_course"  # = exam_templates.ids.E_SANDBOX_COURSE
+
+
+def assert_not_sandbox(course: Course) -> None:
+    if course.sandbox_for_template_id is not None:
+        raise Conflict("This course belongs to an exam template preview", code=SANDBOX_COURSE)
+# --- Phase 8b S1 end ---
+
+
 def require_course(ctx: AuthzContext, action: str, course: Course) -> None:
     """authz.require with one 404 code, so 'missing', 'deleted' and 'not yours' look the same."""
     try:
@@ -230,6 +241,7 @@ _ENROLLMENT_FIELDS = ("enrollment_mode", "enrollment_limit", "visibility")
 
 def update_course(db: Session, ctx: AuthzContext, course: Course, data: CourseUpdateIn) -> Course:
     require_course(ctx, A.COURSE_UPDATE, course)
+    assert_not_sandbox(course)  # Phase 8b S1
     fields = {k: getattr(data, k) for k in data.model_fields_set}
     if any(k in fields for k in _ENROLLMENT_FIELDS):
         require_course(ctx, A.ROSTER_MANAGE, course)
@@ -349,6 +361,7 @@ def course_features(db: Session, course: Course):
 
 def set_status(db: Session, ctx: AuthzContext, course: Course, transition: Transition) -> Course:
     require_course(ctx, A.COURSE_PUBLISH, course)
+    assert_not_sandbox(course)  # Phase 8b S1: never published (publish, conclude, ...)
     before, after = _TRANSITIONS[transition]
     if transition == "unpublish":
         lock_course(db, course)
@@ -370,6 +383,7 @@ def set_status(db: Session, ctx: AuthzContext, course: Course, transition: Trans
 
 def soft_delete_course(db: Session, actor: User, course: Course, *, by_admin: bool = False,
                        reason: Optional[str] = None, request: Optional[Request] = None) -> None:
+    assert_not_sandbox(course)  # Phase 8b S1
     if by_admin:
         if course.deleted_at is not None:
             raise Conflict("Course already deleted", code="already_deleted")
@@ -388,6 +402,9 @@ def restore_course(db: Session, actor: User, course: Course, *, by_admin: bool =
         raise not_found_course()
     if not by_admin and course.deleted_at is not None and course.deleted_by_id != actor.id:
         raise not_found_course()  # owner cannot undo an admin moderation delete
+    # Phase 8b fix M2 (after the 404s, so non-owners learn nothing): route-facing only; a soft-deleted sandbox is
+    # restored by `exam_templates.sandbox.ensure`, which never calls this
+    assert_not_sandbox(course)
     if course.deleted_at is None:
         raise Conflict("Course is not deleted", code="not_deleted")
     course.deleted_at = None
@@ -405,6 +422,7 @@ def restore_course(db: Session, actor: User, course: Course, *, by_admin: bool =
 
 def transfer_ownership(db: Session, actor: User, course: Course, new_owner_id: str, *, by_admin: bool = False,
                        reason: Optional[str] = None, request: Optional[Request] = None) -> Course:
+    assert_not_sandbox(course)  # Phase 8b fix M2: sandbox ownership follows the template, never transferred
     lock_course(db, course)
     # --- Phase 6 S1 begin --- (A13: an org admin of the course's organization reassigns the owner, audited)
     by_org_admin = False
@@ -454,6 +472,7 @@ def transfer_ownership(db: Session, actor: User, course: Course, new_owner_id: s
 
 def regenerate_join_code(db: Session, ctx: AuthzContext, course: Course) -> Course:
     require_course(ctx, A.ROSTER_MANAGE, course)
+    assert_not_sandbox(course)  # Phase 8b S1
     for _ in range(5):
         course.join_code = generate_join_code()
         course.join_code_rotated_at = utcnow()

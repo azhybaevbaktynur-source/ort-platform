@@ -12,11 +12,13 @@ import { Button, Dialog } from "@/components/ui";
  *   keep my draft on top of the new version, or discard my changes.
  */
 export function DraftConflictDialog({
-  kind, otherName, busy, onPrimary, onSecondary, onClose,
+  kind, otherName, busy, onPrimary, onSecondary, onClose, copy,
 }: {
   kind: "draft" | "version" | null;
   otherName?: string | null;
   busy: boolean;
+  /** Phase 8b S5: the `draft` wording for another object than a card (the exam template constructor). */
+  copy?: { title: string; body: string; takeTheirs: string; keepMine: string };
   /** draft: keep mine; version: keep my draft. */
   onPrimary: () => void;
   /** draft: take theirs; version: discard my changes. */
@@ -27,17 +29,17 @@ export function DraftConflictDialog({
   const draft = kind === "draft";
   return (
     <Dialog open={!!kind} onClose={onClose} busy={busy} role="alertdialog"
-      title={draft ? t("quizEditor.conflict.title") : t("quizEditor.conflict.versionTitle")}
+      title={draft ? (copy?.title ?? t("quizEditor.conflict.title")) : t("quizEditor.conflict.versionTitle")}
       description={draft
-        ? (otherName ? t("quizEditor.conflict.bodyNamed", { name: otherName }) : t("quizEditor.conflict.body"))
+        ? (copy?.body ?? (otherName ? t("quizEditor.conflict.bodyNamed", { name: otherName }) : t("quizEditor.conflict.body")))
         : t("quizEditor.conflict.versionBody")}
       footer={(
         <>
           <Button variant="secondary" disabled={busy} onClick={onSecondary}>
-            {draft ? t("quizEditor.conflict.takeTheirs") : t("quizEditor.conflict.discardMine")}
+            {draft ? (copy?.takeTheirs ?? t("quizEditor.conflict.takeTheirs")) : t("quizEditor.conflict.discardMine")}
           </Button>
           <Button variant="primary" loading={busy} onClick={onPrimary}>
-            {draft ? t("quizEditor.conflict.keepMine") : t("quizEditor.conflict.keepDraft")}
+            {draft ? (copy?.keepMine ?? t("quizEditor.conflict.keepMine")) : t("quizEditor.conflict.keepDraft")}
           </Button>
         </>
       )} />

@@ -20,6 +20,7 @@ from app.core.authz import AuthzContext
 from app.lms.assessments.models import Assessment
 from app.lms.core.errors import Forbidden, NotFound
 from app.lms.courses.models import Course
+from app.lms.courses.scopes import regular_courses  # Phase 8b S1
 from app.lms.enrollments.models import Enrollment
 from app.lms.exam_templates import ids
 from app.lms.exam_templates.models import ExamTemplate, ExamTemplateVersion
@@ -144,7 +145,8 @@ def can_promote(ctx: AuthzContext, t: ExamTemplate) -> bool:
 def _staff_in_org(db: Session, user_id: str, organization_id: uuid.UUID) -> bool:
     return db.execute(select(Enrollment.id).join(Course, Course.id == Enrollment.course_id).where(
         Course.organization_id == organization_id, Course.deleted_at.is_(None), Enrollment.user_id == user_id,
-        Enrollment.state == "active", Enrollment.role.in_(STAFF_ROLES)).limit(1)).first() is not None
+        Enrollment.state == "active", Enrollment.role.in_(STAFF_ROLES),
+        regular_courses()).limit(1)).first() is not None  # Phase 8b S1: sandbox staff is not org staff
 
 
 def holds_assessment_from(db: Session, user_id: str, template_id: uuid.UUID) -> bool:

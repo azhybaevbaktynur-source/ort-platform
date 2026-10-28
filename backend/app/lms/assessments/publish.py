@@ -23,7 +23,7 @@ from app.lms.content.models import BankQuestion
 from app.lms.core import clock
 from app.lms.core.errors import Conflict, ValidationFailed
 from app.lms.courses.models import Course
-from app.lms.courses.service import require_course
+from app.lms.courses.service import assert_not_sandbox, require_course
 
 
 @dataclass
@@ -104,6 +104,7 @@ def _raise_invalid(issues: list[Issue]) -> None:
 
 def publish(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID, *, confirm: bool = False) -> PublishResult:
     require_course(ctx, A.CONTENT_MANAGE, course)
+    assert_not_sandbox(course)  # Phase 8b fix L1: the sample quiz is never published; no other assessments
     a = repo.load_assessment(db, course.id, aid, for_update=True)
     snap, issues = build_snapshot(db, a, now=clock.now())
     _raise_invalid(issues)
@@ -140,6 +141,7 @@ def publish(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID, *, c
 
 def unpublish(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID) -> Assessment:
     require_course(ctx, A.CONTENT_MANAGE, course)
+    assert_not_sandbox(course)  # Phase 8b fix L1: the sample quiz is never published; no other assessments
     a = repo.load_assessment(db, course.id, aid, for_update=True)
     if a.status != "published":
         raise Conflict("Assessment is not published", code="not_published")

@@ -1,6 +1,6 @@
 # Phase 8a: course structure (modules, pages, course files, announcements, gating)
 
-**Status**: built 2026-10-28 on `phase-8a`; deploy details at the end. Design: `PHASE_8A_DESIGN.md`. Decisions: `PRODUCT_DECISIONS.md` "Phase 8a decisions" (owner questions 8a-Q1…Q5 with defaults in effect, P8A-1…P8A-9).
+**Status**: **deployed 2026-10-28** (`main` 027d408, migration 0012). Deploy details at the end. Design: `PHASE_8A_DESIGN.md`. Decisions: `PRODUCT_DECISIONS.md` "Phase 8a decisions" (owner questions 8a-Q1…Q5 with defaults in effect, P8A-1…P8A-9).
 
 ## What teachers and students get
 - **Modules**: teachers build an outline of modules with items (page, PDF file, assignment or quiz, link, header). Each item can carry a requirement (view, mark done, submit, minimum score or percent). Modules can have prerequisites, an unlock date and a sequential order. "New quiz" inside a module opens the Phase 7c quiz editor. Warnings cover hidden items and requirements on a draft quiz, including a confirm before publishing such a module. "Re-apply rules" relocks after a rule change.
@@ -36,4 +36,6 @@ No data steps. New backend dependencies: `Markdown==3.11.1`, `nh3==0.3.7`.
   - the screenshot run.
 
 ## Deploy
-(filled in after the gates and the deploy)
+- Gates on merged `phase-8a` (b544215): SQLite 3377 passed / 39 skipped; PG 3444 passed / 20 skipped; fresh PG `alembic upgrade head && alembic check` clean; PG migration tests 31 passed; importers diff empty; i18n parity OK (3477 keys); `tsc` clean; `next build` OK; e2e `modules`, `ort`, `ort-visual`, `quiz-editor` green.
+- Neon backup branch `backup-2026-10-28-before-phase8a` (`br-damp-sky-b2iv2j5r`). No production-copy rehearsal: 0012 is schema-only and additive (new tables, `courses.home_kind` default `assignments`).
+- `phase-8a` → `lms` (be0aa2e) → `main` (027d408). `/health` = 027d408; Neon `alembic_version` = `0012_phase8a_course_structure`; data unchanged (299 question versions, 2 ORT exams, every course `home_kind = assignments`).

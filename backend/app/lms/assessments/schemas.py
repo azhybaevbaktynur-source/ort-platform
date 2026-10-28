@@ -100,6 +100,24 @@ class AssessmentUpdateIn(_In):
             self.access_code = code  # shorter than 6: 422 `access_code_too_short` from the builder
         return self
     # --- Phase 7a S4 end ---
+    # --- Phase 8b S1 begin --- (PHASE_8B_DESIGN 5.3: display fields on general assessments; builder lock guards.
+    # display_mode never null; passage_display / result_view null = inherit the course template's value)
+    display_mode: Optional[str] = None
+    passage_display: Optional[str] = None
+    result_view: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _display(self):
+        from app.lms.exam_templates.blocks import DISPLAY_MODES, PASSAGE_DISPLAYS, RESULT_VIEWS
+
+        if "display_mode" in self.model_fields_set and self.display_mode not in DISPLAY_MODES:
+            raise ValueError("display_mode must be one of " + ", ".join(DISPLAY_MODES))
+        if self.passage_display is not None and self.passage_display not in PASSAGE_DISPLAYS:
+            raise ValueError("passage_display must be null or one of " + ", ".join(PASSAGE_DISPLAYS))
+        if self.result_view is not None and self.result_view not in RESULT_VIEWS:
+            raise ValueError("result_view must be null or one of " + ", ".join(RESULT_VIEWS))
+        return self
+    # --- Phase 8b S1 end ---
 
     @model_validator(mode="after")
     def _v(self):

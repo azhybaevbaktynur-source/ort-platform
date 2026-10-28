@@ -26,6 +26,7 @@ from app.core.authz import A, AuthzContext, decide
 from app.core.config import settings
 from app.lms.assessments.models import Assessment
 from app.lms.attempts import timing
+from app.lms.attempts.display import EffectiveDisplay, effective_display, needs_course  # Phase 8b S1
 from app.lms.attempts.models import Attempt, AttemptItem, AttemptSection
 from app.lms.attempts.schemas import (
     AttemptItemStateOut, AttemptSectionStateOut, AttemptStateOut, MyAttemptOut, RejectedAnswer, StartIn, SubmitIn,
@@ -127,13 +128,16 @@ class AttemptEnv:
     enr_state: str
     enr_role: str
     assessment: Assessment
+    course_template_key: Optional[str] = None  # Phase 8b S1: effective display fallback (attempts/display.py)
 
 
 def load_attempt_bundle(db: Session, user, attempt_id, *, for_update: bool = False) -> tuple[Attempt, AttemptEnv]:
     """Own attempt + assessment + course/enrollment facts in ONE statement; 404 for anything else."""
     aid = parse_attempt_id(attempt_id)
     stmt = (
-        select(Attempt, Assessment, Course.status, Course.deleted_at, Enrollment.state, Enrollment.role)
+        select(Attempt, Assessment, Course.status, Course.deleted_at, Enrollment.state, Enrollment.role,
+               Course.template_key,  # Phase 8b S1
+               Course.sandbox_for_template_id)  # Phase 8b fix M1
         .join(Assessment, Assessment.id == Attempt.assessment_id)
         .join(Course, Course.id == Attempt.course_id)
         .join(Enrollment, Enrollment.id == Attempt.enrollment_id)
@@ -144,8 +148,12 @@ def load_attempt_bundle(db: Session, user, attempt_id, *, for_update: bool = Fal
     row = db.execute(stmt).first()
     if row is None:
         raise attempt_not_found()
-    attempt, assessment, cstatus, cdeleted, estate, erole = row
-    return attempt, AttemptEnv(cstatus, cdeleted is not None, estate, erole, assessment)
+    attempt, assessment, cstatus, cdeleted, estate, erole, tkey, sandbox_tid = row
+    # Phase 8b fix M1: a preview attempt in a template sandbox stays the caller's only while they manage the
+    # template (the sandbox enrollment is a cache); regular courses pay nothing (the column is in the same row)
+    if sandbox_tid is not None and not AuthzContext(user, db).sandbox_ok(attempt.course_id, sandbox_tid):
+        raise attempt_not_found()
+    return attempt, AttemptEnv(cstatus, cdeleted is not None, estate, erole, assessment, tkey)
 
 
 def load_own_attempt(db: Session, user, attempt_id, *, for_update: bool = False) -> Attempt:
@@ -331,9 +339,14 @@ def content_url(attempt, section_pos: Optional[int] = None) -> str:
     return base if section_pos is None else f"{base}?section={int(section_pos)}"
 
 
-def build_state(db: Session, attempt, assessment, sections, items, plan, now: datetime) -> AttemptStateOut:
+def build_state(db: Session, attempt, assessment, sections, items, plan, now: datetime, *,
+                display: Optional[EffectiveDisplay] = None) -> AttemptStateOut:
     """`sections`: objects with section_pos/started_at/deadline_at/closed_at; `items`: rows (position, section_pos,
-    slot, question_version_id, choice_order, response, flagged). Pure apart from pick-question fragments."""
+    slot, question_version_id, choice_order, response, flagged). Pure apart from pick-question fragments.
+    `display` (Phase 8b S1): the effective display values; None reads the course's template key."""
+    if display is None:
+        display = effective_display(plan.snapshot, db.get(Course, assessment.course_id)
+                                    if needs_course(plan.snapshot) else None)
     slot_map = _slot_maps(plan, attempt.language)
     pools: dict[int, dict[str, Optional[str]]] = {}
     out_items: list[AttemptItemStateOut] = []
@@ -371,11 +384,14 @@ def build_state(db: Session, attempt, assessment, sections, items, plan, now: da
         content_etag=content_etag(attempt, plan, section_pos),
         extra_questions=extra or None,
         results_available=results_available(assessment, attempt, now, staff=bool(attempt.is_preview)),
+        display_mode=display.display_mode, passage_display=display.passage_display,  # Phase 8b S1
     )
 
 
 def state_for(db: Session, attempt: Attempt, env: AttemptEnv, sections: list, plan, now: datetime) -> AttemptStateOut:
-    return build_state(db, attempt, env.assessment, sections, load_item_rows(db, attempt.id), plan, now)
+    display = effective_display(plan.snapshot, SimpleNamespace(template_key=env.course_template_key))  # 8b S1
+    return build_state(db, attempt, env.assessment, sections, load_item_rows(db, attempt.id), plan, now,
+                       display=display)
 
 
 def hide_void(attempt: Attempt) -> None:
@@ -707,6 +723,7 @@ def start_attempt(db: Session, ctx: AuthzContext, course: Course, aid, data: Sta
         lang = enr.content_language if enr.content_language in plan.languages else plan.languages[0]
 
     snapshot = plan.snapshot
+    display = effective_display(snapshot, course)  # Phase 8b S1 (read before the commit expires the row)
     entries = _expand_rows(plan, lang, bool(snapshot.get("shuffle_items")), bool(snapshot.get("shuffle_choices")))
     navigation = _navigation(plan)
     # --- Phase 7a S4 begin --- (extra time; ORT presets get 0 while owner question Q1 is open, effective.py)
@@ -761,7 +778,7 @@ def start_attempt(db: Session, ctx: AuthzContext, course: Course, aid, data: Sta
                              question_version_id=e["qv"], choice_order=e["choice_order"], response=None,
                              flagged=False) for e in entries]
     sec_view = [SimpleNamespace(**r) for r in section_rows]
-    return build_state(db, view, assessment, sec_view, items, plan, now), True
+    return build_state(db, view, assessment, sec_view, items, plan, now, display=display), True
 
 
 # --------------------------------------------------------------------------- my attempts

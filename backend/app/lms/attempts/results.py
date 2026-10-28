@@ -12,8 +12,10 @@ from sqlalchemy.orm import Session, object_session
 from app.core.config import settings
 from app.lms.assessments.models import Assessment
 from app.lms.attempts import grading, serializers as ser
+from app.lms.attempts.display import EffectiveDisplay, effective_display, needs_course  # Phase 8b S1
 from app.lms.attempts.models import Attempt, AttemptItem
 from app.lms.content import repository as content_repo
+from app.lms.courses.models import Course  # Phase 8b S1
 from app.lms.courses.service import _aware
 from app.models.user import User
 
@@ -61,11 +63,25 @@ def keys_allowed(assessment: Assessment) -> bool:
     return bool(assessment.show_correct_answers)
 
 
+# --- Phase 8b S1 begin --- (PHASE_8B_DESIGN 5.4: effective result_view / passage_display in result and review)
+def display_for(db: Optional[Session], attempt: Attempt, plan) -> Optional[EffectiveDisplay]:
+    """The attempt's effective display values. The course row is read only when the snapshot leaves a value to the
+    course template (`db.get`: the identity map serves repeated calls for one course, e.g. a list of attempts)."""
+    if plan is None:
+        return None
+    snapshot = plan.snapshot
+    course = None
+    if needs_course(snapshot) and db is not None:
+        course = db.get(Course, attempt.course_id)
+    return effective_display(snapshot, course)
+# --- Phase 8b S1 end ---
+
+
 def result_out(attempt: Attempt, plan=None):
     """Student/preview result with the Phase 4 `grade` (None until released; previews inline). Callers have
     already enforced `results_visible`. One extra statement for real attempts."""
-    out = ser.result_out(attempt, plan)
     db = object_session(attempt)
+    out = ser.result_out(attempt, plan, display_for(db, attempt, plan))  # Phase 8b S1: display fields
     if out is not None and db is not None:
         from app.lms.grading import gradebook
 
@@ -119,7 +135,9 @@ def review_out(attempt: Attempt, items, plan, payload=None, *, with_keys: bool) 
     `payload` (shared student payload) is accepted for signature compatibility and not needed: versions are loaded
     by id through the attempt's session (explanations and pick questions are not in the shared payload)."""
     db = object_session(attempt)
-    return ser.ReviewOut(items=build_review(db, attempt, list(items), plan, with_keys=with_keys))
+    display = display_for(db, attempt, plan)  # Phase 8b S1
+    extra = {"result_view": display.result_view, "passage_display": display.passage_display} if display else {}
+    return ser.ReviewOut(items=build_review(db, attempt, list(items), plan, with_keys=with_keys), **extra)
 
 
 # ------------------------------------------------------------------ staff
@@ -134,7 +152,8 @@ def staff_attempt_out(db: Session, attempt: Attempt) -> ser.AttemptStaffOut:
     summary = ser.staff_summary(attempt, (user.display_name or user.email) if user else None, grade)
     return ser.AttemptStaffOut(
         **summary.model_dump(), assessment_id=attempt.assessment_id,
-        submission_id=gradebook.submission_id_for(db, attempt), result=ser.result_out(attempt, plan),  # S7: titles
+        submission_id=gradebook.submission_id_for(db, attempt),
+        result=ser.result_out(attempt, plan, display_for(db, attempt, plan)),  # S7: titles; 8b S1: display
         items=build_review(db, attempt, items, plan, with_keys=True, staff=True),
     )
 
