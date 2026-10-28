@@ -30,3 +30,6 @@ from app.lms.accommodations.models import EnrollmentAccommodation  # noqa: F401,
 # --- Phase 7b S1 begin ---
 from app.lms.exam_templates.models import ExamTemplate, ExamTemplateVersion  # noqa: F401,E402
 # --- Phase 7b S1 end ---
+# --- Phase 7c S1 begin ---
+from app.lms.quiz_editor.models import QuestionDraft  # noqa: F401,E402
+# --- Phase 7c S1 end ---

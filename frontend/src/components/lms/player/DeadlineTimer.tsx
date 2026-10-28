@@ -51,7 +51,7 @@ export function DeadlineTimer({
 
   if (deadlineMs === null || left === null) {
     return (
-      <span className="inline-flex items-center gap-1.5 text-sm text-slate-500">
+      <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm text-slate-500">
         <Clock className="h-4 w-4" aria-hidden="true" />
         {t("player.timer.unlimited")}
       </span>

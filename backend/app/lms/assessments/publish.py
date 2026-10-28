@@ -74,7 +74,25 @@ def validate(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID) -> 
     warnings = [i for i in issues if i.severity == "warning"]
     for iid in sorted(newer_version_item_ids(db, a), key=str):
         warnings.append(Issue("newer_version", item_id=str(iid), severity="warning"))
+    warnings.extend(_unfinished_drafts(db, a))  # --- Phase 7c S2 --- (P7C-3: warn, publish anyway)
     return ValidationResult([i for i in issues if i.severity == "error"], warnings)
+
+
+# --- Phase 7c S2 begin --- (PHASE_7C_DESIGN 5.8: one warning per card draft; drafts never reach a snapshot)
+def _unfinished_drafts(db: Session, a: Assessment) -> list[Issue]:
+    from app.lms.assessments.models import AssessmentSection
+    from app.lms.quiz_editor.ids import ISSUE_UNFINISHED_DRAFTS
+    from app.lms.quiz_editor.models import QuestionDraft
+
+    rows = db.execute(
+        select(QuestionDraft.item_id, AssessmentSection.position)
+        .join(AssessmentSection, AssessmentSection.id == QuestionDraft.section_id)
+        .where(QuestionDraft.assessment_id == a.id)
+        .order_by(AssessmentSection.position, QuestionDraft.created_at, QuestionDraft.id)
+    ).all()
+    return [Issue(ISSUE_UNFINISHED_DRAFTS, pos, str(iid) if iid is not None else None, severity="warning")
+            for iid, pos in rows]
+# --- Phase 7c S2 end ---
 
 
 def _raise_invalid(issues: list[Issue]) -> None:

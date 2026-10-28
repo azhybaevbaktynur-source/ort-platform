@@ -3,6 +3,7 @@
 import type { Lang, LocalizedText } from "./types";
 import type { Difficulty, QuestionType } from "./contentTypes";
 import type { AssessmentGradingFields, AssessmentGradingUpdate, SchemeStudentRef } from "./gradingTypes";
+import type { DraftOut } from "./quizEditorTypes"; // Phase 7c S3
 
 export type AssessmentPreset = "none" | "ort_main" | "ort_subject";
 export const ASSESSMENT_PRESETS: AssessmentPreset[] = ["none", "ort_main", "ort_subject"];
@@ -322,6 +323,7 @@ export const ISSUE_CODES = [
   "pick_pool_too_small", "section_limit_in_free_navigation", "section_limits_exceed_total", "after_close_needs_until",
   "too_many_items", "languages_not_in_course", "empty_passage", "newer_version",
   "too_few_items", // Phase 7b S4 (P7B-4)
+  "unfinished_drafts", // Phase 7c S3 (PHASE_7C_DESIGN 5.8: a warning, publishing still succeeds)
 ] as const;
 
 // --- Phase 7b S4 begin --- (PHASE_7B_DESIGN 2.3, 2.4, 9.1; interface merging keeps the Phase 3 declarations intact)
@@ -361,3 +363,24 @@ export function templateLockedFields(a: Pick<AssessmentStaffOut, "exam_template"
   return new Set(a.structure_locked && a.exam_template ? a.exam_template.locked_fields : []);
 }
 // --- Phase 7b S4 end ---
+
+// --- Phase 7c S3 begin --- (PHASE_7C_DESIGN 6.1: quiz editor fields of the staff assessment; interface merging)
+export interface ItemQuestionOut {
+  /** `quiz` = the question lives in this quiz's own bank; `shared` = a course bank. */
+  bank_kind?: "quiz" | "shared";
+  /** Number of other live quizzes of the course that use this question. */
+  used_elsewhere?: number;
+  /** Phase 7c S5: staff only, the correct answer(s) in one line (true/false: "true" | "false"; essay: null). */
+  correct_summary?: string | null;
+}
+
+export interface ItemOut {
+  /** A card draft exists for this item (only for readers with content.read_admin). */
+  has_draft?: boolean;
+}
+
+export interface AssessmentStaffOut {
+  /** Card drafts of the quiz editor ([] for readers without content.read_admin). */
+  drafts?: DraftOut[];
+}
+// --- Phase 7c S3 end ---

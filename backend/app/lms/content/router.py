@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import func, select
@@ -146,10 +146,11 @@ def _bank_out(db: Session, course, bank_id: uuid.UUID) -> sch.BankOut:
 
 @router.get("/{course_id}/banks", response_model=PageOut[sch.BankOut])
 def list_banks(course_id: uuid.UUID, deleted: bool = False, cursor: Optional[str] = None, limit: int = 25,
+               kind: Literal["all", "shared", "quiz"] = "all",  # --- Phase 7c S1 --- (PHASE_7C_DESIGN 6.1)
                ctx: AuthzContext = Depends(get_authz)):
     course = _read(ctx, course_id)
     rows, nxt = course_svc.paginate_rows(
-        ctx.db, repo.bank_rows_stmt(course.id, deleted=deleted), sort_col=QuestionBank.created_at,
+        ctx.db, repo.bank_rows_stmt(course.id, deleted=deleted, kind=kind), sort_col=QuestionBank.created_at,
         id_col=QuestionBank.id, entity_of=lambda r: r[0], cursor=cursor, limit=limit,
     )
     return PageOut[sch.BankOut](items=[sch.bank_out(r) for r in rows], next_cursor=nxt)

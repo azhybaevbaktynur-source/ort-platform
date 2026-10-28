@@ -18,14 +18,15 @@ import { AssessmentError } from "./AssessmentError";
 import { Modal } from "./Modal";
 import { BankSelect, PickFields, useBanks, type PickValue } from "./PickFields";
 
-type Tab = "questions" | "passage" | "pick";
+export type AddItemsTab = "questions" | "passage" | "pick";
+type Tab = AddItemsTab;
 
 interface Filters { q: string; type: QuestionType | ""; language: Lang | ""; section: string; topic: string; difficulty: Difficulty | "" }
 const EMPTY: Filters = { q: "", type: "", language: "", section: "", topic: "", difficulty: "" };
 
 /** Add items to a section: questions (multi-select or all filtered), a passage group, or a random pick from a bank. */
 export function AddItemsDialog({
-  open, courseId, assessmentId, sectionId, onClose, onAdded,
+  open, courseId, assessmentId, sectionId, onClose, onAdded, initialTab = "questions", quizEditor = false,
 }: {
   open: boolean;
   courseId: string;
@@ -33,6 +34,11 @@ export function AddItemsDialog({
   sectionId: string;
   onClose: () => void;
   onAdded: () => void | Promise<void>;
+  /** Phase 7c S3: the tab shown when the dialog opens (the quiz editor opens it on "Passage" or "Random group"). */
+  initialTab?: AddItemsTab;
+  /** Phase 7c S5 (opt-in, the quiz editor's "Find questions"): full screen below `sm`, and the only shared bank is
+   * chosen for the teacher. Off for the section builder (ORT screens unchanged). */
+  quizEditor?: boolean;
 }) {
   const { t } = useTranslation();
   const ui = useTemplateUi();
@@ -51,13 +57,14 @@ export function AddItemsDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [report, setReport] = useState<BulkAddOut | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setTab("questions"); setBankId(""); setFilters(EMPTY); setRows([]); setSelected(new Set()); setPassageId("");
+      setTab(initialTab); setBankId(""); setFilters(EMPTY); setRows([]); setSelected(new Set()); setPassageId("");
       setPick({ bank_id: "", count: 5, filter: {} }); setError(null); setReport(null);
     }
-  }, [open]);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = useCallback(async (next?: string | null) => {
     if (!bankId) { setRows([]); setCursor(null); return; }
@@ -88,6 +95,13 @@ export function AddItemsDialog({
     listPassages(courseId, bankId, { limit: 100 }).then((p) => { if (alive) setPassages(p.items); }).catch((e) => { if (alive) setListError(e); });
     return () => { alive = false; };
   }, [open, tab, bankId, courseId]);
+
+  useEffect(() => {
+    if (!quizEditor || !open || banks.length !== 1) return;
+    const only = banks[0].id;
+    setBankId((cur) => cur || only);
+    setPick((p) => (p.bank_id ? p : { ...p, bank_id: only }));
+  }, [quizEditor, open, banks]);
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -139,8 +153,34 @@ export function AddItemsDialog({
       className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${tab === k ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{label}</button>
   );
 
+  // Phase 7c UX (quiz editor only): the actions sit in the dialog's footer (always visible; the X closes it).
+  const questionActions = (
+    <>
+      {!quizEditor && <button type="button" className={btnSecondary} disabled={busy} onClick={onClose}>{t("assessments.add.close")}</button>}
+      <button type="button" className={btnSecondary} disabled={busy || rows.length === 0} onClick={() => void addAllFiltered()}>{t("assessments.add.addAllFiltered")}</button>
+      <button type="button" className={btnPrimary} disabled={busy || selected.size === 0} onClick={() => void addSelected()}>{t("assessments.add.addSelected", { n: selected.size })}</button>
+    </>
+  );
+  const passageActions = (
+    <>
+      {!quizEditor && <button type="button" className={btnSecondary} disabled={busy} onClick={onClose}>{t("assessments.add.close")}</button>}
+      <button type="button" className={btnPrimary} disabled={busy || !passageId} onClick={() => void addPassage()}>{t("assessments.add.addPassage")}</button>
+    </>
+  );
+  const pickActions = (
+    <>
+      {!quizEditor && <button type="button" className={btnSecondary} disabled={busy} onClick={onClose}>{t("assessments.add.close")}</button>}
+      <button type="button" className={btnPrimary} disabled={busy || !pick.bank_id} onClick={() => void addPick()}>{t("assessments.pick.add")}</button>
+    </>
+  );
+  const footer = !quizEditor ? undefined
+    : tab === "questions" ? (bankId ? questionActions : undefined)
+    : tab === "passage" ? (bankId ? passageActions : undefined)
+    : pickActions;
+
   return (
-    <Modal open={open} title={t("assessments.add.title")} onClose={onClose} busy={busy} wide>
+    <Modal open={open} title={quizEditor ? t("quizEditor.add.find") : t("assessments.add.title")} onClose={onClose} busy={busy} wide
+      fullScreenOnPhone={quizEditor} footer={footer}>
       <div role="tablist" aria-label={t("assessments.add.title")} className="mb-4 flex flex-wrap gap-2">
         {tabBtn("questions", t("assessments.add.tabQuestions"))}
         {tabBtn("passage", t("assessments.add.tabPassage"))}
@@ -151,9 +191,13 @@ export function AddItemsDialog({
 
       {tab === "questions" && bankId && (
         <div className="mt-3 space-y-3">
-          <p className="text-xs text-slate-500">{t("assessments.add.translationHint")}</p>
+          {!quizEditor && <p className="text-xs text-slate-500">{t("assessments.add.translationHint")}</p>}
           <input type="search" aria-label={t("bank.filters.search")} placeholder={t("bank.filters.search")} className={inputCls} value={filters.q} onChange={(e) => set({ q: e.target.value })} />
-          <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          {quizEditor && (
+            <button type="button" className={`${btnSecondary} sm:hidden`} aria-expanded={filtersOpen} aria-controls="add-filters"
+              onClick={() => setFiltersOpen((o) => !o)}>{t("quizEditor.find.filters")}</button>
+          )}
+          <div id="add-filters" className={quizEditor ? `${filtersOpen ? "grid" : "hidden"} gap-2 sm:grid sm:grid-cols-3 lg:grid-cols-5` : "grid gap-2 sm:grid-cols-3 lg:grid-cols-5"}>
             <label className="text-xs font-medium text-slate-600">{t("bank.filters.type")}
               <select className={`${inputCls} mt-0.5`} value={filters.type} onChange={(e) => set({ type: e.target.value as QuestionType | "" })}>
                 <option value="">{t("bank.filters.all")}</option>
@@ -180,6 +224,7 @@ export function AddItemsDialog({
               </select>
             </label>
           </div>
+          {quizEditor && <p className="text-xs text-slate-500">{t("quizEditor.find.translationHint")}</p>}
           <ContentError error={listError} onRetry={() => load()} />
           {loading && rows.length === 0 && <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p>}
           {!loading && rows.length === 0 && !listError && <p className="text-sm text-slate-500">{t("assessments.add.noQuestions")}</p>}
@@ -210,11 +255,7 @@ export function AddItemsDialog({
             </div>
           )}
           <AssessmentError error={error} />
-          <div className="flex flex-wrap justify-end gap-2">
-            <button type="button" className={btnSecondary} disabled={busy} onClick={onClose}>{t("assessments.add.close")}</button>
-            <button type="button" className={btnSecondary} disabled={busy || rows.length === 0} onClick={() => void addAllFiltered()}>{t("assessments.add.addAllFiltered")}</button>
-            <button type="button" className={btnPrimary} disabled={busy || selected.size === 0} onClick={() => void addSelected()}>{t("assessments.add.addSelected", { n: selected.size })}</button>
-          </div>
+          {!quizEditor && <div className="flex flex-wrap justify-end gap-2">{questionActions}</div>}
         </div>
       )}
 
@@ -230,10 +271,7 @@ export function AddItemsDialog({
           </div>
           <p className="text-xs text-slate-500">{t("assessments.add.passageHint")}</p>
           <AssessmentError error={error} />
-          <div className="flex justify-end gap-2">
-            <button type="button" className={btnSecondary} disabled={busy} onClick={onClose}>{t("assessments.add.close")}</button>
-            <button type="button" className={btnPrimary} disabled={busy || !passageId} onClick={() => void addPassage()}>{t("assessments.add.addPassage")}</button>
-          </div>
+          {!quizEditor && <div className="flex justify-end gap-2">{passageActions}</div>}
         </div>
       )}
 
@@ -242,10 +280,7 @@ export function AddItemsDialog({
           <p className="text-xs text-slate-500">{t("assessments.pick.hint")}</p>
           <PickFields courseId={courseId} value={pick} onChange={setPick} />
           <AssessmentError error={error} />
-          <div className="flex justify-end gap-2">
-            <button type="button" className={btnSecondary} disabled={busy} onClick={onClose}>{t("assessments.add.close")}</button>
-            <button type="button" className={btnPrimary} disabled={busy || !pick.bank_id} onClick={() => void addPick()}>{t("assessments.pick.add")}</button>
-          </div>
+          {!quizEditor && <div className="flex justify-end gap-2">{pickActions}</div>}
         </div>
       )}
     </Modal>
