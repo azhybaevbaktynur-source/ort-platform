@@ -10,6 +10,7 @@ Read models: the staff outline (never evaluated, warnings computed), the student
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 from typing import Iterable, Optional
 from urllib.parse import urlparse
 
@@ -421,6 +422,11 @@ def delete_item(db: Session, ctx: AuthzContext, course: Course, module_id: uuid.
     db.commit()
 
 
+def _stricter(old, new) -> bool:
+    """A higher min score / percent (same type) is stricter; a lower or equal one keeps the remembered `met`."""
+    return old is not None and new is not None and Decimal(new) > Decimal(old)
+
+
 def set_requirement(db: Session, ctx: AuthzContext, course: Course, module_id: uuid.UUID, item_id: uuid.UUID,
                     data: sch.RequirementIn) -> ModuleItem:
     _manage(db, ctx, course)
@@ -428,6 +434,13 @@ def set_requirement(db: Session, ctx: AuthzContext, course: Course, module_id: u
     it = load_item(db, m, item_id)
     _check_requirement(it.kind, data)
     row = db.get(ItemCompletionRequirement, it.id, populate_existing=True)
+    if row is None or row.type != data.type or _stricter(row.threshold, data.threshold):
+        # A new, different or stricter requirement must not inherit the remembered `met` of the old one
+        # (evaluator: `met = memory or now`). Drop the item's status rows in this transaction; the append-only facts
+        # stay, so view / mark_done / submit are re-met from them on the next read. `module_progress` is left alone:
+        # its state is monotone (invariant 4), so a module already completed stays completed and only a not-yet-
+        # completed module sees the new rule (PHASE_8A_DESIGN 6.4; reapply relocks on purpose).
+        db.execute(delete(ItemRequirementStatus).where(ItemRequirementStatus.item_id == it.id))
     if row is None:
         db.add(ItemCompletionRequirement(item_id=it.id, type=data.type, threshold=data.threshold))
     else:
@@ -607,8 +620,16 @@ def _item_student_out(lang: str, ie: ev_mod.ItemEval, *, evaluated: bool) -> sch
         req = sch.RequirementStudentOut(type=r.req_type, threshold=_f(r.threshold),
                                         met=bool(ie.met) if evaluated else False,
                                         best_score_percent=_f(ie.best) if evaluated else None)
-    return sch.ItemStudentOut(id=r.id, kind=r.kind, title=r.title(lang), indent=r.item.indent,
-                              locked=bool(ie.locked) if evaluated else False, requirement=req, link=_link(r))
+    locked = bool(ie.locked) if evaluated else False
+    # a locked item carries no destination (a url item would leak it before the gate opens); an assignment keeps
+    # only its kind, which picks the row icon (quiz / file / text)
+    link, title = _link(r), r.title(lang)
+    if locked:
+        link = sch.ItemLinkOut(assignment_kind=r.assignment_kind) if r.kind == "assignment" else None
+        if r.kind == "url" and not r.item.title_override:
+            title = {}  # the fallback title of a url item is the url itself (the UI shows "Untitled item")
+    return sch.ItemStudentOut(id=r.id, kind=r.kind, title=title, indent=r.item.indent,
+                              locked=locked, requirement=req, link=link)
 
 
 def module_student_out(st: ev_mod.Structure, me: ev_mod.ModuleEval, *, evaluated: bool = True

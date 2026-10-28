@@ -42,7 +42,12 @@ def test_no_vector_survives(case):
     for src in re.findall(r'src="([^"]*)"', out):
         assert src.startswith("/api/v1/media/"), src
     for href in re.findall(r'href="([^"]*)"', out):
+        if href.startswith("#"):
+            assert re.fullmatch(r"#[A-Za-z0-9_:.-]+", href), href  # same-page fragment only
+            continue
         assert href.startswith(("http://", "https://", "mailto:", "/")) and not href.startswith("//"), href
+    for id_ in re.findall(r'\sid="([^"]*)"', out):
+        assert re.fullmatch(r"fn(ref\d*)?:[A-Za-z0-9_-]+", id_), id_  # footnote anchors only
 
 
 def test_every_link_is_noopener_and_external_opens_new_tab():
@@ -87,3 +92,13 @@ def test_empty_and_whitespace():
 
 def test_clean_content_tags_are_not_in_allowlist():
     assert not (render_mod.CLEAN_CONTENT_TAGS & ALLOWED_TAGS)
+
+
+def test_footnote_fragments_link_to_their_anchors():
+    """Phase 8a fix1 (L5): `#fragment` links survive (footnotes are no dead anchors); ids only as footnote anchors."""
+    out = render("Claim[^1] and [below](#notes).\n\n[^1]: Source.")
+    assert 'href="#fn:1"' in out and 'id="fn:1"' in out and 'href="#fnref:1"' in out and 'id="fnref:1"' in out
+    assert 'href="#notes"' in out and 'target="_blank"' not in out
+    for md in ("[x](#a/b)", "[x](<# x>)", "[x](#)", "<a href='#//evil.example'>x</a>", "<a href='#x\" y'>x</a>"):
+        assert "href=" not in render(md), md
+    assert "id=" not in render('<li id="location">l</li> <p id="fn:1">p</p> <sup id="fn:<b>">t</sup>')

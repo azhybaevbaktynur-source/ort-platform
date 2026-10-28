@@ -19,6 +19,8 @@ ALLOWED_ATTRIBUTES = {
     "a": frozenset({"href", "title", "rel", "target"}),
     "img": frozenset({"src", "alt", "title"}),
     "code": frozenset({"class"}),
+    "sup": frozenset({"id"}),  # footnote anchors only (render._FOOTNOTE_ID_RE)
+    "li": frozenset({"id"}),
 }
 LINK_SCHEMES = frozenset({"http", "https", "mailto"})  # plus relative `/` paths
 MEDIA_PATH_PREFIX = "/api/v1/media/"                    # img.src: this prefix or settings.R2_PUBLIC_BASE_URL
