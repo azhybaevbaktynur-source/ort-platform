@@ -14,3 +14,8 @@ PLANNED_POLICIES: dict[tuple[str, str], str] = {
     ("DELETE", _P): "course:content.manage",
     ("POST", f"{_P}/restore"): "course:content.manage",
 }
+
+
+# --- Phase 8a S3 begin --- (the router is mounted in app/api/v1/router.py: the planned entries become real)
+PAGE_POLICIES.update(PLANNED_POLICIES)
+# --- Phase 8a S3 end ---

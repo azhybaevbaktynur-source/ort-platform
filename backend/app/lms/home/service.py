@@ -262,6 +262,94 @@ def _pending_invitations(db: Session, user: User, now: datetime) -> int:
     ).scalar_one())
 
 
+# --- Phase 8a S3 begin --- (PHASE_8A_DESIGN 5.4, 6.7: two more statements for the modules strip, one for news)
+MODULES_SCAN_MAX = 100  # open modules read for the strip (bounded; at most MODULES_NEXT_MAX rows are returned)
+
+
+def _modules_next(db: Session, uid: str) -> list[sch.HomeModuleNextOut]:
+    """Caches only, never evaluates (design 6.7). 1) the published live modules of the caller's published student
+    courses whose STORED state is `unlocked` or `started`; 2) their visible items (item, target published and live,
+    invariant 1) with a requirement that has no `met` status row of the caller. Per course: the first such item of
+    the first module that has one; courses with a started module first, then the most recently evaluated."""
+    from app.lms.course_files.models import CourseFile
+    from app.lms.modules.models import (
+        CourseModule, ItemCompletionRequirement, ItemRequirementStatus, ModuleItem, ModuleProgress,
+    )
+    from app.lms.modules.schemas import ItemLinkOut
+    from app.lms.pages.models import Page
+
+    mods = db.execute(
+        select(Course.id.label("course_id"), Course.title.label("course_title"), Course.default_language.label("lang"),
+               Enrollment.id.label("enrollment_id"), CourseModule.id.label("module_id"),
+               CourseModule.title.label("module_title"), ModuleProgress.state.label("state"),
+               ModuleProgress.evaluated_at.label("evaluated_at"))
+        .select_from(Enrollment).join(Course, Course.id == Enrollment.course_id)
+        .join(ModuleProgress, ModuleProgress.enrollment_id == Enrollment.id)
+        .join(CourseModule, CourseModule.id == ModuleProgress.module_id)
+        .where(_mine(uid), Course.status == "published", CourseModule.course_id == Course.id,
+               CourseModule.deleted_at.is_(None), CourseModule.published.is_(True),
+               ModuleProgress.state.in_(("unlocked", "started")))
+        .order_by(Course.id, CourseModule.position, CourseModule.id).limit(MODULES_SCAN_MAX)
+    ).all()
+    if not mods:
+        return []
+    target_ok = or_(
+        ModuleItem.kind == "url",
+        and_(ModuleItem.kind == "page", Page.published.is_(True), Page.deleted_at.is_(None)),
+        and_(ModuleItem.kind == "file", CourseFile.published.is_(True), CourseFile.deleted_at.is_(None)),
+        and_(ModuleItem.kind == "assignment", Assignment.published.is_(True), Assignment.deleted_at.is_(None)),
+    )
+    met = and_(ItemRequirementStatus.item_id == ModuleItem.id,
+               ItemRequirementStatus.enrollment_id.in_({m.enrollment_id for m in mods}),
+               ItemRequirementStatus.met.is_(True))
+    first: dict = {}
+    for it in db.execute(
+        select(ModuleItem.module_id, ModuleItem.position, ModuleItem.id, ModuleItem.kind, ModuleItem.title_override,
+               ModuleItem.page_id, ModuleItem.file_id, ModuleItem.assignment_id, ModuleItem.url,
+               Page.title.label("page_title"), Page.language.label("page_lang"),
+               CourseFile.title.label("file_title"), Assignment.title.label("assignment_title"),
+               Assignment.kind.label("assignment_kind"), Assignment.assessment_id)
+        .select_from(ModuleItem)
+        .join(ItemCompletionRequirement, ItemCompletionRequirement.item_id == ModuleItem.id)
+        .outerjoin(ItemRequirementStatus, met)
+        .outerjoin(Page, Page.id == ModuleItem.page_id)
+        .outerjoin(CourseFile, CourseFile.id == ModuleItem.file_id)
+        .outerjoin(Assignment, Assignment.id == ModuleItem.assignment_id)
+        .where(ModuleItem.module_id.in_({m.module_id for m in mods}), ModuleItem.deleted_at.is_(None),
+               ModuleItem.published.is_(True), ModuleItem.kind != "header", target_ok,
+               ItemRequirementStatus.item_id.is_(None))
+        .order_by(ModuleItem.module_id, ModuleItem.position, ModuleItem.id)
+    ).all():
+        first.setdefault(it.module_id, it)
+    chosen: dict = {}
+    for m in mods:  # course, then module position order
+        if m.course_id not in chosen and m.module_id in first:
+            chosen[m.course_id] = (m, first[m.module_id])
+    picks = sorted(chosen.values(), key=lambda p: (p[0].state != "started",
+                                                   -(p[0].evaluated_at.timestamp() if p[0].evaluated_at else 0),
+                                                   str(p[0].module_id)))
+    out = []
+    for m, it in picks[:sch.MODULES_NEXT_MAX]:
+        title = it.title_override
+        if not title:
+            if it.kind == "page":
+                title = {it.page_lang: it.page_title}
+            elif it.kind == "file":
+                title = {m.lang: it.file_title}
+            elif it.kind == "assignment":
+                title = it.assignment_title
+            else:
+                title = {m.lang: it.url}
+        link = ItemLinkOut(page_id=it.page_id, file_id=it.file_id, assignment_id=it.assignment_id,
+                           assessment_id=it.assessment_id if it.kind == "assignment" else None,
+                           assignment_kind=it.assignment_kind if it.kind == "assignment" else None, url=it.url)
+        out.append(sch.HomeModuleNextOut(course_id=m.course_id, course_title=m.course_title, module_id=m.module_id,
+                                         module_title=m.module_title, state=m.state, item_id=it.id, kind=it.kind,
+                                         title=title, link=link))
+    return out
+# --- Phase 8a S3 end ---
+
+
 def home(db: Session, user: User) -> sch.HomeOut:
     now = clock.now()
     uid = user.id
@@ -276,4 +364,13 @@ def home(db: Session, user: User) -> sch.HomeOut:
         in_progress=_in_progress(db, uid), next_up=_next_up(db, uid, now),
         latest_results=_latest_results(db, uid, now), courses=courses, courses_total=total,
         pending_invitations=_pending_invitations(db, user, now),
+        # --- Phase 8a S3 begin ---
+        modules_next=_modules_next(db, uid), announcements=_announcements(db, uid),
+        # --- Phase 8a S3 end ---
     )
+
+
+def _announcements(db: Session, uid: str):  # Phase 8a S3
+    from app.lms.announcements.service import home_strip
+
+    return home_strip(db, uid)

@@ -91,7 +91,7 @@ async def test_empty_home(db, api):
     body = await home(api, make_user(db))
     assert set(body) == HOME_KEYS
     assert body == {"in_progress": [], "next_up": [], "latest_results": [], "courses": [], "courses_total": 0,
-                    "pending_invitations": 0}
+                    "pending_invitations": 0, "modules_next": [], "announcements": []}  # + Phase 8a S3
 
 
 async def test_full_shape_and_no_private_fields(db, api):
@@ -423,8 +423,9 @@ async def test_statement_count_is_fixed(db, api):
             assert len(body["courses"]) == 10 and body["courses_total"] == 14
             assert len(body["in_progress"]) == 3 and len(body["next_up"]) == 3 and len(body["latest_results"]) == 3
         counts[name] = len(c.statements)
-        # user, courses (+total, in_progress), next_due, in_progress, next_up, results, attempts, invitations
-        assert counts[name] <= 8, "\n".join(st[:120] for st in c.statements)
+        # user, courses (+total, in_progress), next_due, in_progress, next_up, results, attempts, invitations;
+        # Phase 8a S3: modules strip (+ its current items when any module is open), announcements
+        assert counts[name] <= 11, "\n".join(st[:120] for st in c.statements)
     assert counts["small"] == counts["big"], counts
 
 
@@ -570,3 +571,50 @@ async def test_latest_results_include_released_manual_grades(db, api):
     assert by_kind["quiz"]["assignment_id"] == str(assignment_id_for(q.id))
     assert by_kind["quiz"]["assessment_id"] == str(q.id)
     assert not (set(walk_keys(body)) & FORBIDDEN)
+
+
+# ------------------------------------------------------------------ Phase 8a S3: modules strip (PHASE_8A_DESIGN 6.7)
+
+async def test_modules_next_reads_caches_only(db, api):
+    from app.lms.core.models import utcnow
+    from app.lms.home.schemas import MODULES_NEXT_KEYS
+    from app.lms.modules.models import ItemRequirementStatus, ModuleProgress
+    from tests.lms.modules_support import make_course_file, make_item, make_module, make_page, structure_world
+
+    w = structure_world(db)
+    now = utcnow()
+
+    def progress(m, state):
+        db.add(ModuleProgress(enrollment_id=w.enr.id, module_id=m.id, state=state, evaluated_rules_version=1,
+                              evaluated_at=now))
+        db.commit()
+
+    done = make_module(db, w.course, w.O)
+    open_ = make_module(db, w.course, w.O, title={"en": "Week 2"})
+    page = make_page(db, w.course, w.O, title="Read me")
+    hidden = make_page(db, w.course, w.O, published=False)
+    make_item(db, done, page, requirement=("view",))
+    make_item(db, open_)  # header: never "next"
+    make_item(db, open_, hidden, requirement=("view",))  # target unpublished: invisible
+    met = make_item(db, open_, page, requirement=("view",))
+    nxt = make_item(db, open_, make_course_file(db, w.course, w.O, title="Notes.pdf"), requirement=("view",))
+    make_item(db, open_, page)  # no requirement
+    # nothing stored yet: nothing to show (the strip never evaluates)
+    assert (await home(api, w.S))["modules_next"] == []
+    progress(done, "completed")
+    progress(open_, "started")
+    db.add(ItemRequirementStatus(enrollment_id=w.enr.id, item_id=met.id, met=True, met_at=now))
+    db.commit()
+    rows = (await home(api, w.S))["modules_next"]
+    assert len(rows) == 1 and set(rows[0]) == MODULES_NEXT_KEYS
+    r = rows[0]
+    assert (r["module_id"], r["item_id"], r["kind"], r["state"]) == (str(open_.id), str(nxt.id), "file", "started")
+    assert r["title"] == {"en": "Notes.pdf"} and r["module_title"] == {"en": "Week 2"}
+    assert r["course_title"] == w.course.title and r["link"]["file_id"] == str(nxt.file_id)
+    # the other student's caches are not mine; staff get nothing
+    assert (await home(api, w.S2))["modules_next"] == []
+    assert (await home(api, w.O))["modules_next"] == []
+    # an unpublished module disappears
+    open_.published = False
+    db.commit()
+    assert (await home(api, w.S))["modules_next"] == []
