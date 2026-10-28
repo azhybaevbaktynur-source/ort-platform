@@ -76,3 +76,8 @@ from app.lms.exam_templates.router import router as _exam_templates_router  # no
 
 api_router.include_router(_exam_templates_router, prefix="/exam-templates", tags=["Exam Templates"])
 # --- Phase 7b S2 end ---
+# --- Phase 7c S2 begin --- (quiz editor, PHASE_7C_DESIGN 6.1)
+from app.lms.quiz_editor.router import router as _quiz_editor_router  # noqa: E402
+
+api_router.include_router(_quiz_editor_router, prefix="/courses", tags=["Quiz Editor"])
+# --- Phase 7c S2 end ---
