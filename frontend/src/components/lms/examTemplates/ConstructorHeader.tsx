@@ -12,7 +12,7 @@ import type { SaveState } from "./useConstructor";
 
 export type HeaderAction = "publish" | "archive" | "lock" | "unlock" | "promote" | "importFormat";
 
-export function ConstructorHeader({ tpl, name, crumbs, readOnly, saveState, issueCount, canPublish, onAction, onPreview, onRetrySave }: {
+export function ConstructorHeader({ tpl, name, crumbs, readOnly, saveState, issueCount, canPublish, onAction, onPreview, previewBusy, onRetrySave }: {
   tpl: ExamTemplateOut;
   name: string;
   crumbs: Breadcrumb[];
@@ -22,6 +22,8 @@ export function ConstructorHeader({ tpl, name, crumbs, readOnly, saveState, issu
   canPublish: boolean;
   onAction: (a: HeaderAction) => void;
   onPreview: () => void;
+  /** The preview is starting (spinner on the button). */
+  previewBusy?: boolean;
   onRetrySave: () => void;
 }) {
   const { t } = useTranslation();
@@ -35,7 +37,12 @@ export function ConstructorHeader({ tpl, name, crumbs, readOnly, saveState, issu
   ];
   const changes = tpl.unpublished_changes;
   const version = tpl.current_version_no != null
-    ? [t("examTemplates.versionShort", { n: tpl.current_version_no }), changes ? t("examTemplates.constructor.header.unpublished", { n: changes }) : null].filter(Boolean).join(" · ")
+    ? [
+      t("examTemplates.versionShort", { n: tpl.current_version_no }),
+      changes ? t("examTemplates.constructor.header.unpublished", { n: changes })
+        // Phase 8b UX: nothing to publish says so ("v2 · published, no changes")
+        : !canPublish && !readOnly ? t("examTemplates.constructor.header.upToDate") : null,
+    ].filter(Boolean).join(" · ")
     : t("examTemplates.editor.noVersion");
 
   return (
@@ -50,12 +57,13 @@ export function ConstructorHeader({ tpl, name, crumbs, readOnly, saveState, issu
         </span>
       )}
       primaryAction={readOnly ? undefined : (
-        <Button disabled={!canPublish} onClick={() => onAction("publish")}>{t("examTemplates.publish.action")}</Button>
+        // Phase 8b UX: with nothing to publish, Publish is a quiet secondary button
+        <Button variant={canPublish ? "primary" : "secondary"} disabled={!canPublish} onClick={() => onAction("publish")}>{t("examTemplates.publish.action")}</Button>
       )}
       secondaryActions={(
         <>
           {!archived && (
-            <Button variant="secondary" leftIcon={<Eye className="h-4 w-4" aria-hidden="true" />} onClick={onPreview}>
+            <Button variant="secondary" loading={previewBusy} leftIcon={<Eye className="h-4 w-4" aria-hidden="true" />} onClick={onPreview}>
               {t("examTemplates.constructor.header.preview")}
             </Button>
           )}

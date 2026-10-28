@@ -18,7 +18,7 @@ import { fromLocalInput, minToSec, secToMin, toLocalInput } from "./format";
 import { AccessCodeField, accessCodeError } from "@/components/lms/accommodations/AccessCodeField"; // Phase 7a S5
 import { templateLockedFields } from "@/lib/lms/assessmentTypes"; // Phase 7b S4
 import { DISPLAY_MODES, PASSAGE_DISPLAYS, RESULT_VIEWS, type DisplayMode, type PassageDisplay, type ResultView } from "@/lib/lms/blocks"; // Phase 8b S3
-import { cn } from "@/components/ui"; // Phase 8b S3
+import { Select, cn } from "@/components/ui"; // Phase 8b S3
 
 // --- Phase 8b S3 begin --- (PHASE_8B_DESIGN 8.3): stored display values; "" = inherit from the course (null)
 const asDisplayMode = (v: string | undefined): DisplayMode => (DISPLAY_MODES as readonly string[]).includes(v ?? "") ? (v as DisplayMode) : "one_per_page";
@@ -243,28 +243,28 @@ export function SettingsPanel({
             {displayModeLocked && <p className="mt-1 text-xs text-slate-500">{t("examTemplates.lockedNote")}</p>}
           </fieldset>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className={labelCls} htmlFor="as-passage-display">{t("assessments.settings.display.passageDisplay.label")}</label>
-              <select id="as-passage-display" className={inputCls} disabled={disabled || resultViewLocked} value={passageDisplay}
-                onChange={(e) => setPassageDisplay(e.target.value as PassageDisplay | "")}>
-                <option value="">{t("assessments.settings.display.passageDisplay.inherit", { value: t(`assessments.settings.display.passageDisplay.options.${courseUi.passageDisplay}`) })}</option>
-                {PASSAGE_DISPLAYS.map((p) => <option key={p} value={p}>{t(`assessments.settings.display.passageDisplay.options.${p}`)}</option>)}
-              </select>
-              {resultViewLocked && <p className="mt-1 text-xs text-slate-500">{t("examTemplates.lockedNote")}</p>}
-            </div>
-            <div>
-              <label className={labelCls} htmlFor="as-result-view">{t("assessments.settings.display.resultView.label")}</label>
-              <select id="as-result-view" className={inputCls} disabled={disabled || resultViewLocked} value={resultView}
-                aria-describedby={(resultView || courseUi.resultView) === "ort" ? "as-result-view-hint" : undefined}
-                onChange={(e) => setResultView(e.target.value as ResultView | "")}>
-                <option value="">{t("assessments.settings.display.resultView.inherit", { value: t(`assessments.settings.display.resultView.options.${courseUi.resultView}`) })}</option>
-                {RESULT_VIEWS.map((v) => <option key={v} value={v}>{t(`assessments.settings.display.resultView.options.${v}`)}</option>)}
-              </select>
-              {(resultView || courseUi.resultView) === "ort" && (
-                <p id="as-result-view-hint" className="mt-1 text-xs text-slate-500">{t("assessments.settings.display.resultView.ortHint")}</p>
-              )}
-              {resultViewLocked && <p className="mt-1 text-xs text-slate-500">{t("examTemplates.lockedNote")}</p>}
-            </div>
+            <Select id="as-passage-display" label={t("assessments.settings.display.passageDisplay.label")}
+              disabled={disabled || resultViewLocked} value={passageDisplay}
+              onChange={(e) => setPassageDisplay(e.target.value as PassageDisplay | "")}
+              hint={resultViewLocked ? t("examTemplates.lockedNote") : undefined}
+              options={[
+                { value: "", label: t("assessments.settings.display.passageDisplay.inherit", { value: t(`assessments.settings.display.passageDisplay.options.${courseUi.passageDisplay}`) }) },
+                ...PASSAGE_DISPLAYS.map((p) => ({ value: p, label: t(`assessments.settings.display.passageDisplay.options.${p}`) })),
+              ]} />
+            <Select id="as-result-view" label={t("assessments.settings.display.resultView.label")}
+              disabled={disabled || resultViewLocked} value={resultView}
+              onChange={(e) => setResultView(e.target.value as ResultView | "")}
+              hint={((resultView || courseUi.resultView) === "ort" || resultViewLocked) ? (
+                <>
+                  {(resultView || courseUi.resultView) === "ort" && t("assessments.settings.display.resultView.ortHint")}
+                  {(resultView || courseUi.resultView) === "ort" && resultViewLocked ? " " : null}
+                  {resultViewLocked && t("examTemplates.lockedNote")}
+                </>
+              ) : undefined}
+              options={[
+                { value: "", label: t("assessments.settings.display.resultView.inherit", { value: t(`assessments.settings.display.resultView.options.${courseUi.resultView}`) }) },
+                ...RESULT_VIEWS.map((v) => ({ value: v, label: t(`assessments.settings.display.resultView.options.${v}`) })),
+              ]} />
           </div>
         </fieldset>
       )}

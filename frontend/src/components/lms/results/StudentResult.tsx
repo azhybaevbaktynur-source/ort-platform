@@ -9,11 +9,10 @@ import { LmsApiError } from "@/lib/lms/client";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { ChevronDown } from "lucide-react";
 import { LinkButton, LoadingState, cn, focusRing } from "@/components/ui";
-import { ResultSummary } from "./ResultSummary";
+import { ResultSummary, useResultSectionName } from "./ResultSummary";
 import { ReviewItemCard } from "./ReviewItemCard";
 import { useReturnPath, withReturn } from "@/components/lms/player/returnPath";
 import type { PassageDisplay } from "@/lib/lms/blocks";
-import { pickLocalized } from "@/lib/lms/localized";
 
 export function StudentResult({ courseId, attemptId }: { courseId: string; attemptId: string }) {
   const { lang, t } = useTranslation();
@@ -64,7 +63,7 @@ export function StudentResult({ courseId, attemptId }: { courseId: string; attem
   const back = `/${lang}/courses/${courseId}/assessments${state ? `/${state.assessment_id}` : ""}`;
   // Phase 8b S3 (PHASE_8B_DESIGN 7.2): a validated `?return=` (template preview) replaces the back link; absent = today's.
   const backLink = returnPath
-    ? <Link href={returnPath} className="text-sm font-medium text-brand-700 hover:underline">{t("player.scrolling.back")}</Link>
+    ? <Link href={returnPath} className="text-sm font-medium text-brand-700 hover:underline">{t(state?.is_preview ? "examTemplates.preview.backToTemplate" : "player.scrolling.back")}</Link>
     : <Link href={back} className="text-sm font-medium text-brand-700 hover:underline">{t("results.back")}</Link>;
 
   if (loading && !state) return <LoadingState label={t("lms.common.loading")} rows={2} />;
@@ -137,7 +136,7 @@ function ReviewList({ items, sections, passageDisplay }: {
   /** Phase 8b S3: renderer from the review payload (null: course template). */
   passageDisplay: PassageDisplay | null;
 }) {
-  const { lang, t } = useTranslation();
+  const { t } = useTranslation();
   const [onlyMistakes, setOnlyMistakes] = useState(false);
   const groups = useMemo(() => {
     const out: { pos: number; entries: { item: ReviewItemOut; number: number }[] }[] = [];
@@ -151,15 +150,7 @@ function ReviewList({ items, sections, passageDisplay }: {
     });
     return out;
   }, [items]);
-  const sectionName = (pos: number) => {
-    const idx = sections.findIndex((s) => s.pos === pos);
-    const key = idx >= 0 ? sections[idx].key : null;
-    if (key && t(`sections.${key}`) !== `sections.${key}`) return t(`sections.${key}`);
-    // Phase 8b S5: a general section's own title (template exams); ORT keys always resolve above
-    const title = idx >= 0 ? sections[idx].title : null;
-    const named = typeof title === "string" ? title : pickLocalized(title ?? null, lang);
-    return named || t("results.sectionN", { n: idx >= 0 ? idx + 1 : pos });
-  };
+  const sectionName = useResultSectionName(sections); // the same names as the summary table above
   const show = (it: ReviewItemOut) => !onlyMistakes || (it.correctness !== null && MISTAKES.has(it.correctness));
   const anyShown = items.some(show);
   const grouped = groups.length > 1;

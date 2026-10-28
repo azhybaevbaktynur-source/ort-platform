@@ -179,19 +179,27 @@ test.describe("exam-template constructor walk (ru)", () => {
     const part2 = admin.locator("section[aria-label='Часть 2']");
     await expect(part1).toBeVisible();
     await expect(part2).toBeVisible();
-    // preview before any sample question: "not ready" with the reason, no player
+    // preview before any sample question: one amber "not ready" callout naming the sections, no player
+    // (8b UX: no generic "could not load" title, no Retry, no second red list)
     const launch = admin.getByRole("button", { name: t("examTemplates.preview.launch") });
     const pagesBefore = admin.context().pages().length;
     await launch.click();
-    await expect(admin.getByText(t("lms.errors.preview_not_ready"))).toBeVisible();
+    const notReady = admin.getByRole("alert").filter({ hasText: t("examTemplates.errors.preview_not_ready") });
+    await expect(notReady).toBeVisible();
+    await expect(notReady).toContainText(t("examTemplates.preview.issueLine", { section: "Часть 1", text: t("examTemplates.preview.noQuestions") }));
+    await expect(notReady).toContainText(t("examTemplates.preview.issueLine", { section: "Часть 2", text: t("examTemplates.preview.noQuestions") }));
+    await expect(admin.getByText(t("ui.error.title"))).toHaveCount(0);
+    await expect(admin.getByRole("button", { name: t("ui.retry") })).toHaveCount(0);
     await expect.poll(() => admin.context().pages().length).toBe(pagesBefore);
 
     await writeCard(admin, part1, "Сколько будет 2 + 2?", "3", "4", 1);
     await writeCard(admin, part2, "Столица Кыргызстана?", "Ош", "Бишкек", 6);
 
-    // ---- Preview: the real player in a new tab (desktop), amber banner, scrolling, forward-only, ORT-style result;
-    // "Back" returns to the constructor's Sample tab
-    const [player] = await Promise.all([admin.context().waitForEvent("page"), launch.click()]);
+    // ---- Preview: the header "Preview" (8b UX: the same action as the Sample tab's launcher) opens the real player in
+    // a new tab (desktop), amber banner, scrolling, forward-only, ORT-style result; "Back to the template" returns to
+    // the constructor's Sample tab
+    const headerPreview = admin.getByRole("button", { name: t("examTemplates.constructor.header.preview"), exact: true });
+    const [player] = await Promise.all([admin.context().waitForEvent("page"), headerPreview.click()]);
     await player.waitForURL(/\/attempts\/[0-9a-f-]{36}\?return=/);
     await expect(player.getByText(t("player.previewBanner"))).toBeVisible();
     await expect(player.locator('section[id^="item-"]')).toHaveCount(1);
@@ -206,7 +214,7 @@ test.describe("exam-template constructor walk (ru)", () => {
     await player.getByRole("dialog").getByRole("button", { name: t("player.submit.confirm") }).click();
     await player.waitForURL(/\/result/);
     await shot(player, "ctor-preview-result-desktop-ru", { fullPage: true });
-    const back = player.getByRole("link", { name: t("player.scrolling.back"), exact: true });
+    const back = player.getByRole("link", { name: t("examTemplates.preview.backToTemplate"), exact: true });
     await expect(back).toHaveAttribute("href", new RegExp(`/exam-templates/${tid}\\?tab=sample$`));
     await back.click();
     await player.waitForURL(new RegExp(`/exam-templates/${tid}\\?tab=sample$`));
@@ -250,6 +258,9 @@ test.describe("exam-template constructor walk (ru)", () => {
     await admin.getByRole("button", { name: t("examTemplates.editor.more") }).click();
     await admin.getByRole("menuitem", { name: rx(t("examTemplates.lock.action")) }).click();
     const lockDlg = admin.getByRole("dialog", { name: t("examTemplates.lock.title") }).or(admin.getByRole("alertdialog", { name: t("examTemplates.lock.title") }));
+    // 8b UX: the effect lists the ticked lock-scope keys and says earlier assignments do not change
+    await expect(lockDlg.getByRole("listitem")).toHaveText([t("examTemplates.specForm.lockKeys.sections")]);
+    await expect(lockDlg).toContainText(t("examTemplates.lock.effectEarlier"));
     await lockDlg.getByRole("textbox").fill("Структура утверждена методсоветом");
     await lockDlg.getByRole("button", { name: t("examTemplates.lock.action") }).click();
     await expect(lockDlg).toBeHidden();
@@ -419,7 +430,7 @@ test.describe("exam-template constructor walk (ru)", () => {
         await shot(admin, `ctor-sample-gate-${sfx}`);
         await gate.click();
         await admin.getByRole("button", { name: tl("examTemplates.preview.launch") }).click();
-        await expect(admin.getByText(tl("lms.errors.preview_not_ready"))).toBeVisible();
+        await expect(admin.getByText(tl("examTemplates.errors.preview_not_ready"))).toBeVisible();
         await shot(admin, `ctor-preview-not-ready-${sfx}`);
         await top(admin);
         await tabL(admin, "structure").click();

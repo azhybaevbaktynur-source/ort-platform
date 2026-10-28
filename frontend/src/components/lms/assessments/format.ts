@@ -26,9 +26,11 @@ export function fromLocalInput(v: string): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-export function fmtDateTime(iso: string | null | undefined): string {
+/** Date and time in the browser's locale, or in the UI language's when `lang` is given (Phase 8b UX: ky results). */
+export function fmtDateTime(iso: string | null | undefined, lang?: string): string {
   const d = parseApiDate(iso);
-  return d ? d.toLocaleString() : "";
+  if (!d) return "";
+  return lang ? d.toLocaleString(lang === "en" ? "en-GB" : lang) : d.toLocaleString();
 }
 
 export function fmtPoints(p: number | string | null | undefined): string {

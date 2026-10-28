@@ -181,7 +181,7 @@ export function ScrollingItems({
       {blocks.length > 0 ? blocks : <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">{t("player.noQuestion")}</p>}
 
       {/* The window footer: where the list is, and the visible way on (UX section 4: no hidden features). */}
-      <div className="sticky bottom-0 z-[5] -mx-4 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border">
+      <div className="sticky bottom-0 z-[5] -mx-4 border-t border-slate-200 bg-white px-4 py-3 sm:mx-0 sm:rounded-2xl sm:border">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <p className="text-sm text-slate-700" aria-live="polite">
             {t("player.scrolling.windowOf", { from: windowStart + 1, to: windowEnd, total: sectionItems.length })}

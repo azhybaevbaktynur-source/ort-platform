@@ -24,7 +24,7 @@ import { IssuesBar } from "./IssuesBar";
 import { StructureTab } from "./StructureTab";
 import { ScoringTab } from "./ScoringTab";
 import { DisplayTab } from "./DisplayTab";
-import { SampleTab } from "./SampleTab";
+import { SampleTab, usePreviewLaunch } from "./SampleTab";
 import { VersionsTab } from "./VersionsTab";
 import { fieldId, tabOfLoc, useFieldIssues, type ConstructorTab } from "./parts";
 import { useConstructor } from "./useConstructor";
@@ -56,6 +56,10 @@ export function ExamTemplateEditor({ area, templateId, crumbs }: {
   const [actionError, setActionError] = useState<unknown>(null);
   const [versionsKey, setVersionsKey] = useState(0);
   const [conflictHidden, setConflictHidden] = useState(false);
+  // Phase 8b UX: one preview action for the header button and the Sample tab
+  const preview = usePreviewLaunch(templateId, draft, c.flush);
+  const [sandboxSeen, setSandboxSeen] = useState(false);
+  const onSandbox = useCallback(() => setSandboxSeen(true), []);
 
   useEffect(() => {
     let alive = true;
@@ -163,11 +167,25 @@ export function ExamTemplateEditor({ area, templateId, crumbs }: {
     ? ((actionError as { code?: string }).code === "constructor_unsaved" ? t("examTemplates.constructor.publishBlocked") : errText(actionError))
     : undefined;
 
-  const tabItems = useMemo(() => TABS.map((id) => ({
-    id,
-    label: t(`examTemplates.constructor.tabs.${id}`),
-    count: id === "structure" && draft ? draft.sections.length : undefined,
-  })), [t, draft]);
+  // Phase 8b UX: a tab's count is the number of problems in it (red), not the number of sections
+  const tabItems = useMemo(() => TABS.map((id) => {
+    const n = c.issues.filter((i) => tabOfLoc(i.loc) === id).length;
+    return {
+      id,
+      label: t(`examTemplates.constructor.tabs.${id}`),
+      count: n > 0 && id !== "sample" && id !== "versions" ? (
+        <><span aria-hidden="true">{n}</span><span className="sr-only">{t("examTemplates.constructor.tabs.issues", { n })}</span></>
+      ) : undefined,
+      countTone: "danger" as const,
+    };
+  }), [t, c.issues]);
+
+  // Header "Preview": the same launch as the Sample tab; without sample questions yet, or on an error, the Sample tab
+  // shows what is missing.
+  const onPreview = () => {
+    if (!tpl?.sandbox && !sandboxSeen) { setTab("sample"); return; }
+    void preview.launch().then((ok) => { if (!ok) setTab("sample"); });
+  };
 
   if (c.loadError && !tpl) {
     const status = (c.loadError as { status?: number }).status;
@@ -182,6 +200,21 @@ export function ExamTemplateEditor({ area, templateId, crumbs }: {
   if (!tpl || !draft) return <LoadingState label={t("lms.common.loading")} />;
 
   const tabProps = { draft, update: c.update, readOnly, err, sectionName };
+  // Phase 8b UX: the lock dialog lists what the lock fixes (the ticked lock-scope keys, their Display-tab labels)
+  const lockEffect = draft.lockScope.length > 0 ? (
+    <div className="space-y-2">
+      <p>{t("examTemplates.lock.effectIntro")}</p>
+      <ul className="list-disc space-y-0.5 pl-5">
+        {draft.lockScope.map((k) => <li key={k}>{t(`examTemplates.specForm.lockKeys.${k}`)}</li>)}
+      </ul>
+      <p>{t("examTemplates.lock.effectEarlier")}</p>
+    </div>
+  ) : (
+    <div className="space-y-2">
+      <p>{t("examTemplates.lock.effectNone", { where: `${t("examTemplates.constructor.tabs.display")} → ${t("examTemplates.specForm.lockScope")}` })}</p>
+      <p>{t("examTemplates.lock.effectEarlier")}</p>
+    </div>
+  );
   const blocksGate = (body: (b: BlocksOut) => React.ReactNode) => blocksError && !blocks
     ? <ErrorState variant="inline" message={t("examTemplates.constructor.blocksError")} onRetry={() => setBlocksTry((n) => n + 1)} />
     : !blocks ? <LoadingState rows={3} label={t("lms.common.loading")} /> : body(blocks);
@@ -189,7 +222,7 @@ export function ExamTemplateEditor({ area, templateId, crumbs }: {
   return (
     <div className="space-y-5">
       <ConstructorHeader tpl={tpl} name={name} crumbs={crumbs(name)} readOnly={readOnly} saveState={c.saveState}
-        issueCount={c.issues.length} canPublish={canPublish} onAction={onHeaderAction} onPreview={() => setTab("sample")}
+        issueCount={c.issues.length} canPublish={canPublish} onAction={onHeaderAction} onPreview={onPreview} previewBusy={preview.busy}
         onRetrySave={() => (c.saveState === "conflict" ? setConflictHidden(false) : void c.flush())} />
 
       {tpl.status === "archived" ? (
@@ -242,7 +275,7 @@ export function ExamTemplateEditor({ area, templateId, crumbs }: {
       <TabPanel tabsId="tpl-constructor" value="sample" hidden={tab !== "sample"}>
         {visited.has("sample") && (
           <SampleTab tpl={tpl} draft={draft} active={tab === "sample"} archived={tpl.status === "archived"} saveState={c.saveState}
-            flush={c.flush} />
+            flush={c.flush} preview={preview} sectionName={sectionName} onSandbox={onSandbox} />
         )}
       </TabPanel>
       <TabPanel tabsId="tpl-constructor" value="versions" hidden={tab !== "versions"}>
@@ -265,7 +298,7 @@ export function ExamTemplateEditor({ area, templateId, crumbs }: {
         onConfirm={() => void run("promote")} onCancel={() => setAction(null)} />
       <ReasonDialog open={action === "lock" || action === "unlock"} optional maxLength={500}
         title={t(action === "unlock" ? "examTemplates.unlock.title" : "examTemplates.lock.title")} object={objectName}
-        effect={t(action === "unlock" ? "examTemplates.unlock.effect" : "examTemplates.lock.effect")}
+        effect={action === "unlock" ? t("examTemplates.unlock.effect") : lockEffect}
         confirmLabel={t(action === "unlock" ? "examTemplates.unlock.action" : "examTemplates.lock.action")}
         reasonLabel={t("examTemplates.lock.reason")}
         cancelLabel={t("ui.cancel")} busy={actionBusy} error={actionErrorText}
