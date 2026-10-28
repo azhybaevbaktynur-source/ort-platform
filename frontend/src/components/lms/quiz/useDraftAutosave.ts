@@ -34,6 +34,7 @@ export function useDraftAutosave({
   const chain = useRef<Promise<void>>(Promise.resolve());
   const stopped = useRef(false);
   const mounted = useRef(true);
+  const inflight = useRef(false);
   const createRef = useRef(createBody);
   createRef.current = createBody;
   const [status, setStatusState] = useState<AutosaveStatus>(initialDraft ? "saved" : "idle");
@@ -41,19 +42,22 @@ export function useDraftAutosave({
   const [draftId, setDraftId] = useState<string | null>(idRef.current);
   const setStatus = (s: AutosaveStatus) => { if (mounted.current) setStatusState(s); };
 
-  const run = useCallback(async () => {
+  const run = useCallback(async (keepalive?: unknown) => {
     const p = pending.current;
     if (!p || stopped.current) return;
     pending.current = null;
     setStatus("saving");
+    inflight.current = true;
+    // Phase 7c UX: the last save when the page is hidden or left must outlive the page (`keepalive`).
+    const opts = { keepalive: keepalive === true };
     try {
       let d: DraftOut;
       if (!idRef.current) {
-        d = await createDraft(courseId, assessmentId, { ...createRef.current(), payload: p });
+        d = await createDraft(courseId, assessmentId, { ...createRef.current(), payload: p }, opts);
         idRef.current = d.id;
         if (mounted.current) setDraftId(d.id);
       } else {
-        d = await updateDraft(courseId, assessmentId, idRef.current, { draft_rev: revRef.current, payload: p });
+        d = await updateDraft(courseId, assessmentId, idRef.current, { draft_rev: revRef.current, payload: p }, opts);
       }
       revRef.current = d.draft_rev;
       setStatus(pending.current ? "saving" : "saved");
@@ -83,6 +87,8 @@ export function useDraftAutosave({
         if (timer.current) clearTimeout(timer.current);
         timer.current = setTimeout(() => { timer.current = null; chain.current = chain.current.then(run); }, RETRY_MS);
       }
+    } finally {
+      inflight.current = false;
     }
   }, [courseId, assessmentId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -142,6 +148,32 @@ export function useDraftAutosave({
       mounted.current = false;
       if (timer.current) { clearTimeout(timer.current); timer.current = null; }
       if (pending.current && !stopped.current) chain.current = chain.current.then(run);
+    };
+  }, [run]);
+
+  // Phase 7c UX (no lost keystrokes): the tab is hidden, closed or navigated away within the debounce: send the pending
+  // change at once with `keepalive`, and ask before leaving while a save is still waiting or running.
+  useEffect(() => {
+    const sendNow = () => {
+      if (!pending.current || stopped.current) return;
+      if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+      chain.current = chain.current.then(() => run(true));
+    };
+    const onVisibility = () => { if (document.visibilityState === "hidden") sendNow(); };
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if ((pending.current && !stopped.current) || inflight.current) {
+        sendNow();
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("pagehide", sendNow);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", sendNow);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [run]);
 

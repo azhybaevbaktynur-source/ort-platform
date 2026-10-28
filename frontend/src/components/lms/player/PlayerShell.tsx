@@ -14,6 +14,7 @@ import {
 } from "@/lib/lms/attempts";
 import type { AttemptContent, AttemptItemState, AttemptState, SubmitOut } from "@/lib/lms/attemptTypes";
 import type { Lang, LocalizedText } from "@/lib/lms/types";
+import { getAssessment } from "@/lib/lms/assessments";
 
 /** Section title/instructions: plain string, or LocalizedText resolved to the attempt language. */
 function sectionText(v: string | LocalizedText | null | undefined, lang: Lang): string {
@@ -267,7 +268,23 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
     [sortedItems, forwardOnly, state],
   );
 
+  // Phase 7c UX: a quiz with one untitled, unkeyed section (the hidden default section of the quiz editor) shows the
+  // quiz title instead of "Section 1". Only that case fetches the title; timed, keyed sections (ORT) are unchanged.
+  const hiddenSection = !!content && content.sections.length === 1 && !sectionText(content.sections[0].title, content.language ?? lang)
+    && !content.sections[0].key;
+  const [quizTitle, setQuizTitle] = useState<string | null>(null);
+  const assessmentId = state?.assessment_id;
+  useEffect(() => {
+    if (!hiddenSection || !assessmentId) return;
+    let alive = true;
+    getAssessment(courseId, assessmentId)
+      .then((a) => { if (alive) setQuizTitle(pickLocalized(a.title, content?.language ?? lang) || t("assessments.untitled")); })
+      .catch(() => { if (alive) setQuizTitle(t("assessments.untitled")); });
+    return () => { alive = false; };
+  }, [hiddenSection, assessmentId, courseId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const sectionTitle = useCallback((pos: number): string => {
+    if (hiddenSection) return quizTitle ?? "";
     const s = content?.sections.find((x) => x.pos === pos);
     const title = sectionText(s?.title, content?.language ?? lang);
     if (title) return title;
@@ -276,7 +293,7 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
       if (label !== `sections.${s.key}`) return label;
     }
     return `${t("player.section")} ${pos}`;
-  }, [content, lang, t]);
+  }, [content, lang, t, hiddenSection, quizTitle]);
 
   const answeredOf = useCallback((it: AttemptItemState): boolean => {
     if (!state || !content) return false;
@@ -615,7 +632,7 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
           {/* S11a, F7: a problem state (offline, error) may take its own line on phones instead of squeezing to one word per line. */}
           <div className={cn(
             "flex min-w-0 flex-1 items-center justify-between gap-3 sm:flex-none sm:justify-end",
-            ["offline", "error", "auth", "closed"].includes(snap.status) && "flex-wrap gap-y-2",
+            (["offline", "error", "auth", "closed"].includes(snap.status) || deadline === null) && "flex-wrap gap-y-2",
           )}>
             <SaveStatus snap={snap} onRetry={() => queueRef.current?.retryNow()} />
             <div className="ml-auto flex shrink-0 items-center gap-2">

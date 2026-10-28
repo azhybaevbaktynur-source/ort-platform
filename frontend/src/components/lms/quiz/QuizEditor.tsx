@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { ListChecks, Plus } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import {
   addItem, addSection, deleteItem as apiDeleteItem, deleteSection, getAssessment, reorderItems, reorderSections, startPreview,
@@ -20,7 +20,7 @@ import type { Lang } from "@/lib/lms/types";
 import { useCourse } from "@/components/lms/CourseContext";
 import { useCanEditContent } from "@/components/lms/content/StaffGate";
 import { useTabCrumbs } from "@/components/lms/course/StaffCourseUi";
-import { Button, ConfirmDialog, PageHeader, TabPanel, Tabs } from "@/components/ui";
+import { Button, ConfirmDialog, EmptyState, PageHeader, TabPanel, Tabs } from "@/components/ui";
 import { inputCls } from "@/components/lms/content/ui";
 import { emptyForm, payloadFromForm } from "@/components/lms/content/types/formModel";
 import type { AddItemsTab } from "@/components/lms/assessments/AddItemsDialog";
@@ -176,7 +176,15 @@ export function QuizEditor({ initial }: { initial: AssessmentStaffOut }) {
       await guard(() => reorderItems(course.id, aid, section.id, { item_ids: ids, parent_item_id: parent.id }));
     },
     moveToSection: async (item, sectionId) => {
+      // Phase 7c UX: the open card closes first (a valid card is saved, else its draft is kept), like "Delete";
+      // then the moved card is shown in its new section.
+      if (!(await closeOpen())) return;
       await guard(() => updateItem(course.id, aid, item.id, { section_id: sectionId }));
+      requestAnimationFrame(() => {
+        const el = document.querySelector<HTMLElement>(`[data-quiz-item="${item.id}"]`);
+        el?.scrollIntoView({ block: "center" });
+        el?.querySelector<HTMLElement>("button")?.focus({ preventScroll: true });
+      });
     },
     deleteItem: async (section, item, index, parent) => {
       if (openKey === itemKey(item.id)) setOpenKey(null);
@@ -323,9 +331,9 @@ export function QuizEditor({ initial }: { initial: AssessmentStaffOut }) {
     <div className="space-y-4">
       <PageHeader breadcrumbs={crumbs} title={aTitle} className="mb-2" />
       {!canEdit && <p className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-sm text-amber-900">{t("assessments.builder.readOnly")}</p>}
-      <QuizPublishBar ctx={ctx} />
+      <QuizPublishBar ctx={ctx} labels={labels} />
       <Tabs id="quiz-editor" label={t("quizEditor.tabs.label")} value={tab} onChange={switchTab} items={[
-        { id: "questions", label: t("quizEditor.tabs.questions"), count: labels.size || undefined },
+        { id: "questions", label: t("quizEditor.tabs.questions"), count: a.item_count || undefined },
         { id: "settings", label: t("quizEditor.tabs.settings") },
         { id: "preview", label: t("quizEditor.tabs.preview") },
       ]} />
@@ -334,10 +342,8 @@ export function QuizEditor({ initial }: { initial: AssessmentStaffOut }) {
         <QuizError error={actionError} />
         {canEdit && structureLocked && showHeaders && <p role="note" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{lockedNote}</p>}
         {a.sections.length === 0 ? (
-          <div className="space-y-3">
-            <p className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-600">{t("quizEditor.section.emptyQuiz")}</p>
-            {canEdit && <AddAtEnd ops={ops} section={null} />}
-          </div>
+          <EmptyState icon={<ListChecks />} title={t("quizEditor.section.emptyQuizTitle")} description={t("quizEditor.section.emptyQuizBody")}
+            action={canEdit ? <AddAtEnd ops={ops} section={null} primary /> : undefined} />
         ) : (
           <div className="space-y-4">
             {a.sections.map((s, i) => (
