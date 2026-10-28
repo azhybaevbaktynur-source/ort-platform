@@ -23,3 +23,14 @@ EXAM_TEMPLATE_POLICIES.update({
     ("GET", f"{_T}/versions/{{version_no}}/import-format"): _ids.POLICY_READ,   # S3 router, mounted by S2
 })
 # --- Phase 7b S2 end ---
+
+# --- Phase 8b S1 begin --- (PHASE_8B_DESIGN 6.1: sandbox, preview, diff). The inventory test rejects entries for
+# routes that are not mounted yet ("stale"), so S1 only names the planned entries; S2 mounts the routes and moves
+# `PLANNED_POLICIES` into `EXAM_TEMPLATE_POLICIES` in its own delimited block. `PATCH /courses/{c}/assessments/{a}`
+# (display fields) and the attempt state / result / review routes are existing routes: no inventory change.
+PLANNED_POLICIES: dict[tuple[str, str], str] = {
+    ("POST", f"{_T}/sandbox"): _ids.POLICY_MANAGE,                # ensure + sync, no attempt
+    ("POST", f"{_T}/preview"): _ids.POLICY_MANAGE_RATELIMIT,      # attempt_start_limit
+    ("GET", f"{_T}/diff"): _ids.POLICY_READ,                      # to=draft additionally needs can_manage (else 404)
+}
+# --- Phase 8b S1 end ---

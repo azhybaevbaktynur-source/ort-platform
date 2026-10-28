@@ -198,6 +198,9 @@ class Settings(BaseSettings):
     COURSE_FILES_MAX_BYTES: int = 500 * 1024 * 1024  # live course files of one course (413 course_files_quota)
     PAGE_PREVIEW_RATE_PER_HOUR: int = 600            # POST /pages/preview per user
     # --- Phase 8a S1 end ---
+    # --- Phase 8b S1 begin --- (exam template preview, docs/phases/PHASE_8B_DESIGN.md 5.1, P8B-2)
+    SANDBOX_PREVIEW_KEEP: int = 20  # finished preview attempts kept per author on a template's sample quiz
+    # --- Phase 8b S1 end ---
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

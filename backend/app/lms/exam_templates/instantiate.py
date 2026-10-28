@@ -81,13 +81,6 @@ def resolve_parameters(spec: ExamTemplateSpec, parameters: Optional[dict]) -> di
     return out
 
 
-def _assert_display_mode(spec: ExamTemplateSpec) -> None:
-    if spec.display_mode == "scrolling":  # P7B-1: accepted in specs, built in 8b
-        raise ValidationFailed("The scrolling display mode is not available yet",
-                               code=ids.E_DISPLAY_MODE_NOT_AVAILABLE,
-                               details=[{"loc": ["display_mode"], "msg": "not available"}])
-
-
 def section_values(spec: ExamTemplateSpec, keys: dict[int, str]) -> list[dict]:
     """The `assessment_sections` column values of a spec, in order (position 1..n); rules as the builder stores them
     (`normalize_rules`, `None` dropped)."""
@@ -117,7 +110,6 @@ def instantiate(db: Session, ctx: AuthzContext, course: Course, version: ExamTem
     if t.status == "archived":
         raise Conflict("The template is archived", code=ids.E_TEMPLATE_ARCHIVED)
     spec = ExamTemplateSpec.model_validate(version.spec)
-    _assert_display_mode(spec)
     if set(languages) - set(course.languages or []):
         raise ValidationFailed("Languages must be a subset of the course languages", code="languages_not_in_course")
     keys = resolve_parameters(spec, parameters)
@@ -242,7 +234,6 @@ def upgrade_to_latest(db: Session, ctx: AuthzContext, course: Course, assessment
         raise Conflict("Only a draft without attempts on an older version can be upgraded",
                        code=ids.E_TEMPLATE_UPGRADE_NOT_ALLOWED)
     spec = ExamTemplateSpec.model_validate(latest.spec)
-    _assert_display_mode(spec)
     old = repo.load_sections(db, a.id)
     keys = _reapply_parameters(spec, old)
     before_scheme = a.grading_scheme_version_id

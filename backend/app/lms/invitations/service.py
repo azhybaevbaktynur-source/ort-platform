@@ -24,7 +24,7 @@ from app.lms.core import clock, ratelimit
 from app.lms.core.errors import Conflict, Forbidden, NotFound, RateLimited, ValidationFailed
 from app.lms.core.ratelimit import Limit
 from app.lms.courses.models import Course
-from app.lms.courses.service import add_event, get_enrollment, paginate_rows, require_course
+from app.lms.courses.service import add_event, assert_not_sandbox, get_enrollment, paginate_rows, require_course
 from app.lms.enrollments.models import Enrollment
 from app.lms.enrollments.service import require_staff_power
 from app.lms.invitations import emails
@@ -249,6 +249,7 @@ def create_staff_invitation(db: Session, ctx: AuthzContext, course: Course, *, e
             _ensure_active_org(staff_org)
     # --- Phase 6 S4b end ---
     require_course(ctx, A.ROSTER_MANAGE, course)
+    assert_not_sandbox(course)  # Phase 8b S1: sandbox staff are the template's managers, never invited
     require_staff_power(ctx, course)
     actor = ctx.user
     if role == "teacher" and course.owner_id != actor.id:

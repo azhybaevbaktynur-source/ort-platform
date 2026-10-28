@@ -78,6 +78,10 @@ def reset_lms_state() -> None:
 
         conn.execute(update(Assessment.__table__).values(exam_template_version_id=None))
         conn.execute(update(ExamTemplate.__table__).values(current_version_id=None))
+        # --- Phase 8b S1 begin --- sandbox courses reference their template (SET NULL; explicit for clarity)
+        conn.execute(update(Course.__table__).where(Course.sandbox_for_template_id.isnot(None))
+                     .values(sandbox_for_template_id=None))
+        # --- Phase 8b S1 end ---
         for model in (ExamTemplateVersion, ExamTemplate):
             conn.execute(delete(model.__table__))
         # --- Phase 7b S1 end ---

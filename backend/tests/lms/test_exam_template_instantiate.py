@@ -1,5 +1,5 @@
 """Phase 7b S2 `instantiate` (PHASE_7B_DESIGN 5.3): the rows equal a hand-built assessment, the quiz assignment is
-written in the same transaction, parameters, `display_mode_not_available`, exclusivity with `preset`, pinned
+written in the same transaction, parameters, scrolling allowed since 8b (P7B-1 lifted), exclusivity with `preset`, pinned
 versions, and the 7a `/assignments` path with its `later` settings."""
 from __future__ import annotations
 
@@ -105,9 +105,12 @@ async def test_parameters(db, api):
 
 async def test_refusals(db, api):
     w = tworld(db)
-    t = await published_template(api, w.PA, spec=general_spec(display_mode="scrolling"))  # accepted in the spec
-    body = await create_from(api, w.TA, w.cid, t["id"], status=422)
-    assert body["error"]["code"] == "display_mode_not_available"
+    # Phase 8b S1: the scrolling display mode is built; instantiate copies it (P7B-1 lifted)
+    t = await published_template(api, w.PA, spec=general_spec(display_mode="scrolling"))
+    scrolling = await create_from(api, w.TA, w.cid, t["id"])
+    assert scrolling["display_mode"] == "scrolling"
+    assert db.get(Assessment, uuid.UUID(scrolling["id"])).display_mode == "scrolling"
+    before = {r.id for r in db.execute(select(Assessment)).scalars()}
     ok = await published_template(api, w.PA)
     body = await create_from(api, w.TA, w.cid, ok["id"], preset="ort_main", status=422)
     assert body["error"]["code"] == "preset_template_exclusive"
@@ -115,7 +118,8 @@ async def test_refusals(db, api):
     assert body["error"]["code"] == "languages_not_in_course"
     body = await create_from(api, w.TA, w.cid, ok["id"], parameters={"subject": "physics"}, status=422)
     assert body["error"]["code"] == "parameter_invalid"                 # the template declares no parameters
-    assert db.execute(select(Assessment)).first() is None and db.execute(select(Assignment)).first() is None
+    assert {r.id for r in db.execute(select(Assessment)).scalars()} == before
+    assert len(db.execute(select(Assignment)).scalars().all()) == 1     # only the scrolling quiz's assignment
 
 
 async def test_pinned_version_and_version_template_mismatch(db, api):

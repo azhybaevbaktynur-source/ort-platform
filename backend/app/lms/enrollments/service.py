@@ -67,6 +67,8 @@ def join_open(db: Session, user: User, course_id: uuid.UUID, ip_hash: Optional[s
 def _joinable(course: Course, source: str) -> bool:
     if course.deleted_at is not None or course.status != "published":
         return False
+    if course.sandbox_for_template_id is not None:  # Phase 8b S1: defence in depth (a sandbox is never published)
+        return False
     if course.enrollment_mode != _MODE_FOR_SOURCE[source]:
         return False
     if source == "open" and (course.visibility != "catalog" or course.unlisted_by_admin_at is not None):
@@ -176,6 +178,9 @@ def leave(db: Session, ctx: AuthzContext, course: Course) -> None:
 
 def add_staff(db: Session, ctx: AuthzContext, course: Course, email: str, role: Literal["teacher", "assistant"]) -> Enrollment:
     require_course(ctx, A.ROSTER_MANAGE, course)
+    from app.lms.courses.service import assert_not_sandbox  # Phase 8b S1: sandbox staff = template managers
+
+    assert_not_sandbox(course)
     require_staff_power(ctx, course)
     if role == "teacher":
         _owner_only(ctx, course)

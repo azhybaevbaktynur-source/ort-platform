@@ -3511,7 +3511,13 @@
       "count_below_min": "A section has fewer questions than the template asks for.",
       "count_above_max": "A section has more questions than the template allows.",
       "attach_target_mismatch": "The questions can only be added to a draft made from the same template version.",
-      "format_mismatch": "The file does not match the chosen format. Choose the other format."
+      "format_mismatch": "The file does not match the chosen format. Choose the other format.",
+      "nothing_to_preview": "There is nothing to preview yet. Add at least one section to the template.",
+      "preview_not_ready": "The preview cannot start yet: add sample questions to every section.",
+      "language_not_in_assessment": "The sample questions are not available in this language.",
+      "sandbox_course": "This course holds a template's sample questions and cannot be changed here.",
+      "diff_target_invalid": "There is no draft to compare with.",
+      "version_not_found": "This template version does not exist."
     },
     "versions": {
       "title": "Versions",
