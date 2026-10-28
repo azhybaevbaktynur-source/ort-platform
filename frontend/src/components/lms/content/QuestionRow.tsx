@@ -2,14 +2,14 @@
 
 import React from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowUp, ImageIcon, Languages, RotateCcw, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ImageIcon, Languages, FolderInput, RotateCcw, Trash2 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import type { QuestionSummaryOut } from "@/lib/lms/contentTypes";
 import { btnSmall } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 
 export function QuestionRow({
-  courseId, q, busy, canEdit, onMove, onDelete, onRestore,
+  courseId, q, busy, canEdit, onMove, onDelete, onRestore, onMoveToBank,
 }: {
   courseId: string;
   q: QuestionSummaryOut;
@@ -18,6 +18,8 @@ export function QuestionRow({
   onMove: (dir: "up" | "down") => void;
   onDelete: () => void;
   onRestore: () => void;
+  /** Phase 7c: only passed for questions of a quiz bank. */
+  onMoveToBank?: () => void;
 }) {
   const { lang, t } = useTranslation();
   const deleted = !!q.deleted_at;
@@ -53,6 +55,11 @@ export function QuestionRow({
               <button type="button" disabled={busy} className={btnSmall} onClick={() => onMove("down")} aria-label={t("bank.questions.moveDown")}>
                 <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
+              {onMoveToBank && (
+                <button type="button" disabled={busy} className={btnSmall} onClick={onMoveToBank} aria-label={t("bank.moveToBank.action")} title={t("bank.moveToBank.action")}>
+                  <FolderInput className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              )}
               <button type="button" disabled={busy} className={btnSmall} onClick={onDelete} aria-label={t("bank.questions.delete")}>
                 <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
