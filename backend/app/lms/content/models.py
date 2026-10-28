@@ -41,10 +41,25 @@ class QuestionBank(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
         Uuid(as_uuid=True), ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False
     )
     # --- Phase 6 S1 end ---
+    # --- Phase 7c S1 begin --- (PHASE_7C_DESIGN 2.1: NULL = shared bank; NOT NULL = the quiz bank of that assessment)
+    assessment_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("assessments.id", ondelete="RESTRICT"), nullable=True
+    )
+    # --- Phase 7c S1 end ---
 
     __table_args__ = (
         CheckConstraint("default_language IS NULL OR default_language IN ('en','ru','ky')",
                         name="default_language_valid"),
+        # --- Phase 7c S1 begin --- (one live quiz bank per assessment; a quiz bank has a course and no importer source)
+        CheckConstraint("assessment_id IS NULL OR course_id IS NOT NULL", name="quiz_bank_has_course"),
+        CheckConstraint("assessment_id IS NULL OR source_id IS NULL", name="quiz_bank_no_source"),
+        Index("ix_question_banks_assessment_id", "assessment_id"),
+        Index(
+            "uq_question_banks_assessment_live", "assessment_id", unique=True,
+            postgresql_where=text("assessment_id IS NOT NULL AND deleted_at IS NULL"),
+            sqlite_where=text("assessment_id IS NOT NULL AND deleted_at IS NULL"),
+        ),
+        # --- Phase 7c S1 end ---
         Index("ix_question_banks_organization_id", "organization_id"),  # Phase 6 S1
         Index(
             "uq_question_banks_course_source", "course_id", "source_id", unique=True,

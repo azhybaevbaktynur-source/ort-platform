@@ -74,6 +74,12 @@ def reset_lms_state() -> None:
         # Phase 3 (attempts, then assessment rows; child items before parents).
         for model in (AttemptItem, AttemptSection, Attempt):
             conn.execute(delete(model.__table__))
+        # --- Phase 7c S1 begin --- drafts reference items and sections; quiz banks reference their assessment
+        from app.lms.quiz_editor.models import QuestionDraft
+
+        conn.execute(delete(QuestionDraft.__table__))
+        conn.execute(update(QuestionBank.__table__).values(assessment_id=None))
+        # --- Phase 7c S1 end ---
         conn.execute(update(Assessment.__table__).values(published_version_id=None))
         conn.execute(delete(AssessmentItem.__table__).where(AssessmentItem.parent_item_id.isnot(None)))
         for model in (AssessmentItem, AssessmentVersion, AssessmentSection, Assessment):

@@ -167,8 +167,12 @@ def question_list_stmt(bank_id: uuid.UUID, f: QuestionFilter):
     return stmt
 
 
-def bank_rows_stmt(course_id: uuid.UUID, *, deleted: bool = False, bank_id: Optional[uuid.UUID] = None):
-    """(QuestionBank, live question count, live passage count) in one statement."""
+def bank_rows_stmt(course_id: uuid.UUID, *, deleted: bool = False, bank_id: Optional[uuid.UUID] = None,
+                   kind: str = "all"):
+    """(QuestionBank, live question count, live passage count, quiz title or None) in one statement.
+
+    Phase 7c: `kind` = all | shared (assessment_id IS NULL) | quiz (assessment_id IS NOT NULL); the quiz title comes
+    from an outer join on the bank's assessment (a quiz bank shows its quiz's title, PHASE_7C_DESIGN 5.1)."""
     qc = (
         select(func.count()).select_from(BankQuestion)
         .where(BankQuestion.bank_id == QuestionBank.id, BankQuestion.deleted_at.is_(None))
@@ -179,11 +183,22 @@ def bank_rows_stmt(course_id: uuid.UUID, *, deleted: bool = False, bank_id: Opti
         .where(Passage.bank_id == QuestionBank.id, Passage.deleted_at.is_(None))
         .correlate(QuestionBank).scalar_subquery()
     )
-    stmt = select(QuestionBank, qc.label("question_count"), pc.label("passage_count")).where(
-        QuestionBank.course_id == course_id
+    # --- Phase 7c S1 begin --- (quiz title through an outer join; kind filter)
+    from app.lms.assessments.models import Assessment
+
+    stmt = (
+        select(QuestionBank, qc.label("question_count"), pc.label("passage_count"),
+               Assessment.title.label("assessment_title"))
+        .outerjoin(Assessment, Assessment.id == QuestionBank.assessment_id)
+        .where(QuestionBank.course_id == course_id)
     )
     if bank_id is not None:
         return stmt.where(QuestionBank.id == bank_id)
+    if kind == "shared":
+        stmt = stmt.where(QuestionBank.assessment_id.is_(None))
+    elif kind == "quiz":
+        stmt = stmt.where(QuestionBank.assessment_id.is_not(None))
+    # --- Phase 7c S1 end ---
     return stmt.where(QuestionBank.deleted_at.is_not(None) if deleted else QuestionBank.deleted_at.is_(None))
 
 

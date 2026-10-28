@@ -94,6 +94,11 @@ from app.lms.exam_templates.policies import EXAM_TEMPLATE_POLICIES  # noqa: E402
 POLICY_NAMES = POLICY_NAMES | frozenset(_EXAM_TEMPLATE_POLICY_NAMES)
 ROUTE_POLICIES.update(EXAM_TEMPLATE_POLICIES)
 # --- Phase 7b S1 end ---
+# --- Phase 7c S1 begin --- (quiz editor, PHASE_7C_DESIGN 6.1: S2 fills QUIZ_EDITOR_POLICIES when it mounts the router)
+from app.lms.quiz_editor.policies import QUIZ_EDITOR_POLICIES  # noqa: E402
+
+ROUTE_POLICIES.update(QUIZ_EDITOR_POLICIES)
+# --- Phase 7c S1 end ---
 
 
 def iter_routes(app):
