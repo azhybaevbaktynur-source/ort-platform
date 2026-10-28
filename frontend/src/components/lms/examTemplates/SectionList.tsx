@@ -17,7 +17,7 @@ import { Badge, Button, Checkbox, FieldError, IconButton, Input, Select, cn } fr
 import {
   boundSections, keyFromTitle, keySourceTitle, newSection, sectionKey, type ParameterDraft, type SectionDraft, type SpecDraft,
 } from "./specDraft";
-import { fieldId, type FieldErr, type Update } from "./parts";
+import { fieldId, filledLang, type FieldErr, type Update } from "./parts";
 
 export function passageDisplayLabel(t: (k: string) => string, key: string): string {
   return t(`examTemplates.blocks.passageDisplays.${key}`);
@@ -160,12 +160,12 @@ function SectionCard({ s, i, count, types, forward, readOnly, open, bound, name,
       {open && (
         <div id={bodyId} className="space-y-4 border-t border-slate-200 p-4 sm:p-5">
           <div id={fieldId("sections", i, "title")}>
-            <LocalizedTextInput label={t("examTemplates.specForm.sectionTitle")} languages={LMS_LANGS} defaultLanguage={lang}
+            <LocalizedTextInput label={t("examTemplates.specForm.sectionTitle")} languages={LMS_LANGS} defaultLanguage={filledLang(s.title, lang)}
               value={s.title} onChange={(v) => onChange({ title: v })} maxLength={200} disabled={readOnly} />
             <FieldError>{err("sections", i, "title")}</FieldError>
           </div>
           <div id={fieldId("sections", i, "instructions")}>
-            <LocalizedTextInput label={t("examTemplates.specForm.instructions")} languages={LMS_LANGS} defaultLanguage={lang}
+            <LocalizedTextInput label={t("examTemplates.specForm.instructions")} languages={LMS_LANGS} defaultLanguage={filledLang(s.instructions, filledLang(s.title, lang))}
               value={s.instructions} onChange={(v) => onChange({ instructions: v })} maxLength={5000} multiline disabled={readOnly} />
             <FieldError>{err("sections", i, "instructions")}</FieldError>
           </div>

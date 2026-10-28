@@ -4,6 +4,7 @@
 import React, { useCallback } from "react";
 import { Lock } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
+import { useAuth } from "@/lib/auth-context";
 import { EXAM_TEMPLATE_ERROR_CODES, type ExamTemplateScope, type ExamTemplateStatus, type SpecIssue } from "@/lib/lms/examTemplateTypes";
 import { apiErrorText } from "@/components/lms/org/OrgUi";
 import { Badge, ErrorState, type BadgeTone } from "@/components/ui";
@@ -131,9 +132,12 @@ export function useSpecIssueText(sectionName: (index: number) => string) {
 // --- Phase 7b S7 end ---
 
 const SCOPE_TONE: Record<ExamTemplateScope, BadgeTone> = { platform: "system", organization: "info", teacher: "neutral" };
-export function ScopeBadge({ scope }: { scope: ExamTemplateScope }) {
+export function ScopeBadge({ scope, ownerId }: { scope: ExamTemplateScope; ownerId?: string | null }) {
   const { t } = useTranslation();
-  return <Badge tone={SCOPE_TONE[scope] ?? "neutral"}>{t(`examTemplates.scope.${scope}`)}</Badge>;
+  const { user } = useAuth();
+  // Phase 8b S5: a teacher template seen by someone else (the org admin) is "Teacher's", not "Mine"
+  const other = scope === "teacher" && !!ownerId && !!user?.uid && ownerId !== user.uid;
+  return <Badge tone={SCOPE_TONE[scope] ?? "neutral"}>{other ? t("examTemplates.scopeTeacherOther") : t(`examTemplates.scope.${scope}`)}</Badge>;
 }
 
 const STATUS_TONE: Record<ExamTemplateStatus, BadgeTone> = { draft: "warning", published: "success", archived: "neutral" };

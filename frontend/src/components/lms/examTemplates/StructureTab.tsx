@@ -12,7 +12,7 @@ import { LMS_LANGS } from "@/lib/lms/types";
 import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
 import { Button, Card, Checkbox, FieldError, IconButton, Input, Select, Textarea, toast } from "@/components/ui";
 import { draftOf, newParameter, specOf, type DefaultsDraft, type ParameterDraft, type SpecDraft } from "./specDraft";
-import { RadioCards, fieldId, type FieldErr, type Update } from "./parts";
+import { RadioCards, fieldId, filledLang, type FieldErr, type Update } from "./parts";
 import { SectionList } from "./SectionList";
 import type { Meta } from "./useConstructor";
 
@@ -38,11 +38,11 @@ export function StructureTab({ draft, update, meta, setMeta, readOnly, err, bloc
       <Card title={t("examTemplates.editor.general")}>
         <div className="space-y-4">
           <div id={fieldId("title")}>
-            <LocalizedTextInput label={t("examTemplates.fields.title")} languages={LMS_LANGS} defaultLanguage={lang} value={meta.title}
+            <LocalizedTextInput label={t("examTemplates.fields.title")} languages={LMS_LANGS} defaultLanguage={filledLang(meta.title, lang)} value={meta.title}
               onChange={(v) => setMeta({ title: v })} maxLength={200} required disabled={readOnly} />
             <FieldError>{err("title")}</FieldError>
           </div>
-          <LocalizedTextInput label={t("examTemplates.fields.description")} languages={LMS_LANGS} defaultLanguage={lang} value={meta.description}
+          <LocalizedTextInput label={t("examTemplates.fields.description")} languages={LMS_LANGS} defaultLanguage={filledLang(meta.description, filledLang(meta.title, lang))} value={meta.description}
             onChange={(v) => setMeta({ description: v })} maxLength={2000} multiline disabled={readOnly} />
         </div>
       </Card>
