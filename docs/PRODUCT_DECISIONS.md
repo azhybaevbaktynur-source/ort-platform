@@ -391,3 +391,29 @@ Design: `phases/PHASE_7C_DESIGN.md` (§14 P7C-1…P7C-11, §16 amendment). The o
 | P7C-12 | ORT | ORT preset exams refuse quiz-editor writes (409 `template_locked`) and keep `SectionBuilder` (today's builder, moved verbatim). A teacher may still make a non-ORT quiz inside an ORT course with the quiz editor. |
 | P7C-13 | Language of an existing card | Locked (422 `language_locked`); other languages are separate questions (translation groups). |
 | P7C-14 | Answer key in the editor | Collapsed cards show a staff-only `correct_summary`; never present in student payloads. |
+
+## Phase 8a decisions (agent, 2026-10-28)
+
+Design: `phases/PHASE_8A_DESIGN.md` (§14, §15). Owner questions with the defaults in effect (listed at the checkpoint after 8b):
+
+| # | Question | Default in effect |
+|---|---|---|
+| 8a-Q1 | Gate ORT exams by module rules? | **Never.** An ORT exam inside a module stays startable and is shown as "Available from Assignments" even when the module is locked. |
+| 8a-Q2 | Default home of new general courses | **Modules** (falls back to today's layout while no module is published). Existing and ORT courses keep the assignments home. |
+| 8a-Q3 | Page format | **Markdown**, sanitized on the server (`Markdown==3.11.1` + `nh3==0.3.7`), KaTeX on the client. |
+| 8a-Q4 | Course files budget | **500 MiB per course** of PDFs, inside the R2 free-tier guard. |
+| 8a-Q5 | Structure features inside ORT courses | **Allowed**: staff see Modules/Pages/Files/Announcements tabs in ORT courses; students only once something is published; the ORT exam, player, import and scoring are untouched. ORT teacher screenshot baselines re-recorded for the new tabs. |
+
+Implementation decisions:
+
+| # | Decision |
+|---|---|
+| P8A-1 | Submit/score facts come from `submissions` (released grades only); not duplicated as progress facts. |
+| P8A-2 | Pages/announcements are Markdown rendered and sanitized on the server into `body_html`; footnote `#fragment` links allowed; images only from our hosts. |
+| P8A-3 | The gate (423 `module_locked`) guards page GET (all language variants of a page's group), file download/content, assignment detail, quiz lobby, hand-in and hand-in uploads, attempt start; content outside modules is ungated; a target in several modules is open if any is. |
+| P8A-4 | The evaluator recomputes on every read (≤ 7 queries), writes only on change, states are monotone; `rules_version` is informational. "Re-apply rules" is the only relock. Changing a requirement's type or tightening its threshold clears that item's "met" memory (completed modules stay completed). |
+| P8A-5 | Prerequisite/order violations are 422, never silently dropped. |
+| P8A-6 | Course files: PDF only (magic bytes), 10 MiB each, private bucket, presigned 120 s downloads; folders are path strings. |
+| P8A-7 | Locked items carry no destination (no link, no URL as title). |
+| P8A-8 | A requirement on an unpublished target does not count; the outline editor warns the teacher at module level and before publishing such a module. |
+| P8A-9 | No announcement emails in 8a; `/me/home` shows the latest three and the "up next" strip reads stored progress only (bounded scan of 100 modules). |
