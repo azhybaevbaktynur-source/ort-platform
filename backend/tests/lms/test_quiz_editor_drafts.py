@@ -222,3 +222,41 @@ async def test_soft_deleted_quiz_keeps_drafts(db, api):
     assert (await api.call(w.O, "POST", f"{A(w)}/restore")).status_code == 200
     g = (await api.call(w.O, "GET", A(w))).json()
     assert [x["id"] for x in g["drafts"]] == [d["id"]]
+
+
+async def test_draft_image_ids_must_be_usable(db, api):
+    """Phase 7c fix1 (L1): a draft refers only to images commit would accept (the actor's live image, or carried by
+    the card's version); images already in the draft stay usable for a colleague's autosave."""
+    from tests.lms.factories import make_asset, make_question
+
+    w = quiz_world(db)
+    mine, theirs = make_asset(db, w.O), make_asset(db, w.X)
+
+    def choices_with(aid):
+        return {"choices": [{"id": "A", "text": "3"}, {"id": "B", "text": "4", "image_asset_id": aid}], "correct": "B"}
+
+    # O's own image: fine; the co-teacher's autosave keeps it
+    r = await new_draft(api, w, payload=card(image_asset_id=str(mine.id)))
+    assert r.status_code == 201, r.text
+    d = r.json()
+    r = await put_draft(api, w, d["id"], d["draft_rev"], payload=card(image_asset_id=str(mine.id), stem="T"), user=w.T)
+    assert r.status_code == 200, r.text
+    # another user's image, as the card image or a choice image, and a malformed id
+    r = await new_draft(api, w, user=w.T, payload=card(image_asset_id=str(theirs.id)))
+    assert r.status_code == 422 and err(r) == "validation_failed", r.text
+    assert r.json()["error"]["details"] == [{"loc": ["payload", "image_asset_id"], "msg": "asset_not_usable"}]
+    r = await new_draft(api, w, payload=card(data=choices_with(str(theirs.id))))
+    assert r.status_code == 422 and err(r) == "validation_failed", r.text
+    assert r.json()["error"]["details"] == [
+        {"loc": ["payload", "data", "choices", 1, "image_asset_id"], "msg": "asset_not_usable"}]
+    r = await new_draft(api, w, payload=card(data=choices_with("not-a-uuid")))
+    assert r.status_code == 422 and err(r) == "validation_failed", r.text
+    r = await put_draft(api, w, d["id"], d["draft_rev"] + 1, payload=card(image_asset_id=str(theirs.id)))
+    assert r.status_code == 422 and err(r) == "validation_failed", r.text
+    db.expire_all()
+    assert db.get(QuestionDraft, uuid.UUID(d["id"])).payload["stem"] == "T"
+    # an existing card whose version already shows another user's image: carried
+    q = make_question(db, w.shared, w.X, image={"asset_id": str(theirs.id), "sha256": theirs.sha256})
+    item = make_item(db, w.quiz, w.s1, question=q)
+    r = await new_draft(api, w, item_id=str(item.id), payload=staff_payload(db, q, image_asset_id=str(theirs.id)))
+    assert r.status_code == 201, r.text

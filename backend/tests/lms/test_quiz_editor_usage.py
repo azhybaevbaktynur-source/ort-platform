@@ -82,3 +82,52 @@ async def test_quiz_get_shows_bank_kind_and_used_elsewhere(db, api):
     assert qs[str(w.items[1].id)]["used_elsewhere"] == 0
     assert qs[r.json()["item"]["id"]]["bank_kind"] == "quiz" and qs[r.json()["item"]["id"]]["used_elsewhere"] == 0
     assert AssessmentItem
+
+
+async def test_commit_scans_published_snapshots_only_for_a_type_change(db, api, monkeypatch):
+    """Phase 7c fix1 (M3): content / meta commits never call `published_pins`; a type change calls it once, and not
+    at all when the cheap checks (used elsewhere) already force `this`."""
+    from app.lms.quiz_editor import usage
+    from tests.lms.quiz_editor_support import quiz_question
+
+    calls = []
+    real = usage.published_pins
+    monkeypatch.setattr(usage, "published_pins", lambda *a, **k: calls.append(1) or real(*a, **k))
+    w = quiz_world(db, link=True)
+    make_item(db, w.quiz2, w.s2, question=w.q2, position=1)
+    assert (await publish(api, w.O, w.cid, w.aid)).status_code == 200
+    item, q = await quiz_question(api, db, w)
+    _, r = await edit_card(api, w, item, staff_payload(db, q, stem="content only"))
+    assert r.status_code == 200 and r.json()["applied"] == "in_place", r.text
+    p = staff_payload(db, w.q1)
+    p["meta"] = {**p["meta"], "tags": ["t"]}
+    _, r = await edit_card(api, w, w.items[0], p)
+    assert r.status_code == 200 and r.json()["applied"] == "in_place", r.text
+    assert calls == []
+    tf = {"type": "true_false", "data": {"correct": True}}
+    _, r = await edit_card(api, w, w.items[1], staff_payload(db, w.q2, **tf))  # used in quiz B: forced, no scan
+    assert r.status_code == 200 and r.json()["applied"] == "this", r.text
+    assert calls == []
+    _, r = await edit_card(api, w, w.items[0], staff_payload(db, w.q1, **tf))  # published in quiz A: one scan
+    assert r.status_code == 200 and r.json()["applied"] == "this", r.text
+    assert calls == [1]
+    # GET /usage still reports it
+    assert (await _usage(api, w, w.q1.id))["published_anywhere"] is True
+
+
+async def test_published_pins_pages_through_published_quizzes(db, api, monkeypatch):
+    """M3 bound: published snapshots are read a page of assessments at a time; a pin on a later page is found."""
+    from app.lms.quiz_editor import usage
+
+    monkeypatch.setattr(usage, "_PIN_PAGE", 1)
+    w = quiz_world(db)
+    for title in ("P1", "P2", "P3"):
+        a, s = _quiz(db, w, title)
+        make_item(db, a, s, question=w.q2, position=1)
+        assert (await publish(api, w.O, w.cid, str(a.id))).status_code == 200
+    assert usage.published_pins(db, w.course.id, w.q1) is False
+    assert usage.published_pins(db, w.course.id, w.q2) is True
+    a, s = _quiz(db, w, "P4")
+    make_item(db, a, s, question=w.q1, position=1)
+    assert (await publish(api, w.O, w.cid, str(a.id))).status_code == 200
+    assert usage.published_pins(db, w.course.id, w.q1) is True

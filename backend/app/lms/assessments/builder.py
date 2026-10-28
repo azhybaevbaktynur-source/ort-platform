@@ -350,7 +350,7 @@ def _language_ok(db: Session, a: Assessment, q: BankQuestion, members: Optional[
         return q.language
     if q.translation_group_id:
         if members is None:
-            members = _load_group_members(db, a.course_id, [q.translation_group_id], langs)
+            members = _load_group_members(db, a.course_id, [q.translation_group_id], langs, assessment_id=a.id)
         for lang in langs:
             if (q.translation_group_id, lang) in members:
                 return lang
@@ -457,7 +457,7 @@ def add_item(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID, sec
                 .order_by(BankQuestion.position, BankQuestion.id)).scalars())
         taken = _existing_question_ids(db, a.id)
         groups = list({q.translation_group_id for q in qs if q.translation_group_id})
-        members = _load_group_members(db, a.course_id, groups, list(a.languages)) if groups else {}
+        members = _load_group_members(db, a.course_id, groups, list(a.languages), assessment_id=a.id) if groups else {}
         for q in qs:
             if q.passage_id != p.id:
                 raise ValidationFailed("The question does not belong to the passage", code="passage_mismatch")
@@ -536,7 +536,7 @@ def _add_questions(db: Session, a: Assessment, sec: AssessmentSection, qs: list[
     number of questions added."""
     taken = _existing_question_ids(db, a.id)
     groups = list({q.translation_group_id for q in qs if q.translation_group_id})
-    members = _load_group_members(db, a.course_id, groups, list(a.languages)) if groups else {}
+    members = _load_group_members(db, a.course_id, groups, list(a.languages), assessment_id=a.id) if groups else {}
     total = repo.draft_totals(db, [a.id]).get(a.id, (0, 0.0))[0]
     mx = (sec.rules or {}).get("max_items")
     sec_rows = db.execute(select(AssessmentItem.kind, AssessmentItem.pick_count).where(
@@ -662,7 +662,7 @@ def update_item(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID, 
         qids = [i.question_id for i in [it, *kids] if i.question_id is not None]
         qmap = _load_course_questions(db, course.id, qids)
         groups = list({q.translation_group_id for q in qmap.values() if q.translation_group_id})
-        members = _load_group_members(db, a.course_id, groups, list(a.languages)) if groups else {}
+        members = _load_group_members(db, a.course_id, groups, list(a.languages), assessment_id=a.id) if groups else {}
         for qid in qids:
             q = qmap.get(qid)
             if q is not None:
@@ -677,6 +677,11 @@ def update_item(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID, 
         for k in kids:
             k.section_id = target.id
         db.flush()
+        # --- Phase 7c fix1 begin --- (M2: drafts of the moved cards follow them to the target section)
+        from app.lms.quiz_editor import drafts as _drafts
+
+        _drafts.move_drafts(db, item_ids=[it.id, *[k.id for k in kids]], section_id=target.id)
+        # --- Phase 7c fix1 end ---
         old_top = [i for i in db.execute(select(AssessmentItem).where(
             AssessmentItem.section_id == old_section, AssessmentItem.parent_item_id.is_(None))
             .order_by(AssessmentItem.position, AssessmentItem.id)).scalars()]
@@ -766,7 +771,8 @@ def _tree_out(db: Session, a: Assessment, sections: list[AssessmentSection], ite
     warnings: list[dict] = []
     langs = list(a.languages or [])
     groups = list({v[0].translation_group_id for v in qinfo.values() if v[0].translation_group_id})
-    members = _load_group_members(db, a.course_id, groups, langs) if groups and len(langs) >= 1 else {}
+    members = (_load_group_members(db, a.course_id, groups, langs, assessment_id=a.id)
+               if groups and len(langs) >= 1 else {})
 
     def one(it: AssessmentItem) -> sch.ItemOut:
         out = sch.ItemOut(id=it.id, kind=it.kind, position=it.position,
