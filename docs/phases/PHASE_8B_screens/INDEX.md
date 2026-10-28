@@ -32,3 +32,39 @@ use a subfolder named after `process.platform`, which CI records with `ORT_BASEL
 |---|---|
 | `scrolling-top-{desktop,phone}-ru.png` | Scrolling player, top of section 1, nothing answered. |
 | `one-per-page-{desktop,phone}-ru.png` | One-per-page general player, question 1 of 3 (regression shot: unchanged layout). |
+
+## S5: exam-template constructor, preview, teacher "Create from template"
+
+All written by `frontend/e2e/exam-constructor.spec.ts` with `PHASE8B_SCREENS_DIR=docs/phases/PHASE_8B_screens`: the
+walk test writes the three `*-desktop-ru` preview/locked shots, the test "UX-gate screenshots" writes the rest after
+the walk. Viewports `phone` (375x812) and `desktop` (1440x900), macOS, system Chrome. Data: the `seed_constructor`
+organization "Школа E2E"; the walk's organization template "Вступительный тест E2E" (v2: three sections, forward-only,
+scrolling, ORT main scheme, ORT-style result, lock scope "sections"), its sample quiz, and the teacher's exam
+"Вступительный тест, 9 класс" built from v1. Content is Russian; the UI language is the one in the file name.
+Admin and teacher screens are ru + en; the student result is ru + ky + en.
+
+| File | Screen |
+|---|---|
+| `ctor-list-{desktop,phone}-{ru,en}.png` | Org area, exam template list: organization and teacher templates; a teacher's template reads "Teacher's" (not "Mine"). |
+| `ctor-structure-{desktop,phone}-{ru,en}.png` | Constructor header (scope, status, v2, Publish / Preview / More) and the Structure tab (general settings). |
+| `ctor-section-{desktop,phone}-{ru,en}.png` | Structure tab: section 2 expanded (title, instructions, time, counts, allowed types, passages numbered, key). |
+| `ctor-scoring-{desktop,phone}-{ru,en}.png` | Scoring tab: system scheme "ORT main test" with the live preview table. |
+| `ctor-display-{desktop,phone}-{ru,en}.png` | Display tab: display mode cards with illustrations (scrolling chosen), passage display per section. |
+| `ctor-lockscope-{desktop,phone}-{ru,en}.png` | Display tab: lock scope checklist with the plain-language effect of each key ("sections" ticked). |
+| `ctor-sample-{desktop,phone}-{ru,en}.png` | Sample questions tab: note, "Preview as student" launcher, the 7c card editor per section (read-only headers). |
+| `ctor-sample-gate-{desktop,phone}-{ru,en}.png` | Sample tab of a new template before the sandbox exists (language choice, "Start writing sample questions"). |
+| `ctor-preview-not-ready-{desktop,phone}-{ru,en}.png` | "Preview as student" with empty sections: `preview_not_ready` message and the per-section issues. |
+| `ctor-diff-{desktop,phone}-{ru,en}.png` | Versions tab, DiffView v1 -> v2 (element): summary chips, section 1 time changed, section 3 added; phone stacks before/after. |
+| `ctor-publish-dialog-{desktop,phone}-{ru,en}.png` | Publish confirmation of a new template ("becomes version v1"). |
+| `ctor-lock-dialog-{desktop,phone}-{ru,en}.png` | Lock dialog with the optional reason. |
+| `ctor-promote-dialog-{desktop,phone}-{ru,en}.png` | Org admin, a teacher's template: "Move the template to the organization?" dialog. |
+| `ctor-conflict-{desktop,phone}-{ru,en}.png` | Draft conflict (saved meanwhile elsewhere): template wording, keep my changes / take the saved version. |
+| `ctor-issues-{desktop,phone}-{ru,en}.png` | Validation: a section with no question type; "Not saved: 1 problem" and the issues bar with "Go to". |
+| `ctor-locked-desktop-ru.png` | Locked template, read-only for its owner (note points to More -> Unlock), right after locking (toast). |
+| `ctor-preview-player-desktop-ru.png` | The preview attempt in the real general player: amber preview banner, scrolling, forward-only section timer. |
+| `ctor-preview-result-desktop-ru.png` | Preview result (ORT-style, section names from the template) without the sandbox course frame; "Back" returns to the Sample tab. |
+| `teacher-create-from-template-{desktop,phone}-{ru,en}.png` | Teacher, Assignments -> New -> Quiz with the template picker (v2): locked structure line, sections summary. |
+| `teacher-template-exam-{desktop,phone}-{ru,en}.png` | Teacher's card editor of the exam built from the locked template: locked-sections note, "Add section" disabled. |
+| `tpl-result-ort-{desktop,phone}-{ru,ky,en}.png` | Student, result of the template exam (general quiz, `result_view = ort`): scaled grade, section names from the template. |
+
+S5 total: 77 screenshots (120 in this folder with S3's 43, plus `general-player/`).
