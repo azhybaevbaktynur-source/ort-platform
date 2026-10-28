@@ -56,9 +56,8 @@ Neon backups (free plan: **max 10 branches, 1 manual snapshot — both nearly fu
 
 ## 5. What to do next
 
-1. If the 7b deploy was not verified: `/health` = 77c5b32 (or later), Neon `alembic_version` = `0010_phase7b_exam_templates`, `select count(*) from exam_templates` works, ORT exams have `exam_template_version_id IS NULL`. Fix and record anything broken.
-2. **Wait for the owner's checkpoint OK** (and answers to the open questions; apply each answer as a small slice, ORT review + tests).
-3. Then Phase 8a (modules, pages, course files, announcements, gating; `IMPLEMENTATION_PLAN.md` Phase 8a; architect design first), and 8b in parallel where the plan allows; checkpoint after 8b.
+1. Phase 8a on branch `phase-8a` (design `docs/phases/PHASE_8A_DESIGN.md`): S1 migration 0012 alone, then S2 ∥ S3 ∥ S4, S5 integration + UX gate + ORT review + security review, gates, Neon backup, deploy (method §4). Merge `origin/lms` into `phase-8a` before the final gates.
+2. Then 8b (exam templates II; may start in parallel with 8a where files do not overlap). **Owner checkpoint after 8b**: list 8a Q1–Q5, 7a Q1–Q6, 7b-Q1 and P8 with their defaults in effect.
 
 ## 6. Models and token usage (Claude Max subscription)
 
