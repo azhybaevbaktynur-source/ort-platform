@@ -40,7 +40,8 @@ export function useScrollSpy({
     const rootRect = root.getBoundingClientRect();
     const zoneTop = rootRect.top + topRef.current;
     const line = zoneTop + Math.max(0, rootRect.bottom - zoneTop) * 0.3;
-    const atEnd = root.scrollTop + root.clientHeight >= root.scrollHeight - 2;
+    // Only after a real scroll: a short list that fits the screen keeps its first item current.
+    const atEnd = root.scrollTop > 0 && root.scrollTop + root.clientHeight >= root.scrollHeight - 2;
     const entries = Array.from(itemRefs.current.entries()).sort((a, b) => a[0] - b[0]);
     let pick: number | null = null;
     for (const [pos, el] of entries) {

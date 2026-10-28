@@ -208,6 +208,9 @@ test.describe("scrolling display mode (general player)", () => {
     const { attemptId, items } = await start(page, user, s.forward_quiz);
     const first = items.filter((i) => i.section_pos === items[0].section_pos);
     const second = items.filter((i) => i.section_pos !== items[0].section_pos);
+    // `?return=` (template preview, PHASE_8B_DESIGN 7.2): a same-origin /<lang>/ path rides along to the result page
+    const ret = `/${L}/courses/${s.course_id}?tab=sample`;
+    await page.goto(`/${L}/courses/${s.course_id}/attempts/${attemptId}?return=${encodeURIComponent(ret)}`);
     await expect(listItems(page)).toHaveCount(2);
     await expect(page.locator("header").getByText("Этап 1")).toBeVisible();
     await expect(page.getByRole("timer")).toBeVisible();
@@ -223,6 +226,8 @@ test.describe("scrolling display mode (general player)", () => {
     expect(st.current_section_pos).toBe(second[0].section_pos);
     await choice(page, second[0].position, 1).click();
     await finishTest(page);
+    expect(new URL(page.url()).searchParams.get("return")).toBe(ret);
+    await expect(page.getByRole("link", { name: t("player.scrolling.back"), exact: true })).toHaveAttribute("href", ret);
     const result = await api(user, `/attempts/${attemptId}/result`);
     expect(Number(result.raw_score)).toBe(3);
     await page.context().close();
@@ -233,6 +238,8 @@ test.describe("scrolling display mode (general player)", () => {
     const user = s.students.page;
     const page = await studentPage(browser, user);
     const { attemptId } = await start(page, user, s.page_quiz);
+    // a `return` that is not a same-origin /<lang>/ path is ignored (no open redirect): today's links stay
+    await page.goto(`/${L}/courses/${s.course_id}/attempts/${attemptId}?return=${encodeURIComponent("//evil.example/ru/x")}`);
     await expect(listItems(page)).toHaveCount(0);
     await expect(page.getByRole("heading", { name: t("player.questionOf", { n: 1, total: 3 }) })).toBeVisible();
     await expect(page.getByText(t("player.scrolling.windowOf", { from: 1, to: 3, total: 3 }))).toHaveCount(0);
@@ -246,6 +253,9 @@ test.describe("scrolling display mode (general player)", () => {
     expect(state.display_mode).toBe("one_per_page");
     await finishTest(page);
     await expect(page.getByRole("heading", { name: t("results.title") })).toBeVisible();
+    expect(new URL(page.url()).searchParams.get("return")).toBeNull();
+    await expect(page.getByRole("link", { name: t("results.back") })).toHaveAttribute("href", `/${L}/courses/${s.course_id}/assessments/${s.page_quiz}`);
+    await expect(page.getByRole("link", { name: t("player.scrolling.back"), exact: true })).toHaveCount(0);
     await page.context().close();
   });
 
