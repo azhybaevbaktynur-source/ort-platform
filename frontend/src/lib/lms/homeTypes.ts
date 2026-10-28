@@ -68,6 +68,17 @@ export interface HomeOut {
   /** absent on a backend before Phase 8a */
   modules_next?: HomeModuleNextOut[];
   // --- Phase 8a S4a end ---
+  /** Phase 8a S5: the latest three published announcements of the student's active courses (absent before 8a) */
+  announcements?: HomeAnnouncementOut[];
+}
+
+/** Phase 8a S5: one row of the home announcements strip (backend `AnnouncementHomeOut`; never a body). */
+export interface HomeAnnouncementOut {
+  id: string;
+  course_id: string;
+  course_title: LocalizedText;
+  title: string;
+  published_at: string;
 }
 
 // --- Phase 8a S4a begin ---

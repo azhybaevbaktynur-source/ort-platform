@@ -243,7 +243,15 @@
       "module_locked": "This is locked for now. Finish the earlier steps first.",
       "prerequisite_invalid": "Only an earlier, published module of this course can be a prerequisite.",
       "prerequisite_order": "This order would put a module before one it depends on. Change the prerequisites first.",
-      "home_page_invalid": "This page cannot be the course home. Choose a page of this course."
+      "home_page_invalid": "This page cannot be the course home. Choose a page of this course.",
+      "page_not_found": "This page was not found. It may have been deleted.",
+      "page_variant_exists": "This page already has a version in this language.",
+      "course_file_not_found": "This file was not found. It may have been deleted.",
+      "announcement_not_found": "This announcement was not found. It may have been deleted.",
+      "folder_invalid": "The folder name is not valid. Use short names separated by /.",
+      "course_files_quota": "The course file limit is reached. Delete files to free up space.",
+      "page_conflict": "Someone saved a newer version. Reload and try again.",
+      "already_published": "This announcement is already posted."
     }
   },
   "courses": {
@@ -2799,6 +2807,10 @@
       "title": "Continue in your courses",
       "inCourse": "Course: {course}",
       "action": "Continue"
+    },
+    "announcements": {
+      "title": "Announcements",
+      "action": "Read"
     }
   },
   "shell": {
@@ -3882,7 +3894,9 @@
       "page_conflict": "Someone saved a newer version. Reload and try again.",
       "payload_too_large": "The text or file is too large.",
       "language_not_in_course": "This language is not enabled in the course.",
-      "home_page_invalid": "This page cannot be the course home."
+      "home_page_invalid": "This page cannot be the course home.",
+      "page_not_found": "This page was not found. It may have been deleted.",
+      "page_variant_exists": "This page already has a version in this language."
     },
     "usedInModules_few": "Used in {count} modules",
     "usedInModules_many": "Used in {count} modules",
@@ -3934,7 +3948,8 @@
       "storage_full": "The server storage is full. Contact the administrator.",
       "folder_invalid": "The folder name is not valid. Use short names separated by /.",
       "notPdf": "Choose a PDF file.",
-      "tooBig": "The file is larger than 10 MB."
+      "tooBig": "The file is larger than 10 MB.",
+      "course_file_not_found": "This file was not found. It may have been deleted."
     },
     "filesCount_few": "{count} files",
     "filesCount_many": "{count} files",
@@ -3977,7 +3992,8 @@
     "fieldBody": "Text",
     "saveDraft": "Save draft",
     "errors": {
-      "already_published": "This announcement is already posted."
+      "already_published": "This announcement is already posted.",
+      "announcement_not_found": "This announcement was not found. It may have been deleted."
     }
   },
   "modules": {

@@ -252,6 +252,9 @@ export const LMS_ERROR_CODES = [
   "attempt_not_submitted", "points_out_of_range", "after_close_needs_until",
   // Phase 8a S4a: module gating and course home (text in lms.errors.*)
   "module_locked", "prerequisite_invalid", "prerequisite_order", "home_page_invalid",
+  // Phase 8a S5: pages, course files and announcements (S3 codes; also in pages/courseFiles/announcements.errors)
+  "page_not_found", "page_variant_exists", "course_file_not_found", "announcement_not_found", "folder_invalid",
+  "course_files_quota", "page_conflict", "already_published",
 ] as const;
 export type LmsErrorCode = (typeof LMS_ERROR_CODES)[number];
 
