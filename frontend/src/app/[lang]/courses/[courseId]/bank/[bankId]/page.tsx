@@ -13,7 +13,9 @@ import { BankHeader } from "@/components/lms/content/BankHeader";
 import { ContentError } from "@/components/lms/content/ContentError";
 import { QuestionRow } from "@/components/lms/content/QuestionRow";
 import { useCanEditContent } from "@/components/lms/content/StaffGate";
-import { ConfirmDialog, EmptyState, LoadingState, MenuButton } from "@/components/ui";
+import { Button, ConfirmDialog, EmptyState, LoadingState, MenuButton } from "@/components/ui";
+import { MoveToBankDialog } from "@/components/lms/content/MoveToBankDialog";
+import { useTemplateUi } from "@/lib/lms/templates";
 import { MathRenderer } from "@/components/math/MathRenderer";
 
 export default function BankQuestionsPage() {
@@ -22,6 +24,8 @@ export default function BankQuestionsPage() {
   const { bankId } = useParams<{ bankId: string }>();
   const { course } = useCourse();
   const canEdit = useCanEditContent();
+  const isOrt = useTemplateUi().key === "ort";
+  const [toMove, setToMove] = useState<QuestionSummaryOut | null>(null);
   const [bank, setBank] = useState<BankOut | null>(null);
   const [filters, setFilters] = useState<BankFilterState>(EMPTY_FILTERS);
   const [applied, setApplied] = useState<BankFilterState>(EMPTY_FILTERS);
@@ -75,17 +79,19 @@ export default function BankQuestionsPage() {
     }
   };
 
-  const newQuestion = (type: QuestionType) => router.push(`/${lang}/courses/${course.id}/bank/${bankId}/new?type=${type}`);
+  const newQuestion = (type?: QuestionType) => router.push(`/${lang}/courses/${course.id}/bank/${bankId}/new${type ? `?type=${type}` : ""}`);
 
   return (
     <div className="space-y-4">
       {/* Phase 6b S11b (UX 1): "New question" is the page's primary button with a menu of the same question types. */}
       <BankHeader courseId={course.id} bank={bank} active="questions"
-        primaryAction={canEdit ? (
+        primaryAction={canEdit ? (!isOrt ? (
+          <Button leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />} onClick={() => newQuestion()}>{t("bank.questions.new")}</Button>
+        ) : (
           <MenuButton label={t("bank.questions.new")} leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />}
             items={QUESTION_TYPES.map((ty) => ({ id: ty, label: t(`bank.types.${ty}.name`), description: t(`bank.types.${ty}.hint`) }))}
             onSelect={(ty) => newQuestion(ty as QuestionType)} />
-        ) : undefined} />
+        )) : undefined} />
       <BankFilters value={filters} onChange={setFilters} />
       <ContentError error={error || actionError} onRetry={error ? () => load() : undefined} />
       {loading && items.length === 0 && !error && <LoadingState rows={3} />}
@@ -96,11 +102,14 @@ export default function BankQuestionsPage() {
             <QuestionRow key={q.id} courseId={course.id} q={q} busy={rowBusy} canEdit={canEdit}
               onMove={(d) => void act(() => moveQuestion(course.id, q.id, d))}
               onDelete={() => setToDelete(q)}
+              onMoveToBank={bank?.assessment ? () => setToMove(q) : undefined}
               onRestore={() => void act(() => restoreQuestion(course.id, q.id))} />
           ))}
         </ul>
       )}
       <Pager nextCursor={cursor} loading={loading} onMore={() => load(cursor)} />
+      <MoveToBankDialog open={!!toMove} courseId={course.id} questionId={toMove?.id ?? null} banksHref={`/${lang}/courses/${course.id}/bank`}
+        onCancel={() => setToMove(null)} onDone={() => { setToMove(null); void load(); }} />
       <ConfirmDialog open={!!toDelete} tone="danger" busy={rowBusy} title={t("bank.questions.deleteTitle")}
         object={toDelete ? (toDelete.stem_excerpt ? <MathRenderer content={toDelete.stem_excerpt} className="!text-sm line-clamp-3" /> : t("bank.questions.noStem")) : undefined}
         effect={t("bank.questions.deleteBody")}

@@ -6,6 +6,7 @@ import { useTranslation } from "@/lib/i18n/context";
 import { createBank, deleteBank, listBanks, restoreBank, updateBank } from "@/lib/lms/content";
 import type { BankOut } from "@/lib/lms/contentTypes";
 import { fmtApiDate } from "@/lib/format";
+import { pickLocalized } from "@/lib/lms/localized";
 import { useCourse } from "@/components/lms/CourseContext";
 import { Pager } from "@/components/lms/Pager";
 import { BankDialog } from "@/components/lms/content/BankDialog";
@@ -33,7 +34,7 @@ export default function BankListPage() {
     setLoading(true);
     setError(null);
     try {
-      const page = await listBanks(course.id, { deleted: trash, cursor: next, limit: 50 });
+      const page = await listBanks(course.id, { deleted: trash, cursor: next, limit: 50, kind: "all" });
       setItems((p) => (next ? [...p, ...page.items] : page.items));
       setCursor(page.next_cursor);
     } catch (e) {
@@ -84,6 +85,45 @@ export default function BankListPage() {
     }
   };
 
+  const sharedItems = items.filter((b) => !b.assessment);
+  const quizItems = items.filter((b) => !!b.assessment);
+  const card = (b: BankOut) => (
+          <li key={b.id} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex-1">
+              {b.deleted_at ? (
+                <h3 className="font-semibold text-slate-900">{b.title}</h3>
+              ) : (
+                <Link href={`${base}/${b.id}`} className="font-semibold text-slate-900 hover:text-brand-700">{b.title}</Link>
+              )}
+              {b.description && <p className="mt-1 line-clamp-2 text-sm text-slate-600">{b.description}</p>}
+              <p className="mt-2 text-xs text-slate-500">
+                {t("bank.list.counts", { questions: b.question_count, passages: b.passage_count })}
+                {b.source_id ? ` · ${t("bank.list.source", { id: b.source_id })}` : ""}
+              </p>
+              <p className="text-xs text-slate-400">{t("bank.list.updated", { date: fmtApiDate(b.updated_at) })}</p>
+              {b.assessment && <p className="mt-1 text-xs font-medium text-slate-600">{t("bank.quizBanks.quiz", { title: pickLocalized(b.assessment.title, lang, course.default_language) })}</p>}
+            </div>
+            {b.assessment && (
+              <div className="mt-3 space-y-2">
+                <p className="text-xs text-slate-500">{t("bank.quizBanks.followsQuiz")}</p>
+                <LinkButton variant="secondary" size="sm" href={`/${lang}/courses/${course.id}/assessments/${b.assessment.id}/edit`}>{t("bank.quizBanks.openQuiz")}</LinkButton>
+              </div>
+            )}
+            {canEdit && !b.assessment && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {b.deleted_at ? (
+                  <button type="button" className={btnSmall} onClick={() => void restore(b)}>{t("bank.list.restore")}</button>
+                ) : (
+                  <>
+                    <button type="button" className={btnSmall} onClick={() => { setActionError(null); setDialog({ bank: b }); }}>{t("bank.list.rename")}</button>
+                    <button type="button" className={btnSmall} onClick={() => { setActionError(null); setToDelete(b); }}>{t("bank.list.delete")}</button>
+                  </>
+                )}
+              </div>
+            )}
+          </li>
+  );
+
   return (
     <div className="space-y-4">
       <PageHeader title={t("bank.list.title")} className="mb-2"
@@ -101,37 +141,22 @@ export default function BankListPage() {
             <LinkButton variant="secondary" href={`${base}/import`}>{t("bank.list.import")}</LinkButton>
           </> : undefined} />
       )}
-      <ul className="grid gap-3 sm:grid-cols-2">
-        {items.map((b) => (
-          <li key={b.id} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex-1">
-              {b.deleted_at ? (
-                <h3 className="font-semibold text-slate-900">{b.title}</h3>
-              ) : (
-                <Link href={`${base}/${b.id}`} className="font-semibold text-slate-900 hover:text-brand-700">{b.title}</Link>
-              )}
-              {b.description && <p className="mt-1 line-clamp-2 text-sm text-slate-600">{b.description}</p>}
-              <p className="mt-2 text-xs text-slate-500">
-                {t("bank.list.counts", { questions: b.question_count, passages: b.passage_count })}
-                {b.source_id ? ` · ${t("bank.list.source", { id: b.source_id })}` : ""}
-              </p>
-              <p className="text-xs text-slate-400">{t("bank.list.updated", { date: fmtApiDate(b.updated_at) })}</p>
-            </div>
-            {canEdit && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {b.deleted_at ? (
-                  <button type="button" className={btnSmall} onClick={() => void restore(b)}>{t("bank.list.restore")}</button>
-                ) : (
-                  <>
-                    <button type="button" className={btnSmall} onClick={() => { setActionError(null); setDialog({ bank: b }); }}>{t("bank.list.rename")}</button>
-                    <button type="button" className={btnSmall} onClick={() => { setActionError(null); setToDelete(b); }}>{t("bank.list.delete")}</button>
-                  </>
-                )}
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
+      {quizItems.length === 0 ? (
+        <ul className="grid gap-3 sm:grid-cols-2">{items.map(card)}</ul>
+      ) : (
+        <>
+          {sharedItems.length > 0 && (
+            <section aria-labelledby="bank-group-shared" className="space-y-2">
+              <h2 id="bank-group-shared" className="text-sm font-semibold text-slate-700">{t("bank.quizBanks.sharedGroup")}</h2>
+              <ul className="grid gap-3 sm:grid-cols-2">{sharedItems.map(card)}</ul>
+            </section>
+          )}
+          <section aria-labelledby="bank-group-quiz" className="space-y-2">
+            <h2 id="bank-group-quiz" className="text-sm font-semibold text-slate-700">{t("bank.quizBanks.group")}</h2>
+            <ul className="grid gap-3 sm:grid-cols-2">{quizItems.map(card)}</ul>
+          </section>
+        </>
+      )}
       <Pager nextCursor={cursor} loading={loading} onMore={() => load(cursor)} />
       <BankDialog open={!!dialog} bank={dialog?.bank ?? null} courseLanguages={course.languages} busy={busy} error={actionError}
         onSubmit={(v) => void submit(v)} onCancel={() => setDialog(null)} />

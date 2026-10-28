@@ -13,8 +13,8 @@ const e = encodeURIComponent;
 const c = (courseId: string) => `/courses/${e(courseId)}`;
 
 // ---- Banks ----
-export const listBanks = (courseId: string, opts: { deleted?: boolean; cursor?: string | null; limit?: number } = {}) =>
-  lmsFetch<PageOut<BankOut>>(`${c(courseId)}/banks`, { params: { deleted: opts.deleted, cursor: opts.cursor, limit: opts.limit } });
+export const listBanks = (courseId: string, opts: { deleted?: boolean; cursor?: string | null; limit?: number; kind?: "all" | "shared" | "quiz" } = {}) =>
+  lmsFetch<PageOut<BankOut>>(`${c(courseId)}/banks`, { params: { deleted: opts.deleted, cursor: opts.cursor, limit: opts.limit, kind: opts.kind } });
 export const getBank = (courseId: string, bankId: string) => lmsFetch<BankOut>(`${c(courseId)}/banks/${e(bankId)}`);
 export const createBank = (courseId: string, body: BankCreateIn) =>
   lmsFetch<BankOut>(`${c(courseId)}/banks`, { method: "POST", body });
@@ -121,3 +121,10 @@ export async function uploadAsset(courseId: string, file: File, visibility: "pub
   }
   return data as AssetOut;
 }
+
+// ---- Phase 7c S4: move/copy a quiz-bank question to a shared bank ----
+export interface QuestionUsageOut { other_count: number; assessments: unknown[]; published_anywhere: boolean }
+export const getQuestionUsage = (courseId: string, questionId: string) =>
+  lmsFetch<QuestionUsageOut>(`${c(courseId)}/questions/${e(questionId)}/usage`);
+export const copyToBank = (courseId: string, questionId: string, body: { bank_id: string; mode: "move" | "copy" }) =>
+  lmsFetch<QuestionStaffOut>(`${c(courseId)}/questions/${e(questionId)}/copy-to-bank`, { method: "POST", body });

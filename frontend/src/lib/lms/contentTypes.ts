@@ -1,6 +1,6 @@
 // TypeScript mirrors of the Phase 2 content API (docs/phases/PHASE_2_DESIGN.md sections 2, 3.4 and 5).
 // Shared by the bank/editor UI (C6) and the import UI (C7).
-import type { Lang } from "./types";
+import type { Lang, LocalizedText } from "./types";
 
 export type QuestionType =
   | "single_choice"
@@ -109,6 +109,8 @@ export interface BankOut {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  /** Phase 7c: set for a quiz bank (private to its quiz); null/absent for shared banks. */
+  assessment?: { id: string; title: LocalizedText } | null;
 }
 export interface BankCreateIn {
   title: string;

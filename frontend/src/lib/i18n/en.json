@@ -974,6 +974,34 @@
         "type_unknown": "Unknown question type \"{type}\".",
         "attach_skipped": "Some questions were saved to the bank but not added to the exam (see the reasons above)."
       }
+    },
+    "quizBanks": {
+      "group": "Quiz banks",
+      "sharedGroup": "Shared banks",
+      "openQuiz": "Open quiz",
+      "quiz": "Quiz: {title}",
+      "followsQuiz": "This bank belongs to its quiz."
+    },
+    "moveToBank": {
+      "action": "Move or copy to a shared bank",
+      "title": "Move or copy to a shared bank",
+      "target": "Shared bank",
+      "choose": "Choose a bank",
+      "mode": "What to do",
+      "move": "Move",
+      "moveHint": "The question leaves the quiz bank and lives in the shared bank. Quizzes that use it keep their link.",
+      "copy": "Copy",
+      "copyHint": "A copy is added to the shared bank. The original stays in the quiz bank.",
+      "usageNote": "Used in {count} quizzes; links are kept.",
+      "noShared": "This course has no shared bank yet. Create one first.",
+      "createBank": "Create a shared bank",
+      "submit": "Confirm",
+      "errors": {
+        "target_not_shared_bank": "Choose a shared bank, not a quiz bank.",
+        "question_has_passage": "This question belongs to a passage and cannot be moved or copied on its own.",
+        "quiz_bank_follows_quiz": "A quiz bank cannot be a target; it follows its quiz.",
+        "source_conflict": "A bank with the same source already exists in this course."
+      }
     }
   },
   "assessments": {
