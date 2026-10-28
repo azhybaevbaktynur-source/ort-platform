@@ -4,18 +4,14 @@ import React, { useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { createQuestion, listPassages, updateQuestion } from "@/lib/lms/content";
 import {
-  DIFFICULTIES, ORT_SECTIONS, type PassageSummaryOut, type QuestionStaffOut, type QuestionType,
+  QUESTION_TYPES, type PassageSummaryOut, type QuestionStaffOut, type QuestionType,
 } from "@/lib/lms/contentTypes";
 import type { Lang } from "@/lib/lms/types";
 import { ContentError } from "./ContentError";
-import { ImagePicker } from "./ImagePicker";
-import { RichTextField } from "./RichTextField";
-import { ChoiceFields } from "./types/ChoiceFields";
-import { ComparisonFields, EssayFields, NumericFields, ShortTextFields, TrueFalseFields } from "./types/SimpleFields";
+import { QuestionCardForm } from "./QuestionCardForm";
 import {
   contentFromForm, emptyForm, formFromStaff, metaFromForm, validateForm, type QuestionForm,
 } from "./types/formModel";
-import { cardCls, inputCls, labelCls } from "./ui";
 import { btnPrimary } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 
 /** Create / edit form for one question. Save sends base_version_id; the page handles conflicts. */
@@ -83,89 +79,11 @@ export function QuestionEditor({
     }
   };
 
-  const fieldProps = { form, onChange: patch, disabled };
   return (
     <form onSubmit={save} className="space-y-5">
-      <div className={`${cardCls} grid gap-3 sm:grid-cols-3`}>
-        <div>
-          <span className={labelCls}>{t("bank.editor.type")}</span>
-          {editing ? (
-            <p className="py-2 text-sm font-semibold text-slate-900">{t(`bank.types.${form.type}.name`)}</p>
-          ) : (
-            <select className={inputCls} disabled={disabled} value={form.type} onChange={(e) => patch({ type: e.target.value as QuestionType })}>
-              {(["single_choice", "multiple_answers", "true_false", "comparison", "numeric", "short_text", "essay"] as QuestionType[]).map((ty) => (
-                <option key={ty} value={ty}>{t(`bank.types.${ty}.name`)}</option>
-              ))}
-            </select>
-          )}
-        </div>
-        <div>
-          <label className={labelCls} htmlFor="q-lang">{t("bank.editor.language")}</label>
-          {editing ? (
-            <p className="py-2 text-sm font-semibold text-slate-900">{t(`courses.languages.${form.language}`)}</p>
-          ) : (
-            <select id="q-lang" className={inputCls} disabled={disabled} value={form.language} onChange={(e) => patch({ language: e.target.value as Lang })}>
-              {courseLanguages.map((l) => <option key={l} value={l}>{t(`courses.languages.${l}`)}</option>)}
-            </select>
-          )}
-        </div>
-        <div>
-          <label className={labelCls} htmlFor="q-points">{t("bank.editor.points")}</label>
-          <input id="q-points" type="number" min={0} max={1000} step="0.01" className={inputCls} disabled={disabled} value={form.points}
-            onChange={(e) => patch({ points: e.target.value })} />
-        </div>
-      </div>
-
-      <div className={`${cardCls} space-y-4`}>
-        <p className="text-xs text-slate-500">{t(`bank.types.${form.type}.hint`)}</p>
-        <RichTextField label={t("bank.editor.stem")} rows={5} value={form.stem} disabled={disabled} onChange={(v) => patch({ stem: v })} />
-        <ImagePicker courseId={courseId} label={t("bank.editor.image")} value={form.image} disabled={disabled} onChange={(img) => patch({ image: img })} />
-        {(form.type === "single_choice" || form.type === "multiple_answers") && <ChoiceFields courseId={courseId} {...fieldProps} />}
-        {form.type === "true_false" && <TrueFalseFields {...fieldProps} />}
-        {form.type === "comparison" && <ComparisonFields {...fieldProps} />}
-        {form.type === "numeric" && <NumericFields {...fieldProps} />}
-        {form.type === "short_text" && <ShortTextFields {...fieldProps} />}
-        {form.type === "essay" && <EssayFields {...fieldProps} />}
-        <RichTextField label={t("bank.editor.explanation")} rows={3} value={form.explanation} disabled={disabled} onChange={(v) => patch({ explanation: v })} />
-      </div>
-
-      <div className={`${cardCls} grid gap-3 sm:grid-cols-2`}>
-        <div>
-          <label className={labelCls} htmlFor="q-section">{t("bank.editor.section")}</label>
-          <input id="q-section" list="q-sections" className={inputCls} disabled={disabled} maxLength={40} value={form.section}
-            onChange={(e) => patch({ section: e.target.value })} />
-          <datalist id="q-sections">
-            {ORT_SECTIONS.map((s) => <option key={s} value={s}>{t(`sections.${s}`)}</option>)}
-          </datalist>
-        </div>
-        <div>
-          <label className={labelCls} htmlFor="q-topic">{t("bank.editor.topic")}</label>
-          <input id="q-topic" className={inputCls} disabled={disabled} maxLength={200} value={form.topic} onChange={(e) => patch({ topic: e.target.value })} />
-        </div>
-        <div>
-          <label className={labelCls} htmlFor="q-diff">{t("bank.editor.difficulty")}</label>
-          <select id="q-diff" className={inputCls} disabled={disabled} value={form.difficulty} onChange={(e) => patch({ difficulty: e.target.value as QuestionForm["difficulty"] })}>
-            <option value="">{t("bank.editor.none")}</option>
-            {DIFFICULTIES.map((d) => <option key={d} value={d}>{t(`bank.difficulty.${d}`)}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className={labelCls} htmlFor="q-tags">{t("bank.editor.tags")}</label>
-          <input id="q-tags" className={inputCls} disabled={disabled} value={form.tags} onChange={(e) => patch({ tags: e.target.value })} />
-          <p className="mt-0.5 text-xs text-slate-500">{t("bank.editor.tagsHint")}</p>
-        </div>
-        <div className="sm:col-span-2">
-          <label className={labelCls} htmlFor="q-passage">{t("bank.editor.passage")}</label>
-          <select id="q-passage" className={inputCls} disabled={disabled} value={form.passageId} onChange={(e) => patch({ passageId: e.target.value })}>
-            <option value="">{t("bank.editor.noPassage")}</option>
-            {passages.map((p) => (
-              <option key={p.id} value={p.id}>
-                {`[${t(`courses.languages.${p.language}`)}] ${p.title || p.body_excerpt.slice(0, 60)}`}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+      {/* Phase 7c S3 (PHASE_7C_DESIGN 8.4): the form body lives in QuestionCardForm (same markup), shared with the quiz editor. */}
+      <QuestionCardForm form={form} onChange={patch} disabled={disabled} courseId={courseId} languages={courseLanguages}
+        typeOptions={QUESTION_TYPES} lockType={editing} lockLanguage={editing} passages={passages} />
 
       {clientError && <p role="alert" className="text-sm text-red-700">{t(clientError)}</p>}
       <ContentError error={error} />

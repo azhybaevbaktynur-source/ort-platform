@@ -18,14 +18,15 @@ import { AssessmentError } from "./AssessmentError";
 import { Modal } from "./Modal";
 import { BankSelect, PickFields, useBanks, type PickValue } from "./PickFields";
 
-type Tab = "questions" | "passage" | "pick";
+export type AddItemsTab = "questions" | "passage" | "pick";
+type Tab = AddItemsTab;
 
 interface Filters { q: string; type: QuestionType | ""; language: Lang | ""; section: string; topic: string; difficulty: Difficulty | "" }
 const EMPTY: Filters = { q: "", type: "", language: "", section: "", topic: "", difficulty: "" };
 
 /** Add items to a section: questions (multi-select or all filtered), a passage group, or a random pick from a bank. */
 export function AddItemsDialog({
-  open, courseId, assessmentId, sectionId, onClose, onAdded,
+  open, courseId, assessmentId, sectionId, onClose, onAdded, initialTab = "questions",
 }: {
   open: boolean;
   courseId: string;
@@ -33,6 +34,8 @@ export function AddItemsDialog({
   sectionId: string;
   onClose: () => void;
   onAdded: () => void | Promise<void>;
+  /** Phase 7c S3: the tab shown when the dialog opens (the quiz editor opens it on "Passage" or "Random group"). */
+  initialTab?: AddItemsTab;
 }) {
   const { t } = useTranslation();
   const ui = useTemplateUi();
@@ -54,10 +57,10 @@ export function AddItemsDialog({
 
   useEffect(() => {
     if (open) {
-      setTab("questions"); setBankId(""); setFilters(EMPTY); setRows([]); setSelected(new Set()); setPassageId("");
+      setTab(initialTab); setBankId(""); setFilters(EMPTY); setRows([]); setSelected(new Set()); setPassageId("");
       setPick({ bank_id: "", count: 5, filter: {} }); setError(null); setReport(null);
     }
-  }, [open]);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = useCallback(async (next?: string | null) => {
     if (!bankId) { setRows([]); setCursor(null); return; }

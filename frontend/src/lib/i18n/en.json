@@ -1219,7 +1219,8 @@
       "languages_not_in_course": "A language of the assessment is not a course language.",
       "empty_passage": "A reading passage has no questions.",
       "newer_version": "A question has a newer version in the bank. Publish again to use it.",
-      "too_few_items": "A section has fewer questions than the template asks for."
+      "too_few_items": "A section has fewer questions than the template asks for.",
+      "unfinished_drafts": "Some cards have unsaved edits; they are not part of the published quiz."
     }
   },
   "player": {
@@ -3550,6 +3551,153 @@
       "not_shareable": "This grading scheme is personal: shared templates can only use system schemes.",
       "reserved": "This value belongs to the ORT course template.",
       "truncated": "And {limit} more errors."
+    }
+  },
+  "quizEditor": {
+    "tabs": {
+      "label": "Quiz editor",
+      "questions": "Questions",
+      "settings": "Settings",
+      "preview": "Preview"
+    },
+    "publishBar": {
+      "items": "{n} questions",
+      "items_one": "{n} question",
+      "items_few": "{n} questions",
+      "items_many": "{n} questions",
+      "items_other": "{n} questions",
+      "points": "{n} points",
+      "points_one": "{n} point",
+      "points_few": "{n} points",
+      "points_many": "{n} points",
+      "points_other": "{n} points",
+      "unpublished": "Unpublished changes",
+      "unfinishedDrafts": "{n} cards have unsaved edits. They are not part of the published quiz until you click Done.",
+      "unfinishedDrafts_one": "{n} card has unsaved edits. It is not part of the published quiz until you click Done.",
+      "unfinishedDrafts_few": "{n} cards have unsaved edits. They are not part of the published quiz until you click Done.",
+      "unfinishedDrafts_many": "{n} cards have unsaved edits. They are not part of the published quiz until you click Done.",
+      "unfinishedDrafts_other": "{n} cards have unsaved edits. They are not part of the published quiz until you click Done.",
+      "check": "Check",
+      "publish": "Publish",
+      "draftsConfirmTitle": "Publish without the unsaved edits?",
+      "publishAnyway": "Publish anyway"
+    },
+    "add": {
+      "question": "New question",
+      "more": "Add from a bank",
+      "find": "Find questions",
+      "findHint": "Pick questions from a shared bank",
+      "passage": "Passage",
+      "passageHint": "A text with its questions from a shared bank",
+      "pick": "Random group",
+      "pickHint": "Each student gets random questions from a shared bank"
+    },
+    "card": {
+      "addQuestion": "New question",
+      "addBetween": "Add here",
+      "number": "Question {n}",
+      "newQuestion": "New question",
+      "openLabel": "Edit {label}",
+      "points": "{n} points",
+      "points_one": "{n} point",
+      "points_few": "{n} points",
+      "points_many": "{n} points",
+      "points_other": "{n} points",
+      "emptyStem": "No question text yet",
+      "done": "Done",
+      "discard": "Discard changes",
+      "discardTitle": "Discard your changes?",
+      "discardBody": "The question goes back to its saved version. Your unsaved edits are lost.",
+      "deleteNewTitle": "Delete this new question?",
+      "deleteNewBody": "The question was never saved, so it is removed with its text.",
+      "duplicate": "Duplicate",
+      "delete": "Delete",
+      "deleted": "Question removed from the quiz.",
+      "undo": "Undo",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "draft": "Draft",
+      "draftHasErrors": "Draft · has errors",
+      "draftIdle": "Changes are saved as a draft while you type.",
+      "draftSaving": "Saving draft…",
+      "draftSaved": "Draft saved. Click Done to save the question.",
+      "draftError": "Not saved: no connection. We will try again.",
+      "draftConflict": "This card was changed in another tab.",
+      "gone": "This card was closed elsewhere.",
+      "goneBody": "This question was removed or finished in another tab. Your text is still here.",
+      "readd": "Re-add as a new card",
+      "close": "Close",
+      "usedIn": "Used in {n} quizzes",
+      "usedIn_one": "Used in {n} quiz",
+      "usedIn_few": "Used in {n} quizzes",
+      "usedIn_many": "Used in {n} quizzes",
+      "usedIn_other": "Used in {n} quizzes",
+      "sharedBank": "Shared bank",
+      "appliedThis": "Saved as a separate question for this quiz only.",
+      "appliedAll": "Saved. Other quizzes get the change when they are republished.",
+      "fieldError": "Check this field: {field}",
+      "answersField": "Answers",
+      "detailsField": "Details",
+      "otherField": "Question"
+    },
+    "scope": {
+      "title": "This question is used in other quizzes",
+      "body": "It is also in {n} other quizzes. Where should your change apply?",
+      "body_one": "It is also in {n} other quiz. Where should your change apply?",
+      "body_few": "It is also in {n} other quizzes. Where should your change apply?",
+      "body_many": "It is also in {n} other quizzes. Where should your change apply?",
+      "body_other": "It is also in {n} other quizzes. Where should your change apply?",
+      "republishNote": "Published quizzes change only after they are republished.",
+      "all": "Update in all {n} quizzes",
+      "all_one": "Update in all {n} quizzes",
+      "all_few": "Update in all {n} quizzes",
+      "all_many": "Update in all {n} quizzes",
+      "all_other": "Update in all {n} quizzes",
+      "this": "Change only in this quiz",
+      "allDisabled": "You cannot edit the bank this question comes from, so it can be changed only in this quiz.",
+      "cancel": "Cancel",
+      "published": "Published",
+      "more": "and {n} more",
+      "more_one": "and {n} more",
+      "more_few": "and {n} more",
+      "more_many": "and {n} more",
+      "more_other": "and {n} more"
+    },
+    "conflict": {
+      "title": "This card was changed in another tab",
+      "body": "Keep your text, or take the text saved in the other tab?",
+      "bodyNamed": "{name} saved this card meanwhile. Keep your text, or take theirs?",
+      "takeTheirs": "Take theirs",
+      "keepMine": "Keep mine",
+      "versionTitle": "A newer version of this question was saved",
+      "versionBody": "Someone saved this question after you opened the card. Keep your draft on top of the new version, or discard your changes?",
+      "keepDraft": "Keep my draft",
+      "discardMine": "Discard my changes"
+    },
+    "passage": {
+      "remove": "Remove passage"
+    },
+    "passageChild": {
+      "note": "This question is also used in other quizzes. A change here applies to all of them."
+    },
+    "section": {
+      "empty": "No questions here yet. Add the first one.",
+      "emptyQuiz": "This quiz has no questions yet. Start with a new question.",
+      "firstBecomesSection1": "With a second section, your questions so far become Section 1."
+    },
+    "preview": {
+      "body": "Take the quiz as a student would. Preview attempts are not graded and students do not see them."
+    },
+    "errors": {
+      "draft_conflict": "This card was changed in another tab.",
+      "draft_exists": "This card is already being edited in another tab.",
+      "draft_not_found": "This draft no longer exists. Reload the page.",
+      "scope_required": "Choose where your change applies.",
+      "scope_not_allowed": "You cannot change this question in the other quizzes. Change it only in this quiz.",
+      "passage_child_scope": "This question belongs to a passage used in other quizzes, so it can only be updated in all of them.",
+      "payload_too_large": "This card is too large to save. Shorten the text or use fewer images.",
+      "passage_not_in_quiz_bank": "A new question can only join a passage of this quiz.",
+      "quiz_bank_private": "Questions of another quiz cannot be used here. Copy them to a shared bank first."
     }
   }
 }
