@@ -99,6 +99,34 @@ def get_version(template_id: uuid.UUID, version_no: int, ctx: AuthzContext = Dep
     return service.version_out(service.load_version(ctx.db, t, version_no))
 
 
+# --- Phase 8b S2 begin --- (PHASE_8B_DESIGN 6.1: sandbox, preview, diff; policies in policies.py S2 block)
+from fastapi import Query  # noqa: E402
+
+from app.lms.exam_templates import sandbox as _sandbox  # noqa: E402
+
+
+@router.post("/{template_id}/sandbox", response_model=sch.SandboxOut)
+def open_sandbox(template_id: uuid.UUID, request: Request, data: Optional[sch.SandboxIn] = None,
+                 ctx: AuthzContext = Depends(get_authz)):
+    """Ensure the template's sandbox course, the caller's staff enrollment and the sample quiz; sync it with the
+    draft (or current version). Idempotent; no attempt is started."""
+    return _sandbox.open_sandbox(ctx, template_id, data or sch.SandboxIn(), request=request)
+
+
+@router.post("/{template_id}/preview", status_code=201, response_model=sch.PreviewOut)
+def preview_template(template_id: uuid.UUID, request: Request, data: Optional[sch.PreviewIn] = None,
+                     ctx: AuthzContext = Depends(get_authz)):
+    """Sync the sample quiz and start a fresh preview attempt in the real player (`attempt_start_limit`)."""
+    return _sandbox.preview(ctx, template_id, data or sch.PreviewIn(), request=request)
+
+
+@router.get("/{template_id}/diff", response_model=sch.SpecDiffOut)
+def diff_template(template_id: uuid.UUID, from_: int = Query(..., alias="from", ge=1),
+                  to: str = Query(..., min_length=1, max_length=16), ctx: AuthzContext = Depends(get_authz)):
+    return service.spec_diff_out(ctx, template_id, from_, to)
+# --- Phase 8b S2 end ---
+
+
 # --- Phase 7b S3 --- (`GET .../versions/{no}/import-format[?download=csv]`; file owned by S3, policy in policies.py)
 from app.lms.exam_templates.import_format_router import import_format_router  # noqa: E402
 

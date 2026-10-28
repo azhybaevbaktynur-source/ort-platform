@@ -34,3 +34,7 @@ PLANNED_POLICIES: dict[tuple[str, str], str] = {
     ("GET", f"{_T}/diff"): _ids.POLICY_READ,                      # to=draft additionally needs can_manage (else 404)
 }
 # --- Phase 8b S1 end ---
+
+# --- Phase 8b S2 begin --- (the routes are mounted in router.py; non-managers get 404 on sandbox / preview)
+EXAM_TEMPLATE_POLICIES.update(PLANNED_POLICIES)
+# --- Phase 8b S2 end ---
