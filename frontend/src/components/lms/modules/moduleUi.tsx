@@ -90,7 +90,8 @@ export function useModuleErrorText() {
 /** In-app target of a student item (null: url, header, file; those are handled by the caller). */
 export function itemHref(base: string, kind: ItemKind, link: ItemLinkOut | null | undefined): string | null {
   if (!link) return null;
-  if (kind === "page" && link.page_id) return `${base}/pages/${link.page_id}`;
+  // 8a UX M7: the page viewer then offers "Go to modules" as the next step
+  if (kind === "page" && link.page_id) return `${base}/pages/${link.page_id}?from=module`;
   if (kind === "assignment") {
     if (link.assignment_kind === "quiz" && link.assessment_id) return `${base}/assessments/${link.assessment_id}`;
     if (link.assignment_id) return `${base}/assignments/${link.assignment_id}`;

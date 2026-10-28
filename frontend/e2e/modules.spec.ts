@@ -215,8 +215,8 @@ test.describe("modules walk (ru)", () => {
     await set.getByRole("button", { name: t("lms.common.save") }).click();
     await expect(set).toBeHidden();
     for (const m of [M1, M2, M3]) {
-      await moduleCard(tp, m).getByRole("switch", { name: t("modules.editor.publishModule") }).click();
-      await expect(moduleCard(tp, m).getByRole("switch", { name: t("modules.editor.publishModule") })).toBeChecked();
+      await moduleCard(tp, m).getByRole("switch", { name: t("modules.editor.publishModule"), exact: true }).click();
+      await expect(moduleCard(tp, m).getByRole("switch", { name: t("modules.editor.publishModule"), exact: true })).toBeChecked();
     }
     await settle(tp);
 
@@ -253,9 +253,14 @@ test.describe("modules walk (ru)", () => {
 
     // ---- the page (KaTeX) records "view": M1 has its only requirement met
     await moduleCard(sp, M1).getByRole("link", { name: new RegExp(PAGE_TITLE) }).click();
-    await sp.waitForURL(new RegExp(`/pages/${pageId}`));
+    await sp.waitForURL(new RegExp(`/pages/${pageId}\\?from=module`));
     await expect(sp.getByRole("heading", { name: PAGE_TITLE })).toBeVisible();
     await expect(sp.locator(".katex").first()).toBeVisible();
+    // 8a UX: the Modules tab stays active on a page (M2) and the page offers the way back (M7)
+    await expect(sp.getByRole("navigation", { name: t("courses.home.tabsLabel") }).getByRole("link", { name: t("modules.tab") }))
+      .toHaveAttribute("aria-current", "page");
+    await sp.getByRole("link", { name: t("pages.locked.toModules") }).click();
+    await sp.waitForURL(new RegExp(`/courses/${cid}/modules$`));
     await studentModules(sp, cid);
     await expect(badge(sp, M1, "completed")).toBeVisible();
     // ---- the PDF downloads through the authenticated content route
@@ -318,9 +323,13 @@ test.describe("modules walk (ru)", () => {
     await expect(badge(sp, M3, "locked")).toBeVisible();
     await expect(badge(sp, M1, "completed")).toBeVisible();
 
-    // ---- student home: "continue in your courses" points at the quiz (the first open item with an unmet requirement)
+    // ---- student home: the quiz (the first open item with an unmet requirement) is listed once: "Next up" when it is
+    // there, else "continue in your courses" (8a UX M4: no row repeats the hero or a "Next up" row)
     await sp.goto(`/${L}/courses`);
-    await expect(sp.locator('section[aria-labelledby="home-modules-next"]')).toContainText(QUIZ);
+    await expect(sp.locator('section[aria-labelledby="home-next"]')).toBeVisible();
+    const inNext = await sp.locator('section[aria-labelledby="home-next"]').getByText(QUIZ).count();
+    const inModulesNext = await sp.locator('section[aria-labelledby="home-modules-next"]').getByText(QUIZ).count();
+    expect(inNext + inModulesNext).toBe(1);
 
     // ---- announcement: draft (students do not see it), then posted -> course list and the student home
     await tp.goto(`${base}/announcements`);
@@ -431,6 +440,8 @@ test.describe("modules walk (ru)", () => {
       await sp.goto(`${base}/modules`);
       await expect(badge(sp, "Пробный ОРТ", "locked")).toBeVisible();
       await expect(badge(sp, "Подготовка", "completed")).toBeVisible(); // no requirement: complete once open
+      // 8a UX M6: the exam row inside the locked module is open (gating-exempt) and says where it lives
+      await expect(moduleCard(sp, "Пробный ОРТ").getByRole("link")).toContainText(t("modules.availableInAssignments"));
       await review(sp, "ort-student-modules");
       const exam = new OrtExam(sp, "ru");
       await exam.openLobby();
@@ -494,6 +505,12 @@ test.describe("modules walk (ru)", () => {
     await api(md.teacher, "POST", `/courses/${cid}/announcements`, { title: "Расписание на неделю", body_md: "Занятия по **вторникам** и четвергам.", pinned: true, publish: true });
     const quizAid = outline.modules.flatMap((m: { items: { target: { assessment_id?: string } | null }[] }) => m.items).find((i: { target: { assessment_id?: string } | null }) => i.target?.assessment_id)!.target.assessment_id;
     const empty = await api(md.teacher, "POST", "/courses", { title: { ru: "Пустой курс", ky: "Бош курс", en: "Empty course" }, languages: ["ru", "ky", "en"], default_language: "ru" });
+    // 8a UX M1: a draft quiz with a requirement in M5: the outline warns, and publishing M5 asks first
+    const draftQuiz = await api(md.teacher, "POST", `/courses/${cid}/modules/${m5.id}/quiz`, {
+      kind: "quiz", title: { ru: "Черновик теста", ky: "Тест долбоору", en: "Draft quiz" }, quiz: { preset: "none", languages: ["ru"] },
+    });
+    await api(md.teacher, "PUT", `/courses/${cid}/modules/${m5.id}/items/${draftQuiz.item.id}/requirement`, { type: "min_percent", threshold: 80 });
+    const m5Title = { ru: "Модуль 5. Практика", ky: "5-модуль. Практика", en: "Module 5. Practice" };
 
     const shoot = async (page: Page, name: string, vp: string, lang: string, full = true) => {
       await settle(page);
@@ -511,7 +528,7 @@ test.describe("modules walk (ru)", () => {
         await sp.goto(base);
         await expect(sp.getByRole("heading", { level: 2 }).first()).toBeVisible();
         await shoot(sp, "student-course-home-modules", vp, lang);
-        await sp.goto(`${base}/pages/${ruPage.id}`);
+        await sp.goto(`${base}/pages/${ruPage.id}?from=module`);
         await expect(sp.locator(".katex").first()).toBeVisible();
         await shoot(sp, "student-page-math", vp, lang);
         await sp.goto(`${base}/pages/${later.id}`);
@@ -524,7 +541,7 @@ test.describe("modules walk (ru)", () => {
         await expect(sp.getByRole("heading", { name: ANN_TITLE })).toBeVisible();
         await shoot(sp, "student-announcements", vp, lang);
         await sp.goto(`/${lang}/courses`);
-        await expect(sp.locator('section[aria-labelledby="home-modules-next"]')).toBeVisible();
+        await expect(sp.locator('section[aria-labelledby="home-next"]')).toBeVisible();
         await shoot(sp, "student-home-strip", vp, lang);
         // the quiz lobby inside a module that is locked (M3 is after M2; M2's quiz is open, so lock M2 by date briefly)
         await api(md.teacher, "PATCH", `/courses/${cid}/modules/${byRu(M2).id}`, { unlock_at: new Date(Date.UTC(2026, 11, 1, 9, 0)).toISOString() });
@@ -559,7 +576,20 @@ test.describe("modules walk (ru)", () => {
         await shoot(tp, "teacher-outline-empty", vp, lang);
         await tp.goto(`${base}/modules`);
         await expect(card(M1)).toBeVisible();
+        const m5Card = tp.locator("section").filter({ has: tp.getByRole("heading", { name: m5Title[lang], exact: true }) });
+        await expect(m5Card.getByText(tl("modules.warnings.requirementIgnoredTitle"))).toBeVisible();
         await shoot(tp, "teacher-outline", vp, lang);
+        // M1: unpublish M5, then switching it on asks first (cancel; published again through the API)
+        await api(md.teacher, "PATCH", `/courses/${cid}/modules/${m5.id}`, { published: false });
+        await tp.reload();
+        await m5Card.getByRole("switch", { name: tl("modules.editor.publishModule"), exact: true }).click();
+        await expect(tp.getByRole("alertdialog", { name: tl("modules.warnings.requirementIgnoredTitle") })).toBeVisible();
+        await shoot(tp, "teacher-publish-warning", vp, lang, false);
+        await tp.keyboard.press("Escape");
+        await expect(tp.getByRole("alertdialog")).toHaveCount(0);
+        await api(md.teacher, "PATCH", `/courses/${cid}/modules/${m5.id}`, { published: true });
+        await tp.reload();
+        await expect(card(M1)).toBeVisible();
         const dialogShot = async (name: string) => { await shoot(tp, name, vp, lang, false); await tp.keyboard.press("Escape"); await expect(tp.getByRole("dialog")).toHaveCount(0); };
         await card(M2).getByRole("button", { name: tl("modules.editor.actions") }).first().click();
         await tp.getByRole("menuitem", { name: tl("modules.editor.editSettings") }).click();

@@ -14,6 +14,7 @@ import { useCourse } from "@/components/lms/CourseContext";
 import { Badge, Button, Dialog, LoadingState, PageHeader, Select, Switch, toast, Input } from "@/components/ui";
 import { ContentError } from "./ApiError";
 import { MarkdownField } from "./MarkdownField";
+import { LangChip } from "./LangChip";
 
 const isLang = (v: string | null, langs: Lang[]): v is Lang => !!v && (langs as string[]).includes(v);
 
@@ -152,13 +153,9 @@ export function PageEditor({ pageId }: { pageId?: string }) {
           <section aria-label={t("pages.editor.variants")}>
             <h2 className="text-sm font-medium text-slate-800">{t("pages.editor.variants")}</h2>
             <ul className="mt-2 flex flex-wrap gap-2">
-              <li><Badge tone="info">{langName(page.language)}</Badge></li>
+              <li><LangChip label={langName(page.language)} selected /></li>
               {page.variants.map((v) => (
-                <li key={v.id}>
-                  <Link href={`${base}/pages/${v.id}/edit`} className="inline-flex min-h-11 items-center rounded-full border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 hover:bg-slate-50">
-                    {langName(v.language)}
-                  </Link>
-                </li>
+                <li key={v.id}><LangChip label={langName(v.language)} href={`${base}/pages/${v.id}/edit`} /></li>
               ))}
               {missingLangs.map((l) => (
                 <li key={l}>

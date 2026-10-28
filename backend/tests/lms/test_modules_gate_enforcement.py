@@ -112,6 +112,37 @@ async def test_ort_preset_exam_is_never_gated(db, api, frozen_clock):
     assert r.status_code == 423, r.text
 
 
+async def test_student_outline_never_shows_a_gating_exempt_exam_as_locked(db, api, frozen_clock):
+    """8a UX M6: the ORT exam inside a locked module starts (gating-exempt), so the student outline shows it open
+    with its link; the module stays `locked`, a free quiz in the same module stays locked without a destination."""
+    q = quiz_in_module(db, preset="ort_main", ort=True, unlock_at=FUTURE)
+    q2 = make_quiz(db)
+    free = q2.assessment
+    free.course_id = q.course.id
+    db.commit()
+    fa = mirror_from_assessment(db, free)
+    db.commit()
+    free_item = make_item(db, q.module, fa)
+    r = await api.call(q.student, "GET", f"/courses/{q.course.id}/modules")
+    assert r.status_code == 200, r.text
+    (mod,) = r.json()["modules"]
+    assert mod["state"] == "locked"
+    items = {i["id"]: i for i in mod["items"]}
+    ort_row = items[str(q.item.id)]
+    assert ort_row["locked"] is False
+    assert ort_row["link"]["assessment_id"] == str(q.assessment.id)
+    assert ort_row["link"]["assignment_id"] == str(q.assignment.id)
+    free_row = items[str(free_item.id)]
+    assert free_row["locked"] is True
+    assert (free_row["link"] or {}).get("assessment_id") is None
+    # without the template lock the same exam is gated again and shown as locked
+    q.course.template_locked = False
+    db.commit()
+    r = await api.call(q.student, "GET", f"/courses/{q.course.id}/modules")
+    row = {i["id"]: i for i in r.json()["modules"][0]["items"]}[str(q.item.id)]
+    assert row["locked"] is True and (row["link"] or {}).get("assessment_id") is None
+
+
 async def test_unlocked_ort_template_course_gates_ort_presets(db, api, frozen_clock):
     """`LOCK_GATING` applies only while the template lock is on (template_locked)."""
     q = quiz_in_module(db, preset="ort_main", ort=True, unlock_at=FUTURE)

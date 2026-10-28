@@ -7,6 +7,7 @@ import { useTranslation } from "@/lib/i18n/context";
 import { leaveCourse } from "@/lib/lms/courses";
 import { pickLocalized } from "@/lib/lms/localized";
 import type { CourseStaffOut } from "@/lib/lms/types";
+import { templateUi } from "@/lib/lms/templates";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { JoinCodeDisplay } from "@/components/lms/JoinCodeDisplay";
 import { Button, Card, ConfirmDialog, DescriptionList, LinkButton, PageHeader } from "@/components/ui";
@@ -69,7 +70,8 @@ export function StaffCourseHome({ course }: { course: CourseStaffOut }) {
           <LinkButton variant="secondary" href={`${base}/modules`} leftIcon={<LayoutList className="h-4 w-4" aria-hidden="true" />}>
             {t("modules.staffHome.open")}
           </LinkButton>
-          {isTeacher && <LinkButton variant="link" href={`${base}/settings#course-home`}>{t("modules.staffHome.changeHome")}</LinkButton>}
+          {/* 8a UX (minor 11): a locked template (ORT) fixes the course home, so no link to change it */}
+          {isTeacher && !templateUi(course).locked && <LinkButton variant="link" href={`${base}/settings#course-home`}>{t("modules.staffHome.changeHome")}</LinkButton>}
         </div>
       </Card>
       {/* --- Phase 8a S4a end --- */}
