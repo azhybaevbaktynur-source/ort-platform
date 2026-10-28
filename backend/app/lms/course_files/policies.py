@@ -13,3 +13,10 @@ PLANNED_POLICIES: dict[tuple[str, str], str] = {
     ("DELETE", _F): "course:content.manage",
     ("GET", f"{_F}/download"): "course:content.read",
 }
+
+
+# --- Phase 8a S3 begin --- (the router is mounted in app/api/v1/router.py: the planned entries become real)
+COURSE_FILE_POLICIES.update(PLANNED_POLICIES)
+# db/local drivers: the authenticated content route behind `download`'s `{url}` (same checks as download)
+COURSE_FILE_POLICIES[("GET", f"{_F}/content")] = "course:content.read"
+# --- Phase 8a S3 end ---
