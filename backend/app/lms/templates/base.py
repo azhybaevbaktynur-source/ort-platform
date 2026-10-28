@@ -24,6 +24,14 @@ ALL_LOCK_FIELDS = frozenset({
 LOCK_DISPLAY_MODE = "display_mode"
 ALL_LOCK_FIELDS = ALL_LOCK_FIELDS | {LOCK_DISPLAY_MODE}
 # --- Phase 7b S1 end ---
+# --- Phase 8a S1 begin --- (PHASE_8A_DESIGN 5.5, 6.5, 13: the ORT template (lock_scope = ALL_LOCK_FIELDS) fixes the
+# course home kind and its preset exams are never module-gated)
+LOCK_HOME_KIND = "home_kind"
+LOCK_GATING = "gating"
+ALL_LOCK_FIELDS = ALL_LOCK_FIELDS | {LOCK_HOME_KIND, LOCK_GATING}
+# Course-level locks: not assessment fields, so exam-template `lock_scope` keys never cover them.
+COURSE_LEVEL_LOCK_FIELDS = frozenset({LOCK_HOME_KIND, LOCK_GATING})
+# --- Phase 8a S1 end ---
 
 
 @dataclass(frozen=True)
@@ -42,6 +50,12 @@ class CourseTemplate:
     seed: Optional[Callable[..., Any]] = None
     # Reserved for exam templates (Phase 7b, EXAM_TEMPLATES_DESIGN 2); empty in 6a.
     exam_template_keys: tuple[str, ...] = ()
+    # --- Phase 8a S1 begin --- (PHASE_8A_DESIGN 5.5)
+    # `courses.home_kind` written by create_course; existing rows keep the server default 'assignments'.
+    default_home_kind: Literal["modules", "page", "assignments"] = "assignments"
+    # Optional seeding of modules on course creation (`(db, course) -> None`); None for both templates in 8a.
+    default_structure: Optional[Callable[..., None]] = None
+    # --- Phase 8a S1 end ---
 
     def locks(self, field_name: str) -> bool:
         return field_name in self.lock_scope

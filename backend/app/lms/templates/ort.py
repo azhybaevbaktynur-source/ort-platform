@@ -32,4 +32,8 @@ ORT = CourseTemplate(
     lock_scope=ALL_LOCK_FIELDS,
     default_settings={},
     seed=_seed,
+    # --- Phase 8a S1 begin --- (today's layout; LOCK_HOME_KIND and LOCK_GATING come with ALL_LOCK_FIELDS)
+    default_home_kind="assignments",
+    default_structure=None,
+    # --- Phase 8a S1 end ---
 )
