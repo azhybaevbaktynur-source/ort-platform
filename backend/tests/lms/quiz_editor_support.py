@@ -84,3 +84,70 @@ def A(w, a=None) -> str:
 
 def Q(w, qid) -> str:
     return f"/courses/{w.cid}/questions/{qid}"
+
+
+# --- Phase 7c S2 begin --- (API shortcuts for the quiz editor route tests)
+def err(res) -> Optional[str]:
+    try:
+        return res.json()["error"]["code"]
+    except Exception:  # pragma: no cover
+        return None
+
+
+async def create_q(api, w, user=None, a=None, **body):
+    """POST _A/questions (direct create); `body` overrides {section_id, after_item_id, payload}."""
+    body.setdefault("payload", card())
+    return await api.call(user or w.O, "POST", f"{A(w, a)}/questions", json=body)
+
+
+async def new_draft(api, w, user=None, a=None, **body):
+    body.setdefault("payload", card())
+    return await api.call(user or w.O, "POST", f"{A(w, a)}/drafts", json=body)
+
+
+async def put_draft(api, w, did, rev, payload=None, user=None, a=None):
+    return await api.call(user or w.O, "PUT", f"{A(w, a)}/drafts/{did}",
+                          json={"draft_rev": rev, "payload": payload or card()})
+
+
+async def commit(api, w, did, rev, scope=None, user=None, a=None):
+    body = {"draft_rev": rev}
+    if scope is not None:
+        body["scope"] = scope
+    return await api.call(user or w.O, "POST", f"{A(w, a)}/drafts/{did}/commit", json=body)
+
+
+async def edit_card(api, w, item, payload, scope=None, user=None, a=None):
+    """Open an existing card (draft with `payload`), then Done. Returns (draft json, commit response)."""
+    r = await new_draft(api, w, user=user, a=a, item_id=str(item.id), payload=payload)
+    assert r.status_code == 201, r.text
+    d = r.json()
+    return d, await commit(api, w, d["id"], d["draft_rev"], scope=scope, user=user, a=a)
+
+
+def staff_payload(db, q, **over) -> dict:
+    """The card payload of an existing question's current version (what the client seeds the form with)."""
+    from app.lms.content.models import QuestionVersion
+
+    db.refresh(q)
+    v = db.get(QuestionVersion, q.current_version_id)
+    body = card(type=v.type, language=q.language, stem=v.stem, data=v.data, explanation=v.explanation,
+                default_points=float(v.default_points), points=float(v.default_points),
+                meta={"topic": q.topic, "difficulty": q.difficulty, "section": q.section, "tags": list(q.tags or []),
+                      "passage_id": str(q.passage_id) if q.passage_id else None})
+    body.update(over)
+    return body
+
+
+async def quiz_question(api, db, w, a=None, **payload_over):
+    """A question written in quiz `a` (direct create). Returns (item row, question row)."""
+    from app.lms.assessments.models import AssessmentItem
+    from app.lms.content.models import BankQuestion
+    import uuid as _uuid
+
+    r = await create_q(api, w, a=a, payload=card(**payload_over))
+    assert r.status_code == 201, r.text
+    db.expire_all()
+    return (db.get(AssessmentItem, _uuid.UUID(r.json()["item"]["id"])),
+            db.get(BankQuestion, _uuid.UUID(r.json()["question"]["id"])))
+# --- Phase 7c S2 end ---

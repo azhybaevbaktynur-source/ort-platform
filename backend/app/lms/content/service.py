@@ -392,9 +392,20 @@ def create_bank(db: Session, ctx: AuthzContext, course, data: BankCreateIn) -> Q
     return bank
 
 
+# --- Phase 7c S2 begin --- (PHASE_7C_DESIGN 5.1: a quiz bank is deleted, restored and titled by its quiz)
+def _refuse_quiz_bank(bank: QuestionBank) -> None:
+    if bank.assessment_id is not None:
+        from app.lms.quiz_editor.ids import E_QUIZ_BANK_FOLLOWS_QUIZ
+
+        raise Conflict("This bank belongs to a quiz and follows it", code=E_QUIZ_BANK_FOLLOWS_QUIZ)
+# --- Phase 7c S2 end ---
+
+
 def update_bank(db: Session, ctx: AuthzContext, course, bank_id: uuid.UUID, data: BankUpdateIn) -> QuestionBank:
     bank = repo.load_bank(db, course.id, bank_id, for_update=True)
     fields = data.model_fields_set
+    if "title" in fields:  # --- Phase 7c S2 --- (the quiz bank title follows the quiz, Q3)
+        _refuse_quiz_bank(bank)
     if "title" in fields and data.title is not None:
         bank.title = data.title.strip()
     if "description" in fields:
@@ -408,6 +419,7 @@ def update_bank(db: Session, ctx: AuthzContext, course, bank_id: uuid.UUID, data
 
 def soft_delete_bank(db: Session, ctx: AuthzContext, course, bank_id: uuid.UUID) -> None:
     bank = repo.load_bank(db, course.id, bank_id, include_deleted=True, for_update=True)
+    _refuse_quiz_bank(bank)  # --- Phase 7c S2 ---
     if bank.deleted_at is not None:
         raise Conflict("Bank already deleted", code="already_deleted")
     bank.soft_delete(ctx.user.id)
@@ -416,6 +428,7 @@ def soft_delete_bank(db: Session, ctx: AuthzContext, course, bank_id: uuid.UUID)
 
 def restore_bank(db: Session, ctx: AuthzContext, course, bank_id: uuid.UUID) -> QuestionBank:
     bank = repo.load_bank(db, course.id, bank_id, include_deleted=True, for_update=True)
+    _refuse_quiz_bank(bank)  # --- Phase 7c S2 ---
     if bank.deleted_at is None:
         raise Conflict("Bank is not deleted", code="not_deleted")
     if bank.source_id:

@@ -17,3 +17,8 @@ PLANNED_POLICIES: dict[tuple[str, str], str] = {
     ("GET", f"{_C}/questions/{{question_id}}/usage"): "course:content.read_admin",
     ("POST", f"{_C}/questions/{{question_id}}/copy-to-bank"): "course:content.manage",
 }
+
+
+# --- Phase 7c S2 begin --- (the router is mounted in app/api/v1/router.py: the planned entries become real)
+QUIZ_EDITOR_POLICIES.update(PLANNED_POLICIES)
+# --- Phase 7c S2 end ---

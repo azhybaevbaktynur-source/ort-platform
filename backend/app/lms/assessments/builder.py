@@ -189,6 +189,11 @@ def soft_delete_assessment(db: Session, ctx: AuthzContext, course: Course, aid: 
         raise Conflict("Students are taking this assessment", code="attempts_in_progress")
     a.soft_delete(ctx.user.id)
     assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
+    # --- Phase 7c S2 begin --- (PHASE_7C_DESIGN 5.1: the quiz bank follows its quiz; drafts stay for a restore)
+    from app.lms.quiz_editor import quiz_banks as _qb
+
+    _qb.soft_delete_with_quiz(db, a, ctx.user.id)
+    # --- Phase 7c S2 end ---
     db.commit()
 
 
@@ -199,6 +204,11 @@ def restore_assessment(db: Session, ctx: AuthzContext, course: Course, aid: uuid
         raise Conflict("Assessment is not deleted", code="not_deleted")
     a.restore()
     assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
+    # --- Phase 7c S2 begin --- (PHASE_7C_DESIGN 5.1: the quiz bank follows its quiz)
+    from app.lms.quiz_editor import quiz_banks as _qb
+
+    _qb.restore_with_quiz(db, a)
+    # --- Phase 7c S2 end ---
     db.commit()
     return a
 
@@ -285,6 +295,11 @@ def delete_section(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUI
     # --- Phase 6 S2b end ---
     if db.execute(select(AssessmentItem.id).where(AssessmentItem.section_id == s.id).limit(1)).first():
         raise Conflict("The section still has items", code="section_not_empty")
+    # --- Phase 7c S2 begin --- (PHASE_7C_DESIGN 2.2: new-card drafts of the section go first)
+    from app.lms.quiz_editor import drafts as _drafts
+
+    _drafts.remove_drafts(db, section_id=s.id)
+    # --- Phase 7c S2 end ---
     db.delete(s)
     db.flush()
     _renumber(repo.load_sections(db, a.id))
@@ -344,6 +359,11 @@ def _language_ok(db: Session, a: Assessment, q: BankQuestion, members: Optional[
 
 def _check_question(db: Session, a: Assessment, sec: AssessmentSection, q: BankQuestion,
                     members: Optional[dict] = None) -> None:
+    # --- Phase 7c S2 begin --- (PHASE_7C_DESIGN 16: another quiz's bank is private to that quiz)
+    from app.lms.quiz_editor import quiz_banks as _qb
+
+    _qb.assert_question_usable(db, q, a)
+    # --- Phase 7c S2 end ---
     lang = _language_ok(db, a, q, members)
     if lang is None:
         raise ValidationFailed("The question has no version in the assessment languages",
@@ -377,8 +397,15 @@ def _flush_unique(db: Session) -> None:
         raise Conflict("The question is already in the assessment", code="item_duplicate") from None
 
 
-def _pick_values(db: Session, course: Course, sec: AssessmentSection, pick: sch.PickIn) -> dict:
-    content_repo.load_bank(db, course.id, pick.bank_id)       # 404 bank_not_found (anti-IDOR)
+def _pick_values(db: Session, course: Course, sec: AssessmentSection, pick: sch.PickIn,
+                 a: Optional[Assessment] = None) -> dict:
+    bank = content_repo.load_bank(db, course.id, pick.bank_id)       # 404 bank_not_found (anti-IDOR)
+    # --- Phase 7c S2 begin --- (16: picks from another quiz's bank are refused; the quiz's own bank is allowed)
+    if a is not None:
+        from app.lms.quiz_editor import quiz_banks as _qb
+
+        _qb.assert_bank_usable(bank, a)
+    # --- Phase 7c S2 end ---
     flt = pick.filter.as_json()
     allowed = (sec.rules or {}).get("allowed_types")
     if flt.get("type") and allowed and flt["type"] not in allowed:
@@ -406,6 +433,11 @@ def add_item(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID, sec
         return [item]
     if data.kind == "passage":
         p = content_repo.load_passage(db, course.id, data.passage_id)
+        # --- Phase 7c S2 begin --- (16: a passage of another quiz's bank is private to that quiz)
+        from app.lms.quiz_editor import quiz_banks as _qb
+
+        _qb.assert_bank_usable(db.get(QuestionBank, p.bank_id), a)
+        # --- Phase 7c S2 end ---
         if (sec.rules or {}).get("allow_passages") is False:
             raise ValidationFailed("Passages are not allowed in this section", code="item_type_not_allowed")
         if db.execute(select(AssessmentItem.id).where(
@@ -446,7 +478,7 @@ def add_item(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID, sec
         _commit(db, a)
         return [header]
     # pick
-    vals = _pick_values(db, course, sec, data.pick)
+    vals = _pick_values(db, course, sec, data.pick, a)  # Phase 7c S2: `a` for the quiz bank rule (16)
     _caps(db, a, sec, data.pick.count)
     item = AssessmentItem(assessment_id=a.id, section_id=sec.id, position=pos, kind="pick", points=data.points,
                           **vals)
@@ -470,7 +502,12 @@ def add_items_bulk(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUI
             else:
                 skipped.append(sch.SkippedOut(question_id=i, code="question_not_found"))
     else:
-        content_repo.load_bank(db, course.id, data.bank_id)
+        _bulk_bank = content_repo.load_bank(db, course.id, data.bank_id)
+        # --- Phase 7c S2 begin --- (16: another quiz's bank is refused as a whole)
+        from app.lms.quiz_editor import quiz_banks as _qb
+
+        _qb.assert_bank_usable(_bulk_bank, a)
+        # --- Phase 7c S2 end ---
         f = data.filter
         flt = content_repo.QuestionFilter(
             q=f.q if f else None, type=f.type if f else None, language=f.language if f else None,
@@ -607,7 +644,7 @@ def update_item(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID, 
             raise ValidationFailed("Only pick items have a pick", code="validation_failed",
                                    details=[{"loc": ["pick"], "msg": "not a pick item"}])
         sec = repo.load_section(db, a.id, it.section_id)
-        vals = _pick_values(db, course, sec, data.pick)
+        vals = _pick_values(db, course, sec, data.pick, a)  # Phase 7c S2: `a` for the quiz bank rule (16)
         total = repo.draft_totals(db, [a.id]).get(a.id, (0, 0.0))[0] - (it.pick_count or 0)
         if total + data.pick.count > settings.ASSESSMENT_MAX_ITEMS:
             raise ValidationFailed("Too many items in the assessment", code="too_many_items")
@@ -652,6 +689,11 @@ def delete_item(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID, 
     a = _manage(db, ctx, course, aid)
     it = repo.load_item(db, a.id, item_id)
     section_id, parent_id = it.section_id, it.parent_item_id
+    # --- Phase 7c S2 begin --- (PHASE_7C_DESIGN 2.2: drafts of the removed cards go first; position hints cleared)
+    from app.lms.quiz_editor import drafts as _drafts
+
+    _drafts.remove_drafts(db, item_ids=[it.id, *[k.id for k in _block(db, it)]])
+    # --- Phase 7c S2 end ---
     for k in _block(db, it):
         db.delete(k)
     db.flush()
@@ -691,19 +733,26 @@ def _question_infos(db: Session, a: Assessment, items: list[AssessmentItem]) -> 
     out: dict[uuid.UUID, tuple] = {}
     for k in range(0, len(ids), 500):
         rows = db.execute(
-            select(BankQuestion, QuestionVersion.stem, QuestionBank.deleted_at)
+            select(BankQuestion, QuestionVersion.stem, QuestionBank.deleted_at,
+                   QuestionBank.assessment_id)  # --- Phase 7c S2 --- (bank_kind)
             .join(QuestionVersion, QuestionVersion.id == BankQuestion.current_version_id)
             .join(QuestionBank, QuestionBank.id == BankQuestion.bank_id)
             .where(BankQuestion.id.in_(ids[k:k + 500]), QuestionBank.course_id == a.course_id)
         ).all()
-        for q, stem, bank_deleted in rows:
-            out[q.id] = (q, stem, q.deleted_at is not None or bank_deleted is not None)
+        for q, stem, bank_deleted, bank_quiz in rows:
+            out[q.id] = (q, stem, q.deleted_at is not None or bank_deleted is not None, bank_quiz)
     return out
 
 
-def _tree_out(db: Session, a: Assessment, sections: list[AssessmentSection], items: list[AssessmentItem]):
+def _tree_out(db: Session, a: Assessment, sections: list[AssessmentSection], items: list[AssessmentItem],
+              draft_items: frozenset = frozenset()):  # --- Phase 7c S2 --- (items with a draft: `has_draft`)
     top, kids = repo.group_items(items)
     qinfo = _question_infos(db, a, items)
+    # --- Phase 7c S2 begin --- (PHASE_7C_DESIGN 5.5: other live quizzes using each question, one grouped query)
+    from app.lms.quiz_editor.usage import used_elsewhere_counts
+
+    elsewhere = used_elsewhere_counts(db, a, list(qinfo)) if qinfo else {}
+    # --- Phase 7c S2 end ---
     newer = newer_version_item_ids(db, a, {k: v[0] for k, v in qinfo.items()}) if a.published_version_id else set()
     pids = [i.passage_id for i in items if i.passage_id is not None]
     ptitles: dict[uuid.UUID, Optional[str]] = {}
@@ -723,11 +772,14 @@ def _tree_out(db: Session, a: Assessment, sections: list[AssessmentSection], ite
         out = sch.ItemOut(id=it.id, kind=it.kind, position=it.position,
                           points=float(it.points) if it.points is not None else None)
         if it.kind == "question":
-            q, stem, deleted = qinfo.get(it.question_id, (None, "", True))
+            q, stem, deleted, bank_quiz = qinfo.get(it.question_id, (None, "", True, None))
+            out.has_draft = it.id in draft_items  # --- Phase 7c S2 ---
             if q is not None:
                 out.question = sch.ItemQuestionOut(
                     id=q.id, type=q.type, language=q.language, stem_excerpt=(stem or "")[:200], deleted=deleted,
-                    newer_version_available=it.id in newer)
+                    newer_version_available=it.id in newer,
+                    # --- Phase 7c S2 --- (PHASE_7C_DESIGN 6.1)
+                    bank_kind="quiz" if bank_quiz is not None else "shared", used_elsewhere=elsewhere.get(q.id, 0))
                 if it.id in newer:
                     warnings.append({"code": "newer_version", "item_id": str(it.id)})
                 for lang in langs:
@@ -807,10 +859,18 @@ def staff_summaries(db: Session, assessments: list[Assessment]) -> list[sch.Asse
             for a in assessments]
 
 
-def staff_out(db: Session, a: Assessment) -> sch.AssessmentStaffOut:
+def staff_out(db: Session, a: Assessment, *, include_drafts: bool = False) -> sch.AssessmentStaffOut:
+    """Phase 7c S2: `include_drafts` (callers holding `course:content.read_admin`) adds the card drafts and
+    `ItemOut.has_draft`; otherwise `drafts = []` and `has_draft = false` (PHASE_7C_DESIGN 5.2)."""
     sections = repo.load_sections(db, a.id)
     items = repo.load_items(db, a.id)
-    sec_outs, warnings = _tree_out(db, a, sections, items)
+    # --- Phase 7c S2 begin ---
+    from app.lms.quiz_editor import drafts as _drafts
+
+    draft_list = _drafts.list_drafts(db, a) if include_drafts else []
+    draft_items = frozenset(d.item_id for d in draft_list if d.item_id is not None)
+    # --- Phase 7c S2 end ---
+    sec_outs, warnings = _tree_out(db, a, sections, items, draft_items)
     n, pts = repo.item_totals(items)
     totals = {a.id: (n, float(pts))}
     counts = repo.attempt_counts(db, [a.id])
@@ -829,6 +889,7 @@ def staff_out(db: Session, a: Assessment) -> sch.AssessmentStaffOut:
         exam_template=exam_template_ref(db, a), display_mode=a.display_mode or "one_per_page",
         passage_display=a.passage_display, result_view=a.result_view, structure_locked=bool(a.structure_locked),
         # --- Phase 7b S1 end ---
+        drafts=draft_list,  # --- Phase 7c S2 ---
     )
 
 

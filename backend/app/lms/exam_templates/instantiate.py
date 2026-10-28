@@ -179,6 +179,11 @@ def _reapply_parameters(spec: ExamTemplateSpec, old_sections: list[AssessmentSec
 
 def _delete_section_items(db: Session, section: AssessmentSection) -> None:
     items = list(db.execute(select(AssessmentItem).where(AssessmentItem.section_id == section.id)).scalars())
+    # --- Phase 7c S2 begin --- (PHASE_7C_DESIGN 2.2: card drafts of a removed section go first, FK RESTRICT)
+    from app.lms.quiz_editor import drafts as _drafts
+
+    _drafts.remove_drafts(db, item_ids=[i.id for i in items], section_id=section.id)
+    # --- Phase 7c S2 end ---
     for it in [i for i in items if i.parent_item_id is not None]:
         db.delete(it)
     db.flush()
