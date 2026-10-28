@@ -76,7 +76,10 @@ export function AnnouncementsView() {
           <div className="mt-4 flex flex-wrap gap-2">
             <LinkButton href={`${base}/${r.id}/edit`} variant="secondary" size="sm">{t("announcements.edit")}</LinkButton>
             {!staff.published_at && <Button size="sm" loading={busyId === r.id} onClick={() => void post(staff)}>{t("announcements.postNow")}</Button>}
-            <Button variant="danger" size="sm" onClick={() => setConfirm(staff)}>{t("announcements.delete")}</Button>
+            {/* 8a UX (minor 8): a quiet text button on every card; the filled red button is only the confirm */}
+            <Button variant="link" size="sm" className="ml-auto text-danger-700 hover:text-danger-800" onClick={() => setConfirm(staff)}>
+              {t("announcements.delete")}<span className="sr-only">: {r.title}</span>
+            </Button>
           </div>
         )}
       </li>

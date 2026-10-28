@@ -91,5 +91,7 @@ export interface HomeModuleNextOut {
   item_id: string;
   kind?: "page" | "file" | "assignment" | "url" | "header";
   title: LocalizedText;
+  /** Phase 8a UX: the item's target ids (backend `ItemLinkOut`); used to drop rows already shown above */
+  link?: { assignment_id?: string | null; assessment_id?: string | null } | null;
 }
 // --- Phase 8a S4a end ---

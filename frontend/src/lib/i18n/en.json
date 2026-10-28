@@ -3881,7 +3881,7 @@
     "locked": {
       "title": "This is not open yet",
       "body": "Finish the earlier steps to open it.",
-      "bodyModule": "It is part of the module {title}.",
+      "bodyModule": "It is part of “{title}”.",
       "reasonUnlockAt": "Opens {date}",
       "reasonPrerequisite": "Finish {title} first",
       "reasonSequential": "Finish {title} first",
@@ -3912,7 +3912,7 @@
     "empty": "No files yet",
     "emptyHintStaff": "Upload a PDF to share it with your students.",
     "emptyHintStudent": "Your teacher has not shared any files yet.",
-    "rootFolder": "Files",
+    "rootFolder": "Without folder",
     "filesCount_one": "{count} file",
     "filesCount_other": "{count} files",
     "draft": "Draft",
@@ -3959,7 +3959,8 @@
     "usedInModules": "In {count} modules",
     "deleteEffectUsed_few": "It is used in {count} modules. Students can no longer download it.",
     "deleteEffectUsed_many": "It is used in {count} modules. Students can no longer download it.",
-    "deleteEffectUsed": "It is used in {count} modules. Students can no longer download it."
+    "deleteEffectUsed": "It is used in {count} modules. Students can no longer download it.",
+    "chooseFile": "Choose PDF"
   },
   "announcements": {
     "title": "Announcements",
@@ -4064,7 +4065,7 @@
       "draft": "Draft",
       "hidden": "Hidden",
       "publishModule": "Published",
-      "visible": "Visible",
+      "visible": "Published",
       "actions": "Actions",
       "editSettings": "Settings",
       "prerequisites": "Prerequisites",
@@ -4095,7 +4096,8 @@
       "editQuiz": "Edit quiz",
       "removeItem": "Remove from module",
       "deleteItemTitle": "Remove this item from the module?",
-      "deleteItemBody": "The page, file or assignment itself is not deleted. Progress on this item no longer counts."
+      "deleteItemBody": "The page, file or assignment itself is not deleted. Progress on this item no longer counts.",
+      "publishAnyway": "Publish anyway"
     },
     "settings": {
       "createTitle": "New module",
@@ -4111,7 +4113,8 @@
       "modeAny": "any one requirement is met",
       "publish": "Publish now",
       "publishHint": "Students see only published modules.",
-      "create": "Create module"
+      "create": "Create module",
+      "localTime": "Your local time"
     },
     "prereq": {
       "title": "Prerequisites",
@@ -4122,14 +4125,14 @@
     },
     "reqPicker": {
       "title": "Completion requirement",
-      "label": "To complete this item, students must",
-      "none": "Nothing (no requirement)",
+      "label": "What must students do to complete this item?",
+      "none": "No requirement",
       "types": {
-        "view": "view it",
-        "mark_done": "mark it as done",
-        "submit": "hand it in",
-        "min_score": "score at least a number of points",
-        "min_percent": "score at least a percentage"
+        "view": "View it",
+        "mark_done": "Mark it as done",
+        "submit": "Hand it in",
+        "min_score": "Score at least a number of points",
+        "min_percent": "Score at least a percentage"
       },
       "thresholdPoints": "Minimum points",
       "thresholdPercent": "Minimum percent",
@@ -4195,8 +4198,10 @@
       "target_deleted": "Target deleted",
       "prerequisite_unpublished": "Prerequisite not published",
       "prerequisite_deleted": "Prerequisite deleted",
-      "requirement_on_unpublished_target": "Requirement on a hidden item",
-      "unlock_in_past_with_locked_students": "Opening date passed"
+      "requirement_on_unpublished_target": "Requirement does not count (item hidden)",
+      "unlock_in_past_with_locked_students": "Opening date passed",
+      "requirementIgnoredTitle": "Quiz not published",
+      "requirementIgnoredBody": "“{item}” is a draft, so its requirement does not count. Students can complete this module without it. Publish the quiz or remove the requirement."
     },
     "errors": {
       "module_locked": "This is locked for now. Finish the earlier steps first.",
@@ -4208,6 +4213,7 @@
       "order_incomplete": "The list changed meanwhile. Reload the page and try again.",
       "home_page_invalid": "This page cannot be the course home. Choose a page of this course.",
       "template_locked": "The course template fixes this setting."
-    }
+    },
+    "availableInAssignments": "Available from Assignments"
   }
 }

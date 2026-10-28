@@ -105,3 +105,7 @@ owner. Never to make a failing run green without looking.
    description (or `docs/phases/PHASE_N_screens/`). The orchestrator reviews every baseline diff; the DOM
    assertions must still pass unchanged.
 4. If the change also affects Linux, replace `linux/` from the CI artifact of that PR.
+
+## History
+
+- 2026-10-28: teacher-* re-recorded for Phase 8a staff course tabs (approved; before/after in docs/phases/PHASE_8A_screens/ort-review/)

@@ -613,14 +613,28 @@ def _link(r: ev_mod.ItemRow) -> Optional[sch.ItemLinkOut]:
     return None
 
 
-def _item_student_out(lang: str, ie: ev_mod.ItemEval, *, evaluated: bool) -> sch.ItemStudentOut:
+def _gating_exempt(course: Course, r: ev_mod.ItemRow) -> bool:
+    """8a UX M6: a quiz whose assessment the course template exempts from gating (ORT preset exams, `LOCK_GATING`)
+    still starts inside a locked module (gate.require_access), so the student outline never shows it as locked.
+    Same rule as `gate._ort_exempt`."""
+    if r.kind != "assignment" or r.preset is None:
+        return False
+    from app.lms.templates import service as tpl
+    from app.lms.templates.base import LOCK_GATING
+
+    return tpl.is_locked(course, LOCK_GATING, preset=r.preset)
+
+
+def _item_student_out(course: Course, ie: ev_mod.ItemEval, *, evaluated: bool) -> sch.ItemStudentOut:
+    lang = course.default_language
     r = ie.row
     req = None
     if r.req_type is not None:
         req = sch.RequirementStudentOut(type=r.req_type, threshold=_f(r.threshold),
                                         met=bool(ie.met) if evaluated else False,
                                         best_score_percent=_f(ie.best) if evaluated else None)
-    locked = bool(ie.locked) if evaluated else False
+    # an exempt item is open even in a locked module (the module itself may still read `locked`)
+    locked = bool(ie.locked) and not _gating_exempt(course, r) if evaluated else False
     # a locked item carries no destination (a url item would leak it before the gate opens); an assignment keeps
     # only its kind, which picks the row icon (quiz / file / text)
     link, title = _link(r), r.title(lang)
@@ -644,7 +658,7 @@ def module_student_out(st: ev_mod.Structure, me: ev_mod.ModuleEval, *, evaluated
         id=m.id, title=m.title or {}, state=me.state if evaluated else None, unlock_at=_utc(m.unlock_at),
         sequential=bool(m.sequential), completion_mode=m.completion_mode,
         current_position=me.current_position if evaluated else None, lock_reasons=reasons,
-        items=[_item_student_out(st.course.default_language, ie, evaluated=evaluated) for ie in me.items])
+        items=[_item_student_out(st.course, ie, evaluated=evaluated) for ie in me.items])
 
 
 def _up_next(st: ev_mod.Structure, ev: ev_mod.Evaluation) -> Optional[sch.ItemRefOut]:

@@ -7,7 +7,7 @@
 // action (375 px first). Warnings are badges with text. Writes reload the outline (one document, design 2.3).
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp, Plus, RefreshCw, Users } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Plus, Users } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
 import {
@@ -18,7 +18,7 @@ import type { ItemStaffOut, ModuleStaffOut, ModulesStaffOut, ModuleWarningOut } 
 import { isStaffCourse } from "@/lib/lms/types";
 import { useCourse } from "@/components/lms/CourseContext";
 import {
-  Badge, Button, Checkbox, ConfirmDialog, EmptyState, ErrorState, IconButton, LoadingState, MenuButton, PageHeader, Switch, toast,
+  Badge, Button, Checkbox, ConfirmDialog, EmptyState, ErrorState, IconButton, LoadingState, MenuButton, PageHeader, Switch, cn, focusRing, toast,
 } from "@/components/ui";
 import { fmtShortDateTime } from "@/components/lms/home/format";
 import { ItemKindIcon, useItemKindText, useModuleErrorText, useRequirementText } from "./moduleUi";
@@ -38,7 +38,8 @@ type DialogState =
   | { kind: "requirement"; item: ItemStaffOut }
   | { kind: "moveItem"; item: ItemStaffOut }
   | { kind: "deleteItem"; item: ItemStaffOut }
-  | { kind: "progress" };
+  | { kind: "progress" }
+  | { kind: "publishWarn"; module: ModuleStaffOut; names: string };
 
 function swap<T>(list: T[], i: number, j: number): T[] {
   const next = [...list];
@@ -56,6 +57,10 @@ function Warnings({ warnings }: { warnings: ModuleWarningOut[] }) {
     </span>
   );
 }
+
+const REQ_IGNORED = "requirement_on_unpublished_target";
+/** 8a UX M1: items whose requirement does not count because their target (for example a quiz) is still a draft. */
+const ignoredReqItems = (m: ModuleStaffOut) => m.items.filter((i) => i.warnings.some((w) => w.code === REQ_IGNORED));
 
 export function ModuleOutlineEditor() {
   const { lang, t } = useTranslation();
@@ -97,6 +102,7 @@ export function ModuleOutlineEditor() {
     || i.url || t("modules.untitledItem");
 
   const closeDialog = () => { setDialog(null); setDialogError(null); };
+  const ignoredNames = (m: ModuleStaffOut) => ignoredReqItems(m).map(itemName).join(", ");
 
   /** Runs a write; `inDialog`: keep the dialog open and show the error in it. */
   const run = async (key: string, fn: () => Promise<unknown>, opts: { inDialog?: boolean; success?: string } = {}) => {
@@ -169,7 +175,7 @@ export function ModuleOutlineEditor() {
             </Button>
           )}
           {canEdit && (
-            <Button variant="secondary" leftIcon={<RefreshCw aria-hidden="true" className="h-4 w-4" />} onClick={() => setDialog({ kind: "reapply", module: null })}>
+            <Button variant="secondary" leftIcon={<AlertTriangle aria-hidden="true" className="h-4 w-4 text-warning-700" />} onClick={() => setDialog({ kind: "reapply", module: null })}>
               {t("modules.editor.reapplyCourse")}
             </Button>
           )}
@@ -199,7 +205,7 @@ export function ModuleOutlineEditor() {
                   <div className="min-w-0">
                     <h2 id={headingId} className="break-words text-lg font-semibold leading-7 text-slate-900">{moduleName(m)}</h2>
                     <p className="mt-0.5 flex flex-wrap gap-x-3 text-sm leading-6 text-slate-600">
-                      <span>{m.published ? t("modules.editor.published") : t("modules.editor.draft")}</span>
+                      {!canEdit && <span>{m.published ? t("modules.editor.published") : t("modules.editor.draft")}</span>}
                       {m.unlock_at && <span>{t("modules.reason.unlockAt", { date: fmtShortDateTime(m.unlock_at, lang) })}</span>}
                       {m.sequential && <span>{t("modules.sequentialHint")}</span>}
                       {m.completion_mode === "any" && <span>{t("modules.completionAny")}</span>}
@@ -209,7 +215,11 @@ export function ModuleOutlineEditor() {
                   {canEdit && (
                     <div className="flex shrink-0 flex-wrap items-center gap-1">
                       <Switch label={t("modules.editor.publishModule")} checked={m.published} busy={busy === `pub-${m.id}`}
-                        onChange={(v) => void run(`pub-${m.id}`, () => updateModule(course.id, m.id, { published: v }))} />
+                        onChange={(v) => {
+                          // 8a UX M1: publishing a module whose requirement points at a draft asks first
+                          if (v && ignoredReqItems(m).length > 0) { setDialogError(null); setDialog({ kind: "publishWarn", module: m, names: ignoredNames(m) }); return; }
+                          void run(`pub-${m.id}`, () => updateModule(course.id, m.id, { published: v }));
+                        }} />
                       <IconButton aria-label={t("modules.editor.moveModuleUp")} icon={<ArrowUp />} disabled={mi === 0 || !!busy} onClick={() => moveModule(mi, -1)} />
                       <IconButton aria-label={t("modules.editor.moveModuleDown")} icon={<ArrowDown />} disabled={mi === live.length - 1 || !!busy} onClick={() => moveModule(mi, 1)} />
                       <MenuButton variant="secondary" size="sm" label={t("modules.editor.actions")} onSelect={(id) => onModuleMenu(m, id)} items={[
@@ -222,6 +232,15 @@ export function ModuleOutlineEditor() {
                   )}
                 </div>
                 <Warnings warnings={m.warnings} />
+                {m.published && ignoredReqItems(m).length > 0 && (
+                  <div role="note" className="flex items-start gap-2 rounded-xl border border-warning-200 bg-warning-50 px-3 py-2 text-sm leading-6 text-warning-900">
+                    <AlertTriangle aria-hidden="true" className="mt-1 h-4 w-4 shrink-0 text-warning-700" />
+                    <div className="min-w-0 space-y-1 break-words">
+                      <Badge tone="warning">{t("modules.warnings.requirementIgnoredTitle")}</Badge>
+                      <p>{t("modules.warnings.requirementIgnoredBody", { item: ignoredNames(m) })}</p>
+                    </div>
+                  </div>
+                )}
               </header>
               {items.length === 0 ? (
                 <p className="px-4 py-4 text-base text-slate-600 sm:px-6 sm:text-sm">{t("modules.editor.noItems")}</p>
@@ -240,15 +259,20 @@ export function ModuleOutlineEditor() {
                               <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm leading-6 text-slate-600">
                                 <span>{kindText(it.kind, it.target?.assignment_kind)}</span>
                                 {it.target?.language && it.kind === "page" && <span>{t(`courses.languages.${it.target.language}`)}</span>}
-                                {it.requirement && <span>{t("modules.editor.requirement", { text: reqText(it.requirement.type, it.requirement.threshold) })}</span>}
-                                {!it.published && <Badge>{t("modules.editor.hidden")}</Badge>}
+                                {it.requirement && (canEdit ? (
+                                  <button type="button" onClick={() => onItemMenu(it, "requirement")}
+                                    className={cn("min-h-11 rounded text-left font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800 sm:min-h-0", focusRing)}>
+                                    {t("modules.editor.requirement", { text: reqText(it.requirement.type, it.requirement.threshold) })}
+                                  </button>
+                                ) : <span>{t("modules.editor.requirement", { text: reqText(it.requirement.type, it.requirement.threshold) })}</span>)}
+                                {!it.published && !canEdit && <Badge>{t("modules.editor.hidden")}</Badge>}
                                 <Warnings warnings={it.warnings} />
                               </p>
                             </div>
                           </div>
                           {canEdit && (
                             <div className="flex shrink-0 flex-wrap items-center gap-1 pl-8 lg:pl-0">
-                              <Switch label={t("modules.editor.visible")} checked={it.published} busy={busy === `ip-${it.id}`}
+                              <Switch label={<>{t("modules.editor.visible")}<span className="sr-only">: {itemName(it)}</span></>} checked={it.published} busy={busy === `ip-${it.id}`}
                                 onChange={(v) => void run(`ip-${it.id}`, () => updateItem(course.id, m.id, it.id, { published: v }))} />
                               <IconButton aria-label={t("modules.editor.moveItemUp", { title: itemName(it) })} icon={<ArrowUp />} disabled={ii === 0 || !!busy} onClick={() => moveItemBy(m, ii, -1)} />
                               <IconButton aria-label={t("modules.editor.moveItemDown", { title: itemName(it) })} icon={<ArrowDown />} disabled={ii === items.length - 1 || !!busy} onClick={() => moveItemBy(m, ii, 1)} />
@@ -376,6 +400,13 @@ export function ModuleOutlineEditor() {
           onConfirm={() => void run("delItem", () => deleteItem(course.id, d.item.module_id, d.item.id), { inDialog: true })} onCancel={closeDialog} />
       )}
       {d?.kind === "progress" && <ProgressDrawer open onClose={closeDialog} />}
+      {d?.kind === "publishWarn" && (
+        <ConfirmDialog open busy={busy === `pub-${d.module.id}`} title={t("modules.warnings.requirementIgnoredTitle")} object={moduleName(d.module)}
+          effect={t("modules.warnings.requirementIgnoredBody", { item: d.names })} confirmLabel={t("modules.editor.publishAnyway")}
+          error={dialogError ?? undefined}
+          onConfirm={() => void run(`pub-${d.module.id}`, () => updateModule(course.id, d.module.id, { published: true }), { inDialog: true })}
+          onCancel={closeDialog} />
+      )}
     </div>
   );
 }

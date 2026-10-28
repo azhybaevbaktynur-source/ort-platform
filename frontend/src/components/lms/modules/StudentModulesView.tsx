@@ -48,7 +48,10 @@ function ItemRow({ item, module, ctx }: { item: ItemStudentOut; module: ModuleSt
   }
 
   const moduleLocked = module.state === "locked";
-  const locked = item.locked || moduleLocked;
+  // 8a UX M6: the server never marks a gating-exempt exam (ORT preset) as locked, even inside a locked module; such a
+  // row opens and says where it lives. Every other item of a locked module is locked (the server says so too).
+  const exempt = moduleLocked && !item.locked && item.kind === "assignment" && !!item.link?.assignment_id;
+  const locked = item.locked || (moduleLocked && !exempt);
   const student = ctx.mode === "student";
   const req = item.requirement;
   const met = !!req?.met;
@@ -85,6 +88,9 @@ function ItemRow({ item, module, ctx }: { item: ItemStudentOut; module: ModuleSt
     }
   };
 
+  const canOpen = !locked && ctx.mode !== "progress";
+  // 8a UX M5: a file row names its action in the meta line at every width (like a page row's "View")
+  const canDownload = canOpen && item.kind === "file" && !!item.link?.file_id;
   const meta = (
     <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm leading-6 text-slate-600">
       <span className="inline-flex items-center gap-1"><ItemKindIcon kind={item.kind} assignmentKind={assignmentKind} />{kindText(item.kind, assignmentKind)}</span>
@@ -101,6 +107,8 @@ function ItemRow({ item, module, ctx }: { item: ItemStudentOut; module: ModuleSt
       {locked && !moduleLocked && (
         <span className="inline-flex items-center gap-1 text-slate-700"><Lock aria-hidden="true" className="h-4 w-4" />{t("modules.reason.sequentialItem")}</span>
       )}
+      {exempt && <span>{t("modules.availableInAssignments")}</span>}
+      {canDownload && <span className="font-semibold text-brand-700">{t("modules.download")}</span>}
     </span>
   );
 
@@ -113,7 +121,6 @@ function ItemRow({ item, module, ctx }: { item: ItemStudentOut; module: ModuleSt
       : <ItemKindIcon kind={item.kind} assignmentKind={assignmentKind} className="mt-1 h-5 w-5 text-slate-500" />;
 
   const href = itemHref(ctx.base, item.kind, item.link);
-  const canOpen = !locked && ctx.mode !== "progress";
   let body: React.ReactNode;
   if (canOpen && href) {
     body = (
@@ -137,7 +144,6 @@ function ItemRow({ item, module, ctx }: { item: ItemStudentOut; module: ModuleSt
       <button type="button" onClick={() => void openFile()} disabled={busy} aria-busy={busy || undefined}
         className={cn(rowCls, "text-slate-900 hover:bg-slate-50 disabled:opacity-70", focusRing)}>
         {leading}<span className="min-w-0 flex-1">{titleEl}{meta}</span>
-        <span className="hidden shrink-0 self-center text-sm font-semibold text-brand-700 sm:inline">{t("modules.download")}</span>
       </button>
     );
   } else {

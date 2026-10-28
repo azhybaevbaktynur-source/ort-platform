@@ -91,7 +91,7 @@ export function ModuleSettingsDialog({ open, module, langs, busy, error, onSave,
         <LocalizedTextInput label={t("modules.settings.titleLabel")} languages={langs.languages} defaultLanguage={langs.defaultLanguage}
           value={title} onChange={setTitle} maxLength={200} required disabled={busy} />
         {touched && !titleOk && <p role="alert" className="text-sm text-danger-700">{t("modules.settings.titleRequired")}</p>}
-        <Input type="datetime-local" label={t("modules.settings.unlockAt")} hint={t("modules.settings.unlockAtHint")} optional
+        <Input type="datetime-local" label={t("modules.settings.unlockAt")} hint={`${t("modules.settings.localTime")}. ${t("modules.settings.unlockAtHint")}`} optional
           value={unlock} disabled={busy} onChange={(e) => setUnlock(e.target.value)} />
         <Checkbox label={t("modules.settings.sequential")} hint={t("modules.settings.sequentialHint")} checked={sequential} disabled={busy}
           onChange={(e) => setSequential(e.target.checked)} />
