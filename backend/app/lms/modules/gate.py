@@ -7,7 +7,7 @@ S1 created this module so S2 (modules) and S3 (pages, course files) share no fil
   caller's transaction (no commit). Return the number of modules bumped.
 - `require_access(db, ctx, course, *, page=None, file=None, assignment=None, preset=None)`: students only; raises
   `ModuleLocked` (423 `module_locked`, details `schemas.ModuleLockedDetails`) when every visible module item
-  referencing the target is locked; content outside modules is ungated; ORT preset exams are never gated
+  referencing the target is locked (a page matches through its translation group: any language variant); content outside modules is ungated; ORT preset exams are never gated
   (`LOCK_GATING`, design 13). Read-only: the evaluation is not persisted here (hot path of the attempt start burst,
   and callers such as the attempt start hit the rate limiter afterwards, which needs a session without uncommitted
   writes); `GET /modules` and the facts routes persist."""
@@ -37,9 +37,9 @@ def _ids(values: Iterable[Any]) -> list[uuid.UUID]:
     return [getattr(v, "id", v) for v in (values or [])]
 
 
-def _touch(db: Session, column, values: Iterable[Any]) -> int:
-    targets = _ids(values)
-    if not targets:
+def _touch(db: Session, column, values) -> int:
+    targets = values if hasattr(values, "subquery") else _ids(values)  # a list of ids or a SELECT of ids
+    if not hasattr(targets, "subquery") and not targets:
         return 0
     modules = select(ModuleItem.module_id).where(column.in_(targets), ModuleItem.deleted_at.is_(None))
     t = CourseModule.__table__
@@ -53,7 +53,14 @@ def touch_assignment(db: Session, assignment_ids: Iterable[uuid.UUID]) -> int:
 
 
 def touch_pages(db: Session, page_ids: Iterable[uuid.UUID]) -> int:
-    return _touch(db, ModuleItem.page_id, page_ids)
+    """Items point to one page of a translation group; every variant of the group counts (the gate matches by group)."""
+    targets = _ids(page_ids)
+    if not targets:
+        return 0
+    from app.lms.pages.models import Page
+
+    groups = select(Page.translation_group_id).where(Page.id.in_(targets))
+    return _touch(db, ModuleItem.page_id, select(Page.id).where(Page.translation_group_id.in_(groups)))
 
 
 def touch_files(db: Session, file_ids: Iterable[uuid.UUID]) -> int:
@@ -81,14 +88,28 @@ def lock_details(structure: "ev_mod.Structure", me: "ev_mod.ModuleEval",
     return {"module_id": str(me.module.id), "module_title": dict(me.module.title or {}), "reasons": reasons}
 
 
-def _referenced(db: Session, course, column, target_id) -> bool:
-    """One EXISTS: a live, published item in a live, published module of this course points to the target."""
+def _referenced(db: Session, course, column, targets: list) -> bool:
+    """One EXISTS: a live, published item in a live, published module of this course points to a target."""
     return db.execute(
         select(ModuleItem.id).join(CourseModule, CourseModule.id == ModuleItem.module_id)
-        .where(column == target_id, ModuleItem.deleted_at.is_(None), ModuleItem.published.is_(True),
+        .where(column.in_(targets), ModuleItem.deleted_at.is_(None), ModuleItem.published.is_(True),
                CourseModule.course_id == course.id, CourseModule.deleted_at.is_(None),
                CourseModule.published.is_(True)).limit(1)
     ).first() is not None
+
+
+def _page_group_ids(db: Session, page: Any) -> list:
+    """Every page id of the page's translation group (S3 request): a module item tracks one variant, and opening any
+    other language variant of a locked page directly must be locked too."""
+    from app.lms.pages.models import Page
+
+    pid = getattr(page, "id", page)
+    group = getattr(page, "translation_group_id", None)
+    if group is None:
+        group = db.execute(select(Page.translation_group_id).where(Page.id == pid)).scalar()
+    if group is None:
+        return [pid]
+    return list(db.execute(select(Page.id).where(Page.translation_group_id == group)).scalars()) or [pid]
 
 
 def require_access(db: Session, ctx: Any, course: Any, *, page: Optional[Any] = None, file: Optional[Any] = None,
@@ -98,18 +119,18 @@ def require_access(db: Session, ctx: Any, course: Any, *, page: Optional[Any] = 
     if ctx.role_for(course.id) != "student":
         return  # staff are never gated; org admins (A13) read published content
     if page is not None:
-        column, target = ModuleItem.page_id, getattr(page, "id", page)
+        column, targets = ModuleItem.page_id, _page_group_ids(db, page)
     elif file is not None:
-        column, target = ModuleItem.file_id, getattr(file, "id", file)
+        column, targets = ModuleItem.file_id, [getattr(file, "id", file)]
     elif assignment is not None:
-        column, target = ModuleItem.assignment_id, getattr(assignment, "id", assignment)
+        column, targets = ModuleItem.assignment_id, [getattr(assignment, "id", assignment)]
     else:
         return
     if assignment is not None and preset is not None and _ort_exempt(course, preset):
         return
-    if not _referenced(db, course, column, target):
+    if not _referenced(db, course, column, targets):
         return  # content outside modules is ungated, as today
-    if assignment is not None and preset is None and _ort_exempt(course, _preset_of(db, assignment, target)):
+    if assignment is not None and preset is None and _ort_exempt(course, _preset_of(db, assignment, targets[0])):
         return
     from app.lms.courses import service as course_svc
 
@@ -118,7 +139,8 @@ def require_access(db: Session, ctx: Any, course: Any, *, page: Optional[Any] = 
         return  # the target route's own authorization answers
     structure, _mem, ev = ev_mod.evaluate(db, course, enr.id, clock.now(), persist_changes=False)
     attr = {"page_id": "page_id", "file_id": "file_id", "assignment_id": "assignment_id"}[column.key]
-    refs = [(me, ie) for me in ev.modules.values() for ie in me.items if getattr(ie.row.item, attr) == target]
+    wanted = set(targets)
+    refs = [(me, ie) for me in ev.modules.values() for ie in me.items if getattr(ie.row.item, attr) in wanted]
     if not refs or any(not ie.locked for _me, ie in refs):
         return  # not visible (the route answers 404 itself) or open through at least one module
     me, ie = refs[0]

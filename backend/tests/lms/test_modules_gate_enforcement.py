@@ -234,3 +234,35 @@ async def test_removed_student_is_not_gated_but_cannot_start(db, api, frozen_clo
     other = make_user(db)
     enroll(db, q.course, other)
     assert (await api.call(other, "POST", start_url(q), json={})).status_code == 423
+
+
+async def test_untracked_language_variant_of_a_locked_page_is_locked(db, api, frozen_clock):
+    """S3 request: a module item tracks one variant of a page; opening another language variant of the same
+    translation group directly (by id, or through `?lang=`) is locked too. Unrelated pages stay open."""
+    w = structure_world(db)
+    c = db.get(Course, w.course.id)
+    c.languages = ["en", "ru"]
+    db.commit()
+    en = make_page(db, w.course, w.O, title="Rules")
+    ru = make_page(db, w.course, w.O, language="ru", title="Правила", group=en)
+    loose = make_page(db, w.course, w.O, title="Elsewhere")
+    m = make_module(db, w.course, w.O, unlock_at=FUTURE)
+    make_item(db, m, en)
+    course = db.get(Course, w.course.id)
+    for target in (ru, ru.id, en):
+        with pytest.raises(gate.ModuleLocked):
+            gate.require_access(db, _ctx(db, w.S), course, page=target)
+    pages = f"/courses/{w.cid}/pages"
+    for path, params in ((f"{pages}/{ru.id}", None), (f"{pages}/{en.id}", {"lang": "ru"}), (f"{pages}/{en.id}", None)):
+        r = await api.call(w.S, "GET", path, params=params)
+        assert r.status_code == 423 and r.json()["error"]["code"] == "module_locked", (path, params, r.text)
+    assert (await api.call(w.S, "GET", f"{pages}/{loose.id}")).status_code == 200
+    assert (await api.call(w.O, "GET", f"{pages}/{ru.id}")).status_code == 200
+    # touch_pages of any variant bumps the module that tracks the group
+    rv = m.rules_version
+    assert gate.touch_pages(db, [ru.id]) == 1
+    db.commit()
+    db.expire_all()
+    assert db.get(type(m), m.id).rules_version == rv + 1
+    frozen_clock.t = FUTURE
+    assert (await api.call(w.S, "GET", f"{pages}/{ru.id}")).status_code == 200
