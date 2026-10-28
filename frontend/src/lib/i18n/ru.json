@@ -3666,7 +3666,10 @@
       "fieldError": "Проверьте поле: {field}",
       "answersField": "Ответы",
       "detailsField": "Дополнительно",
-      "otherField": "Вопрос"
+      "otherField": "Вопрос",
+      "correctAnswer": "Правильный ответ:",
+      "answerLabel": "Вариант {letter}",
+      "enterAdds": "Enter добавляет следующий вариант. Backspace в пустом варианте удаляет его."
     },
     "scope": {
       "title": "Этот вопрос используется в других тестах",

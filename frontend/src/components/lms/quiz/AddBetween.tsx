@@ -17,7 +17,7 @@ function useAddItems(withQuestion: boolean): MenuItem[] {
   return withQuestion ? [{ id: "question", label: t("quizEditor.add.question") }, ...items] : items;
 }
 
-function onPick(ops: QuizOps, section: SectionOut, after: string | null, id: string) {
+function onPick(ops: QuizOps, section: SectionOut | null, after: string | null, id: string) {
   if (id === "question") void ops.addQuestion(section, after);
   else if (id === "find") ops.addFrom(section, after, "questions");
   else if (id === "passage") ops.addFrom(section, after, "passage");
@@ -45,10 +45,8 @@ export function AddAtEnd({ ops, section, disabled }: { ops: QuizOps; section: Se
     <div className="flex flex-wrap gap-2 [&>*]:flex-1 sm:[&>*]:flex-none">
       <Button variant="secondary" disabled={disabled} leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}
         onClick={() => void ops.addQuestion(section, null)}>{t("quizEditor.card.addQuestion")}</Button>
-      {section && (
-        <MenuButton variant="secondary" align="start" disabled={disabled} items={items} label={t("quizEditor.add.more")}
-          onSelect={(id) => onPick(ops, section, null, id)} />
-      )}
+      <MenuButton variant="secondary" align="start" disabled={disabled} items={items} label={t("quizEditor.add.more")}
+        onSelect={(id) => onPick(ops, section, null, id)} />
     </div>
   );
 }

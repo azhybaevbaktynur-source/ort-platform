@@ -21,6 +21,6 @@ export function FindQuestionsDrawer({
 }) {
   return (
     <AddItemsDialog open={open} courseId={courseId} assessmentId={assessmentId} sectionId={sectionId}
-      initialTab={tab} onClose={onClose} onAdded={onAdded} />
+      initialTab={tab} onClose={onClose} onAdded={onAdded} quizEditor />
   );
 }

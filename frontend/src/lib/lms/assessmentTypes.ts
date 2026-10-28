@@ -370,6 +370,8 @@ export interface ItemQuestionOut {
   bank_kind?: "quiz" | "shared";
   /** Number of other live quizzes of the course that use this question. */
   used_elsewhere?: number;
+  /** Phase 7c S5: staff only, the correct answer(s) in one line (true/false: "true" | "false"; essay: null). */
+  correct_summary?: string | null;
 }
 
 export interface ItemOut {

@@ -16,8 +16,9 @@ export interface QuizOps {
   closed: () => void;
   /** A new card in `section` after `afterItemId` (null: at the end), optionally pre-filled. */
   addQuestion: (section: SectionOut | null, afterItemId: string | null, payload?: CardPayload) => Promise<void>;
-  /** Find questions / passage / random group from a shared bank, placed after `afterItemId`. */
-  addFrom: (section: SectionOut, afterItemId: string | null, tab: AddItemsTab) => void;
+  /** Find questions / passage / random group from a shared bank, placed after `afterItemId`. A quiz without sections
+   * (S5: an empty quiz) gets its hidden default section first. */
+  addFrom: (section: SectionOut | null, afterItemId: string | null, tab: AddItemsTab) => void;
   moveItem: (section: SectionOut, from: number, to: number) => Promise<void>;
   moveChild: (section: SectionOut, parent: ItemOut, from: number, to: number) => Promise<void>;
   moveToSection: (item: ItemOut, sectionId: string) => Promise<void>;

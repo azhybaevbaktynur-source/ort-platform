@@ -137,7 +137,10 @@ export function QuizEditor({ initial }: { initial: AssessmentStaffOut }) {
       if (!(await closeOpen())) return;
       setActionError(null);
       try {
-        const body = payload ?? payloadFromForm(emptyForm(cardTypeOptions(section)[0] ?? "single_choice", defaultLanguage));
+        // Phase 7c S5: a new card starts with two answers; Enter in the last one adds the next (8.3)
+        const blank = emptyForm(cardTypeOptions(section)[0] ?? "single_choice", defaultLanguage);
+        blank.choices = blank.choices.slice(0, 2);
+        const body = payload ?? payloadFromForm(blank);
         const d = await createDraft(course.id, aid, { ...(section ? { section_id: section.id } : {}), after_item_id: afterItemId, payload: body });
         await reload();
         setOpenKey(draftKey(d.id));
@@ -148,7 +151,19 @@ export function QuizEditor({ initial }: { initial: AssessmentStaffOut }) {
     addFrom: (section, afterItemId, addTab) => {
       void (async () => {
         if (!(await closeOpen())) return;
-        setFind({ sectionId: section.id, tab: addTab, anchor: afterItemId, known: section.items.map((i) => i.id) });
+        let target = section;
+        if (!target) {
+          // Phase 7c S5: an empty quiz has no section yet; create the hidden default one (7c-6) for the bank dialog
+          setActionError(null);
+          try {
+            target = await addSection(course.id, aid, {});
+            await reload();
+          } catch (e) {
+            setActionError(e);
+            return;
+          }
+        }
+        setFind({ sectionId: target.id, tab: addTab, anchor: afterItemId, known: target.items.map((i) => i.id) });
       })();
     },
     moveItem: async (section, from, to) => {

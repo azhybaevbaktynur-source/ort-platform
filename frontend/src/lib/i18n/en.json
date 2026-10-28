@@ -3666,7 +3666,10 @@
       "fieldError": "Check this field: {field}",
       "answersField": "Answers",
       "detailsField": "Details",
-      "otherField": "Question"
+      "otherField": "Question",
+      "correctAnswer": "Correct answer:",
+      "answerLabel": "Answer {letter}",
+      "enterAdds": "Enter adds the next answer. Backspace in an empty answer removes it."
     },
     "scope": {
       "title": "This question is used in other quizzes",
