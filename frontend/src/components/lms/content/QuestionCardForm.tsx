@@ -20,7 +20,7 @@ import { cardCls, inputCls, labelCls } from "./ui";
  */
 export function QuestionCardForm({
   form, onChange, disabled, courseId, languages, typeOptions = QUESTION_TYPES, lockType = false, lockLanguage = false,
-  passages = [], showMeta = true, idPrefix = "q",
+  passages = [], showMeta = true, idPrefix = "q", keyboardAnswers = false,
 }: {
   form: QuestionForm;
   onChange: (patch: Partial<QuestionForm>) => void;
@@ -37,6 +37,8 @@ export function QuestionCardForm({
   showMeta?: boolean;
   /** Prefix of the element ids, unique per form on a page. */
   idPrefix?: string;
+  /** Phase 7c S5: Enter / Backspace manage the answers (the quiz card; off in the Bank tab). */
+  keyboardAnswers?: boolean;
 }) {
   const { t } = useTranslation();
   const patch = onChange;
@@ -79,7 +81,7 @@ export function QuestionCardForm({
         <p className="text-xs text-slate-500">{t(`bank.types.${form.type}.hint`)}</p>
         <RichTextField label={t("bank.editor.stem")} rows={5} value={form.stem} disabled={disabled} onChange={(v) => patch({ stem: v })} />
         <ImagePicker courseId={courseId} label={t("bank.editor.image")} value={form.image} disabled={disabled} onChange={(img) => patch({ image: img })} />
-        {(form.type === "single_choice" || form.type === "multiple_answers") && <ChoiceFields courseId={courseId} {...fieldProps} />}
+        {(form.type === "single_choice" || form.type === "multiple_answers") && <ChoiceFields courseId={courseId} {...fieldProps} keyboardAnswers={keyboardAnswers} />}
         {form.type === "true_false" && <TrueFalseFields {...fieldProps} />}
         {form.type === "comparison" && <ComparisonFields {...fieldProps} />}
         {form.type === "numeric" && <NumericFields {...fieldProps} />}

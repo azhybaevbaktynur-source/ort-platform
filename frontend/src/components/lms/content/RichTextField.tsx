@@ -15,6 +15,9 @@ export function RichTextField({
   maxLength,
   disabled,
   compact = false,
+  onKeyDown,
+  inputRef,
+  ariaLabel,
 }: {
   label?: string;
   value: string;
@@ -23,6 +26,11 @@ export function RichTextField({
   maxLength?: number;
   disabled?: boolean;
   compact?: boolean;
+  /** Phase 7c S5 (opt-in, the quiz card's answers): keys pressed in the textarea. */
+  onKeyDown?: React.KeyboardEventHandler<HTMLTextAreaElement>;
+  /** Phase 7c S5: receives the textarea element (focus management of the quiz card's answers). */
+  inputRef?: (el: HTMLTextAreaElement | null) => void;
+  ariaLabel?: string;
 }) {
   const { t } = useTranslation();
   const id = useId();
@@ -53,8 +61,8 @@ export function RichTextField({
           <button type="button" disabled={disabled} className={btnSmall} onClick={() => wrap("<b>", "</b>")}>{t("bank.rich.bold")}</button>
         </div>
       )}
-      <textarea id={id} ref={ref} rows={rows} value={value} maxLength={maxLength} disabled={disabled}
-        onChange={(e) => onChange(e.target.value)} className={`${inputCls} font-mono`} />
+      <textarea id={id} ref={(el) => { ref.current = el; inputRef?.(el); }} rows={rows} value={value} maxLength={maxLength} disabled={disabled}
+        onChange={(e) => onChange(e.target.value)} onKeyDown={onKeyDown} aria-label={ariaLabel} className={`${inputCls} font-mono`} />
       {value.trim() && (
         <div className="mt-1.5 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2">
           <p className="mb-0.5 text-xs font-medium uppercase tracking-wide text-slate-400">{t("bank.rich.preview")}</p>

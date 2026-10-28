@@ -28,6 +28,17 @@ export interface Seed {
   staff_attempt_id: string;
   admin: SeedUser;
   students: Record<string, SeedUser>;
+  /** Phase 7c S5: the general course of the quiz editor walk (quiz-editor.spec.ts). */
+  quiz_editor: {
+    course_id: string;
+    bank_id: string;
+    shared_question_ids: string[];
+    quiz_a: string;
+    quiz_b: string;
+    quiz_b_version: number;
+    teacher: SeedUser;
+    student: SeedUser;
+  };
 }
 
 export const E2E_DIR = process.env.E2E_DIR || "/tmp/ort_e2e";

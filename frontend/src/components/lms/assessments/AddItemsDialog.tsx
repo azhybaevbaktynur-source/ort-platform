@@ -26,7 +26,7 @@ const EMPTY: Filters = { q: "", type: "", language: "", section: "", topic: "", 
 
 /** Add items to a section: questions (multi-select or all filtered), a passage group, or a random pick from a bank. */
 export function AddItemsDialog({
-  open, courseId, assessmentId, sectionId, onClose, onAdded, initialTab = "questions",
+  open, courseId, assessmentId, sectionId, onClose, onAdded, initialTab = "questions", quizEditor = false,
 }: {
   open: boolean;
   courseId: string;
@@ -36,6 +36,9 @@ export function AddItemsDialog({
   onAdded: () => void | Promise<void>;
   /** Phase 7c S3: the tab shown when the dialog opens (the quiz editor opens it on "Passage" or "Random group"). */
   initialTab?: AddItemsTab;
+  /** Phase 7c S5 (opt-in, the quiz editor's "Find questions"): full screen below `sm`, and the only shared bank is
+   * chosen for the teacher. Off for the section builder (ORT screens unchanged). */
+  quizEditor?: boolean;
 }) {
   const { t } = useTranslation();
   const ui = useTemplateUi();
@@ -92,6 +95,13 @@ export function AddItemsDialog({
     return () => { alive = false; };
   }, [open, tab, bankId, courseId]);
 
+  useEffect(() => {
+    if (!quizEditor || !open || banks.length !== 1) return;
+    const only = banks[0].id;
+    setBankId((cur) => cur || only);
+    setPick((p) => (p.bank_id ? p : { ...p, bank_id: only }));
+  }, [quizEditor, open, banks]);
+
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
     setError(null);
@@ -143,7 +153,7 @@ export function AddItemsDialog({
   );
 
   return (
-    <Modal open={open} title={t("assessments.add.title")} onClose={onClose} busy={busy} wide>
+    <Modal open={open} title={t("assessments.add.title")} onClose={onClose} busy={busy} wide fullScreenOnPhone={quizEditor}>
       <div role="tablist" aria-label={t("assessments.add.title")} className="mb-4 flex flex-wrap gap-2">
         {tabBtn("questions", t("assessments.add.tabQuestions"))}
         {tabBtn("passage", t("assessments.add.tabPassage"))}

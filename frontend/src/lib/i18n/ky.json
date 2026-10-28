@@ -1169,7 +1169,8 @@
       "up": "Бөлүмдү жогору жылдыруу",
       "down": "Бөлүмдү төмөн жылдыруу",
       "addItems": "Суроо кошуу",
-      "keyHint": "CSV импортунда колдонулат (section тилкеси)."
+      "keyHint": "CSV импортунда колдонулат (section тилкеси).",
+      "itemCount_one": "{n} суроо"
     },
     "item": {
       "points": "Балл",
@@ -3666,7 +3667,10 @@
       "fieldError": "Бул талааны текшериңиз: {field}",
       "answersField": "Жооптор",
       "detailsField": "Кошумча маалымат",
-      "otherField": "Суроо"
+      "otherField": "Суроо",
+      "correctAnswer": "Туура жооп:",
+      "answerLabel": "{letter} варианты",
+      "enterAdds": "Enter кийинки вариантты кошот. Бош варианттагы Backspace аны өчүрөт."
     },
     "scope": {
       "title": "Бул суроо башка тесттерде колдонулат",

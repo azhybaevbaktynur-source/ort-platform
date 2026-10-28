@@ -1169,7 +1169,8 @@
       "up": "Переместить раздел вверх",
       "down": "Переместить раздел вниз",
       "addItems": "Добавить вопросы",
-      "keyHint": "Используется в CSV-импорте (колонка section)."
+      "keyHint": "Используется в CSV-импорте (колонка section).",
+      "itemCount_one": "Вопросов: {n}"
     },
     "item": {
       "points": "Баллы",
@@ -3666,7 +3667,10 @@
       "fieldError": "Проверьте поле: {field}",
       "answersField": "Ответы",
       "detailsField": "Дополнительно",
-      "otherField": "Вопрос"
+      "otherField": "Вопрос",
+      "correctAnswer": "Правильный ответ:",
+      "answerLabel": "Вариант {letter}",
+      "enterAdds": "Enter добавляет следующий вариант. Backspace в пустом варианте удаляет его."
     },
     "scope": {
       "title": "Этот вопрос используется в других тестах",

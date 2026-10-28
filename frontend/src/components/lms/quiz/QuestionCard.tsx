@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { AlertTriangle, ArrowDown, ArrowUp, Copy, GripVertical, PencilLine } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Check, Copy, GripVertical, PencilLine } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { isLmsApiError } from "@/lib/lms/client";
 import { getQuestion } from "@/lib/lms/content";
@@ -53,6 +53,21 @@ function isBlank(f: QuestionForm): boolean {
     && !f.shortAnswers.trim() && !f.rubric.trim();
 }
 
+/**
+ * Phase 7c S5: blank answers after the first two are dropped when the card is finished (Enter adds one more than
+ * needed, and a new card starts with empty answers). Answers marked correct are kept, so the validation explains them.
+ */
+function pruneBlankChoices(f: QuestionForm): QuestionForm {
+  if (f.type !== "single_choice" && f.type !== "multiple_answers") return f;
+  const marked = (id: string) => (f.type === "single_choice" ? f.correctSingle === id : f.correctMulti.includes(id));
+  const choices = [...f.choices];
+  for (let i = choices.length - 1; i >= 0 && choices.length > 2; i--) {
+    const c = choices[i];
+    if (!c.text.trim() && !c.image && !marked(c.id)) choices.splice(i, 1);
+  }
+  return choices.length === f.choices.length ? f : { ...f, choices };
+}
+
 function rememberFormImages(f: QuestionForm) {
   rememberImage(f.image);
   f.choices.forEach((c) => rememberImage(c.image));
@@ -91,6 +106,10 @@ function CollapsedCard({ ctx, item, draft, label, onOpen, dragProps }: React.Com
   const hasDraft = !!draft || !!item?.has_draft;
   const draftBad = draft ? validateForm(formFromPayload(draft.payload)) !== null : false;
   const used = q?.used_elsewhere ?? 0;
+  // Phase 7c S5: the correct answer(s) of the saved version (owner's proposal 4); true/false tokens are translated
+  const summary = item ? q?.correct_summary ?? null : null;
+  const tf = q?.type === "true_false";
+  const answer = tf && summary === "true" ? t("bank.editor.true") : tf && summary === "false" ? t("bank.editor.false") : summary;
   const draggable = !!dragProps && Object.keys(dragProps).length > 0;
   return (
     <div {...dragProps} className="rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -116,6 +135,15 @@ function CollapsedCard({ ctx, item, draft, label, onOpen, dragProps }: React.Com
           {stem
             ? <span className="mt-1 line-clamp-2 block break-words text-base text-slate-800 sm:text-sm" dangerouslySetInnerHTML={{ __html: renderRichText(stem) }} />
             : <span className="mt-1 block text-sm italic text-slate-500">{t("quizEditor.card.emptyStem")}</span>}
+          {answer && (
+            <span className="mt-1 flex items-start gap-1.5 text-sm text-emerald-800">
+              <Check className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="min-w-0 break-words line-clamp-2">
+                <span className="font-medium">{t("quizEditor.card.correctAnswer")}</span>{" "}
+                <span dangerouslySetInnerHTML={{ __html: renderRichText(answer) }} />
+              </span>
+            </span>
+          )}
         </button>
       </div>
     </div>
@@ -235,7 +263,13 @@ function OpenCard({ ctx, section, item, draft, label, onClosed, actions, childOf
         await finish();
         return true;
       }
-      const bad = validateForm(f);
+      const pruned = pruneBlankChoices(f);
+      if (pruned !== f) {
+        formRef.current = pruned;
+        setForm(pruned);
+        autosave.schedule(payloadFromForm(pruned));
+      }
+      const bad = validateForm(pruned);
       if (bad) {
         if (mode === "done") { setClientError(bad); return false; }
         // Closing an unfinished card keeps it as a draft ("Draft saved · has errors").
@@ -372,7 +406,8 @@ function OpenCard({ ctx, section, item, draft, label, onClosed, actions, childOf
         <div className="space-y-4">
           <QuestionCardForm form={form} onChange={change} disabled={busy || autosave.status === "conflict"} courseId={courseId}
             languages={languages.length ? languages : a.languages} typeOptions={cardTypeOptions(section, form.type)}
-            lockLanguage={!isNew || languages.length <= 1} showMeta={false} idPrefix={`qc-${item?.id ?? draft?.id ?? "new"}`} />
+            lockLanguage={!isNew || languages.length <= 1} showMeta={false} idPrefix={`qc-${item?.id ?? draft?.id ?? "new"}`}
+            keyboardAnswers />
           {clientError && <p role="alert" className="text-sm text-red-700">{t(clientError)}</p>}
           {fieldErrors.length > 0 && (
             <ul role="alert" className="list-disc space-y-0.5 pl-5 text-sm text-red-700">
@@ -424,7 +459,7 @@ function OpenCard({ ctx, section, item, draft, label, onClosed, actions, childOf
         </div>
       </div>
 
-      <ScopeDialog details={scope?.details ?? null} busy={busy} defaultLanguage={ctx.defaultLanguage}
+      <ScopeDialog details={scope?.details ?? null} busy={busy} defaultLanguage={ctx.defaultLanguage} passageChild={!!childOf}
         onCancel={() => setScope(null)}
         onChoose={(sc) => {
           const s = scope;

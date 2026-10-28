@@ -739,21 +739,24 @@ def _question_infos(db: Session, a: Assessment, items: list[AssessmentItem]) -> 
     for k in range(0, len(ids), 500):
         rows = db.execute(
             select(BankQuestion, QuestionVersion.stem, QuestionBank.deleted_at,
-                   QuestionBank.assessment_id)  # --- Phase 7c S2 --- (bank_kind)
+                   QuestionBank.assessment_id,  # --- Phase 7c S2 --- (bank_kind)
+                   QuestionVersion.type, QuestionVersion.data)  # --- Phase 7c S5 --- (correct_summary)
             .join(QuestionVersion, QuestionVersion.id == BankQuestion.current_version_id)
             .join(QuestionBank, QuestionBank.id == BankQuestion.bank_id)
             .where(BankQuestion.id.in_(ids[k:k + 500]), QuestionBank.course_id == a.course_id)
         ).all()
-        for q, stem, bank_deleted, bank_quiz in rows:
-            out[q.id] = (q, stem, q.deleted_at is not None or bank_deleted is not None, bank_quiz)
+        for q, stem, bank_deleted, bank_quiz, vtype, vdata in rows:
+            out[q.id] = (q, stem, q.deleted_at is not None or bank_deleted is not None, bank_quiz, (vtype, vdata))
     return out
 
 
 def _tree_out(db: Session, a: Assessment, sections: list[AssessmentSection], items: list[AssessmentItem],
-              draft_items: frozenset = frozenset()):  # --- Phase 7c S2 --- (items with a draft: `has_draft`)
+              draft_items: frozenset = frozenset(),  # --- Phase 7c S2 --- (items with a draft: `has_draft`)
+              include_answers: bool = False):  # --- Phase 7c S5 --- (`correct_summary`, staff read_admin only)
     top, kids = repo.group_items(items)
     qinfo = _question_infos(db, a, items)
     # --- Phase 7c S2 begin --- (PHASE_7C_DESIGN 5.5: other live quizzes using each question, one grouped query)
+    from app.lms.quiz_editor.summary import correct_summary  # Phase 7c S5
     from app.lms.quiz_editor.usage import used_elsewhere_counts
 
     elsewhere = used_elsewhere_counts(db, a, list(qinfo)) if qinfo else {}
@@ -778,14 +781,16 @@ def _tree_out(db: Session, a: Assessment, sections: list[AssessmentSection], ite
         out = sch.ItemOut(id=it.id, kind=it.kind, position=it.position,
                           points=float(it.points) if it.points is not None else None)
         if it.kind == "question":
-            q, stem, deleted, bank_quiz = qinfo.get(it.question_id, (None, "", True, None))
+            q, stem, deleted, bank_quiz, content = qinfo.get(it.question_id, (None, "", True, None, (None, None)))
             out.has_draft = it.id in draft_items  # --- Phase 7c S2 ---
             if q is not None:
                 out.question = sch.ItemQuestionOut(
                     id=q.id, type=q.type, language=q.language, stem_excerpt=(stem or "")[:200], deleted=deleted,
                     newer_version_available=it.id in newer,
                     # --- Phase 7c S2 --- (PHASE_7C_DESIGN 6.1)
-                    bank_kind="quiz" if bank_quiz is not None else "shared", used_elsewhere=elsewhere.get(q.id, 0))
+                    bank_kind="quiz" if bank_quiz is not None else "shared", used_elsewhere=elsewhere.get(q.id, 0),
+                    # --- Phase 7c S5 ---
+                    correct_summary=correct_summary(content[0] or q.type, content[1]) if include_answers else None)
                 if it.id in newer:
                     warnings.append({"code": "newer_version", "item_id": str(it.id)})
                 for lang in langs:
@@ -865,9 +870,11 @@ def staff_summaries(db: Session, assessments: list[Assessment]) -> list[sch.Asse
             for a in assessments]
 
 
-def staff_out(db: Session, a: Assessment, *, include_drafts: bool = False) -> sch.AssessmentStaffOut:
+def staff_out(db: Session, a: Assessment, *, include_drafts: bool = False,
+              include_answers: bool = False) -> sch.AssessmentStaffOut:
     """Phase 7c S2: `include_drafts` (callers holding `course:content.read_admin`) adds the card drafts and
-    `ItemOut.has_draft`; otherwise `drafts = []` and `has_draft = false` (PHASE_7C_DESIGN 5.2)."""
+    `ItemOut.has_draft`; otherwise `drafts = []` and `has_draft = false` (PHASE_7C_DESIGN 5.2).
+    Phase 7c S5: `include_answers` (same callers) adds `ItemQuestionOut.correct_summary`."""
     sections = repo.load_sections(db, a.id)
     items = repo.load_items(db, a.id)
     # --- Phase 7c S2 begin ---
@@ -876,7 +883,7 @@ def staff_out(db: Session, a: Assessment, *, include_drafts: bool = False) -> sc
     draft_list = _drafts.list_drafts(db, a) if include_drafts else []
     draft_items = frozenset(d.item_id for d in draft_list if d.item_id is not None)
     # --- Phase 7c S2 end ---
-    sec_outs, warnings = _tree_out(db, a, sections, items, draft_items)
+    sec_outs, warnings = _tree_out(db, a, sections, items, draft_items, include_answers)
     n, pts = repo.item_totals(items)
     totals = {a.id: (n, float(pts))}
     counts = repo.attempt_counts(db, [a.id])
