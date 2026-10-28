@@ -91,7 +91,6 @@ def test_shapes():
 
 
 def test_gate_stubs():
+    # S2 filled the gate (tests/lms/test_modules_gate_enforcement.py); empty id lists still touch nothing
     assert gate.touch_assignment(None, []) == 0 and gate.touch_pages(None, []) == 0 and gate.touch_files(None, []) == 0
-    with pytest.raises(NotImplementedError):
-        gate.require_access(None, None, None)
     assert gate.ModuleLocked("x").status_code == 423 and gate.ModuleLocked("x").code == "module_locked"

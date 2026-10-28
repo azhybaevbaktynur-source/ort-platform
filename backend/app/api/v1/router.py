@@ -81,6 +81,11 @@ from app.lms.quiz_editor.router import router as _quiz_editor_router  # noqa: E4
 
 api_router.include_router(_quiz_editor_router, prefix="/courses", tags=["Quiz Editor"])
 # --- Phase 7c S2 end ---
+# --- Phase 8a S2 begin --- (modules and gating, PHASE_8A_DESIGN 7.1)
+from app.lms.modules.router import router as _modules_router  # noqa: E402
+
+api_router.include_router(_modules_router, prefix="/courses", tags=["Modules"])
+# --- Phase 8a S2 end ---
 # --- Phase 8a S3 begin --- (pages, course files, announcements, PHASE_8A_DESIGN 7.2)
 from app.lms.announcements.router import router as _announcements_router  # noqa: E402
 from app.lms.course_files.router import router as _course_files_router  # noqa: E402

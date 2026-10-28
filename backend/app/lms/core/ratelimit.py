@@ -98,6 +98,22 @@ def scheme_preview_limit() -> Limit:
     """Phase 4 (P4-21): scheme preview, per user."""
     return Limit("scheme_preview_1m", settings.SCHEME_PREVIEW_RATE_PER_MIN, 60)
 
+
+# --- Phase 8a S2 begin --- (PHASE_8A_DESIGN 6.6, 7.1)
+def progress_limit() -> Limit:
+    """Module item view + mark-done facts, per user (shared by both routes)."""
+    from app.lms.modules.ids import PROGRESS_RATE_PER_HOUR
+
+    return Limit("progress_1h", PROGRESS_RATE_PER_HOUR, 3600)
+
+
+def module_reapply_limit() -> Limit:
+    """"Re-apply rules" (course or module scope), per user."""
+    from app.lms.modules.ids import REAPPLY_RATE_PER_HOUR
+
+    return Limit("module_reapply_1h", REAPPLY_RATE_PER_HOUR, 3600)
+# --- Phase 8a S2 end ---
+
 _CLEANUP_PROBABILITY = 1 / 200
 _CLEANUP_BATCH = 1000
 
