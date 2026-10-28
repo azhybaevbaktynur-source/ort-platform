@@ -283,6 +283,11 @@ def hand_in(db: Session, ctx: AuthzContext, course: Course, assignment_id: uuid.
     ratelimit.enforce(f"handin:{ctx.user.id}", submit_limit())  # before any write of this session
     now = now or clock.now()
     enr = own_enrollment(db, ctx, course)
+    # --- Phase 8a S2 begin --- (PHASE_8A_DESIGN 6.5: a locked module item cannot be handed in; read-only check)
+    from app.lms.modules import gate
+
+    gate.require_access(db, ctx, course, assignment=a)
+    # --- Phase 8a S2 end ---
     eff = effective_dates(a, load_override(db, a.id, enr.id))
     w = window_reason(eff, now)
     if w is not None:

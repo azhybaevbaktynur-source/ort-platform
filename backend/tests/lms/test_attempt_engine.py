@@ -375,7 +375,8 @@ def test_statement_budgets(client, db):
     with Counter() as c:
         r = client.post(url, json={}, headers=h2)
     assert r.status_code == 201
-    assert c.n <= 9, "\n".join(c.statements)
+    # Phase 8a S2: +1 for the module gate's single EXISTS on module_items (PHASE_8A_DESIGN 6.7)
+    assert c.n <= 10, "\n".join(c.statements)
     with Counter() as c:
         assert state(client, q, aid).status_code == 200
     assert c.n <= 5, c.statements

@@ -64,4 +64,34 @@ export interface HomeOut {
   courses: HomeCourseOut[];
   courses_total: number;
   pending_invitations: number;
+  // --- Phase 8a S4a begin --- (PHASE_8A_DESIGN 7.2: "up next" in modules, read from the progress cache)
+  /** absent on a backend before Phase 8a */
+  modules_next?: HomeModuleNextOut[];
+  // --- Phase 8a S4a end ---
+  /** Phase 8a S5: the latest three published announcements of the student's active courses (absent before 8a) */
+  announcements?: HomeAnnouncementOut[];
 }
+
+/** Phase 8a S5: one row of the home announcements strip (backend `AnnouncementHomeOut`; never a body). */
+export interface HomeAnnouncementOut {
+  id: string;
+  course_id: string;
+  course_title: LocalizedText;
+  title: string;
+  published_at: string;
+}
+
+// --- Phase 8a S4a begin ---
+/** "Continue in *Course*: *Item*": the first unlocked item with an unmet requirement in one course. */
+export interface HomeModuleNextOut {
+  course_id: string;
+  course_title: LocalizedText;
+  module_id: string;
+  module_title?: LocalizedText;
+  item_id: string;
+  kind?: "page" | "file" | "assignment" | "url" | "header";
+  title: LocalizedText;
+  /** Phase 8a UX: the item's target ids (backend `ItemLinkOut`); used to drop rows already shown above */
+  link?: { assignment_id?: string | null; assessment_id?: string | null } | null;
+}
+// --- Phase 8a S4a end ---

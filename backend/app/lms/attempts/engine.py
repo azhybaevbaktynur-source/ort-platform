@@ -667,6 +667,14 @@ def start_attempt(db: Session, ctx: AuthzContext, course: Course, aid, data: Sta
     # from the accommodation and the override (one SELECT), then the access code. Without either, `eff` equals the
     # assessment's own values and zero extra time, so the checks and deadlines are exactly the Phase 3 ones.)
     eff = s4_enr = None
+    # --- Phase 8a S2 begin --- (PHASE_8A_DESIGN 6.5, 13: module gate before the window and access-code checks;
+    # read-only; ORT preset exams are never gated (LOCK_GATING), so the ORT start path is unchanged)
+    if not staff:
+        from app.lms.assignments.ids import assignment_id_for
+        from app.lms.modules import gate
+
+        gate.require_access(db, ctx, course, assignment=assignment_id_for(assessment.id), preset=assessment.preset)
+    # --- Phase 8a S2 end ---
     if not staff:
         from app.lms.accommodations import service as accommodations
 

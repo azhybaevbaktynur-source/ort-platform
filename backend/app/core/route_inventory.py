@@ -99,6 +99,17 @@ from app.lms.quiz_editor.policies import QUIZ_EDITOR_POLICIES  # noqa: E402
 
 ROUTE_POLICIES.update(QUIZ_EDITOR_POLICIES)
 # --- Phase 7c S1 end ---
+# --- Phase 8a S1 begin --- (course structure, PHASE_8A_DESIGN 7: S2 fills MODULE_POLICIES, S3 the other three)
+from app.lms.announcements.policies import ANNOUNCEMENT_POLICIES  # noqa: E402
+from app.lms.course_files.policies import COURSE_FILE_POLICIES  # noqa: E402
+from app.lms.modules.policies import MODULE_POLICIES  # noqa: E402
+from app.lms.pages.policies import PAGE_POLICIES  # noqa: E402
+
+ROUTE_POLICIES.update(MODULE_POLICIES)
+ROUTE_POLICIES.update(PAGE_POLICIES)
+ROUTE_POLICIES.update(COURSE_FILE_POLICIES)
+ROUTE_POLICIES.update(ANNOUNCEMENT_POLICIES)
+# --- Phase 8a S1 end ---
 
 
 def iter_routes(app):

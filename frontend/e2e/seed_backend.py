@@ -212,6 +212,32 @@ def seed_quiz_editor(api: Api, log: Path, admin_tok: str) -> dict:
 # --- Phase 7c S5 end ---
 
 
+# --- Phase 8a S5 begin --- (modules walk, frontend/e2e/modules.spec.ts; written after every ORT and quiz-editor row, so
+# those rows and screens are exactly as before)
+def seed_modules(api: Api, log: Path, admin_tok: str, ort_course_id: str) -> dict:
+    """A general course (ru, ky, en) of a second approved teacher, published, with no structure yet (the walk builds
+    it in the browser) and one enrolled student; plus one extra ORT (Russian) student for the ORT proof of the walk
+    (ORT exam listed in a locked module still starts)."""
+    teacher = register(api, log, "e2e-modules-teacher@example.com", "Modules Teacher")
+    tp = profile(api, teacher["token"])
+    api.call("POST", f"/platform/users/{tp['id']}/teacher-status", admin_tok, {"status": "approved"})
+    teacher["profile"] = profile(api, teacher["token"])
+    tok = teacher["token"]
+    title = {"ru": "Курс модулей E2E", "ky": "Модулдар курсу E2E", "en": "Modules course E2E"}
+    course = api.call("POST", "/courses", tok, {"title": title, "languages": ["ru", "ky", "en"], "default_language": "ru"})
+    cid = course["id"]
+    api.call("POST", f"/courses/{cid}/publish", tok, {})
+    student = register(api, log, "e2e-modules-student@example.com", "Modules Student")
+    student["profile"] = profile(api, student["token"])
+    api.call("POST", "/courses/join", student["token"], {"code": course["join_code"]})
+    ort_student = register(api, log, "e2e-ort-modules@example.com", "ORT Modules Student")
+    ort_student["profile"] = profile(api, ort_student["token"])
+    api.call("POST", f"/courses/{ort_course_id}/join", ort_student["token"], {})
+    return {"course_id": cid, "join_code": course["join_code"], "teacher": teacher, "student": student,
+            "ort_student": ort_student}
+# --- Phase 8a S5 end ---
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--api", required=True)
@@ -281,9 +307,11 @@ def main() -> int:
     staff_attempt = seeded_attempt(api, students["staff-seed"]["token"], cid, staff_exam["id"])
 
     quiz_editor = seed_quiz_editor(api, log, tok)  # Phase 7c S5 (after every ORT row)
+    modules = seed_modules(api, log, tok, cid)  # Phase 8a S5 (after every ORT and quiz-editor row)
 
     seed = {
         "quiz_editor": quiz_editor,
+        "modules": modules,
         "api": args.api, "course_id": cid, "bank_id": bank_id, "exam": exam, "staff_exam": staff_exam,
         "picks": picks, "keys": keys, "comparison_question_id": comparison_qid, "passage_id": passage_id,
         "staff_attempt_id": staff_attempt, "admin": admin, "students": students,

@@ -4,6 +4,7 @@ import { expect, type Locator, type Page, type TestInfo } from "@playwright/test
 import { PNG } from "pngjs";
 import ru from "../src/lib/i18n/ru.json";
 import ky from "../src/lib/i18n/ky.json";
+import en from "../src/lib/i18n/en.json";
 
 // ----------------------------------------------------------------------------- seed (frontend/e2e/seed_backend.py)
 
@@ -39,6 +40,14 @@ export interface Seed {
     teacher: SeedUser;
     student: SeedUser;
   };
+  /** Phase 8a S5: the general course of the modules walk (modules.spec.ts) and one extra ORT (Russian) student. */
+  modules: {
+    course_id: string;
+    join_code: string;
+    teacher: SeedUser;
+    student: SeedUser;
+    ort_student: SeedUser;
+  };
 }
 
 export const E2E_DIR = process.env.E2E_DIR || "/tmp/ort_e2e";
@@ -55,9 +64,9 @@ export const sectionCounts = () => ORT_SECTIONS.map((k) => seed().picks[k].lengt
 
 // ----------------------------------------------------------------------------- i18n (the app's own strings)
 
-const DICTS: Record<Lang, unknown> = { ru, ky };
+const DICTS: Record<Lang | "en", unknown> = { ru, ky, en };
 /** Same lookup and `{name}` interpolation as the app (src/lib/i18n/context). */
-export function tr(lang: Lang, key: string, vars: Record<string, string | number> = {}): string {
+export function tr(lang: Lang | "en", key: string, vars: Record<string, string | number> = {}): string {
   let cur: unknown = DICTS[lang];
   for (const part of key.split(".")) {
     if (cur && typeof cur === "object" && part in (cur as Record<string, unknown>)) cur = (cur as Record<string, unknown>)[part];

@@ -9,13 +9,14 @@ ALL = frozenset({
     "content.read", "content.read_admin", "content.manage", "assessment.take", "attempt.read_own",
     "attempt.read_all", "grades.read_own", "grades.manage", "course.transfer", "course.leave",
     "assignment.submit", "accommodations.manage",  # Phase 7a
+    "progress.record",  # Phase 8a: module view / mark-done facts, students only
 })
-TEACHER = ALL - {"assignment.submit"}  # Phase 7a: staff never hand in
+TEACHER = ALL - {"assignment.submit", "progress.record"}  # Phase 7a/8a: staff never hand in nor record progress
 ASSISTANT_PUBLISHED = TEACHER - {"course.delete", "course.publish", "roster.manage", "course.transfer",
                                  "accommodations.manage"}
 STUDENT_PUBLISHED = frozenset({
     "course.read", "content.read", "assessment.take", "attempt.read_own", "grades.read_own", "course.leave",
-    "assignment.submit",
+    "assignment.submit", "progress.record",
 })
 READ_ONLY = frozenset({
     "course.read", "roster.read", "content.read", "content.read_admin", "attempt.read_own", "attempt.read_all",

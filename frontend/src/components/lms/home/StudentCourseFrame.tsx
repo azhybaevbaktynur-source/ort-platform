@@ -8,16 +8,26 @@ import { usePathname } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
 import type { CourseOut } from "@/lib/lms/types";
+import { useCourse } from "@/components/lms/CourseContext";
 import { PageHeader, Skeleton, TabsNav } from "@/components/ui";
 
 export function StudentCourseTabs({ courseId }: { courseId: string }) {
   const { lang, t } = useTranslation();
+  const { course } = useCourse();
+  const features = course.features; // Phase 8a S4a
   const pathname = usePathname();
   const base = `/${lang}/courses/${courseId}`;
   // --- Phase 7a S5: "Assignments" replaces the "Assessments" entry (the lobby URLs under /assessments stay and keep it active) ---
-  const tabs = [
-    { href: base, label: t("courses.home.tab"), exact: true },
+  // --- Phase 8a S4a: Modules / Files / Announcements only when the course has published content of that kind
+  // (`features`, PHASE_8A_DESIGN 8.2), so a course without structure (every ORT course today) keeps its tab row ---
+  // Phase 8a UX: pages (opened from modules) keep "Modules" active; the course home page (home_kind = page) keeps "Home".
+  const onHomePage = course.home_kind === "page" && !!course.home_page_id && pathname === `${base}/pages/${course.home_page_id}`;
+  const tabs: { href: string; label: string; exact?: boolean; also?: string; force?: boolean; never?: boolean }[] = [
+    { href: base, label: t("courses.home.tab"), exact: true, force: onHomePage },
+    ...(features?.modules ? [{ href: `${base}/modules`, label: t("modules.tab"), also: `${base}/pages`, never: onHomePage }] : []),
     { href: `${base}/assignments`, label: t("assignments.tab"), also: `${base}/assessments` },
+    ...(features?.files ? [{ href: `${base}/files`, label: t("courseFiles.title") }] : []),
+    ...(features?.announcements ? [{ href: `${base}/announcements`, label: t("announcements.title") }] : []),
     { href: `${base}/grades`, label: t("gradebook.tab") },
     { href: `${base}/people`, label: t("courses.people.tabStudent") },
   ];
@@ -25,7 +35,7 @@ export function StudentCourseTabs({ courseId }: { courseId: string }) {
     <TabsNav label={t("courses.home.tabsLabel")} className="mb-6"
       items={tabs.map((tab) => ({
         href: tab.href, label: tab.label,
-        active: tab.exact ? pathname === tab.href : pathname.startsWith(tab.href) || (!!tab.also && pathname.startsWith(tab.also)),
+        active: !!tab.force || (!tab.never && (tab.exact ? pathname === tab.href : pathname.startsWith(tab.href) || (!!tab.also && pathname.startsWith(tab.also)))),
       }))} />
   );
   // --- Phase 7a S5 end ---

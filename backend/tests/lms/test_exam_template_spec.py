@@ -282,7 +282,8 @@ def test_ort_like_spec_is_valid(db):
     for s in spec.sections:
         assert s.rules() == ort_rules(s.key)                         # same rules dict the ORT preset stores
     assert spec.result_view == "ort" and spec.sections[3].passage_display == "numbered"
-    assert spec.locked_fields() == frozenset(tpl_fields.ALL_LOCK_FIELDS - {tpl_fields.LOCK_PRESET})
+    assert spec.locked_fields() == frozenset(  # Phase 8a: course-level locks are not exam fields
+        tpl_fields.ALL_LOCK_FIELDS - {tpl_fields.LOCK_PRESET} - tpl_fields.COURSE_LEVEL_LOCK_FIELDS)
     sub = validate_spec(db, ort_subject_spec(), PLATFORM)
     assert sub.parameters[0].options and sub.sections[0].key is None
 
@@ -346,7 +347,8 @@ def test_lock_scope_map_covers_the_course_template_fields():
     assert tpl_fields.LOCK_DISPLAY_MODE == "display_mode" and "display_mode" in tpl_fields.ALL_LOCK_FIELDS
     covered = ids.expand_lock_scope(ids.LOCK_SCOPE_KEYS)
     assert covered <= tpl_fields.ALL_LOCK_FIELDS
-    assert tpl_fields.ALL_LOCK_FIELDS - covered == {tpl_fields.LOCK_PRESET}   # presets are not template-locked
+    # presets are not template-locked; Phase 8a course-level locks (home kind, gating) are not exam fields
+    assert tpl_fields.ALL_LOCK_FIELDS - covered == {tpl_fields.LOCK_PRESET} | tpl_fields.COURSE_LEVEL_LOCK_FIELDS
     assert ids.expand_lock_scope(["sections"]) == {tpl_fields.LOCK_SECTION_KEY, tpl_fields.LOCK_SECTION_ORDER,
                                                    tpl_fields.LOCK_SECTION_ADD_REMOVE}
 

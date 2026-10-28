@@ -15,6 +15,7 @@ import { JoinCodeDisplay } from "@/components/lms/JoinCodeDisplay";
 import { LanguagePicker } from "@/components/lms/LanguagePicker";
 import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
 import { CourseGradingSection } from "@/components/lms/grading/settings/CourseGradingSection";
+import { CourseHomeSection } from "@/components/lms/modules/CourseHomeSection"; // Phase 8a S4a
 import { ConfirmDialog, PageHeader, buttonClasses } from "@/components/ui";
 import { pickLocalized } from "@/lib/lms/localized";
 
@@ -141,6 +142,10 @@ function Settings({ course }: { course: CourseStaffOut }) {
           {savedFor("general")}
         </div>
       </form>
+
+      {/* --- Phase 8a S4a: course home (locked on ORT with the template note) --- */}
+      <CourseHomeSection course={course} />
+      {/* --- Phase 8a S4a end --- */}
 
       <section className={`${card} space-y-5`}>
         <h2 className="text-lg font-bold text-slate-900">{t("courses.settings.enrollment")}</h2>

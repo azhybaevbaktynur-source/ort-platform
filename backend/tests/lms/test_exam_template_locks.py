@@ -42,7 +42,8 @@ def _p(w, a, tail=""):
 async def test_lock_matrix(db, api):
     w, t, a = await _locked_world(api, db)
     s1, s2 = a["sections"]
-    assert set(a["exam_template"]["locked_fields"]) == set(tpl_fields.ALL_LOCK_FIELDS) - {tpl_fields.LOCK_PRESET}
+    assert set(a["exam_template"]["locked_fields"]) == (  # Phase 8a: course-level locks are not exam fields
+        set(tpl_fields.ALL_LOCK_FIELDS) - {tpl_fields.LOCK_PRESET} - tpl_fields.COURSE_LEVEL_LOCK_FIELDS)
     locked = [
         ("POST", _p(w, a, "/sections"), {"title": {"en": "C"}}, tpl_fields.LOCK_SECTION_ADD_REMOVE),
         ("DELETE", _p(w, a, f"/sections/{s2['id']}"), None, tpl_fields.LOCK_SECTION_ADD_REMOVE),

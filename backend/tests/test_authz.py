@@ -51,9 +51,11 @@ def test_decide_platform_admin():
 
 
 def test_teacher_has_all():
-    for a in ALL_ACTIONS - {A.ASSIGNMENT_SUBMIT}:  # Phase 7a: staff never hand in
+    # Phase 7a: staff never hand in; Phase 8a: staff never record module progress
+    for a in ALL_ACTIONS - {A.ASSIGNMENT_SUBMIT, A.PROGRESS_RECORD}:
         assert decide(role=T, course_status="published", action=a)
     assert not decide(role=T, course_status="published", action=A.ASSIGNMENT_SUBMIT)
+    assert not decide(role=T, course_status="published", action=A.PROGRESS_RECORD)
 
 
 def _ctx(role, user=None):
