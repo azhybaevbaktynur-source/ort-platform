@@ -1001,7 +1001,11 @@
         "question_has_passage": "This question belongs to a passage and cannot be moved or copied on its own.",
         "quiz_bank_follows_quiz": "A quiz bank cannot be a target; it follows its quiz.",
         "source_conflict": "A bank with the same source already exists in this course."
-      }
+      },
+      "usageNote_one": "Used in {count} quiz; the link is kept.",
+      "usageNote_few": "Used in {count} quizzes; links are kept.",
+      "usageNote_many": "Used in {count} quizzes; links are kept.",
+      "usageNote_other": "Used in {count} quizzes; links are kept."
     }
   },
   "assessments": {
@@ -3601,15 +3605,16 @@
       "points_many": "{n} points",
       "points_other": "{n} points",
       "unpublished": "Unpublished changes",
-      "unfinishedDrafts": "{n} cards have unsaved edits. They are not part of the published quiz until you click Done.",
-      "unfinishedDrafts_one": "{n} card has unsaved edits. It is not part of the published quiz until you click Done.",
-      "unfinishedDrafts_few": "{n} cards have unsaved edits. They are not part of the published quiz until you click Done.",
-      "unfinishedDrafts_many": "{n} cards have unsaved edits. They are not part of the published quiz until you click Done.",
-      "unfinishedDrafts_other": "{n} cards have unsaved edits. They are not part of the published quiz until you click Done.",
-      "check": "Check",
+      "unfinishedDrafts": "{n} cards have unfinished edits (saved as drafts). They join the published quiz only after you click Done.",
+      "unfinishedDrafts_one": "{n} card has unfinished edits (saved as a draft). They join the published quiz only after you click Done.",
+      "unfinishedDrafts_few": "{n} cards have unfinished edits (saved as drafts). They join the published quiz only after you click Done.",
+      "unfinishedDrafts_many": "{n} cards have unfinished edits (saved as drafts). They join the published quiz only after you click Done.",
+      "unfinishedDrafts_other": "{n} cards have unfinished edits (saved as drafts). They join the published quiz only after you click Done.",
+      "check": "Check for problems",
       "publish": "Publish",
-      "draftsConfirmTitle": "Publish without the unsaved edits?",
-      "publishAnyway": "Publish anyway"
+      "draftsConfirmTitle": "Publish without the unfinished edits?",
+      "publishAnyway": "Publish anyway",
+      "draftItem": "{label}: {text}"
     },
     "add": {
       "question": "New question",
@@ -3636,7 +3641,7 @@
       "done": "Done",
       "discard": "Discard changes",
       "discardTitle": "Discard your changes?",
-      "discardBody": "The question goes back to its saved version. Your unsaved edits are lost.",
+      "discardBody": "The question goes back to its saved version. Your unfinished edits (saved as a draft) are removed.",
       "deleteNewTitle": "Delete this new question?",
       "deleteNewBody": "The question was never saved, so it is removed with its text.",
       "duplicate": "Duplicate",
@@ -3670,7 +3675,13 @@
       "otherField": "Question",
       "correctAnswer": "Correct answer:",
       "answerLabel": "Answer {letter}",
-      "enterAdds": "Enter adds the next answer. Backspace in an empty answer removes it."
+      "enterAdds": "Enter adds the next answer. Backspace in an empty answer removes it.",
+      "addImage": "Add image",
+      "addImageTo": "Add an image to answer {letter}",
+      "answerActions": "Answer {letter}: more actions",
+      "markCorrect": "Answer {letter} is correct",
+      "fixFields": "Fix the highlighted fields.",
+      "quizBank": "Only in this quiz"
     },
     "scope": {
       "title": "This question is used in other quizzes",
@@ -3702,7 +3713,7 @@
       "takeTheirs": "Take theirs",
       "keepMine": "Keep mine",
       "versionTitle": "A newer version of this question was saved",
-      "versionBody": "Someone saved this question after you opened the card. Keep your draft on top of the new version, or discard your changes?",
+      "versionBody": "Someone saved this question after you opened the card. Keep your draft on top of the new version, or discard your changes? Your draft is kept until you choose.",
       "keepDraft": "Keep my draft",
       "discardMine": "Discard my changes"
     },
@@ -3714,8 +3725,9 @@
     },
     "section": {
       "empty": "No questions here yet. Add the first one.",
-      "emptyQuiz": "This quiz has no questions yet. Start with a new question.",
-      "firstBecomesSection1": "With a second section, your questions so far become Section 1."
+      "firstBecomesSection1": "With a second section, your questions so far become Section 1.",
+      "emptyQuizTitle": "No questions yet",
+      "emptyQuizBody": "Start with a new question, or add questions from a shared bank."
     },
     "preview": {
       "body": "Take the quiz as a student would. Preview attempts are not graded and students do not see them."
@@ -3730,6 +3742,13 @@
       "payload_too_large": "This card is too large to save. Shorten the text or use fewer images.",
       "passage_not_in_quiz_bank": "A new question can only join a passage of this quiz.",
       "quiz_bank_private": "Questions of another quiz cannot be used here. Copy them to a shared bank first."
+    },
+    "find": {
+      "filters": "Filters",
+      "translationHint": "Translations of the question are added together."
+    },
+    "pick": {
+      "pointsPerQuestion": "Points per question"
     }
   }
 }

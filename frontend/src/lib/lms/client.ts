@@ -21,10 +21,12 @@ export interface LmsFetchOptions {
   body?: unknown;
   params?: Record<string, string | number | boolean | null | undefined>;
   signal?: AbortSignal;
+  /** Phase 7c UX: let the request outlive the page (a last autosave on `pagehide`); bodies must stay under 64 KB. */
+  keepalive?: boolean;
 }
 
 export async function lmsFetch<T>(path: string, opts: LmsFetchOptions = {}): Promise<T> {
-  const { method = "GET", body, params, signal } = opts;
+  const { method = "GET", body, params, signal, keepalive } = opts;
   let url = `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
   if (params) {
     const sp = new URLSearchParams();
@@ -45,6 +47,7 @@ export async function lmsFetch<T>(path: string, opts: LmsFetchOptions = {}): Pro
       headers,
       cache: "no-store",
       signal,
+      ...(keepalive ? { keepalive: true } : {}),
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch (e) {

@@ -14,10 +14,10 @@ const a = (courseId: string, aid: string) => `${c(courseId)}/assessments/${e(aid
 
 export const createQuizQuestion = (courseId: string, aid: string, body: QuizQuestionCreateIn) =>
   lmsFetch<CommitOut>(`${a(courseId, aid)}/questions`, { method: "POST", body });
-export const createDraft = (courseId: string, aid: string, body: DraftCreateIn) =>
-  lmsFetch<DraftOut>(`${a(courseId, aid)}/drafts`, { method: "POST", body });
-export const updateDraft = (courseId: string, aid: string, draftId: string, body: DraftUpdateIn) =>
-  lmsFetch<DraftOut>(`${a(courseId, aid)}/drafts/${e(draftId)}`, { method: "PUT", body });
+export const createDraft = (courseId: string, aid: string, body: DraftCreateIn, opts: { keepalive?: boolean } = {}) =>
+  lmsFetch<DraftOut>(`${a(courseId, aid)}/drafts`, { method: "POST", body, ...opts });
+export const updateDraft = (courseId: string, aid: string, draftId: string, body: DraftUpdateIn, opts: { keepalive?: boolean } = {}) =>
+  lmsFetch<DraftOut>(`${a(courseId, aid)}/drafts/${e(draftId)}`, { method: "PUT", body, ...opts });
 export const deleteDraft = (courseId: string, aid: string, draftId: string) =>
   lmsFetch<void>(`${a(courseId, aid)}/drafts/${e(draftId)}`, { method: "DELETE" });
 export const commitDraft = (courseId: string, aid: string, draftId: string, body: CommitIn) =>

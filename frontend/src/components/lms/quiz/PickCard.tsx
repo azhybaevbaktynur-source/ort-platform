@@ -27,7 +27,7 @@ export function PickCard({
   return (
     <ul className="[&>li]:rounded-2xl [&>li]:shadow-sm">
       <ItemRow item={item} ctx={rowCtx} index={index} count={count} dragProps={dragProps}
-        onMoveBy={(d) => void ops.moveItem(section, index, index + d)} />
+        onMoveBy={(d) => void ops.moveItem(section, index, index + d)} pickPointsPerQuestion />
     </ul>
   );
 }

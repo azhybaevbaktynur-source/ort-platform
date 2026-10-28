@@ -38,12 +38,16 @@ export function AddBetween({ ops, section, afterItemId }: { ops: QuizOps; sectio
 }
 
 /** End of a section: "+ New question" and the other ways to add (Canvas: New question, Find questions). */
-export function AddAtEnd({ ops, section, disabled }: { ops: QuizOps; section: SectionOut | null; disabled?: boolean }) {
+export function AddAtEnd({ ops, section, disabled, primary = false }: {
+  ops: QuizOps; section: SectionOut | null; disabled?: boolean;
+  /** Phase 7c UX: "New question" is the primary action (the empty quiz). */
+  primary?: boolean;
+}) {
   const { t } = useTranslation();
   const items = useAddItems(false);
   return (
     <div className="flex flex-wrap gap-2 [&>*]:flex-1 sm:[&>*]:flex-none">
-      <Button variant="secondary" disabled={disabled} leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}
+      <Button variant={primary ? "primary" : "secondary"} disabled={disabled} leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}
         onClick={() => void ops.addQuestion(section, null)}>{t("quizEditor.card.addQuestion")}</Button>
       <MenuButton variant="secondary" align="start" disabled={disabled} items={items} label={t("quizEditor.add.more")}
         onSelect={(id) => onPick(ops, section, null, id)} />

@@ -22,7 +22,7 @@ const excerpt = (s: string) => s.replace(/\s+/g, " ").trim().slice(0, 80);
  * "Check" and "Unpublish" sit under it. Unfinished drafts are not part of the published quiz: the bar says so, and
  * publishing with drafts asks first (5.8, P7C-3).
  */
-export function QuizPublishBar({ ctx }: { ctx: QuizCtx }) {
+export function QuizPublishBar({ ctx, labels }: { ctx: QuizCtx; labels?: Map<string, string> }) {
   const { lang, t } = useTranslation();
   const { a, courseId, canEdit } = ctx;
   const flow = usePublishFlow(courseId, ctx.reload);
@@ -72,7 +72,7 @@ export function QuizPublishBar({ ctx }: { ctx: QuizCtx }) {
           <div className="ml-auto flex items-center gap-2">
             <div className="hidden items-center gap-2 sm:flex">{secondary}</div>
             {canEdit && (
-              <Button variant={publishIsPrimary(a) ? "primary" : "secondary"} size="sm" loading={!!flow.busyId} onClick={() => void publish()}>
+              <Button variant={publishIsPrimary(a) && a.item_count > 0 ? "primary" : "secondary"} size="sm" loading={!!flow.busyId} onClick={() => void publish()}>
                 {published ? t("assessments.publish.republish") : t("quizEditor.publishBar.publish")}
               </Button>
             )}
@@ -110,7 +110,12 @@ export function QuizPublishBar({ ctx }: { ctx: QuizCtx }) {
         onConfirm={() => { setConfirmDrafts(false); void flow.publish(a.id); }} onCancel={() => setConfirmDrafts(false)}>
         <ul className="mt-2 list-disc space-y-0.5 pl-5 text-sm text-slate-700">
           {drafts.slice(0, 10).map((d) => (
-            <li key={d.id} className="break-words">{excerpt(d.payload.stem) || t("quizEditor.card.emptyStem")}</li>
+            <li key={d.id} className="break-words">
+              {t("quizEditor.publishBar.draftItem", {
+                label: (d.item_id ? labels?.get(d.item_id) : undefined) ?? t("quizEditor.card.newQuestion"),
+                text: excerpt(d.payload.stem) || t("quizEditor.card.emptyStem"),
+              })}
+            </li>
           ))}
         </ul>
       </ConfirmDialog>

@@ -6,14 +6,14 @@ import { useTranslation } from "@/lib/i18n/context";
 import { isLmsApiError } from "@/lib/lms/client";
 import { getQuestion } from "@/lib/lms/content";
 import { QUESTION_TYPES, type QuestionType } from "@/lib/lms/contentTypes";
-import type { ItemOut, SectionOut } from "@/lib/lms/assessmentTypes";
+import type { AssessmentStaffOut, ItemOut, SectionOut } from "@/lib/lms/assessmentTypes";
 import { commitDraft, createDraft, deleteDraft, rememberImage, resolvePayloadImages } from "@/lib/lms/quizEditor";
 import type {
   CardDraftConflictDetails, CardPayload, DraftOut, EditScope, ScopeRequiredDetails,
 } from "@/lib/lms/quizEditorTypes";
 import { renderRichText } from "@/components/math/MathRenderer";
-import { Badge, Button, ConfirmDialog, IconButton, toast } from "@/components/ui";
-import { QuestionCardForm } from "@/components/lms/content/QuestionCardForm";
+import { Badge, Button, ConfirmDialog, IconButton, MenuButton, toast } from "@/components/ui";
+import { QuestionCardForm, type QuestionFormErrors } from "@/components/lms/content/QuestionCardForm";
 import {
   formFromPayload, formFromStaff, payloadFromForm, validateForm, type QuestionForm,
 } from "@/components/lms/content/types/formModel";
@@ -68,6 +68,53 @@ function pruneBlankChoices(f: QuestionForm): QuestionForm {
   return choices.length === f.choices.length ? f : { ...f, choices };
 }
 
+/**
+ * Phase 7c UX: "Only in this quiz" is shown on quiz-bank cards only when the quiz also has shared-bank cards (then the
+ * difference matters; in a quiz written only in the card editor every card would carry it).
+ */
+export function quizHasSharedCards(a: AssessmentStaffOut): boolean {
+  return a.sections.some((s) => s.items.some((it) => it.question?.bank_kind === "shared"
+    || (it.children ?? []).some((c) => c.question?.bank_kind === "shared")));
+}
+
+const ANSWER_KEYS = new Set(["bank.editor.errChoices", "bank.editor.errChoiceEmpty", "bank.editor.errCorrect", "bank.editor.errColumns", "bank.editor.errAnswers"]);
+const SERVER_FIELDS: Record<string, keyof QuestionFormErrors> = {
+  "bank.editor.stem": "stem", "bank.editor.points": "points", "bank.editor.image": "image",
+  "bank.editor.explanation": "explanation", "quizEditor.card.answersField": "answers",
+};
+
+/** Phase 7c UX: the card's errors under their fields: the client check (one i18n key) and the API's 422 fields. */
+function cardErrors(clientKey: string | null, serverKeys: string[], t: (k: string, p?: Record<string, string | number>) => string): QuestionFormErrors {
+  const out: QuestionFormErrors = {};
+  if (clientKey) {
+    if (clientKey === "bank.editor.errStem") out.stem = t(clientKey);
+    else if (clientKey === "bank.editor.errPoints") out.points = t(clientKey);
+    else if (ANSWER_KEYS.has(clientKey)) { out.answers = t(clientKey); out.answersKey = clientKey; }
+    else out.other = t(clientKey);
+  }
+  const other: string[] = [];
+  for (const k of serverKeys) {
+    const msg = t("quizEditor.card.fieldError", { field: t(k) });
+    const f = SERVER_FIELDS[k];
+    if (f && !out[f]) out[f] = msg;
+    else other.push(msg);
+  }
+  if (other.length) out.other = [out.other, ...other].filter(Boolean).join(" ");
+  return out;
+}
+
+/** Focus and show the first field marked invalid in the card (after "Done" found errors). */
+function focusFirstInvalid(root: HTMLElement | null) {
+  requestAnimationFrame(() => {
+    const el = root?.querySelector<HTMLElement>(
+      "[aria-invalid='true'], [data-field-invalid] input, [data-field-invalid] textarea, [data-field-invalid] select, [data-field-invalid]",
+    );
+    if (!el) return;
+    el.scrollIntoView({ block: "center" });
+    el.focus({ preventScroll: true });
+  });
+}
+
 function rememberFormImages(f: QuestionForm) {
   rememberImage(f.image);
   f.choices.forEach((c) => rememberImage(c.image));
@@ -112,7 +159,7 @@ function CollapsedCard({ ctx, item, draft, label, onOpen, dragProps }: React.Com
   const answer = tf && summary === "true" ? t("bank.editor.true") : tf && summary === "false" ? t("bank.editor.false") : summary;
   const draggable = !!dragProps && Object.keys(dragProps).length > 0;
   return (
-    <div {...dragProps} className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div {...dragProps} data-quiz-item={item?.id} className="rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="flex items-start">
         {draggable && <GripVertical className="ml-2 mt-4 hidden h-4 w-4 shrink-0 cursor-grab text-slate-400 sm:block" aria-hidden="true" />}
         <button type="button" disabled={!ctx.canEdit} onClick={onOpen} aria-expanded={false}
@@ -129,6 +176,7 @@ function CollapsedCard({ ctx, item, draft, label, onOpen, dragProps }: React.Com
             )}
             {used > 0 && <Badge tone="info">{t("quizEditor.card.usedIn", { n: used + 1 })}</Badge>}
             {q?.bank_kind === "shared" && <Badge>{t("quizEditor.card.sharedBank")}</Badge>}
+            {q?.bank_kind === "quiz" && quizHasSharedCards(ctx.a) && <Badge>{t("quizEditor.card.quizBank")}</Badge>}
             {q?.deleted && <Badge tone="danger">{t("assessments.item.deleted")}</Badge>}
             {q?.newer_version_available && <Badge tone="warning">{t("assessments.item.newerVersion")}</Badge>}
           </span>
@@ -240,8 +288,13 @@ function OpenCard({ ctx, section, item, draft, label, onClosed, actions, childOf
         autosave.markGone();
       } else {
         setScope(null);
-        if (isLmsApiError(e) && e.status === 422) setFieldErrors(fieldErrorKeys(e.details));
-        setError(e);
+        if (isLmsApiError(e) && e.status === 422) {
+          // Phase 7c UX: the fields go under their inputs; the generic error box is not repeated.
+          setFieldErrors(fieldErrorKeys(e.details));
+          focusFirstInvalid(rootRef.current);
+        } else {
+          setError(e);
+        }
       }
       return false;
     }
@@ -271,7 +324,7 @@ function OpenCard({ ctx, section, item, draft, label, onClosed, actions, childOf
       }
       const bad = validateForm(pruned);
       if (bad) {
-        if (mode === "done") { setClientError(bad); return false; }
+        if (mode === "done") { setClientError(bad); focusFirstInvalid(rootRef.current); return false; }
         // Closing an unfinished card keeps it as a draft ("Draft saved · has errors").
         if (!(await autosave.flush())) return false;
         await finish();
@@ -388,6 +441,8 @@ function OpenCard({ ctx, section, item, draft, label, onClosed, actions, childOf
     error: t("quizEditor.card.draftError"),
   }[autosave.status];
   const hasDraft = !!autosave.draftId;
+  const errors = cardErrors(clientError, fieldErrors, t);
+  const hasErrors = Object.keys(errors).length > 0;
 
   return (
     <div ref={rootRef} className="rounded-2xl border-2 border-brand-300 bg-white p-3 shadow-md sm:p-4"
@@ -397,6 +452,7 @@ function OpenCard({ ctx, section, item, draft, label, onClosed, actions, childOf
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h3 className="text-base font-semibold text-slate-900">{label}</h3>
         {q?.bank_kind === "shared" && <Badge>{t("quizEditor.card.sharedBank")}</Badge>}
+        {q?.bank_kind === "quiz" && quizHasSharedCards(a) && <Badge>{t("quizEditor.card.quizBank")}</Badge>}
         {(q?.used_elsewhere ?? 0) > 0 && <Badge tone="info">{t("quizEditor.card.usedIn", { n: (q?.used_elsewhere ?? 0) + 1 })}</Badge>}
       </div>
       {showPassageNote && <p role="note" className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{t("quizEditor.passageChild.note")}</p>}
@@ -407,13 +463,7 @@ function OpenCard({ ctx, section, item, draft, label, onClosed, actions, childOf
           <QuestionCardForm form={form} onChange={change} disabled={busy || autosave.status === "conflict"} courseId={courseId}
             languages={languages.length ? languages : a.languages} typeOptions={cardTypeOptions(section, form.type)}
             lockLanguage={!isNew || languages.length <= 1} showMeta={false} idPrefix={`qc-${item?.id ?? draft?.id ?? "new"}`}
-            keyboardAnswers />
-          {clientError && <p role="alert" className="text-sm text-red-700">{t(clientError)}</p>}
-          {fieldErrors.length > 0 && (
-            <ul role="alert" className="list-disc space-y-0.5 pl-5 text-sm text-red-700">
-              {fieldErrors.map((k) => <li key={k}>{t("quizEditor.card.fieldError", { field: t(k) })}</li>)}
-            </ul>
-          )}
+            keyboardAnswers compact errors={errors} hideLockedLanguage={a.languages.length <= 1 || languages.length <= 1} />
         </div>
       )}
       <QuizError error={error} className="mt-3" />
@@ -427,6 +477,7 @@ function OpenCard({ ctx, section, item, draft, label, onClosed, actions, childOf
       )}
 
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+        {hasErrors && <p role="alert" className="min-w-full text-sm font-medium text-red-700">{t("quizEditor.card.fixFields")}</p>}
         <p role="status" aria-live="polite" className={`min-w-full text-sm sm:min-w-0 sm:flex-1 ${autosave.status === "error" || autosave.status === "conflict" ? "text-amber-800" : "text-slate-600"}`}>
           {statusText}
         </p>
@@ -434,12 +485,9 @@ function OpenCard({ ctx, section, item, draft, label, onClosed, actions, childOf
           <IconButton variant="secondary" icon={<ArrowUp />} aria-label={t("quizEditor.card.moveUp")} disabled={busy || !actions.onMoveUp} onClick={actions.onMoveUp} />
           <IconButton variant="secondary" icon={<ArrowDown />} aria-label={t("quizEditor.card.moveDown")} disabled={busy || !actions.onMoveDown} onClick={actions.onMoveDown} />
           {item && actions.onMoveToSection && (actions.moveTargets?.length ?? 0) > 0 && (
-            <select aria-label={t("assessments.item.moveTo")} disabled={busy} value=""
-              className="min-h-11 max-w-full rounded-xl border border-slate-300 bg-white px-2 text-sm sm:min-h-9"
-              onChange={(e) => { const sid = e.target.value; if (sid) void autosave.flush().then(() => actions.onMoveToSection?.(sid)); }}>
-              <option value="">{t("assessments.item.moveTo")}</option>
-              {actions.moveTargets?.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-            </select>
+            <MenuButton variant="secondary" size="sm" align="end" disabled={busy} label={t("assessments.item.moveTo")}
+              items={(actions.moveTargets ?? []).map((s) => ({ id: s.id, label: s.label }))}
+              onSelect={(sid) => actions.onMoveToSection?.(sid)} />
           )}
           {item && actions.onDuplicate && (
             <Button variant="secondary" size="sm" leftIcon={<Copy className="h-4 w-4" aria-hidden="true" />} disabled={busy || !form}
@@ -471,7 +519,7 @@ function OpenCard({ ctx, section, item, draft, label, onClosed, actions, childOf
         otherName={autosave.conflict?.updated_by_name} busy={busy}
         onPrimary={() => (autosave.conflict ? keepMine() : void keepDraftOnNewVersion())}
         onSecondary={() => (autosave.conflict ? void takeTheirs() : void discard())}
-        onClose={() => (autosave.conflict ? keepMine() : setVersionConflict(false))} />
+        onClose={() => (autosave.conflict ? keepMine() : void keepDraftOnNewVersion())} />
       <ConfirmDialog open={confirmDiscard} tone="danger" busy={busy}
         title={isNew ? t("quizEditor.card.deleteNewTitle") : t("quizEditor.card.discardTitle")}
         effect={isNew ? t("quizEditor.card.deleteNewBody") : t("quizEditor.card.discardBody")}
