@@ -191,6 +191,26 @@ function Sections({ data }: { data: HomeOut }) {
         </HomeSection>
       )}
 
+      {/* --- Phase 8a S4a: "up next" in modules, one row per course ("Continue in Course: Item"), above assignments --- */}
+      {(data.modules_next?.length ?? 0) > 0 && (
+        <HomeSection id="home-modules-next" title={t("home.modulesNext.title")}>
+          <ul className="divide-y divide-slate-100">
+            {data.modules_next!.map((r) => (
+              <HomeRow key={`${r.course_id}-${r.item_id}`} href={`${base}/${r.course_id}/modules`}
+                title={pickLocalized(r.title, lang) || t("modules.untitledItem")}
+                meta={(
+                  <>
+                    <span>{t("home.modulesNext.inCourse", { course: pickLocalized(r.course_title, lang) || t("courses.list.untitled") })}</span>
+                    {r.module_title && <span>{pickLocalized(r.module_title, lang)}</span>}
+                  </>
+                )}
+                actionLabel={t("home.modulesNext.action")} />
+            ))}
+          </ul>
+        </HomeSection>
+      )}
+      {/* --- Phase 8a S4a end --- */}
+
       <HomeSection id="home-next" title={t("home.next.title")}>
         {data.next_up.length === 0 ? (
           <p className="px-3 py-4 text-base leading-6 text-slate-600 sm:px-4">{t("home.next.empty")}</p>

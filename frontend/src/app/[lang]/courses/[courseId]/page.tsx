@@ -10,6 +10,8 @@ import { useCourse } from "@/components/lms/CourseContext";
 import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
 import { StaffCourseHome } from "@/components/lms/course/StaffCourseHome"; // Phase 6b S5c
 import { StudentCourseHome } from "@/components/lms/home/StudentCourseHome"; // Phase 6 S6b
+import { StudentModulesView } from "@/components/lms/modules/StudentModulesView"; // Phase 8a S4a
+import { PageView } from "@/components/lms/pages/PageView"; // Phase 8a S4a (home_kind = page)
 
 export default function CourseHomePage() {
   const { lang, t } = useTranslation();
@@ -39,7 +41,20 @@ export default function CourseHomePage() {
   }
   // --- Phase 6b S5c end ---
   // --- Phase 6 S6b begin --- (student view: next assessment, latest result, about; UX S5)
-  if (course.my_enrollment.role === "student") return <StudentCourseHome />;
+  // --- Phase 8a S4a: course home switch (PHASE_8A_DESIGN 8.1). `modules` falls back to today's home while no module is
+  // published (`features.modules`, and an empty list); `page` shows the chosen page; `assignments` (and an older backend
+  // without `home_kind`, and every ORT course) is today's home unchanged. ---
+  if (course.my_enrollment.role === "student") {
+    const kind = course.home_kind ?? "assignments";
+    if (kind === "modules" && course.features?.modules) {
+      return <StudentModulesView fallback={<StudentCourseHome />} />;
+    }
+    if (kind === "page" && course.home_page_id) {
+      return <div className="mx-auto w-full max-w-3xl"><PageView pageId={course.home_page_id} embedded /></div>;
+    }
+    return <StudentCourseHome />;
+  }
+  // --- Phase 8a S4a end ---
   // --- Phase 6 S6b end ---
 
   return (

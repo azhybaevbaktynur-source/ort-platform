@@ -239,7 +239,11 @@
       "value_out_of_range": "A value is outside the allowed range.",
       "attempt_in_progress": "The attempt is still in progress.",
       "already_void": "This attempt is already voided.",
-      "grade_release_auto": "Grades of this assessment are released automatically, so they cannot be hidden. Switch grade release to manual first."
+      "grade_release_auto": "Grades of this assessment are released automatically, so they cannot be hidden. Switch grade release to manual first.",
+      "module_locked": "This is locked for now. Finish the earlier steps first.",
+      "prerequisite_invalid": "Only an earlier, published module of this course can be a prerequisite.",
+      "prerequisite_order": "This order would put a module before one it depends on. Change the prerequisites first.",
+      "home_page_invalid": "This page cannot be the course home. Choose a page of this course."
     }
   },
   "courses": {
@@ -388,6 +392,25 @@
       "title": "Course not found",
       "body": "This course doesn't exist, was removed, or you are not enrolled in it. Ask your teacher for a join code or find it in the catalog.",
       "join": "Join with code"
+    },
+    "homeKind": {
+      "title": "Course home",
+      "hint": "What students see first when they open the course.",
+      "label": "Students see first",
+      "kinds": {
+        "modules": "Modules",
+        "page": "A page",
+        "assignments": "Assignments and results"
+      },
+      "hints": {
+        "modules": "Until a module is published, students see assignments and results.",
+        "page": "A page you wrote, for example a welcome text.",
+        "assignments": "The next assignment and the latest result."
+      },
+      "page": "Page",
+      "choosePage": "Choose a page",
+      "pageHint": "Publish the page so students can see it.",
+      "noPages": "No pages yet. Create one in the Pages tab."
     }
   },
   "teacherRequest": {
@@ -2771,6 +2794,11 @@
         "graded": "Graded",
         "void": "Cancelled"
       }
+    },
+    "modulesNext": {
+      "title": "Continue in your courses",
+      "inCourse": "Course: {course}",
+      "action": "Continue"
     }
   },
   "shell": {
@@ -3950,6 +3978,220 @@
     "saveDraft": "Save draft",
     "errors": {
       "already_published": "This announcement is already posted."
+    }
+  },
+  "modules": {
+    "tab": "Modules",
+    "untitledModule": "Untitled module",
+    "untitledItem": "Untitled item",
+    "state": {
+      "locked": "Locked",
+      "unlocked": "Not started",
+      "started": "In progress",
+      "completed": "Completed"
+    },
+    "kinds": {
+      "page": "Page",
+      "file": "File",
+      "assignment": "Assignment",
+      "url": "Link",
+      "header": "Header"
+    },
+    "reason": {
+      "unlockAt": "Opens {date}",
+      "prerequisite": "Finish “{title}” first",
+      "sequential": "Finish “{title}” first",
+      "sequentialItem": "Finish the items above first"
+    },
+    "req": {
+      "view": "View",
+      "mark_done": "Mark as done",
+      "submit": "Hand in",
+      "min_score": "Score at least {threshold} points",
+      "min_percent": "Score at least {threshold} %",
+      "met": "Done",
+      "markedDone": "Marked as done",
+      "best": "Best so far: {percent} %"
+    },
+    "markDone": "Mark as done",
+    "download": "Download",
+    "opensNewTab": "(opens in a new tab)",
+    "progressCount": "{done} of {total} done",
+    "completionAny": "Any one requirement completes it",
+    "sequentialHint": "Items open in order",
+    "noItemsStudent": "Nothing here yet.",
+    "emptyStudentTitle": "No modules yet",
+    "emptyStudentBody": "Your teacher has not published any modules yet. Check your assignments in the meantime.",
+    "celebrate": "Module “{title}” completed. Well done!",
+    "upNext": {
+      "title": "Up next",
+      "action": "Open",
+      "allDone": "You have finished every module. Well done!"
+    },
+    "staffHome": {
+      "title": "Modules",
+      "body": {
+        "modules": "Students see the modules first when they open the course.",
+        "page": "Students see the chosen page first. Modules group pages, files and assignments into steps.",
+        "assignments": "Modules group pages, files and assignments into steps for students."
+      },
+      "open": "Open modules",
+      "changeHome": "Change the course home"
+    },
+    "editor": {
+      "title": "Modules",
+      "description": "Students see published modules in this order.",
+      "newModule": "New module",
+      "emptyTitle": "No modules yet",
+      "emptyBody": "Modules group pages, files, assignments and links into steps. Students see published modules in order.",
+      "published": "Published",
+      "draft": "Draft",
+      "hidden": "Hidden",
+      "publishModule": "Published",
+      "visible": "Visible",
+      "actions": "Actions",
+      "editSettings": "Settings",
+      "prerequisites": "Prerequisites",
+      "reapply": "Re-apply rules",
+      "reapplyCourse": "Re-apply rules",
+      "reapplyWholeCourse": "All modules of the course",
+      "reapplyTitle": "Re-apply rules?",
+      "reapplyBody": "Student progress is checked again against the current rules. Some students may lose access to later modules they had already opened.",
+      "reapplyDone": "Rules re-applied. Students affected: {n}.",
+      "delete": "Delete",
+      "deleteModuleTitle": "Delete this module?",
+      "deleteModuleBody": "Students stop seeing it. Its items are kept and come back if you restore the module.",
+      "deletedTitle": "Deleted modules",
+      "showDeleted": "Show deleted modules",
+      "restore": "Restore",
+      "moveModuleUp": "Move module up",
+      "moveModuleDown": "Move module down",
+      "moveItemUp": "Move “{title}” up",
+      "moveItemDown": "Move “{title}” down",
+      "after": "After: {titles}",
+      "noItems": "No items yet. Add a page, file, assignment, link or header.",
+      "addItem": "Add item",
+      "editItem": "Edit",
+      "setRequirement": "Completion requirement",
+      "requirement": "Requirement: {text}",
+      "moveTo": "Move to another module",
+      "openTarget": "Open",
+      "editQuiz": "Edit quiz",
+      "removeItem": "Remove from module",
+      "deleteItemTitle": "Remove this item from the module?",
+      "deleteItemBody": "The page, file or assignment itself is not deleted. Progress on this item no longer counts."
+    },
+    "settings": {
+      "createTitle": "New module",
+      "editTitle": "Module settings",
+      "titleLabel": "Module title",
+      "titleRequired": "Enter a title.",
+      "unlockAt": "Opens on",
+      "unlockAtHint": "Leave empty to open it at once.",
+      "sequential": "Students complete items in order",
+      "sequentialHint": "An item opens only after the requirements above it are met.",
+      "completionMode": "The module is complete when",
+      "modeAll": "all requirements are met",
+      "modeAny": "any one requirement is met",
+      "publish": "Publish now",
+      "publishHint": "Students see only published modules.",
+      "create": "Create module"
+    },
+    "prereq": {
+      "title": "Prerequisites",
+      "hint": "Students must complete the chosen modules first. Only earlier modules can be chosen.",
+      "none": "This is the first module, so it has no earlier modules to choose.",
+      "laterHint": "Comes later: move it above this module to choose it",
+      "unpublishedHint": "Not published: ignored until you publish it"
+    },
+    "reqPicker": {
+      "title": "Completion requirement",
+      "label": "To complete this item, students must",
+      "none": "Nothing (no requirement)",
+      "types": {
+        "view": "view it",
+        "mark_done": "mark it as done",
+        "submit": "hand it in",
+        "min_score": "score at least a number of points",
+        "min_percent": "score at least a percentage"
+      },
+      "thresholdPoints": "Minimum points",
+      "thresholdPercent": "Minimum percent",
+      "thresholdInvalid": "Enter a number from 0 (percent: up to 100).",
+      "headerNone": "A header has no requirement.",
+      "hiddenNote": "This item is hidden, so its requirement does not count yet."
+    },
+    "add": {
+      "title": "Add item",
+      "kindLabel": "What to add",
+      "newQuiz": "New quiz",
+      "pickPage": "Choose a page",
+      "pickFile": "Choose a file",
+      "pickAssignment": "Choose an assignment",
+      "pickRequired": "Choose one from the list.",
+      "noPages": "No pages yet.",
+      "noFiles": "No files yet.",
+      "noAssignments": "No assignments yet.",
+      "createPage": "Create a page",
+      "uploadFile": "Upload a file",
+      "createAssignment": "Create an assignment",
+      "url": "Web address",
+      "urlHint": "Starts with https://",
+      "titleOverride": "Title shown in the module",
+      "titleOverrideHint": "Optional. Leave empty to use the item's own title.",
+      "headerTitle": "Header text",
+      "headerRequired": "Enter the header text.",
+      "visible": "Visible to students",
+      "visibleHint": "Students see it once the module is published.",
+      "indent": "Indent",
+      "indentLevels": {
+        "0": "No indent",
+        "1": "Level 1",
+        "2": "Level 2",
+        "3": "Level 3"
+      },
+      "quizTitle": "Quiz title",
+      "quizNext": "The quiz editor opens next. The quiz stays a draft until you publish it.",
+      "createQuiz": "Create quiz",
+      "submit": "Add"
+    },
+    "itemEdit": {
+      "title": "Edit item"
+    },
+    "move": {
+      "title": "Move item",
+      "target": "Module",
+      "hint": "The item goes to the end of the chosen module.",
+      "noTargets": "There is no other module yet.",
+      "submit": "Move"
+    },
+    "progress": {
+      "open": "Student progress",
+      "title": "Student progress",
+      "hint": "See the modules as one student sees them.",
+      "student": "Student",
+      "choose": "Choose a student",
+      "noStudents": "No students in this course yet.",
+      "empty": "This student sees no modules yet."
+    },
+    "warnings": {
+      "target_unpublished": "Target not published",
+      "target_deleted": "Target deleted",
+      "prerequisite_unpublished": "Prerequisite not published",
+      "prerequisite_deleted": "Prerequisite deleted",
+      "requirement_on_unpublished_target": "Requirement on a hidden item",
+      "unlock_in_past_with_locked_students": "Opening date passed"
+    },
+    "errors": {
+      "module_locked": "This is locked for now. Finish the earlier steps first.",
+      "prerequisite_invalid": "Only an earlier, published module of this course can be a prerequisite.",
+      "prerequisite_order": "This order would put a module before one it depends on. Change the prerequisites first.",
+      "requirement_kind_mismatch": "This requirement does not fit this kind of item.",
+      "url_invalid": "Enter a web address that starts with http:// or https://.",
+      "limit_reached": "The limit is reached: up to 100 modules per course and 200 items per module.",
+      "order_incomplete": "The list changed meanwhile. Reload the page and try again.",
+      "home_page_invalid": "This page cannot be the course home. Choose a page of this course.",
+      "template_locked": "The course template fixes this setting."
     }
   }
 }
