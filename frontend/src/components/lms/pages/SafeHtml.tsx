@@ -29,7 +29,7 @@ export function SafeHtml({ html, className }: { html: string; className?: string
   return (
     <div
       ref={ref}
-      className={cn("prose max-w-none break-words text-slate-800 leading-relaxed [&_img]:h-auto [&_img]:max-w-full [&_table]:block [&_table]:overflow-x-auto", className)}
+      className={cn("page-body max-w-none", className)}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

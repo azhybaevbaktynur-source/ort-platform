@@ -12,7 +12,7 @@ import type { PageSummaryStaffOut, PageSummaryStudentOut } from "@/lib/lms/pages
 import { useCourse } from "@/components/lms/CourseContext";
 import { useCanEditContent } from "@/components/lms/content/StaffGate";
 import { fmtShortDateTime } from "@/components/lms/home/format";
-import { Badge, Button, ConfirmDialog, EmptyState, LinkButton, LoadingState, MenuButton, PageHeader, Pagination, Table, type TableColumn } from "@/components/ui";
+import { Badge, Button, Checkbox, ConfirmDialog, EmptyState, LinkButton, LoadingState, MenuButton, PageHeader, Pagination, Table, type TableColumn } from "@/components/ui";
 import { ContentError } from "./ApiError";
 
 export function PageList() {
@@ -94,7 +94,7 @@ export function PageList() {
     { key: "modules", header: t("pages.col.modules"), label: t("pages.col.modules"), cell: (p) => t("pages.usedInModules", { count: p.used_in_modules }) },
     { key: "updated", header: t("pages.col.updated"), label: t("pages.col.updated"), cell: (p) => fmtShortDateTime(p.updated_at, lang) },
     ...(canEdit ? [{
-      key: "actions", header: <span className="sr-only">{t("pages.col.actions")}</span>, label: t("pages.col.actions"), align: "right" as const,
+      key: "actions", header: <span className="sr-only">{t("pages.col.actions")}</span>, label: t("pages.col.actions"), align: "right" as const, actions: true,
       cell: (p: PageSummaryStaffOut) => trash ? (
         <Button variant="secondary" size="sm" onClick={() => void doRestore(p)}>{t("pages.restore")}</Button>
       ) : (
@@ -111,8 +111,9 @@ export function PageList() {
 
   return (
     <div>
-      <PageHeader title={t("pages.title")} description={t("pages.description")} primaryAction={newButton}
-        secondaryActions={<Button variant="secondary" onClick={() => setTrash((v) => !v)}>{t(trash ? "pages.hideTrash" : "pages.showTrash")}</Button>} />
+      <PageHeader title={t("pages.title")} description={t("pages.description")} primaryAction={newButton} />
+      {/* 8a UX (minor 10): a filter, not an action: a checkbox under the header instead of a second button */}
+      <Checkbox label={t("pages.showTrash")} checked={trash} onChange={(e) => setTrash(e.target.checked)} containerClassName="mb-2" />
       <ContentError error={actionError} className="mb-4" />
       <Table<PageSummaryStaffOut>
         caption={t("pages.title")}

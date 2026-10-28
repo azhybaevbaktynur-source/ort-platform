@@ -163,6 +163,15 @@ function Sections({ data }: { data: HomeOut }) {
   const [showAll, setShowAll] = useState(false);
   const base = `/${lang}/courses`;
   const untitled = t("assessments.untitled");
+  // Phase 8a UX (M4): a module step that is already the hero or a "Next up" row is not listed a second time.
+  const shownAssignments = new Set(data.next_up.map((r) => r.assignment_id).filter(Boolean));
+  const shownAssessments = new Set([
+    ...data.next_up.map((r) => r.assessment_id), ...data.in_progress.map((r) => r.assessment_id),
+  ].filter(Boolean));
+  const modulesNext = (data.modules_next ?? []).filter((r) => !(
+    (r.link?.assignment_id && shownAssignments.has(r.link.assignment_id))
+    || (r.link?.assessment_id && shownAssessments.has(r.link.assessment_id))
+  ));
 
   if (data.courses_total === 0 && data.in_progress.length === 0) {
     return (
@@ -192,10 +201,10 @@ function Sections({ data }: { data: HomeOut }) {
       )}
 
       {/* --- Phase 8a S4a: "up next" in modules, one row per course ("Continue in Course: Item"), above assignments --- */}
-      {(data.modules_next?.length ?? 0) > 0 && (
+      {modulesNext.length > 0 && (
         <HomeSection id="home-modules-next" title={t("home.modulesNext.title")}>
           <ul className="divide-y divide-slate-100">
-            {data.modules_next!.map((r) => (
+            {modulesNext.map((r) => (
               <HomeRow key={`${r.course_id}-${r.item_id}`} href={`${base}/${r.course_id}/modules`}
                 title={pickLocalized(r.title, lang) || t("modules.untitledItem")}
                 meta={(
@@ -210,24 +219,6 @@ function Sections({ data }: { data: HomeOut }) {
         </HomeSection>
       )}
       {/* --- Phase 8a S4a end --- */}
-
-      {/* --- Phase 8a S5: the latest three announcements of the student's courses (design 7.2, 8.1; never a body) --- */}
-      {(data.announcements?.length ?? 0) > 0 && (
-        <HomeSection id="home-announcements" title={t("home.announcements.title")}>
-          <ul className="divide-y divide-slate-100">
-            {data.announcements!.map((r) => (
-              <HomeRow key={r.id} href={`${base}/${r.course_id}/announcements`} title={r.title}
-                meta={(
-                  <>
-                    <span>{pickLocalized(r.course_title, lang) || t("courses.list.untitled")}</span>
-                    <span>{fmtShortDateTime(r.published_at, lang)}</span>
-                  </>
-                )}
-                actionLabel={t("home.announcements.action")} />
-            ))}
-          </ul>
-        </HomeSection>
-      )}
 
       <HomeSection id="home-next" title={t("home.next.title")}>
         {data.next_up.length === 0 ? (
@@ -278,6 +269,25 @@ function Sections({ data }: { data: HomeOut }) {
           </ul>
         )}
       </HomeSection>
+
+      {/* --- Phase 8a S5: the latest three announcements of the student's courses (design 7.2, 8.1; never a body);
+          below "Latest results" since 8a UX (M4) --- */}
+      {(data.announcements?.length ?? 0) > 0 && (
+        <HomeSection id="home-announcements" title={t("home.announcements.title")}>
+          <ul className="divide-y divide-slate-100">
+            {data.announcements!.map((r) => (
+              <HomeRow key={r.id} href={`${base}/${r.course_id}/announcements`} title={r.title}
+                meta={(
+                  <>
+                    <span>{pickLocalized(r.course_title, lang) || t("courses.list.untitled")}</span>
+                    <span>{fmtShortDateTime(r.published_at, lang)}</span>
+                  </>
+                )}
+                actionLabel={t("home.announcements.action")} />
+            ))}
+          </ul>
+        </HomeSection>
+      )}
 
       <HomeSection id="home-courses" title={t("home.courses.title")}
         footer={(

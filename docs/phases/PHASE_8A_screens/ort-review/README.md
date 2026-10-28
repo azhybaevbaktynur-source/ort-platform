@@ -48,10 +48,17 @@ Per screen: `-before` = `ORT_BASELINE`, `-after` = 8a, `-diff` = after vs before
 Note: `teacher-builder-desktop-ru` is at 0.493 % against the baseline, just under the 0.5 % gate. One more tab or
 header change will fail it; the teacher baselines should be re-recorded after the owner accepts the 8a tabs.
 
+**2026-10-28 (8a UX slice):** the 14 changed `teacher-*` PNGs in `docs/phases/ORT_BASELINE/` were re-recorded
+(`UPDATE_BASELINES=1 ... ort-visual.spec.ts -g "teacher screens"`; orchestrator approval). The `-before` images
+above are the old baselines, the `-after` images show the new tab bar. The student baselines were not touched
+(byte-identical); `ort.spec.ts`, `ort-visual.spec.ts` and `quiz-editor.spec.ts` then passed with no diff.
+
 ## Other images (modules.spec.ts test 2)
 
 - `ort-student-course-home-before-*`: ORT student course home before any structure (no new tabs).
-- `ort-teacher-course-home-after-*`: ORT staff course home with the new tabs.
+- `ort-teacher-course-home-after-*`: ORT staff course home with the new tabs (no "Change the course home" link: the
+  home kind is locked, 8a UX minor 11).
 - `ort-student-course-home-with-structure-*`: student home after a published module and file (Modules and Files tabs,
   home unchanged).
-- `ort-student-modules-*`: ORT module with the exam locked by date; the exam still starts (design 13).
+- `ort-student-modules-*`: ORT module locked by date; the exam row inside it is open and reads "Available from
+  Assignments" (gating-exempt, 8a UX M6); the exam still starts (design 13).

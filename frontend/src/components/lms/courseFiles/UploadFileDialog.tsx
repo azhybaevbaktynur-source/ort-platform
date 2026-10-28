@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { FileUp } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { uploadCourseFile } from "@/lib/lms/courseFiles";
 import { FILE_MAX_BYTES } from "@/lib/lms/pagesTypes";
@@ -59,11 +60,20 @@ export function UploadFileDialog({
         <ContentError error={error} />
         <div>
           <label htmlFor="cf-file" className="text-sm font-medium text-slate-800">{t("courseFiles.fieldFile")}</label>
-          <input
-            id="cf-file" ref={fileRef} type="file" accept="application/pdf,.pdf" disabled={busy}
-            onChange={(ev) => choose(ev.target.files?.[0])}
-            className="mt-1 block min-h-11 w-full text-sm text-slate-700 file:mr-3 file:min-h-11 file:rounded-xl file:border-0 file:bg-slate-100 file:px-4 file:font-medium file:text-slate-800"
-          />
+          {/* 8a UX (minor 9): the native input is visually hidden; a styled button opens it and the chosen name shows */}
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <input
+              id="cf-file" ref={fileRef} type="file" accept="application/pdf,.pdf" disabled={busy}
+              aria-describedby={file ? "cf-file-name" : undefined}
+              onChange={(ev) => choose(ev.target.files?.[0])}
+              className="peer sr-only"
+            />
+            <label htmlFor="cf-file" aria-hidden="true"
+              className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50 peer-focus-visible:ring-2 peer-focus-visible:ring-brand-600 peer-focus-visible:ring-offset-2 peer-disabled:cursor-not-allowed peer-disabled:opacity-60">
+              <FileUp aria-hidden="true" className="h-4 w-4" />{t("courseFiles.chooseFile")}
+            </label>
+            {file && <span id="cf-file-name" className="min-w-0 break-all text-sm text-slate-700">{file.name}</span>}
+          </div>
           {fileError && <p role="alert" className="mt-1 text-sm text-danger-700">{fileError}</p>}
         </div>
         <Input label={t("courseFiles.fieldTitle")} value={title} maxLength={300} onChange={(ev) => setTitle(ev.target.value)} />
