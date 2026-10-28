@@ -7,8 +7,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LayoutTemplate, Plus } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
-import { createExamTemplate, listExamTemplates } from "@/lib/lms/examTemplates";
-import { EXAM_TEMPLATE_STATUSES, type ExamTemplateOut, type ExamTemplateScope, type ExamTemplateStatus } from "@/lib/lms/examTemplateTypes";
+import { DEFAULT_DISPLAY_MODE, NEW_SECTION_EXCLUDED_TYPES, createExamTemplate, getExamTemplateBlocks, listExamTemplates } from "@/lib/lms/examTemplates";
+import {
+  EXAM_TEMPLATE_STATUSES, type BlocksOut, type ExamTemplateOut, type ExamTemplateScope, type ExamTemplateSpec, type ExamTemplateStatus,
+} from "@/lib/lms/examTemplateTypes";
+import type { DisplayMode } from "@/lib/lms/blocks";
 import { listMyOrganizations, type MyOrganizationOut } from "@/lib/lms/organizations";
 import { cleanLocalized, pickLocalized } from "@/lib/lms/localized";
 import { LMS_LANGS, type LocalizedText } from "@/lib/lms/types";
@@ -20,17 +23,22 @@ import {
   Button, Dialog, EmptyState, FilterBar, PageHeader, Select, Table, type Breadcrumb, type TableColumn,
 } from "@/components/ui";
 import { ExamTemplateError, LockedBadge, ScopeBadge, TemplateStatusBadge, type TemplateArea } from "./ui";
+import { RadioCards } from "./parts";
 
-/** Starter draft of a new template: one section, every type allowed (edited as JSON in the editor). */
-export const STARTER_SPEC = {
-  schema: 1,
-  navigation: "free" as const,
-  display_mode: "one_per_page" as const,
-  importer_profile: "general",
-  sections: [{ key: null, title: null, allowed_types: ["single_choice", "multiple_answers", "true_false", "numeric", "short_text", "essay"] }],
-  parameters: [],
-  lock_scope: [],
-};
+/**
+ * Starter draft of a new template (Phase 8b S4): one section with every catalog type except the ORT-only ones, and
+ * the display mode chosen in the "New template" dialog. Navigation and import format take the server defaults.
+ */
+export function starterSpec(blocks: BlocksOut, displayMode: string): ExamTemplateSpec {
+  const excluded = NEW_SECTION_EXCLUDED_TYPES as readonly string[];
+  return {
+    schema: 1,
+    display_mode: displayMode as DisplayMode,
+    sections: [{ key: null, title: null, allowed_types: blocks.question_types.map((q) => q.key).filter((k) => !excluded.includes(k)) }],
+    parameters: [],
+    lock_scope: [],
+  };
+}
 
 export function templateHref(lang: string, area: TemplateArea, id: string): string {
   if (area.kind === "platform") return `/${lang}/admin/exam-templates/${id}`;
@@ -120,10 +128,17 @@ function NewTemplateDialog({ open, area, onClose }: { open: boolean; area: Templ
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [touched, setTouched] = useState(false);
+  // Phase 8b S4: display-mode starter choice, listed from the blocks catalog
+  const [blocks, setBlocks] = useState<BlocksOut | null>(null);
+  const [displayMode, setDisplayMode] = useState<string>(DEFAULT_DISPLAY_MODE);
 
   useEffect(() => {
     if (!open) return;
-    setTitle({}); setError(null); setTouched(false); setBusy(false);
+    setTitle({}); setError(null); setTouched(false); setBusy(false); setDisplayMode(DEFAULT_DISPLAY_MODE);
+    let live = true;
+    getExamTemplateBlocks().then((b) => { if (live) setBlocks(b); }).catch((e) => { if (live) setError(e); });
+    const stop = () => { live = false; };
+    if (area.kind !== "teacher") return stop;
     if (area.kind !== "teacher") return;
     let alive = true;
     setOrgs(null);
@@ -135,7 +150,7 @@ function NewTemplateDialog({ open, area, onClose }: { open: boolean; area: Templ
         setOrgId(active[0]?.id ?? "");
       })
       .catch((e) => { if (alive) { setOrgs([]); setError(e); } });
-    return () => { alive = false; };
+    return () => { alive = false; stop(); };
   }, [open, area.kind]);
 
   const scope: ExamTemplateScope = area.kind === "platform" ? "platform" : area.kind === "org" ? "organization" : "teacher";
@@ -147,11 +162,11 @@ function NewTemplateDialog({ open, area, onClose }: { open: boolean; area: Templ
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     setTouched(true);
-    if (!titleOk || !orgOk) return;
+    if (!titleOk || !orgOk || !blocks) return;
     setBusy(true);
     setError(null);
     try {
-      const out = await createExamTemplate({ owner_scope: scope, organization_id: organizationId, title: cleaned, draft_spec: STARTER_SPEC });
+      const out = await createExamTemplate({ owner_scope: scope, organization_id: organizationId, title: cleaned, draft_spec: starterSpec(blocks, displayMode) });
       router.push(templateHref(lang, area, out.id));
     } catch (err) {
       setError(err);
@@ -166,7 +181,7 @@ function NewTemplateDialog({ open, area, onClose }: { open: boolean; area: Templ
       footer={(
         <>
           <Button variant="secondary" disabled={busy} onClick={onClose}>{t("ui.cancel")}</Button>
-          <Button type="submit" form={formId} loading={busy} disabled={area.kind === "teacher" && orgs !== null && orgs.length === 0}>{t("examTemplates.create.submit")}</Button>
+          <Button type="submit" form={formId} loading={busy} disabled={!blocks || (area.kind === "teacher" && orgs !== null && orgs.length === 0)}>{t("examTemplates.create.submit")}</Button>
         </>
       )}>
       <form id={formId} onSubmit={(e) => void submit(e)} className="space-y-4">
@@ -175,6 +190,11 @@ function NewTemplateDialog({ open, area, onClose }: { open: boolean; area: Templ
             value={title} onChange={setTitle} maxLength={200} required />
           {touched && !titleOk && <p className="mt-1 text-sm text-danger-700">{t("examTemplates.fields.titleRequired")}</p>}
         </div>
+        {blocks && (
+          <RadioCards legend={t("examTemplates.create.displayMode")} hint={t("examTemplates.create.displayModeHint")} value={displayMode}
+            onChange={setDisplayMode} disabled={busy}
+            options={blocks.display_modes.map((m) => ({ value: m, label: t(`examTemplates.blocks.displayModes.${m}`), description: t(`examTemplates.constructor.displayMode.body.${m}`) }))} />
+        )}
         {area.kind === "teacher" && orgs && orgs.length > 1 && (
           <Select label={t("examTemplates.create.organization")} hint={t("examTemplates.create.organizationHint")} value={orgId}
             onChange={(e) => setOrgId(e.target.value)} options={orgs.map((o) => ({ value: o.id, label: o.name }))} />
