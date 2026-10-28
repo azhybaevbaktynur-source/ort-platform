@@ -13,6 +13,7 @@ import { ResultSummary } from "./ResultSummary";
 import { ReviewItemCard } from "./ReviewItemCard";
 import { useReturnPath, withReturn } from "@/components/lms/player/returnPath";
 import type { PassageDisplay } from "@/lib/lms/blocks";
+import { pickLocalized } from "@/lib/lms/localized";
 
 export function StudentResult({ courseId, attemptId }: { courseId: string; attemptId: string }) {
   const { lang, t } = useTranslation();
@@ -136,7 +137,7 @@ function ReviewList({ items, sections, passageDisplay }: {
   /** Phase 8b S3: renderer from the review payload (null: course template). */
   passageDisplay: PassageDisplay | null;
 }) {
-  const { t } = useTranslation();
+  const { lang, t } = useTranslation();
   const [onlyMistakes, setOnlyMistakes] = useState(false);
   const groups = useMemo(() => {
     const out: { pos: number; entries: { item: ReviewItemOut; number: number }[] }[] = [];
@@ -154,7 +155,10 @@ function ReviewList({ items, sections, passageDisplay }: {
     const idx = sections.findIndex((s) => s.pos === pos);
     const key = idx >= 0 ? sections[idx].key : null;
     if (key && t(`sections.${key}`) !== `sections.${key}`) return t(`sections.${key}`);
-    return t("results.sectionN", { n: idx >= 0 ? idx + 1 : pos });
+    // Phase 8b S5: a general section's own title (template exams); ORT keys always resolve above
+    const title = idx >= 0 ? sections[idx].title : null;
+    const named = typeof title === "string" ? title : pickLocalized(title ?? null, lang);
+    return named || t("results.sectionN", { n: idx >= 0 ? idx + 1 : pos });
   };
   const show = (it: ReviewItemOut) => !onlyMistakes || (it.correctness !== null && MISTAKES.has(it.correctness));
   const anyShown = items.some(show);

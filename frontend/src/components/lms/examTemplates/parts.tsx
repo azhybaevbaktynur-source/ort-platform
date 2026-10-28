@@ -3,6 +3,7 @@
 // Phase 8b S4: small shared pieces of the constructor tabs (radio cards, field issues, "Go to" targets).
 import React, { useId } from "react";
 import type { SpecIssue } from "@/lib/lms/examTemplateTypes";
+import { LMS_LANGS, type Lang, type LocalizedText } from "@/lib/lms/types";
 import { FieldError, cn } from "@/components/ui";
 import { locStartsWith } from "./ui";
 import type { SpecDraft } from "./specDraft";
@@ -10,6 +11,15 @@ import type { SpecDraft } from "./specDraft";
 export type Update = (fn: (d: SpecDraft) => SpecDraft) => void;
 export type FieldErr = (...prefix: (string | number)[]) => string | undefined;
 export type ConstructorTab = "structure" | "scoring" | "display" | "sample" | "versions";
+
+/**
+ * Phase 8b S5: the language tab a localized field opens on: the UI language when it has text, else the first
+ * language that has text (a template written in Russian opens on RU for an English UI instead of an empty box).
+ */
+export function filledLang(v: LocalizedText | null | undefined, lang: Lang): Lang {
+  if (v?.[lang]?.trim()) return lang;
+  return LMS_LANGS.find((l) => v?.[l]?.trim()) ?? lang;
+}
 
 /** DOM id of a spec field, the target of the issues bar's "Go to" links. */
 export const fieldId = (...loc: (string | number)[]) => `tplf-${loc.map(String).join("-")}`;

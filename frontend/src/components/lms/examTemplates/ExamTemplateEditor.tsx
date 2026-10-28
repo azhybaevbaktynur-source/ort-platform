@@ -271,6 +271,10 @@ export function ExamTemplateEditor({ area, templateId, crumbs }: {
         cancelLabel={t("ui.cancel")} busy={actionBusy} error={actionErrorText}
         onConfirm={(reason) => void run(action === "unlock" ? "unlock" : "lock", reason)} onCancel={() => setAction(null)} />
       <DraftConflictDialog kind={c.saveState === "conflict" && !conflictHidden ? "draft" : null} busy={c.conflictBusy}
+        copy={{
+          title: t("examTemplates.constructor.conflict.title"), body: t("examTemplates.constructor.conflict.body"),
+          takeTheirs: t("examTemplates.constructor.conflict.takeTheirs"), keepMine: t("examTemplates.constructor.conflict.keepMine"),
+        }}
         onPrimary={() => void c.keepMine()} onSecondary={() => void c.takeTheirs()} onClose={() => setConflictHidden(true)} />
     </div>
   );

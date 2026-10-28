@@ -72,7 +72,7 @@ export function ExamTemplatesPage({ area, breadcrumbs }: { area: TemplateArea; b
         </Link>
       ),
     },
-    { key: "scope", header: t("examTemplates.list.scope"), cell: (x) => <ScopeBadge scope={x.owner_scope} /> },
+    { key: "scope", header: t("examTemplates.list.scope"), cell: (x) => <ScopeBadge scope={x.owner_scope} ownerId={x.owner_user_id} /> },
     { key: "status", header: t("examTemplates.list.status"), cell: (x) => <TemplateStatusBadge status={x.status} /> },
     { key: "version", header: t("examTemplates.list.version"), cell: (x) => x.current_version_no != null ? t("examTemplates.versionShort", { n: x.current_version_no }) : <span className="text-slate-500">—</span> },
     { key: "locked", header: t("examTemplates.list.locked"), cell: (x) => x.locked ? <LockedBadge /> : <span className="text-slate-500">—</span> },

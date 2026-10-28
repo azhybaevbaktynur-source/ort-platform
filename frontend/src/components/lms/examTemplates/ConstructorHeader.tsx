@@ -42,7 +42,7 @@ export function ConstructorHeader({ tpl, name, crumbs, readOnly, saveState, issu
     <PageHeader
       title={name}
       breadcrumbs={crumbs}
-      badge={<span className="inline-flex flex-wrap gap-1.5"><ScopeBadge scope={tpl.owner_scope} /><TemplateStatusBadge status={tpl.status} />{tpl.locked && <LockedBadge />}</span>}
+      badge={<span className="inline-flex flex-wrap gap-1.5"><ScopeBadge scope={tpl.owner_scope} ownerId={tpl.owner_user_id} /><TemplateStatusBadge status={tpl.status} />{tpl.locked && <LockedBadge />}</span>}
       description={(
         <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span>{version}</span>

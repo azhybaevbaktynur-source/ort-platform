@@ -3321,6 +3321,7 @@
       "organization": "Organization",
       "teacher": "Mine"
     },
+    "scopeTeacherOther": "Teacher's",
     "scopeHint": {
       "platform": "Visible in every course on the platform.",
       "organization": "Visible in every course of this organization.",
@@ -3810,7 +3811,13 @@
         "discard": "Discard"
       },
       "publishBlocked": "The draft is not saved yet. Fix the problems listed on the page, then publish.",
-      "publishUnchanged": "Nothing new to publish: the draft is the same as v{n}."
+      "publishUnchanged": "Nothing new to publish: the draft is the same as v{n}.",
+      "conflict": {
+        "title": "This template was changed elsewhere",
+        "body": "Someone saved this template in another tab, or another administrator did. Keep your changes (they replace the saved ones) or take the saved version?",
+        "takeTheirs": "Take the saved version",
+        "keepMine": "Keep my changes"
+      }
     },
     "sandbox": {
       "gateTitle": "Sample questions",
