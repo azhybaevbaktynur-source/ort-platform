@@ -445,3 +445,4 @@ Implementation decisions:
 | P8B-8 | Sample questions are never copied into exams created from a template (templates share structure only). |
 | P8B-9 | Inside a sandbox course everything except editing the sample quiz and previewing is refused (409 `sandbox_course`): publishing, new assessments, transfer, restore, modules/pages/files/announcements writes, staff changes, joins. |
 | P8B-10 | The player's `?return=` accepts only same-site `/<lang>/…` paths. |
+| P8B-11 | The `sections` lock key covers adding, removing, reordering and section keys; section **titles** stay editable on a locked template (matches the key's label; found in the 8b walkthrough). |
