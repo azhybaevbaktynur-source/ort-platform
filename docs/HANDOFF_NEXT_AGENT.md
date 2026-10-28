@@ -24,12 +24,13 @@ A teacher-owned, Canvas-style LMS where ORT/ЖРТ test prep is one course kind:
 | 7b exam templates I (templates + versions, create from template, save as template, general import format, block catalog) | **Deployed 2026-10-26** (`main` 77c5b32, migration 0010) — verify `/health` + Neon if the previous session could not | `PHASE_7B.md`, `PHASE_7B_DESIGN.md`, `EXAM_TEMPLATES_DESIGN.md` |
 | Owner checkpoint after 7b | Closed 2026-10-28 (owner approved 7c and continuing to 8a) | `PRODUCT_DECISIONS.md` 7c-9 |
 | 7c quiz editor (owner, 2026-10-28) | **Deployed 2026-10-28** (`main` 0177705, migration 0011) | `PHASE_7C.md`, `PHASE_7C_DESIGN.md`, `PHASE_7C_PROPOSAL.md` |
-| **8a** | **In progress**: design `PHASE_8A_DESIGN.md` on branch `phase-8a` (owner questions Q1–Q5 with defaults, listed at the 8b checkpoint) | — |
+| 8a modules, pages, files, announcements, gating | **Deployed 2026-10-28** (`main` 027d408, migration 0012) | `PHASE_8A.md`, `PHASE_8A_DESIGN.md` |
+| **8b** | **In progress**: design `PHASE_8B_DESIGN.md` on branch `phase-8b` (migration 0013, owner questions Q1–Q6 with defaults) | — |
 | Next | 8a modules, pages, files, announcements, gating → 8b exam templates II (visual constructor, scrolling display mode; **checkpoint after 8b**) → 9 → 10 → 11 | `IMPLEMENTATION_PLAN.md` |
 
-Production: Vercel https://ort-platform-nu.vercel.app + Render https://ort-platform-w77q.onrender.com (`/health` shows `commit`; Render deploys only when backend files change) + Neon project `noisy-sound-20763725` (production branch `br-cool-firefly-b227gbuy`, Alembic head `0011_phase7c_quiz_editor`) + Cloudflare R2. Production data is small: 6 users, 3 courses (2 ORT + the owner's draft), 299 question versions, ~4 attempts, 1 submission; one organization "Platform".
+Production: Vercel https://ort-platform-nu.vercel.app + Render https://ort-platform-w77q.onrender.com (`/health` shows `commit`; Render deploys only when backend files change) + Neon project `noisy-sound-20763725` (production branch `br-cool-firefly-b227gbuy`, Alembic head `0012_phase8a_course_structure`) + Cloudflare R2. Production data is small: 6 users, 3 courses (2 ORT + the owner's draft), 299 question versions, ~4 attempts, 1 submission; one organization "Platform".
 
-Neon backups (free plan: **max 10 branches, 1 manual snapshot — both nearly full**): `backup-2026-10-23-before-phase5` (pre-cutover; owner: delete ≥ 2026-10-30), `backup-2026-10-25-before-phase6a`, `backup-2026-10-26-before-phase7a`, `backup-2026-10-26-before-phase7b`, `backup-2026-10-28-before-phase7c`, snapshot `before-phase6a-deploy-2026-10-25`. Before each `main` merge with a migration create `backup-<date>-before-<phase>`; when full, ask the owner which old backup to delete (owner OK'd deleting obsolete ones on 2026-10-26; deleting Neon data always needs the owner's OK).
+Neon backups (free plan: **max 10 branches, 1 manual snapshot — both nearly full**): `backup-2026-10-23-before-phase5` (pre-cutover; owner: delete ≥ 2026-10-30), `backup-2026-10-25-before-phase6a`, `backup-2026-10-26-before-phase7a`, `backup-2026-10-26-before-phase7b`, `backup-2026-10-28-before-phase7c`, `backup-2026-10-28-before-phase8a`, snapshot `before-phase6a-deploy-2026-10-25`. Before each `main` merge with a migration create `backup-<date>-before-<phase>`; when full, ask the owner which old backup to delete (owner OK'd deleting obsolete ones on 2026-10-26; deleting Neon data always needs the owner's OK).
 
 ## 3b. Waiting for the owner
 
@@ -56,8 +57,8 @@ Neon backups (free plan: **max 10 branches, 1 manual snapshot — both nearly fu
 
 ## 5. What to do next
 
-1. Phase 8a on branch `phase-8a` (design `docs/phases/PHASE_8A_DESIGN.md`): S1 migration 0012 alone, then S2 ∥ S3 ∥ S4, S5 integration + UX gate + ORT review + security review, gates, Neon backup, deploy (method §4). Merge `origin/lms` into `phase-8a` before the final gates.
-2. Then 8b (exam templates II; may start in parallel with 8a where files do not overlap). **Owner checkpoint after 8b**: list 8a Q1–Q5, 7a Q1–Q6, 7b-Q1 and P8 with their defaults in effect.
+1. Phase 8b on branch `phase-8b` (design `docs/phases/PHASE_8B_DESIGN.md`): S1 migration 0013 alone, then S2 (fable) ∥ S3 ∥ S4, S5 integration + UX gate + ORT review + security review, gates, Neon backup, deploy (method §4). Merge `origin/lms` into `phase-8b` first.
+2. **Owner checkpoint after 8b**: list 8b Q1–Q6, 8a Q1–Q5, 7a Q1–Q6, 7b-Q1 and P8 with the defaults in effect, plus what changed in 7c/8a/8b, URLs and screenshots.
 
 ## 6. Models and token usage (Claude Max subscription)
 
