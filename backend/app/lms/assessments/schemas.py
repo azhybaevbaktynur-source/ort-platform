@@ -311,6 +311,8 @@ class ItemQuestionOut(BaseModel):
     bank_kind: Literal["quiz", "shared"] = "shared"
     used_elsewhere: int = 0
     # --- Phase 7c S1 end ---
+    # --- Phase 7c S5 --- (staff only, `content.read_admin`: the correct answer(s) in one line; quiz_editor/summary.py)
+    correct_summary: Optional[str] = None
 
 
 class ItemPassageOut(BaseModel):

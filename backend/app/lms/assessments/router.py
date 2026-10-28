@@ -34,7 +34,8 @@ def _staff(ctx: AuthzContext, a):
     from app.lms.courses.models import Course
 
     course = ctx.db.get(Course, a.course_id)
-    return builder.staff_out(ctx.db, a, include_drafts=course is not None and can(ctx, A.CONTENT_READ_ADMIN, course))
+    read_admin = course is not None and can(ctx, A.CONTENT_READ_ADMIN, course)
+    return builder.staff_out(ctx.db, a, include_drafts=read_admin, include_answers=read_admin)  # S5: answers
 
 
 # ------------------------------------------------------------------ assessments
