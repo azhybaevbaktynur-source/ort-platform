@@ -402,6 +402,9 @@ def restore_course(db: Session, actor: User, course: Course, *, by_admin: bool =
         raise not_found_course()
     if not by_admin and course.deleted_at is not None and course.deleted_by_id != actor.id:
         raise not_found_course()  # owner cannot undo an admin moderation delete
+    # Phase 8b fix M2 (after the 404s, so non-owners learn nothing): route-facing only; a soft-deleted sandbox is
+    # restored by `exam_templates.sandbox.ensure`, which never calls this
+    assert_not_sandbox(course)
     if course.deleted_at is None:
         raise Conflict("Course is not deleted", code="not_deleted")
     course.deleted_at = None
@@ -419,6 +422,7 @@ def restore_course(db: Session, actor: User, course: Course, *, by_admin: bool =
 
 def transfer_ownership(db: Session, actor: User, course: Course, new_owner_id: str, *, by_admin: bool = False,
                        reason: Optional[str] = None, request: Optional[Request] = None) -> Course:
+    assert_not_sandbox(course)  # Phase 8b fix M2: sandbox ownership follows the template, never transferred
     lock_course(db, course)
     # --- Phase 6 S1 begin --- (A13: an org admin of the course's organization reassigns the owner, audited)
     by_org_admin = False

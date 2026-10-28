@@ -29,7 +29,7 @@ EXAM_TEMPLATE_POLICIES.update({
 # `PLANNED_POLICIES` into `EXAM_TEMPLATE_POLICIES` in its own delimited block. `PATCH /courses/{c}/assessments/{a}`
 # (display fields) and the attempt state / result / review routes are existing routes: no inventory change.
 PLANNED_POLICIES: dict[tuple[str, str], str] = {
-    ("POST", f"{_T}/sandbox"): _ids.POLICY_MANAGE,                # ensure + sync, no attempt
+    ("POST", f"{_T}/sandbox"): _ids.POLICY_MANAGE_RATELIMIT,      # ensure + sync, no attempt (fix L3: limited)
     ("POST", f"{_T}/preview"): _ids.POLICY_MANAGE_RATELIMIT,      # attempt_start_limit
     ("GET", f"{_T}/diff"): _ids.POLICY_READ,                      # to=draft additionally needs can_manage (else 404)
 }

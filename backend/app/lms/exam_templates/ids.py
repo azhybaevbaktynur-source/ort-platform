@@ -128,3 +128,6 @@ SANDBOX_DROPPED_RULE_KEYS = ("min_items", "max_items")
 POLICY_MANAGE_RATELIMIT = "exam_template_manage+ratelimit"
 POLICY_NAMES = POLICY_NAMES + (POLICY_MANAGE_RATELIMIT,)
 # --- Phase 8b S1 end ---
+
+# Phase 8b fix L3: `POST /exam-templates/{id}/sandbox` (ensure + sync), per user (`ratelimit.sandbox_open_limit`)
+SANDBOX_OPEN_RATE_PER_HOUR = 120

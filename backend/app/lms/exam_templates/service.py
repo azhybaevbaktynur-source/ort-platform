@@ -378,7 +378,18 @@ def spec_diff_out(ctx: AuthzContext, template_id: uuid.UUID, from_no: int, to: s
             raise ValidationFailed("to must be a version number or 'draft'", code=ids.E_DIFF_TARGET_INVALID,
                                    details=[{"loc": ["to"], "msg": "version number or 'draft'"}]) from None
         after = _version_or_404(db, t, to_end).spec
-    changes = diff.spec_diff(before, after)
+    # Phase 8b fix L2: an old stored spec that no longer validates is a 422 naming the end, never a 500
+    from pydantic import ValidationError
+
+    ends = {}
+    for end, raw in (("from", before), ("to", after)):
+        try:
+            ends[end] = diff.normalize(raw)
+        except ValidationError:
+            raise ValidationFailed("The stored spec cannot be compared", code=ids.E_DIFF_TARGET_INVALID,
+                                   details=[{"loc": [end], "msg": "stored spec is not valid", "end": end}]
+                                   ) from None
+    changes = diff.spec_diff(ends["from"], ends["to"])
     return sch.SpecDiffOut(from_=from_no, to=to_end, changes=changes, summary=diff.summary(changes))
 # --- Phase 8b S2 end ---
 

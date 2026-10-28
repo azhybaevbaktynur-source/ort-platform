@@ -158,6 +158,7 @@ def prepare_upload(ctx: AuthzContext, course_id: uuid.UUID) -> uuid.UUID:
     db = ctx.db
     course = course_svc.load_course(db, course_id)
     course_svc.require_course(ctx, A.CONTENT_MANAGE, course)
+    course_svc.assert_not_sandbox(course)  # Phase 8b fix L4: no course structure in a template sandbox
     cid = course.id
     db.rollback()  # end the read transaction before the limiter's own write (SQLite)
     ratelimit.enforce(f"course-file-upload:{ctx.user.id}", upload_limit())
@@ -184,6 +185,7 @@ def upload(db: Session, ctx: AuthzContext, course_id: uuid.UUID, raw: bytes, *, 
            folder: Optional[str], title: Optional[str], published: bool) -> CourseFile:
     course = course_svc.load_course(db, course_id)
     course_svc.require_course(ctx, A.CONTENT_MANAGE, course)
+    course_svc.assert_not_sandbox(course)  # Phase 8b fix L4: no course structure in a template sandbox
     folder_ = normalize_folder(folder)
     title_ = clean_title(title if (title or "").strip() else _default_title(filename), ids.FILE_TITLE_MAX)
     if len(raw) > settings.FILE_MAX_UPLOAD_BYTES:
@@ -215,6 +217,7 @@ def upload(db: Session, ctx: AuthzContext, course_id: uuid.UUID, raw: bytes, *, 
 def update(db: Session, ctx: AuthzContext, course: Course, file_id: uuid.UUID,
            data: sch.CourseFileUpdateIn) -> CourseFile:
     course_svc.require_course(ctx, A.CONTENT_MANAGE, course)
+    course_svc.assert_not_sandbox(course)  # Phase 8b fix L4: no course structure in a template sandbox
     fields = data.model_fields_set
     title = clean_title(data.title, ids.FILE_TITLE_MAX) if "title" in fields else None
     folder = normalize_folder(data.folder) if "folder" in fields else None
@@ -232,6 +235,7 @@ def update(db: Session, ctx: AuthzContext, course: Course, file_id: uuid.UUID,
 
 def soft_delete(db: Session, ctx: AuthzContext, course: Course, file_id: uuid.UUID) -> None:
     course_svc.require_course(ctx, A.CONTENT_MANAGE, course)
+    course_svc.assert_not_sandbox(course)  # Phase 8b fix L4: no course structure in a template sandbox
     row = load(db, course, file_id, for_update=True)
     row.soft_delete(ctx.user.id)
     gate.touch_files(db, [row.id])

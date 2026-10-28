@@ -12,7 +12,7 @@ from app.core.authz import A, AuthzContext
 from app.lms.assessments.repository import load_assessment
 from app.lms.core.errors import Conflict, ValidationFailed
 from app.lms.courses.models import Course
-from app.lms.courses.service import require_course
+from app.lms.courses.service import assert_not_sandbox, require_course
 from app.lms.exam_templates import ids, service
 from app.lms.exam_templates import schemas as sch
 from app.lms.exam_templates.models import ExamTemplate
@@ -54,6 +54,7 @@ def _source_template_locked(db: Session, a) -> bool:
 def save_as_template(db: Session, ctx: AuthzContext, course: Course, assessment_id: uuid.UUID,
                      data: sch.SaveAsTemplateIn, *, request: Request | None = None) -> ExamTemplate:
     require_course(ctx, A.CONTENT_MANAGE, course)
+    assert_not_sandbox(course)  # Phase 8b fix L1: the sample quiz is never published; no other assessments
     a = load_assessment(db, course.id, assessment_id)
     if (a.preset or "none") != "none":
         raise Conflict("Preset exams cannot be saved as templates", code=ids.E_PRESET_NOT_TEMPLATABLE)

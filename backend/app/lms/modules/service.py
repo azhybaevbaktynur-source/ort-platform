@@ -52,6 +52,7 @@ def is_staff(ctx: AuthzContext, course: Course) -> bool:
 
 def _manage(db: Session, ctx: AuthzContext, course: Course) -> Course:
     course_svc.require_course(ctx, A.CONTENT_MANAGE, course)
+    course_svc.assert_not_sandbox(course)  # Phase 8b fix L4: no course structure in a template sandbox
     return course_svc.lock_course(db, course)
 
 
@@ -471,6 +472,7 @@ def create_quiz_item(db: Session, ctx: AuthzContext, course: Course, module_id: 
     from app.lms.assignments import service as asvc
 
     course_svc.require_course(ctx, A.CONTENT_MANAGE, course)
+    course_svc.assert_not_sandbox(course)  # Phase 8b fix L4: no course structure in a template sandbox
     if data.kind != "quiz" or data.quiz is None:
         raise _invalid("A module quiz needs kind quiz and the quiz body", "quiz_body_required",
                        [{"loc": ["kind"], "msg": "kind must be quiz"}])
@@ -501,6 +503,7 @@ def reapply(db: Session, ctx: AuthzContext, course: Course, module_id: Optional[
     """Delete the progress caches for the course (or the module and its transitive dependents) and bump their
     `rules_version`: the only path that can relock. Returns the number of students whose caches were cleared."""
     course_svc.require_course(ctx, A.CONTENT_MANAGE, course)
+    course_svc.assert_not_sandbox(course)  # Phase 8b fix L4: no course structure in a template sandbox
     ratelimit.enforce(f"module_reapply:{ctx.user.id}", ratelimit.module_reapply_limit())  # before any write
     course_svc.lock_course(db, course)
     if module_id is not None:

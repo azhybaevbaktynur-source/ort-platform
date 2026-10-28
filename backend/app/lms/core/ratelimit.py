@@ -114,6 +114,13 @@ def module_reapply_limit() -> Limit:
     return Limit("module_reapply_1h", REAPPLY_RATE_PER_HOUR, 3600)
 # --- Phase 8a S2 end ---
 
+
+def sandbox_open_limit() -> Limit:
+    """Phase 8b fix L3: opening an exam template's sandbox (ensure + sync), per user."""
+    from app.lms.exam_templates.ids import SANDBOX_OPEN_RATE_PER_HOUR
+
+    return Limit("sandbox_open_1h", SANDBOX_OPEN_RATE_PER_HOUR, 3600)
+
 _CLEANUP_PROBABILITY = 1 / 200
 _CLEANUP_BATCH = 1000
 

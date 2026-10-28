@@ -136,7 +136,8 @@ def load_attempt_bundle(db: Session, user, attempt_id, *, for_update: bool = Fal
     aid = parse_attempt_id(attempt_id)
     stmt = (
         select(Attempt, Assessment, Course.status, Course.deleted_at, Enrollment.state, Enrollment.role,
-               Course.template_key)  # Phase 8b S1
+               Course.template_key,  # Phase 8b S1
+               Course.sandbox_for_template_id)  # Phase 8b fix M1
         .join(Assessment, Assessment.id == Attempt.assessment_id)
         .join(Course, Course.id == Attempt.course_id)
         .join(Enrollment, Enrollment.id == Attempt.enrollment_id)
@@ -147,7 +148,11 @@ def load_attempt_bundle(db: Session, user, attempt_id, *, for_update: bool = Fal
     row = db.execute(stmt).first()
     if row is None:
         raise attempt_not_found()
-    attempt, assessment, cstatus, cdeleted, estate, erole, tkey = row
+    attempt, assessment, cstatus, cdeleted, estate, erole, tkey, sandbox_tid = row
+    # Phase 8b fix M1: a preview attempt in a template sandbox stays the caller's only while they manage the
+    # template (the sandbox enrollment is a cache); regular courses pay nothing (the column is in the same row)
+    if sandbox_tid is not None and not AuthzContext(user, db).sandbox_ok(attempt.course_id, sandbox_tid):
+        raise attempt_not_found()
     return attempt, AttemptEnv(cstatus, cdeleted is not None, estate, erole, assessment, tkey)
 
 
