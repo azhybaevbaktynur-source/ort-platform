@@ -53,6 +53,22 @@ def reset_lms_state() -> None:
         for model in (AssignmentSubmission, AssignmentRubricCriterion, AssignmentOverride, EnrollmentAccommodation):
             conn.execute(delete(model.__table__))
         # --- Phase 7a S1 end ---
+        # --- Phase 8a S1 begin --- course structure (children first; before assignments, assets, enrollments,
+        # courses and users, which its rows reference with RESTRICT)
+        from app.lms.announcements.models import Announcement
+        from app.lms.course_files.models import CourseFile
+        from app.lms.modules.models import (
+            CourseModule, ItemCompletionRequirement, ItemProgress, ItemRequirementStatus, ModuleItem,
+            ModulePrerequisite, ModuleProgress,
+        )
+        from app.lms.pages.models import Page
+
+        for model in (ItemRequirementStatus, ModuleProgress, ItemProgress, ItemCompletionRequirement,
+                      ModulePrerequisite, ModuleItem, CourseModule, CourseFile, Announcement):
+            conn.execute(delete(model.__table__))
+        conn.execute(update(Course.__table__).values(home_page_id=None))
+        conn.execute(delete(Page.__table__))
+        # --- Phase 8a S1 end ---
         # Phase 4 first (design 2.8): grade rows, then the FKs into categories and scheme versions.
         for model in (GradeEvent, CourseGrade, AttemptGrade, Submission):
             conn.execute(delete(model.__table__))

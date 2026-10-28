@@ -61,6 +61,16 @@ class Course(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
     template_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False,
                                                   server_default=text("false"))
     # --- Phase 6 S1 end ---
+    # --- Phase 8a S1 begin --- (course home, PHASE_8A_DESIGN 2.1; existing rows keep today's layout)
+    home_kind: Mapped[str] = mapped_column(String(16), nullable=False, default="assignments",
+                                           server_default="assignments")
+    # NOT NULL iff home_kind = 'page' (service rule); use_alter: courses and pages reference each other
+    home_page_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("pages.id", ondelete="SET NULL", use_alter=True, name="fk_courses_home_page_id_pages"),
+        nullable=True,
+    )
+    # --- Phase 8a S1 end ---
 
     __table_args__ = (
         CheckConstraint("grading_total_mode IN ('points','weighted')", name="grading_total_mode_valid"),
@@ -86,6 +96,9 @@ class Course(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
         CheckConstraint("(template_key IS NULL) = (template_version IS NULL)", name="template_version_matches_key"),
         Index("ix_courses_organization_id_status_deleted_at", "organization_id", "status", "deleted_at"),
         # --- Phase 6 S1 end ---
+        # --- Phase 8a S1 begin ---
+        CheckConstraint("home_kind IN ('modules','page','assignments')", name="home_kind_valid"),
+        # --- Phase 8a S1 end ---
     )
 
 

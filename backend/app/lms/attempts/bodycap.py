@@ -26,6 +26,9 @@ _METHODS = {"POST", "PUT", "PATCH"}
 _EXEMPT = re.compile(rf"(?:{_EXEMPT.pattern})|^/api/v1/courses/[^/]+/assignments/[^/]+/(submissions/files|feedback-files)/?$")
 _GRADING = re.compile(rf"(?:{_GRADING.pattern})|^/api/v1/courses/[^/]+/assignments/[^/]+/submissions/?$")
 # --- Phase 7a S2 end ---
+# --- Phase 8a S3 begin --- (PHASE_8A_DESIGN 5.3: course file uploads stream with their own cap, FILE_MAX_UPLOAD_BYTES)
+_EXEMPT = re.compile(rf"(?:{_EXEMPT.pattern})|^/api/v1/courses/[^/]+/course-files/?$")
+# --- Phase 8a S3 end ---
 
 
 class _TooLarge(Exception):

@@ -193,6 +193,7 @@ def create_course(db: Session, actor: User, data: CourseCreateIn, *, organizatio
             join_code_rotated_at=now, enrollment_limit=data.enrollment_limit,
             starts_at=_aware(data.starts_at), ends_at=_aware(data.ends_at), settings={},
             organization_id=org_id, **template,
+            home_kind=_default_home_kind(template.get("template_key")),  # --- Phase 8a S3 --- (one line)
         )
         db.add(candidate)
         try:
@@ -269,6 +270,7 @@ def update_course(db: Session, ctx: AuthzContext, course: Course, data: CourseUp
     if starts and ends and ends <= starts:
         raise ValidationFailed("ends_at must be after starts_at")
 
+    _apply_home(db, course, fields)  # --- Phase 8a S3 --- (one line; validates before any field is set)
     course.title, course.description = title, description
     course.languages, course.default_language = languages, default_language
     course.starts_at, course.ends_at = starts, ends
@@ -277,6 +279,70 @@ def update_course(db: Session, ctx: AuthzContext, course: Course, data: CourseUp
             setattr(course, key, fields[key])
     db.commit()
     return course
+
+
+# --- Phase 8a S3 begin --- (course home and student tabs, PHASE_8A_DESIGN 5.5, 8.2, invariant 7, P8A-7)
+def _default_home_kind(template_key: Optional[str]) -> str:
+    """`template.default_home_kind` of the new course (general: `modules`; ORT: `assignments`)."""
+    from app.lms.templates import registry
+
+    template = (registry.TEMPLATES.get(template_key) if template_key else None) or registry.GENERAL
+    return template.default_home_kind
+
+
+def _apply_home(db: Session, course: Course, fields: dict) -> None:
+    """`PATCH` home_kind / home_page_id: 409 `template_locked` on ORT courses (`LOCK_HOME_KIND`); `page` needs a live
+    page of this course (422 `home_page_invalid`); any other kind clears `home_page_id`."""
+    if "home_kind" not in fields and "home_page_id" not in fields:
+        return
+    from app.lms.modules.ids import E_HOME_PAGE_INVALID
+    from app.lms.pages.models import Page
+    from app.lms.templates.base import LOCK_HOME_KIND
+    from app.lms.templates.service import assert_not_locked
+
+    assert_not_locked(course, LOCK_HOME_KIND)
+    if "home_kind" in fields and fields["home_kind"] is None:
+        raise ValidationFailed("home_kind cannot be null")
+    kind = fields.get("home_kind") or course.home_kind
+    page_id = fields["home_page_id"] if "home_page_id" in fields else course.home_page_id
+
+    def invalid(msg: str) -> ValidationFailed:
+        return ValidationFailed(msg, code=E_HOME_PAGE_INVALID, details=[{"loc": ["home_page_id"], "msg": msg}])
+
+    if kind == "page":
+        if page_id is None:
+            raise invalid("A page is required for this course home")
+        found = db.execute(select(Page.id).where(Page.id == page_id, Page.course_id == course.id,
+                                                 Page.deleted_at.is_(None))).first()
+        if found is None:
+            raise invalid("Not a page of this course")
+    else:
+        if "home_page_id" in fields and fields["home_page_id"] is not None:
+            raise invalid("home_page_id is only used with the page home")
+        page_id = None
+    course.home_kind, course.home_page_id = kind, page_id
+
+
+def course_features(db: Session, course: Course):
+    """Which student tabs have published content (design 8.2): three EXISTS over published, live rows."""
+    from sqlalchemy import exists
+
+    from app.lms.announcements.models import Announcement
+    from app.lms.course_files.models import CourseFile
+    from app.lms.courses.schemas import CourseFeaturesOut
+    from app.lms.modules.models import CourseModule
+
+    now = utcnow()
+    row = db.execute(select(
+        exists().where(CourseModule.course_id == course.id, CourseModule.deleted_at.is_(None),
+                       CourseModule.published.is_(True)),
+        exists().where(CourseFile.course_id == course.id, CourseFile.deleted_at.is_(None),
+                       CourseFile.published.is_(True)),
+        exists().where(Announcement.course_id == course.id, Announcement.deleted_at.is_(None),
+                       Announcement.published_at.isnot(None), Announcement.published_at <= now),
+    )).one()
+    return CourseFeaturesOut(modules=bool(row[0]), files=bool(row[1]), announcements=bool(row[2]))
+# --- Phase 8a S3 end ---
 
 
 # ---------------------------------------------------------------- lifecycle

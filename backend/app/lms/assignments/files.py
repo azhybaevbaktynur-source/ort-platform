@@ -90,6 +90,10 @@ def _prepare_hand_in_upload(ctx: AuthzContext, course_id: uuid.UUID, assignment_
         raise ValidationFailed("This assignment takes no files", code="hand_in_not_accepted")
     now = clock.now()
     enr = handins.own_enrollment(db, ctx, course)
+    # --- Phase 8a fix1 --- (PHASE_8A_DESIGN 6.5: no upload for a hand-in whose module item is locked; read-only)
+    from app.lms.modules import gate
+
+    gate.require_access(db, ctx, course, assignment=a)
     eff = handins.effective_dates(a, handins.load_override(db, a.id, enr.id))
     sub = handins.own_submission(db, a.id, enr.id)
     block = handins.hand_in_block(a, eff, sub, handins.hand_ins_of(db, a.id, enr.id), now)

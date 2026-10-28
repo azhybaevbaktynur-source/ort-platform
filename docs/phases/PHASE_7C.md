@@ -1,6 +1,6 @@
 # Phase 7c: quiz editor (write questions inside the quiz)
 
-**Status**: built 2026-10-28 on `phase-7c`; deploy details at the end. Proposal and owner decisions: `PHASE_7C_PROPOSAL.md`, `PRODUCT_DECISIONS.md` (7c-1…7c-9, P7C-1…P7C-14). Design: `PHASE_7C_DESIGN.md` (+ §16 amendment).
+**Status**: **deployed 2026-10-28** (`main` 0177705, migration 0011). Deploy details at the end. Proposal and owner decisions: `PHASE_7C_PROPOSAL.md`, `PRODUCT_DECISIONS.md` (7c-1…7c-9, P7C-1…P7C-14). Design: `PHASE_7C_DESIGN.md` (+ §16 amendment).
 
 ## What a teacher gets
 - A general quiz opens in a **card editor** (Questions · Settings · Preview, publish bar with question count and points). "+ New question" at the end and "+" between cards; the question type is a dropdown inside the card; answers are one line each with a radio/checkbox for the correct one; Enter adds an answer, Backspace in an empty one removes it; "Add image" and the formatting toolbar appear on demand.
@@ -22,7 +22,9 @@ Migration `0011_phase7c_quiz_editor`: `question_banks.assessment_id` (+ partial 
 
 ## Tests
 Backend: `tests/lms/test_quiz_editor_*.py` (drafts, commit, scope, type change, usage, bank ops, quiz banks, isolation, publish with drafts, correct summary), `test_pg_concurrency_quiz_editor.py` (5 races), `tests/test_migration_0011.py`. Frontend: `frontend/e2e/quiz-editor.spec.ts` (teacher writes five types, scope both ways, sections, draft survives closing the browser, publish with unfinished draft, student takes it, second quiz unchanged, Bank tab move).
-Gate results: see "Deploy" below.
+Gate results (merged `phase-7c` b3791b9 + docs): SQLite 3127 passed / 35 skipped; PG 3190 passed / 17 skipped; fresh PG `alembic upgrade head && alembic check` clean; PG migration tests 22 passed; importers diff empty; i18n parity OK (3092 keys); `tsc` clean; `next build` OK; e2e `quiz-editor`, `ort`, `ort-visual` green, ORT zero diffs.
 
 ## Deploy
-(filled in after the gates and the deploy)
+- Neon backup branch `backup-2026-10-28-before-phase7c` (`br-old-snow-b2p63hcn`, no compute) before the merge. No production-copy rehearsal: 0011 is schema-only and additive (nullable column, new empty table), covered by the migration tests on SQLite and PG.
+- `phase-7c` → `lms` (bde4b30) → `main` (0177705). `/health` shows `0177705`; Neon `alembic_version` = `0011_phase7c_quiz_editor`; production data unchanged (299 question versions, 2 ORT exams, 0 quiz banks, 0 drafts).
+- Vercel production deployment for 0177705: see `HANDOFF_NEXT_AGENT.md` (checked after the build).

@@ -38,6 +38,9 @@ class A:
     ASSIGNMENT_SUBMIT = "assignment.submit"          # students only; status and suspension gates as assessment.take
     ACCOMMODATIONS_MANAGE = "accommodations.manage"  # teachers only (Q3 a): not assistants, not org admins
     # --- Phase 7a S1 end ---
+    # --- Phase 8a S1 begin --- (PHASE_8A_DESIGN 7: module view / mark-done facts; students only, published course)
+    PROGRESS_RECORD = "progress.record"
+    # --- Phase 8a S1 end ---
 
 
 ALL_ACTIONS = frozenset(v for k, v in vars(A).items() if not k.startswith("_"))
@@ -54,6 +57,11 @@ ROLE_GRANTS["teacher"] = ROLE_GRANTS["teacher"] - {A.ASSIGNMENT_SUBMIT}
 ROLE_GRANTS["assistant"] = ROLE_GRANTS["assistant"] - {A.ASSIGNMENT_SUBMIT, A.ACCOMMODATIONS_MANAGE}
 ROLE_GRANTS["student"] = ROLE_GRANTS["student"] | {A.ASSIGNMENT_SUBMIT}
 # --- Phase 7a S1 end ---
+# --- Phase 8a S1 begin --- (staff are never evaluated nor gated: no progress facts; not in CONCLUDED_ACTIONS)
+ROLE_GRANTS["teacher"] = ROLE_GRANTS["teacher"] - {A.PROGRESS_RECORD}
+ROLE_GRANTS["assistant"] = ROLE_GRANTS["assistant"] - {A.PROGRESS_RECORD}
+ROLE_GRANTS["student"] = ROLE_GRANTS["student"] | {A.PROGRESS_RECORD}
+# --- Phase 8a S1 end ---
 
 READ_ONLY_ACTIONS = frozenset({
     A.COURSE_READ, A.ROSTER_READ, A.CONTENT_READ, A.CONTENT_READ_ADMIN,

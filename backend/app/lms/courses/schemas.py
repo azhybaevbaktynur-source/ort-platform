@@ -17,6 +17,16 @@ Lang = Literal["en", "ru", "ky"]
 CreateMode = Literal["invite_code", "closed"]
 Title = localized_text(200)
 Description = localized_text(5000)
+# --- Phase 8a S1 begin --- (course home, PHASE_8A_DESIGN 2.1, 5.5)
+HomeKind = Literal["modules", "page", "assignments"]
+
+
+class CourseFeaturesOut(BaseModel):
+    """Which student tabs have published content (design 8.2). Computed by S3 (three EXISTS); False until then."""
+    modules: bool = False
+    files: bool = False
+    announcements: bool = False
+# --- Phase 8a S1 end ---
 
 
 def _check_languages(languages: list[str]) -> None:
@@ -70,6 +80,11 @@ class CourseUpdateIn(BaseModel):
     visibility: Optional[Literal["private", "catalog"]] = None
     starts_at: Optional[datetime] = None
     ends_at: Optional[datetime] = None
+    # --- Phase 8a S1 begin --- (PHASE_8A_DESIGN 5.5; applied by the update_course block of S3: LOCK_HOME_KIND,
+    # 422 `home_page_invalid`; home_page_id is required iff home_kind = 'page')
+    home_kind: Optional[HomeKind] = None
+    home_page_id: Optional[uuid.UUID] = None
+    # --- Phase 8a S1 end ---
 
 
 class TransferIn(BaseModel):
@@ -125,6 +140,11 @@ class CourseStudentOut(BaseModel):
     # --- Phase 6 S2b begin --- (course template, PHASE_6_DESIGN 5.3; null for a general course)
     template: Optional["CourseTemplateOut"] = None
     # --- Phase 6 S2b end ---
+    # --- Phase 8a S1 begin --- (course home and student tabs, PHASE_8A_DESIGN 5.5, 8.2)
+    home_kind: HomeKind = "assignments"
+    home_page_id: Optional[uuid.UUID] = None
+    features: CourseFeaturesOut = Field(default_factory=CourseFeaturesOut)
+    # --- Phase 8a S1 end ---
 
 
 class CourseStaffOut(CourseStudentOut):
@@ -197,7 +217,25 @@ def course_student_out(course, enrollment, owner, organization_name: str = "") -
         my_enrollment=MyEnrollmentOut.model_validate(enrollment) if enrollment is not None else None,
         organization_id=course.organization_id, organization_name=organization_name,
         template=_course_template_out(course),  # --- Phase 6 S2b --- (one line)
+        # --- Phase 8a S1 begin --- (features: all False until S3 computes them)
+        home_kind=getattr(course, "home_kind", None) or "assignments",
+        home_page_id=getattr(course, "home_page_id", None),
+        # --- Phase 8a S1 end ---
+        features=_course_features(course),  # --- Phase 8a S3 --- (one line)
     )
+
+
+# --- Phase 8a S3 begin --- (student tabs, PHASE_8A_DESIGN 8.2: three EXISTS on the course's own session)
+def _course_features(course) -> CourseFeaturesOut:
+    from sqlalchemy.orm import object_session
+
+    db = object_session(course)
+    if db is None or getattr(course, "id", None) is None:
+        return CourseFeaturesOut()
+    from app.lms.courses.service import course_features
+
+    return course_features(db, course)
+# --- Phase 8a S3 end ---
 
 
 def course_staff_out(course, enrollment, owner, active_student_count: int, viewer_id: str,
