@@ -83,6 +83,12 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
   const staff = isStaffCourse(course);
   // --- Phase 6b S5c: staff course frame on the design system (course bar + scrollable tabs; pages own the h1) ---
   const role = course.my_enrollment.role;
+  // --- Phase 8b S5: an exam template's sandbox (template preview result pages) has no course frame: its course
+  // pages are not part of the product (every course-level write answers 409 `sandbox_course`); the page's own
+  // "Back" link (`?return=`) leads to the constructor ---
+  if (staff && course.sandbox_for_template_id) {
+    return <CourseContext.Provider value={{ course, reload, setCourse }}>{children}</CourseContext.Provider>;
+  }
   if (staff && (role === "teacher" || role === "assistant")) {
     return (
       <CourseContext.Provider value={{ course, reload, setCourse }}>

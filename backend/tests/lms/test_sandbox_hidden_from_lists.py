@@ -155,3 +155,17 @@ def test_ort_courses_are_not_sandboxes(db):
     ensure_ort_courses(db, samples=False)
     rows = db.execute(select(Course)).scalars().all()
     assert len(rows) == 2 and all(c.sandbox_for_template_id is None and not c.is_sandbox for c in rows)
+
+
+# --- Phase 8b S5 --- (the staff course payload names the sandbox, so the course frame hides the course tabs)
+async def test_staff_course_payload_names_the_sandbox(db, api):
+    w = sandbox_world(db)
+    res = await api.call(w.TA, "GET", f"/courses/{w.sid}")
+    assert res.status_code == 200, res.text
+    assert res.json()["sandbox_for_template_id"] == str(w.t.id)
+    res = await api.call(w.TA, "GET", f"/courses/{w.rid}")
+    assert res.status_code == 200, res.text
+    assert res.json()["sandbox_for_template_id"] is None
+    res = await api.call(w.S, "GET", f"/courses/{w.rid}")
+    assert res.status_code == 200, res.text
+    assert "sandbox_for_template_id" not in res.json()
