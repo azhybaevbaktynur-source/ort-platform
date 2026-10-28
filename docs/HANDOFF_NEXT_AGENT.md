@@ -22,8 +22,9 @@ A teacher-owned, Canvas-style LMS where ORT/ЖРТ test prep is one course kind:
 | 6b design system, AppHeader with areas, student home, ORT player part 1, ORT browser suite | Deployed 2026-10-25 (`main` 89050a4) + landing fix 4771318 | `PHASE_6B.md` |
 | 7a assignments, hand-ins, manual grading, general gradebook, accommodations, access codes | Deployed 2026-10-26 (`main` 95b040f, migration 0009) | `PHASE_7A.md`, `PHASE_7A_DESIGN.md` |
 | 7b exam templates I (templates + versions, create from template, save as template, general import format, block catalog) | **Deployed 2026-10-26** (`main` 77c5b32, migration 0010) — verify `/health` + Neon if the previous session could not | `PHASE_7B.md`, `PHASE_7B_DESIGN.md`, `EXAM_TEMPLATES_DESIGN.md` |
-| **Owner checkpoint after 7b** | **Waiting for the owner's review/OK** — do not start 8a before it | — |
-| Next | 8a modules, pages, files, announcements, gating → 8b exam templates II (visual constructor, scrolling display mode; **checkpoint after 8b**) → 9 → 10 → 11 | `IMPLEMENTATION_PLAN.md` |
+| Owner checkpoint after 7b | Closed 2026-10-28 (owner approved 7c and continuing to 8a) | `PRODUCT_DECISIONS.md` 7c-9 |
+| **7c quiz editor** (owner, 2026-10-28) | **In progress** | `PHASE_7C_PROPOSAL.md`, `PHASE_7C_DESIGN.md` |
+| Next | 7c → 8a modules, pages, files, announcements, gating → 8b exam templates II (visual constructor, scrolling display mode; **checkpoint after 8b**) → 9 → 10 → 11 | `IMPLEMENTATION_PLAN.md` |
 
 Production: Vercel https://ort-platform-nu.vercel.app + Render https://ort-platform-w77q.onrender.com (`/health` shows `commit`; Render deploys only when backend files change) + Neon project `noisy-sound-20763725` (production branch `br-cool-firefly-b227gbuy`, Alembic head `0010_phase7b_exam_templates`) + Cloudflare R2. Production data is small: 6 users, 3 courses (2 ORT + the owner's draft), 299 question versions, ~4 attempts, 1 submission; one organization "Platform".
 

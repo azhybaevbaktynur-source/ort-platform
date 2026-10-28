@@ -356,3 +356,19 @@ From `phases/PHASE_7A_DESIGN.md` §8. Work continues with the interim default; t
 | K1 | Copying locked structures | "Save as template" is refused for an exam built from a locked template (or with a locked structure), so a locked structure cannot be copied into an unlocked template (security review 7b, L5). |
 | K2 | CSV column cap | The general importer refuses more than 64 columns; every CSV import (ORT included) refuses more than 256 header columns in the shared import service. ORT importer files are unchanged and the golden ORT imports are identical (no real ORT file comes close). |
 | K3 | Org template editing | The creator of an organization template may edit its drafts while the organization allows teachers to publish org templates; locking stays with the org admins. |
+
+## Owner decisions 2026-10-28: Phase 7c quiz editor (answers to `phases/PHASE_7C_PROPOSAL.md` §7)
+
+Trigger: the owner's Canvas screenshots (`docs/example_canvas_quiz/`). Writing questions only in the Bank tab and then adding them to a quiz was too cumbersome. Teachers now write questions inside the quiz.
+
+| # | Topic | Decision |
+|---|---|---|
+| 7c-1 | Data model | **One store, no copies.** A question written in a quiz is a normal `bank_questions` row in the quiz's own **quiz bank** (`question_banks.assessment_id`). No separate quiz-question table. Shared banks are reused by link. |
+| 7c-2 | Editing a question used in other quizzes | One dialog: **"Update in all N quizzes"** or **"Change only in this quiz"** (copies the question into this quiz's bank and repoints this item). The dialog says that published quizzes change only after they are republished. If the teacher cannot edit the source bank, only "Change only in this quiz" is offered. Used only here: no question. |
+| 7c-3 | Quiz banks in the Bank tab | Visible, grouped under **"Quiz banks"** with the quiz name. |
+| 7c-4 | Saving | **Hybrid.** Typing autosaves a **draft per card** (nothing is lost if the browser closes). A **question version** is created only when the card is closed or "Done" is clicked; the scope question (7c-2) is asked at that moment, once. No version per autosave. |
+| 7c-5 | Changing a question's type | Allowed in the card. If the question is used in another quiz or in any published version, a type change always creates a **new question in this quiz only** (the old question is untouched). |
+| 7c-6 | Sections | A new quiz has one hidden default section. When the teacher adds a second section, the existing questions visibly become **"Section 1"**. |
+| 7c-7 | New question types (matching, fill-in-the-blank, ordering) | Not in 7c; **Phase 10**. When added they appear in the 7c type dropdown and in the 7b general import format. |
+| 7c-8 | ORT | ORT screens unchanged (bank, import, exam screens, player, scoring). ORT review and UX gate as usual. |
+| 7c-9 | Order | **7c before 8a**; then 8a, 8b. Next owner checkpoint: after 8b. The owner's "yes" on 2026-10-28 also closes the checkpoint after 7b. |
