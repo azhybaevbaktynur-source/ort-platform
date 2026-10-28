@@ -1,6 +1,6 @@
 # Phase 8b: exam templates II (visual constructor, sample questions with preview, scrolling display mode)
 
-**Status**: built 2026-10-28 on `phase-8b`; deploy details at the end. Design: `PHASE_8B_DESIGN.md`. Decisions: `PRODUCT_DECISIONS.md` "Phase 8b decisions" (owner questions 8b-Q1…Q6 with defaults in effect, P8B-1…P8B-11). **Owner checkpoint follows this phase.**
+**Status**: **deployed 2026-10-28** (`main` b716d78, migration 0013). Deploy details at the end. Design: `PHASE_8B_DESIGN.md`. Decisions: `PRODUCT_DECISIONS.md` "Phase 8b decisions" (owner questions 8b-Q1…Q6 with defaults in effect, P8B-1…P8B-11). **Owner checkpoint follows this phase.**
 
 ## What platform admins, org admins and teachers get
 - **Visual constructor for exam templates** at three places: platform admin, organization admin, and the teacher's own templates in Teaching. It has five tabs.
@@ -45,4 +45,6 @@ Migration `0013_phase8b_template_sandbox` adds `courses.sandbox_for_template_id`
   - `frontend/e2e/scrolling-player.spec.ts`: 48 items, windowing, palette, keyboard, forward-only, 375 px, return link safety.
 
 ## Deploy
-(filled in after the gates and the deploy)
+- Gates on merged `phase-8b` (960ca1e): SQLite 3459 passed / 42 skipped; PG 3526 passed / 22 skipped / **1 flaky** (`test_enrollments_api.py::test_ip_failure_limit_counts_failures_only`: passes alone 3/3; 122 join calls against a time-windowed limiter can straddle a window boundary; from Phase 7a, unrelated to 8b; to fix by freezing the clock in the test); fresh PG `alembic upgrade head && alembic check` clean; PG migration tests 36 passed; importers diff empty; i18n parity OK (3669 keys); `tsc` clean; `next build` OK; e2e `exam-constructor`, `scrolling-player`, `modules`, `quiz-editor`, `ort`, `ort-visual` green, ORT zero diffs.
+- Neon backup branch `backup-2026-10-28-before-phase8b` (`br-curly-king-b2tfv8gq`). No production-copy rehearsal: 0013 is one nullable column.
+- `phase-8b` → `lms` (38d4b93) → `main` (b716d78). `/health` = b716d78; Neon `alembic_version` = `0013_phase8b_template_sandbox`; data unchanged (299 question versions, 2 ORT exams, 3 courses, 0 sandboxes).
