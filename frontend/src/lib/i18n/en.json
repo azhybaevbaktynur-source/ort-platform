@@ -251,7 +251,11 @@
       "folder_invalid": "The folder name is not valid. Use short names separated by /.",
       "course_files_quota": "The course file limit is reached. Delete files to free up space.",
       "page_conflict": "Someone saved a newer version. Reload and try again.",
-      "already_published": "This announcement is already posted."
+      "already_published": "This announcement is already posted.",
+      "preview_not_ready": "The preview cannot start yet: add sample questions to every section.",
+      "nothing_to_preview": "There is nothing to preview yet: the template has no sections.",
+      "language_not_in_assessment": "The sample questions are not available in this language.",
+      "sandbox_course": "This course holds a template's sample questions and cannot be changed here."
     }
   },
   "courses": {
@@ -3270,7 +3274,6 @@
       "display_mode": "display",
       "result_view": "result view"
     },
-    "scrollingLater": "\"All questions on one page\" comes later; new exams use one question per page.",
     "scope": {
       "platform": "Platform",
       "organization": "Organization",
@@ -3302,7 +3305,7 @@
       },
       "displayModes": {
         "one_per_page": "One question per page",
-        "scrolling": "All questions on one page (later)"
+        "scrolling": "All questions on one page"
       }
     },
     "picker": {
@@ -3393,7 +3396,9 @@
       "title": "New exam template",
       "submit": "Create and edit",
       "organization": "Organization",
-      "organizationHint": "The template is kept in this organization."
+      "organizationHint": "The template is kept in this organization.",
+      "displayMode": "Question display",
+      "displayModeHint": "You can change it later in the Display tab."
     },
     "fields": {
       "title": "Template name",
@@ -3629,7 +3634,199 @@
       "unknown_scheme": "Grading scheme not found or not available.",
       "not_shareable": "This grading scheme is personal: shared templates can only use system schemes.",
       "reserved": "This value belongs to the ORT course template.",
-      "truncated": "And {limit} more errors."
+      "truncated": "And {limit} more errors.",
+      "types_required": "Check at least one question type.",
+      "sections_required": "Add at least one section.",
+      "title_required": "Enter a name in at least one language."
+    },
+    "constructor": {
+      "tabs": {
+        "label": "Template constructor",
+        "structure": "Structure",
+        "scoring": "Scoring",
+        "display": "Display",
+        "sample": "Sample questions",
+        "versions": "Versions"
+      },
+      "header": {
+        "preview": "Preview",
+        "unpublished": "{n} unpublished changes",
+        "unpublished_one": "{n} unpublished change",
+        "unpublished_few": "{n} unpublished changes",
+        "unpublished_many": "{n} unpublished changes",
+        "unpublished_other": "{n} unpublished changes",
+        "importFormatHint": "The import format of v{n} (CSV)"
+      },
+      "saveState": {
+        "dirty": "Unsaved changes",
+        "saving": "Saving…",
+        "saved": "All changes saved",
+        "invalid": "Not saved: {n} problems",
+        "invalid_one": "Not saved: {n} problem",
+        "invalid_few": "Not saved: {n} problems",
+        "invalid_many": "Not saved: {n} problems",
+        "invalid_other": "Not saved: {n} problems",
+        "conflict": "Not saved: changed elsewhere",
+        "error": "Not saved",
+        "retry": "Retry",
+        "resolve": "Resolve"
+      },
+      "issuesBar": {
+        "title": "{n} problems in the template",
+        "title_one": "{n} problem in the template",
+        "title_few": "{n} problems in the template",
+        "title_many": "{n} problems in the template",
+        "title_other": "{n} problems in the template",
+        "body": "Your changes stay on this device until the problems are fixed and the draft is saved.",
+        "goTo": "Go to",
+        "goToField": "Go to {field}"
+      },
+      "section": {
+        "untitled": "Untitled section",
+        "typesChip": "{n} question types",
+        "typesChip_one": "{n} question type",
+        "typesChip_few": "{n} question types",
+        "typesChip_many": "{n} question types",
+        "typesChip_other": "{n} question types",
+        "passagesChip": "Reading passages",
+        "boundChip": "Key from parameter {key}",
+        "hasIssues": "Needs fixing",
+        "timerNeedsForward": "Section time limits need section-by-section navigation (see Navigation).",
+        "remove": "Remove section"
+      },
+      "navigation": {
+        "legend": "How students move between sections",
+        "body": {
+          "free": "Students can open any question in any order.",
+          "section_forward_only": "Sections are taken in order and a finished section closes. Each section can have its own time limit."
+        },
+        "timersHint": "Set a time limit in each section card. Together they must not exceed the total time limit (Default settings)."
+      },
+      "parameters": {
+        "empty": "No parameters. Most templates do not need any.",
+        "optionsHint": "One option per line: lowercase Latin letters, digits and _.",
+        "max": "At most {n} parameters."
+      },
+      "jsonApplied": "JSON copied into the form. It saves by itself when it is valid.",
+      "jsonHint": "For the platform admin. \"Apply JSON\" copies the structure into the form; it then saves automatically.",
+      "scoring": {
+        "title": "Grading scheme",
+        "body": "How raw points become the score students see.",
+        "noScheme": "No scheme (points)",
+        "group": {
+          "system": "System schemes",
+          "mine": "My schemes"
+        },
+        "previewTitle": "Scheme preview",
+        "previewPossible": "Maximum raw score in this preview: {n} (the sum of \"At most\" of all sections, or 100). You can change it below.",
+        "previewError": "Could not load the scheme for the preview.",
+        "previewUnavailable": "This scheme cannot be previewed here.",
+        "pointsOnly": "Without a scheme, students see their points."
+      },
+      "resultView": {
+        "legend": "What students see after submitting",
+        "inherit": "As set for the course.",
+        "body": {
+          "general": "Score, points per section and the review of answers.",
+          "ort": "ORT-style page with the scaled score (meaningful with a scaled scheme)."
+        }
+      },
+      "displayMode": {
+        "legend": "How questions are shown",
+        "body": {
+          "one_per_page": "One question at a time, with Back and Next.",
+          "scrolling": "All questions of a section on one scrolling page."
+        }
+      },
+      "passageDisplay": {
+        "body": "How reading passages are shown. A section can set its own.",
+        "default": "Default for all sections",
+        "perSection": "Sections with reading passages",
+        "none": "No section allows reading passages yet."
+      },
+      "lockScope": {
+        "sections": "Teachers cannot add, remove or reorder sections.",
+        "section_time_limit_s": "Teachers cannot change section time limits.",
+        "rules": "Teachers cannot change a section's question types, counts or reading passages.",
+        "navigation": "Teachers cannot change the navigation.",
+        "scheme": "Teachers cannot change the grading scheme.",
+        "result_view": "Teachers cannot change the result page or how passages are shown.",
+        "importer_profile": "Teachers cannot change the import format.",
+        "display_mode": "Teachers cannot change how questions are shown."
+      },
+      "versions": {
+        "actions": "Actions"
+      },
+      "blocksError": "Could not load the building blocks of the constructor.",
+      "lockedOwner": "This template is locked, so it is read-only. To change the draft, unlock it (More actions).",
+      "lockedOther": "This template is locked by its owner, so it is read-only.",
+      "readOnlyArea": "This organization is read-only: the template cannot be changed.",
+      "restoreDraft": {
+        "title": "Restore unsaved changes?",
+        "body": "This browser tab kept changes that were not saved to the server.",
+        "restore": "Restore",
+        "discard": "Discard"
+      },
+      "publishBlocked": "The draft is not saved yet. Fix the problems listed on the page, then publish.",
+      "publishUnchanged": "Nothing new to publish: the draft is the same as v{n}."
+    },
+    "sandbox": {
+      "gateTitle": "Sample questions",
+      "gateBody": "Write a few sample questions to see the template as a student does. They are kept in a hidden practice course.",
+      "note": "Sample questions are only for previewing; they are never part of exams created from this template.",
+      "language": "Language of the sample questions",
+      "languageHint": "You can add other languages to the questions later.",
+      "create": "Start writing sample questions",
+      "loading": "Loading sample questions…",
+      "saveFirst": "The sample questions follow the last saved draft. Unsaved changes are not in them yet.",
+      "archivedTitle": "Sample questions are closed"
+    },
+    "preview": {
+      "title": "Preview as a student",
+      "body": "Opens the real exam player with the sample questions. Nothing is graded or added to a gradebook.",
+      "language": "Language",
+      "parameter": "Option: {key}",
+      "launch": "Preview as student",
+      "backToTemplate": "Back to the template"
+    },
+    "diff": {
+      "title": "Changes: {from} → {to}",
+      "draft": "draft",
+      "close": "Close the comparison",
+      "noChanges": "No differences.",
+      "summaryLabel": "Summary",
+      "summary": {
+        "sectionsAdded": "Sections added: {n}",
+        "sectionsRemoved": "Sections removed: {n}",
+        "sectionsChanged": "Sections changed: {n}",
+        "fieldsChanged": "Settings changed: {n}"
+      },
+      "groups": {
+        "common": "General",
+        "sections": "Sections",
+        "parameters": "Parameters",
+        "locks": "Lock"
+      },
+      "added": "Added",
+      "removed": "Removed",
+      "changed": "Changed",
+      "field": "Setting",
+      "yes": "Yes",
+      "no": "No",
+      "otherScheme": "Another scheme",
+      "sectionKey": "Section {key}",
+      "parameter": "Parameter {key}",
+      "sectionAdded": "Section added",
+      "sectionRemoved": "Section removed",
+      "sectionChanged": "Changed",
+      "parameterAdded": "Parameter added",
+      "parameterRemoved": "Parameter removed",
+      "locksAdded": "Now fixed: {keys}",
+      "locksRemoved": "No longer fixed: {keys}",
+      "compareWithPrevious": "Compare with previous",
+      "compareWithPreviousN": "Compare v{n} with the previous version",
+      "compareWithDraft": "Compare with draft",
+      "compareWithDraftN": "Compare v{n} with the draft"
     }
   },
   "quizEditor": {
