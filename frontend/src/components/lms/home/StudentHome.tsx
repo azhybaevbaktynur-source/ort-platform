@@ -211,6 +211,24 @@ function Sections({ data }: { data: HomeOut }) {
       )}
       {/* --- Phase 8a S4a end --- */}
 
+      {/* --- Phase 8a S5: the latest three announcements of the student's courses (design 7.2, 8.1; never a body) --- */}
+      {(data.announcements?.length ?? 0) > 0 && (
+        <HomeSection id="home-announcements" title={t("home.announcements.title")}>
+          <ul className="divide-y divide-slate-100">
+            {data.announcements!.map((r) => (
+              <HomeRow key={r.id} href={`${base}/${r.course_id}/announcements`} title={r.title}
+                meta={(
+                  <>
+                    <span>{pickLocalized(r.course_title, lang) || t("courses.list.untitled")}</span>
+                    <span>{fmtShortDateTime(r.published_at, lang)}</span>
+                  </>
+                )}
+                actionLabel={t("home.announcements.action")} />
+            ))}
+          </ul>
+        </HomeSection>
+      )}
+
       <HomeSection id="home-next" title={t("home.next.title")}>
         {data.next_up.length === 0 ? (
           <p className="px-3 py-4 text-base leading-6 text-slate-600 sm:px-4">{t("home.next.empty")}</p>

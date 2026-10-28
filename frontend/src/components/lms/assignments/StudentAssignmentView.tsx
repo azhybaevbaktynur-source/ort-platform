@@ -23,6 +23,7 @@ import { fmtShortDateTime, isPast } from "@/components/lms/home/format";
 import { Button, Card, ConfirmDialog, ErrorState, LoadingState, PageHeader, Textarea, cn } from "@/components/ui";
 import { AssignmentError, AssignmentStatusBadge, KindIcon, LateBadge, fmtBytes, fmtPts, useAssignmentErrorText } from "./assignmentUi";
 import { studentAssignmentView } from "./studentAssignment";
+import { LockedState, isModuleLocked } from "@/components/lms/pages/ApiError"; // Phase 8a S5
 
 const draftKey = (id: string) => `ort_assignment_draft_${id}`;
 function readDraft(id: string): string {
@@ -130,7 +131,9 @@ export function StudentAssignmentView({ assignmentId }: { assignmentId: string }
     return (
       <div className="space-y-4">
         <Link href={`${base}/assignments`} className="inline-flex min-h-11 items-center text-sm font-medium text-brand-700 hover:underline sm:min-h-0">{t("assignments.backToList")}</Link>
-        <ErrorState title={missing ? t("assignments.submit.notFoundTitle") : undefined} message={errorText(loadError)} onRetry={missing ? undefined : () => void load()} />
+        {isModuleLocked(loadError) ? <LockedState error={loadError} courseId={course.id} /> /* Phase 8a S5: 423 module gate */ : (
+          <ErrorState title={missing ? t("assignments.submit.notFoundTitle") : undefined} message={errorText(loadError)} onRetry={missing ? undefined : () => void load()} />
+        )}
       </div>
     );
   }
