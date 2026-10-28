@@ -221,7 +221,21 @@ def course_student_out(course, enrollment, owner, organization_name: str = "") -
         home_kind=getattr(course, "home_kind", None) or "assignments",
         home_page_id=getattr(course, "home_page_id", None),
         # --- Phase 8a S1 end ---
+        features=_course_features(course),  # --- Phase 8a S3 --- (one line)
     )
+
+
+# --- Phase 8a S3 begin --- (student tabs, PHASE_8A_DESIGN 8.2: three EXISTS on the course's own session)
+def _course_features(course) -> CourseFeaturesOut:
+    from sqlalchemy.orm import object_session
+
+    db = object_session(course)
+    if db is None or getattr(course, "id", None) is None:
+        return CourseFeaturesOut()
+    from app.lms.courses.service import course_features
+
+    return course_features(db, course)
+# --- Phase 8a S3 end ---
 
 
 def course_staff_out(course, enrollment, owner, active_student_count: int, viewer_id: str,

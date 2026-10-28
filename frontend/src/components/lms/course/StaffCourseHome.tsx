@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ClipboardList, Library } from "lucide-react";
+import { ClipboardList, LayoutList, Library } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { leaveCourse } from "@/lib/lms/courses";
 import { pickLocalized } from "@/lib/lms/localized";
@@ -61,6 +61,18 @@ export function StaffCourseHome({ course }: { course: CourseStaffOut }) {
           </div>
         </Card>
       )}
+
+      {/* --- Phase 8a S4a: link to the module outline and what students see first (PHASE_8A_DESIGN 8.1) --- */}
+      <Card title={t("modules.staffHome.title")}
+        description={t(`modules.staffHome.body.${course.home_kind ?? "assignments"}`)}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <LinkButton variant="secondary" href={`${base}/modules`} leftIcon={<LayoutList className="h-4 w-4" aria-hidden="true" />}>
+            {t("modules.staffHome.open")}
+          </LinkButton>
+          {isTeacher && <LinkButton variant="link" href={`${base}/settings#course-home`}>{t("modules.staffHome.changeHome")}</LinkButton>}
+        </div>
+      </Card>
+      {/* --- Phase 8a S4a end --- */}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title={t("courses.home.about")}>

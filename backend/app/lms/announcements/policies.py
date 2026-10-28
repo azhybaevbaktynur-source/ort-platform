@@ -13,3 +13,10 @@ PLANNED_POLICIES: dict[tuple[str, str], str] = {
     ("POST", f"{_A}/publish"): "course:content.manage",
     ("DELETE", _A): "course:content.manage",
 }
+
+
+# --- Phase 8a S3 begin --- (the router is mounted in app/api/v1/router.py: the planned entries become real)
+ANNOUNCEMENT_POLICIES.update(PLANNED_POLICIES)
+# one announcement (the editor; staff shape for staff, published student shape otherwise)
+ANNOUNCEMENT_POLICIES[("GET", _A)] = "course:content.read"
+# --- Phase 8a S3 end ---

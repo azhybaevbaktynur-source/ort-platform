@@ -1,0 +1,137 @@
+[
+  {
+    "name": "sample_document",
+    "md": "# Lesson 1\n\nWelcome to **algebra**. Read *carefully*.\n\n## Formulas\n\nInline $a_1 * b_2 = c^2$ and display:\n\n$$\n\\sum_{i=1}^{n} x_i\n$$\n\n### List\n\n1. first\n2. second\n\n- dot\n- dash\n\n> quote line\n\n`code` and\n\n```python\nprint('<b>')\n```\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n---\n\n[site](https://example.com) [course](/courses/1) [mail](mailto:t@example.com)\n\n![diagram](/api/v1/media/0123abcd.webp)\n\nline one\nline two",
+    "html": "<h2>Lesson 1</h2>\n<p>Welcome to <strong>algebra</strong>. Read <em>carefully</em>.</p>\n<h2>Formulas</h2>\n<p>Inline $a_1 * b_2 = c^2$ and display:</p>\n<p>$$\n\\sum_{i=1}^{n} x_i\n$$</p>\n<h3>List</h3>\n<ol>\n<li>first</li>\n<li>second</li>\n</ol>\n<ul>\n<li>dot</li>\n<li>dash</li>\n</ul>\n<blockquote>\n<p>quote line</p>\n</blockquote>\n<p><code>code</code> and</p>\n<pre><code class=\"language-python\">print('&lt;b&gt;')\n</code></pre>\n<table>\n<thead>\n<tr>\n<th>a</th>\n<th>b</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>1</td>\n<td>2</td>\n</tr>\n</tbody>\n</table>\n<hr>\n<p><a href=\"https://example.com\" rel=\"noopener noreferrer\" target=\"_blank\">site</a> <a href=\"/courses/1\" rel=\"noopener noreferrer\">course</a> <a href=\"mailto:t@example.com\" rel=\"noopener noreferrer\">mail</a></p>\n<p><img alt=\"diagram\" src=\"/api/v1/media/0123abcd.webp\"></p>\n<p>line one<br>\nline two</p>"
+  },
+  {
+    "name": "heading_levels",
+    "md": "# h1\n\n##### h5\n\n###### h6",
+    "html": "<h2>h1</h2>\n<h4>h5</h4>\n<h4>h6</h4>"
+  },
+  {
+    "name": "script_tag",
+    "md": "<script>alert(1)</script>after",
+    "html": "<p>after</p>"
+  },
+  {
+    "name": "script_in_markdown_link_title",
+    "md": "[x](https://a.com \"<script>alert(1)</script>\")",
+    "html": "<p><a href=\"https://a.com\" title=\"&lt;script&gt;alert(1)&lt;/script&gt;\" rel=\"noopener noreferrer\" target=\"_blank\">x</a></p>"
+  },
+  {
+    "name": "onerror_attribute",
+    "md": "<img src=\"/api/v1/media/a.webp\" onerror=\"alert(1)\">",
+    "html": "<p><img src=\"/api/v1/media/a.webp\"></p>"
+  },
+  {
+    "name": "onclick_on_link",
+    "md": "<a href=\"https://a.com\" onclick=\"steal()\">x</a>",
+    "html": "<p><a href=\"https://a.com\" rel=\"noopener noreferrer\" target=\"_blank\">x</a></p>"
+  },
+  {
+    "name": "onmouseover_div",
+    "md": "<div onmouseover=alert(1)>hover</div>",
+    "html": "hover"
+  },
+  {
+    "name": "javascript_href_markdown",
+    "md": "[click](javascript:alert(1))",
+    "html": "<p><a rel=\"noopener noreferrer\">click</a></p>"
+  },
+  {
+    "name": "javascript_href_html_mixed_case",
+    "md": "<a href=\"JaVaScRiPt:alert(1)\">x</a>",
+    "html": "<p><a rel=\"noopener noreferrer\">x</a></p>"
+  },
+  {
+    "name": "javascript_href_entity",
+    "md": "<a href=\"&#106;avascript:alert(1)\">x</a>",
+    "html": "<p><a rel=\"noopener noreferrer\">x</a></p>"
+  },
+  {
+    "name": "vbscript_href",
+    "md": "<a href=\"vbscript:msgbox(1)\">x</a>",
+    "html": "<p><a rel=\"noopener noreferrer\">x</a></p>"
+  },
+  {
+    "name": "data_url_image",
+    "md": "![x](data:image/png;base64,iVBORw0KGgo=)",
+    "html": "<p><img alt=\"x\"></p>"
+  },
+  {
+    "name": "data_url_link",
+    "md": "[x](data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==)",
+    "html": "<p><a rel=\"noopener noreferrer\">x</a></p>"
+  },
+  {
+    "name": "external_image",
+    "md": "![x](https://evil.example/a.png)",
+    "html": "<p><img alt=\"x\"></p>"
+  },
+  {
+    "name": "protocol_relative_link",
+    "md": "[x](//evil.example/a)",
+    "html": "<p><a rel=\"noopener noreferrer\">x</a></p>"
+  },
+  {
+    "name": "svg_inline",
+    "md": "<svg onload=\"alert(1)\"><circle r=\"5\"/><script>alert(2)</script></svg>after",
+    "html": "<p>after</p>"
+  },
+  {
+    "name": "style_tag",
+    "md": "<style>body{display:none}</style>text",
+    "html": "<p>text</p>"
+  },
+  {
+    "name": "style_attribute",
+    "md": "<p style=\"background:url(javascript:alert(1))\">styled</p>",
+    "html": "<p>styled</p>"
+  },
+  {
+    "name": "iframe",
+    "md": "<iframe src=\"https://evil.example\"></iframe>after",
+    "html": "<p>after</p>"
+  },
+  {
+    "name": "object_embed",
+    "md": "<object data=\"x.swf\"></object><embed src=\"x.swf\">after",
+    "html": "<p>after</p>"
+  },
+  {
+    "name": "form_input",
+    "md": "<form action=\"https://evil.example\"><input name=\"p\"></form>text",
+    "html": "<p>text</p>"
+  },
+  {
+    "name": "raw_html_unknown_tags",
+    "md": "<marquee>moving</marquee> <font color=red>red</font> <b>bold</b>",
+    "html": "<p>moving red bold</p>"
+  },
+  {
+    "name": "html_comment",
+    "md": "a <!-- secret --> b",
+    "html": "<p>a  b</p>"
+  },
+  {
+    "name": "target_attribute_dropped",
+    "md": "<a href=\"/x\" target=\"_top\">x</a>",
+    "html": "<p><a href=\"/x\" rel=\"noopener noreferrer\">x</a></p>"
+  },
+  {
+    "name": "code_class",
+    "md": "<code class=\"language-js\">x</code> <code class=\"evil\">y</code>",
+    "html": "<p><code class=\"language-js\">x</code> <code>y</code></p>"
+  },
+  {
+    "name": "katex_survives",
+    "md": "Price $5 and $10. Math $x<y$ and $$\\frac{a}{b}$$ and $\\alpha_{1}$.",
+    "html": "<p>Price $5 and $10. Math $x&lt;y$ and $$\\frac{a}{b}$$ and $\\alpha_{1}$.</p>"
+  },
+  {
+    "name": "katex_multiline_display",
+    "md": "$$\na_1\n+ b_2\n$$",
+    "html": "<p>$$\na_1\n+ b_2\n$$</p>"
+  }
+]

@@ -64,4 +64,21 @@ export interface HomeOut {
   courses: HomeCourseOut[];
   courses_total: number;
   pending_invitations: number;
+  // --- Phase 8a S4a begin --- (PHASE_8A_DESIGN 7.2: "up next" in modules, read from the progress cache)
+  /** absent on a backend before Phase 8a */
+  modules_next?: HomeModuleNextOut[];
+  // --- Phase 8a S4a end ---
 }
+
+// --- Phase 8a S4a begin ---
+/** "Continue in *Course*: *Item*": the first unlocked item with an unmet requirement in one course. */
+export interface HomeModuleNextOut {
+  course_id: string;
+  course_title: LocalizedText;
+  module_id: string;
+  module_title?: LocalizedText;
+  item_id: string;
+  kind?: "page" | "file" | "assignment" | "url" | "header";
+  title: LocalizedText;
+}
+// --- Phase 8a S4a end ---

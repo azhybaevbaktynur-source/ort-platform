@@ -8,16 +8,23 @@ import { usePathname } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
 import type { CourseOut } from "@/lib/lms/types";
+import { useCourse } from "@/components/lms/CourseContext";
 import { PageHeader, Skeleton, TabsNav } from "@/components/ui";
 
 export function StudentCourseTabs({ courseId }: { courseId: string }) {
   const { lang, t } = useTranslation();
+  const features = useCourse().course.features; // Phase 8a S4a
   const pathname = usePathname();
   const base = `/${lang}/courses/${courseId}`;
   // --- Phase 7a S5: "Assignments" replaces the "Assessments" entry (the lobby URLs under /assessments stay and keep it active) ---
-  const tabs = [
+  // --- Phase 8a S4a: Modules / Files / Announcements only when the course has published content of that kind
+  // (`features`, PHASE_8A_DESIGN 8.2), so a course without structure (every ORT course today) keeps its tab row ---
+  const tabs: { href: string; label: string; exact?: boolean; also?: string }[] = [
     { href: base, label: t("courses.home.tab"), exact: true },
+    ...(features?.modules ? [{ href: `${base}/modules`, label: t("modules.tab") }] : []),
     { href: `${base}/assignments`, label: t("assignments.tab"), also: `${base}/assessments` },
+    ...(features?.files ? [{ href: `${base}/files`, label: t("courseFiles.title") }] : []),
+    ...(features?.announcements ? [{ href: `${base}/announcements`, label: t("announcements.title") }] : []),
     { href: `${base}/grades`, label: t("gradebook.tab") },
     { href: `${base}/people`, label: t("courses.people.tabStudent") },
   ];

@@ -250,6 +250,8 @@ export const LMS_ERROR_CODES = [
   "language_not_available", "attempt_closed", "section_closed", "section_not_current",
   "use_submit", "invalid_response", "payload_too_large", "results_not_available",
   "attempt_not_submitted", "points_out_of_range", "after_close_needs_until",
+  // Phase 8a S4a: module gating and course home (text in lms.errors.*)
+  "module_locked", "prerequisite_invalid", "prerequisite_order", "home_page_invalid",
 ] as const;
 export type LmsErrorCode = (typeof LMS_ERROR_CODES)[number];
 
@@ -283,3 +285,27 @@ export interface CourseCreateIn {
   template_key?: string | null;
 }
 // --- Phase 6 S4 end ---
+
+// --- Phase 8a S4a begin --- (course home and student tabs, docs/phases/PHASE_8A_DESIGN.md 5.5, 8.2; optional so an
+// older backend keeps today's layout)
+export type HomeKind = "modules" | "page" | "assignments";
+
+/** Which student tabs have published content (three EXISTS on the server). */
+export interface CourseFeaturesOut {
+  modules: boolean;
+  files: boolean;
+  announcements: boolean;
+}
+
+export interface CourseStudentOut {
+  /** `undefined` (older backend) behaves as `assignments`: today's course home. */
+  home_kind?: HomeKind;
+  home_page_id?: string | null;
+  features?: CourseFeaturesOut;
+}
+
+export interface CourseUpdateIn {
+  home_kind?: HomeKind;
+  home_page_id?: string | null;
+}
+// --- Phase 8a S4a end ---

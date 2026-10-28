@@ -62,6 +62,29 @@ class HomeCourseOut(BaseModel):
     in_progress: bool
 
 
+# --- Phase 8a S3 begin --- (PHASE_8A_DESIGN 5.4, 6.7, 8.1: "continue in course" strip and announcements)
+from app.lms.announcements.schemas import AnnouncementHomeOut  # noqa: E402
+from app.lms.modules.schemas import ItemLinkOut  # noqa: E402
+
+MODULES_NEXT_MAX = 3
+
+
+class HomeModuleNextOut(BaseModel):
+    """"Continue in *course*: *item*": per course, the first visible item with an unmet requirement in the first
+    open (`unlocked`/`started`) published module that has one. Read from the stored caches only (`module_progress`,
+    `item_requirement_status`; never evaluates, design 6.7). Titles are `{lang: text}`."""
+    course_id: uuid.UUID
+    course_title: dict
+    module_id: uuid.UUID
+    module_title: dict
+    state: str
+    item_id: uuid.UUID
+    kind: str
+    title: dict
+    link: Optional[ItemLinkOut] = None
+# --- Phase 8a S3 end ---
+
+
 class HomeOut(BaseModel):
     in_progress: list[HomeInProgressOut]
     next_up: list[HomeNextUpOut]
@@ -69,9 +92,17 @@ class HomeOut(BaseModel):
     courses: list[HomeCourseOut]
     courses_total: int  # all active student courses; `courses` holds at most COURSES_MAX of them
     pending_invitations: int
+    # --- Phase 8a S3 begin ---
+    modules_next: list[HomeModuleNextOut] = []
+    announcements: list[AnnouncementHomeOut] = []  # latest three, never a body
+    # --- Phase 8a S3 end ---
 
 
 HOME_KEYS = frozenset(HomeOut.model_fields)
+# --- Phase 8a S3 begin ---
+MODULES_NEXT_KEYS = frozenset(HomeModuleNextOut.model_fields)
+ANNOUNCEMENT_KEYS = frozenset(AnnouncementHomeOut.model_fields)
+# --- Phase 8a S3 end ---
 IN_PROGRESS_KEYS = frozenset(HomeInProgressOut.model_fields)
 NEXT_UP_KEYS = frozenset(HomeNextUpOut.model_fields)
 RESULT_KEYS = frozenset(HomeResultOut.model_fields)
