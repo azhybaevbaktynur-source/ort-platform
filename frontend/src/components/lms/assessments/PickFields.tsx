@@ -2,21 +2,24 @@
 
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
-import { listBanks } from "@/lib/lms/content";
+import { listSharedBanks } from "@/lib/lms/quizEditor"; // Phase 7c S3
 import { DIFFICULTIES, QUESTION_TYPES, type BankOut, type Difficulty, type QuestionType } from "@/lib/lms/contentTypes";
 import { useTemplateUi } from "@/lib/lms/templates";
 import type { PickFilter } from "@/lib/lms/assessmentTypes";
 import { inputCls, labelCls } from "@/components/lms/content/ui";
 import { ContentError } from "@/components/lms/content/ContentError";
 
-/** Loads the course banks once (first 100) for pickers. */
+/**
+ * Loads the course banks once (first 100) for pickers. Phase 7c S3 (PHASE_7C_DESIGN 16): shared banks only; a quiz
+ * bank is private to its quiz (the server refuses `quiz_bank_private`), so it is never offered here.
+ */
 export function useBanks(courseId: string, enabled = true) {
   const [banks, setBanks] = useState<BankOut[]>([]);
   const [error, setError] = useState<unknown>(null);
   useEffect(() => {
     if (!enabled) return;
     let alive = true;
-    listBanks(courseId, { limit: 100 }).then((p) => { if (alive) setBanks(p.items); }).catch((e) => { if (alive) setError(e); });
+    listSharedBanks(courseId, { limit: 100 }).then((p) => { if (alive) setBanks(p.items); }).catch((e) => { if (alive) setError(e); });
     return () => { alive = false; };
   }, [courseId, enabled]);
   return { banks, error };
