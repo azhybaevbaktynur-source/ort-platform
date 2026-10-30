@@ -163,6 +163,13 @@ PHASE_9_PLANNED_POLICIES: dict[str, dict[tuple[str, str], str]] = {
         ("POST", f"{_P9_C}/students/invitations/{{invitation_id}}/resend"): "course:roster.manage+ratelimit",
     },
 }
+# --- Phase 9 S2 begin --- (S2 routes are mounted: their rows live in organizations/policies.py ORG_POLICIES,
+# platform_admin/organizations_policies.py and content/shared_banks_policies.py; the planned S2 rows are dropped)
+from app.lms.content.shared_banks_policies import SHARED_BANK_POLICIES  # noqa: E402
+
+ROUTE_POLICIES.update(SHARED_BANK_POLICIES)
+PHASE_9_PLANNED_POLICIES.pop("S2", None)
+# --- Phase 9 S2 end ---
 # `org_admin+ratelimit` is the one policy label Phase 9 adds (roster imports, design 5).
 POLICY_NAMES = POLICY_NAMES | frozenset({"org_admin+ratelimit"})
 # --- Phase 9 S1 end ---
