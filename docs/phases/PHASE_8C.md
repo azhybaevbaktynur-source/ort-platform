@@ -79,4 +79,6 @@ Student view uses the `X-View-As: student` header. `core/authz.py` matches it by
 - These existing specs were updated for the new navigation: `modules`, `quiz-editor`, `exam-constructor`, `scrolling-player`, `ort` and `ort-visual`.
 
 ## Deploy
-(filled in after the gates and the deploy)
+- Gates on merged `phase-8c` (a43853d + report): SQLite 3491 passed / 42 skipped; PG 3560 passed / 22 skipped; fresh PG `alembic upgrade head && alembic check` clean (head stays 0013); PG migration tests 36 passed; importers diff empty; i18n parity OK (3765 keys); `tsc` clean; `next build` OK; e2e `course-nav`, `modules`, `quiz-editor`, `exam-constructor`, `scrolling-player`, `ort`, `ort-visual` green twice (ORT zero diffs against the re-recorded frame baselines).
+- No Neon backup branch: no model, migration or DB file changed (rule 7); Neon branch slots 9/10.
+- `phase-8c` → `lms` (d42a41f) → `main` (ff508a8). `/health` = ff508a8 (backend reinstalled with `fastapi==0.141.1`); Neon `alembic_version` = `0013_phase8b_template_sandbox`; data intact (300 question versions, 2 ORT exams, 3 courses).
