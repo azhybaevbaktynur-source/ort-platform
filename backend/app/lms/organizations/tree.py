@@ -145,6 +145,15 @@ def trees_scope(root_ids: Iterable):
         or_(*(within_clause(Organization.path, r) for r in roots)), Organization.deleted_at.is_(None))
 
 
+def suspended_on_path(db: Session, org: Organization) -> bool:
+    """Phase 9 fix 2 (M1): True when `org` or any of its ancestors (from `path`) is suspended, in one query. Suspension
+    is stored only on the suspended row and inherited downwards, so a write into a department checks the whole path
+    (a suspended department is read-only, the same as a suspended root)."""
+    ids_ = ancestor_ids(org.path) or [org.id]
+    return bool(db.execute(select(exists().where(
+        Organization.id.in_(ids_), Organization.status == "suspended"))).scalar())
+
+
 def load_root(db: Session, org: Organization, *, for_update: bool = False) -> Organization:
     """The root of `org`'s tree (`org` itself for a root). `for_update` serializes tree writes per root (4.1)."""
     rid = root_id(org.path)

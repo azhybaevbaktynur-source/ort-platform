@@ -18,12 +18,13 @@ status `partial`); emails are sent after the response. The raw file is never sto
 line numbers and codes only, never a cell value.
 
 Limits: `roster_upload_1h` (dry runs, per actor), `roster_import_1d` 5 applies and `roster_rows_1d` 1,000 applied rows
-per tree, checked before any write."""
+per tree, checked before any write and counted once the claim succeeded (a 409 loser spends nothing)."""
 from __future__ import annotations
 
 import csv
 import hashlib
 import io
+import logging
 import os
 import re
 import uuid
@@ -53,10 +54,11 @@ from app.lms.organizations import defaults, ids
 from app.lms.organizations.models import Organization, OrganizationMember
 from app.lms.organizations.roster_models import RosterImport
 from app.lms.organizations.schemas import RosterImportOut, roster_import_out
-from app.lms.organizations.tree import is_within, load_root, subtree_scope
+from app.lms.organizations.tree import is_within, load_root, subtree_scope, suspended_on_path
 from app.models.user import User
 
 router = APIRouter(tags=["Roster imports"])
+logger = logging.getLogger(__name__)
 
 ROSTER_UPLOAD_1H = Limit("roster_upload_1h", 30, 3600)  # dry runs, per actor
 ROSTER_IMPORT_1D = Limit("roster_import_1d", ids.ROSTER_IMPORTS_PER_DAY, 86400)  # applies, per tree
@@ -292,9 +294,23 @@ def report_of(rows: list[RosterRow]) -> list[dict]:
 
 def _ensure_writable(db: Session, user: User, org: Organization) -> Organization:
     root = load_root(db, org)
-    if root.status != "active" and not user.is_platform_admin:
+    if not user.is_platform_admin and suspended_on_path(db, org):  # Phase 9 fix 2 (M1): the whole path counts
         raise Forbidden("Organization is suspended", code="organization_suspended")
     return root
+
+
+def _check_budget(key: str, rule: Limit, n: int) -> None:
+    """Read only: 429 when `n` more events of `rule` would not fit in the current window (Phase 9 fix 2, L3)."""
+    if n <= 0:
+        return
+    now = ratelimit._now()
+    ws = ratelimit._window(now, rule)
+    t = ratelimit.RateLimitBucket.__table__
+    with ratelimit._engine().connect() as conn:
+        current = conn.execute(select(t.c.count).where(
+            t.c.key == ratelimit._bucket_key(key, rule), t.c.window_start == ws)).scalar_one_or_none() or 0
+    if current + n > rule.limit:
+        raise RateLimited("Too many requests", details={"retry_after_seconds": max(1, ws + rule.window_seconds - now)})
 
 
 def _clean_name(name: Optional[str]) -> str:
@@ -398,13 +414,11 @@ def apply(db: Session, user: User, org: Organization, import_id: uuid.UUID, *, r
     dept = resolve_department(db, org, department_id) if kind == "teacher" else None
     if kind == "student":
         students.ensure_student_invitations_enabled(db, org)
-    # limits before any write (a refusal counts nothing)
+    # limits checked before any write (a refusal counts nothing); counted only once the claim below succeeded, so
+    # the loser of a concurrent apply (409 `already_applied`) spends no budget (Phase 9 fix 2, L3)
     db.rollback()
-    allowed, retry = ratelimit.peek(f"roster_import:{root.id}", ROSTER_IMPORT_1D)
-    if not allowed:
-        raise RateLimited("Too many requests", details={"retry_after_seconds": retry})
-    students.hit_many(f"roster_rows:{root.id}", ROSTER_ROWS_1D, row_count)
-    students.hit_many(f"roster_import:{root.id}", ROSTER_IMPORT_1D, 1)
+    _check_budget(f"roster_import:{root.id}", ROSTER_IMPORT_1D, 1)
+    _check_budget(f"roster_rows:{root.id}", ROSTER_ROWS_1D, row_count)
 
     # claim the (organization, kind, target, file) slot: the partial unique indexes admit one applied import
     row = _load_import(db, org, import_id, for_update=True)
@@ -421,6 +435,16 @@ def apply(db: Session, user: User, org: Organization, import_id: uuid.UUID, *, r
         twin = _applied_twin(db, fresh)
         raise Conflict("This file was already applied", code=ids.E_ALREADY_APPLIED,
                        details={"import_id": str(twin.id) if twin else None}) from None
+    # count the budget now (each hit refuses atomically past the limit). Another apply of the tree may have used it
+    # since the check: then the claim is released and nothing is written (a rare race may count rows it refused).
+    try:
+        students.hit_many(f"roster_rows:{root.id}", ROSTER_ROWS_1D, row_count)
+        students.hit_many(f"roster_import:{root.id}", ROSTER_IMPORT_1D, 1)
+    except RateLimited:
+        row = _load_import(db, org, import_id, for_update=True)
+        row.status, row.applied_at = "dry_run", None
+        db.commit()
+        raise
 
     parsed = parse_roster(raw, kind)
     course = resolve_course(db, org, course_id) if kind == "student" else None
@@ -445,8 +469,10 @@ def apply(db: Session, user: User, org: Organization, import_id: uuid.UUID, *, r
                         language=language, now=now, roster_import_id=import_id)
                     created.append((invitation, token))
             db.commit()
-        except Exception:  # one failed chunk never stops the others (design 4.4)
+        except Exception as e:  # one failed chunk never stops the others (design 4.4)
             db.rollback()
+            # Phase 9 fix 2 (L4): the type only, a DBAPI message may carry the email parameters
+            logger.warning("roster chunk failed: %s", type(e).__name__)
             for r in chunk:
                 r.result, r.error_code = "failed", "write_failed"
             continue

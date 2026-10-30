@@ -155,8 +155,11 @@ def load_org_for_admin(db: Session, user: User, organization_id: uuid.UUID, *, w
         Organization.id == organization_id, Organization.deleted_at.is_(None))).scalar_one_or_none()
     if org is None or not (user.is_platform_admin or is_org_admin(db, org.id, user.id)):
         raise org_not_found()
-    if write and org.status == "suspended" and not user.is_platform_admin:
-        raise org_suspended_error()
+    if write and not user.is_platform_admin:
+        from app.lms.organizations.tree import suspended_on_path
+
+        if suspended_on_path(db, org):  # Phase 9 fix 2 (M1): a suspended ancestor makes the department read-only
+            raise org_suspended_error()
     return org
 
 

@@ -16,7 +16,7 @@ from typing import Optional
 from fastapi import Request
 from sqlalchemy import and_, func, select, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from app.core.authz import A, AuthzContext, can, enrollment_role_resolver
 from app.lms.audit import service as audit
@@ -33,6 +33,7 @@ from app.lms.invitations.schemas import (
     InvitationAcceptOut, InvitationCreatedOut, InvitationLookupOut, InvitationOut, MyInvitationOut,
 )
 from app.lms.organizations.models import Invitation, Organization, OrganizationMember
+from app.lms.organizations.tree import suspended_on_path
 from app.models.user import User
 
 INVITATION_TTL = timedelta(days=14)
@@ -152,7 +153,10 @@ def item_out(inv: Invitation, course_title: Optional[dict], inviter: Optional[Us
 
 
 def _ensure_active_org(org: Organization) -> None:
-    if org.status != "active":
+    """Phase 9 fix 2 (M1): the organization or any ancestor on its path suspended -> 403 (read from the org's own
+    session, so every caller gets the inherited check)."""
+    db = object_session(org)
+    if org.status != "active" or (db is not None and suspended_on_path(db, org)):
         raise Forbidden("Organization is suspended", code="organization_suspended")
 
 
@@ -528,7 +532,7 @@ def accept(db: Session, user: User, token: str, *, ip_hash: Optional[str],
             raise _accept_failure(db, ip_hash, not_found_invitation())
         raise _accept_failure(db, ip_hash, Forbidden("This invitation is for another email address",
                                                      code="invitation_email_mismatch"))
-    if org.status != "active":
+    if org.status != "active" or suspended_on_path(db, org):  # Phase 9 fix 2 (M1): a suspended ancestor too
         db.rollback()
         raise Forbidden("Organization is suspended", code="organization_suspended")
     course = _course_of(db, inv)
