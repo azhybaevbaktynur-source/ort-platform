@@ -19,8 +19,9 @@ export function StudentViewBanner({ courseId }: { courseId: string }) {
     <div role="status"
       className="sticky top-0 z-30 -mx-4 mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-y border-warning-200 bg-warning-50 px-4 py-2.5 text-sm leading-6 text-warning-900 sm:mx-0 sm:rounded-xl sm:border">
       <Eye aria-hidden="true" className="h-4 w-4 shrink-0" />
-      <p className="min-w-0 flex-1">{t("studentView.banner")}</p>
-      <Button size="sm" variant="secondary" onClick={() => { setStudentView(courseId, false); reload(); }}>
+      {/* Phase 8c UX M2: on phones the text takes its own line and the button sits below it at full width */}
+      <p className="min-w-0 flex-1 basis-[calc(100%-1.75rem)] sm:basis-auto">{t("studentView.banner")}</p>
+      <Button size="sm" variant="secondary" className="w-full sm:w-auto" onClick={() => { setStudentView(courseId, false); reload(); }}>
         {t("studentView.leave")}
       </Button>
     </div>

@@ -109,3 +109,4 @@ owner. Never to make a failing run green without looking.
 ## History
 
 - 2026-10-28: teacher-* re-recorded for Phase 8a staff course tabs (approved; before/after in docs/phases/PHASE_8A_screens/ort-review/)
+- 2026-10-31: lobby-* and teacher-* frame screens re-recorded for Phase 8c course sidebar (approved; before/after in docs/phases/PHASE_8C_screens/ort-before-after/)

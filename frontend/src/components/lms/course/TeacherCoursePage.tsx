@@ -6,26 +6,21 @@
 // (`StaffAssessmentList`, same content) with the To do panel, and the outline below in a collapsed "Course structure"
 // section. The course title (`StaffCourseBar`) is the page `<h1>`; no dashboard cards, no About card.
 import React, { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
-import { leaveCourse } from "@/lib/lms/courses";
-import { pickLocalized } from "@/lib/lms/localized";
 import type { ModuleStaffOut } from "@/lib/lms/modulesTypes";
 import { templateUi } from "@/lib/lms/templates";
 import type { CourseStaffOut } from "@/lib/lms/types";
-import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { StaffAssessmentList } from "@/components/lms/assessments/StaffAssessmentList";
 import { ModuleOutlineEditor } from "@/components/lms/modules/ModuleOutlineEditor";
-import { Button, ConfirmDialog, cn, focusRing } from "@/components/ui";
+import { cn, focusRing } from "@/components/ui";
 import { TodoPanel } from "./TodoPanel";
 import { UnsortedGroup } from "./UnsortedGroup";
 
 const STRUCTURE_KEY = (courseId: string) => `coursePage.structure:${courseId}`;
 
 export function TeacherCoursePage({ course }: { course: CourseStaffOut }) {
-  const { lang, t } = useTranslation();
-  const router = useRouter();
+  const { t } = useTranslation();
   const ui = templateUi(course);
   const ortCourse = ui.locked && ui.key === "ort";
   const canEdit = course.status !== "concluded";
@@ -34,9 +29,6 @@ export function TeacherCoursePage({ course }: { course: CourseStaffOut }) {
   const [sideKey, setSideKey] = useState(0);
   const [unsortedOpen, setUnsortedOpen] = useState(true);
   const [structureOpen, setStructureOpen] = useState(!ortCourse);
-  const [leaving, setLeaving] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<unknown>(null);
 
   // ORT: the "Course structure" section remembers its state per tab; a `#m-…` link (Back from an object, To do)
   // opens it
@@ -63,18 +55,6 @@ export function TeacherCoursePage({ course }: { course: CourseStaffOut }) {
     window.requestAnimationFrame(() => document.getElementById("unsorted")?.scrollIntoView({ block: "start", behavior: "smooth" }));
   };
 
-  const leave = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await leaveCourse(course.id);
-      router.push(`/${lang}/courses`);
-    } catch (e) {
-      setError(e);
-      setBusy(false);
-    }
-  };
-
   const outline = (
     <ModuleOutlineEditor embedded refreshKey={outlineKey} onChanged={onOutlineChanged} onModules={setModules} onAddExisting={openUnsorted}
       afterModules={(
@@ -91,9 +71,12 @@ export function TeacherCoursePage({ course }: { course: CourseStaffOut }) {
       {course.status === "concluded" && (
         <p role="status" className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-700">{t("courses.home.concludedNotice")}</p>
       )}
-      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-8">
-        <TodoPanel course={course} refreshKey={sideKey} className="lg:sticky lg:top-6 lg:col-start-2 lg:row-start-1" />
-        <div className="min-w-0 space-y-6 lg:col-start-1 lg:row-start-1">
+      {/* Phase 8c UX M7 (decided b): ORT keeps the full content width for the locked exam list; To do is the one-line
+          form above it at every width, never a column */}
+      <div className={cn("flex flex-col gap-4", !ortCourse && "lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-8")}>
+        <TodoPanel course={course} refreshKey={sideKey} compact={ortCourse}
+          className={ortCourse ? undefined : "lg:sticky lg:top-6 lg:col-start-2 lg:row-start-1"} />
+        <div className={cn("min-w-0 space-y-6", !ortCourse && "lg:col-start-1 lg:row-start-1")}>
           {ortCourse ? (
             <>
               <StaffAssessmentList embedded />
@@ -112,17 +95,9 @@ export function TeacherCoursePage({ course }: { course: CourseStaffOut }) {
               </div>
             </>
           ) : outline}
-          {!course.is_owner && (
-            <div>
-              <Button variant="link" className="text-danger-700 hover:text-danger-800" onClick={() => setLeaving(true)}>{t("courses.home.leave")}</Button>
-            </div>
-          )}
+          {/* Phase 8c UX m9: no "Leave course" on the teacher Course page */}
         </div>
       </div>
-      <ConfirmDialog open={leaving} tone="danger" busy={busy} title={t("courses.home.leaveTitle")}
-        object={pickLocalized(course.title, lang, course.default_language) || t("courses.list.untitled")}
-        effect={t("courses.home.leaveBody")} error={error ? <ErrorMessage error={error} /> : undefined}
-        confirmLabel={t("courses.home.leave")} onConfirm={() => void leave()} onCancel={() => setLeaving(false)} />
     </div>
   );
 }

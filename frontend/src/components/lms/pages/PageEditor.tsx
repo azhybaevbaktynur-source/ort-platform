@@ -149,21 +149,15 @@ export function PageEditor({ pageId, embedded = false, onPage }: {
   if (loading) return <LoadingState />;
   if (loadError) return <ContentError error={loadError} />;
 
-  const saveButton = <Button onClick={() => void save()} loading={saving} disabled={!canSave}>{t("common.save")}</Button>;
   return (
     <div className="max-w-4xl">
-      {embedded ? (
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
-          {dirty && <p role="status" className="text-sm text-slate-600 sm:mr-auto">{t("pages.object.unsaved")}</p>}
-          {saveButton}
-        </div>
-      ) : (
+      {/* one Save: the sticky footer below (8c UX m6) */}
+      {embedded ? null : (
         <>
           <BackLink nav={nav} />
           <PageHeader
             title={page ? t("pages.editor.editTitle") : t("pages.editor.newTitle")}
             badge={page ? <Badge tone={page.published ? "success" : "neutral"}>{t(page.published ? "pages.published" : "pages.draft")}</Badge> : undefined}
-            primaryAction={saveButton}
           />
         </>
       )}
@@ -202,7 +196,9 @@ export function PageEditor({ pageId, embedded = false, onPage }: {
         )}
 
         <MarkdownField courseId={course.id} label={t("pages.editor.fieldBody")} value={body} max={PAGE_BODY_MAX} onChange={(v) => { setBody(v); setDirty(true); }} />
-        <div className="flex justify-end">
+        {/* Phase 8c UX m6: a sticky footer Save, so a long body never hides the action */}
+        <div className="sticky bottom-0 z-10 -mx-4 flex flex-col gap-2 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:mx-0 sm:flex-row sm:items-center sm:justify-end sm:rounded-xl sm:px-3 [&>button]:w-full sm:[&>button]:w-auto">
+          {dirty && <p role="status" className="text-sm text-slate-600 sm:mr-auto">{t("pages.object.unsaved")}</p>}
           <Button onClick={() => void save()} loading={saving} disabled={!canSave}>{t("common.save")}</Button>
         </div>
       </div>

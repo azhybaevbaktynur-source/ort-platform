@@ -62,6 +62,8 @@ export function StaffCourseBar({ course, titleAsHeading = false, studentViewButt
             </Link>
             <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400" />
           </li>
+          {/* Phase 8c UX m4: on the Course page the course name is the current crumb (no dangling chevron) */}
+          {titleAsHeading && <li aria-current="page" className="min-w-0 break-words text-slate-700">{title}</li>}
         </ol>
       </nav>
       <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-2">

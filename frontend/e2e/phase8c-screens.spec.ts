@@ -98,6 +98,12 @@ test.describe("phase 8c screens", () => {
         await page.goto(`/${lang}/courses/${ids.empty}`);
         await expect(page.getByText(tl("modules.editor.emptyTitle"))).toBeVisible();
         await shoot(page, "teacher-course-empty", vp, lang);
+        if (vp === "phone") {
+          // 8c UX m10: the drawer of the empty course, so the "hidden from students" marks show
+          await page.getByRole("button", { name: new RegExp(`^${tl("courseNav.menu")}`) }).click();
+          await shoot(page, "teacher-drawer", vp, lang);
+          await page.keyboard.press("Escape");
+        }
         // filled course page: sidebar (desktop) / drawer button (phone), outline, Unsorted, To do
         await page.goto(base);
         await expect(page.getByRole("heading", { name: tl("todo.title") }).first()).toBeVisible().catch(() => null);
@@ -105,10 +111,6 @@ test.describe("phase 8c screens", () => {
         await shoot(page, "teacher-course-filled", vp, lang);
         await shoot(page, "teacher-course-filled-full", vp, lang, true);
         if (vp === "phone") {
-          const menu = page.getByRole("button", { name: new RegExp(`^${tl("courseNav.menu")}`) });
-          await menu.click();
-          await shoot(page, "teacher-drawer", vp, lang);
-          await page.keyboard.press("Escape");
           // the collapsed To do line, then expanded
           const line = page.getByRole("button", { expanded: false }).filter({ hasText: /\d/ }).first();
           if (await line.count()) { await line.scrollIntoViewIfNeeded(); await shoot(page, "teacher-todo-collapsed", vp, lang); await line.click(); await shoot(page, "teacher-todo-expanded", vp, lang); }
@@ -193,8 +195,8 @@ test.describe("phase 8c screens", () => {
         await expect(e.page.getByText(tl("courseNav.unavailable.title"))).toBeVisible();
         await shoot(e.page, "student-not-available", vp, lang);
         await e.ctx.close();
-        // the assistant's Student view: banner
-        const a = await ctxPage(browser, c.students.assistant, vp, lang);
+        // the owner teacher's Student view (8c fix 2): banner
+        const a = await ctxPage(browser, c.teacher, vp, lang);
         await a.page.goto(base);
         await a.page.getByRole("button", { name: tl("studentView.button") }).click();
         await expect(a.page.getByRole("status").filter({ hasText: tl("studentView.banner") })).toBeVisible();

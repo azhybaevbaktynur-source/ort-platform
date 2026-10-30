@@ -92,11 +92,15 @@ function PublishToggle({ published, name, busy, disabled, onToggle }: {
   );
 }
 
-/** Drag handle for pointer devices (≥ lg). Hidden from assistive tech: the "⋯" menu's Move entries do the same. */
-function DragHandle({ label, onStart, onEnd }: { label: string; onStart: (e: React.DragEvent) => void; onEnd: () => void }) {
+/** Drag handle for pointer devices (≥ lg). Hidden from assistive tech: the "⋯" menu's Move entries do the same.
+ * Phase 8c UX M1: shown only while its module header (`group/mod`) or item row (`group/row`) is hovered or holds focus. */
+function DragHandle({ label, onStart, onEnd, scope }: {
+  label: string; onStart: (e: React.DragEvent) => void; onEnd: () => void; scope: "mod" | "row";
+}) {
   return (
     <span draggable aria-hidden="true" title={label} onDragStart={onStart} onDragEnd={onEnd}
-      className="hidden h-11 w-6 shrink-0 cursor-grab items-center justify-center text-slate-400 hover:text-slate-700 active:cursor-grabbing lg:inline-flex">
+      className={cn("hidden h-11 w-6 shrink-0 cursor-grab items-center justify-center text-slate-400 hover:text-slate-700 active:cursor-grabbing lg:inline-flex lg:opacity-0 lg:transition-opacity",
+        scope === "mod" ? "lg:group-hover/mod:opacity-100 lg:group-focus-within/mod:opacity-100" : "lg:group-hover/row:opacity-100 lg:group-focus-within/row:opacity-100")}>
       <GripVertical className="h-5 w-5" />
     </span>
   );
@@ -334,9 +338,22 @@ export function ModuleOutlineEditor({ embedded = false, refreshKey = 0, onChange
     return null;
   };
 
+  /** Phase 8c UX M4: the icon toggle and the menu entry; a toast names the new state. */
+  const publishToast = (published: boolean, title: string) =>
+    (published ? t("modules.editor.toastPublished", { title }) : t("modules.editor.toastUnpublished", { title }));
+  const toggleModulePublished = (m: ModuleStaffOut) => {
+    // 8a UX M1: publishing a module whose requirement points at a draft asks first
+    if (!m.published && ignoredReqItems(m).length > 0) { setDialogError(null); setDialog({ kind: "publishWarn", module: m, names: ignoredNames(m) }); return; }
+    void run(`pub-${m.id}`, () => updateModule(course.id, m.id, { published: !m.published }), { success: publishToast(!m.published, moduleName(m)) });
+  };
+  const toggleItemPublished = (m: ModuleStaffOut, it: ItemStaffOut) => {
+    void run(`ip-${it.id}`, () => updateItem(course.id, m.id, it.id, { published: !it.published }), { success: publishToast(!it.published, itemName(it)) });
+  };
+
   const onModuleMenu = (m: ModuleStaffOut, mi: number, id: string) => {
     setDialogError(null);
-    if (id === "settings") setDialog({ kind: "settings", module: m });
+    if (id === "publish") toggleModulePublished(m);
+    else if (id === "settings") setDialog({ kind: "settings", module: m });
     else if (id === "prereq") setDialog({ kind: "prereq", module: m });
     else if (id === "duplicate") void run(`dup-${m.id}`, () => duplicateModule(course.id, m.id), { success: t("modules.editor.duplicated") });
     else if (id === "up") moveModuleTo(mi, mi - 1);
@@ -347,7 +364,8 @@ export function ModuleOutlineEditor({ embedded = false, refreshKey = 0, onChange
   };
   const onItemMenu = (m: ModuleStaffOut, item: ItemStaffOut, ii: number, id: string) => {
     setDialogError(null);
-    if (id === "edit") setDialog({ kind: "editItem", item });
+    if (id === "publish") toggleItemPublished(m, item);
+    else if (id === "edit") setDialog({ kind: "editItem", item });
     else if (id === "requirement") setDialog({ kind: "requirement", item });
     else if (id === "up") moveItemTo(m, ii, ii - 1);
     else if (id === "down") moveItemTo(m, ii, ii + 1);
@@ -462,10 +480,10 @@ export function ModuleOutlineEditor({ embedded = false, refreshKey = 0, onChange
               className={cn("scroll-mt-24 rounded-2xl border bg-white shadow-sm",
                 dropTarget ? "border-brand-500 ring-2 ring-brand-200" : "border-slate-200",
                 drag?.type === "module" && drag.id === m.id && "opacity-60")}>
-              <header className="space-y-2 px-2 py-2 sm:px-3">
+              <header className="group/mod space-y-2 px-2 py-2 sm:px-3">
                 <div className="flex items-start gap-1">
                   {canEdit && (
-                    <DragHandle label={t("modules.editor.dragHandle", { title: name })} onEnd={endDrag}
+                    <DragHandle scope="mod" label={t("modules.editor.dragHandle", { title: name })} onEnd={endDrag}
                       onStart={startDrag({ type: "module", id: m.id }, `m-${m.id}`)} />
                   )}
                   <button type="button" aria-expanded={!isCollapsed} aria-controls={itemsId} onClick={() => toggleCollapsed(m.id)}
@@ -488,22 +506,22 @@ export function ModuleOutlineEditor({ embedded = false, refreshKey = 0, onChange
                   {canEdit && (
                     <div className="flex shrink-0 items-center gap-1">
                       <PublishToggle published={m.published} name={name} busy={busy === `pub-${m.id}`}
-                        onToggle={() => {
-                          // 8a UX M1: publishing a module whose requirement points at a draft asks first
-                          if (!m.published && ignoredReqItems(m).length > 0) { setDialogError(null); setDialog({ kind: "publishWarn", module: m, names: ignoredNames(m) }); return; }
-                          void run(`pub-${m.id}`, () => updateModule(course.id, m.id, { published: !m.published }));
-                        }} />
-                      {addMenu(m, { className: "hidden sm:block" })}
-                      <OutlineMenu label={t("modules.editor.actions")} onSelect={(id) => onModuleMenu(m, mi, id)} groups={[{
+                        onToggle={() => toggleModulePublished(m)} />
+                      {/* an empty module has one "+ Add": the footer one (M1) */}
+                      {items.length > 0 && addMenu(m, { className: "hidden sm:block" })}
+                      <OutlineMenu label={t("modules.editor.actions")} sheetTitle={t("modules.editor.actionsFor", { title: name })}
+                        onSelect={(id) => onModuleMenu(m, mi, id)} groups={[{
                         id: "module", items: [
+                          { id: "publish", label: m.published ? t("modules.editor.unpublish") : t("modules.editor.publish"), disabled: !!busy },
                           { id: "settings", label: t("modules.editor.editSettings") },
-                          { id: "prereq", label: t("modules.editor.prerequisites"), disabled: mi === 0 },
+                          // Phase 8c UX m3: the first module has no Prerequisites and no Move up
+                          ...(mi > 0 ? [{ id: "prereq", label: t("modules.editor.prerequisites") }] : []),
                           { id: "duplicate", label: t("modules.editor.duplicate"), disabled: !!busy },
-                          { id: "up", label: t("modules.editor.moveUp"), disabled: mi === 0 || !!busy },
+                          ...(mi > 0 ? [{ id: "up", label: t("modules.editor.moveUp"), disabled: !!busy }] : []),
                           { id: "down", label: t("modules.editor.moveDown"), disabled: mi === live.length - 1 || !!busy },
                           { id: "reapply", label: t("modules.editor.reapply") },
                           { id: "progress", label: t("modules.progress.open") },
-                          { id: "delete", label: t("modules.editor.delete") },
+                          { id: "delete", label: t("modules.editor.delete"), danger: true },
                         ],
                       }]} />
                     </div>
@@ -535,11 +553,11 @@ export function ModuleOutlineEditor({ embedded = false, refreshKey = 0, onChange
                         it.kind === "header" ? "font-semibold uppercase tracking-wide text-slate-700" : "font-medium text-slate-900");
                       return (
                         <li key={it.id} id={`mi-${it.id}`} onDragOver={canEdit ? onItemDragOver(it) : undefined} onDrop={canEdit ? onItemDrop(m, ii) : undefined}
-                          className={cn("flex items-start gap-1 px-2 py-1.5 sm:px-3", pad,
+                          className={cn("group/row flex items-start gap-1 px-2 py-1.5 sm:px-3", pad,
                             over === `i:${it.id}` && "shadow-[inset_0_2px_0_0_theme(colors.brand.500)]",
                             drag?.type === "item" && drag.id === it.id && "opacity-60")}>
                           {canEdit && (
-                            <DragHandle label={t("modules.editor.dragHandle", { title: iname })} onEnd={endDrag}
+                            <DragHandle scope="row" label={t("modules.editor.dragHandle", { title: iname })} onEnd={endDrag}
                               onStart={startDrag({ type: "item", id: it.id, moduleId: m.id }, `mi-${it.id}`)} />
                           )}
                           <ItemKindIcon kind={it.kind} assignmentKind={it.target?.assignment_kind} className="mt-3 h-5 w-5 text-slate-500" />
@@ -569,16 +587,18 @@ export function ModuleOutlineEditor({ embedded = false, refreshKey = 0, onChange
                           {canEdit && (
                             <div className="flex shrink-0 items-center gap-1">
                               <PublishToggle published={it.published} name={iname} busy={busy === `ip-${it.id}`}
-                                onToggle={() => void run(`ip-${it.id}`, () => updateItem(course.id, m.id, it.id, { published: !it.published }))} />
+                                onToggle={() => toggleItemPublished(m, it)} />
                               <OutlineMenu label={t("modules.editor.actionsFor", { title: iname })} onSelect={(id) => onItemMenu(m, it, ii, id)} groups={[{
                                 id: "item", items: [
+                                  // Phase 8c UX M4, M6: Publish first, then Open, settings, requirement, moves; Remove last
+                                  { id: "publish", label: it.published ? t("modules.editor.unpublish") : t("modules.editor.publish"), disabled: !!busy },
+                                  ...(it.kind !== "header" ? [{ id: "open", label: it.target?.assignment_kind === "quiz" ? t("modules.editor.editQuiz") : t("modules.editor.openTarget") }] : []),
                                   { id: "edit", label: t("modules.editor.editItem") },
                                   ...(it.kind !== "header" ? [{ id: "requirement", label: t("modules.editor.setRequirement") }] : []),
                                   { id: "up", label: t("modules.editor.moveUp"), disabled: ii === 0 || !!busy },
                                   { id: "down", label: t("modules.editor.moveDown"), disabled: ii === items.length - 1 || !!busy },
                                   ...(live.length > 1 ? [{ id: "move", label: t("modules.editor.moveTo") }] : []),
-                                  ...(it.kind !== "header" ? [{ id: "open", label: it.target?.assignment_kind === "quiz" ? t("modules.editor.editQuiz") : t("modules.editor.openTarget") }] : []),
-                                  { id: "delete", label: t("modules.editor.removeItem") },
+                                  { id: "delete", label: t("modules.editor.removeItem"), danger: true },
                                 ],
                               }]} />
                             </div>
@@ -588,8 +608,9 @@ export function ModuleOutlineEditor({ embedded = false, refreshKey = 0, onChange
                     })}
                   </ul>
                 )}
+                {/* Phase 8c UX M1: the footer "+ Add" on phones, and on wider screens only for an empty module */}
                 {canEdit && (
-                  <div className={cn("border-t border-slate-100 px-3 py-3 sm:px-4", items.length === 0 && "sm:hidden")}>
+                  <div className={cn("border-t border-slate-100 px-3 py-3 sm:px-4", items.length > 0 && "sm:hidden")}>
                     {addMenu(m, { fullWidth: true, className: "sm:w-fit" })}
                   </div>
                 )}
@@ -715,7 +736,8 @@ export function ModuleOutlineEditor({ embedded = false, refreshKey = 0, onChange
         <ConfirmDialog open busy={busy === `pub-${d.module.id}`} title={t("modules.warnings.requirementIgnoredTitle")} object={moduleName(d.module)}
           effect={t("modules.warnings.requirementIgnoredBody", { item: d.names })} confirmLabel={t("modules.editor.publishAnyway")}
           error={dialogError ?? undefined}
-          onConfirm={() => void run(`pub-${d.module.id}`, () => updateModule(course.id, d.module.id, { published: true }), { inDialog: true })}
+          onConfirm={() => void run(`pub-${d.module.id}`, () => updateModule(course.id, d.module.id, { published: true }),
+            { inDialog: true, success: t("modules.editor.toastPublished", { title: moduleName(d.module) }) })}
           onCancel={closeDialog} />
       )}
     </div>

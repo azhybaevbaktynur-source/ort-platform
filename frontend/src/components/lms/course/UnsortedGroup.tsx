@@ -148,7 +148,7 @@ export function UnsortedGroup({ courseId, defaultLang, modules, canEdit, open, o
           id: "row", items: [
             ...(canEdit ? [{ id: "place", label: t("coursePage.unsorted.moveTo"), disabled: modules.length === 0 }] : []),
             { id: "open", label: t("modules.editor.openTarget") },
-            ...(canEdit ? [{ id: "delete", label: t("modules.editor.delete") }] : []),
+            ...(canEdit ? [{ id: "delete", label: t("modules.editor.delete"), danger: true }] : []),
           ],
         }]} />
       </li>

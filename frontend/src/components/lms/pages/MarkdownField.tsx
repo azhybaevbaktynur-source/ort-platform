@@ -10,7 +10,7 @@ import { previewMarkdown } from "@/lib/lms/pages";
 import { ImagePicker } from "@/components/lms/content/ImagePicker";
 import { Button, Dialog, IconButton, Input, Spinner, Textarea } from "@/components/ui";
 import { ContentError } from "./ApiError";
-import { SafeHtml } from "./SafeHtml";
+import { SafeHtml, preloadKatexAutoRender } from "./SafeHtml";
 
 type Wrap = { before: string; after: string; sample: string };
 
@@ -29,6 +29,8 @@ export function MarkdownField({
   const [linkText, setLinkText] = useState("");
   const [alt, setAlt] = useState("");
   const sel = useRef({ start: 0, end: 0 });
+  // Phase 8c UX m5: load KaTeX auto-render with the editor, before the preview shows a formula
+  useEffect(() => { void preloadKatexAutoRender().catch(() => undefined); }, []);
 
   // Debounced server preview
   useEffect(() => {

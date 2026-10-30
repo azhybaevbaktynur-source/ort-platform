@@ -11,6 +11,7 @@ import type { AttemptStatus } from "@/lib/lms/attemptTypes";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { fmtDateTime, fmtPoints } from "@/components/lms/assessments/format";
 import { useListCount, useTabCrumbs } from "@/components/lms/course/StaffCourseUi";
+import { useTemplateUi } from "@/lib/lms/templates";
 import { Badge, type BadgeTone, Checkbox, EmptyState, PageHeader, SearchInput, Select, Table, type TableColumn, buttonClasses } from "@/components/ui";
 import { useGradeText } from "./GradeBadge";
 
@@ -28,6 +29,8 @@ export function StaffAttemptList({ courseId, assessmentId, embedded = false }: {
   const { lang, t } = useTranslation();
   const gradeText = useGradeText();
   const countText = useListCount();
+  const tui = useTemplateUi();
+  const ortCourse = tui.locked && tui.key === "ort";
   const [status, setStatus] = useState<AttemptStatus | "">("");
   const [previews, setPreviews] = useState(false);
   const [q, setQ] = useState("");
@@ -140,7 +143,8 @@ export function StaffAttemptList({ courseId, assessmentId, embedded = false }: {
         rowKey={(r) => r.id}
         loading={loading}
         countText={!loading ? (needle ? t("ui.table.count", { count: shown.length }) : countText(rows.length, !!next)) : undefined}
-        search={
+        search={ortCourse ? (
+          // ORT (locked template): the filters stay exactly as they were
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
             <SearchInput value={q} onChange={setQ} label={t("teaching.searchStudent")} />
             <Select label={t("grading.filterStatus")} value={status} onChange={(e) => setStatus(e.target.value as AttemptStatus | "")}
@@ -151,7 +155,19 @@ export function StaffAttemptList({ courseId, assessmentId, embedded = false }: {
             </button>
             <Checkbox label={t("grading.showPreviews")} checked={previews} onChange={(e) => setPreviews(e.target.checked)} containerClassName="sm:col-span-3" />
           </div>
-        }
+        ) : (
+          // Phase 8c UX m8: "Needs review only" is a checkbox next to "Show preview attempts"
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <SearchInput value={q} onChange={setQ} label={t("teaching.searchStudent")} />
+            <Select label={t("grading.filterStatus")} value={status} onChange={(e) => setStatus(e.target.value as AttemptStatus | "")}
+              options={[{ value: "", label: t("grading.allStatuses") }, ...STATUSES.map((s) => ({ value: s, label: t(`results.status.${s}`) }))]} />
+            <div className="flex flex-wrap gap-x-6 gap-y-2 sm:col-span-2">
+              <Checkbox label={t("grading.needsReviewOnly")} checked={status === "needs_review"}
+                onChange={(e) => setStatus(e.target.checked ? "needs_review" : "")} />
+              <Checkbox label={t("grading.showPreviews")} checked={previews} onChange={(e) => setPreviews(e.target.checked)} />
+            </div>
+          </div>
+        )}
         empty={<EmptyState variant="bordered" title={needle ? t("teaching.noMatch") : t("grading.empty")} />}
         pagination={{ nextCursor: next, loading: more, onLoadMore: () => void loadMore() }}
       />

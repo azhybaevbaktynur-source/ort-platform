@@ -24,13 +24,14 @@ import { useCourse } from "@/components/lms/CourseContext";
 import { useCanEditContent } from "@/components/lms/content/StaffGate";
 import { useListCount } from "@/components/lms/course/StaffCourseUi";
 import {
-  Badge, Button, Checkbox, ConfirmDialog, EmptyState, FilterBar, MenuButton, PageHeader, Select, Switch, Table, toast,
-  type MenuItem, type TableColumn,
+  Badge, Button, Checkbox, ConfirmDialog, EmptyState, FilterBar, PageHeader, Select, Switch, Table, toast,
+  type TableColumn,
 } from "@/components/ui";
 import { fmtShortDateTime } from "@/components/lms/home/format";
 import { AssignmentError, KindBadge, fmtPts, useAssignmentErrorText } from "./assignmentUi";
 import { AssignmentEditorDialog } from "./AssignmentEditorDialog";
 import { useCategories } from "./useCategories";
+import { OutlineMenu, type OutlineMenuItem } from "@/components/lms/modules/OutlineMenu";
 
 const KINDS: AssignmentKind[] = ["quiz", "text", "file", "none"];
 const asKind = (v: string | null): AssignmentKind | "" => ((KINDS as string[]).includes(v ?? "") ? (v as AssignmentKind) : "");
@@ -198,10 +199,10 @@ export function StaffAssignmentList() {
     else if (id === "delete") { setActionError(null); setConfirm({ kind: "delete", a }); }
   };
 
-  const menuItems = (a: AssignmentStaffSummaryOut): MenuItem[] => {
+  const menuItems = (a: AssignmentStaffSummaryOut): OutlineMenuItem[] => {
     const i = items.findIndex((x) => x.id === a.id);
     const quiz = a.kind === "quiz";
-    const out: MenuItem[] = [{ id: "edit", label: t("assignments.list.edit") }];
+    const out: OutlineMenuItem[] = [{ id: "edit", label: t("assignments.list.edit") }];
     if (quiz) {
       out.push({ id: "builder", label: t("assignments.list.openBuilder") });
       out.push({ id: "attempts", label: t("assignments.list.attempts") });
@@ -216,7 +217,7 @@ export function StaffAssignmentList() {
       out.push({ id: "up", label: t("assignments.list.moveUp"), disabled: i <= 0 });
       out.push({ id: "down", label: t("assignments.list.moveDown"), disabled: i < 0 || i >= items.length - 1 });
     }
-    out.push({ id: "delete", label: t("assignments.list.delete") });
+    out.push({ id: "delete", label: t("assignments.list.delete"), danger: true });
     return out;
   };
 
@@ -254,9 +255,9 @@ export function StaffAssignmentList() {
           {t("assignments.list.restore")}<span className="sr-only">: {titleOf(a)}</span>
         </Button>
       ) : (
-        <MenuButton variant="secondary" size="sm" disabled={busyId === a.id}
-          label={<>{t("assignments.list.actions")}<span className="sr-only">: {titleOf(a)}</span></>}
-          items={menuItems(a)} onSelect={(id) => onMenu(a, id)} />
+        // Phase 8c UX m7: the same "⋯" menu as the Course page rows
+        <OutlineMenu disabled={busyId === a.id} label={t("modules.editor.actionsFor", { title: titleOf(a) })}
+          groups={[{ id: "row", items: menuItems(a) }]} onSelect={(id) => onMenu(a, id)} />
       ),
     }] : []),
   ];

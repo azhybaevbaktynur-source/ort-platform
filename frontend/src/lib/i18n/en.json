@@ -3214,7 +3214,7 @@
       "tabs": {
         "label": "Assignment sections",
         "details": "Details",
-        "submissions": "Submissions and grading",
+        "submissions": "Submissions",
         "results": "Results",
         "settings": "Settings"
       },
@@ -4377,7 +4377,7 @@
       "after": "After: {titles}",
       "noItems": "No items yet. Add a page, file, assignment, link or header.",
       "addItem": "Add",
-      "editItem": "Edit",
+      "editItem": "Item settings",
       "setRequirement": "Completion requirement",
       "requirement": "Requirement: {text}",
       "moveTo": "Move to another module",
@@ -4395,7 +4395,11 @@
       "dragHandle": "Drag to move “{title}”",
       "moveUp": "Move up",
       "moveDown": "Move down",
-      "actionsFor": "Actions: {title}"
+      "actionsFor": "Actions: {title}",
+      "publish": "Publish",
+      "unpublish": "Unpublish",
+      "toastPublished": "Published: {title}",
+      "toastUnpublished": "Draft (unpublished): {title}"
     },
     "settings": {
       "createTitle": "New module",
@@ -4591,6 +4595,7 @@
     "studentsTitle": "Students",
     "students": "Active students: {n}",
     "nothing": "Nothing to do",
-    "more": "{n} more"
+    "more": "{n} more",
+    "joinCodeOff": "The code is off. Turn on joining by code in Enrollment settings."
   }
 }
