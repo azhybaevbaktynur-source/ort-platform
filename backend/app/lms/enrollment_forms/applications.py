@@ -29,7 +29,7 @@ from sqlalchemy.orm import Session, aliased
 from app.core.authz import A, AuthzContext
 from app.lms.audit import service as audit
 from app.lms.core import clock, ratelimit
-from app.lms.core.errors import Conflict, NotFound, RateLimited
+from app.lms.core.errors import Conflict, NotFound, RateLimited, ValidationFailed
 from app.lms.core.pagination import PageOut
 from app.lms.courses import scopes
 from app.lms.courses.models import Course
@@ -39,7 +39,7 @@ from app.lms.courses.service import (
 from app.lms.enrollment_forms import emails, ids, purge
 from app.lms.enrollment_forms import schemas as sch
 from app.lms.enrollment_forms.fields import field_out_dict, validate_answers
-from app.lms.enrollment_forms.models import EnrollmentApplication, EnrollmentForm
+from app.lms.enrollment_forms.models import EnrollmentApplication, EnrollmentForm, EnrollmentFormField
 from app.lms.enrollment_forms.service import fields_of, is_course_staff
 from app.lms.enrollments.models import Enrollment
 from app.lms.enrollments.schemas import UserBrief, staff_display_name
@@ -225,6 +225,16 @@ def _submit(db: Session, user: User, course_id: uuid.UUID, data: sch.Application
                          .values(answered=True).execution_options(synchronize_session=False)).rowcount
     if not changed:
         raise Conflict("The form has changed; reload it", code=E_FORM_CHANGED)
+    # Phase 9 fix 2 (L2): validate again against the fields read under that row lock (a builder PATCH committed
+    # between the first read and the lock changed them); the refusal undoes the `answered` flag
+    fresh = db.execute(select(EnrollmentFormField).where(EnrollmentFormField.form_id == form.id)
+                       .order_by(EnrollmentFormField.position)
+                       .execution_options(populate_existing=True)).scalars().all()
+    try:
+        clean = validate_answers(fresh, data.answers)
+    except ValidationFailed:
+        db.rollback()
+        raise
     now = clock.now()
     app = EnrollmentApplication(course_id=course.id, user_id=user.id, form_id=form.id, status="pending",
                                 answers=clean, submitted_at=now)
@@ -300,16 +310,20 @@ def approve(db: Session, ctx: AuthzContext, course: Course, application_id: uuid
     if course.deleted_at is not None or course.status != "published":
         raise Conflict("The course is not open", code=ids.E_COURSE_NOT_OPEN)
     try:
-        enr = _enroll_locked(db, course, app.user_id, ctx.user.id)
-    except _Full:
-        db.rollback()  # the application stays pending (design 4.9: raise the limit or reject)
-        raise Conflict("The course is full", code=ids.E_COURSE_FULL) from None
-    now = clock.now()
-    app.status, app.enrollment_id = "approved", enr.id
-    app.decided_by_id, app.decided_at = ctx.user.id, now
-    app.decision_note = (data.note or "").strip() or None
-    _audit(db, ctx, ids.AUDIT_APPROVED, app, request)
-    db.commit()
+        try:
+            enr = _enroll_locked(db, course, app.user_id, ctx.user.id)
+        except _Full:
+            db.rollback()  # the application stays pending (design 4.9: raise the limit or reject)
+            raise Conflict("The course is full", code=ids.E_COURSE_FULL) from None
+        now = clock.now()
+        app.status, app.enrollment_id = "approved", enr.id
+        app.decided_by_id, app.decided_at = ctx.user.id, now
+        app.decision_note = (data.note or "").strip() or None
+        _audit(db, ctx, ids.AUDIT_APPROVED, app, request)
+        db.commit()
+    except IntegrityError:  # Phase 9 fix 2 (L1): a concurrent invitation accept inserted the enrollment first
+        db.rollback()  # the application stays pending; the student is enrolled by the invitation
+        raise Conflict("Already enrolled", code=ids.E_ALREADY_ENROLLED) from None
     applicant = db.get(User, app.user_id)
     _queue_email(background, db, "approved", applicant, course, app.decision_note if data.send_note else None)
     return application_out(db, app)

@@ -156,6 +156,12 @@ def copy_bank(db: Session, ctx: AuthzContext, course, source_bank_id: uuid.UUID,
     if row is None:
         raise bank_not_found()
     src: QuestionBank = row[0]
+    # Phase 9 fix 2 (Info): copies stay inside the source's tree (design 4.2); another tree's bank is not found
+    paths = dict(db.execute(select(Organization.id, Organization.path).where(
+        Organization.id.in_([src.organization_id, course.organization_id]))).all())
+    src_path, dst_path = paths.get(src.organization_id), paths.get(course.organization_id)
+    if not src_path or not dst_path or tree.root_id(src_path) != tree.root_id(dst_path):
+        raise bank_not_found()
     q_ids = list(db.execute(select(BankQuestion.id).where(
         BankQuestion.bank_id == src.id, BankQuestion.deleted_at.is_(None))
         .order_by(BankQuestion.position, BankQuestion.id).limit(ids.BANK_COPY_MAX_QUESTIONS + 1)).scalars())
