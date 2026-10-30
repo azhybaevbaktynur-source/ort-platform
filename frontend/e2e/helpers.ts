@@ -58,7 +58,25 @@ export interface Seed {
     view_quiz: string;
   };
   /** Phase 9 S4: a published private general course without a form and one applicant (catalog-apply.spec.ts). */
-  catalog_apply: { course_id: string; teacher: SeedUser; student: SeedUser };
+  catalog_apply: {
+    course_id: string; teacher: SeedUser; student: SeedUser;
+    /** Phase 9 S5: applicants who withdraw, are rejected, and join a `form_auto` course. */
+    applicants: Record<"withdraw" | "reject" | "auto", SeedUser>;
+  };
+  /** Phase 9 S5: the school walk (org-admin.spec.ts). */
+  org_admin: {
+    organization_id: string;
+    org_admin: SeedUser;
+    maths: SeedUser;
+    languages: SeedUser;
+    maths_course_id: string;
+    languages_course_id: string;
+    bank_id: string;
+    roster_teacher: SeedUser;
+    roster_student: SeedUser;
+    invite_student: SeedUser;
+    independent: SeedUser;
+  };
   /** Phase 8b S3: the scrolling-player course (its published quizzes serve the Student view "Start" check). */
   scrolling: {
     course_id: string;
@@ -221,3 +239,42 @@ export const VIEWPORTS = {
   desktop: { width: 1440, height: 900 },
 } as const;
 export type ViewportName = keyof typeof VIEWPORTS;
+
+// ----------------------------------------------------------------------------- UX gate screens (Phase 9 S5)
+
+/**
+ * UX-gate screenshots (not compared): `<name>-<lang>-<375|1440>.png` in `$E2E_DIR/<folder>/`, full page. For each
+ * language the current URL is reopened with that language prefix and `reach` (optional) brings the page back into
+ * the state to show (an open dialog, a tab). Afterwards the page is back on its first URL at 1440 px (and `reach`
+ * is run again there when another language was opened), so a walk continues where it was.
+ */
+export async function uxShots(page: Page, folder: string, name: string, langs: (Lang | "en")[],
+  reach?: (page: Page, lang: Lang | "en") => Promise<void>): Promise<void> {
+  const dir = path.join(E2E_DIR, folder);
+  fs.mkdirSync(dir, { recursive: true });
+  const start = new URL(page.url());
+  const startLang = (start.pathname.match(/^\/(ru|ky|en)(?=\/|$)/)?.[1] ?? "ru") as Lang | "en";
+  const here = () => { const u = new URL(page.url()); return u.pathname + u.search; };
+  const urlFor = (lang: string) => start.pathname.replace(/^\/(ru|ky|en)(?=\/|$)/, `/${lang}`) + start.search;
+  const open = async (lang: Lang | "en") => {
+    if (here() === urlFor(lang)) return;
+    await page.goto(urlFor(lang));
+    await page.waitForLoadState("networkidle");
+    if (reach) await reach(page, lang);
+  };
+  // toasts of earlier steps are not part of the screen (the live region keeps its place for later toasts)
+  const toasts = (visibility: string) => page.evaluate((v) => document.querySelectorAll<HTMLElement>('div[aria-live="polite"].fixed')
+    .forEach((e) => { e.style.visibility = v; }), visibility);
+  for (const lang of langs) {
+    await open(lang);
+    for (const [vp, size] of [["375", VIEWPORTS.phone], ["1440", VIEWPORTS.desktop]] as const) {
+      await page.setViewportSize(size);
+      await settle(page);
+      await toasts("hidden");
+      await page.screenshot({ path: path.join(dir, `${name}-${lang}-${vp}.png`), fullPage: true, animations: "disabled", caret: "hide" });
+      await toasts("");
+    }
+  }
+  await page.setViewportSize(VIEWPORTS.desktop);
+  await open(startLang);
+}

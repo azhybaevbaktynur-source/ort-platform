@@ -4902,7 +4902,11 @@
     "resumeTitle": "Resume this department?",
     "resumeBody": "The courses of this department and of the departments inside it can be edited again.",
     "suspendedToast": "{name} is suspended.",
-    "resumedToast": "{name} is active again."
+    "resumedToast": "{name} is active again.",
+    "courseDepartment": "Department",
+    "courseDepartmentHint": "Move the course to another department. Its students, staff and question banks stay with it.",
+    "moveCourse": "Move course",
+    "courseMoved": "The course is now in {name}"
   },
   "sharedBanks": {
     "nav": "Shared banks",

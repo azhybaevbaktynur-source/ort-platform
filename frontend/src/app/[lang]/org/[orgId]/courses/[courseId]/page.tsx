@@ -6,6 +6,7 @@ import { useTranslation } from "@/lib/i18n/context";
 import { getCourse, listPeople, transferOwnership } from "@/lib/lms/courses";
 import { pickLocalized } from "@/lib/lms/localized";
 import { joinCourseAsTeacher, searchOrgMembers } from "@/lib/lms/organizations";
+import { CourseDepartmentCard } from "@/components/lms/org/CourseDepartmentCard"; // Phase 9 S5
 import { templateTitle } from "@/lib/lms/templates";
 import { isStaffCourse, type CourseOut, type RosterEntryOut } from "@/lib/lms/types";
 import { fmtApiDate } from "@/lib/format";
@@ -141,6 +142,9 @@ export default function OrgCourseSummaryPage() {
             </ul>
           )}
         </Card>
+        {/* Phase 9 S5: the course's department (PATCH /org/{org}/courses/{id}) */}
+        <CourseDepartmentCard orgId={org.id} courseId={course.id} current={course.organization_id ?? ""} readOnly={readOnly}
+          onMoved={() => void load()} />
         <Card title={t("organizations.course.assignOwner")} description={t("organizations.course.assignOwnerHint")}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="min-w-0 flex-1">

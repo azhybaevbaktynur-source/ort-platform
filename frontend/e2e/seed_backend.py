@@ -340,8 +340,65 @@ def seed_catalog_apply(api: Api, log: Path, admin_tok: str) -> dict:
     api.call("POST", f"/courses/{course['id']}/publish", tok, {})
     student = register(api, log, "e2e-apply-student@example.com", "Айдана Заявка")
     student["profile"] = profile(api, student["token"])
-    return {"course_id": course["id"], "teacher": teacher, "student": student}
+    # --- Phase 9 S5 --- (more applicants: withdraw, reject, form_auto; registered after the S4 rows)
+    others = {}
+    for key, name in (("withdraw", "Бакыт Отзыв"), ("reject", "Нурлан Отказ"), ("auto", "Айгуль Авто")):
+        u = register(api, log, f"e2e-apply-{key}@example.com", name)
+        u["profile"] = profile(api, u["token"])
+        others[key] = u
+    return {"course_id": course["id"], "teacher": teacher, "student": student, "applicants": others}
 # --- Phase 9 S4 end ---
+
+
+# --- Phase 9 S5 begin --- (organization walk: departments, settings, usage, shared banks, roster import, student
+# invitations; frontend/e2e/org-admin.spec.ts; written after every other row)
+def seed_org_admin(api: Api, log: Path, admin_tok: str) -> dict:
+    """School "Лицей 61 E2E" (root, teachers may create courses, bank sharing off: the walk turns it on) with an org
+    admin and two member teachers: "maths" owns the published course "Математика E2E" with a private bank "Алгебра
+    E2E" (two questions), "languages" owns the published course "Языки E2E". Outside the school: an approved teacher
+    with an account (the roster file adds him to a department), a student with an account (roster invitation), a
+    student for the People → Invitations walk, and an independent teacher (personal organization only)."""
+    org = api.call("POST", "/platform/organizations", admin_tok, {"name": "Лицей 61 E2E", "slug": "e2e-lyceum-61",
+                                                                    "settings": {"teachers_can_create_courses": True}})
+    oid = org["id"]
+
+    def person(email: str, name: str, *, teacher: bool, role: str | None = None) -> dict:
+        u = register(api, log, email, name)
+        if teacher:
+            uid = profile(api, u["token"])["id"]
+            api.call("POST", f"/platform/users/{uid}/teacher-status", admin_tok, {"status": "approved"})
+        u["profile"] = profile(api, u["token"])
+        if role:
+            api.call("POST", f"/platform/organizations/{oid}/members", admin_tok,
+                     {"user_id": u["profile"]["id"], "role": role})
+        return u
+
+    org_admin = person("e2e-lyceum-admin@example.com", "Админ Лицея", teacher=False, role="org_admin")
+    maths = person("e2e-lyceum-maths@example.com", "Преподаватель Математики", teacher=True, role="teacher")
+    languages = person("e2e-lyceum-lang@example.com", "Преподаватель Языков", teacher=True, role="teacher")
+    roster_teacher = person("e2e-roster-teacher@example.com", "Преподаватель Из Списка", teacher=True)
+    roster_student = person("e2e-roster-student@example.com", "Ученик Из Списка", teacher=False)
+    invite_student = person("e2e-invite-student@example.com", "Ученик По Приглашению", teacher=False)
+    independent = person("e2e-independent@example.com", "Независимый Преподаватель", teacher=True)
+
+    def course(owner: dict, ru: str, ky: str, en: str) -> str:
+        c = api.call("POST", "/courses", owner["token"], {"title": {"ru": ru, "ky": ky, "en": en},
+                                                          "languages": ["ru", "ky", "en"], "default_language": "ru",
+                                                          "organization_id": oid})
+        api.call("POST", f"/courses/{c['id']}/publish", owner["token"], {})
+        return c["id"]
+
+    maths_cid = course(maths, "Математика E2E", "Математика E2E", "Maths E2E")
+    lang_cid = course(languages, "Языки E2E", "Тилдер E2E", "Languages E2E")
+    bank = api.call("POST", f"/courses/{maths_cid}/banks", maths["token"],
+                    {"title": "Алгебра E2E", "default_language": "ru"})
+    for q in (sc("Сколько будет 2 + 2?", "4", "5"), sc("Сколько будет 3 · 3?", "9", "6")):
+        api.call("POST", f"/courses/{maths_cid}/banks/{bank['id']}/questions", maths["token"], q)
+    return {"organization_id": oid, "org_admin": org_admin, "maths": maths, "languages": languages,
+            "maths_course_id": maths_cid, "languages_course_id": lang_cid, "bank_id": bank["id"],
+            "roster_teacher": roster_teacher, "roster_student": roster_student, "invite_student": invite_student,
+            "independent": independent}
+# --- Phase 9 S5 end ---
 
 
 # --- Phase 8c S4a begin --- (course navigation, frontend/e2e/course-nav.spec.ts; written after every other row)
@@ -507,6 +564,7 @@ def main() -> int:
     exam_constructor = seed_constructor(api, log, tok)  # Phase 8b S5 (after every other row)
     course_nav = seed_course_nav(api, log, tok)  # Phase 8c S4a (after every other row)
     catalog_apply = seed_catalog_apply(api, log, tok)  # Phase 9 S4 (after every other row)
+    org_admin = seed_org_admin(api, log, tok)  # Phase 9 S5 (after every other row)
 
     seed = {
         "quiz_editor": quiz_editor,
@@ -515,6 +573,7 @@ def main() -> int:
         "exam_constructor": exam_constructor,
         "course_nav": course_nav,
         "catalog_apply": catalog_apply,
+        "org_admin": org_admin,
         "api": args.api, "course_id": cid, "bank_id": bank_id, "exam": exam, "staff_exam": staff_exam,
         "picks": picks, "keys": keys, "comparison_question_id": comparison_qid, "passage_id": passage_id,
         "staff_attempt_id": staff_attempt, "admin": admin, "students": students,
