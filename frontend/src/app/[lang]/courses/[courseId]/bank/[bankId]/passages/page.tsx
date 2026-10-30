@@ -10,7 +10,7 @@ import { useCourse } from "@/components/lms/CourseContext";
 import { Pager } from "@/components/lms/Pager";
 import { BankHeader } from "@/components/lms/content/BankHeader";
 import { ContentError } from "@/components/lms/content/ContentError";
-import { useCanEditContent } from "@/components/lms/content/StaffGate";
+import { useCanEditBank } from "@/components/lms/content/StaffGate";
 import { btnSmall } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { Badge, Button, ConfirmDialog, EmptyState, LinkButton, LoadingState } from "@/components/ui";
 import { excerptText } from "@/components/lms/course/excerpt";
@@ -19,9 +19,9 @@ export default function PassagesPage() {
   const { lang, t } = useTranslation();
   const { bankId } = useParams<{ bankId: string }>();
   const { course } = useCourse();
-  const canEdit = useCanEditContent();
   const base = `/${lang}/courses/${course.id}/bank`;
   const [bank, setBank] = useState<BankOut | null>(null);
+  const canEdit = useCanEditBank(bank); // Phase 9 S2: `bank.can_edit`
   const [trash, setTrash] = useState(false);
   const [items, setItems] = useState<PassageSummaryOut[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);

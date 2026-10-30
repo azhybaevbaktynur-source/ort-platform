@@ -8,7 +8,7 @@ from datetime import timedelta
 import pytest
 from sqlalchemy import delete, select
 
-from app.core.route_inventory import PHASE_9_PLANNED_POLICIES, ROUTE_POLICIES
+from app.core.route_inventory import ROUTE_POLICIES
 from app.db import session as db_session
 from app.lms.audit.models import AdminAuditLog
 from app.lms.core import clock
@@ -76,8 +76,23 @@ async def invite(api, actor, w, emails_, **body):
 
 # ---------------------------------------------------------------- inventory
 
-def test_planned_s3_rows_are_registered():
-    for key, policy in PHASE_9_PLANNED_POLICIES["S3"].items():
+_P9_O = "/api/v1/org/{organization_id}"
+_P9_C = "/api/v1/courses/{course_id}"
+# The S3 rows of PHASE_9_DESIGN 5 (formerly route_inventory.PHASE_9_PLANNED_POLICIES["S3"]).
+S3_POLICIES = {
+    ("POST", f"{_P9_O}/roster-imports"): "org_admin+ratelimit",
+    ("GET", f"{_P9_O}/roster-imports"): "org_admin",
+    ("GET", f"{_P9_O}/roster-imports/{{import_id}}"): "org_admin",
+    ("POST", f"{_P9_O}/roster-imports/{{import_id}}/apply"): "org_admin+ratelimit",
+    ("POST", f"{_P9_C}/students/invitations"): "course:roster.manage+ratelimit",
+    ("GET", f"{_P9_C}/students/invitations"): "course:roster.manage",
+    ("POST", f"{_P9_C}/students/invitations/{{invitation_id}}/revoke"): "course:roster.manage",
+    ("POST", f"{_P9_C}/students/invitations/{{invitation_id}}/resend"): "course:roster.manage+ratelimit",
+}
+
+
+def test_s3_rows_are_registered():
+    for key, policy in S3_POLICIES.items():
         assert ROUTE_POLICIES.get(key) == policy, key
 
 

@@ -203,9 +203,11 @@ def copy_bank(db: Session, ctx: AuthzContext, course, source_bank_id: uuid.UUID,
             nv = PassageVersion(id=uuid.uuid4(), passage_id=np.id, version_no=1, language=pv.language,
                                 title=pv.title, body=pv.body, image=pv.image, content_hash=pv.content_hash,
                                 origin="create", created_by_id=actor.id, created_at=now)
-            np.current_version_id = nv.id
             new_vs.append(nv)
         db.add_all(new_vs)
+        db.flush()  # versions first: the FK `current_version_id` is not deferred on PostgreSQL (service pattern)
+        for nv, np in zip(new_vs, new_ps):
+            np.current_version_id = nv.id
         db.flush()
 
     # translation groups: re-created inside the copy for groups with at least two copied members
@@ -249,9 +251,11 @@ def copy_bank(db: Session, ctx: AuthzContext, course, source_bank_id: uuid.UUID,
                 default_points=v.default_points, image=v.image, content_hash=v.content_hash, origin="create",
                 created_by_id=actor.id, created_at=now,
             )
-            nq.current_version_id = nv.id
             new_vs.append(nv)
         db.add_all(new_vs)
+        db.flush()  # versions first, then point the questions at them (as for passages)
+        for nv, nq in zip(new_vs, new_qs):
+            nq.current_version_id = nv.id
         db.flush()
 
     audit.record(db, actor=actor, action="bank.copied", target_type="course", target_id=str(course.id),

@@ -7,17 +7,20 @@ import type { DepartmentOut } from "@/lib/lms/organizations";
 import { MenuButton, cn } from "@/components/ui";
 import { OrgBadge } from "./OrgUi";
 
-export type DepartmentAction = "create" | "rename" | "move" | "delete";
+export type DepartmentAction = "create" | "rename" | "move" | "delete" | "suspend" | "resume";
 
 /**
  * Phase 9 S2 (PHASE_9_DESIGN 8.1, 8.4): the subtree of an organization as an indented list (one level of indent
  * per depth, so it stays readable at 375 px). Each row has one "⋯" menu; the first row is the organization of the
- * page (no rename / move / delete here). `readOnly` hides the menus (suspended organization, platform admin tab).
+ * page (no rename / move / delete here). `readOnly` hides the menus (suspended organization). `mode="platform"`
+ * (platform admin's Departments tab) offers only Suspend / Resume on the departments (the organization itself is
+ * suspended from the page header).
  */
-export function DepartmentTree({ rows, readOnly = false, onAction }: {
+export function DepartmentTree({ rows, readOnly = false, onAction, mode = "org" }: {
   rows: DepartmentOut[];
   readOnly?: boolean;
   onAction?: (action: DepartmentAction, dept: DepartmentOut) => void;
+  mode?: "org" | "platform";
 }) {
   const { t } = useTranslation();
   if (rows.length === 0) return null;
@@ -27,7 +30,9 @@ export function DepartmentTree({ rows, readOnly = false, onAction }: {
       {rows.map((d, i) => {
         const level = d.depth - top;
         const isTop = i === 0;
-        const items = [
+        const items = mode === "platform" ? (isTop ? [] : [d.status === "suspended"
+          ? { id: "resume", label: t("organizations.admin.resume") }
+          : { id: "suspend", label: t("organizations.admin.suspend") }]) : [
           ...(d.depth < 2 ? [{ id: "create", label: t("departments.create") }] : []),
           ...(isTop ? [] : [
             { id: "rename", label: t("departments.rename") },

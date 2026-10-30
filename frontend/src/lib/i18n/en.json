@@ -2275,6 +2275,7 @@
         "admins": "Admins",
         "teachers": "Teachers",
         "courses": "Courses",
+        "departments": "Departments",
         "usage": "Usage",
         "templates": "Templates",
         "log": "Log"
@@ -2411,8 +2412,7 @@
       "suspendedBanner": "This organization is suspended: its courses are read-only and changes are disabled. Contact the platform administrator.",
       "pickTitle": "Your organizations",
       "pickEmpty": "You do not administer any organization.",
-      "rosterImport": "Roster import",
-      "rosterImportSoon": "Roster import will appear here."
+      "rosterImport": "Roster import"
     }
   },
   "invitations": {
@@ -4842,9 +4842,15 @@
     "usageTitle": "By department",
     "usageDepartment": "Department",
     "noneUsage": "No departments yet.",
-    "platformHint": "Read only. A suspended department suspends everything inside it.",
+    "platformHint": "A suspended department suspends everything inside it: its courses and sub-departments become read-only.",
     "save": "Save",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "suspendTitle": "Suspend this department?",
+    "suspendBody": "The courses of this department and of the departments inside it become read-only. You can resume it later.",
+    "resumeTitle": "Resume this department?",
+    "resumeBody": "The courses of this department and of the departments inside it can be edited again.",
+    "suspendedToast": "{name} is suspended.",
+    "resumedToast": "{name} is active again."
   },
   "sharedBanks": {
     "nav": "Shared banks",
