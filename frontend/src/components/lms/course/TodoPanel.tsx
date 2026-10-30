@@ -19,7 +19,11 @@ import { Button, Skeleton, cn, focusRing } from "@/components/ui";
 
 const linkCls = cn("rounded font-medium text-brand-700 underline-offset-2 hover:text-brand-800 hover:underline", focusRing);
 
-export function TodoPanel({ course, refreshKey = 0, className }: { course: CourseStaffOut; refreshKey?: number; className?: string }) {
+export function TodoPanel({ course, refreshKey = 0, className, compact = false }: {
+  course: CourseStaffOut; refreshKey?: number; className?: string;
+  /** Phase 8c UX M7 (ORT courses): the one-line form that expands in place, at every width (no column). */
+  compact?: boolean;
+}) {
   const { lang, t } = useTranslation();
   const errorText = useModuleErrorText();
   const base = `/${lang}/courses/${course.id}`;
@@ -123,7 +127,12 @@ export function TodoPanel({ course, refreshKey = 0, className }: { course: Cours
           <section aria-labelledby="todo-join" className="space-y-2">
             <h3 id="todo-join" className={sectionTitle}>{t("courses.settings.joinCode")}</h3>
             <JoinCodeDisplay code={data.join_code} />
-            {!data.join_code_active && <p className="text-sm leading-6 text-warning-800">{t("courses.settings.joinCodeInactive")}</p>}
+            {/* Phase 8c UX M5: a published course only needs joining by code turned on */}
+            {!data.join_code_active && (
+              <p className="text-sm leading-6 text-warning-800">
+                {course.status === "published" ? t("todo.joinCodeOff") : t("courses.settings.joinCodeInactive")}
+              </p>
+            )}
             <Link href={`${base}/settings`} className={cn(linkCls, "inline-flex min-h-11 items-center text-sm sm:min-h-0")}>{t("teaching.manageEnrollment")}</Link>
           </section>
         )}
@@ -141,15 +150,15 @@ export function TodoPanel({ course, refreshKey = 0, className }: { course: Cours
   return (
     <aside aria-label={t("todo.title")} className={cn("rounded-2xl border border-slate-200 bg-white shadow-sm", className)}>
       <button type="button" aria-expanded={open} aria-controls="todo-body" onClick={() => setOpen((o) => !o)}
-        className={cn("flex min-h-12 w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left lg:hidden", focusRing)}>
+        className={cn("flex min-h-12 w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left", !compact && "lg:hidden", focusRing)}>
         <span className="min-w-0">
           <span className="block text-sm font-semibold text-slate-900">{t("todo.title")}</span>
           <span className="block text-sm text-slate-700">{line}</span>
         </span>
         <ChevronDown aria-hidden="true" className={cn("h-5 w-5 shrink-0 text-slate-600 transition-transform", open && "rotate-180")} />
       </button>
-      <div id="todo-body" className={cn("border-t border-slate-100 p-4 lg:block lg:border-t-0 lg:p-5", open ? "block" : "hidden")}>
-        <h2 className="mb-4 hidden text-lg font-semibold leading-7 text-slate-900 lg:block">{t("todo.title")}</h2>
+      <div id="todo-body" className={cn("border-t border-slate-100 p-4", !compact && "lg:block lg:border-t-0 lg:p-5", open ? "block" : "hidden")}>
+        {!compact && <h2 className="mb-4 hidden text-lg font-semibold leading-7 text-slate-900 lg:block">{t("todo.title")}</h2>}
         {body}
       </div>
     </aside>

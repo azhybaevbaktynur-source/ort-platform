@@ -8,11 +8,14 @@ import React, { useEffect, useId, useRef, useState } from "react";
 import { ChevronDown, Ellipsis } from "lucide-react";
 import { Button, type ButtonVariant, type MenuItem, cn, focusRing } from "@/components/ui";
 
+/** Phase 8c UX M6: `danger` entries (Delete, Remove) are drawn last in their group, in red, after a separator. */
+export type OutlineMenuItem = MenuItem & { icon?: React.ReactNode; danger?: boolean };
+
 export interface MenuGroup {
   id: string;
   /** Group heading (shown above its items); omit for an ungrouped list. */
   heading?: string;
-  items: (MenuItem & { icon?: React.ReactNode })[];
+  items: OutlineMenuItem[];
 }
 
 export interface OutlineMenuProps {
@@ -34,7 +37,7 @@ export interface OutlineMenuProps {
 }
 
 export function OutlineMenu({
-  label, groups, onSelect, trigger = "icon", text, leftIcon, variant = "secondary", fullWidth, disabled, sheetTitle, className,
+  label, groups: rawGroups, onSelect, trigger = "icon", text, leftIcon, variant = "secondary", fullWidth, disabled, sheetTitle, className,
 }: OutlineMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -43,6 +46,7 @@ export function OutlineMenu({
   const uid = useId().replace(/:/g, "");
   const buttonId = `om${uid}`;
   const menuId = `om${uid}-menu`;
+  const groups = rawGroups.map((g) => ({ ...g, items: [...g.items.filter((it) => !it.danger), ...g.items.filter((it) => it.danger)] }));
   const flat = groups.flatMap((g) => g.items);
   const enabled = flat.map((it, i) => (it.disabled ? -1 : i)).filter((i) => i >= 0);
 
@@ -118,15 +122,19 @@ export function OutlineMenu({
             <p aria-hidden="true" className="px-3 pb-1 pt-2 text-base font-semibold text-slate-900 sm:hidden">{sheetTitle ?? label}</p>
             {groups.map((g) => {
               const headingId = `${menuId}-${g.id}`;
-              const body = g.items.map((it) => {
+              const body = g.items.map((it, gi) => {
                 index += 1;
                 const i = index;
+                const separated = it.danger && gi > 0 && !g.items[gi - 1].danger;
                 return (
-                  <button key={it.id} ref={(el) => { itemRefs.current[i] = el; }} type="button" role="menuitem" tabIndex={-1}
+                  <React.Fragment key={it.id}>
+                  {separated && <div role="separator" className="my-1 border-t border-slate-200" />}
+                  <button ref={(el) => { itemRefs.current[i] = el; }} type="button" role="menuitem" tabIndex={-1}
                     disabled={it.disabled}
                     onClick={() => { close(false); onSelect(it.id); }}
                     className={cn(
-                      "flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-base leading-6 text-slate-800 hover:bg-slate-100 focus:bg-slate-100 sm:text-sm",
+                      "flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-base leading-6 sm:text-sm",
+                      it.danger ? "text-danger-700 hover:bg-danger-50 focus:bg-danger-50" : "text-slate-800 hover:bg-slate-100 focus:bg-slate-100",
                       "disabled:cursor-not-allowed disabled:opacity-50", focusRing, "focus-visible:ring-offset-0",
                     )}>
                     {it.icon && <span aria-hidden="true" className="inline-flex shrink-0 text-slate-500 [&>svg]:h-5 [&>svg]:w-5">{it.icon}</span>}
@@ -135,6 +143,7 @@ export function OutlineMenu({
                       {it.description && <span className="block text-sm leading-5 text-slate-600">{it.description}</span>}
                     </span>
                   </button>
+                  </React.Fragment>
                 );
               });
               return g.heading ? (
