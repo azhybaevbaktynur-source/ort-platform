@@ -108,7 +108,8 @@ async function studentModules(page: Page, cid: string) {
 }
 
 /** Publish icon button of a module header or item row (design 3.6): `aria-pressed` = published. */
-const publishIcon = (card: Locator) => card.getByRole("button", { name: new RegExp(`${t("modules.editor.publishedIcon")}|${t("modules.editor.draftIcon")}`) }).first();
+const publishIcon = (card: Locator, title: string, lang: "ru" | "en" = "ru") =>
+  card.getByRole("button", { name: tr(lang, "modules.editor.publishToggle", { title }), exact: true });
 
 const badge = (page: Page, title: string, state: string) => moduleCard(page, title).getByText(t(`modules.state.${state}`), { exact: true });
 
@@ -232,8 +233,8 @@ test.describe("modules walk (ru)", () => {
     await set.getByRole("button", { name: t("lms.common.save") }).click();
     await expect(set).toBeHidden();
     for (const m of [M1, M2, M3]) {
-      await publishIcon(tCard(tp, m)).click();
-      await expect(publishIcon(tCard(tp, m))).toHaveAttribute("aria-pressed", "true");
+      await publishIcon(tCard(tp, m), m).click();
+      await expect(publishIcon(tCard(tp, m), m)).toHaveAttribute("aria-pressed", "true");
     }
     await settle(tp);
 
@@ -330,7 +331,8 @@ test.describe("modules walk (ru)", () => {
 
     // ---- "Re-apply rules" (whole course): M2 is no longer met at 60 %, M3 locks again
     await tp.goto(base);
-    await tp.getByRole("button", { name: t("modules.editor.reapplyCourse") }).click();
+    await tp.getByRole("button", { name: t("modules.editor.actions"), exact: true }).first().click(); // course toolbar "⋯"
+    await tp.getByRole("menuitem", { name: t("modules.editor.reapplyCourse") }).click();
     const re = tp.getByRole("alertdialog", { name: t("modules.editor.reapplyTitle") });
     await re.getByRole("button", { name: t("modules.editor.reapply") }).click();
     await expect(re).toBeHidden();
@@ -598,7 +600,7 @@ test.describe("modules walk (ru)", () => {
         // M1: unpublish M5, then switching it on asks first (cancel; published again through the API)
         await api(md.teacher, "PATCH", `/courses/${cid}/modules/${m5.id}`, { published: false });
         await tp.reload();
-        await publishIcon(m5Card).click();
+        await publishIcon(m5Card, m5Title[lang], lang === "en" ? "en" : "ru").click();
         await expect(tp.getByRole("alertdialog", { name: tl("modules.warnings.requirementIgnoredTitle") })).toBeVisible();
         await shoot(tp, "teacher-publish-warning", vp, lang, false);
         await tp.keyboard.press("Escape");
