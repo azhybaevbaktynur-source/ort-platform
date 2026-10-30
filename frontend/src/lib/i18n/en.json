@@ -3210,6 +3210,37 @@
       "waiting": "Handed in. Waiting for the grade.",
       "open": "Open the assignment",
       "openFeedback": "See grade and feedback"
+    },
+    "page": {
+      "backTo": "Back to {place}",
+      "publish": "Publish",
+      "dueLine": "Due {date}",
+      "noDue": "No due date",
+      "tabs": {
+        "label": "Assignment sections",
+        "details": "Details",
+        "submissions": "Submissions and grading",
+        "results": "Results",
+        "settings": "Settings"
+      },
+      "summary": "Summary",
+      "progress": "Hand-ins",
+      "counts": {
+        "submitted": "Handed in",
+        "needsGrading": "To grade",
+        "graded": "Graded",
+        "released": "Grades released"
+      },
+      "gradeNow": "Grade hand-ins ({n})",
+      "usedIn": "Used in modules",
+      "usedInNone": "Not in any module yet",
+      "quizTitle": "Questions",
+      "quizHint": "Questions, sections and the timer are set in the quiz editor. Publish the quiz there too.",
+      "editQuestions": "Edit questions",
+      "viewQuestions": "Open questions",
+      "publishing": "Publishing and versions",
+      "noInstructions": "No instructions yet. Add them in Settings.",
+      "filterNeedsGrading": "Needs grading only"
     }
   },
   "accommodations": {
@@ -4163,7 +4194,17 @@
     },
     "usedInModules_few": "Used in {count} modules",
     "usedInModules_many": "Used in {count} modules",
-    "usedInModules": "Used in {count} modules"
+    "usedInModules": "Used in {count} modules",
+    "object": {
+      "tabs": {
+        "label": "Page sections",
+        "edit": "Edit",
+        "preview": "Preview"
+      },
+      "previewNote": "This is the saved page as students see it. Unsaved changes are not shown.",
+      "unsaved": "Unsaved changes",
+      "addToModuleFailed": "The page is saved, but it could not be added to the module. Add it from the Course page."
+    }
   },
   "courseFiles": {
     "title": "Files",

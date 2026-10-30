@@ -19,8 +19,8 @@ import { isAssessmentLocked, useTemplateUi } from "@/lib/lms/templates";
 import type { Lang } from "@/lib/lms/types";
 import { useCourse } from "@/components/lms/CourseContext";
 import { useCanEditContent } from "@/components/lms/content/StaffGate";
-import { useTabCrumbs } from "@/components/lms/course/StaffCourseUi";
-import { Button, ConfirmDialog, EmptyState, PageHeader, TabPanel, Tabs } from "@/components/ui";
+import { useObjectNav } from "@/components/lms/assignments/objectNav"; // Phase 8c S3
+import { Button, ConfirmDialog, EmptyState, LinkButton, PageHeader, TabPanel, Tabs } from "@/components/ui";
 import { inputCls } from "@/components/lms/content/ui";
 import { emptyForm, payloadFromForm } from "@/components/lms/content/types/formModel";
 import type { AddItemsTab } from "@/components/lms/assessments/AddItemsDialog";
@@ -80,6 +80,8 @@ export function QuizEditor({ initial, mode = "course" }: {
   const router = useRouter();
   const canEdit = useCanEditContent();
   const ui = useTemplateUi();
+  // Phase 8c S3 (PHASE_8C_DESIGN §5.3): the first breadcrumb is Close: the validated `?from=`, else the Course page
+  const closeNav = useObjectNav();
   const aid = initial.id;
   const base = `/${lang}/courses/${course.id}/assessments`;
   const [a, setA] = useState<AssessmentStaffOut>(initial);
@@ -316,10 +318,11 @@ export function QuizEditor({ initial, mode = "course" }: {
 
   const labels = useMemo(() => cardLabels(a, t), [a, t]);
   const aTitle = pickLocalized(a.title, lang, course.default_language) || t("assessments.untitled");
-  const crumbs = useTabCrumbs("assessments", [
+  const crumbs = [
+    { label: closeNav.placeLabel, href: closeNav.backHref },
     { label: aTitle, href: `${base}/${aid}` },
     { label: t("teaching.builderCrumb") },
-  ], course.id);
+  ];
   const templatable = canEdit && a.preset === "none" && !a.structure_locked && !a.exam_template?.template_locked;
   const showHeaders = a.sections.length > 1;
   const secName = (s: SectionOut) => quizSectionName(s, a.sections.indexOf(s), lang, defaultLanguage, t);
@@ -373,7 +376,8 @@ export function QuizEditor({ initial, mode = "course" }: {
 
   return (
     <div className="space-y-4">
-      <PageHeader breadcrumbs={crumbs} title={aTitle} className="mb-2" />
+      <PageHeader breadcrumbs={crumbs} title={aTitle} className="mb-2"
+        secondaryActions={<LinkButton variant="secondary" href={`${base}/${aid}/attempts`}>{t("assignments.page.tabs.results")}</LinkButton>} />
       {!canEdit && <p className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-sm text-amber-900">{t("assessments.builder.readOnly")}</p>}
       <QuizPublishBar ctx={ctx} labels={labels} />
       <Tabs id="quiz-editor" label={t("quizEditor.tabs.label")} value={tab} onChange={switchTab} items={[

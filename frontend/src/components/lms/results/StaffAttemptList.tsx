@@ -21,8 +21,10 @@ const STATUS_TONE: Record<string, BadgeTone> = { in_progress: "info", needs_revi
 /**
  * Staff attempts of one assessment. Phase 6b S5c (UX T3): design-system Table (stacked cards under 640 px),
  * a student search over the loaded rows, a count line, status Badges and PageHeader breadcrumbs. Same API, filters and links.
+ * Phase 8c S3 (PHASE_8C_DESIGN §5.1): also the Results tab of a quiz's assignment page (`embedded`: no page header;
+ * the assessment comes from the `assessmentId` prop, never from the route).
  */
-export function StaffAttemptList({ courseId, assessmentId }: { courseId: string; assessmentId: string }) {
+export function StaffAttemptList({ courseId, assessmentId, embedded = false }: { courseId: string; assessmentId: string; embedded?: boolean }) {
   const { lang, t } = useTranslation();
   const gradeText = useGradeText();
   const countText = useListCount();
@@ -129,7 +131,7 @@ export function StaffAttemptList({ courseId, assessmentId }: { courseId: string;
 
   return (
     <div className="space-y-4">
-      <PageHeader breadcrumbs={crumbs} title={t("grading.attemptsTitle")} className="mb-2" />
+      {!embedded && <PageHeader breadcrumbs={crumbs} title={t("grading.attemptsTitle")} className="mb-2" />}
       <ErrorMessage error={error} onRetry={() => void load()} />
       <Table
         caption={t("grading.attemptsTitle")}
