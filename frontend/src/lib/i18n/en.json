@@ -2743,11 +2743,6 @@
     "searchStudent": "Search by student",
     "noMatch": "No one found. Check the spelling.",
     "studentAnswer": "Student's answer",
-    "homeTitle": "Course overview",
-    "nextStepTitle": "Next step",
-    "nextStepBody": "Add questions to the bank, then build an assessment for your students from them.",
-    "createAssessment": "Create an assessment",
-    "addQuestions": "Add questions",
     "manageEnrollment": "Enrollment settings",
     "showCatalog": "Course catalog",
     "ownerStays": "The owner cannot be removed. Transfer the course in Settings."
@@ -4308,16 +4303,6 @@
       "action": "Open",
       "allDone": "You have finished every module. Well done!"
     },
-    "staffHome": {
-      "title": "Modules",
-      "body": {
-        "modules": "Students see the modules first when they open the course.",
-        "page": "Students see the chosen page first. Modules group pages, files and assignments into steps.",
-        "assignments": "Modules group pages, files and assignments into steps for students."
-      },
-      "open": "Open modules",
-      "changeHome": "Change the course home"
-    },
     "editor": {
       "title": "Modules",
       "description": "Students see published modules in this order.",
@@ -4350,7 +4335,7 @@
       "moveItemDown": "Move “{title}” down",
       "after": "After: {titles}",
       "noItems": "No items yet. Add a page, file, assignment, link or header.",
-      "addItem": "Add item",
+      "addItem": "Add",
       "editItem": "Edit",
       "setRequirement": "Completion requirement",
       "requirement": "Requirement: {text}",
@@ -4360,7 +4345,16 @@
       "removeItem": "Remove from module",
       "deleteItemTitle": "Remove this item from the module?",
       "deleteItemBody": "The page, file or assignment itself is not deleted. Progress on this item no longer counts.",
-      "publishAnyway": "Publish anyway"
+      "publishAnyway": "Publish anyway",
+      "publishToggle": "Published: {title}",
+      "publishedIcon": "Published. Select to unpublish.",
+      "draftIcon": "Draft. Select to publish.",
+      "duplicate": "Duplicate",
+      "duplicated": "Copy created as a draft.",
+      "dragHandle": "Drag to move “{title}”",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "actionsFor": "Actions: {title}"
     },
     "settings": {
       "createTitle": "New module",
@@ -4495,5 +4489,67 @@
     "leave": "Leave student view",
     "handInsOff": "Student view: hand-ins are off.",
     "readOnlyError": "Student view is read-only. Leave student view to make changes."
+  },
+  "coursePage": {
+    "add": "Add to “{title}”",
+    "addDescription": "{kind} · {module}",
+    "addGroups": {
+      "content": "Content",
+      "assessment": "Assignments and quizzes"
+    },
+    "addItems": {
+      "page": "Page",
+      "file": "File",
+      "link": "Link",
+      "header": "Header",
+      "quiz": "Quiz",
+      "assignment": "Assignment",
+      "ortExam": "ORT exam"
+    },
+    "addExisting": "Add existing items",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
+    "moreActions": "More actions",
+    "hideDeleted": "Hide deleted modules",
+    "toggleModule": "Show or hide the items of “{title}”",
+    "itemCount": "Items: {n}",
+    "structure": "Course structure",
+    "structureHint": "Modules: pages, files and links in steps for students.",
+    "unsorted": {
+      "title": "Not in a module",
+      "empty": "Everything is in a module.",
+      "hint": "These assignments, pages and files are in no module. Students find them only in Assignments, Files or through a link.",
+      "totals": "Assignments: {assignments} · Pages: {pages} · Files: {files}",
+      "groups": {
+        "assignments": "Assignments ({n})",
+        "pages": "Pages ({n})",
+        "files": "Files ({n})"
+      },
+      "more": "Show more",
+      "moveTo": "Move to module…",
+      "allPages": "All pages",
+      "allFiles": "All files",
+      "placeTitle": "Move to a module",
+      "noModules": "There are no modules yet. Create a module first.",
+      "position": "Position in the module",
+      "atStart": "At the start",
+      "atEnd": "At the end",
+      "after": "After “{title}”",
+      "placed": "Added to the module.",
+      "deleteTitle": "Delete this item?",
+      "deleteBody": "It goes to the trash of its list (Assignments, Pages or Files) and can be restored there. Students stop seeing it."
+    }
+  },
+  "todo": {
+    "title": "To do",
+    "toGrade": "To grade",
+    "toGradeLine": "To grade: {toGrade} · Drafts: {drafts}",
+    "waiting": "Waiting: {n}",
+    "drafts": "Drafts",
+    "unpublishedModules": "Unpublished modules: {n}",
+    "studentsTitle": "Students",
+    "students": "Active students: {n}",
+    "nothing": "Nothing to do",
+    "more": "{n} more"
   }
 }
