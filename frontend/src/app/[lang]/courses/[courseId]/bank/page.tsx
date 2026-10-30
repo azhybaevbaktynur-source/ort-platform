@@ -14,12 +14,27 @@ import { Button, ConfirmDialog, EmptyState, LinkButton, LoadingState, PageHeader
 import { ContentError } from "@/components/lms/content/ContentError";
 import { useCanEditContent } from "@/components/lms/content/StaffGate";
 import { btnSmall } from "@/components/lms/course/staffUi"; // Phase 6b S5c
+import { getBankSharing, type BankSharingOut } from "@/lib/lms/organizations"; // Phase 9 S2
+import { useTemplateUi } from "@/lib/lms/templates";
+import { SharedBankPicker } from "@/components/lms/content/SharedBankPicker";
 
 export default function BankListPage() {
   const { lang, t } = useTranslation();
   const { course } = useCourse();
   const canEdit = useCanEditContent();
   const base = `/${lang}/courses/${course.id}/bank`;
+  // --- Phase 9 S2 --- (org admins see the organization-shared banks only: no trash, no create; per-bank rights)
+  const role = course.my_enrollment.role;
+  const staff = !course.my_enrollment.read_only && (role === "teacher" || role === "assistant");
+  const open = course.status !== "concluded";
+  const isOrt = useTemplateUi().key === "ort";
+  const [sharing, setSharing] = useState<BankSharingOut | null>(null);
+  useEffect(() => {
+    if (isOrt || !staff) return; // ORT stays as it is; only course staff copy shared banks in
+    let alive = true;
+    getBankSharing(course.id).then((s) => { if (alive) setSharing(s); }).catch(() => { if (alive) setSharing(null); });
+    return () => { alive = false; };
+  }, [course.id, isOrt, staff]);
   const [trash, setTrash] = useState(false);
   const [items, setItems] = useState<BankOut[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -109,14 +124,15 @@ export default function BankListPage() {
                 <LinkButton variant="secondary" size="sm" href={`/${lang}/courses/${course.id}/assessments/${b.assessment.id}/edit`}>{t("bank.quizBanks.openQuiz")}</LinkButton>
               </div>
             )}
-            {canEdit && !b.assessment && (
+            {/* Phase 9 S2: rename follows `can_edit`; delete and restore follow `can_delete` (course staff only). */}
+            {open && !b.assessment && (b.deleted_at ? b.can_delete : b.can_edit || b.can_delete) && (
               <div className="mt-3 flex flex-wrap gap-2">
                 {b.deleted_at ? (
                   <button type="button" className={btnSmall} onClick={() => void restore(b)}>{t("bank.list.restore")}</button>
                 ) : (
                   <>
-                    <button type="button" className={btnSmall} onClick={() => { setActionError(null); setDialog({ bank: b }); }}>{t("bank.list.rename")}</button>
-                    <button type="button" className={btnSmall} onClick={() => { setActionError(null); setToDelete(b); }}>{t("bank.list.delete")}</button>
+                    {b.can_edit && <button type="button" className={btnSmall} onClick={() => { setActionError(null); setDialog({ bank: b }); }}>{t("bank.list.rename")}</button>}
+                    {b.can_delete && <button type="button" className={btnSmall} onClick={() => { setActionError(null); setToDelete(b); }}>{t("bank.list.delete")}</button>}
                   </>
                 )}
               </div>
@@ -128,7 +144,7 @@ export default function BankListPage() {
     <div className="space-y-4">
       <PageHeader title={t("bank.list.title")} className="mb-2"
         secondaryActions={<>
-          <Button variant="secondary" onClick={() => setTrash((s) => !s)}>{trash ? t("bank.list.hideTrash") : t("bank.list.showTrash")}</Button>
+          {staff && <Button variant="secondary" onClick={() => setTrash((s) => !s)}>{trash ? t("bank.list.hideTrash") : t("bank.list.showTrash")}</Button>}
           {canEdit && <LinkButton variant="secondary" href={`${base}/import`}>{t("bank.list.import")}</LinkButton>}
         </>}
         primaryAction={canEdit ? <Button onClick={() => { setActionError(null); setDialog({ bank: null }); }}>{t("bank.list.create")}</Button> : undefined} />
@@ -158,6 +174,10 @@ export default function BankListPage() {
         </>
       )}
       <Pager nextCursor={cursor} loading={loading} onMore={() => load(cursor)} />
+      {/* Phase 9 S2: "From my organization" (copy a shared bank into this course) */}
+      {sharing?.can_copy && canEdit && !trash && (
+        <SharedBankPicker courseId={course.id} sharing={sharing} onCopied={() => void load()} />
+      )}
       <BankDialog open={!!dialog} bank={dialog?.bank ?? null} courseLanguages={course.languages} busy={busy} error={actionError}
         onSubmit={(v) => void submit(v)} onCancel={() => setDialog(null)} />
       <ConfirmDialog open={!!toDelete} tone="danger" busy={busy} title={t("bank.list.deleteTitle")} object={toDelete?.title}

@@ -1,6 +1,6 @@
 // TypeScript mirrors of the Phase 2 content API (docs/phases/PHASE_2_DESIGN.md sections 2, 3.4 and 5).
 // Shared by the bank/editor UI (C6) and the import UI (C7).
-import type { Lang, LocalizedText } from "./types";
+import type { BankSharingFields, Lang, LocalizedText } from "./types";
 
 export type QuestionType =
   | "single_choice"
@@ -111,6 +111,13 @@ export interface BankOut {
   deleted_at: string | null;
   /** Phase 7c: set for a quiz bank (private to its quiz); null/absent for shared banks. */
   assessment?: { id: string; title: LocalizedText } | null;
+  // --- Phase 9 S2 --- (`BankSharingFields`, types.ts: sharing state and the caller's edit right)
+  visibility: BankSharingFields["visibility"];
+  shared_at: string | null;
+  copied_from_bank_id: string | null;
+  can_edit: boolean;
+  /** Phase 9 S2: delete / restore the whole bank (course staff with content.manage only, never org admins). */
+  can_delete: boolean;
 }
 export interface BankCreateIn {
   title: string;

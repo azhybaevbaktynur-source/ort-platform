@@ -121,6 +121,26 @@ POLICY_NAMES = POLICY_NAMES | frozenset(_EXAM_TEMPLATE_POLICY_NAMES_8B)
 # ASSIGNMENT_POLICIES `GET _C/todo`. The `X-View-As: student` header is request state in `core/authz.get_authz`.)
 # Label `course:content.read+staff` (fix 1): content.read plus a staff role in the service (students get 403).
 # --- Phase 8c S1 end ---
+# --- Phase 9 S1 begin --- (PHASE_9_DESIGN 5: no new route in S1. S4 moves
+# `enrollment_forms.policies.PLANNED_POLICIES` into ENROLLMENT_FORM_POLICIES when it mounts its routers. The S2 and S3
+# routes live in packages those slices own exclusively: each slice registered its rows in its own package dict
+# (organizations / content / invitations / platform admin) in its own delimited block.
+# `org_admin` (Phase 9): active org admin of {organization_id} **or of an ancestor** (organizations.tree), or the
+# platform admin. Shared-bank reads are `authenticated` + member of the tree in the service (404 otherwise).)
+from app.lms.enrollment_forms.policies import ENROLLMENT_FORM_POLICIES  # noqa: E402
+
+ROUTE_POLICIES.update(ENROLLMENT_FORM_POLICIES)
+
+# --- Phase 9 S2 begin --- (S2 and S3 routes are mounted: their rows live in organizations/policies.py ORG_POLICIES,
+# platform_admin/organizations_policies.py, content/shared_banks_policies.py and invitations/policies.py; the
+# planned S2 / S3 rows that S1 listed here (PHASE_9_PLANNED_POLICIES) are dropped)
+from app.lms.content.shared_banks_policies import SHARED_BANK_POLICIES  # noqa: E402
+
+ROUTE_POLICIES.update(SHARED_BANK_POLICIES)
+# --- Phase 9 S2 end ---
+# `org_admin+ratelimit` is the one policy label Phase 9 adds (roster imports, design 5).
+POLICY_NAMES = POLICY_NAMES | frozenset({"org_admin+ratelimit"})
+# --- Phase 9 S1 end ---
 
 
 def iter_routes(app):

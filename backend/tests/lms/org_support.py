@@ -19,6 +19,19 @@ def make_org(db, name: str = "School", *, slug: Optional[str] = None, status: st
     return org
 
 
+def make_department(db, parent: Organization, name: str = "Dept", *, slug: Optional[str] = None) -> Organization:
+    """--- Phase 9 S1 --- A department row under `parent` (path, depth, status of the parent, settings {})."""
+    from app.lms.organizations.tree import child_path
+
+    oid = uuid.uuid4()
+    org = Organization(id=oid, slug=slug or f"d-{oid.hex[:10]}", name=name, status=parent.status,
+                       kind="department", parent_id=parent.id, path=child_path(parent.path, oid),
+                       depth=parent.depth + 1, settings={})
+    db.add(org)
+    db.commit()
+    return org
+
+
 def add_member(db, org, user, role: str = "teacher", state: str = "active") -> OrganizationMember:
     m = OrganizationMember(organization_id=org.id, user_id=user.id, role=role, state=state)
     db.add(m)

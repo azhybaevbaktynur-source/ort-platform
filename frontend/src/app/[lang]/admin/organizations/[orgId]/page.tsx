@@ -7,8 +7,8 @@ import { TriangleAlert } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { listAuditLog } from "@/lib/lms/admin";
 import {
-  SLUG_RE, getOrganization, getOrganizationUsage, listOrganizationCourses, resumeOrganization,
-  suspendOrganization, updateOrganization, type OrganizationAdminRowOut, type OrganizationOut, type OrgUsageOut,
+  SLUG_RE, getOrganization, getOrganizationUsage, listOrganizationCourses, listPlatformDepartments, resumeOrganization,
+  suspendOrganization, updateOrganization, type DepartmentOut, type OrganizationAdminRowOut, type OrganizationOut, type OrgUsageOut,
 } from "@/lib/lms/organizations";
 import { fmtApiDateTimeShort } from "@/lib/format";
 import { formatBytes } from "@/lib/lms/storage"; // Phase 6b S11b (UX 10): the localized formatter
@@ -23,8 +23,9 @@ import { OrgCourseList } from "@/components/lms/org/OrgCourseList";
 import { OrgMembersTab } from "@/components/lms/org/admin/OrgMembersTab";
 import { OrgTemplatesTab } from "@/components/lms/org/admin/OrgTemplatesTab";
 import { LoadError, OrgBadge, OrgError } from "@/components/lms/org/OrgUi";
+import { DepartmentTree, type DepartmentAction } from "@/components/lms/org/DepartmentTree"; // Phase 9 S2
 
-const TABS = ["summary", "admins", "teachers", "courses", "usage", "templates", "log"] as const;
+const TABS = ["summary", "admins", "teachers", "courses", "departments", "usage", "templates", "log"] as const; // Phase 9 S2: departments
 type Tab = (typeof TABS)[number];
 
 export default function AdminOrganizationDetailPage() {
@@ -125,12 +126,14 @@ export default function AdminOrganizationDetailPage() {
               { key: "storage", term: t("organizations.usage.storage"), description: usage ? bytes(usage.storage_bytes) : "—" },
               { key: "created", term: t("organizations.admin.created"), description: fmtApiDateTimeShort(org.created_at, lang) },
               { key: "canCreate", term: t("organizations.fields.teachersCanCreate"), description: org.settings?.teachers_can_create_courses ? t("platformAdmin.yes") : t("platformAdmin.no") },
+              ...settingsRows(org, t),
             ]} />
           </Card>
         )}
         {tab === "admins" && <OrgMembersTab org={org} role="org_admin" onChanged={() => void load()} />}
         {tab === "teachers" && <OrgMembersTab org={org} role="teacher" onChanged={() => void load()} />}
         {tab === "courses" && <OrgCoursesTab org={org} />}
+        {tab === "departments" && <OrgDepartmentsTab org={org} />}
         {tab === "usage" && (
           usageError ? <LoadError error={usageError} onRetry={loadUsage} /> : !usage ? <LoadingState label={t("lms.common.loading")} /> : (
             <div>
@@ -165,6 +168,87 @@ export default function AdminOrganizationDetailPage() {
     </div>
   );
 }
+
+// --- Phase 9 S2 begin --- (PHASE_9_DESIGN 8.1: settings fields in Summary, Departments tab with suspend / resume)
+type T = (key: string, params?: Record<string, string | number>) => string;
+
+/** Effective Phase 9 settings of a root organization (stored keys, defaults filled in as the server does). */
+function settingsRows(org: OrganizationOut, t: T) {
+  if (org.parent_id) return []; // departments read their root's settings
+  const s = (org.settings ?? {}) as Record<string, unknown>;
+  const yesNo = (v: boolean) => (v ? t("platformAdmin.yes") : t("platformAdmin.no"));
+  const defaults = (s.catalog_defaults ?? {}) as { visibility?: string; enrollment_mode?: string };
+  const retention = typeof s.application_retention_days === "number" ? s.application_retention_days : 30;
+  return [
+    { key: "bankSharing", term: t("orgSettings.bankSharing"), description: yesNo(org.kind !== "personal" && s.bank_sharing_enabled === true) },
+    { key: "studentInvitations", term: t("orgSettings.studentInvitations"), description: yesNo(s.student_invitations_enabled !== false) },
+    { key: "visibility", term: t("orgSettings.visibility"), description: t(`orgSettings.visibilityOptions.${defaults.visibility ?? "private"}`) },
+    { key: "enrollmentMode", term: t("orgSettings.enrollmentMode"), description: t(`orgSettings.modes.${defaults.enrollment_mode ?? "invite_code"}`) },
+    { key: "retention", term: t("orgSettings.retention"), description: `${retention} ${t("orgSettings.days")}` },
+  ];
+}
+
+function OrgDepartmentsTab({ org }: { org: OrganizationOut }) {
+  const { t } = useTranslation();
+  const [rows, setRows] = useState<DepartmentOut[] | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [target, setTarget] = useState<{ dept: DepartmentOut; action: "suspend" | "resume" } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [dialogError, setDialogError] = useState<unknown>(null);
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      setRows(await listPlatformDepartments(org.id));
+    } catch (e) {
+      setError(e);
+    }
+  }, [org.id]);
+  useEffect(() => { void load(); }, [load]);
+
+  const onAction = (action: DepartmentAction, dept: DepartmentOut) => {
+    if (action !== "suspend" && action !== "resume") return;
+    setDialogError(null);
+    setTarget({ dept, action });
+  };
+  const confirm = async (reason: string) => {
+    if (!target) return;
+    setBusy(true);
+    setDialogError(null);
+    try {
+      if (target.action === "suspend") await suspendOrganization(target.dept.id, reason);
+      else await resumeOrganization(target.dept.id, reason);
+      toast.success(t(target.action === "suspend" ? "departments.suspendedToast" : "departments.resumedToast", { name: target.dept.name }));
+      setTarget(null);
+      await load();
+    } catch (e) {
+      setDialogError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (error && !rows) return <LoadError error={error} onRetry={load} />;
+  if (!rows) return <LoadingState label={t("lms.common.loading")} />;
+  const suspend = target?.action === "suspend";
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-slate-700">{t("departments.platformHint")}</p>
+      <DepartmentTree rows={rows} mode="platform" onAction={onAction} />
+      {rows.length <= 1 && <EmptyState variant="plain" className="py-4" title={t("departments.noneUsage")} />}
+      <ReasonDialog
+        open={!!target}
+        title={t(suspend ? "departments.suspendTitle" : "departments.resumeTitle")}
+        object={target?.dept.name}
+        effect={t(suspend ? "departments.suspendBody" : "departments.resumeBody")}
+        confirmLabel={t(suspend ? "organizations.admin.suspend" : "organizations.admin.resume")}
+        tone={suspend ? "danger" : "primary"} busy={busy}
+        error={dialogError ? <OrgError error={dialogError} /> : undefined}
+        onConfirm={(r) => void confirm(r)} onCancel={() => setTarget(null)}
+      />
+    </div>
+  );
+}
+// --- Phase 9 S2 end ---
 
 function OrgCoursesTab({ org }: { org: OrganizationOut }) {
   const { lang, t } = useTranslation();
@@ -218,7 +302,7 @@ function EditOrganizationDialog({ open, org, onClose, onSaved }: { open: boolean
     setError(null);
     try {
       const o = await updateOrganization(org.id, {
-        name: name.trim(), slug, settings: { teachers_can_create_courses: canCreate },
+        name: name.trim(), slug, ...(org.parent_id ? {} : { settings: { teachers_can_create_courses: canCreate } }), // Phase 9 S2
       });
       onSaved(o);
     } catch (err) {
@@ -242,8 +326,10 @@ function EditOrganizationDialog({ open, org, onClose, onSaved }: { open: boolean
         <Input label={t("organizations.fields.slug")} value={slug} maxLength={64} disabled={busy} className="font-mono"
           error={checked && !slugOk ? t("organizations.fields.slugEditHint") : undefined} hint={checked && !slugOk ? undefined : t("organizations.fields.slugEditHint")}
           onChange={(e) => setSlug(e.target.value.toLowerCase())} />
-        <Checkbox label={t("organizations.fields.teachersCanCreate")} hint={t("organizations.fields.teachersCanCreateHint")}
-          checked={canCreate} disabled={busy} onChange={(e) => setCanCreate(e.target.checked)} />
+        {!org.parent_id && (
+          <Checkbox label={t("organizations.fields.teachersCanCreate")} hint={t("organizations.fields.teachersCanCreateHint")}
+            checked={canCreate} disabled={busy} onChange={(e) => setCanCreate(e.target.checked)} />
+        )}
         <OrgError error={error} />
       </form>
     </Dialog>

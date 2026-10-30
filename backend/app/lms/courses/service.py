@@ -191,6 +191,8 @@ def _resolve_creation(db: Session, actor: User, data: CourseCreateIn, organizati
 def create_course(db: Session, actor: User, data: CourseCreateIn, *, organization_id=None,
                   request: Optional[Request] = None) -> Course:
     org_id, owner, template = _resolve_creation(db, actor, data, organization_id)  # Phase 6 S1
+    # Phase 9 S1: a new course is private and has no form yet, so a form mode is always refused here
+    _check_enrollment_mode(db, None, data.enrollment_mode, "private", template.get("template_key"))
     owner_id = owner.id
     db.commit()  # ends the read transaction (and a platform-org insert), so the course row is the first write below
     now = utcnow()
@@ -256,6 +258,9 @@ def update_course(db: Session, ctx: AuthzContext, course: Course, data: CourseUp
             raise Conflict("Limit is below the current number of students", code="limit_below_current")
     if fields.get("visibility") == "catalog" and course.unlisted_by_admin_at is not None:
         raise Conflict("Unlisted by an administrator", code="unlisted_by_admin")
+    if "enrollment_mode" in fields or "visibility" in fields:  # --- Phase 9 S1 --- (design 4.6 mode rules)
+        _check_enrollment_mode(db, course, fields.get("enrollment_mode", course.enrollment_mode),
+                               fields.get("visibility", course.visibility), course.template_key)
 
     languages = list(fields["languages"]) if "languages" in fields else list(course.languages)
     if len(set(languages)) != len(languages) or not languages:
@@ -291,6 +296,33 @@ def update_course(db: Session, ctx: AuthzContext, course: Course, data: CourseUp
             setattr(course, key, fields[key])
     db.commit()
     return course
+
+
+# --- Phase 9 S1 begin --- (PHASE_9_DESIGN 4.6, invariant 9: enrollment mode rules)
+def _check_enrollment_mode(db: Session, course: Optional[Course], mode: str, visibility: str,
+                           template_key: Optional[str]) -> None:
+    """Form modes (`form_auto`, `form_review`): refused on ORT template courses (422 `template_locked`), refused
+    on a private course (422 `form_needs_catalog`: the landing of a private course is 404, a dead end) and refused
+    without an active form (422 `form_required`). Leaving a form mode is always allowed (pending applications stay
+    decidable). Called when `enrollment_mode` or `visibility` is written, so a form-mode course cannot go private."""
+    from app.lms.enrollment_forms import ids as form_ids
+    from app.lms.enrollment_forms.models import EnrollmentForm
+
+    if mode not in form_ids.FORM_MODES:
+        return
+
+    def refuse(msg: str, code: str, loc: str = "enrollment_mode") -> ValidationFailed:
+        return ValidationFailed(msg, code=code, details=[{"loc": [loc], "msg": code}])
+
+    if template_key == "ort":
+        raise refuse("Fixed by the course template", form_ids.E_TEMPLATE_LOCKED)
+    if visibility != "catalog":
+        raise refuse("Enrollment forms need a catalog-visible course", form_ids.E_FORM_NEEDS_CATALOG, "visibility")
+    active = course is not None and db.execute(select(EnrollmentForm.id).where(
+        EnrollmentForm.course_id == course.id, EnrollmentForm.status == "active")).first() is not None
+    if not active:
+        raise refuse("An active enrollment form is required", form_ids.E_FORM_REQUIRED)
+# --- Phase 9 S1 end ---
 
 
 # --- Phase 8a S3 begin --- (course home and student tabs, PHASE_8A_DESIGN 5.5, 8.2, invariant 7, P8A-7)

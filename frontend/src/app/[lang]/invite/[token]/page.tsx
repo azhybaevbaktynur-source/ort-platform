@@ -10,6 +10,7 @@ import { fmtApiDate } from "@/lib/format";
 import { pickLocalized } from "@/lib/lms/localized";
 import { AuthHeader } from "@/components/auth/AuthHeader";
 import { OrgError } from "@/components/lms/org/OrgUi";
+import { StudentInviteError } from "@/components/lms/people/InvitationList"; // Phase 9 S3
 import { Button, LinkButton, LoadingState } from "@/components/ui";
 
 const card = "rounded-3xl border border-slate-200/80 bg-white px-6 py-8 shadow-lg sm:px-10";
@@ -120,7 +121,8 @@ function InviteAccept() {
         )}
         {user && acceptError && !mismatch ? (
           <div className="mt-6 space-y-3">
-            <OrgError error={acceptError} />
+            {/* Phase 9 S3: student invitations answer course_full / course_not_open honestly */}
+            <StudentInviteError error={acceptError} />
             <Button fullWidth loading={accepting} onClick={() => void accept()}>{t("invitations.accept.retry")}</Button>
           </div>
         ) : null}

@@ -54,6 +54,38 @@ function revealInRow(row: HTMLElement | null, selector: string) {
   else if (r.right > c.right - REVEAL_PEEK) row.scrollLeft += r.right - c.right + REVEAL_PEEK;
 }
 
+/**
+ * Phase 9 UX: on mount, a selected tab that is not fully visible (a long ky/ru row at 375 px) is centred in its row,
+ * again after the web fonts load (widths change then). Sideways only, never the page (same effect as
+ * `scrollIntoView({ inline: "center", block: "nearest" })` without moving the page); a row whose selected tab is
+ * already visible is left alone, so rows that fit (the ORT screens) never move.
+ */
+function centerInRow(row: HTMLElement | null, selector: string) {
+  const el = row?.querySelector<HTMLElement>(selector);
+  if (!row || !el || row.scrollWidth <= row.clientWidth) return;
+  const c = row.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+  if (r.left >= c.left && r.right <= c.right) return;
+  row.scrollLeft += r.left + r.width / 2 - (c.left + c.width / 2);
+}
+
+/** Reveal the selected tab: centred on mount (and after fonts load), `revealInRow` on later changes. */
+function useRevealSelected(listRef: React.RefObject<HTMLDivElement | null>, selector: string, key: unknown) {
+  const mounted = useRef(false);
+  useEffect(() => {
+    if (mounted.current) {
+      revealInRow(listRef.current, selector);
+      return;
+    }
+    mounted.current = true;
+    centerInRow(listRef.current, selector);
+    // not cancelled on cleanup: React's dev double effect would drop it, and a late run only moves a hidden tab
+    const fonts = typeof document !== "undefined" ? (document as Document & { fonts?: FontFaceSet }).fonts : undefined;
+    fonts?.ready.then(() => centerInRow(listRef.current, selector)).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+}
+
 const TAB_BASE =
   "relative -mb-px inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-4 text-sm font-semibold leading-5 transition-colors";
 const TAB_ON = "border-brand-600 text-brand-700";
@@ -97,10 +129,7 @@ export const panelId = (tabsId: string, value: string) => `${tabsId}-panel-${val
  */
 export function Tabs({ id, label, items, value, onChange, className }: TabsProps) {
   const listRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    revealInRow(listRef.current, '[aria-selected="true"]');
-  }, [value]);
+  useRevealSelected(listRef, '[aria-selected="true"]', value);
 
   const enabled = items.filter((i) => !i.disabled);
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -175,9 +204,7 @@ export interface TabsNavItem {
 export function TabsNav({ label, items, className }: { label: string; items: TabsNavItem[]; className?: string }) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const activeHref = items.find((i) => i.active)?.href;
-  useEffect(() => {
-    revealInRow(listRef.current, '[aria-current="page"]');
-  }, [activeHref]);
+  useRevealSelected(listRef, '[aria-current="page"]', activeHref);
   return (
     <nav aria-label={label} className={className}>
       <ScrollFade>

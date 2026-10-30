@@ -68,7 +68,10 @@ async def test_teacher_status_bypass_attempts(db, api, kind):
     ({"title": {"ky": "x"}}, False),
     ({"title": {"en": ""}}, False),
     ({"title": {"en": "x" * 201}}, False),
-    ({"enrollment_mode": "open"}, False),
+    ({"enrollment_mode": "open"}, True),           # Phase 9 S1: CreateMode widened to the five modes
+    ({"enrollment_mode": "form_review"}, False),   # Phase 9 S1: a new course has no form (form_needs_catalog)
+    ({"enrollment_mode": "form_auto"}, False),
+    ({"enrollment_mode": "waitlist"}, False),
     ({"enrollment_limit": 0}, False),
     ({"enrollment_limit": 10001}, False),
     ({"join_code": "AAAAAAAA"}, False),

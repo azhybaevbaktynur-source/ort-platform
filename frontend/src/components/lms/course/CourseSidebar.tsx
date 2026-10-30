@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { courseNavItems, courseNavRole, type CourseNavKey } from "@/lib/lms/nav";
-import type { CourseOut } from "@/lib/lms/types";
+import { isStaffCourse, type CourseOut } from "@/lib/lms/types";
 import { AreaShell } from "@/components/ui/AreaShell";
 
 const ICONS: Record<CourseNavKey, React.ReactNode> = {
@@ -29,7 +29,8 @@ export function CourseSidebar({ course, children }: { course: CourseOut; childre
   const { t } = useTranslation();
   const pathname = usePathname() || "";
   const role = courseNavRole(course);
-  const links = courseNavItems(course, role, pathname, t);
+  // Phase 9 UX: same predicate as the course layout's Teaching area (org admins get the staff serializer)
+  const links = courseNavItems(course, role, pathname, t, { staffShape: isStaffCourse(course) });
   const anyHidden = links.some((l) => l.hiddenFromStudents);
   return (
     <AreaShell

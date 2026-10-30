@@ -13,7 +13,7 @@ from sqlalchemy.engine import Connection
 from app.core.config import settings
 from app.lms.core.models import utcnow
 from app.lms.organizations.ids import personal_org_id, personal_org_slug, platform_org_id
-from app.lms.organizations.models import Organization, OrganizationMember
+from app.lms.organizations.models import Organization, OrganizationMember, path_segment
 
 DEMO_TEACHER_ID = "usr_ort_demo_teacher"  # same value as app.lms.ort.seed.DEMO_TEACHER_ID
 CREATOR_SETTINGS = {"teachers_can_create_courses": True}
@@ -36,6 +36,7 @@ def ensure_platform_org(conn: Connection) -> uuid.UUID:
         insert_ignore(conn, Organization.__table__, dict(
             id=oid, slug=settings.PLATFORM_ORG_SLUG, name=settings.PLATFORM_ORG_NAME, status="active",
             settings=dict(CREATOR_SETTINGS), created_at=now, updated_at=now,
+            kind="platform", path=path_segment(oid), depth=0,  # Phase 9 S1 (PHASE_9_DESIGN 2.1)
         ))
     return oid
 
@@ -73,6 +74,7 @@ def ensure_personal_org(conn: Connection, user_id: str, display_name: Optional[s
             status="suspended" if reason else "active", settings=dict(CREATOR_SETTINGS),
             created_by_id=None, created_at=now, updated_at=now,
             suspended_at=now if reason else None, suspended_reason=reason,
+            kind="personal", path=path_segment(oid), depth=0,  # Phase 9 S1 (PHASE_9_DESIGN 2.1, invariant 2)
         ))
     if with_membership:
         ensure_membership(conn, oid, user_id)

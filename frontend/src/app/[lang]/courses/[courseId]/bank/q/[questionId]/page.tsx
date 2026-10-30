@@ -11,7 +11,7 @@ import { useCourse } from "@/components/lms/CourseContext";
 import { ConflictDialog } from "@/components/lms/content/ConflictDialog";
 import { ContentError } from "@/components/lms/content/ContentError";
 import { QuestionEditor } from "@/components/lms/content/QuestionEditor";
-import { useCanEditContent } from "@/components/lms/content/StaffGate";
+import { useCanEditBank } from "@/components/lms/content/StaffGate";
 import { StudentPreview } from "@/components/lms/content/StudentPreview";
 import { TranslationPanel } from "@/components/lms/content/TranslationPanel";
 import { VersionHistory } from "@/components/lms/content/VersionHistory";
@@ -23,7 +23,6 @@ export default function QuestionPage() {
   const { lang, t } = useTranslation();
   const { questionId } = useParams<{ questionId: string }>();
   const { course } = useCourse();
-  const canEdit = useCanEditContent();
   const [q, setQ] = useState<QuestionStaffOut | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [tab, setTab] = useState<Tab>("edit");
@@ -47,6 +46,7 @@ export default function QuestionPage() {
     if (!bankId) return;
     getBank(course.id, bankId).then(setBank).catch(() => setBank(null));
   }, [course.id, bankId]);
+  const canEdit = useCanEditBank(bank); // Phase 9 S2: `bank.can_edit` (org admins on shared banks)
   const base = `/${lang}/courses/${course.id}/bank`;
   const crumbs = useTabCrumbs("bank", [
     { label: bank?.title || t("bank.backToQuestions"), href: bankId ? `${base}/${bankId}` : base },

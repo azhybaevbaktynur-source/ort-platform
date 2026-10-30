@@ -14,7 +14,9 @@ from app.lms.enrollments.schemas import (
 )
 
 Lang = Literal["en", "ru", "ky"]
-CreateMode = Literal["invite_code", "closed"]
+# Phase 9 S1 (PHASE_9_DESIGN 2.6, 4.6): all five modes; form modes need an active form and `visibility = catalog`
+# (422 `form_required` / `form_needs_catalog`) and ORT template courses refuse them (422 `template_locked`)
+CreateMode = Literal["invite_code", "closed", "open", "form_auto", "form_review"]
 Title = localized_text(200)
 Description = localized_text(5000)
 # --- Phase 8a S1 begin --- (course home, PHASE_8A_DESIGN 2.1, 5.5)

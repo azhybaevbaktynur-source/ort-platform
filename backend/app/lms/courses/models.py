@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import (
-    Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, Uuid, event, text,
+    Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, Uuid, event, text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -71,6 +71,10 @@ class Course(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
         nullable=True,
     )
     # --- Phase 8a S1 end ---
+    # --- Phase 9 S1 begin --- (PHASE_9_DESIGN 2.6, 4.6: lowercased titles and descriptions in every language, kept
+    # in step by the mapper listener below on every ORM insert/update; catalog `q` is a plain LIKE on it)
+    catalog_search: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
+    # --- Phase 9 S1 end ---
     # --- Phase 8b S1 begin --- (exam template sandbox, PHASE_8B_DESIGN 2; NULL for every regular course)
     sandbox_for_template_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("exam_templates.id", ondelete="SET NULL"), nullable=True
@@ -120,3 +124,33 @@ from app.lms.organizations.defaults import course_org_listener  # noqa: E402
 
 event.listen(Course, "before_insert", course_org_listener)
 # --- Phase 6 S1 end ---
+
+
+# --- Phase 9 S1 begin --- (PHASE_9_DESIGN 2.6: `courses.catalog_search`; migration 0014 copies this formula)
+def catalog_search_text(title, description) -> str:
+    """Every non-empty title and description value (languages in sorted order), space-joined and lowercased."""
+    parts: list[str] = []
+    for blob in (title, description):
+        if isinstance(blob, dict):
+            for lang in sorted(blob):
+                value = blob[lang]
+                if isinstance(value, str) and value.strip():
+                    parts.append(value.strip())
+    return " ".join(parts).lower()
+
+
+def _catalog_search_insert(mapper, conn, target) -> None:
+    target.catalog_search = catalog_search_text(target.title, target.description)
+
+
+def _catalog_search_update(mapper, conn, target) -> None:
+    from sqlalchemy import inspect
+
+    state = inspect(target)
+    if state.attrs.title.history.has_changes() or state.attrs.description.history.has_changes():
+        target.catalog_search = catalog_search_text(target.title, target.description)
+
+
+event.listen(Course, "before_insert", _catalog_search_insert)
+event.listen(Course, "before_update", _catalog_search_update)
+# --- Phase 9 S1 end ---

@@ -1,12 +1,14 @@
 // Invitations API (docs/phases/PHASE_6_DESIGN.md §2.3, §7).
-import { lmsFetch } from "./client";
+import { getAuthHeader } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/apiBase";
+import { LmsApiError, lmsFetch } from "./client";
 import { asPage, type ListParams } from "./organizations";
-import type { Lang, LocalizedText, PageOut } from "./types";
+import type { Lang, LocalizedText, PageOut, RosterCounts, RosterImportOut, RosterKind } from "./types";
 
 const enc = encodeURIComponent;
 const post = <T,>(path: string, body?: unknown) => lmsFetch<T>(path, { method: "POST", body: body ?? {} });
 
-export type InvitationRole = "org_admin" | "teacher" | "assistant";
+export type InvitationRole = "org_admin" | "teacher" | "assistant" | "student"; // student: Phase 9 S3
 export type InvitationState = "pending" | "accepted" | "revoked" | "expired";
 
 /** `InvitationOut` of GET /org/{orgId}/invitations and of revoke. */
@@ -125,3 +127,111 @@ export function takeAccepted(pathname: string): AcceptedNoticeData | null {
     return null;
   }
 }
+
+// --- Phase 9 S3 begin --- (PHASE_9_DESIGN 4.4, 4.5: student invitations and roster CSV imports)
+
+/** Most addresses per "Invite students" request (the server refuses more with 422). */
+export const STUDENT_INVITE_MAX = 50;
+
+export type StudentInviteResult = "invited" | "already_enrolled" | "invalid_email" | "duplicate";
+
+/** One row per submitted address, in order; the same shape whether or not the address has an account. */
+export interface StudentInviteRowOut {
+  email: string;
+  result: StudentInviteResult;
+  invitation: InvitationOut | null;
+}
+
+export interface StudentInvitationsOut {
+  items: StudentInviteRowOut[];
+  invited: number;
+  already_enrolled: number;
+  invalid: number;
+}
+
+export const createStudentInvitations = (courseId: string, body: { emails: string[]; message?: string; language: Lang }) =>
+  post<StudentInvitationsOut>(`/courses/${enc(courseId)}/students/invitations`, body);
+export const listStudentInvitations = (courseId: string, p: ListParams & { state?: InvitationState } = {}) =>
+  lmsFetch<PageOut<InvitationOut>>(`/courses/${enc(courseId)}/students/invitations`, { params: { limit: 25, ...p } })
+    .then((x) => asPage<InvitationOut>(x));
+export const revokeStudentInvitation = (courseId: string, id: string) =>
+  post<InvitationOut>(`/courses/${enc(courseId)}/students/invitations/${enc(id)}/revoke`);
+export const resendStudentInvitation = (courseId: string, id: string) =>
+  post<InvitationCreatedOut>(`/courses/${enc(courseId)}/students/invitations/${enc(id)}/resend`);
+
+/** Split a pasted list (new lines, commas, semicolons, spaces) into distinct addresses, lowercased. */
+export function splitEmails(text: string): string[] {
+  const seen = new Set<string>();
+  for (const part of text.split(/[\s,;]+/)) {
+    const v = part.trim().toLowerCase();
+    if (v) seen.add(v);
+  }
+  return Array.from(seen);
+}
+
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Roster import limits shown in the UI; the server enforces them. */
+export const ROSTER_LIMITS = { rows: 500, kib: 256 } as const;
+
+/** `counts` of a roster import: S1's `RosterCounts` plus `added` (teachers with an account added directly). */
+export type RosterImportCounts = RosterCounts & { added?: number };
+export type RosterImport = Omit<RosterImportOut, "counts"> & { counts: RosterImportCounts };
+
+export interface RosterUploadParams {
+  file: File;
+  kind: RosterKind;
+  courseId?: string | null;
+  departmentId?: string | null;
+  /** Language of the invitation emails (the UI language). */
+  language: Lang;
+}
+
+async function rosterPost(path: string, form: FormData): Promise<RosterImport> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      method: "POST", headers: { ...(await getAuthHeader()) }, body: form, cache: "no-store",
+    });
+  } catch {
+    throw new LmsApiError(0, "network", "Network error");
+  }
+  const text = await res.text();
+  let data: unknown = undefined;
+  if (text) {
+    try { data = JSON.parse(text); } catch { data = undefined; }
+  }
+  if (!res.ok) {
+    const err = (data as { error?: { code?: string; message?: string; details?: Record<string, unknown> } } | undefined)?.error;
+    if (err && typeof err.code === "string") throw new LmsApiError(res.status, err.code, err.message || err.code, err.details || {});
+    const code = res.status === 413 ? "roster_too_large" : res.status === 429 ? "rate_limited" : res.status === 403 ? "forbidden" : res.status === 404 ? "not_found" : "unknown";
+    throw new LmsApiError(res.status, code, `HTTP ${res.status}`);
+  }
+  return data as RosterImport;
+}
+
+/** Dry run: checks every row and saves only the masked report; sends nothing. */
+export function checkRoster(orgId: string, p: RosterUploadParams): Promise<RosterImport> {
+  const form = new FormData();
+  form.append("file", p.file);
+  form.append("kind", p.kind);
+  if (p.courseId) form.append("course_id", p.courseId);
+  if (p.departmentId) form.append("department_id", p.departmentId);
+  form.append("dry_run", "true");
+  form.append("language", p.language);
+  return rosterPost(`/org/${enc(orgId)}/roster-imports`, form);
+}
+
+/** Apply a checked import: the same file again (the server compares the hash); idempotent. */
+export function applyRoster(orgId: string, importId: string, file: File, language: Lang): Promise<RosterImport> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("language", language);
+  return rosterPost(`/org/${enc(orgId)}/roster-imports/${enc(importId)}/apply`, form);
+}
+
+export const listRosterImports = (orgId: string, p: ListParams = {}) =>
+  lmsFetch<PageOut<RosterImport>>(`/org/${enc(orgId)}/roster-imports`, { params: { limit: 25, ...p } }).then((x) => asPage<RosterImport>(x));
+export const getRosterImport = (orgId: string, id: string) =>
+  lmsFetch<RosterImport>(`/org/${enc(orgId)}/roster-imports/${enc(id)}`);
+// --- Phase 9 S3 end ---

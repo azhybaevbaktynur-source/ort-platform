@@ -42,3 +42,9 @@ from app.lms.modules.models import (  # noqa: F401,E402
     ModuleProgress,
 )
 # --- Phase 8a S1 end ---
+# --- Phase 9 S1 begin ---
+from app.lms.organizations.roster_models import RosterImport  # noqa: F401,E402
+from app.lms.enrollment_forms.models import (  # noqa: F401,E402
+    EnrollmentApplication, EnrollmentForm, EnrollmentFormField,
+)
+# --- Phase 9 S1 end ---
