@@ -1,9 +1,9 @@
 """SQL scopes for course lists. Never call can() in a loop; filter in SQL."""
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Optional
 
-from sqlalchemy import Select, and_, func, or_, select
+from sqlalchemy import Select, String, and_, cast, exists, func, or_, select
 from sqlalchemy.orm import aliased
 
 from app.lms.courses.models import Course
@@ -68,21 +68,71 @@ def my_deleted_courses(user_id: str) -> Select:
 def catalog_courses(user_id: str) -> Select:
     """Rows of (Course, my_role, my_state): published, catalog-visible, not deleted, not unlisted by an admin.
 
-    published_at IS NOT NULL keeps the keyset cursor well defined (the publish transition always sets it)."""
+    published_at IS NOT NULL keeps the keyset cursor well defined (the publish transition always sets it).
+    Phase 9 S4: the course's organization **and the root of its tree** must be active and not deleted (a suspended
+    school takes its departments' courses out of the catalog)."""
+    return _catalog_select(user_id)[0]
+
+
+def _catalog_select(user_id: str):
     from app.lms.organizations.models import Organization  # Phase 6 S1
 
     mine = aliased(Enrollment)
-    return (
+    root = aliased(Organization, name="catalog_root")  # Phase 9 S4: the root's path is its own id (32 hex chars)
+    stmt = (
         select(Course, mine.role.label("my_role"), mine.state.label("my_state"))
         .outerjoin(mine, and_(mine.course_id == Course.id, mine.user_id == user_id))
         .join(Organization, Organization.id == Course.organization_id)  # Phase 6 S1: suspended orgs leave
+        .join(root, root.path == func.substr(Organization.path, 1, 32))  # Phase 9 S4
         .where(
             Course.status == "published", Course.visibility == "catalog", Course.deleted_at.is_(None),
             Course.unlisted_by_admin_at.is_(None), Course.published_at.is_not(None),
             Organization.status == "active", Organization.deleted_at.is_(None),
+            root.status == "active", root.deleted_at.is_(None),  # Phase 9 S4
             regular_courses(),  # Phase 8b S1
         )
     )
+    return stmt, root
+
+
+# --- Phase 9 S4 begin --- (PHASE_9_DESIGN 4.6: catalog search, filters and card extras in the same statement)
+CATALOG_MODES = ("invite_code", "closed", "open", "form_auto", "form_review")
+CATALOG_LANGUAGES = ("en", "ky", "ru")
+CATALOG_Q_MAX = 80
+
+
+def catalog_cards(user_id: str, *, q: Optional[str] = None, language: Optional[str] = None,
+                  mode: Optional[str] = None, organization_id=None) -> Select:
+    """Rows of (Course, my_role, my_state, root_id, root_name, has_active_form, my_app_id, my_app_status).
+
+    `q` matches `courses.catalog_search` (lowercased titles and descriptions in every language) with a plain
+    `LIKE` (design 7: acceptable at catalog size); `language` is one of the course's languages; `mode` is the
+    enrollment mode; `organization_id` is a root (its whole tree). One statement per page."""
+    from app.lms.enrollment_forms.models import EnrollmentApplication, EnrollmentForm
+    from app.lms.courses.service import like_escape
+
+    stmt, root = _catalog_select(user_id)
+    has_form = exists().where(EnrollmentForm.course_id == Course.id, EnrollmentForm.status == "active")
+    latest = (select(EnrollmentApplication.id, EnrollmentApplication.status)
+              .where(EnrollmentApplication.course_id == Course.id, EnrollmentApplication.user_id == user_id)
+              .order_by(EnrollmentApplication.submitted_at.desc(), EnrollmentApplication.id.desc())
+              .limit(1).correlate(Course))
+    stmt = stmt.add_columns(
+        root.id.label("root_id"), root.name.label("root_name"), has_form.label("has_active_form"),
+        latest.with_only_columns(EnrollmentApplication.id).scalar_subquery().label("my_app_id"),
+        latest.with_only_columns(EnrollmentApplication.status).scalar_subquery().label("my_app_status"),
+    )
+    if q and q.strip():
+        needle = like_escape(q.strip().lower()[:CATALOG_Q_MAX])
+        stmt = stmt.where(Course.catalog_search.like("%" + needle + "%", escape="\\"))
+    if language:
+        stmt = stmt.where(cast(Course.languages, String).like(f'%"{language}"%'))
+    if mode:
+        stmt = stmt.where(Course.enrollment_mode == mode)
+    if organization_id is not None:
+        stmt = stmt.where(root.id == organization_id)
+    return stmt
+# --- Phase 9 S4 end ---
 
 
 def active_student_counts(course_ids) -> Select:

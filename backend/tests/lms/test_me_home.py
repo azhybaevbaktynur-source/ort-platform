@@ -91,7 +91,8 @@ async def test_empty_home(db, api):
     body = await home(api, make_user(db))
     assert set(body) == HOME_KEYS
     assert body == {"in_progress": [], "next_up": [], "latest_results": [], "courses": [], "courses_total": 0,
-                    "pending_invitations": 0, "modules_next": [], "announcements": []}  # + Phase 8a S3
+                    "pending_invitations": 0, "modules_next": [], "announcements": [],  # + Phase 8a S3
+                    "pending_applications": []}  # + Phase 9 S4
 
 
 async def test_full_shape_and_no_private_fields(db, api):

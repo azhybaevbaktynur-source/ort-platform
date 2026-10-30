@@ -95,3 +95,8 @@ api_router.include_router(_pages_router, prefix="/courses", tags=["Pages"])
 api_router.include_router(_course_files_router, prefix="/courses", tags=["Course Files"])
 api_router.include_router(_announcements_router, prefix="/courses", tags=["Announcements"])
 # --- Phase 8a S3 end ---
+# --- Phase 9 S4 begin --- (enrollment forms, applications, /me/applications; PHASE_9_DESIGN 5)
+from app.lms.enrollment_forms.router import router as _enrollment_forms_router  # noqa: E402
+
+api_router.include_router(_enrollment_forms_router, tags=["Enrollment forms"])
+# --- Phase 9 S4 end ---

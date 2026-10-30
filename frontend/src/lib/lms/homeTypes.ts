@@ -70,6 +70,16 @@ export interface HomeOut {
   // --- Phase 8a S4a end ---
   /** Phase 8a S5: the latest three published announcements of the student's active courses (absent before 8a) */
   announcements?: HomeAnnouncementOut[];
+  /** Phase 9 S4: the newest three pending applications (absent before Phase 9; never answers) */
+  pending_applications?: HomePendingApplicationOut[];
+}
+
+/** Phase 9 S4: one "Pending applications" row on the student home. */
+export interface HomePendingApplicationOut {
+  application_id: string;
+  course_id: string;
+  course_title: LocalizedText;
+  submitted_at: string;
 }
 
 /** Phase 8a S5: one row of the home announcements strip (backend `AnnouncementHomeOut`; never a body). */

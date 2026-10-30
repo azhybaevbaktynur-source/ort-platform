@@ -1,7 +1,6 @@
 """Route policies of the enrollment forms, applications and purge routes (PHASE_9_DESIGN 5). S1 creates the dict
 (registered by `app/core/route_inventory.py`, block `# --- Phase 9 S1 ---`) and names the planned entries; S4 mounts
-the routers and moves `PLANNED_POLICIES` into `ENROLLMENT_FORM_POLICIES` in its own delimited block. The inventory
-test rejects entries for routes that do not exist yet ("stale"), so the planned entries are not registered before.
+the routers (`router.py`, `attempts/internal_router.py`) and registers them (block `# --- Phase 9 S4 ---` below).
 
 No new policy names: `course:*` (validated by prefix), `authenticated[+ratelimit]`, `internal_token`.
 The catalog filters and the landing (`GET /catalog/courses[/{course_id}]`) stay in `enrollments.policies`."""
@@ -30,3 +29,7 @@ PLANNED_POLICIES: dict[tuple[str, str], str] = {
     # D7 purge: no cron in production (see ids.py); bounded opportunistic runs plus this endpoint
     ("POST", "/api/v1/internal/purge-applications"): "internal_token",
 }
+
+# --- Phase 9 S4 begin --- (routes mounted: enrollment_forms/router.py and the purge entry in attempts/internal_router)
+ENROLLMENT_FORM_POLICIES.update(PLANNED_POLICIES)
+# --- Phase 9 S4 end ---
