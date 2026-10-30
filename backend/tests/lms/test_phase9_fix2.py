@@ -6,16 +6,22 @@
 - L2: submit validates again against the fields read after the form row lock.
 - L3: a losing roster apply (409 `already_applied`) spends no daily budget.
 - L4: a failed roster chunk is logged with the exception type only (never an email).
-- Info: a shared bank is copied only into a course of the same tree."""
+- Info: a shared bank is copied only into a course of the same tree.
+- Authz: `_org` and the resolver hint see a suspension anywhere on the path (a suspended middle department), at the
+  same statement counts."""
 from __future__ import annotations
 
 import logging
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.exc import IntegrityError
 
-from app.db.session import SessionLocal
+from app.core.authz import A, AuthzContext, can, enrollment_role_resolver
+from app.db.session import SessionLocal, engine
+from app.lms.content.permissions import can_edit_bank
+from app.lms.courses.models import Course
+from tests.lms.factories import make_bank
 from app.lms.core import clock
 from app.lms.core.errors import RateLimited
 from app.lms.core.models import utcnow
@@ -268,3 +274,71 @@ async def test_copy_bank_only_into_the_same_tree(db, api):
     # inside the tree the copy still works
     r = await api.call(w.T2, "POST", f"/courses/{w.C2.id}/banks/copy-from", json={"bank_id": str(w.B.id)})
     assert r.status_code == 201, r.text
+
+
+# ------------------------------------------------------------------ authz: a suspended middle department
+
+def _ctx(db, user) -> AuthzContext:
+    return AuthzContext(user, db, enrollment_role_resolver(db, user.id))
+
+
+def _write_statements(db, user, course) -> int:
+    db.expire_all()
+    course = db.get(Course, course.id)
+    _ = (user.id, user.is_platform_admin, course.status)  # loaded before counting
+    n = [0]
+
+    def count(*a):
+        n[0] += 1
+
+    event.listen(engine, "before_cursor_execute", count)
+    try:
+        ctx = _ctx(db, user)
+        assert can(ctx, A.CONTENT_MANAGE, course) == can(ctx, A.CONTENT_MANAGE, course)  # 2nd call cached
+    finally:
+        event.remove(engine, "before_cursor_execute", count)
+    return n[0]
+
+
+async def test_authz_middle_department_suspended_reaches_sub_department_course(db, api):
+    w = tree_world(db)
+    ts = teacher(db)
+    add_member(db, w.S, ts, "teacher")
+    cs = make_course(db, ts, organization_id=w.S.id, status="published")
+    bank = make_bank(db, cs, ts, title="Shared", visibility="organization", shared_at=utcnow(), shared_by_id=ts.id)
+    student = make_user(db)
+    enroll(db, cs, student)
+    # statement counts: a root course write is one statement; depth 1 and depth 2 cost the same
+    root_course = make_course(db, w.T, organization_id=w.R.id, status="published")
+    n_root = _write_statements(db, w.T, root_course)
+    assert n_root == 1
+    assert _write_statements(db, w.T, w.C) == n_root
+    assert _write_statements(db, ts, cs) == n_root
+    assert can_edit_bank(_ctx(db, w.aD), cs, bank)
+
+    suspend(db, w.D)
+    assert w.R.status == "active" and w.S.status == "active"
+    # enrolled users: the resolver hint sees the middle department
+    for user, action in ((ts, A.CONTENT_MANAGE), (student, A.ASSESSMENT_TAKE)):
+        c = _ctx(db, user)
+        assert c.role_for(cs.id) is not None
+        assert c.role_resolver.org_status[cs.id] == "suspended"
+        assert not can(c, action, cs)
+        assert can(c, A.COURSE_READ, cs)
+    # org admins (`_org` through the path): suspended, no bank edit right
+    for admin in (w.aR, w.aD, w.aS):
+        c = _ctx(db, admin)
+        assert c.org_suspended(w.S.id)
+        assert not can_edit_bank(c, cs, bank)
+    # the routes say why; reads stay
+    for user in (ts, w.aR, w.aS):
+        r = await api.call(user, "PATCH", f"/courses/{cs.id}/banks/{bank.id}", json={"title": "nope"})
+        assert (r.status_code, err(r)) == (403, "organization_suspended"), (user.id, r.text)
+    assert (await api.call(ts, "GET", f"/courses/{cs.id}")).status_code == 200
+    assert (await api.call(student, "GET", f"/courses/{cs.id}")).status_code == 200
+    # a sibling department's courses are not affected
+    sibling = make_department(db, w.R, "D2")
+    tsib = teacher(db)
+    add_member(db, sibling, tsib, "teacher")
+    csib = make_course(db, tsib, organization_id=sibling.id, status="published")
+    assert can(_ctx(db, tsib), A.CONTENT_MANAGE, csib)
