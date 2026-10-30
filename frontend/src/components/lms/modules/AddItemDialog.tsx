@@ -4,34 +4,45 @@
 // target (with a way to create one); "New quiz" creates the 7a quiz assignment and its item in one call, then opens
 // the 7c quiz editor; a link takes a web address; a header is a title only. Optional: the title shown in the module,
 // visibility and a completion requirement (types allowed by the kind).
+// Phase 8c S2 (PHASE_8C_DESIGN §3.3, §3.4): opened from the grouped "+ Add" menu with `initialKind` (the kind radios
+// are then hidden). "New page" leads to `/pages/new?module=&from=`; "Upload" and "New assignment" open their dialogs
+// over this one and add the new target to the module; the quiz editor and the assignment page get `from` (back to
+// the module). `PlaceInModuleDialog` puts an unsorted target into a module at a chosen position.
 import React, { useCallback, useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { cleanLocalized, pickLocalized } from "@/lib/lms/localized";
 import { listAssignments } from "@/lib/lms/assignments";
-import type { AssignmentStaffSummaryOut } from "@/lib/lms/assignmentTypes";
+import type { AssignmentStaffOut, AssignmentStaffSummaryOut } from "@/lib/lms/assignmentTypes";
 import { addItem, createQuizItem, listCourseFilesForPicker, listPagesForPicker } from "@/lib/lms/modules";
-import type { ItemIn, ItemKind, ModuleStaffOut, RequirementType } from "@/lib/lms/modulesTypes";
+import type { ItemIn, ItemKind, ItemStaffOut, ModuleStaffOut, RequirementType } from "@/lib/lms/modulesTypes";
+import { withFrom } from "@/lib/lms/nav";
+import type { CourseFileStaffOut } from "@/lib/lms/pagesTypes";
 import type { Lang, LocalizedText } from "@/lib/lms/types";
-import { Badge, Button, Checkbox, Dialog, FieldLabel, Input, LinkButton, Pagination, Skeleton, Switch } from "@/components/ui";
+import { Badge, Button, Checkbox, Dialog, FieldLabel, Input, LinkButton, Pagination, Select, Skeleton, Switch } from "@/components/ui";
 import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
+import { AssignmentEditorDialog } from "@/components/lms/assignments/AssignmentEditorDialog";
+import { UploadFileDialog } from "@/components/lms/courseFiles/UploadFileDialog";
 import { ItemKindIcon, useItemKindText, useModuleErrorText } from "./moduleUi";
 import { RequirementFields, requirementBody, type CourseLangs } from "./OutlineDialogs";
 
-type AddKind = ItemKind | "quiz";
+export type AddKind = ItemKind | "quiz";
 const ADD_KINDS: AddKind[] = ["page", "file", "assignment", "quiz", "url", "header"];
+
+/** The Course page fragment of a module: the `from` of every object opened from the outline (§5.3). */
+export const moduleAnchor = (base: string, moduleId: string) => `${base}#m-${moduleId}`;
 
 interface Pick { id: string; title: string; meta?: string; draft: boolean; icon: React.ReactNode }
 
 /** A paged radio list of existing targets (pages, files or assignments). */
-function PickList({ load, picked, onPick, emptyText, createHref, createLabel, label, disabled }: {
+function PickList({ load, picked, onPick, emptyText, create, label, disabled }: {
   load: (cursor: string | null) => Promise<{ items: Pick[]; next: string | null }>;
   picked: string | null;
   onPick: (id: string) => void;
   emptyText: string;
-  createHref: string;
-  createLabel: string;
+  /** The way to create a new target (a link or a button). */
+  create?: React.ReactNode;
   label: string;
   disabled?: boolean;
 }) {
@@ -95,17 +106,21 @@ function PickList({ load, picked, onPick, emptyText, createHref, createLabel, la
           <Pagination nextCursor={cursor} loading={loading} onLoadMore={() => void fetchPage(cursor)} className="pb-2" />
         </div>
       )}
-      <LinkButton variant="link" href={createHref} leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />}>{createLabel}</LinkButton>
+      {create}
     </fieldset>
   );
 }
 
-export function AddItemDialog({ open, module, courseId, base, langs, onAdded, onClose }: {
+export function AddItemDialog({ open, module, courseId, base, langs, initialKind, allowNewAssignment = true, onAdded, onClose }: {
   open: boolean;
   module: ModuleStaffOut;
   courseId: string;
   base: string;
   langs: CourseLangs;
+  /** Phase 8c S2: the kind chosen in the "+ Add" menu; the kind radios are then hidden. */
+  initialKind?: AddKind;
+  /** Phase 8c S2: false in ORT courses (non-quiz assignments stay out of them, 7a). */
+  allowNewAssignment?: boolean;
   onAdded: () => void;
   onClose: () => void;
 }) {
@@ -115,7 +130,7 @@ export function AddItemDialog({ open, module, courseId, base, langs, onAdded, on
   const errorText = useModuleErrorText();
   const formId = useId();
   const kindName = useId();
-  const [kind, setKind] = useState<AddKind>("page");
+  const [kind, setKind] = useState<AddKind>(initialKind ?? "page");
   const [target, setTarget] = useState<string | null>(null);
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState<LocalizedText>({});
@@ -125,6 +140,10 @@ export function AddItemDialog({ open, module, courseId, base, langs, onAdded, on
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  // Phase 8c S2: "Upload" and "New assignment" open their own dialog over this one
+  const [sub, setSub] = useState<null | "upload" | "assignment">(null);
+  const from = moduleAnchor(base, module.id);
+  const moduleName = pickLocalized(module.title, lang, langs.defaultLanguage) || t("modules.untitledModule");
 
   const chooseKind = (k: AddKind) => {
     setKind(k);
@@ -183,7 +202,7 @@ export function AddItemDialog({ open, module, courseId, base, langs, onAdded, on
     try {
       if (kind === "quiz") {
         const out = await createQuizItem(courseId, module.id, { kind: "quiz", title: cleaned, quiz: { preset: "none", languages: quizLangs } });
-        router.push(`${base}/assessments/${out.assessment_id}/edit`);
+        router.push(withFrom(`${base}/assessments/${out.assessment_id}/edit`, from));
         return;
       }
       const body: ItemIn = { kind, published: visible };
@@ -201,12 +220,40 @@ export function AddItemDialog({ open, module, courseId, base, langs, onAdded, on
     }
   };
 
+  /** Phase 8c S2: a target created in a nested dialog goes straight into the module (visible, no requirement). */
+  const addCreated = async (body: ItemIn, next?: string) => {
+    setSub(null);
+    setBusy(true);
+    setError(null);
+    try {
+      await addItem(courseId, module.id, body);
+      if (next) { router.push(next); return; }
+      onAdded();
+    } catch (e) {
+      setError(e);
+      setBusy(false);
+    }
+  };
+  const onFileUploaded = (f?: CourseFileStaffOut) => {
+    if (!f) { setSub(null); return; }
+    void addCreated({ kind: "file", file_id: f.id, published: true });
+  };
+  const onAssignmentCreated = (a: AssignmentStaffOut) => {
+    const next = a.kind === "quiz" && a.assessment_id
+      ? withFrom(`${base}/assessments/${a.assessment_id}/edit`, from)
+      : withFrom(`${base}/assignments/${a.id}?tab=settings`, from);
+    void addCreated({ kind: "assignment", assignment_id: a.id, published: true }, next);
+  };
+
   const toggleLang = (l: Lang) => setQuizLangs((p) => (p.includes(l) ? p.filter((x) => x !== l) : [...p, l]));
   const itemKind: ItemKind = kind === "quiz" ? "assignment" : kind;
+  const plus = <Plus aria-hidden="true" className="h-4 w-4" />;
 
   return (
     <Dialog open={open} onClose={onClose} busy={busy} size="lg" title={t("modules.add.title")}
-      description={pickLocalized(module.title, lang, langs.defaultLanguage) || t("modules.untitledModule")}
+      description={initialKind
+        ? t("coursePage.addDescription", { kind: initialKind === "quiz" ? t("coursePage.addItems.quiz") : kindText(initialKind), module: moduleName })
+        : moduleName}
       footer={(
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>{t("lms.common.cancel")}</Button>
@@ -214,30 +261,45 @@ export function AddItemDialog({ open, module, courseId, base, langs, onAdded, on
         </>
       )}>
       <form id={formId} onSubmit={(e) => void submit(e)} noValidate className="space-y-5">
-        <fieldset>
-          <legend className="mb-1 text-sm font-medium leading-6 text-slate-800">{t("modules.add.kindLabel")}</legend>
-          <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-            {ADD_KINDS.map((k) => (
-              <label key={k} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-slate-200 px-3 py-2 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
-                <input type="radio" name={kindName} className="h-4 w-4 shrink-0 accent-brand-600" checked={kind === k} disabled={busy} onChange={() => chooseKind(k)} />
-                <ItemKindIcon kind={k === "quiz" ? "assignment" : k} assignmentKind={k === "quiz" ? "quiz" : undefined} className="h-5 w-5 text-slate-600" />
-                <span className="text-base leading-6 text-slate-900 sm:text-sm">{k === "quiz" ? t("modules.add.newQuiz") : kindText(k)}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+        {!initialKind && (
+          <fieldset>
+            <legend className="mb-1 text-sm font-medium leading-6 text-slate-800">{t("modules.add.kindLabel")}</legend>
+            <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+              {ADD_KINDS.map((k) => (
+                <label key={k} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-slate-200 px-3 py-2 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
+                  <input type="radio" name={kindName} className="h-4 w-4 shrink-0 accent-brand-600" checked={kind === k} disabled={busy} onChange={() => chooseKind(k)} />
+                  <ItemKindIcon kind={k === "quiz" ? "assignment" : k} assignmentKind={k === "quiz" ? "quiz" : undefined} className="h-5 w-5 text-slate-600" />
+                  <span className="text-base leading-6 text-slate-900 sm:text-sm">{k === "quiz" ? t("modules.add.newQuiz") : kindText(k)}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        )}
 
         {kind === "page" && (
           <PickList key="page" load={loadPages} picked={target} onPick={setTarget} label={t("modules.add.pickPage")} disabled={busy}
-            emptyText={t("modules.add.noPages")} createHref={`${base}/pages/new`} createLabel={t("modules.add.createPage")} />
+            emptyText={t("modules.add.noPages")}
+            create={(
+              <LinkButton variant="link" href={withFrom(`${base}/pages/new?module=${encodeURIComponent(module.id)}`, from)} leftIcon={plus}>
+                {t("modules.add.createPage")}
+              </LinkButton>
+            )} />
         )}
         {kind === "file" && (
           <PickList key="file" load={loadFiles} picked={target} onPick={setTarget} label={t("modules.add.pickFile")} disabled={busy}
-            emptyText={t("modules.add.noFiles")} createHref={`${base}/files`} createLabel={t("modules.add.uploadFile")} />
+            emptyText={t("modules.add.noFiles")}
+            create={(
+              <Button variant="link" disabled={busy} onClick={() => setSub("upload")} leftIcon={<Upload aria-hidden="true" className="h-4 w-4" />}>
+                {t("modules.add.uploadFile")}
+              </Button>
+            )} />
         )}
         {kind === "assignment" && (
           <PickList key="assignment" load={loadAssignments} picked={target} onPick={setTarget} label={t("modules.add.pickAssignment")} disabled={busy}
-            emptyText={t("modules.add.noAssignments")} createHref={`${base}/assignments?new=1`} createLabel={t("modules.add.createAssignment")} />
+            emptyText={t("modules.add.noAssignments")}
+            create={allowNewAssignment ? (
+              <Button variant="link" disabled={busy} onClick={() => setSub("assignment")} leftIcon={plus}>{t("modules.add.createAssignment")}</Button>
+            ) : undefined} />
         )}
         {touched && !target && (kind === "page" || kind === "file" || kind === "assignment") && (
           <p role="alert" className="text-sm text-danger-700">{t("modules.add.pickRequired")}</p>
@@ -283,6 +345,89 @@ export function AddItemDialog({ open, module, courseId, base, langs, onAdded, on
         )}
         {error ? <p role="alert" className="rounded-xl border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-800">{errorText(error)}</p> : null}
       </form>
+      {sub === "upload" && (
+        <UploadFileDialog open courseId={courseId} folders={[]} onClose={() => setSub(null)} onDone={onFileUploaded} />
+      )}
+      {sub === "assignment" && (
+        <AssignmentEditorDialog open onCreated={onAssignmentCreated} onCancel={() => setSub(null)} />
+      )}
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------- Phase 8c S2: put an unsorted target into a module
+
+export interface PlaceTarget {
+  kind: "page" | "file" | "assignment";
+  id: string;
+  title: string;
+}
+
+/** "Move to module…" of the Unsorted group (§3.4): pick a module and a position, then `POST …/modules/{mid}/items`. */
+export function PlaceInModuleDialog({ open, target, modules, courseId, defaultLang, onPlaced, onClose }: {
+  open: boolean;
+  target: PlaceTarget;
+  modules: ModuleStaffOut[];
+  courseId: string;
+  defaultLang: Lang;
+  onPlaced: (moduleId: string) => void;
+  onClose: () => void;
+}) {
+  const { lang, t } = useTranslation();
+  const errorText = useModuleErrorText();
+  const live = modules.filter((m) => !m.deleted_at);
+  const [to, setTo] = useState(live[0]?.id ?? "");
+  const mod = live.find((m) => m.id === to);
+  const items = mod ? [...mod.items].sort((a, b) => a.position - b.position) : [];
+  const [pos, setPos] = useState("end");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const itemTitle = (i: ItemStaffOut) =>
+    pickLocalized(i.title_override, lang, defaultLang) || pickLocalized(i.target?.title, lang, defaultLang) || i.url || t("modules.untitledItem");
+
+  const place = async () => {
+    if (!mod) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const body: ItemIn = { kind: target.kind, published: true };
+      if (target.kind === "page") body.page_id = target.id;
+      if (target.kind === "file") body.file_id = target.id;
+      if (target.kind === "assignment") body.assignment_id = target.id;
+      if (pos !== "end") body.position = Number(pos);
+      await addItem(courseId, mod.id, body);
+      onPlaced(mod.id);
+    } catch (e) {
+      setError(e);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} busy={busy} size="md" title={t("coursePage.unsorted.placeTitle")} description={target.title}
+      footer={(
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>{t("lms.common.cancel")}</Button>
+          <Button onClick={() => void place()} loading={busy} disabled={!mod}>{t("modules.move.submit")}</Button>
+        </>
+      )}>
+      <div className="space-y-4">
+        {live.length === 0 ? (
+          <p className="text-sm text-slate-700">{t("coursePage.unsorted.noModules")}</p>
+        ) : (
+          <>
+            <Select label={t("modules.move.target")} value={to} disabled={busy} onChange={(e) => { setTo(e.target.value); setPos("end"); }}
+              options={live.map((m) => ({ value: m.id, label: pickLocalized(m.title, lang, defaultLang) || t("modules.untitledModule") }))} />
+            <Select label={t("coursePage.unsorted.position")} value={pos} disabled={busy} onChange={(e) => setPos(e.target.value)}
+              options={[
+                ...(items.length > 0 ? [{ value: "1", label: t("coursePage.unsorted.atStart") }] : []),
+                ...items.slice(0, -1).map((i, n) => ({ value: String(n + 2), label: t("coursePage.unsorted.after", { title: itemTitle(i) }) })),
+                { value: "end", label: t("coursePage.unsorted.atEnd") },
+              ]} />
+          </>
+        )}
+        {error ? <p role="alert" className="rounded-xl border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-800">{errorText(error)}</p> : null}
+      </div>
     </Dialog>
   );
 }
