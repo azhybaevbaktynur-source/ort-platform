@@ -17,7 +17,10 @@ def can_edit_bank(ctx: AuthzContext, course, bank) -> bool:
     no write while the organization (its root) is suspended, nothing in Student view (`org_admin_for` is false for
     that course's organization). Quiz banks and ORT template banks never reach it: they are never shared (CHECK
     `quiz_bank_private`, invariant 1; design 9), and it refuses them explicitly as well. Platform admins get no edit
-    right from their flag (only from an org-admin membership, like anyone else)."""
+    right from their flag (only from an org-admin membership, like anyone else).
+
+    Phase 9 fix 1 (L3): the org-admin branch covers the bank's content (questions, passages, bank settings), not
+    deleting or restoring the whole bank: those routes stay `course:content.manage` (staff only, A13)."""
     if bank is None or bank.deleted_at is not None or bank.course_id != course.id:
         return False
     if can(ctx, A.CONTENT_MANAGE, course):
@@ -31,5 +34,7 @@ def can_edit_bank(ctx: AuthzContext, course, bank) -> bool:
         return False
     if ctx.org_suspended(course.organization_id, course.id):
         return False
-    return ctx.org_admin_for(bank.organization_id)
+    # Phase 9 fix 1 (M1): decided from the course's organization (live), never the bank's denormalized copy, so a
+    # course moved between departments answers for its new place at once
+    return ctx.org_admin_for(course.organization_id)
     # --- Phase 9 S1 end ---
