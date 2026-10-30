@@ -134,7 +134,7 @@ Note where they get stuck and adjust before building slice 3.
 ## 7. Agent review notes (2026-10-31, accepted with the plan)
 
 1. **Student view** is the only technically non-trivial item. To show the course "as a student sees it", the server has to answer as a student would, including module locks and hidden areas. The design picks between a hidden per-course test-student account (Canvas approach) and a read-only staff preview of student payloads. The default is the simplest safe option, chosen in `PHASE_8C_DESIGN.md`.
-2. **The teacher test needs the owner.** Slices 1–2 are built and deployed first. The agent then pauses for the owner to run the test with real teachers, then builds slices 3–4.
+2. **Teacher test (updated 2026-10-31, 8c-9).** There is no pause: slices 1–4 run straight through to one release. The owner may run the teacher test any time after deploy, and its findings become a follow-up slice.
 3. **"Course" is role-specific.** Teachers always see the modules outline (or, in ORT courses, today's exam list). Students keep the course home chosen in Settings (8a `home_kind`: modules, page or assignments).
 4. **ORT.** The course frame around ORT screens changes to the sidebar, which is an approved visual update with before/after screenshots. The ORT player, bank, builder, import and results keep their screens and behaviour.
 
