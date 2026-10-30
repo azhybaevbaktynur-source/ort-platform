@@ -89,7 +89,7 @@ export function DepartmentDialog({ mode, orgId, rows, onClose, onDone }: {
         <>
           <Button variant="secondary" disabled={busy} onClick={onClose}>{t("departments.cancel")}</Button>
           <Button type="submit" form={formId} loading={busy}>
-            {t(mode.kind === "create" ? "departments.create" : mode.kind === "move" ? "departments.move" : "departments.save")}
+            {t(mode.kind === "create" ? "departments.submitCreate" : mode.kind === "move" ? "departments.move" : "departments.save")}
           </Button>
         </>
       }>

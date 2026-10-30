@@ -130,7 +130,7 @@ export function TodoPanel({ course, refreshKey = 0, className, compact = false }
             {/* Phase 8c UX M5: a published course only needs joining by code turned on */}
             {!data.join_code_active && (
               <p className="text-sm leading-6 text-warning-800">
-                {course.status === "published" ? t("todo.joinCodeOff") : t("courses.settings.joinCodeInactive")}
+                {course.status === "published" ? t("todo.joinCodeOff") : t("courses.settings.joinCodeInactiveUnpublished")}
               </p>
             )}
             <Link href={`${base}/settings`} className={cn(linkCls, "inline-flex min-h-11 items-center text-sm sm:min-h-0")}>{t("teaching.manageEnrollment")}</Link>

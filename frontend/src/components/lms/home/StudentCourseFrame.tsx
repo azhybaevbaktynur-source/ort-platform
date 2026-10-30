@@ -6,15 +6,20 @@
 import React from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
-import type { CourseOut } from "@/lib/lms/types";
+import { isStaffCourse, type CourseOut } from "@/lib/lms/types";
 import { PageHeader, Skeleton } from "@/components/ui";
 
 export function StudentCourseHeader({ course }: { course: CourseOut }) {
   const { lang, t } = useTranslation();
   const title = pickLocalized(course.title, lang, course.default_language) || t("courses.list.untitled");
+  // Phase 9 UX: an org admin reading a course of their organization (no enrollment, staff serializer) goes back to
+  // the course's page in the organization area, not to "My courses" (the course is not one of theirs)
+  const orgReader = !!course.my_enrollment.read_only && isStaffCourse(course) && !!course.organization_id && !!course.organization_name;
+  const parent = orgReader
+    ? { label: course.organization_name as string, href: `/${lang}/org/${course.organization_id}/courses/${course.id}` }
+    : { label: t("lms.nav.myCourses"), href: `/${lang}/courses` };
   return (
-    <PageHeader title={title} className="mb-4"
-      breadcrumbs={[{ label: t("lms.nav.myCourses"), href: `/${lang}/courses` }, { label: title }]} />
+    <PageHeader title={title} className="mb-4" breadcrumbs={[parent, { label: title }]} />
   );
 }
 

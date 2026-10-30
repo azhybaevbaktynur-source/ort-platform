@@ -282,8 +282,9 @@ export const shareBank = (courseId: string, bankId: string) =>
   post<BankOut>(`/courses/${enc(courseId)}/banks/${enc(bankId)}/share`);
 export const unshareBank = (courseId: string, bankId: string) =>
   lmsFetch<BankOut>(`/courses/${enc(courseId)}/banks/${enc(bankId)}/share`, { method: "DELETE" });
-export const copySharedBank = (courseId: string, bankId: string) =>
-  post<BankOut>(`/courses/${enc(courseId)}/banks/copy-from`, { bank_id: bankId });
+// Phase 9 UX: `title` = the localized copy title ("{title} (copy)" in the UI language); the server adds " (copy)" without it
+export const copySharedBank = (courseId: string, bankId: string, title?: string) =>
+  post<BankOut>(`/courses/${enc(courseId)}/banks/copy-from`, title ? { bank_id: bankId, title } : { bank_id: bankId });
 // --- Phase 9 S2 end ---
 
 // --- Me ---

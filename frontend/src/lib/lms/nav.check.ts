@@ -47,7 +47,9 @@ ok(keys("assistant") === "course,announcements,assignments,grades,people,bank,fi
 ok(keys("student") === "course,assignments,grades,people", "student: announcements and files auto-hidden");
 ok(keys("student", { modules: true, files: true, announcements: true }) === "course,announcements,assignments,grades,people,files",
   "student: shown with published content");
-ok(keys("observer") === "course,assignments,grades,people", "org admin: student list, no banks, no settings");
+ok(keys("observer") === "course,assignments,grades,people", "observer without the staff shape: no banks, no settings");
+ok(courseNavItems(course("observer"), "observer", base, t, { staffShape: true }).map((i) => i.key).join(",")
+  === "course,assignments,grades,people,bank", "org admin (staff shape): question banks, no settings");
 const marks = courseNavItems(course("teacher"), "teacher", base, t).filter((i) => i.hiddenFromStudents).map((i) => i.key);
 ok(marks.join(",") === "announcements,files", "staff: hidden-from-students marks");
 ok(courseNavItems(course("student"), "student", base, t).every((i) => !i.hiddenFromStudents), "students: no marks");

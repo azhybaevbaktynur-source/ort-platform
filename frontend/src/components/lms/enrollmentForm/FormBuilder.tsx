@@ -6,7 +6,7 @@
 // row with edit, move up / down and remove. Field keys are generated from the label, never typed.
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, ChevronDown, ChevronUp, Plus } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp, MoreHorizontal, Plus } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import {
   FIELDS_PER_FORM_MAX, activateForm, createFormDraft, deleteFormDraft, getForm, keyFromLabel, listFormVersions,
@@ -238,7 +238,14 @@ export function FormBuilder({ course }: { course: CourseStaffOut }) {
     <PageHeader title={t("enrollmentForm.title")} className="mb-4"
       breadcrumbs={[{ label: t("courses.settings.tab"), href: `${base}/settings` }, { label: t("enrollmentForm.title") }]}
       badge={form ? <Badge tone={statusTone(form.status)}>{t(`enrollmentForm.status.${form.status}`)}</Badge> : undefined}
-      description={form ? t("enrollmentForm.versionN", { n: form.version }) : undefined} />
+      description={form ? t("enrollmentForm.versionN", { n: form.version }) : undefined}
+      // Phase 9 UX: "Delete draft" moved here from the sticky bar (8c pattern: a "More actions" menu in the header)
+      secondaryActions={editable && form?.status === "draft" ? (
+        <MenuButton variant="secondary" align="end" disabled={!!busy} label={t("coursePage.moreActions")}
+          leftIcon={<MoreHorizontal className="h-4 w-4" aria-hidden="true" />}
+          items={[{ id: "delete", label: t("enrollmentForm.deleteDraft") }]}
+          onSelect={() => { setError(null); setConfirm("delete"); }} />
+      ) : undefined} />
   );
 
   if (loading && !form && !loadError) return <div className="max-w-4xl">{header}<LoadingState rows={4} /></div>;
@@ -375,20 +382,18 @@ export function FormBuilder({ course }: { course: CourseStaffOut }) {
           ) : null}
 
           {editable && (
+            // Phase 9 UX: Save and Activate stay in one row on phones; "Delete draft" is in the page header's menu.
             <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-slate-200 bg-white/95 px-4 py-2 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border sm:py-3">
-              <Button loading={busy === "save"} disabled={!dirty || !!busy} onClick={() => void save()}>{t("lms.common.save")}</Button>
-              {form.status === "draft" && (
-                <Button variant="secondary" disabled={!!busy || rows.length === 0} loading={busy === "activate"}
-                  onClick={() => { setError(null); setConfirm("activate"); }}>
-                  {dirty ? t("enrollmentForm.saveAndActivate") : t("enrollmentForm.activate")}
-                </Button>
-              )}
+              <div className="flex flex-nowrap gap-2">
+                <Button loading={busy === "save"} disabled={!dirty || !!busy} onClick={() => void save()}>{t("lms.common.save")}</Button>
+                {form.status === "draft" && (
+                  <Button variant="secondary" disabled={!!busy || rows.length === 0} loading={busy === "activate"}
+                    onClick={() => { setError(null); setConfirm("activate"); }}>
+                    {dirty ? t("enrollmentForm.saveAndActivate") : t("enrollmentForm.activate")}
+                  </Button>
+                )}
+              </div>
               {dirty && <Button variant="link" disabled={!!busy} onClick={() => show(form)}>{t("enrollmentForm.discard")}</Button>}
-              {form.status === "draft" && (
-                <Button variant="dangerOutline" className="sm:ml-auto" disabled={!!busy} onClick={() => { setError(null); setConfirm("delete"); }}>
-                  {t("enrollmentForm.deleteDraft")}
-                </Button>
-              )}
               {dirty && <span role="status" className="text-sm text-slate-600">{t("enrollmentForm.unsaved")}</span>}
             </div>
           )}

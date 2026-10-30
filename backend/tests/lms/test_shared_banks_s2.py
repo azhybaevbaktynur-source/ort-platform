@@ -223,6 +223,21 @@ async def test_copy_content_and_rules(db, api, monkeypatch):
     assert db.get(QuestionBank, new_id).deleted_at is None
 
 
+async def test_copy_localized_title(db, api):
+    """Phase 9 UX: the client may send the copy's title in the UI language; blank falls back, long is cut."""
+    w = world(db)
+    await _share(api, w.T, w.C, w.B)
+    path = f"/courses/{w.C2.id}/banks/copy-from"
+    r = await api.call(w.T2, "POST", path, json={"bank_id": str(w.B.id), "title": "  Algebra (копия)\n"})
+    assert (r.status_code, r.json()["title"]) == (201, "Algebra (копия)"), r.text
+    r = await api.call(w.T2, "POST", path, json={"bank_id": str(w.B.id), "title": "   "})
+    assert (r.status_code, r.json()["title"]) == (201, "Algebra (copy)")
+    r = await api.call(w.T2, "POST", path, json={"bank_id": str(w.B.id), "title": "x" * 300})
+    assert (r.status_code, len(r.json()["title"])) == (201, 200)
+    r = await api.call(w.T2, "POST", path, json={"bank_id": str(w.B.id), "title": "x" * 1001})
+    assert r.status_code == 422
+
+
 async def test_copy_rate_limit(db, api, monkeypatch):
     w = world(db)
     await _share(api, w.T, w.C, w.B)

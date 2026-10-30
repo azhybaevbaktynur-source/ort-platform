@@ -13,7 +13,7 @@ import { BankHeader } from "@/components/lms/content/BankHeader";
 import { ContentError } from "@/components/lms/content/ContentError";
 import { QuestionRow } from "@/components/lms/content/QuestionRow";
 import { useCanEditBank } from "@/components/lms/content/StaffGate";
-import { ShareBankToggle, shareToggleVisible } from "@/components/lms/content/ShareBankToggle";
+import { ShareBankHint, ShareBankToggle, shareHintVisible, shareToggleVisible } from "@/components/lms/content/ShareBankToggle";
 import { getBankSharing, type BankSharingOut } from "@/lib/lms/organizations"; // Phase 9 S2
 import { Button, ConfirmDialog, EmptyState, LoadingState, MenuButton } from "@/components/ui";
 import { MoveToBankDialog } from "@/components/lms/content/MoveToBankDialog";
@@ -104,7 +104,7 @@ export default function BankQuestionsPage() {
         )) : undefined}
         secondaryActions={!isOrt && bank && canEdit && shareToggleVisible(bank, sharing) ? (
           <ShareBankToggle courseId={course.id} bank={bank} sharing={sharing} onChanged={setBank} />
-        ) : undefined} />
+        ) : !isOrt && shareHintVisible(bank, sharing, !!course.my_enrollment.read_only) ? <ShareBankHint /> : undefined} />
       <BankFilters value={filters} onChange={setFilters} />
       <ContentError error={error || actionError} onRetry={error ? () => load() : undefined} />
       {loading && items.length === 0 && !error && <LoadingState rows={3} />}

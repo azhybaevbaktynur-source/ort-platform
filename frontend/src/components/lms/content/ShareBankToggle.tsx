@@ -16,6 +16,27 @@ export function shareToggleVisible(bank: BankOut | null, sharing: BankSharingOut
 }
 
 /**
+ * Phase 9 UX: an org admin reading a course (no enrollment, `read_only`) on a private bank cannot share it (only the
+ * course's teachers can; the server refuses anyway): the "More actions" menu shows the share entry disabled with
+ * that hint.
+ */
+export function shareHintVisible(bank: BankOut | null, sharing: BankSharingOut | null, readOnlyViewer: boolean): boolean {
+  if (!readOnlyViewer || !bank || !sharing || bank.can_edit || bank.assessment || bank.deleted_at) return false;
+  if (sharing.reason === "template_locked" || sharing.reason === "personal") return false;
+  return bank.visibility === "private";
+}
+
+export function ShareBankHint() {
+  const { t } = useTranslation();
+  return (
+    <MenuButton variant="secondary" label={t("sharedBanks.menu")}
+      leftIcon={<MoreHorizontal aria-hidden="true" className="h-4 w-4" />}
+      items={[{ id: "share", label: t("sharedBanks.share"), description: t("sharedBanks.teachersOnly"), disabled: true }]}
+      onSelect={() => undefined} />
+  );
+}
+
+/**
  * Phase 9 S2 (PHASE_9_DESIGN 4.2, 8.1): "Share with organization" / "Stop sharing" in the bank page's "⋯" menu.
  * Rendered only when the caller may edit the bank (`bank.can_edit`), the bank is a live course bank (never a quiz
  * bank) and `GET /courses/{id}/bank-sharing` allows sharing; a bank that is already shared can always be unshared.

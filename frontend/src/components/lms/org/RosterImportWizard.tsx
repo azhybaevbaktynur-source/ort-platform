@@ -279,11 +279,22 @@ export function RosterImportWizard({
         ) : null}
 
         <div>
-          <label htmlFor="roster-file" className="mb-1.5 block text-sm font-medium text-slate-900">{t("rosterImport.file.label")}</label>
-          <input id="roster-file" ref={fileRef} type="file" accept=".csv,text/csv" disabled={busy}
-            aria-describedby="roster-file-hint" aria-invalid={fileError ? true : undefined}
-            onChange={(e) => { setFile(e.target.files?.[0] ?? null); setError(null); }}
-            className="block w-full min-h-11 rounded-xl border border-slate-300 bg-white text-sm text-slate-900 file:mr-3 file:min-h-11 file:border-0 file:bg-slate-100 file:px-4 file:text-sm file:font-medium file:text-slate-900" />
+          {/* Phase 9 UX: a hidden file input behind a design-system Button, with the chosen file's name */}
+          <p id="roster-file-label" className="mb-1.5 block text-sm font-medium text-slate-900">{t("rosterImport.file.label")}</p>
+          <input id="roster-file" ref={fileRef} type="file" accept=".csv,text/csv" disabled={busy} tabIndex={-1}
+            aria-labelledby="roster-file-label" className="sr-only"
+            onChange={(e) => { setFile(e.target.files?.[0] ?? null); setError(null); }} />
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+            <Button id="roster-file-button" type="button" variant="secondary" disabled={busy}
+              aria-labelledby="roster-file-label roster-file-button" aria-describedby="roster-file-name roster-file-hint"
+              aria-invalid={fileError ? true : undefined}
+              onClick={() => fileRef.current?.click()}>
+              {t("rosterImport.file.choose")}
+            </Button>
+            <span id="roster-file-name" className={`min-w-0 break-all text-sm ${file ? "font-medium text-slate-900" : "text-slate-600"}`}>
+              {file ? file.name : t("rosterImport.file.none")}
+            </span>
+          </div>
           <p id="roster-file-hint" className="mt-1.5 text-sm text-slate-600">{t("rosterImport.file.hint", { rows: ROSTER_LIMITS.rows, kib: ROSTER_LIMITS.kib })}</p>
           {fileError && <p role="alert" className="mt-1.5 text-sm text-danger-700">{fileError}</p>}
         </div>

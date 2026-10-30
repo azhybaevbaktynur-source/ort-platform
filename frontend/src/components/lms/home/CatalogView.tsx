@@ -134,6 +134,11 @@ export function CatalogView() {
       <CatalogFilters value={filters} onChange={setFilters}
         organizations={Array.from(orgs, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))} />
 
+      {/* Phase 9 UX: how many courses a search found (cursor pages: "shown, more below" while more pages exist) */}
+      <p role="status" aria-live="polite" className="mb-3 text-sm leading-6 text-slate-600 empty:hidden">
+        {filtered && !loading && !error && items.length > 0
+          ? t(cursor ? "catalog.resultCountMore" : "catalog.resultCount", { count: items.length }) : null}
+      </p>
       {error && items.length === 0 ? <ErrorState message={errorText(error)} onRetry={() => void load()} retrying={loading} /> : null}
       {error && items.length > 0 ? <ErrorState variant="inline" message={errorText(error)} onRetry={() => void load(cursor)} className="mb-4" /> : null}
       {loading && items.length === 0 && !error && <CatalogSkeleton />}
