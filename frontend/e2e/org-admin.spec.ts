@@ -323,6 +323,7 @@ test("ORT course: People tabs, no form modes, no share entry on the bank", async
   await uxShots(page, SHOTS, "ort-people-tabs", ["ru"]);
   await page.goto(`/ru/courses/${cid}/settings`);
   // form modes are listed but cannot be chosen (with the template lock note); the server refuses them too
+  await expect(page.getByText(t("enrollmentForm.settings.ortNote"))).toBeVisible(); // the settings form is loaded
   const formModes = await page.locator("#s-mode option").evaluateAll((os) => (os as HTMLOptionElement[])
     .filter((o) => o.value.startsWith("form_")).map((o) => o.disabled));
   expect(formModes).toEqual([true, true]);
