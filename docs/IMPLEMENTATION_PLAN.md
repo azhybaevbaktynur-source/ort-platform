@@ -48,7 +48,8 @@
 | 7c | **Quiz editor**: write questions inside the quiz (cards, type dropdown in the card, draft autosave, quiz banks, edit scope), Canvas-style (owner, 2026-10-28) | M | 7b | A teacher builds a quiz on one page without visiting the Bank tab; nothing is duplicated; ORT untouched |
 | 8a | Course structure: modules, pages, files, announcements, gating | L | 7c | Guided course paths with locked/unlocked steps; pages, files, announcements, course home |
 | 8b | **Exam templates II**: visual constructor (platform/org/teacher), scrolling display mode, result-view and passage options UI, lock/scope UI (proposed) | M–L | 7b, 6b | Exam templates designed in a builder and previewed with the real player |
-| 9 | Organizations completion, enrollment forms, invitations | M | 6a | Shared org banks, org settings and departments, roster import; catalog forms, student email invitations |
+| 8c | **Teacher navigation redesign** (owner, 2026-10-31): short left sidebar, course page = modules outline + To do, grouped "+ Add", Tests list removed, one page per object, Student view | M | 8b | A teacher builds and runs a course from one page; four navigation layers become one sidebar |
+| 9 | Organizations completion, enrollment forms, invitations | M | 6a, 8c | Shared org banks, org settings and departments, roster import; catalog forms, student email invitations |
 | 10 | Practice, analytics, quiz statistics, student tools | M | 7, 8 | Practice by topic, mistakes notebook, course and org analytics, item statistics |
 | 11 | Privacy (observer/parent with consent), hardening, launch | M | 6–10 | Parent accounts and consent, data requests, load/security checks, runbooks |
 
@@ -250,7 +251,18 @@ Dependencies: 6b needs 6a; 7a needs 6a (organizations, course templates) and use
 **Tests**: constructor Playwright flow (design → publish → create exam → take → result); scrolling-mode player tests and baselines for the **general** player; block catalog ⇔ frontend map contract; ORT review (ORT baselines unchanged except approved look updates); UX gate in en/ky/ru.
 **Exit criteria**: a teacher designs a two-section exam in the constructor, previews it, publishes a version and gives it as an assignment; an org admin locks it and teachers can no longer change its structure; the ORT exam behaves exactly as before.
 
+## Phase 8c — Teacher navigation redesign (M) · owner decisions 8c-1…8c-8 (2026-10-31)
+
+**Why**: after 8b the owner found teacher navigation too deep and confusing (four navigation layers, 11 equal tabs, quizzes creatable in three places, a dashboard home, list → detail → edit chains). **Proposal and decisions**: `docs/phases/PHASE_8C_NAVIGATION_PROPOSAL.md`; design: `docs/phases/PHASE_8C_DESIGN.md`.
+**Frontend**: short left course sidebar (Course · Announcements · Assignments · Grades · People · Question banks · Settings · Files optional), phone drawer, students do not see empty areas; course page = modules outline with grouped "+ Add" per module, "Unsorted" group, To do panel; lighter controls (publish icon, one "⋯" menu, drag + menu alternative); Tests list removed (quiz filter in Assignments); one page per object with tabs (assignment: Details · Submissions and grading · Settings; page: Edit · Preview; quiz as in 7c); Student view; Teaching sub-menu removed inside courses; old URLs redirect.
+**Backend (small, no migration expected)**: unsorted items for the outline, To do summary, per-area "has published content" flags, whatever Student view needs.
+**Slices**: 1 course shell · 2 course page · **teacher test by the owner** · 3 one-page objects · 4 integration, ORT review, redirects, UX gate, deploy.
+**Exit criteria**: slices 1–4 deployed; teacher test done and findings addressed; UX gate and ORT review passed; old URLs redirect; e2e green. Phase 9 starts only then.
+
 ## Phase 9 — Organizations completion, enrollment forms, invitations (M)
+
+**Built inside the 8c shell**: every new Phase 9 screen adds its own sidebar link (hidden for students while empty) or a "+ Add" item, and objects follow the one-page-with-tabs pattern; anything planned against the old Tests list, the 11-tab layout or the dashboard home is adjusted at Phase 9 kickoff. If the sidebar gets long, add a per-course hide/reorder page then.
+
 
 **Schema**: `question_banks.visibility` `private|organization` (shared org banks), org `settings` grows (bank sharing on/off, catalog defaults), department tree management on `parent_id`, `organization_roster_imports`; `enrollment_forms`, `enrollment_form_fields`, `enrollment_applications`; student invitations reuse `invitations` with `course_id` and role `student`.
 **Backend**: shared question banks per organization (read for every org teacher, edit by owner and org admins; copy into a course; personal organizations of independents can never share with each other); org settings page; departments (create, move, org admin scope includes descendants); roster CSV import (students and teachers, dry run, no passwords in files); org usage dashboard; (the general import format moved to Phase 7b; the ORT importer stays the ORT template's profile, unchanged); catalog modes `open | invite_code | form_auto | form_review | closed`, form builder with versioning, application submit/approve/reject/withdraw, purge job (D7), student email invitations with expiry; answers visible only to the course's staff, never logged.
