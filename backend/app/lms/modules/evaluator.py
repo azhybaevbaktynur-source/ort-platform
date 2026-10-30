@@ -518,5 +518,42 @@ def evaluate(db: Session, course: Course, enrollment_id: uuid.UUID, now: datetim
     return structure, mem, ev
 
 
+# --- Phase 8c S1 begin --- (PHASE_8C_DESIGN 6.2: Student view = the state of a new student, never persisted)
+
+class _AsPublished:
+    """Read-only stand-in for a draft course in Student view: `compute` sees `status = "published"` (a draft course
+    stays previewable); every other attribute is the course's own."""
+
+    status = "published"
+
+    def __init__(self, course: Course):
+        self._course = course
+
+    def __getattr__(self, name):
+        return getattr(self._course, name)
+
+
+def evaluate_new_student(db: Session, course: Course, now: datetime, *, structure: Optional[Structure] = None
+                         ) -> tuple[Structure, Memory, Evaluation]:
+    """`evaluate(..., persist=False, enrollment=None)` of the design: the course as a student with no facts, no
+    submissions, no cached progress and no requirement status would see it now. Reads the structure only (3 queries,
+    no per-enrollment query) and writes nothing: no `module_progress`, `item_requirement_status` or fact row exists or
+    is created for anyone (8a invariant 5 holds for staff). A draft course is evaluated as published."""
+    structure = structure or load_structure(db, course)
+    mem = Memory(enrollment_id=None)  # type: ignore[arg-type]  # nobody's memory
+    view = structure
+    if course.status == "draft":
+        view = Structure(course=_AsPublished(course), modules=structure.modules,  # type: ignore[arg-type]
+                         prereqs=structure.prereqs, items=structure.items,
+                         deleted_modules=structure.deleted_modules)
+    ev = compute(view, mem, now)
+    ev.persist_allowed = False
+    for me in ev.modules.values():
+        me.persistable = False
+    return structure, mem, ev
+# --- Phase 8c S1 end ---
+
+
 __all__ = ["Structure", "ItemRow", "Memory", "Facts", "Evaluation", "ModuleEval", "ItemEval", "load_structure",
-           "load_memory", "compute", "persist", "evaluate", "requirement_met_now", "sequential_blocker", "utc"]
+           "load_memory", "compute", "persist", "evaluate", "requirement_met_now", "sequential_blocker", "utc",
+           "evaluate_new_student"]

@@ -10,7 +10,7 @@ import { isAssessmentLocked, useTemplateUi } from "@/lib/lms/templates";
 import { templateLockedFields } from "@/lib/lms/assessmentTypes"; // Phase 7b S5
 import { useCourse } from "@/components/lms/CourseContext";
 import { useCanEditContent } from "@/components/lms/content/StaffGate";
-import { useTabCrumbs } from "@/components/lms/course/StaffCourseUi"; // Phase 6b S5c
+import { useObjectNav } from "@/components/lms/assignments/objectNav"; // Phase 8c S3 (Close only)
 import { Button, ConfirmDialog, EmptyState, LoadingState, PageHeader } from "@/components/ui";
 import { AddItemsDialog } from "./AddItemsDialog";
 import { AssessmentError } from "./AssessmentError";
@@ -32,6 +32,9 @@ export function SectionBuilder({ initial }: { initial: AssessmentStaffOut }) {
   const router = useRouter();
   const canEdit = useCanEditContent();
   const ui = useTemplateUi(); // Phase 6 S4b
+  // Phase 8c S3 (PHASE_8C_DESIGN §5.3, §11): only the Close link changes: the first breadcrumb goes to the validated
+  // `?from=`, else the Course page. The builder's content stays as it is.
+  const closeNav = useObjectNav();
   const aid = initial.id;
   const base = `/${lang}/courses/${course.id}/assessments`;
   const [a, setA] = useState<AssessmentStaffOut | null>(initial);
@@ -71,10 +74,11 @@ export function SectionBuilder({ initial }: { initial: AssessmentStaffOut }) {
   // --- Phase 7b S5 end ---
   const drag = useDragReorder(moveSection, canEdit && !structureLocked);
   const aTitle = a ? pickLocalized(a.title, lang, course.default_language) || t("assessments.untitled") : "";
-  const crumbs = useTabCrumbs("assessments", [
+  const crumbs = [
+    { label: closeNav.placeLabel, href: closeNav.backHref },
     { label: aTitle || t("lms.common.loading"), href: `${base}/${aid}` },
     { label: t("teaching.builderCrumb") },
-  ], course.id);
+  ];
 
   if (error && !a) return <AssessmentError error={error} onRetry={() => void load()} />;
   if (!a) return <LoadingState rows={3} />;

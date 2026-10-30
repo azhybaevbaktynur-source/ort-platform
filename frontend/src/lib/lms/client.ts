@@ -1,4 +1,4 @@
-import { getAuthHeader } from "@/lib/api";
+import { getAuthHeader, viewAsHeader } from "@/lib/api";
 import { API_BASE_URL } from "@/lib/apiBase";
 
 /** Error from LMS endpoints. `code` maps to the i18n key `lms.errors.<code>`. */
@@ -37,7 +37,7 @@ export async function lmsFetch<T>(path: string, opts: LmsFetchOptions = {}): Pro
     if (qs) url += `?${qs}`;
   }
 
-  const headers: Record<string, string> = { ...(await getAuthHeader()) };
+  const headers: Record<string, string> = { ...(await getAuthHeader()), ...viewAsHeader(path) }; // Phase 8c S1
   if (body !== undefined) headers["Content-Type"] = "application/json";
 
   let res: Response;

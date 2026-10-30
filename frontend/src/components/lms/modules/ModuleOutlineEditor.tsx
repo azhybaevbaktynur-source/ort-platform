@@ -1,29 +1,39 @@
 "use client";
 
-// Phase 8a S4a (PHASE_8A_DESIGN 8.1): the teacher's module outline. "New module" is the one primary action; each
-// module card has a publish switch, move up/down buttons and a labelled actions menu (settings, prerequisites,
-// re-apply rules, delete); each item row has a visibility switch, move up/down buttons and an actions menu
-// (edit, completion requirement, move to another module, open, remove). Everything is a visible button: no drag-only
-// action (375 px first). Warnings are badges with text. Writes reload the outline (one document, design 2.3).
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+// Phase 8a S4a (PHASE_8A_DESIGN 8.1): the teacher's module outline. Writes reload the outline (one document, design
+// 2.3). Warnings are badges with text.
+// Phase 8c S2 (PHASE_8C_DESIGN §3.2, §3.3, §3.6): the outline of the teacher Course page. `embedded` drops the page
+// header for a small toolbar ("New module", "Expand all / Collapse all", "⋯" with student progress, course-wide
+// re-apply and the deleted modules). Module cards collapse (state in sessionStorage per course) and carry
+// `id="m-{moduleId}"` (the `from` fragment of every object opened from here). Lighter controls: a publish icon toggle
+// and one "⋯" menu per module and per item (the Move entries are the keyboard, phone and screen-reader path); native
+// HTML5 drag and drop on desktop pointers (≥ lg) with optimistic reorder and a revert on error; a grouped "+ Add" menu
+// per module (Content: page, file, link, header; Assessment: quiz, or the ORT exam in ORT courses, and assignment).
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ArrowDown, ArrowUp, Plus, Users } from "lucide-react";
+import { AlertTriangle, ChevronRight, CircleCheck, CircleDashed, GripVertical, Plus } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
 import {
-  clearRequirement, createModule, deleteItem, deleteModule, getModules, moveItem, reapplyCourse, reapplyModule, reorderItems,
+  addItem, clearRequirement, createModule, deleteItem, deleteModule, getModules, moveItem, reapplyCourse, reapplyModule, reorderItems,
   reorderModules, restoreModule, setPrerequisites, setRequirement, updateItem, updateModule,
 } from "@/lib/lms/modules";
 import type { ItemStaffOut, ModuleStaffOut, ModulesStaffOut, ModuleWarningOut } from "@/lib/lms/modulesTypes";
-import { isStaffCourse } from "@/lib/lms/types";
+import { withFrom } from "@/lib/lms/nav";
+import { quizAssignmentId } from "@/lib/lms/quizAssignmentId";
+import { templateUi } from "@/lib/lms/templates";
+import { duplicateModule } from "@/lib/lms/unsorted";
 import { useCourse } from "@/components/lms/CourseContext";
 import {
-  Badge, Button, Checkbox, ConfirmDialog, EmptyState, ErrorState, IconButton, LoadingState, MenuButton, PageHeader, Switch, cn, focusRing, toast,
+  Badge, Button, ConfirmDialog, EmptyState, ErrorState, LoadingState, PageHeader, cn, focusRing, toast,
 } from "@/components/ui";
 import { fmtShortDateTime } from "@/components/lms/home/format";
+import { CreateAssessmentDialog } from "@/components/lms/assessments/CreateAssessmentDialog";
 import { ItemKindIcon, useItemKindText, useModuleErrorText, useRequirementText } from "./moduleUi";
 import { ItemEditDialog, ModuleSettingsDialog, MoveItemDialog, PrerequisiteDialog, RequirementDialog, type ModuleSettingsValue } from "./OutlineDialogs";
-import { AddItemDialog } from "./AddItemDialog";
+import { AddItemDialog, moduleAnchor, type AddKind } from "./AddItemDialog";
+import { OutlineMenu, type MenuGroup } from "./OutlineMenu";
 import { ProgressDrawer } from "./ProgressDrawer";
 
 type DialogState =
@@ -33,7 +43,8 @@ type DialogState =
   | { kind: "prereq"; module: ModuleStaffOut }
   | { kind: "deleteModule"; module: ModuleStaffOut }
   | { kind: "reapply"; module: ModuleStaffOut | null }
-  | { kind: "addItem"; module: ModuleStaffOut }
+  | { kind: "addItem"; module: ModuleStaffOut; initialKind?: AddKind }
+  | { kind: "ortExam"; module: ModuleStaffOut }
   | { kind: "editItem"; item: ItemStaffOut }
   | { kind: "requirement"; item: ItemStaffOut }
   | { kind: "moveItem"; item: ItemStaffOut }
@@ -41,9 +52,12 @@ type DialogState =
   | { kind: "progress" }
   | { kind: "publishWarn"; module: ModuleStaffOut; names: string };
 
-function swap<T>(list: T[], i: number, j: number): T[] {
+type DragState = null | { type: "module"; id: string } | { type: "item"; id: string; moduleId: string };
+
+function move<T>(list: T[], from: number, to: number): T[] {
   const next = [...list];
-  [next[i], next[j]] = [next[j], next[i]];
+  const [x] = next.splice(from, 1);
+  next.splice(to, 0, x);
   return next;
 }
 
@@ -58,11 +72,71 @@ function Warnings({ warnings }: { warnings: ModuleWarningOut[] }) {
   );
 }
 
+/** Phase 8c S2 (§3.6): published = filled green check, draft = dashed circle (shape differs, not only color). */
+function PublishToggle({ published, name, busy, disabled, onToggle }: {
+  published: boolean; name: string; busy: boolean; disabled?: boolean; onToggle: () => void;
+}) {
+  const { t } = useTranslation();
+  const tip = published ? t("modules.editor.publishedIcon") : t("modules.editor.draftIcon");
+  return (
+    <button type="button" aria-pressed={published} aria-label={t("modules.editor.publishToggle", { title: name })} title={tip}
+      aria-busy={busy || undefined} disabled={disabled || busy} onClick={onToggle}
+      className={cn(
+        "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60",
+        focusRing,
+      )}>
+      {published
+        ? <CircleCheck aria-hidden="true" className="h-6 w-6 fill-success-600 text-white" />
+        : <CircleDashed aria-hidden="true" className="h-6 w-6 text-slate-500" />}
+    </button>
+  );
+}
+
+/** Drag handle for pointer devices (≥ lg). Hidden from assistive tech: the "⋯" menu's Move entries do the same.
+ * Phase 8c UX M1: shown only while its module header (`group/mod`) or item row (`group/row`) is hovered or holds focus. */
+function DragHandle({ label, onStart, onEnd, scope }: {
+  label: string; onStart: (e: React.DragEvent) => void; onEnd: () => void; scope: "mod" | "row";
+}) {
+  return (
+    <span draggable aria-hidden="true" title={label} onDragStart={onStart} onDragEnd={onEnd}
+      className={cn("hidden h-11 w-6 shrink-0 cursor-grab items-center justify-center text-slate-400 hover:text-slate-700 active:cursor-grabbing lg:inline-flex lg:opacity-0 lg:transition-opacity",
+        scope === "mod" ? "lg:group-hover/mod:opacity-100 lg:group-focus-within/mod:opacity-100" : "lg:group-hover/row:opacity-100 lg:group-focus-within/row:opacity-100")}>
+      <GripVertical className="h-5 w-5" />
+    </span>
+  );
+}
+
 const REQ_IGNORED = "requirement_on_unpublished_target";
 /** 8a UX M1: items whose requirement does not count because their target (for example a quiz) is still a draft. */
 const ignoredReqItems = (m: ModuleStaffOut) => m.items.filter((i) => i.warnings.some((w) => w.code === REQ_IGNORED));
 
-export function ModuleOutlineEditor() {
+const collapsedKey = (courseId: string) => `outline.collapsed:${courseId}`;
+function readCollapsed(courseId: string): string[] {
+  try {
+    const raw = window.sessionStorage.getItem(collapsedKey(courseId));
+    const v = raw ? JSON.parse(raw) : [];
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+export interface ModuleOutlineEditorProps {
+  /** Phase 8c S2: inside the Course page (no page header; a toolbar instead). */
+  embedded?: boolean;
+  /** Changing it reloads the outline (an unsorted target was placed in a module). */
+  refreshKey?: number;
+  /** After every successful write (the Course page refreshes the To do panel and the Unsorted group). */
+  onChanged?: () => void;
+  /** The live modules after each load (the Unsorted group's "Move to module…" lists them). */
+  onModules?: (modules: ModuleStaffOut[]) => void;
+  /** Rendered after the live modules (the Unsorted group). */
+  afterModules?: React.ReactNode;
+  /** Empty course: "Add existing items" (opens the Unsorted group). */
+  onAddExisting?: () => void;
+}
+
+export function ModuleOutlineEditor({ embedded = false, refreshKey = 0, onChanged, onModules, afterModules, onAddExisting }: ModuleOutlineEditorProps) {
   const { lang, t } = useTranslation();
   const router = useRouter();
   const { course } = useCourse();
@@ -72,6 +146,8 @@ export function ModuleOutlineEditor() {
   const base = `/${lang}/courses/${course.id}`;
   const langs = { languages: course.languages, defaultLanguage: course.default_language };
   const canEdit = course.status !== "concluded";
+  const ui = templateUi(course);
+  const ortCourse = ui.locked && ui.key === "ort";
   const [data, setData] = useState<ModulesStaffOut | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
@@ -79,20 +155,35 @@ export function ModuleOutlineEditor() {
   const [dialog, setDialog] = useState<DialogState>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<string[]>([]);
+  const [drag, setDrag] = useState<DragState>(null);
+  const [over, setOver] = useState<string | null>(null);
+  const hashDone = useRef(false);
+  const onModulesRef = useRef(onModules);
+  onModulesRef.current = onModules;
+
+  useEffect(() => { setCollapsed(readCollapsed(course.id)); }, [course.id]);
+  const saveCollapsed = (next: string[]) => {
+    setCollapsed(next);
+    try { window.sessionStorage.setItem(collapsedKey(course.id), JSON.stringify(next)); } catch { /* storage unavailable */ }
+  };
+  const toggleCollapsed = (id: string) => saveCollapsed(collapsed.includes(id) ? collapsed.filter((x) => x !== id) : [...collapsed, id]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const out = (await getModules(course.id, { deleted: showDeleted })) as ModulesStaffOut;
-      setData({ modules: [...(out.modules ?? [])].sort((a, b) => a.position - b.position) });
+      const modules = [...(out.modules ?? [])].sort((a, b) => a.position - b.position);
+      setData({ modules });
+      onModulesRef.current?.(modules.filter((m) => !m.deleted_at));
     } catch (e) {
       setError(e);
     } finally {
       setLoading(false);
     }
   }, [course.id, showDeleted]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); }, [load, refreshKey]);
 
   const live = useMemo(() => (data?.modules ?? []).filter((m) => !m.deleted_at), [data]);
   const deleted = useMemo(() => (data?.modules ?? []).filter((m) => m.deleted_at), [data]);
@@ -100,6 +191,29 @@ export function ModuleOutlineEditor() {
   const itemName = (i: ItemStaffOut) =>
     pickLocalized(i.title_override, lang, course.default_language) || pickLocalized(i.target?.title, lang, course.default_language)
     || i.url || t("modules.untitledItem");
+  const sortedItems = (m: ModuleStaffOut) => [...m.items].sort((a, b) => a.position - b.position);
+
+  // `#m-{id}` (Back from an object, the To do "unpublished modules" link): expand that module and scroll to it
+  const revealHash = useCallback(() => {
+    const id = window.location.hash.startsWith("#m-") ? window.location.hash.slice(3) : "";
+    if (!id) return;
+    setCollapsed((prev) => {
+      if (!prev.includes(id)) return prev;
+      const next = prev.filter((x) => x !== id);
+      try { window.sessionStorage.setItem(collapsedKey(course.id), JSON.stringify(next)); } catch { /* storage unavailable */ }
+      return next;
+    });
+    window.requestAnimationFrame(() => document.getElementById(`m-${id}`)?.scrollIntoView({ block: "start" }));
+  }, [course.id]);
+  useEffect(() => {
+    if (!data || hashDone.current) return;
+    hashDone.current = true;
+    revealHash();
+  }, [data, revealHash]);
+  useEffect(() => {
+    window.addEventListener("hashchange", revealHash);
+    return () => window.removeEventListener("hashchange", revealHash);
+  }, [revealHash]);
 
   const closeDialog = () => { setDialog(null); setDialogError(null); };
   const ignoredNames = (m: ModuleStaffOut) => ignoredReqItems(m).map(itemName).join(", ");
@@ -113,6 +227,7 @@ export function ModuleOutlineEditor() {
       if (opts.inDialog) closeDialog();
       if (opts.success) toast.success(opts.success);
       await load();
+      onChanged?.();
       return true;
     } catch (e) {
       if (opts.inDialog) setDialogError(errorText(e));
@@ -123,89 +238,265 @@ export function ModuleOutlineEditor() {
     }
   };
 
+  /** Optimistic reorder (drag and drop): show the new order at once, write, reload; on error reload and say why. */
+  const optimistic = async (next: ModuleStaffOut[], key: string, fn: () => Promise<unknown>) => {
+    const before = data;
+    setData((d) => (d ? { modules: [...next, ...d.modules.filter((m) => m.deleted_at)] } : d));
+    const ok = await run(key, fn);
+    if (!ok && before) setData(before);
+  };
+
   const saveSettings = (v: ModuleSettingsValue, module: ModuleStaffOut | null) => run("settings", () => (module
     ? updateModule(course.id, module.id, { title: v.title, unlock_at: v.unlock_at, sequential: v.sequential, completion_mode: v.completion_mode })
     : createModule(course.id, v)), { inDialog: true });
 
-  const moveModule = (index: number, delta: number) => {
-    const next = swap(live, index, index + delta).map((m) => m.id);
-    void run(`mm-${live[index].id}`, () => reorderModules(course.id, next));
+  const moveModuleTo = (from: number, to: number) => {
+    if (from === to || to < 0 || to >= live.length) return;
+    const next = move(live, from, to);
+    void optimistic(next, `mm-${live[from].id}`, () => reorderModules(course.id, next.map((m) => m.id)));
   };
-  const moveItemBy = (module: ModuleStaffOut, index: number, delta: number) => {
-    const items = [...module.items].sort((a, b) => a.position - b.position);
-    const next = swap(items, index, index + delta).map((i) => i.id);
-    void run(`mi-${items[index].id}`, () => reorderItems(course.id, module.id, next));
+  const moveItemTo = (module: ModuleStaffOut, from: number, to: number) => {
+    const items = sortedItems(module);
+    if (from === to || to < 0 || to >= items.length) return;
+    const nextItems = move(items, from, to).map((it, i) => ({ ...it, position: i + 1 }));
+    const next = live.map((m) => (m.id === module.id ? { ...m, items: nextItems } : m));
+    void optimistic(next, `mi-${items[from].id}`, () => reorderItems(course.id, module.id, nextItems.map((i) => i.id)));
+  };
+  /** Drop an item into another module before `beforeIndex` (or at the end). */
+  const moveItemAcross = (item: ItemStaffOut, target: ModuleStaffOut, beforeIndex: number | null) => {
+    const targetItems = sortedItems(target);
+    const position = beforeIndex === null ? targetItems.length + 1 : beforeIndex + 1;
+    const moved = { ...item, module_id: target.id };
+    const nextTarget = [...targetItems];
+    nextTarget.splice(position - 1, 0, moved);
+    const next = live.map((m) => {
+      if (m.id === item.module_id) return { ...m, items: m.items.filter((i) => i.id !== item.id) };
+      if (m.id === target.id) return { ...m, items: nextTarget.map((it, i) => ({ ...it, position: i + 1 })) };
+      return m;
+    });
+    void optimistic(next, `mv-${item.id}`, () => moveItem(course.id, item.module_id, item.id, target.id, position));
   };
 
-  const onModuleMenu = (m: ModuleStaffOut, id: string) => {
+  // ---- native drag and drop (desktop pointers; the "⋯" Move entries are the alternative) ----
+  const startDrag = (state: NonNullable<DragState>, elId: string) => (e: React.DragEvent) => {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", state.id);
+    const el = document.getElementById(elId);
+    if (el) e.dataTransfer.setDragImage(el, 24, 24);
+    setDrag(state);
+  };
+  const endDrag = () => { setDrag(null); setOver(null); };
+  const onModuleDragOver = (m: ModuleStaffOut) => (e: React.DragEvent) => {
+    if (!drag) return;
+    if (drag.type === "module" && drag.id !== m.id) { e.preventDefault(); setOver(`m:${m.id}`); }
+    else if (drag.type === "item") { e.preventDefault(); setOver(`end:${m.id}`); }
+  };
+  const onModuleDrop = (m: ModuleStaffOut, mi: number) => (e: React.DragEvent) => {
+    if (!drag) return;
+    e.preventDefault();
+    const d = drag;
+    endDrag();
+    if (d.type === "module") {
+      const from = live.findIndex((x) => x.id === d.id);
+      if (from >= 0) moveModuleTo(from, mi);
+      return;
+    }
+    // an item dropped on a module card (not on a row): to the end of that module
+    const src = live.find((x) => x.id === d.moduleId);
+    const item = src?.items.find((i) => i.id === d.id);
+    if (!src || !item) return;
+    if (src.id === m.id) moveItemTo(m, sortedItems(m).findIndex((i) => i.id === item.id), m.items.length - 1);
+    else moveItemAcross(item, m, null);
+  };
+  const onItemDragOver = (it: ItemStaffOut) => (e: React.DragEvent) => {
+    if (drag?.type !== "item" || drag.id === it.id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setOver(`i:${it.id}`);
+  };
+  const onItemDrop = (m: ModuleStaffOut, ii: number) => (e: React.DragEvent) => {
+    if (drag?.type !== "item") return;
+    e.preventDefault();
+    e.stopPropagation();
+    const d = drag;
+    endDrag();
+    const src = live.find((x) => x.id === d.moduleId);
+    const item = src?.items.find((i) => i.id === d.id);
+    if (!src || !item) return;
+    if (src.id === m.id) moveItemTo(m, sortedItems(m).findIndex((i) => i.id === item.id), ii);
+    else moveItemAcross(item, m, ii);
+  };
+
+  const itemHref = (item: ItemStaffOut): string | null => {
+    const from = moduleAnchor(base, item.module_id);
+    if (item.kind === "page" && item.page_id) return withFrom(`${base}/pages/${item.page_id}`, from);
+    if (item.kind === "file") return `${base}/files`;
+    if (item.kind === "assignment" && item.target?.assignment_kind === "quiz" && item.target.assessment_id) {
+      return withFrom(`${base}/assessments/${item.target.assessment_id}/edit`, from);
+    }
+    if (item.kind === "assignment" && item.assignment_id) return withFrom(`${base}/assignments/${item.assignment_id}`, from);
+    return null;
+  };
+
+  /** Phase 8c UX M4: the icon toggle and the menu entry; a toast names the new state. */
+  const publishToast = (published: boolean, title: string) =>
+    (published ? t("modules.editor.toastPublished", { title }) : t("modules.editor.toastUnpublished", { title }));
+  const toggleModulePublished = (m: ModuleStaffOut) => {
+    // 8a UX M1: publishing a module whose requirement points at a draft asks first
+    if (!m.published && ignoredReqItems(m).length > 0) { setDialogError(null); setDialog({ kind: "publishWarn", module: m, names: ignoredNames(m) }); return; }
+    void run(`pub-${m.id}`, () => updateModule(course.id, m.id, { published: !m.published }), { success: publishToast(!m.published, moduleName(m)) });
+  };
+  const toggleItemPublished = (m: ModuleStaffOut, it: ItemStaffOut) => {
+    void run(`ip-${it.id}`, () => updateItem(course.id, m.id, it.id, { published: !it.published }), { success: publishToast(!it.published, itemName(it)) });
+  };
+
+  const onModuleMenu = (m: ModuleStaffOut, mi: number, id: string) => {
     setDialogError(null);
-    if (id === "settings") setDialog({ kind: "settings", module: m });
+    if (id === "publish") toggleModulePublished(m);
+    else if (id === "settings") setDialog({ kind: "settings", module: m });
     else if (id === "prereq") setDialog({ kind: "prereq", module: m });
+    else if (id === "duplicate") void run(`dup-${m.id}`, () => duplicateModule(course.id, m.id), { success: t("modules.editor.duplicated") });
+    else if (id === "up") moveModuleTo(mi, mi - 1);
+    else if (id === "down") moveModuleTo(mi, mi + 1);
     else if (id === "reapply") setDialog({ kind: "reapply", module: m });
+    else if (id === "progress") setDialog({ kind: "progress" });
     else if (id === "delete") setDialog({ kind: "deleteModule", module: m });
   };
-  const onItemMenu = (item: ItemStaffOut, id: string) => {
+  const onItemMenu = (m: ModuleStaffOut, item: ItemStaffOut, ii: number, id: string) => {
     setDialogError(null);
-    if (id === "edit") setDialog({ kind: "editItem", item });
+    if (id === "publish") toggleItemPublished(m, item);
+    else if (id === "edit") setDialog({ kind: "editItem", item });
     else if (id === "requirement") setDialog({ kind: "requirement", item });
+    else if (id === "up") moveItemTo(m, ii, ii - 1);
+    else if (id === "down") moveItemTo(m, ii, ii + 1);
     else if (id === "move") setDialog({ kind: "moveItem", item });
     else if (id === "delete") setDialog({ kind: "deleteItem", item });
     else if (id === "open") {
-      const href = item.kind === "page" && item.page_id ? `${base}/pages/${item.page_id}/edit`
-        : item.kind === "file" ? `${base}/files`
-          : item.kind === "assignment" && item.target?.assignment_kind === "quiz" && item.target.assessment_id ? `${base}/assessments/${item.target.assessment_id}/edit`
-            : item.kind === "assignment" && item.assignment_id ? `${base}/assignments/${item.assignment_id}` : null;
+      const href = itemHref(item);
       if (href) router.push(href);
       else if (item.url) window.open(item.url, "_blank", "noopener,noreferrer");
     }
   };
+  const onAdd = (m: ModuleStaffOut, id: string) => {
+    setDialogError(null);
+    if (id === "ortExam") setDialog({ kind: "ortExam", module: m });
+    else setDialog({ kind: "addItem", module: m, initialKind: id as AddKind });
+  };
 
-  const header = (
-    <PageHeader title={t("modules.editor.title")} description={t("modules.editor.description")} className="mb-2"
-      primaryAction={canEdit ? (
-        <Button leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />} onClick={() => { setDialogError(null); setDialog({ kind: "newModule" }); }}>
-          {t("modules.editor.newModule")}
-        </Button>
-      ) : undefined}
-      secondaryActions={live.length > 0 ? (
-        <>
-          {isStaffCourse(course) && (
-            <Button variant="secondary" leftIcon={<Users aria-hidden="true" className="h-4 w-4" />} onClick={() => setDialog({ kind: "progress" })}>
-              {t("modules.progress.open")}
-            </Button>
-          )}
-          {canEdit && (
-            <Button variant="secondary" leftIcon={<AlertTriangle aria-hidden="true" className="h-4 w-4 text-warning-700" />} onClick={() => setDialog({ kind: "reapply", module: null })}>
-              {t("modules.editor.reapplyCourse")}
-            </Button>
-          )}
-        </>
-      ) : undefined} />
+  const addGroups: MenuGroup[] = [
+    {
+      id: "content", heading: t("coursePage.addGroups.content"), items: [
+        { id: "page", label: t("coursePage.addItems.page"), icon: <ItemKindIcon kind="page" /> },
+        { id: "file", label: t("coursePage.addItems.file"), icon: <ItemKindIcon kind="file" /> },
+        { id: "url", label: t("coursePage.addItems.link"), icon: <ItemKindIcon kind="url" /> },
+        { id: "header", label: t("coursePage.addItems.header"), icon: <ItemKindIcon kind="header" /> },
+      ],
+    },
+    {
+      id: "assessment", heading: t("coursePage.addGroups.assessment"), items: [
+        ortCourse
+          ? { id: "ortExam", label: t("coursePage.addItems.ortExam"), icon: <ItemKindIcon kind="assignment" assignmentKind="quiz" /> }
+          : { id: "quiz", label: t("coursePage.addItems.quiz"), icon: <ItemKindIcon kind="assignment" assignmentKind="quiz" /> },
+        { id: "assignment", label: t("coursePage.addItems.assignment"), icon: <ItemKindIcon kind="assignment" assignmentKind="text" /> },
+      ],
+    },
+  ];
+  const addMenu = (m: ModuleStaffOut, opts: { fullWidth?: boolean; className?: string } = {}) => (
+    <OutlineMenu trigger="button" variant="secondary" label={t("modules.editor.addItem")} leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />}
+      sheetTitle={t("coursePage.add", { title: moduleName(m) })} groups={addGroups} onSelect={(id) => onAdd(m, id)}
+      fullWidth={opts.fullWidth} className={opts.className} />
   );
 
+  const allCollapsed = live.length > 0 && live.every((m) => collapsed.includes(m.id));
+  const moreGroups: MenuGroup[] = [{
+    id: "more", items: [
+      { id: "progress", label: t("modules.progress.open") },
+      ...(canEdit ? [{ id: "reapply", label: t("modules.editor.reapplyCourse"), description: t("modules.editor.reapplyWholeCourse") }] : []),
+      { id: "deleted", label: showDeleted ? t("coursePage.hideDeleted") : t("modules.editor.showDeleted") },
+    ],
+  }];
+  const onMore = (id: string) => {
+    if (id === "progress") setDialog({ kind: "progress" });
+    else if (id === "reapply") { setDialogError(null); setDialog({ kind: "reapply", module: null }); }
+    else if (id === "deleted") setShowDeleted((s) => !s);
+  };
+
+  const newModuleButton = (
+    <Button leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />} onClick={() => { setDialogError(null); setDialog({ kind: "newModule" }); }}>
+      {t("modules.editor.newModule")}
+    </Button>
+  );
+  const header = embedded ? (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <h2 className="text-xl font-semibold leading-7 text-slate-900">{t("modules.editor.title")}</h2>
+      <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+        {live.length > 1 && (
+          <Button variant="link" size="sm" onClick={() => saveCollapsed(allCollapsed ? [] : live.map((m) => m.id))}>
+            {allCollapsed ? t("coursePage.expandAll") : t("coursePage.collapseAll")}
+          </Button>
+        )}
+        {(live.length > 0 || deleted.length > 0 || showDeleted) && (
+          <OutlineMenu label={t("coursePage.moreActions")} groups={moreGroups} onSelect={onMore} />
+        )}
+        {/* an empty course shows "New module" in its empty state */}
+        {canEdit && (live.length > 0 || deleted.length > 0) && newModuleButton}
+      </div>
+    </div>
+  ) : (
+    <PageHeader title={t("modules.editor.title")} description={t("modules.editor.description")} className="mb-2"
+      primaryAction={canEdit ? newModuleButton : undefined}
+      secondaryActions={live.length > 0 || deleted.length > 0 || showDeleted
+        ? <OutlineMenu label={t("coursePage.moreActions")} groups={moreGroups} onSelect={onMore} /> : undefined} />
+  );
+
+  const H = embedded ? "h3" : "h2";
   let body: React.ReactNode;
   if (error && !data) body = <ErrorState message={errorText(error)} onRetry={() => void load()} retrying={loading} />;
   else if (!data) body = <LoadingState rows={3} />;
   else if (live.length === 0 && deleted.length === 0) {
     body = (
       <EmptyState title={t("modules.editor.emptyTitle")} description={t("modules.editor.emptyBody")}
-        action={canEdit ? <Button onClick={() => setDialog({ kind: "newModule" })} leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />}>{t("modules.editor.newModule")}</Button> : undefined} />
+        action={canEdit ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-center">
+            <Button onClick={() => setDialog({ kind: "newModule" })} leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />}>{t("modules.editor.newModule")}</Button>
+            {onAddExisting && <Button variant="secondary" onClick={onAddExisting}>{t("coursePage.addExisting")}</Button>}
+          </div>
+        ) : undefined} />
     );
   } else {
     body = (
-      <div className="space-y-5">
+      <div className="space-y-4">
         {live.map((m, mi) => {
-          const items = [...m.items].sort((a, b) => a.position - b.position);
+          const items = sortedItems(m);
           const prereqNames = m.prerequisites.map((id) => live.find((x) => x.id === id)).filter(Boolean).map((x) => moduleName(x!));
           const headingId = `om-${m.id}`;
+          const itemsId = `omi-${m.id}`;
+          const isCollapsed = collapsed.includes(m.id);
+          const name = moduleName(m);
+          const dropTarget = over === `m:${m.id}` || over === `end:${m.id}`;
           return (
-            <section key={m.id} aria-labelledby={headingId} className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <header className="space-y-2 border-b border-slate-100 px-4 py-4 sm:px-6">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <h2 id={headingId} className="break-words text-lg font-semibold leading-7 text-slate-900">{moduleName(m)}</h2>
+            <section key={m.id} id={`m-${m.id}`} aria-labelledby={headingId}
+              onDragOver={canEdit ? onModuleDragOver(m) : undefined} onDrop={canEdit ? onModuleDrop(m, mi) : undefined}
+              className={cn("scroll-mt-24 rounded-2xl border bg-white shadow-sm",
+                dropTarget ? "border-brand-500 ring-2 ring-brand-200" : "border-slate-200",
+                drag?.type === "module" && drag.id === m.id && "opacity-60")}>
+              <header className="group/mod space-y-2 px-2 py-2 sm:px-3">
+                <div className="flex items-start gap-1">
+                  {canEdit && (
+                    <DragHandle scope="mod" label={t("modules.editor.dragHandle", { title: name })} onEnd={endDrag}
+                      onStart={startDrag({ type: "module", id: m.id }, `m-${m.id}`)} />
+                  )}
+                  <button type="button" aria-expanded={!isCollapsed} aria-controls={itemsId} onClick={() => toggleCollapsed(m.id)}
+                    aria-label={t("coursePage.toggleModule", { title: name })} title={t("coursePage.toggleModule", { title: name })}
+                    className={cn("inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100", focusRing)}>
+                    <ChevronRight aria-hidden="true" className={cn("h-5 w-5 transition-transform", !isCollapsed && "rotate-90")} />
+                  </button>
+                  <div className="min-w-0 flex-1 py-2">
+                    <H id={headingId} className="break-words text-lg font-semibold leading-7 text-slate-900">{name}</H>
                     <p className="mt-0.5 flex flex-wrap gap-x-3 text-sm leading-6 text-slate-600">
-                      {!canEdit && <span>{m.published ? t("modules.editor.published") : t("modules.editor.draft")}</span>}
+                      {!m.published && <span>{t("modules.editor.draft")}</span>}
+                      {m.published && !canEdit && <span>{t("modules.editor.published")}</span>}
+                      {isCollapsed && <span>{t("coursePage.itemCount", { n: m.items.length })}</span>}
                       {m.unlock_at && <span>{t("modules.reason.unlockAt", { date: fmtShortDateTime(m.unlock_at, lang) })}</span>}
                       {m.sequential && <span>{t("modules.sequentialHint")}</span>}
                       {m.completion_mode === "any" && <span>{t("modules.completionAny")}</span>}
@@ -213,127 +504,150 @@ export function ModuleOutlineEditor() {
                     </p>
                   </div>
                   {canEdit && (
-                    <div className="flex shrink-0 flex-wrap items-center gap-1">
-                      <Switch label={t("modules.editor.publishModule")} checked={m.published} busy={busy === `pub-${m.id}`}
-                        onChange={(v) => {
-                          // 8a UX M1: publishing a module whose requirement points at a draft asks first
-                          if (v && ignoredReqItems(m).length > 0) { setDialogError(null); setDialog({ kind: "publishWarn", module: m, names: ignoredNames(m) }); return; }
-                          void run(`pub-${m.id}`, () => updateModule(course.id, m.id, { published: v }));
-                        }} />
-                      <IconButton aria-label={t("modules.editor.moveModuleUp")} icon={<ArrowUp />} disabled={mi === 0 || !!busy} onClick={() => moveModule(mi, -1)} />
-                      <IconButton aria-label={t("modules.editor.moveModuleDown")} icon={<ArrowDown />} disabled={mi === live.length - 1 || !!busy} onClick={() => moveModule(mi, 1)} />
-                      <MenuButton variant="secondary" size="sm" label={t("modules.editor.actions")} onSelect={(id) => onModuleMenu(m, id)} items={[
-                        { id: "settings", label: t("modules.editor.editSettings") },
-                        { id: "prereq", label: t("modules.editor.prerequisites"), disabled: mi === 0 },
-                        { id: "reapply", label: t("modules.editor.reapply") },
-                        { id: "delete", label: t("modules.editor.delete") },
-                      ]} />
+                    <div className="flex shrink-0 items-center gap-1">
+                      <PublishToggle published={m.published} name={name} busy={busy === `pub-${m.id}`}
+                        onToggle={() => toggleModulePublished(m)} />
+                      {/* an empty module has one "+ Add": the footer one (M1) */}
+                      {items.length > 0 && addMenu(m, { className: "hidden sm:block" })}
+                      <OutlineMenu label={t("modules.editor.actions")} sheetTitle={t("modules.editor.actionsFor", { title: name })}
+                        onSelect={(id) => onModuleMenu(m, mi, id)} groups={[{
+                        id: "module", items: [
+                          { id: "publish", label: m.published ? t("modules.editor.unpublish") : t("modules.editor.publish"), disabled: !!busy },
+                          { id: "settings", label: t("modules.editor.editSettings") },
+                          // Phase 8c UX m3: the first module has no Prerequisites and no Move up
+                          ...(mi > 0 ? [{ id: "prereq", label: t("modules.editor.prerequisites") }] : []),
+                          { id: "duplicate", label: t("modules.editor.duplicate"), disabled: !!busy },
+                          ...(mi > 0 ? [{ id: "up", label: t("modules.editor.moveUp"), disabled: !!busy }] : []),
+                          { id: "down", label: t("modules.editor.moveDown"), disabled: mi === live.length - 1 || !!busy },
+                          { id: "reapply", label: t("modules.editor.reapply") },
+                          { id: "progress", label: t("modules.progress.open") },
+                          { id: "delete", label: t("modules.editor.delete"), danger: true },
+                        ],
+                      }]} />
                     </div>
                   )}
                 </div>
-                <Warnings warnings={m.warnings} />
-                {m.published && ignoredReqItems(m).length > 0 && (
-                  <div role="note" className="flex items-start gap-2 rounded-xl border border-warning-200 bg-warning-50 px-3 py-2 text-sm leading-6 text-warning-900">
-                    <AlertTriangle aria-hidden="true" className="mt-1 h-4 w-4 shrink-0 text-warning-700" />
-                    <div className="min-w-0 space-y-1 break-words">
-                      <Badge tone="warning">{t("modules.warnings.requirementIgnoredTitle")}</Badge>
-                      <p>{t("modules.warnings.requirementIgnoredBody", { item: ignoredNames(m) })}</p>
+                <div className="space-y-2 pl-1 empty:hidden sm:pl-12">
+                  {m.warnings.length > 0 && <Warnings warnings={m.warnings} />}
+                  {m.published && ignoredReqItems(m).length > 0 && (
+                    <div role="note" className="flex items-start gap-2 rounded-xl border border-warning-200 bg-warning-50 px-3 py-2 text-sm leading-6 text-warning-900">
+                      <AlertTriangle aria-hidden="true" className="mt-1 h-4 w-4 shrink-0 text-warning-700" />
+                      <div className="min-w-0 space-y-1 break-words">
+                        <Badge tone="warning">{t("modules.warnings.requirementIgnoredTitle")}</Badge>
+                        <p>{t("modules.warnings.requirementIgnoredBody", { item: ignoredNames(m) })}</p>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </header>
-              {items.length === 0 ? (
-                <p className="px-4 py-4 text-base text-slate-600 sm:px-6 sm:text-sm">{t("modules.editor.noItems")}</p>
-              ) : (
-                <ul className="divide-y divide-slate-100">
-                  {items.map((it, ii) => {
-                    const pad = ["", "sm:pl-10", "sm:pl-14", "sm:pl-20"][Math.min(it.indent, 3)];
-                    const hidden = !it.published || (it.target && (!it.target.published || it.target.deleted));
-                    return (
-                      <li key={it.id} className={`px-4 py-3 sm:px-6 ${pad}`}>
-                        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                          <div className="flex min-w-0 items-start gap-3">
-                            <ItemKindIcon kind={it.kind} assignmentKind={it.target?.assignment_kind} className="mt-1 h-5 w-5 text-slate-500" />
-                            <div className="min-w-0">
-                              <p className={`break-words text-base leading-6 sm:text-sm ${it.kind === "header" ? "font-semibold uppercase tracking-wide text-slate-700" : "font-medium text-slate-900"} ${hidden ? "opacity-80" : ""}`}>{itemName(it)}</p>
-                              <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm leading-6 text-slate-600">
-                                <span>{kindText(it.kind, it.target?.assignment_kind)}</span>
-                                {it.target?.language && it.kind === "page" && <span>{t(`courses.languages.${it.target.language}`)}</span>}
-                                {it.requirement && (canEdit ? (
-                                  <button type="button" onClick={() => onItemMenu(it, "requirement")}
-                                    className={cn("min-h-11 rounded text-left font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800 sm:min-h-0", focusRing)}>
-                                    {t("modules.editor.requirement", { text: reqText(it.requirement.type, it.requirement.threshold) })}
-                                  </button>
-                                ) : <span>{t("modules.editor.requirement", { text: reqText(it.requirement.type, it.requirement.threshold) })}</span>)}
-                                {!it.published && !canEdit && <Badge>{t("modules.editor.hidden")}</Badge>}
-                                <Warnings warnings={it.warnings} />
-                              </p>
-                            </div>
+              <div id={itemsId} hidden={isCollapsed} className="border-t border-slate-100">
+                {items.length === 0 ? (
+                  <p className="px-4 py-4 text-base text-slate-600 sm:px-6 sm:text-sm">{t("modules.editor.noItems")}</p>
+                ) : (
+                  <ul className="divide-y divide-slate-100">
+                    {items.map((it, ii) => {
+                      const pad = ["", "sm:pl-8", "sm:pl-12", "sm:pl-16"][Math.min(it.indent, 3)];
+                      const iname = itemName(it);
+                      const href = it.kind !== "header" ? itemHref(it) : null;
+                      const titleCls = cn("break-words text-base leading-6 sm:text-sm",
+                        it.kind === "header" ? "font-semibold uppercase tracking-wide text-slate-700" : "font-medium text-slate-900");
+                      return (
+                        <li key={it.id} id={`mi-${it.id}`} onDragOver={canEdit ? onItemDragOver(it) : undefined} onDrop={canEdit ? onItemDrop(m, ii) : undefined}
+                          className={cn("group/row flex items-start gap-1 px-2 py-1.5 sm:px-3", pad,
+                            over === `i:${it.id}` && "shadow-[inset_0_2px_0_0_theme(colors.brand.500)]",
+                            drag?.type === "item" && drag.id === it.id && "opacity-60")}>
+                          {canEdit && (
+                            <DragHandle scope="row" label={t("modules.editor.dragHandle", { title: iname })} onEnd={endDrag}
+                              onStart={startDrag({ type: "item", id: it.id, moduleId: m.id }, `mi-${it.id}`)} />
+                          )}
+                          <ItemKindIcon kind={it.kind} assignmentKind={it.target?.assignment_kind} className="mt-3 h-5 w-5 text-slate-500" />
+                          <div className="min-w-0 flex-1 py-2 pl-2">
+                            {href ? (
+                              <Link href={href} className={cn(titleCls, "rounded hover:text-brand-700 hover:underline", focusRing)}>{iname}</Link>
+                            ) : it.kind === "url" && it.url ? (
+                              <a href={it.url} target="_blank" rel="noopener noreferrer" className={cn(titleCls, "rounded hover:text-brand-700 hover:underline", focusRing)}>
+                                {iname}<span className="sr-only"> {t("modules.opensNewTab")}</span>
+                              </a>
+                            ) : (
+                              <p className={titleCls}>{iname}</p>
+                            )}
+                            <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm leading-6 text-slate-600">
+                              {it.kind !== "header" && <span>{kindText(it.kind, it.target?.assignment_kind)}</span>}
+                              {!it.published && <span>{t("modules.editor.draft")}</span>}
+                              {it.target?.language && it.kind === "page" && <span>{t(`courses.languages.${it.target.language}`)}</span>}
+                              {it.requirement && (canEdit ? (
+                                <button type="button" onClick={() => onItemMenu(m, it, ii, "requirement")}
+                                  className={cn("min-h-11 rounded text-left font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800 sm:min-h-0", focusRing)}>
+                                  {t("modules.editor.requirement", { text: reqText(it.requirement.type, it.requirement.threshold) })}
+                                </button>
+                              ) : <span>{t("modules.editor.requirement", { text: reqText(it.requirement.type, it.requirement.threshold) })}</span>)}
+                              <Warnings warnings={it.warnings} />
+                            </p>
                           </div>
                           {canEdit && (
-                            <div className="flex shrink-0 flex-wrap items-center gap-1 pl-8 lg:pl-0">
-                              <Switch label={<>{t("modules.editor.visible")}<span className="sr-only">: {itemName(it)}</span></>} checked={it.published} busy={busy === `ip-${it.id}`}
-                                onChange={(v) => void run(`ip-${it.id}`, () => updateItem(course.id, m.id, it.id, { published: v }))} />
-                              <IconButton aria-label={t("modules.editor.moveItemUp", { title: itemName(it) })} icon={<ArrowUp />} disabled={ii === 0 || !!busy} onClick={() => moveItemBy(m, ii, -1)} />
-                              <IconButton aria-label={t("modules.editor.moveItemDown", { title: itemName(it) })} icon={<ArrowDown />} disabled={ii === items.length - 1 || !!busy} onClick={() => moveItemBy(m, ii, 1)} />
-                              <MenuButton variant="secondary" size="sm" label={t("modules.editor.actions")} onSelect={(id) => onItemMenu(it, id)} items={[
-                                { id: "edit", label: t("modules.editor.editItem") },
-                                ...(it.kind !== "header" ? [{ id: "requirement", label: t("modules.editor.setRequirement") }] : []),
-                                ...(live.length > 1 ? [{ id: "move", label: t("modules.editor.moveTo") }] : []),
-                                ...(it.kind !== "header" ? [{ id: "open", label: it.target?.assignment_kind === "quiz" ? t("modules.editor.editQuiz") : t("modules.editor.openTarget") }] : []),
-                                { id: "delete", label: t("modules.editor.removeItem") },
-                              ]} />
+                            <div className="flex shrink-0 items-center gap-1">
+                              <PublishToggle published={it.published} name={iname} busy={busy === `ip-${it.id}`}
+                                onToggle={() => toggleItemPublished(m, it)} />
+                              <OutlineMenu label={t("modules.editor.actionsFor", { title: iname })} onSelect={(id) => onItemMenu(m, it, ii, id)} groups={[{
+                                id: "item", items: [
+                                  // Phase 8c UX M4, M6: Publish first, then Open, settings, requirement, moves; Remove last
+                                  { id: "publish", label: it.published ? t("modules.editor.unpublish") : t("modules.editor.publish"), disabled: !!busy },
+                                  ...(it.kind !== "header" ? [{ id: "open", label: it.target?.assignment_kind === "quiz" ? t("modules.editor.editQuiz") : t("modules.editor.openTarget") }] : []),
+                                  { id: "edit", label: t("modules.editor.editItem") },
+                                  ...(it.kind !== "header" ? [{ id: "requirement", label: t("modules.editor.setRequirement") }] : []),
+                                  { id: "up", label: t("modules.editor.moveUp"), disabled: ii === 0 || !!busy },
+                                  { id: "down", label: t("modules.editor.moveDown"), disabled: ii === items.length - 1 || !!busy },
+                                  ...(live.length > 1 ? [{ id: "move", label: t("modules.editor.moveTo") }] : []),
+                                  { id: "delete", label: t("modules.editor.removeItem"), danger: true },
+                                ],
+                              }]} />
                             </div>
                           )}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-              {canEdit && (
-                <div className="border-t border-slate-100 px-4 py-3 sm:px-6">
-                  <Button variant="secondary" size="sm" leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />}
-                    onClick={() => { setDialogError(null); setDialog({ kind: "addItem", module: m }); }}>
-                    {t("modules.editor.addItem")}
-                  </Button>
-                </div>
-              )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                {/* Phase 8c UX M1: the footer "+ Add" on phones, and on wider screens only for an empty module */}
+                {canEdit && (
+                  <div className={cn("border-t border-slate-100 px-3 py-3 sm:px-4", items.length > 0 && "sm:hidden")}>
+                    {addMenu(m, { fullWidth: true, className: "sm:w-fit" })}
+                  </div>
+                )}
+              </div>
             </section>
           );
         })}
-
-        {deleted.length > 0 && (
-          <section aria-labelledby="om-deleted" className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-6">
-            <h2 id="om-deleted" className="text-base font-semibold text-slate-800">{t("modules.editor.deletedTitle")}</h2>
-            <ul className="mt-2 divide-y divide-slate-200">
-              {deleted.map((m) => (
-                <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                  <span className="min-w-0 break-words text-base text-slate-700 sm:text-sm">{moduleName(m)}</span>
-                  {canEdit && (
-                    <Button size="sm" variant="secondary" loading={busy === `restore-${m.id}`}
-                      onClick={() => void run(`restore-${m.id}`, () => restoreModule(course.id, m.id))}>{t("modules.editor.restore")}</Button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
       </div>
     );
   }
 
   const d = dialog;
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {header}
-      {course.status === "concluded" && (
+      {!embedded && course.status === "concluded" && (
         <p role="status" className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-700">{t("courses.home.concludedNotice")}</p>
       )}
-      {data && (live.length > 0 || deleted.length > 0 || showDeleted) && (
-        <Checkbox label={t("modules.editor.showDeleted")} checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />
-      )}
       {body}
+      {afterModules}
+
+      {deleted.length > 0 && (
+        <section aria-labelledby="om-deleted" className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-6">
+          <h2 id="om-deleted" className="text-base font-semibold text-slate-800">{t("modules.editor.deletedTitle")}</h2>
+          <ul className="mt-2 divide-y divide-slate-200">
+            {deleted.map((m) => (
+              <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <span className="min-w-0 break-words text-base text-slate-700 sm:text-sm">{moduleName(m)}</span>
+                {canEdit && (
+                  <Button size="sm" variant="secondary" loading={busy === `restore-${m.id}`}
+                    onClick={() => void run(`restore-${m.id}`, () => restoreModule(course.id, m.id))}>{t("modules.editor.restore")}</Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {d?.kind === "newModule" && (
         <ModuleSettingsDialog open module={null} langs={langs} busy={busy === "settings"} error={dialogError}
@@ -375,8 +689,26 @@ export function ModuleOutlineEditor() {
           }} onCancel={closeDialog} />
       )}
       {d?.kind === "addItem" && (
-        <AddItemDialog open module={d.module} courseId={course.id} base={base} langs={langs}
-          onAdded={() => { closeDialog(); void load(); }} onClose={closeDialog} />
+        <AddItemDialog open module={d.module} courseId={course.id} base={base} langs={langs} initialKind={d.initialKind}
+          allowNewAssignment={!ortCourse}
+          onAdded={() => { closeDialog(); void load(); onChanged?.(); }} onClose={closeDialog} />
+      )}
+      {d?.kind === "ortExam" && (
+        // ORT courses: the existing create dialog with the ORT presets; the exam's quiz assignment goes into the module
+        <CreateAssessmentDialog open courseId={course.id} courseLanguages={course.languages} defaultLanguage={course.default_language}
+          onCancel={closeDialog}
+          onCreated={(a) => {
+            const target = d.module;
+            closeDialog();
+            void (async () => {
+              try {
+                await addItem(course.id, target.id, { kind: "assignment", assignment_id: quizAssignmentId(a.id), published: true });
+              } catch (e) {
+                toast.error(errorText(e));
+              }
+              router.push(withFrom(`${base}/assessments/${a.id}/edit`, moduleAnchor(base, target.id)));
+            })();
+          }} />
       )}
       {d?.kind === "editItem" && (
         <ItemEditDialog open item={d.item} langs={langs} busy={busy === "item"} error={dialogError}
@@ -404,7 +736,8 @@ export function ModuleOutlineEditor() {
         <ConfirmDialog open busy={busy === `pub-${d.module.id}`} title={t("modules.warnings.requirementIgnoredTitle")} object={moduleName(d.module)}
           effect={t("modules.warnings.requirementIgnoredBody", { item: d.names })} confirmLabel={t("modules.editor.publishAnyway")}
           error={dialogError ?? undefined}
-          onConfirm={() => void run(`pub-${d.module.id}`, () => updateModule(course.id, d.module.id, { published: true }), { inDialog: true })}
+          onConfirm={() => void run(`pub-${d.module.id}`, () => updateModule(course.id, d.module.id, { published: true }),
+            { inDialog: true, success: t("modules.editor.toastPublished", { title: moduleName(d.module) }) })}
           onCancel={closeDialog} />
       )}
     </div>

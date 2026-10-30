@@ -254,3 +254,38 @@ class AssignmentStudentDetailOut(AssignmentStudentOut):
 
 STUDENT_KEYS = frozenset(AssignmentStudentOut.model_fields)
 STUDENT_DETAIL_KEYS = frozenset(AssignmentStudentDetailOut.model_fields)
+
+
+# --- Phase 8c S1 begin --- (PHASE_8C_DESIGN 3.5, 7: the teacher Course page "To do" panel)
+TODO_GROUP_MAX = 10
+
+
+class TodoGradeOut(BaseModel):
+    assignment_id: uuid.UUID
+    title: dict
+    kind: Kind
+    needs_grading: int
+    oldest_submitted_at: Optional[datetime] = None
+
+
+class TodoDraftOut(BaseModel):
+    assignment_id: uuid.UUID
+    title: dict
+    kind: Kind
+    assessment_id: Optional[uuid.UUID] = None
+    updated_at: Optional[datetime] = None
+
+
+class TodoOut(BaseModel):
+    """`GET _C/todo` (teacher, assistant): at most `TODO_GROUP_MAX` rows per group, with the group totals.
+    `join_code` only for teachers (assistants: None)."""
+    to_grade: list[TodoGradeOut] = []
+    to_grade_total: int = 0
+    drafts: list[TodoDraftOut] = []
+    drafts_total: int = 0
+    unpublished_modules: int = 0
+    first_unpublished_module_id: Optional[uuid.UUID] = None
+    active_students: int = 0
+    join_code: Optional[str] = None
+    join_code_active: bool = False
+# --- Phase 8c S1 end ---

@@ -1,4 +1,4 @@
-fastapi>=0.110.0
+fastapi==0.141.1  # pinned 2026-10-31: core/authz.py route_template() reads FastAPI's route scope (Phase 8c Student view); upgrade deliberately and rerun tests/lms/test_student_view.py
 uvicorn[standard]>=0.28.0
 pydantic>=2.6.0
 pydantic-settings>=2.7.0

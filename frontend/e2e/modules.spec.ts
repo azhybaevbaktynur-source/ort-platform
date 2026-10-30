@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
 import { sectionCounts, seed, settle, signIn, tr, VIEWPORTS, type SeedUser } from "./helpers";
 import { OrtExam } from "./ort-exam";
 
@@ -14,6 +14,12 @@ import { OrtExam } from "./ort-exam";
  * switches to a page. Then the ORT proof (design 13): an ORT exam listed in a locked module of the ORT course still
  * starts, and the student sees the new tabs only while structure is published (cleaned up afterwards, so the ORT
  * specs that run next see the course exactly as seeded).
+ *
+ * Phase 8c S4a (PHASE_8C_DESIGN 12): the teacher works on the Course page (`base`; the staff `/modules` route redirects
+ * there), adds items from the grouped "+ Add" menu (`coursePage.addItems.*`), publishes with the icon button
+ * (`aria-pressed`) and finds a module card by its `#m-{id}` anchor; the student parts assert the course sidebar
+ * (`courseNav`) instead of the old tab bar. Written against the design before S2 (course page) and S3 (one-page
+ * objects) were merged: the selectors below are the design's roles and i18n keys.
  *
  * Data: `seed_backend.py` (`seed_modules`, after every ORT and quiz-editor row): course "Курс модулей E2E" (ru, ky, en)
  * of an approved teacher, published, empty; one enrolled student; one extra ORT (Russian) student.
@@ -61,7 +67,13 @@ async function open(browser: Browser, user: SeedUser, viewport = VIEWPORTS.deskt
   return page;
 }
 
+/** Student outline: one `section` per module (unchanged by 8c). */
 const moduleCard = (page: Page, title: string) => page.locator("section").filter({ has: page.getByRole("heading", { name: title, exact: true }) });
+/** Teacher Course page (8c): every module card carries the anchor `#m-{moduleId}` (design 3.3, 5.3). */
+const tCard = (page: Page, title: string) =>
+  page.locator('[id^="m-"]').filter({ has: page.getByRole("heading", { name: title, exact: true }) }).first();
+/** The course sidebar (design 2.1): staff and students, same landmark name as the old tab bar. */
+const sidebar = (page: Page) => page.getByRole("navigation", { name: t("courses.home.tabsLabel") });
 
 async function createModule(page: Page, title: string) {
   await page.getByRole("button", { name: t("modules.editor.newModule") }).first().click();
@@ -69,19 +81,20 @@ async function createModule(page: Page, title: string) {
   await dlg.getByRole("textbox", { name: t("modules.settings.titleLabel") }).fill(title);
   await dlg.getByRole("button", { name: t("modules.settings.create") }).click();
   await expect(dlg).toBeHidden();
-  await expect(moduleCard(page, title)).toBeVisible();
+  await expect(tCard(page, title)).toBeVisible();
 }
 
 async function moduleMenu(page: Page, title: string, item: string) {
-  const card = moduleCard(page, title);
+  const card = tCard(page, title);
   await card.getByRole("button", { name: t("modules.editor.actions") }).first().click();
   await page.getByRole("menuitem", { name: item }).click();
 }
 
-async function addItem(page: Page, module: string, kind: string, pick?: string, req?: string, threshold?: string) {
-  await moduleCard(page, module).getByRole("button", { name: t("modules.editor.addItem") }).click();
+/** "+ Add" in a module header, then the item from the grouped menu (Content: page, file, link, header; Assessment: quiz, assignment). */
+async function addItem(page: Page, module: string, kind: "page" | "file" | "link" | "header" | "quiz" | "assignment", pick?: string, req?: string, threshold?: string) {
+  await tCard(page, module).getByRole("button", { name: t("modules.editor.addItem") }).first().click();
+  await page.getByRole("menuitem", { name: t(`coursePage.addItems.${kind}`) }).click();
   const dlg = page.getByRole("dialog", { name: t("modules.add.title") });
-  await dlg.getByRole("radio", { name: kind, exact: true }).check();
   if (pick) await dlg.getByRole("radio", { name: new RegExp(pick) }).check();
   if (req) await dlg.getByRole("radio", { name: req, exact: true }).check();
   if (threshold) await dlg.getByRole("spinbutton").fill(threshold);
@@ -93,6 +106,10 @@ async function studentModules(page: Page, cid: string) {
   await expect(page.getByRole("heading", { name: M1, exact: true })).toBeVisible();
   await settle(page);
 }
+
+/** Publish icon button of a module header or item row (design 3.6): `aria-pressed` = published. */
+const publishIcon = (card: Locator, title: string, lang: "ru" | "en" = "ru") =>
+  card.getByRole("button", { name: tr(lang, "modules.editor.publishToggle", { title }), exact: true });
 
 const badge = (page: Page, title: string, state: string) => moduleCard(page, title).getByText(t(`modules.state.${state}`), { exact: true });
 
@@ -112,7 +129,7 @@ test.describe("modules walk (ru)", () => {
     await tp.getByRole("textbox", { name: t("pages.editor.fieldBody") }).fill(PAGE_BODY);
     await tp.getByRole("switch", { name: t("pages.editor.fieldPublished") }).click();
     await tp.getByRole("button", { name: t("common.save") }).first().click();
-    await tp.waitForURL(/\/pages\/[0-9a-f-]{36}\/edit/);
+    await tp.waitForURL(/\/pages\/[0-9a-f-]{36}/); // 8c: the page object (`?tab=edit`), was `/edit`
     const pageId = /\/pages\/([0-9a-f-]{36})/.exec(tp.url())![1];
 
     // ---- PDF upload (published)
@@ -127,22 +144,23 @@ test.describe("modules walk (ru)", () => {
 
     // ---- three modules
     await tp.goto(`${base}/modules`);
+    await tp.waitForURL(new RegExp(`/courses/${cid}$`)); // 8c: the staff /modules route redirects to the Course page
     await expect(tp.getByText(t("modules.editor.emptyTitle"))).toBeVisible();
     await createModule(tp, M1);
     await createModule(tp, M2);
     await createModule(tp, M3);
 
     // M1: the page ("view" requirement) and the PDF
-    let dlg = await addItem(tp, M1, t("modules.kinds.page"), PAGE_TITLE, t("modules.reqPicker.types.view"));
+    let dlg = await addItem(tp, M1, "page", PAGE_TITLE, t("modules.reqPicker.types.view"));
     await dlg.getByRole("button", { name: t("modules.add.submit") }).click();
     await expect(dlg).toBeHidden();
-    dlg = await addItem(tp, M1, t("modules.kinds.file"), FILE_TITLE);
+    dlg = await addItem(tp, M1, "file", FILE_TITLE);
     await dlg.getByRole("button", { name: t("modules.add.submit") }).click();
     await expect(dlg).toBeHidden();
-    await expect(moduleCard(tp, M1).getByText(FILE_TITLE, { exact: true })).toBeVisible();
+    await expect(tCard(tp, M1).getByText(FILE_TITLE, { exact: true })).toBeVisible();
 
-    // M2: "New quiz" creates the quiz assignment and its item, then opens the 7c editor
-    dlg = await addItem(tp, M2, t("modules.add.newQuiz"));
+    // M2: "+ Add -> Quiz" creates the quiz assignment and its item, then opens the 7c editor
+    dlg = await addItem(tp, M2, "quiz");
     await dlg.getByRole("textbox", { name: t("modules.add.quizTitle") }).fill(QUIZ);
     for (const other of ["ky", "en"]) {
       const box = dlg.getByRole("checkbox", { name: t(`courses.languages.${other}`) });
@@ -176,8 +194,8 @@ test.describe("modules walk (ru)", () => {
     await expect(tp.getByText(t("assessments.status.published")).first()).toBeVisible();
 
     // back in the outline: requirement "score at least 80 %" on the quiz item
-    await tp.goto(`${base}/modules`);
-    const quizRow = moduleCard(tp, M2).locator("li").filter({ hasText: QUIZ });
+    await tp.goto(base);
+    const quizRow = tCard(tp, M2).locator("li").filter({ hasText: QUIZ });
     await quizRow.getByRole("button", { name: t("modules.editor.actions") }).click();
     await tp.getByRole("menuitem", { name: t("modules.editor.setRequirement") }).click();
     const reqDlg = tp.getByRole("dialog", { name: t("modules.reqPicker.title") });
@@ -199,8 +217,8 @@ test.describe("modules walk (ru)", () => {
     await pre.getByRole("checkbox", { name: M2 }).check();
     await pre.getByRole("button", { name: t("lms.common.save") }).click();
     await expect(pre).toBeHidden();
-    await expect(moduleCard(tp, M3)).toContainText(t("modules.editor.after", { titles: M2 }));
-    dlg = await addItem(tp, M3, t("modules.kinds.url"), undefined, t("modules.reqPicker.types.mark_done"));
+    await expect(tCard(tp, M3)).toContainText(t("modules.editor.after", { titles: M2 }));
+    dlg = await addItem(tp, M3, "link", undefined, t("modules.reqPicker.types.mark_done"));
     await dlg.getByRole("textbox", { name: t("modules.add.url") }).fill("https://example.com/fractions");
     await dlg.getByRole("textbox", { name: t("modules.add.titleOverride") }).fill(LINK_TITLE);
     await dlg.getByRole("button", { name: t("modules.add.submit") }).click();
@@ -215,8 +233,8 @@ test.describe("modules walk (ru)", () => {
     await set.getByRole("button", { name: t("lms.common.save") }).click();
     await expect(set).toBeHidden();
     for (const m of [M1, M2, M3]) {
-      await moduleCard(tp, m).getByRole("switch", { name: t("modules.editor.publishModule"), exact: true }).click();
-      await expect(moduleCard(tp, m).getByRole("switch", { name: t("modules.editor.publishModule"), exact: true })).toBeChecked();
+      await publishIcon(tCard(tp, m), m).click();
+      await expect(publishIcon(tCard(tp, m), m)).toHaveAttribute("aria-pressed", "true");
     }
     await settle(tp);
 
@@ -256,9 +274,8 @@ test.describe("modules walk (ru)", () => {
     await sp.waitForURL(new RegExp(`/pages/${pageId}\\?from=module`));
     await expect(sp.getByRole("heading", { name: PAGE_TITLE })).toBeVisible();
     await expect(sp.locator(".katex").first()).toBeVisible();
-    // 8a UX: the Modules tab stays active on a page (M2) and the page offers the way back (M7)
-    await expect(sp.getByRole("navigation", { name: t("courses.home.tabsLabel") }).getByRole("link", { name: t("modules.tab") }))
-      .toHaveAttribute("aria-current", "page");
+    // 8a UX / 8c: the Course link of the sidebar stays active on a page (design 2.2) and the page offers the way back (M7)
+    await expect(sidebar(sp).getByRole("link", { name: t("courses.home.tab"), exact: true })).toHaveAttribute("aria-current", "page");
     await sp.getByRole("link", { name: t("pages.locked.toModules") }).click();
     await sp.waitForURL(new RegExp(`/courses/${cid}/modules$`));
     await studentModules(sp, cid);
@@ -313,8 +330,9 @@ test.describe("modules walk (ru)", () => {
     await expect(badge(sp, M3, "unlocked")).toBeVisible();
 
     // ---- "Re-apply rules" (whole course): M2 is no longer met at 60 %, M3 locks again
-    await tp.goto(`${base}/modules`);
-    await tp.getByRole("button", { name: t("modules.editor.reapplyCourse") }).click();
+    await tp.goto(base);
+    await tp.getByRole("button", { name: t("coursePage.moreActions"), exact: true }).click(); // course toolbar "⋯"
+    await tp.getByRole("menuitem", { name: t("modules.editor.reapplyCourse") }).click();
     const re = tp.getByRole("alertdialog", { name: t("modules.editor.reapplyTitle") });
     await re.getByRole("button", { name: t("modules.editor.reapply") }).click();
     await expect(re).toBeHidden();
@@ -377,7 +395,7 @@ test.describe("modules walk (ru)", () => {
     const base = `/${L}/courses/${cid}`;
     const ortStudent = s.modules.ort_student;
     const created: { modules: string[]; file?: string } = { modules: [] };
-    const tabs = (page: Page) => page.getByRole("navigation", { name: t("courses.home.tabsLabel") });
+    const tabs = sidebar;
     /** ORT review images (orchestrator approval; never written into docs/phases/ORT_BASELINE). */
     const review = async (page: Page, name: string) => {
       if (!SCREENS) return;
@@ -389,12 +407,13 @@ test.describe("modules walk (ru)", () => {
       await page.setViewportSize(VIEWPORTS.desktop);
     };
     try {
-      // before: the ORT student's tab bar has no Modules / Files / Announcements, the home lists the exams
+      // before: the ORT student's sidebar has no Files / Announcements (auto-hide), the home lists the exams
       const sp = await open(browser, ortStudent);
       await sp.goto(base);
       await expect(sp.getByRole("link", { name: "ОРТ E2E", exact: true }).first()).toBeVisible();
-      await expect(tabs(sp).getByRole("link", { name: t("modules.tab") })).toHaveCount(0);
-      await expect(tabs(sp).getByRole("link", { name: t("courseFiles.title") })).toHaveCount(0);
+      await expect(tabs(sp).getByRole("link", { name: t("courses.home.tab"), exact: true })).toBeVisible();
+      await expect(tabs(sp).getByRole("link", { name: t("announcements.title"), exact: true })).toHaveCount(0);
+      await expect(tabs(sp).getByRole("link", { name: t("courseFiles.title"), exact: true })).toHaveCount(0);
       const course0 = await api(ortStudent, "GET", `/courses/${cid}`);
       expect(course0.home_kind).toBe("assignments");
       expect(course0.features).toEqual({ modules: false, files: false, announcements: false });
@@ -402,11 +421,11 @@ test.describe("modules walk (ru)", () => {
       // the home kind is locked on ORT courses
       await api(admin, "PATCH", `/courses/${cid}`, { home_kind: "modules" }, [409]);
 
-      // staff see the new tabs in the ORT course (owner Q5 default)
+      // staff see every sidebar link in the ORT course (owner Q5 default; Files and Announcements marked as hidden)
       const ap = await open(browser, admin);
       await ap.goto(base);
-      for (const name of [t("modules.tab"), t("pages.title"), t("courseFiles.title"), t("announcements.title")]) {
-        await expect(tabs(ap).getByRole("link", { name, exact: true })).toBeVisible();
+      for (const name of [t("courses.home.tab"), t("assignments.tab"), t("courseFiles.title"), t("announcements.title")]) {
+        await expect(tabs(ap).getByRole("link", { name: new RegExp(`^${name}(\\s|$)`) })).toBeVisible(); // staff links may carry the "hidden from students" mark text
       }
       await review(ap, "ort-teacher-course-home-after");
 
@@ -433,8 +452,7 @@ test.describe("modules walk (ru)", () => {
 
       // after: the student sees Modules and Files; the ORT module lists the exam as locked, yet the exam starts
       await sp.goto(base);
-      await expect(tabs(sp).getByRole("link", { name: t("modules.tab") })).toBeVisible();
-      await expect(tabs(sp).getByRole("link", { name: t("courseFiles.title") })).toBeVisible();
+      await expect(tabs(sp).getByRole("link", { name: t("courseFiles.title"), exact: true })).toBeVisible();
       await expect(sp.getByRole("link", { name: "ОРТ E2E", exact: true }).first()).toBeVisible(); // home unchanged
       await review(sp, "ort-student-course-home-with-structure");
       await sp.goto(`${base}/modules`);
@@ -570,19 +588,19 @@ test.describe("modules walk (ru)", () => {
         const tctx = await browser.newContext({ viewport: VIEWPORTS[vp], locale: lang === "en" ? "en-US" : "ru-RU", timezoneId: "UTC", colorScheme: "light" });
         const tp = await tctx.newPage();
         await signIn(tp, md.teacher);
-        const card = (ruTitle: string) => tp.locator("section").filter({ has: tp.getByRole("heading", { name: { [M1]: lang === "en" ? "Module 1. Getting started" : M1, [M2]: lang === "en" ? "Module 2. Check" : M2, [M3]: lang === "en" ? "Module 3. Summary" : M3 }[ruTitle]!, exact: true }) });
-        await tp.goto(`/${lang}/courses/${empty.id}/modules`);
+        const card = (ruTitle: string) => tp.locator('[id^="m-"]').filter({ has: tp.getByRole("heading", { name: { [M1]: lang === "en" ? "Module 1. Getting started" : M1, [M2]: lang === "en" ? "Module 2. Check" : M2, [M3]: lang === "en" ? "Module 3. Summary" : M3 }[ruTitle]!, exact: true }) });
+        await tp.goto(`/${lang}/courses/${empty.id}`);
         await expect(tp.getByText(tl("modules.editor.emptyTitle"))).toBeVisible();
         await shoot(tp, "teacher-outline-empty", vp, lang);
-        await tp.goto(`${base}/modules`);
+        await tp.goto(base);
         await expect(card(M1)).toBeVisible();
-        const m5Card = tp.locator("section").filter({ has: tp.getByRole("heading", { name: m5Title[lang], exact: true }) });
+        const m5Card = tp.locator('[id^="m-"]').filter({ has: tp.getByRole("heading", { name: m5Title[lang], exact: true }) });
         await expect(m5Card.getByText(tl("modules.warnings.requirementIgnoredTitle"))).toBeVisible();
         await shoot(tp, "teacher-outline", vp, lang);
         // M1: unpublish M5, then switching it on asks first (cancel; published again through the API)
         await api(md.teacher, "PATCH", `/courses/${cid}/modules/${m5.id}`, { published: false });
         await tp.reload();
-        await m5Card.getByRole("switch", { name: tl("modules.editor.publishModule"), exact: true }).click();
+        await publishIcon(m5Card, m5Title[lang], lang === "en" ? "en" : "ru").click();
         await expect(tp.getByRole("alertdialog", { name: tl("modules.warnings.requirementIgnoredTitle") })).toBeVisible();
         await shoot(tp, "teacher-publish-warning", vp, lang, false);
         await tp.keyboard.press("Escape");
@@ -600,8 +618,9 @@ test.describe("modules walk (ru)", () => {
         await card(M2).locator("li").filter({ hasText: QUIZ }).getByRole("button", { name: tl("modules.editor.actions") }).click();
         await tp.getByRole("menuitem", { name: tl("modules.editor.setRequirement") }).click();
         await dialogShot("teacher-requirement");
-        await card(M1).getByRole("button", { name: tl("modules.editor.addItem") }).click();
-        await expect(tp.getByRole("dialog").getByRole("radio").nth(6)).toBeVisible(); // kinds + the page list loaded
+        await card(M1).getByRole("button", { name: tl("modules.editor.addItem") }).first().click();
+        await tp.getByRole("menuitem", { name: tl("coursePage.addItems.page") }).click();
+        await expect(tp.getByRole("dialog").getByRole("radio").first()).toBeVisible(); // the page list loaded
         await dialogShot("teacher-add-item");
         await tp.getByRole("button", { name: tl("modules.progress.open") }).click();
         const prog = tp.getByRole("dialog", { name: tl("modules.progress.title") });

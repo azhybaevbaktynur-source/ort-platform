@@ -139,7 +139,9 @@ export function Tabs({ id, label, items, value, onChange, className }: TabsProps
                 tabIndex={active ? 0 : -1}
                 disabled={item.disabled}
                 onClick={() => onChange(item.id)}
-                className={cn(TAB_BASE, active ? TAB_ON : TAB_OFF, "disabled:cursor-not-allowed disabled:opacity-50", focusRing, "focus-visible:ring-inset focus-visible:ring-offset-0")}
+                // Phase 8c UX M3: narrower padding on phones, so three tabs fit at 375 px in every language (TabsNav,
+                // the ORT bank tabs, keeps px-4)
+                className={cn(TAB_BASE, "px-2 sm:px-4", active ? TAB_ON : TAB_OFF, "disabled:cursor-not-allowed disabled:opacity-50", focusRing, "focus-visible:ring-inset focus-visible:ring-offset-0")}
               >
                 {item.label}
                 {item.count !== undefined && <TabCount value={item.count} active={active} tone={item.countTone} />}
