@@ -2,11 +2,12 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { deleteAssessment, listAssessments, restoreAssessment } from "@/lib/lms/assessments";
 import type { AssessmentStaffSummaryOut } from "@/lib/lms/assessmentTypes";
 import { pickLocalized } from "@/lib/lms/localized";
+import { withFrom } from "@/lib/lms/nav"; // Phase 8c S2
 import { useCourse } from "@/components/lms/CourseContext";
 import { Pager } from "@/components/lms/Pager";
 import { useCanEditContent } from "@/components/lms/content/StaffGate";
@@ -25,13 +26,19 @@ import { KeyRound } from "lucide-react"; // Phase 7a S5
  * EmptyState with its own button (UX T24), action row under the text on phones (T6), unpublish through a
  * confirmation that names the assessment and its attempts (T6). `?new=1` opens the create dialog (course home link).
  */
-export function StaffAssessmentList() {
+// Phase 8c S2 (PHASE_8C_DESIGN §3.7, P8C-7): the Tests list is gone; this list lives on the ORT teacher Course page
+// (`embedded`: the course title is the page `<h1>`, so the list title is an `<h2>`; `?new=1` is cleared on the page
+// itself instead of the old `/assessments` route, which is now a redirect stub). The list content is unchanged.
+export function StaffAssessmentList({ embedded = false }: { embedded?: boolean } = {}) {
   const { lang, t } = useTranslation();
   const { course } = useCourse();
   const canEdit = useCanEditContent();
   const router = useRouter();
   const search = useSearchParams();
+  const pathname = usePathname() || "";
   const base = `/${lang}/courses/${course.id}/assessments`;
+  // Phase 8c S2: from the Course page the builder's Back leads to it (`from`, §5.3)
+  const editHref = (id: string) => (embedded ? withFrom(`${base}/${id}/edit`, `/${lang}/courses/${course.id}`) : `${base}/${id}/edit`);
   const [trash, setTrash] = useState(false);
   const [items, setItems] = useState<AssessmentStaffSummaryOut[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -46,9 +53,9 @@ export function StaffAssessmentList() {
   useEffect(() => {
     if (search.get("new") === "1" && canEdit) {
       setCreating(true);
-      router.replace(base);
+      router.replace(embedded ? pathname : base);
     }
-  }, [search, canEdit, router, base]);
+  }, [search, canEdit, router, base, embedded, pathname]);
 
   const load = useCallback(async (next?: string | null) => {
     setLoading(true);
@@ -97,10 +104,23 @@ export function StaffAssessmentList() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title={t("assessments.list.title")} className="mb-2"
-        description={!loading && !error && items.length > 0 ? countText(items.length, !!cursor) : undefined}
-        secondaryActions={<Button variant="secondary" onClick={() => setTrash((s) => !s)}>{trash ? t("assessments.list.hideTrash") : t("assessments.list.showTrash")}</Button>}
-        primaryAction={canEdit ? <Button onClick={() => setCreating(true)}>{t("assessments.list.create")}</Button> : undefined} />
+      {embedded ? (
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-xl font-semibold leading-7 text-slate-900">{t("assessments.list.title")}</h2>
+            {!loading && !error && items.length > 0 && <p className="mt-1 text-sm leading-6 text-slate-600">{countText(items.length, !!cursor)}</p>}
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <Button variant="secondary" onClick={() => setTrash((s) => !s)}>{trash ? t("assessments.list.hideTrash") : t("assessments.list.showTrash")}</Button>
+            {canEdit && <Button onClick={() => setCreating(true)}>{t("assessments.list.create")}</Button>}
+          </div>
+        </div>
+      ) : (
+        <PageHeader title={t("assessments.list.title")} className="mb-2"
+          description={!loading && !error && items.length > 0 ? countText(items.length, !!cursor) : undefined}
+          secondaryActions={<Button variant="secondary" onClick={() => setTrash((s) => !s)}>{trash ? t("assessments.list.hideTrash") : t("assessments.list.showTrash")}</Button>}
+          primaryAction={canEdit ? <Button onClick={() => setCreating(true)}>{t("assessments.list.create")}</Button> : undefined} />
+      )}
       <AssessmentError error={error} onRetry={error ? () => load() : undefined} />
       {!toDelete && <AssessmentError error={actionError} />}
       <AssessmentError error={flow.error} />
@@ -146,7 +166,7 @@ export function StaffAssessmentList() {
                       <button type="button" className={btnSmall} onClick={() => void restore(a)}>{t("assessments.list.restore")}</button>
                     ) : (
                       <>
-                        <Link href={`${base}/${a.id}/edit`} className={btnSmall}>{t("assessments.list.edit")}</Link>
+                        <Link href={editHref(a.id)} className={btnSmall}>{t("assessments.list.edit")}</Link>
                         {a.status === "published" ? (
                           <button type="button" className={btnSmall} disabled={flow.busyId === a.id}
                             onClick={() => flow.requestUnpublish(a.id, title, a.attempt_counts)}>{t("assessments.publish.unpublish")}</button>
@@ -165,7 +185,7 @@ export function StaffAssessmentList() {
       </ul>
       <Pager nextCursor={cursor} loading={loading} onMore={() => load(cursor)} />
       <CreateAssessmentDialog open={creating} courseId={course.id} courseLanguages={course.languages} defaultLanguage={course.default_language}
-        onCreated={(a) => { setCreating(false); router.push(`${base}/${a.id}/edit`); }} onCancel={() => setCreating(false)} />
+        onCreated={(a) => { setCreating(false); router.push(editHref(a.id)); }} onCancel={() => setCreating(false)} />
       <ConfirmDialog open={!!toDelete} tone="danger" busy={busy} title={t("assessments.list.deleteTitle")}
         object={toDelete ? titleOf(toDelete) : undefined} effect={t("assessments.list.deleteBody")}
         confirmLabel={t("assessments.list.delete")} onConfirm={() => void remove()} onCancel={() => setToDelete(null)}

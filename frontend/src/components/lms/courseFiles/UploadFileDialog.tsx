@@ -4,14 +4,14 @@ import React, { useEffect, useRef, useState } from "react";
 import { FileUp } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { uploadCourseFile } from "@/lib/lms/courseFiles";
-import { FILE_MAX_BYTES } from "@/lib/lms/pagesTypes";
+import { FILE_MAX_BYTES, type CourseFileStaffOut } from "@/lib/lms/pagesTypes";
 import { ContentError } from "@/components/lms/pages/ApiError";
 import { Button, Dialog, Input, Switch, toast } from "@/components/ui";
 
 /** Upload a PDF (max 10 MB) into a folder; errors (quota, storage full, size, type) are translated. */
 export function UploadFileDialog({
   open, courseId, folders, onClose, onDone,
-}: { open: boolean; courseId: string; folders: string[]; onClose: () => void; onDone: () => void }) {
+}: { open: boolean; courseId: string; folders: string[]; onClose: () => void; onDone: (file?: CourseFileStaffOut) => void }) {
   const { t } = useTranslation();
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -42,9 +42,9 @@ export function UploadFileDialog({
     if (!file || !title.trim()) return;
     setBusy(true); setError(null); setProgress(0);
     try {
-      await uploadCourseFile(courseId, { file, folder: folder.trim().replace(/^\/+|\/+$/g, ""), title: title.trim(), published }, setProgress);
+      const out = await uploadCourseFile(courseId, { file, folder: folder.trim().replace(/^\/+|\/+$/g, ""), title: title.trim(), published }, setProgress);
       toast.success(t("courseFiles.uploaded"));
-      onDone();
+      onDone(out); // Phase 8c S2: the module "+ Add → File" adds the uploaded file as an item
     } catch (e) { setError(e); } finally { setBusy(false); }
   };
 
