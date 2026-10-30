@@ -119,6 +119,7 @@ POLICY_NAMES = POLICY_NAMES | frozenset(_EXAM_TEMPLATE_POLICY_NAMES_8B)
 # --- Phase 8c S1 begin --- (PHASE_8C_DESIGN 7: no new policy name; the three routes live in their packages' dicts,
 # already registered above: MODULE_POLICIES `GET _C/modules/unsorted`, `POST _C/modules/{mid}/duplicate`;
 # ASSIGNMENT_POLICIES `GET _C/todo`. The `X-View-As: student` header is request state in `core/authz.get_authz`.)
+# Label `course:content.read+staff` (fix 1): content.read plus a staff role in the service (students get 403).
 # --- Phase 8c S1 end ---
 
 

@@ -191,6 +191,53 @@ async def test_other_course_and_other_paths(db):
     assert plain.json() == viewed.json()
 
 
+def _spellings(cid: uuid.UUID) -> list[str]:
+    """Course id spellings FastAPI's `uuid.UUID` path parameter accepts besides the dashed form (fix 1, Medium 1)."""
+    s = str(cid)
+    return [cid.hex, s.upper(), f"urn:uuid:{s}", f"{{{s}}}", f"urn%3Auuid%3A{s}", f"%7B{s}%7D",
+            "%" + format(ord(s[0]), "02X") + s[1:]]
+
+
+async def test_course_id_spellings_cannot_bypass_student_view(db):
+    w, m1, *_ = _world_with_structure(db)
+    student_keys = set((await call(w.S, "GET", C(w), view=False)).json())
+    before = counts(db)
+    for sp in _spellings(w.course.id):
+        base = f"/courses/{sp}"
+        staff = await call(w.O, "GET", base, view=False)  # FastAPI accepts the spelling (the test is not vacuous)
+        assert staff.status_code == 200 and "join_code" in staff.json(), (sp, staff.text)
+        for who in (w.O, w.T):
+            res = await call(who, "POST", f"{base}/modules", json={"title": {"en": "x"}})
+            assert res.status_code == 403 and code(res) == "student_view_read_only", (sp, res.text)
+            res = await call(who, "PATCH", f"{base}/modules/{m1.id}", json={"title": {"en": "y"}})
+            assert res.status_code == 403 and code(res) == "student_view_read_only", (sp, res.text)
+            res = await call(who, "GET", base)
+            assert res.status_code == 200, (sp, res.text)
+            assert set(res.json()) == student_keys and res.json()["my_enrollment"]["role"] == "student", sp
+            out = (await call(who, "GET", f"{base}/modules")).json()
+            assert [m["title"]["en"] for m in out["modules"]] == ["M1", "M2"], sp
+            assert (await call(who, "GET", f"{base}/modules/unsorted")).status_code == 403, sp
+    assert counts(db) == before
+    db.expire_all()
+    assert db.get(CourseModule, m1.id).title == {"en": "M1"}
+
+
+async def test_suspended_organization_answers_before_student_view(db):
+    from app.lms.organizations.models import Organization
+
+    w, *_ = _world_with_structure(db)
+    db.get(Organization, w.course.organization_id).status = "suspended"
+    db.commit()
+    before = counts(db)
+    for who in (w.O, w.T):
+        for view in (False, True):
+            res = await call(who, "POST", f"{C(w)}/modules", json={"title": {"en": "x"}}, view=view)
+            assert res.status_code == 403 and code(res) == "organization_suspended", (view, res.text)
+        res = await call(who, "GET", C(w))  # reads stay in Student view
+        assert res.status_code == 200 and res.json()["my_enrollment"]["role"] == "student"
+    assert counts(db) == before
+
+
 async def test_sandbox_staff_header_ignored(db, api):
     from tests.lms.test_exam_template_sandbox import draft_t, open_sb
     from tests.lms.test_exam_templates_api import tworld
@@ -243,6 +290,10 @@ async def test_preview_allowed_with_real_role(db, api):
         res = await call(who, "POST", url, json={})
         assert res.status_code == 201 and res.json()["is_preview"] is True, res.text
         assert (await call(w.S, "POST", url, json={})).status_code == 403  # students: as today, header or not
+        # fix 1: the preview exception follows the route, so other id spellings keep it too
+        res = await call(who, "POST", f"/courses/urn:uuid:{w.cid}/assessments/{{{out['assessment']['id']}}}/preview",
+                         json={})
+        assert res.status_code == 201 and res.json()["is_preview"] is True, res.text
     db.expire_all()
     assert db.execute(select(func.count()).select_from(Submission)).scalar_one() == before
 
