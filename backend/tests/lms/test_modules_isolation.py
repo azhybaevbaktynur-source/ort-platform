@@ -61,7 +61,7 @@ def routes(w):
 
 
 def test_every_route_is_listed_with_its_policy():
-    assert len(MODULE_POLICIES) == 20
+    assert len(MODULE_POLICIES) == 22  # Phase 8c S1: + GET modules/unsorted, POST modules/{mid}/duplicate
     for key, policy in MODULE_POLICIES.items():
         assert ROUTE_POLICIES[key] == policy
 

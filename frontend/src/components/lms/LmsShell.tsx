@@ -20,19 +20,26 @@ import { InvitationAcceptedNotice } from "./InvitationAcceptedNotice"; // Phase 
  * `/org/{id}` (or the picker `/org`), Platform `/admin`.
  */
 
-type DeclareArea = (area: AreaKey | null) => void;
+/** Phase 8c S1 (PHASE_8C_DESIGN §2.5): a page's area plus whether the area's sub-menu (the header's second row on
+ * desktop, the sections in the phone menu) is hidden there; course pages hide it (the course sidebar navigates). */
+interface DeclaredArea {
+  area: AreaKey;
+  hideSections: boolean;
+}
+type DeclareArea = (value: DeclaredArea | null) => void;
 const AreaDeclareContext = createContext<DeclareArea>(() => {});
 
 /**
  * Lets a page tell the header which area it belongs to when the URL alone cannot (a course page is
  * Teaching for its staff and Learning for its students). Pass null to fall back to the URL rule.
  */
-export function useDeclareArea(area: AreaKey | null) {
+export function useDeclareArea(area: AreaKey | null, opts: { hideSections?: boolean } = {}) {
   const declare = useContext(AreaDeclareContext);
+  const hideSections = !!opts.hideSections;
   useEffect(() => {
-    declare(area);
+    declare(area ? { area, hideSections } : null);
     return () => declare(null);
-  }, [area, declare]);
+  }, [area, hideSections, declare]);
 }
 
 /** Reads `?view=` (needs a Suspense boundary for static pages). */
@@ -73,7 +80,8 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const { me } = meState;
   const unauthorized = meState.error?.status === 401;
   const [view, setView] = useState<string | null>(null);
-  const [declared, setDeclared] = useState<AreaKey | null>(null);
+  const [declaredArea, setDeclared] = useState<DeclaredArea | null>(null);
+  const declared = declaredArea?.area ?? null;
   const [orgs, setOrgs] = useState<MyOrganizationOut[]>([]);
 
   useEffect(() => {
@@ -127,6 +135,8 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const urlArea = areaFromUrl(rest, view, coursesDefault);
   // A page's own declaration wins only where the URL does not decide (course pages).
   const activeArea: AreaKey = urlArea === "learning" && declared ? declared : urlArea;
+  // Phase 8c S1: inside a course (declared area with hidden sections) no area shows its sub-menu
+  const hideSections = urlArea === "learning" && !!declaredArea?.hideSections;
 
   const areas = useMemo<AppHeaderArea[]>(() => {
     const base = `/${lang}`;
@@ -149,8 +159,8 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
       });
     }
     if (isAdmin) list.push({ key: "platform", label: t("shell.areas.platform"), href: `${base}/admin`, icon: <ShieldCheck /> });
-    return list;
-  }, [lang, t, hasTeaching, isAdmin, canCreate, orgs, rest, urlArea]);
+    return hideSections ? list.map((a) => ({ ...a, sections: undefined })) : list;
+  }, [lang, t, hasTeaching, isAdmin, canCreate, orgs, rest, urlArea, hideSections]);
 
   if (authLoading || !user || unauthorized) {
     // Student finding S16: the frame (header + skeleton content) shows at once, never a blank screen.

@@ -325,6 +325,47 @@ def seed_scrolling(api: Api, log: Path, admin_tok: str) -> dict:
 # --- Phase 8b S3 end ---
 
 
+# --- Phase 8c S4a begin --- (course navigation, frontend/e2e/course-nav.spec.ts; written after every other row)
+NAV_STUDENTS = ["sidebar", "handin", "phone", "assistant"]
+
+
+def seed_course_nav(api: Api, log: Path, admin_tok: str) -> dict:
+    """A general course (ru, ky, en) of a fourth approved teacher, published and empty (the spec builds its content
+    through the API and the browser), with three enrolled students: "sidebar" (auto-hide, drawer-free checks),
+    "handin" (hands an assignment in for the To do deep link) and "phone" (the phone drawer)."""
+    teacher = register(api, log, "e2e-nav-teacher@example.com", "Nav Teacher")
+    tp = profile(api, teacher["token"])
+    api.call("POST", f"/platform/users/{tp['id']}/teacher-status", admin_tok, {"status": "approved"})
+    teacher["profile"] = profile(api, teacher["token"])
+    tok = teacher["token"]
+    title = {"ru": "Навигация E2E", "ky": "Навигация E2E", "en": "Navigation E2E"}
+    course = api.call("POST", "/courses", tok, {"title": title, "languages": ["ru", "ky", "en"], "default_language": "ru"})
+    cid = course["id"]
+    api.call("POST", f"/courses/{cid}/publish", tok, {})
+    students = {}
+    for key in NAV_STUDENTS:
+        s = register(api, log, f"e2e-nav-{key}@example.com", f"Nav {key}")
+        s["profile"] = profile(api, s["token"])
+        api.call("POST", "/courses/join", s["token"], {"code": course["join_code"]})
+        students[key] = s
+    # "assistant": promoted to course assistant. Student view downgrades a real teacher/assistant, also the owner who
+    # administers their personal organization (fix 2); the Student view checks run as this assistant and as the owner.
+    mine = api.call("GET", f"/courses/{cid}", students["assistant"]["token"])["my_enrollment"]["id"]
+    api.call("PATCH", f"/courses/{cid}/enrollments/{mine}", tok, {"role": "assistant"})
+    # one published quiz with one question (Student view "Start" opens a preview attempt)
+    bank = api.call("POST", f"/courses/{cid}/banks", tok, {"title": "Банк навигации", "default_language": "ru"})
+    qid = api.call("POST", f"/courses/{cid}/banks/{bank['id']}/questions", tok, sc("Сколько будет 1 + 1?", "2", "3"))["id"]
+    a = api.call("POST", f"/courses/{cid}/assessments", tok, {
+        "title": {"ru": "Квиз просмотра", "ky": "Квиз просмотра", "en": "Preview quiz"}, "preset": "none", "languages": ["ru"]})
+    abase = f"/courses/{cid}/assessments/{a['id']}"
+    sid = api.call("POST", f"{abase}/sections", tok, {"title": {"ru": "Часть 1", "ky": "Часть 1", "en": "Part 1"}})["id"]
+    api.call("POST", f"{abase}/sections/{sid}/items/bulk", tok, {"question_ids": [qid]})
+    api.call("POST", f"{abase}/publish", tok, {})
+    return {"course_id": cid, "join_code": course["join_code"], "teacher": teacher, "students": students,
+            "view_quiz": a["id"]}
+# --- Phase 8c S4a end ---
+
+
 # --- Phase 8b S5 begin --- (exam-template constructor walk, frontend/e2e/exam-constructor.spec.ts; written after every
 # other row, so the ORT, quiz-editor, modules and scrolling rows and screens are exactly as before)
 def seed_constructor(api: Api, log: Path, admin_tok: str) -> dict:
@@ -445,12 +486,14 @@ def main() -> int:
     modules = seed_modules(api, log, tok, cid)  # Phase 8a S5 (after every ORT and quiz-editor row)
     scrolling = seed_scrolling(api, log, tok)  # Phase 8b S3 (after every ORT, quiz-editor and modules row)
     exam_constructor = seed_constructor(api, log, tok)  # Phase 8b S5 (after every other row)
+    course_nav = seed_course_nav(api, log, tok)  # Phase 8c S4a (after every other row)
 
     seed = {
         "quiz_editor": quiz_editor,
         "modules": modules,
         "scrolling": scrolling,
         "exam_constructor": exam_constructor,
+        "course_nav": course_nav,
         "api": args.api, "course_id": cid, "bank_id": bank_id, "exam": exam, "staff_exam": staff_exam,
         "picks": picks, "keys": keys, "comparison_question_id": comparison_qid, "passage_id": passage_id,
         "staff_attempt_id": staff_attempt, "admin": admin, "students": students,

@@ -3,11 +3,11 @@
 // Phase 7a S5: assignment editor (PHASE_7A_DESIGN 5): the fields of section 2.1, saved through the assignment PATCH.
 // For a quiz the assessment stays the source of truth (section 3.2): the same fields are saved through the assignment
 // (the server delegates them to the builder; 409 template_locked shows the locked note) and "Open exam builder" leads
-// to the questions and the exam settings. Rubric and exceptions sit below.
-import React, { useCallback, useEffect, useState } from "react";
-import { ExternalLink } from "lucide-react";
+// to the questions and the exam settings. Rubric and exceptions sit below. Phase 8c S3: the Settings tab of the
+// assignment page (`AssignmentPage`), no header of its own.
+import React, { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
-import { getStaffAssignment, updateAssignment } from "@/lib/lms/assignments";
+import { updateAssignment } from "@/lib/lms/assignments";
 import type { AssignmentStaffOut, AssignmentUpdateIn } from "@/lib/lms/assignmentTypes";
 import { GRADE_RELEASES, type GradeRelease } from "@/lib/lms/gradingTypes";
 import { cleanLocalized, pickLocalized } from "@/lib/lms/localized";
@@ -19,10 +19,10 @@ import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
 import { SchemePicker } from "@/components/lms/grading/settings/SchemePicker";
 import { fromLocalInput, toLocalInput } from "@/components/lms/assessments/format";
 import {
-  Badge, Button, Card, Checkbox, ConfirmDialog, FieldLabel, Input, LinkButton, LoadingState, PageHeader, Select, Switch, toast,
+  Button, Card, Checkbox, FieldLabel, Input, Select, toast,
 } from "@/components/ui";
 import { OverridesPanel } from "@/components/lms/accommodations/OverridesPanel";
-import { AssignmentError, KindBadge, fmtPts, parsePoints } from "./assignmentUi";
+import { AssignmentError, fmtPts, parsePoints } from "./assignmentUi";
 import { RubricEditor } from "./RubricEditor";
 import { useCategories } from "./useCategories";
 
@@ -52,54 +52,38 @@ const formOf = (a: AssignmentStaffOut): Form => ({
   omit: a.omit_from_total,
 });
 
-export function AssignmentEditor({ assignmentId }: { assignmentId: string }) {
+export interface AssignmentEditorHandle {
+  /** The form has changes that are not saved yet. */
+  isDirty: () => boolean;
+  /** Saves the form; false when it is invalid or the server refused it (the form shows why). */
+  save: () => Promise<boolean>;
+}
+
+/**
+ * Phase 8c S3 (PHASE_8C_DESIGN §5.1): the Settings tab of the assignment page. The page loads the assignment, owns the
+ * header (title, badges, Publish) and passes the assignment in; "Grade" and "Open exam builder" moved to the header
+ * and the Details tab. The page asks `isDirty`/`save` through the ref before publishing (unsaved changes first).
+ */
+export const AssignmentEditor = forwardRef<AssignmentEditorHandle, {
+  assignment: AssignmentStaffOut;
+  onChange: (a: AssignmentStaffOut) => void;
+}>(function AssignmentEditor({ assignment: a, onChange }, ref) {
   const { lang, t } = useTranslation();
   const { course } = useCourse();
   const canEdit = useCanEditContent();
   const isTeacher = course.my_enrollment.role === "teacher";
   const ui = useTemplateUi();
   const categories = useCategories(course.id);
-  const base = `/${lang}/courses/${course.id}`;
-  const [a, setA] = useState<AssignmentStaffOut | null>(null);
-  const [form, setForm] = useState<Form | null>(null);
-  const [loadError, setLoadError] = useState<unknown>(null);
+  const [form, setForm] = useState<Form>(() => formOf(a));
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
-  const [pubBusy, setPubBusy] = useState(false);
   const [locked, setLocked] = useState(false);
   const [touched, setTouched] = useState(false);
-  // Phase 7a UX: the publish switch asks to save unsaved form changes first (value = the wanted published state)
-  const [pubAsk, setPubAsk] = useState<boolean | null>(null);
-
-  const load = useCallback(async () => {
-    setLoadError(null);
-    try {
-      const out = await getStaffAssignment(course.id, assignmentId);
-      setA(out);
-      setForm(formOf(out));
-    } catch (e) {
-      setLoadError(e);
-    }
-  }, [course.id, assignmentId]);
-  useEffect(() => { void load(); }, [load]);
-
-  const title = a ? pickLocalized(a.title, lang, course.default_language) || t("assignments.untitled") : "";
-  const crumbs = [{ label: t("assignments.tab"), href: `${base}/assignments` }, { label: title || t("ui.loading") }];
-
-  if (loadError && !a) {
-    return (
-      <div className="space-y-4">
-        <PageHeader title={t("assignments.editor.title")} breadcrumbs={crumbs.slice(0, 1).concat([{ label: t("assignments.editor.title") }])} />
-        <AssignmentError error={loadError} onRetry={() => void load()} />
-      </div>
-    );
-  }
-  if (!a || !form) return <LoadingState rows={3} />;
 
   const quiz = a.kind === "quiz";
   const preset = a.assessment?.preset ?? null;
   const ortLocked = quiz && isAssessmentLocked(ui, preset);
-  const set = (patch: Partial<Form>) => setForm((f) => (f ? { ...f, ...patch } : f));
+  const set = (patch: Partial<Form>) => setForm((f) => ({ ...f, ...patch }));
   const pts = parsePoints(form.points);
   const pointsOk = quiz || (pts !== null && !Number.isNaN(pts) && pts >= 0 && pts <= 10000);
   const fromIso = fromLocalInput(form.from);
@@ -132,7 +116,7 @@ export function AssignmentEditor({ assignmentId }: { assignmentId: string }) {
     };
     try {
       const out = await updateAssignment(course.id, a.id, body);
-      setA(out);
+      onChange(out);
       setForm(formOf(out));
       toast.success(t("assignments.editor.saved"));
       return true;
@@ -144,55 +128,18 @@ export function AssignmentEditor({ assignmentId }: { assignmentId: string }) {
       setBusy(false);
     }
   };
+  const live = useRef({ formDirty, saveForm });
+  live.current = { formDirty, saveForm };
+  useImperativeHandle(ref, () => ({ isDirty: () => live.current.formDirty, save: () => live.current.saveForm() }), []);
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     await saveForm();
   };
 
-  const setPublished = async (value: boolean) => {
-    setPubBusy(true);
-    setError(null);
-    try {
-      const out = await updateAssignment(course.id, a.id, { published: value });
-      setA(out);
-      toast.success(value ? t("assignments.editor.publishedToast") : t("assignments.editor.unpublishedToast"));
-    } catch (err) {
-      setError(err);
-    } finally {
-      setPubBusy(false);
-    }
-  };
-  const togglePublished = (value: boolean) => {
-    if (formDirty) { setPubAsk(value); return; }
-    void setPublished(value);
-  };
-  const saveThenPublish = async () => {
-    if (pubAsk === null) return;
-    const value = pubAsk;
-    const ok = await saveForm();
-    setPubAsk(null);
-    if (ok) await setPublished(value);
-  };
-
-  const builder = quiz && a.assessment_id ? (
-    <LinkButton variant="secondary" href={`${base}/assessments/${a.assessment_id}/edit`} rightIcon={<ExternalLink aria-hidden="true" className="h-4 w-4" />}>
-      {t("assignments.editor.openBuilder")}
-    </LinkButton>
-  ) : null;
-  const publishSwitch = !quiz ? (
-    <Switch label={t("assignments.editor.published")} checked={a.published} busy={pubBusy} disabled={disabled}
-      onChange={togglePublished} containerClassName="basis-full rounded-xl border border-slate-200 bg-white pl-3 pr-1 sm:basis-auto" />
-  ) : null;
-  const gradeLink = !quiz ? <LinkButton variant="secondary" href={`${base}/assignments/${a.id}/grade`}>{t("assignments.editor.grade")}</LinkButton> : null;
-
   return (
     <div className="space-y-6">
-      <PageHeader breadcrumbs={crumbs} title={title} className="mb-2"
-        badge={<><KindBadge kind={a.kind} ort={!!preset && preset !== "none"} />
-          <Badge tone={a.published ? "success" : "neutral"}>{a.published ? t("assignments.list.publishedBadge") : t("assignments.list.draftBadge")}</Badge></>}
-        description={quiz ? t("assignments.editor.quizHint") : t("assignments.editor.publishedHint")}
-        secondaryActions={<>{publishSwitch}{builder}{gradeLink}</>} />
-
+      <p className="text-sm text-slate-600">{quiz ? t("assignments.editor.quizHint") : t("assignments.editor.publishedHint")}</p>
       {a.deleted_at && <p role="status" className="rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-700">{t("assignments.editor.deletedNote")}</p>}
 
       <form onSubmit={(e) => void save(e)} className="space-y-6">
@@ -256,17 +203,12 @@ export function AssignmentEditor({ assignmentId }: { assignmentId: string }) {
 
       {!quiz && (
         <RubricEditor courseId={course.id} assignment={a} defaultLanguage={course.default_language} canEdit={canEdit && !a.deleted_at}
-          onSaved={(rubric) => setA((x) => (x ? { ...x, rubric } : x))} />
+          onSaved={(rubric) => onChange({ ...a, rubric })} />
       )}
 
       {isTeacher && !a.deleted_at && (
         <OverridesPanel courseId={course.id} assignmentId={a.id} isQuiz={quiz} ortTimeLocked={!!preset && preset !== "none"} canEdit={canEdit} />
       )}
-
-      <ConfirmDialog open={pubAsk !== null} busy={busy || pubBusy} title={t("assignments.editor.unsavedTitle")} object={title}
-        effect={pubAsk ? t("assignments.editor.unsavedPublishBody") : t("assignments.editor.unsavedUnpublishBody")}
-        confirmLabel={pubAsk ? t("assignments.editor.saveAndPublish") : t("assignments.editor.saveAndUnpublish")}
-        onConfirm={() => void saveThenPublish()} onCancel={() => setPubAsk(null)} />
     </div>
   );
-}
+});

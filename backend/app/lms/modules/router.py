@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import uuid
+from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 
 from app.core.authz import AuthzContext, get_authz
 from app.lms.assignments.schemas import AssignmentCreateIn
@@ -32,6 +33,24 @@ def get_modules(course_id: uuid.UUID, deleted: bool = False, ctx: AuthzContext =
     Org admin: the student shape with `state = null`."""
     course = _course(ctx, course_id)
     return svc.outline_for(ctx.db, ctx, course, include_deleted=deleted)
+
+
+# --- Phase 8c S1 begin --- (PHASE_8C_DESIGN 7: before any `/modules/{module_id}` route of the same method)
+@router.get(_C + "/unsorted", response_model=sch.UnsortedOut, response_model_exclude_none=False)
+def get_unsorted(course_id: uuid.UUID, kind: Optional[Literal["assignment", "page", "file"]] = None,
+                 cursor: Optional[str] = None, limit: Optional[int] = Query(None, ge=1, le=100),
+                 ctx: AuthzContext = Depends(get_authz)):
+    """Staff and org admins: live assignments, page groups and files no live item of a live module references."""
+    course = _course(ctx, course_id)
+    return svc.unsorted(ctx.db, ctx, course, kind=kind, cursor=cursor, limit=limit)
+
+
+@router.post(_M + "/duplicate", status_code=201, response_model=sch.ModuleStaffOut)
+def duplicate_module(course_id: uuid.UUID, module_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
+    course = _course(ctx, course_id)
+    m = svc.duplicate_module(ctx.db, ctx, course, module_id)
+    return _module(ctx, course, m.id)
+# --- Phase 8c S1 end ---
 
 
 @router.post(_C, status_code=201, response_model=sch.ModuleStaffOut)

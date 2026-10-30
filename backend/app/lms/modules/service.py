@@ -14,7 +14,7 @@ from decimal import Decimal
 from typing import Iterable, Optional
 from urllib.parse import urlparse
 
-from sqlalchemy import delete, func, select, union, update
+from sqlalchemy import and_, delete, func, or_, select, union, update
 from sqlalchemy.orm import Session
 
 from app.core.authz import A, AuthzContext
@@ -699,6 +699,9 @@ def outline_for(db: Session, ctx: AuthzContext, course: Course, *, include_delet
     role = ctx.role_for(course.id)
     if role in STAFF_ROLES:
         return staff_outline(db, course, include_deleted=include_deleted)
+    if role == "student" and ctx.view_as_student(course.id):  # Phase 8c S1: Student view, nothing persisted
+        st, _mem, ev = ev_mod.evaluate_new_student(db, course, clock.now())
+        return student_outline(st, ev)
     if role == "student":
         enr = course_svc.get_enrollment(db, course.id, ctx.user.id)
         st, _mem, ev = ev_mod.evaluate(db, course, enr.id, clock.now())
@@ -720,6 +723,172 @@ def student_progress(db: Session, ctx: AuthzContext, course: Course, enrollment_
     st, _mem, ev = ev_mod.evaluate(db, course, enr.id, clock.now(), persist_changes=enr.state == "active")
     db.commit()
     return student_outline(st, ev)
+
+
+# --- Phase 8c S1 begin --- (PHASE_8C_DESIGN 3.4, 7: the "Unsorted" group and module duplicate)
+
+UNSORTED_LIMIT_DEFAULT = 20
+UNSORTED_LIMIT_MAX = 50
+_COPY_SUFFIX = {"en": " (copy)", "ky": " (көчүрмө)", "ru": " (копия)"}
+
+
+def require_structure_reader(ctx: AuthzContext, course: Course) -> None:
+    """Staff (teacher, assistant) and org admins of the course's organization (A13: titles and publish state only);
+    students 403; outsiders 404. In Student view the caller reads as a student, so 403."""
+    from app.lms.core.errors import Forbidden
+
+    course_svc.require_course(ctx, A.CONTENT_READ, course)
+    role = ctx.role_for(course.id)
+    if role in STAFF_ROLES or (role is None and ctx.org_admin_for(course.organization_id)):
+        return
+    raise Forbidden("Action not permitted")
+
+
+def _referenced_by_live_item(target_col, target_expr):
+    """EXISTS a live item of a live module whose `target_col` equals `target_expr` (8a indexes
+    `ix_module_items_{assignment,page,file}_id`)."""
+    return (select(ModuleItem.id).join(CourseModule, CourseModule.id == ModuleItem.module_id)
+            .where(target_col == target_expr, ModuleItem.deleted_at.is_(None), CourseModule.deleted_at.is_(None))
+            .exists())
+
+
+def _unsorted_assignments_where(course: Course):
+    from app.lms.assessments.models import Assessment
+    from app.lms.assignments.models import Assignment
+
+    conds = [Assignment.course_id == course.id, Assignment.deleted_at.is_(None),
+             ~_referenced_by_live_item(ModuleItem.assignment_id, Assignment.id)]
+    if getattr(course, "template_key", None) == "ort":
+        # ORT courses list their preset exams on the Course page (exam list), not as unsorted items
+        preset = select(Assessment.preset).where(Assessment.id == Assignment.assessment_id).scalar_subquery()
+        conds.append(or_(Assignment.assessment_id.is_(None), func.coalesce(preset, "none") == "none"))
+    return Assignment, and_(*conds)
+
+
+def _unsorted_pages_where(course: Course):
+    """One row per translation group: the group's earliest live variant (created_at, id), when no live item of a live
+    module references a live variant of the group."""
+    from sqlalchemy.orm import aliased
+
+    from app.lms.pages.models import Page
+
+    sib, ref = aliased(Page), aliased(Page)
+    earlier = (select(sib.id).where(
+        sib.translation_group_id == Page.translation_group_id, sib.deleted_at.is_(None),
+        or_(sib.created_at < Page.created_at, and_(sib.created_at == Page.created_at, sib.id < Page.id))).exists())
+    referenced = (select(ModuleItem.id).join(CourseModule, CourseModule.id == ModuleItem.module_id)
+                  .join(ref, ref.id == ModuleItem.page_id)
+                  .where(ref.translation_group_id == Page.translation_group_id, ref.deleted_at.is_(None),
+                         ModuleItem.deleted_at.is_(None), CourseModule.deleted_at.is_(None)).exists())
+    return Page, and_(Page.course_id == course.id, Page.deleted_at.is_(None), ~earlier, ~referenced)
+
+
+def _unsorted_files_where(course: Course):
+    from app.lms.course_files.models import CourseFile
+
+    return CourseFile, and_(CourseFile.course_id == course.id, CourseFile.deleted_at.is_(None),
+                            ~_referenced_by_live_item(ModuleItem.file_id, CourseFile.id))
+
+
+def _unsorted_page(db: Session, course: Course, kind: str, cursor: Optional[str], limit: int) -> sch.UnsortedPageOut:
+    from app.lms.pages.service import keyset_page
+
+    if kind == "assignment":
+        model, where = _unsorted_assignments_where(course)
+        cols = [(model.position, "int"), (model.id, "uuid")]
+        key = lambda r: (r.position, r.id)  # noqa: E731
+    elif kind == "page":
+        model, where = _unsorted_pages_where(course)
+        cols = [(model.title, "str"), (model.id, "uuid")]
+        key = lambda r: (r.title, r.id)  # noqa: E731
+    else:
+        model, where = _unsorted_files_where(course)
+        cols = [(model.folder, "str"), (model.title, "str"), (model.id, "uuid")]
+        key = lambda r: (r.folder, r.title, r.id)  # noqa: E731
+    rows, nxt = keyset_page(db, select(model).where(where), cols, key, cursor=cursor, limit=limit, descending=False)
+    total = int(db.execute(select(func.count()).select_from(model).where(where)).scalar_one())
+    if kind == "assignment":
+        items = [sch.UnsortedItemOut(kind="assignment", id=a.id, title=dict(a.title or {}), published=bool(a.published),
+                                     assignment_kind=a.kind, assessment_id=a.assessment_id,
+                                     updated_at=_utc(a.updated_at)) for a in rows]
+    elif kind == "page":
+        variants: dict = {}
+        if rows:
+            from app.lms.pages.models import Page
+
+            for gid, pid, lang in db.execute(
+                    select(Page.translation_group_id, Page.id, Page.language)
+                    .where(Page.course_id == course.id, Page.deleted_at.is_(None),
+                           Page.translation_group_id.in_([p.translation_group_id for p in rows]))
+                    .order_by(Page.translation_group_id, Page.language, Page.id)):
+                variants.setdefault(gid, []).append(sch.UnsortedVariantOut(id=pid, language=lang))
+        items = [sch.UnsortedItemOut(kind="page", id=p.id, title=p.title, published=bool(p.published),
+                                     language=p.language, translation_group_id=p.translation_group_id,
+                                     variants=variants.get(p.translation_group_id, []),
+                                     updated_at=_utc(p.updated_at)) for p in rows]
+    else:
+        items = [sch.UnsortedItemOut(kind="file", id=f.id, title=f.title, published=bool(f.published),
+                                     folder=f.folder, updated_at=_utc(f.updated_at)) for f in rows]
+    return sch.UnsortedPageOut(items=items, next_cursor=nxt, total=total)
+
+
+def unsorted(db: Session, ctx: AuthzContext, course: Course, *, kind: Optional[str] = None,
+             cursor: Optional[str] = None, limit: Optional[int] = None) -> sch.UnsortedOut:
+    """`GET _C/modules/unsorted`: live assignments (every kind; ORT preset exams only outside ORT courses), page groups
+    and course files that no live item of a live module references. Per kind: one keyset page + one COUNT (+ one
+    variants query for pages); bounded by `limit <= 50`, independent of the course size."""
+    require_structure_reader(ctx, course)
+    if cursor is not None and kind is None:
+        raise _invalid("A cursor needs a kind", "invalid_cursor")
+    n = max(1, min(limit or UNSORTED_LIMIT_DEFAULT, UNSORTED_LIMIT_MAX))
+    kinds = [kind] if kind is not None else ["assignment", "page", "file"]
+    pages = {k: _unsorted_page(db, course, k, cursor, n) for k in kinds}
+    return sch.UnsortedOut(assignments=pages.get("assignment"), pages=pages.get("page"), files=pages.get("file"))
+
+
+def _copy_title(title: Optional[dict]) -> dict:
+    out = {}
+    for lang, value in (title or {}).items():
+        suffix = _COPY_SUFFIX.get(lang, _COPY_SUFFIX["en"])
+        out[lang] = (value or "")[: max(0, ids.MODULE_TITLE_MAX - len(suffix))] + suffix
+    return out or {"en": "Module" + _COPY_SUFFIX["en"]}
+
+
+def duplicate_module(db: Session, ctx: AuthzContext, course: Course, module_id: uuid.UUID) -> CourseModule:
+    """`POST _C/modules/{mid}/duplicate`: a draft copy placed right after the original (title + " (copy)" in every
+    language; `unlock_at`, `sequential`, `completion_mode`, live items and their requirements copied with the same
+    targets; prerequisites not copied). Under `lock_course`; 422 `limit_reached` at the module cap; the modules moved
+    down get `rules_version += 1` (as a reorder)."""
+    _manage(db, ctx, course)
+    src = load_module(db, course, module_id)
+    live = _live_modules(db, course)
+    if len(live) >= ids.MODULES_PER_COURSE_MAX:
+        raise _limit("modules", ids.MODULES_PER_COURSE_MAX)
+    copy = CourseModule(course_id=course.id, title=_copy_title(src.title), position=src.position + 1,
+                        published=False, unlock_at=src.unlock_at, sequential=bool(src.sequential),
+                        completion_mode=src.completion_mode, rules_version=1, created_by_id=ctx.user.id)
+    db.add(copy)
+    db.flush()
+    before = {m.id: m.position for m in live}
+    _place(live, copy, src.position + 1)
+    items = _live_items(db, src.id)
+    reqs = {r.item_id: r for r in db.execute(select(ItemCompletionRequirement).where(
+        ItemCompletionRequirement.item_id.in_([it.id for it in items]))).scalars()} if items else {}
+    for it in items:
+        new = ModuleItem(module_id=copy.id, kind=it.kind, position=it.position, indent=it.indent,
+                         title_override=dict(it.title_override) if it.title_override else None,
+                         published=bool(it.published), page_id=it.page_id, file_id=it.file_id,
+                         assignment_id=it.assignment_id, url=it.url)
+        db.add(new)
+        db.flush()
+        req = reqs.get(it.id)
+        if req is not None:
+            db.add(ItemCompletionRequirement(item_id=new.id, type=req.type, threshold=req.threshold))
+    db.flush()
+    _bump(db, [m.id for m in live if m.id in before and before[m.id] != m.position])
+    db.commit()
+    return copy
+# --- Phase 8c S1 end ---
 
 
 __all__ = ["create_module", "update_module", "delete_module", "restore_module", "reorder_modules",

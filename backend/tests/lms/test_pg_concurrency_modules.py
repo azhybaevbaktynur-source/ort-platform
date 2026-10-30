@@ -211,3 +211,42 @@ def test_reapply_under_load(pg):
         for _uid, eid in students:
             ev = _states(s, cid, eid)  # rebuilt from facts whatever the interleaving was
             assert (ev.modules[ma].state, ev.modules[mb].state) == ("completed", "completed")
+
+
+# --- Phase 8c S1 begin --- (PHASE_8C_DESIGN 7: module duplicate under `lock_course`, racing a reorder)
+def test_duplicate_races_with_reorder(pg):
+    from app.lms.core.errors import ValidationFailed
+
+    Session = sessionmaker(bind=pg, autoflush=False)
+    with Session() as s:
+        w = structure_world(s)
+        mods = [make_module(s, w.course, w.O) for _ in range(4)]
+        for m in mods:
+            make_item(s, m, make_page(s, w.course, w.O))
+        cid, owner, ids_ = w.course.id, w.O.id, [m.id for m in mods]
+
+    def act(i):
+        with Session() as s:
+            course, ctx = load_course(s, cid), _ctx(s, owner)
+            if i % 2 == 0:
+                return ("dup", service.duplicate_module(s, ctx, course, ids_[i % 4]).id)
+            try:
+                service.reorder_modules(s, ctx, course, list(reversed(ids_)))
+                return ("order", None)
+            except ValidationFailed as exc:  # a copy committed first: the old list is incomplete
+                assert exc.code == "order_incomplete"
+                return ("order_refused", None)
+
+    out, errors = _parallel(6, act)
+    assert not errors, errors
+    with Session() as s:
+        live = list(s.execute(select(CourseModule).where(CourseModule.course_id == cid,
+                                                         CourseModule.deleted_at.is_(None))).scalars())
+        assert sorted(m.position for m in live) == list(range(1, len(live) + 1))  # dense, no duplicates
+        assert len(live) == 4 + sum(1 for kind, _ in out if kind == "dup")
+        from app.lms.modules.models import ModuleItem
+
+        for kind, mid in out:
+            if kind == "dup":
+                assert s.execute(select(ModuleItem).where(ModuleItem.module_id == mid)).first() is not None
+# --- Phase 8c S1 end ---

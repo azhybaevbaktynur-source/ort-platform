@@ -36,6 +36,12 @@ def _out(ctx: AuthzContext, course: Course):
     enrollment = svc.get_enrollment(db, course.id, ctx.user.id)
     owner = db.get(User, course.owner_id)
     org_name = _org_name(db, course)  # Phase 6 S1
+    # --- Phase 8c S1 begin --- (Student view: the student serializer; my enrollment reads as a student's)
+    if enrollment is not None and ctx.view_as_student(course.id):
+        out = course_student_out(course, None, owner, org_name)
+        out.my_enrollment = MyEnrollmentOut.model_validate(enrollment).model_copy(update={"role": "student"})
+        return out
+    # --- Phase 8c S1 end ---
     # Phase 6 S1: an org admin of the course's organization gets the staff view (roster management; A13)
     if (enrollment is not None and enrollment.role in STAFF_ROLES) or (
             enrollment is None and ctx.org_admin_for(course.organization_id)):

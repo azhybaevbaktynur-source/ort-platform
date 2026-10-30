@@ -73,16 +73,18 @@ test.describe("quiz editor walk (ru)", () => {
     const qe = seed().quiz_editor;
     let page = await teacherPage(browser);
 
-    // ---- a new quiz from the assignments list opens the card editor with an empty quiz
+    // ---- a new quiz from Assignments (8c: the Tests list is gone; /assessments redirects to /assignments?kind=quiz)
     await page.goto(`/${L}/courses/${qe.course_id}/assessments`);
-    await page.getByRole("button", { name: t("assessments.list.create") }).click();
-    const create = page.getByRole("dialog", { name: t("assessments.create.title") });
+    await page.waitForURL(new RegExp(`/courses/${qe.course_id}/assignments\\?kind=quiz`));
+    await page.getByRole("button", { name: t("assignments.list.create") }).first().click();
+    const create = page.getByRole("dialog", { name: t("assignments.create.title") });
+    await create.getByRole("radio", { name: new RegExp(`^${t("assignments.kinds.quiz")}`) }).check();
     await create.getByRole("textbox").first().fill(QUIZ);
     for (const other of ["ky", "en"]) {
       const box = create.getByRole("checkbox", { name: t(`courses.languages.${other}`) });
       if (await box.isChecked()) await box.uncheck();
     }
-    await create.getByRole("button", { name: t("assessments.create.submit") }).click();
+    await create.getByRole("button", { name: t("assignments.create.submitQuiz") }).click();
     await page.waitForURL(/\/assessments\/[0-9a-f-]{36}/);
     const aid = /\/assessments\/([0-9a-f-]{36})/.exec(page.url())![1];
     const editUrl = `/${L}/courses/${qe.course_id}/assessments/${aid}/edit`;

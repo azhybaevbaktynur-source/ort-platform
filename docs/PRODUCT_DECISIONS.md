@@ -446,3 +446,20 @@ Implementation decisions:
 | P8B-9 | Inside a sandbox course everything except editing the sample quiz and previewing is refused (409 `sandbox_course`): publishing, new assessments, transfer, restore, modules/pages/files/announcements writes, staff changes, joins. |
 | P8B-10 | The player's `?return=` accepts only same-site `/<lang>/…` paths. |
 | P8B-11 | The `sections` lock key covers adding, removing, reordering and section keys; section **titles** stay editable on a locked template (matches the key's label; found in the 8b walkthrough). |
+
+## Owner decisions 2026-10-31: Phase 8c teacher navigation (`phases/PHASE_8C_NAVIGATION_PROPOSAL.md`, v3)
+
+Trigger: the owner reviewed the teacher side after 8b. Navigation was too deep ("go inside each step") and confusing. The checkpoint after 8b is closed with this decision. The open questions listed in `phases/CHECKPOINT_8B.md` keep their defaults until the owner answers.
+
+| # | Topic | Decision |
+|---|---|---|
+| 8c-1 | Course menu | **Short left sidebar, 7–8 links:** Course · Announcements · Assignments · Grades · People · Question banks · Settings (teacher) · Files (optional, decided at the slice 1 review). No "More" menu. No per-course hide/reorder page in 8c. On phones it becomes a "Course menu" drawer. Students do not see links to areas with no published content. |
+| 8c-2 | Adding content | **"+ Add" in each module** with one grouped menu (Content: page, file, link, header · Assessment: assignment, quiz). Creating a quiz opens its question builder. |
+| 8c-3 | Teacher course home | **Modules outline plus a To do panel** (to grade, linking straight to the submissions; drafts; join code). Items in no module go to an "Unsorted" group. No dashboard cards. |
+| 8c-4 | Tests list | **Removed.** Quizzes are in Assignments (with a "Type: quiz" filter) and in Modules. Old URLs redirect. |
+| 8c-5 | Edit mode | **None.** Every function is always available with lighter display: a publish icon, one "⋯" menu per row, drag plus a menu alternative. A **Student view** button shows the course as a student sees it. |
+| 8c-6 | Order | **8c first, then Phase 9.** Before Phase 9: slices 1–4 deployed, a **teacher test with real teachers run by the owner** after slices 1–2, the UX gate and ORT review passed, old URLs redirect and e2e green. Every Phase 9 screen is built inside the new shell. |
+| 8c-7 | ORT | Same shell. ORT content, bank, builder, import, player and results keep their screens and behaviour. The new frame is an approved visual update (before/after screenshots). |
+| 8c-8 | Course home per role | Teachers' "Course" always shows the outline (ORT courses: today's exam list). Students keep the course home chosen in Settings (8a `home_kind`). |
+| 8c-9 | Teacher test (owner, 2026-10-31 later the same day) | **No pause**: slices 1–4 run straight through to one release. The teacher test is optional, run by the owner any time after deploy; its findings become a follow-up slice. It no longer gates Phase 9. |
+| P8C-1 | FastAPI version | **Pinned `fastapi==0.141.1`** (2026-10-31). The Student view check (`core/authz.py::route_template`) reads FastAPI's matched-route scope, whose shape changed across versions; CI and Render previously installed the newest release on every deploy. Upgrades are deliberate and must pass `tests/lms/test_student_view.py` (the course-id spelling test fails if the header stops applying). |

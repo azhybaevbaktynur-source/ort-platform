@@ -134,10 +134,14 @@ def require_access(db: Session, ctx: Any, course: Any, *, page: Optional[Any] = 
         return
     from app.lms.courses import service as course_svc
 
-    enr = course_svc.get_enrollment(db, course.id, ctx.user.id)
-    if enr is None or enr.state != "active" or enr.role != "student":
-        return  # the target route's own authorization answers
-    structure, _mem, ev = ev_mod.evaluate(db, course, enr.id, clock.now(), persist_changes=False)
+    view = getattr(ctx, "view_as_student", None)
+    if view is not None and view(course.id):  # Phase 8c S1: Student view gates as for a new student (read-only)
+        structure, _mem, ev = ev_mod.evaluate_new_student(db, course, clock.now())
+    else:
+        enr = course_svc.get_enrollment(db, course.id, ctx.user.id)
+        if enr is None or enr.state != "active" or enr.role != "student":
+            return  # the target route's own authorization answers
+        structure, _mem, ev = ev_mod.evaluate(db, course, enr.id, clock.now(), persist_changes=False)
     attr = {"page_id": "page_id", "file_id": "file_id", "assignment_id": "assignment_id"}[column.key]
     wanted = set(targets)
     refs = [(me, ie) for me in ev.modules.values() for ie in me.items if getattr(ie.row.item, attr) in wanted]

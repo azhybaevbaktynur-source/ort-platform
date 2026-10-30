@@ -2,6 +2,8 @@
 
 // Phase 8a S4b: page viewer (design 8.1). `body_html` is sanitized by the server and typeset with KaTeX in SafeHtml.
 // Reused by the course home when `home_kind = page` (`embedded` drops the breadcrumbs). A 423 shows the locked state.
+// Phase 8c S3 (PHASE_8C_DESIGN §5.2): the Preview tab of the page object (`preview`: the saved page as students see
+// it, no Edit button; the language chips stay in the Preview tab of the variant).
 import React, { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Pencil } from "lucide-react";
@@ -16,7 +18,12 @@ import { ContentError, LockedState, isModuleLocked } from "./ApiError";
 import { SafeHtml } from "./SafeHtml";
 import { LangChip } from "./LangChip";
 
-export function PageView({ pageId, embedded = false }: { pageId: string; embedded?: boolean }) {
+export function PageView({ pageId, embedded = false, preview = null }: {
+  pageId: string;
+  embedded?: boolean;
+  /** Phase 8c S3: inside the page object's Preview tab; `variantHref` is the link of a language variant. */
+  preview?: { variantHref: (id: string) => string } | null;
+}) {
   const { lang, t } = useTranslation();
   const { course } = useCourse();
   const fromModule = useSearchParams()?.get("from") === "module"; // 8a UX M7: set by module item links
@@ -46,10 +53,10 @@ export function PageView({ pageId, embedded = false }: { pageId: string; embedde
     <article className="max-w-3xl">
       <PageHeader
         title={page.title}
-        breadcrumbs={embedded || !staffRole ? undefined : [{ label: t("pages.title"), href: `${base}/pages` }, { label: page.title }]}
+        breadcrumbs={embedded || preview || !staffRole ? undefined : [{ label: t("pages.title"), href: `${base}/pages` }, { label: page.title }]}
         badge={staff && !staff.published ? <Badge tone="neutral">{t("pages.draft")}</Badge> : undefined}
-        primaryAction={staffRole ? (
-          <LinkButton href={`${base}/pages/${page.id}/edit`} leftIcon={<Pencil className="h-4 w-4" aria-hidden="true" />}>{t("pages.view.edit")}</LinkButton>
+        primaryAction={staffRole && !preview ? (
+          <LinkButton href={`${base}/pages/${page.id}?tab=edit`} leftIcon={<Pencil className="h-4 w-4" aria-hidden="true" />}>{t("pages.view.edit")}</LinkButton>
         ) : undefined}
       >
         {page.variants.length > 0 && (
@@ -57,7 +64,7 @@ export function PageView({ pageId, embedded = false }: { pageId: string; embedde
             <span className="text-sm text-slate-600">{t("pages.view.variants")}</span>
             <LangChip label={t(`pages.lang.${page.language}`)} selected />
             {page.variants.map((v) => (
-              <LangChip key={v.id} label={t(`pages.lang.${v.language}`)} href={`${base}/pages/${v.id}${fromModule ? "?from=module" : ""}`} />
+              <LangChip key={v.id} label={t(`pages.lang.${v.language}`)} href={preview ? preview.variantHref(v.id) : `${base}/pages/${v.id}${fromModule ? "?from=module" : ""}`} />
             ))}
           </nav>
         )}
@@ -65,7 +72,7 @@ export function PageView({ pageId, embedded = false }: { pageId: string; embedde
       <SafeHtml html={page.body_html} />
       <p className="mt-6 text-xs text-slate-600">{t("pages.view.updated", { date: fmtShortDateTime(page.updated_at, lang) })}</p>
       {/* 8a UX M7: a page opened from a module offers the way back as the next step */}
-      {fromModule && !embedded && (
+      {fromModule && !embedded && !preview && (
         <div className="mt-6 [&>*]:w-full sm:[&>*]:w-auto">
           <LinkButton variant="secondary" href={`${base}/modules`} leftIcon={<ArrowLeft aria-hidden="true" className="h-4 w-4" />}>
             {t("pages.locked.toModules")}

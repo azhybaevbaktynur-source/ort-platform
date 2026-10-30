@@ -1,0 +1,50 @@
+Changed (more than 0.5 % of the pixels differ, or the size differs): 17
+  lobby-desktop-ky.png                                1.965 %  1440x900
+  lobby-desktop-ru.png                                1.825 %  1440x900
+  lobby-phone-ky.png                                100.000 %  375x1023 -> 375x1019
+  lobby-phone-ru.png                                100.000 %  375x1023 -> 375x1019
+  teacher-attempts-desktop-ru.png                     3.718 %  1440x900
+  teacher-attempts-phone-ru.png                       5.121 %  375x812
+  teacher-bank-desktop-ru.png                         3.715 %  1440x900
+  teacher-bank-phone-ru.png                          12.388 %  375x812
+  teacher-builder-desktop-ru.png                      2.968 %  1440x900
+  teacher-builder-phone-ru.png                        4.906 %  375x812
+  teacher-import-desktop-ru.png                     100.000 %  1440x918 -> 1440x900
+  teacher-import-phone-ru.png                       100.000 %  375x1192 -> 375x1244
+  teacher-passage-desktop-ru.png                      3.492 %  1440x900
+  teacher-passage-phone-ru.png                        5.489 %  375x812
+  teacher-publish-desktop-ru.png                    100.000 %  1120x102 -> 864x184
+  teacher-question-comparison-desktop-ru.png        100.000 %  1440x1923 -> 1440x1840
+  teacher-question-comparison-phone-ru.png          100.000 %  375x2879 -> 375x2957
+
+Unchanged by the harness rule (must stay pixel-identical, pass against the existing baselines): 30
+  comparison-desktop-ky.png                           0.000 %  1440x900
+  comparison-desktop-ru.png                           0.000 %  1440x900
+  comparison-phone-ky.png                             0.000 %  375x812
+  comparison-phone-ru.png                             0.000 %  375x812
+  flagged-palette-desktop-ky.png                      0.000 %  1440x900
+  flagged-palette-desktop-ru.png                      0.000 %  1440x900
+  flagged-palette-phone-ky.png                        0.000 %  375x812
+  flagged-palette-phone-ru.png                        0.000 %  375x812
+  passage-desktop-ky.png                              0.000 %  1440x900
+  passage-desktop-ru.png                              0.000 %  1440x900
+  passage-phone-ky.png                                0.000 %  375x812
+  passage-phone-ru.png                                0.000 %  375x812
+  player-loading-phone-ru.png                         0.000 %  375x812
+  result-desktop-ky.png                               0.005 %  1120x576
+  result-desktop-ru.png                               0.000 %  1120x576
+  result-phone-ky.png                                 0.000 %  343x652
+  result-phone-ru.png                                 0.008 %  343x596
+  review-desktop-ky.png                               0.000 %  1440x900
+  review-desktop-ru.png                               0.000 %  1440x900
+  review-phone-ky.png                                 0.000 %  375x812
+  review-phone-ru.png                                 0.000 %  375x812
+  section-end-desktop-ky.png                          0.000 %  1440x900
+  section-end-desktop-ru.png                          0.000 %  1440x900
+  section-end-phone-ky.png                            0.000 %  375x812
+  section-end-phone-ru.png                            0.000 %  375x812
+  submit-desktop-ky.png                               0.000 %  1440x900
+  submit-desktop-ru.png                               0.000 %  1440x900
+  submit-phone-ky.png                                 0.000 %  375x812
+  submit-phone-ru.png                                 0.000 %  375x812
+  teacher-publish-phone-ru.png                        0.000 %  343x200

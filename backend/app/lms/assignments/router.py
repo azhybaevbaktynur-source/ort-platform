@@ -120,3 +120,12 @@ async def upload_feedback_file(course_id: uuid.UUID, assignment_id: uuid.UUID, r
 def download_submission_file(course_id: uuid.UUID, submission_id: uuid.UUID, asset_id: uuid.UUID,
                              ctx: AuthzContext = Depends(get_authz)):
     return afiles.serve(afiles.load_download(ctx, course_id, submission_id, asset_id))
+
+
+# --- Phase 8c S1 begin --- (PHASE_8C_DESIGN 3.5, 7: teacher Course page "To do" panel)
+@router.get("/courses/{course_id}/todo", response_model=sch.TodoOut)
+def get_todo(course_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
+    from app.lms.assignments import todo as todo_svc
+
+    return todo_svc.todo(ctx.db, ctx, _course(ctx, course_id))
+# --- Phase 8c S1 end ---

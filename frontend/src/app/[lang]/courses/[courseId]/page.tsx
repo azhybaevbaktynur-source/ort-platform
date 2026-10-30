@@ -8,7 +8,7 @@ import { pickLocalized } from "@/lib/lms/localized";
 import { isStaffCourse } from "@/lib/lms/types";
 import { useCourse } from "@/components/lms/CourseContext";
 import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
-import { StaffCourseHome } from "@/components/lms/course/StaffCourseHome"; // Phase 6b S5c
+import { TeacherCoursePage } from "@/components/lms/course/TeacherCoursePage"; // Phase 8c S2
 import { StudentCourseHome } from "@/components/lms/home/StudentCourseHome"; // Phase 6 S6b
 import { StudentModulesView } from "@/components/lms/modules/StudentModulesView"; // Phase 8a S4a
 import { PageView } from "@/components/lms/pages/PageView"; // Phase 8a S4a (home_kind = page)
@@ -35,11 +35,13 @@ export default function CourseHomePage() {
     }
   };
 
-  // --- Phase 6b S5c: staff course home (next step instead of the roadmap sentence) ---
-  if (isStaffCourse(course) && (course.my_enrollment.role === "teacher" || course.my_enrollment.role === "assistant")) {
-    return <StaffCourseHome course={course} />;
+  // --- Phase 8c S2 begin --- (PHASE_8C_DESIGN §3: the teacher Course page: modules outline, Unsorted, To do; ORT
+  // courses: the exam list with To do and the outline collapsed below. Replaces the 6b staff course home.)
+  if (isStaffCourse(course) && (course.my_enrollment.role === "teacher" || course.my_enrollment.role === "assistant")
+    && !course.my_enrollment.read_only) {
+    return <TeacherCoursePage course={course} />;
   }
-  // --- Phase 6b S5c end ---
+  // --- Phase 8c S2 end ---
   // --- Phase 6 S6b begin --- (student view: next assessment, latest result, about; UX S5)
   // --- Phase 8a S4a: course home switch (PHASE_8A_DESIGN 8.1). `modules` falls back to today's home while no module is
   // published (`features.modules`, and an empty list); `page` shows the chosen page; `assignments` (and an older backend

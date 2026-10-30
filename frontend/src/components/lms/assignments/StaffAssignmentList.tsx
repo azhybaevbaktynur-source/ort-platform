@@ -3,6 +3,10 @@
 // Phase 7a S5: the teacher's Assignments tab (PHASE_7A_DESIGN 5): a design-system Table with search, kind / published /
 // category filters, a published switch per row (quizzes publish in the exam builder), a row menu (edit, grade, release,
 // order, delete) and one primary button "New assignment". The server decides every permission.
+// Phase 8c S3 (PHASE_8C_DESIGN §4.1, §5.3): the filters live in the URL (`?kind=quiz|text|file|none`,
+// `?published=yes|no`, `?category=`, `?needs_grading=1`), `?new=<kind>` opens "New assignment" with that kind
+// (a locked ORT course has no "New" here: its exam is created from the Course page, so `?new=` goes there), and every
+// link into an assignment or a quiz carries `from` = this list with its filters.
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -14,18 +18,23 @@ import {
 } from "@/lib/lms/assignments";
 import type { AssignmentKind, AssignmentStaffSummaryOut } from "@/lib/lms/assignmentTypes";
 import { pickLocalized } from "@/lib/lms/localized";
+import { withFrom } from "@/lib/lms/nav";
 import { useTemplateUi } from "@/lib/lms/templates";
 import { useCourse } from "@/components/lms/CourseContext";
 import { useCanEditContent } from "@/components/lms/content/StaffGate";
 import { useListCount } from "@/components/lms/course/StaffCourseUi";
 import {
-  Badge, Button, ConfirmDialog, EmptyState, FilterBar, MenuButton, PageHeader, Select, Switch, Table, toast,
-  type MenuItem, type TableColumn,
+  Badge, Button, Checkbox, ConfirmDialog, EmptyState, FilterBar, PageHeader, Select, Switch, Table, toast,
+  type TableColumn,
 } from "@/components/ui";
 import { fmtShortDateTime } from "@/components/lms/home/format";
 import { AssignmentError, KindBadge, fmtPts, useAssignmentErrorText } from "./assignmentUi";
 import { AssignmentEditorDialog } from "./AssignmentEditorDialog";
 import { useCategories } from "./useCategories";
+import { OutlineMenu, type OutlineMenuItem } from "@/components/lms/modules/OutlineMenu";
+
+const KINDS: AssignmentKind[] = ["quiz", "text", "file", "none"];
+const asKind = (v: string | null): AssignmentKind | "" => ((KINDS as string[]).includes(v ?? "") ? (v as AssignmentKind) : "");
 
 type Confirm =
   | { kind: "delete"; a: AssignmentStaffSummaryOut }
@@ -46,10 +55,29 @@ export function StaffAssignmentList() {
   const base = `/${lang}/courses/${course.id}`;
 
   const [trash, setTrash] = useState(false);
-  const [kind, setKind] = useState<AssignmentKind | "">("");
-  const [published, setPublished] = useState<"" | "yes" | "no">("");
-  const [category, setCategory] = useState("");
+  // Phase 8c S3: filters from the URL
+  const kind = asKind(search.get("kind"));
+  const publishedParam = search.get("published");
+  const published: "" | "yes" | "no" = publishedParam === "yes" || publishedParam === "no" ? publishedParam : "";
+  const category = search.get("category") ?? "";
+  const needsGrading = search.get("needs_grading") === "1";
+  const listQuery = (() => {
+    const p = new URLSearchParams(search.toString());
+    p.delete("new");
+    return p.toString();
+  })();
+  const here = `${base}/assignments${listQuery ? `?${listQuery}` : ""}`;
+  const setFilters = (patch: Record<string, string | null>) => {
+    const p = new URLSearchParams(listQuery);
+    for (const [k, v] of Object.entries(patch)) {
+      if (v) p.set(k, v);
+      else p.delete(k);
+    }
+    const qs = p.toString();
+    router.replace(`${base}/assignments${qs ? `?${qs}` : ""}`, { scroll: false });
+  };
   const [query, setQuery] = useState("");
+  const [createKind, setCreateKind] = useState<AssignmentKind>("text");
   const [items, setItems] = useState<AssignmentStaffSummaryOut[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,12 +87,16 @@ export function StaffAssignmentList() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<unknown>(null);
 
+  // Phase 7a UX (owner Q5 default): a locked ORT course has only its exam (quiz) assignments; the server refuses others
+  const ortOnly = ui.key === "ort" && ui.locked;
+  const newParam = search.get("new");
   useEffect(() => {
-    if (search.get("new") === "1" && canEdit) {
-      setCreating(true);
-      router.replace(`${base}/assignments`);
-    }
-  }, [search, canEdit, router, base]);
+    if (!newParam || !canEdit) return;
+    if (ortOnly) { router.replace(`${base}?new=1`); return; } // the ORT exam list on the Course page
+    setCreateKind(asKind(newParam) || "text"); // `?new=1` (old links): the default kind
+    setCreating(true);
+    router.replace(here, { scroll: false });
+  }, [newParam, canEdit, ortOnly, router, base, here]);
 
   const load = useCallback(async (next?: string | null) => {
     setLoading(true);
@@ -90,9 +122,10 @@ export function StaffAssignmentList() {
     [lang, course.default_language, t],
   );
   const q = query.trim().toLowerCase();
-  const rows = useMemo(() => (q ? items.filter((a) => titleOf(a).toLowerCase().includes(q)) : items), [items, q, titleOf]);
+  const rows = useMemo(() => items.filter((a) => (!q || titleOf(a).toLowerCase().includes(q))
+    && (!needsGrading || (a.counts?.needs_grading ?? 0) > 0)), [items, q, needsGrading, titleOf]);
   // Reordering sends the full order: only when every assignment is loaded and nothing is filtered.
-  const canOrder = canEdit && !trash && !cursor && !kind && !published && !category && !q;
+  const canOrder = canEdit && !trash && !cursor && !kind && !published && !category && !q && !needsGrading;
 
   const run = async (id: string, fn: () => Promise<void>) => {
     setBusyId(id);
@@ -155,10 +188,10 @@ export function StaffAssignmentList() {
 
   const onMenu = (a: AssignmentStaffSummaryOut, id: string) => {
     const i = items.findIndex((x) => x.id === a.id);
-    if (id === "edit") router.push(`${base}/assignments/${a.id}/edit`);
-    else if (id === "grade") router.push(`${base}/assignments/${a.id}/grade`);
-    else if (id === "builder" && a.assessment_id) router.push(`${base}/assessments/${a.assessment_id}/edit`);
-    else if (id === "attempts" && a.assessment_id) router.push(`${base}/assessments/${a.assessment_id}/attempts`);
+    if (id === "edit") router.push(withFrom(`${base}/assignments/${a.id}?tab=settings`, here));
+    else if (id === "grade") router.push(withFrom(`${base}/assignments/${a.id}?tab=submissions`, here));
+    else if (id === "builder" && a.assessment_id) router.push(withFrom(`${base}/assessments/${a.assessment_id}/edit`, here));
+    else if (id === "attempts") router.push(withFrom(`${base}/assignments/${a.id}?tab=results`, here));
     else if (id === "release") release(a);
     else if (id === "unrelease") { setActionError(null); setConfirm({ kind: "unrelease", a }); }
     else if (id === "up" && i > 0) move(a, -1);
@@ -166,10 +199,10 @@ export function StaffAssignmentList() {
     else if (id === "delete") { setActionError(null); setConfirm({ kind: "delete", a }); }
   };
 
-  const menuItems = (a: AssignmentStaffSummaryOut): MenuItem[] => {
+  const menuItems = (a: AssignmentStaffSummaryOut): OutlineMenuItem[] => {
     const i = items.findIndex((x) => x.id === a.id);
     const quiz = a.kind === "quiz";
-    const out: MenuItem[] = [{ id: "edit", label: t("assignments.list.edit") }];
+    const out: OutlineMenuItem[] = [{ id: "edit", label: t("assignments.list.edit") }];
     if (quiz) {
       out.push({ id: "builder", label: t("assignments.list.openBuilder") });
       out.push({ id: "attempts", label: t("assignments.list.attempts") });
@@ -184,7 +217,7 @@ export function StaffAssignmentList() {
       out.push({ id: "up", label: t("assignments.list.moveUp"), disabled: i <= 0 });
       out.push({ id: "down", label: t("assignments.list.moveDown"), disabled: i < 0 || i >= items.length - 1 });
     }
-    out.push({ id: "delete", label: t("assignments.list.delete") });
+    out.push({ id: "delete", label: t("assignments.list.delete"), danger: true });
     return out;
   };
 
@@ -192,7 +225,7 @@ export function StaffAssignmentList() {
     {
       key: "title", header: t("assignments.list.colTitle"), primary: true,
       cell: (a) => a.deleted_at ? <span className="break-words">{titleOf(a)}</span> : (
-        <Link href={`${base}/assignments/${a.id}/edit`} className="break-words font-semibold text-slate-900 hover:text-brand-700 hover:underline">{titleOf(a)}</Link>
+        <Link href={withFrom(`${base}/assignments/${a.id}`, here)} className="break-words font-semibold text-slate-900 hover:text-brand-700 hover:underline">{titleOf(a)}</Link>
       ),
     },
     { key: "kind", header: t("assignments.list.colKind"), mobilePriority: 0, cell: (a) => <KindBadge kind={a.kind} ort={a.kind === "quiz" && ui.key === "ort"} /> },
@@ -222,17 +255,15 @@ export function StaffAssignmentList() {
           {t("assignments.list.restore")}<span className="sr-only">: {titleOf(a)}</span>
         </Button>
       ) : (
-        <MenuButton variant="secondary" size="sm" disabled={busyId === a.id}
-          label={<>{t("assignments.list.actions")}<span className="sr-only">: {titleOf(a)}</span></>}
-          items={menuItems(a)} onSelect={(id) => onMenu(a, id)} />
+        // Phase 8c UX m7: the same "⋯" menu as the Course page rows
+        <OutlineMenu disabled={busyId === a.id} label={t("modules.editor.actionsFor", { title: titleOf(a) })}
+          groups={[{ id: "row", items: menuItems(a) }]} onSelect={(id) => onMenu(a, id)} />
       ),
     }] : []),
   ];
 
-  // Phase 7a UX (owner Q5 default): a locked ORT course has only its exam (quiz) assignments; the server refuses others
-  const ortOnly = ui.key === "ort" && ui.locked;
-  const create = canEdit && !trash && !ortOnly ? <Button onClick={() => setCreating(true)}>{t("assignments.list.create")}</Button> : undefined;
-  const filtered = !!(kind || published || category || q);
+  const create = canEdit && !trash && !ortOnly ? <Button onClick={() => { setCreateKind("text"); setCreating(true); }}>{t("assignments.list.create")}</Button> : undefined;
+  const filtered = !!(kind || published || category || q || needsGrading);
   const confirmTitle = confirm?.kind === "delete" ? t("assignments.list.deleteTitle")
     : confirm?.kind === "unpublish" ? t("assignments.list.unpublishTitle") : t("assignments.list.unreleaseTitle");
   const confirmEffect = confirm?.kind === "delete" ? (confirm.a.kind === "quiz" ? t("assignments.list.deleteQuizBody") : t("assignments.list.deleteBody"))
@@ -258,16 +289,20 @@ export function StaffAssignmentList() {
         countText={!loading && !error && rows.length > 0 ? countText(rows.length, !!cursor) : undefined}
         search={(
           <FilterBar search={{ value: query, onChange: setQuery, label: t("assignments.list.search") }}
-            canReset={filtered} onReset={() => { setQuery(""); setKind(""); setPublished(""); setCategory(""); }}>
-            <Select label={t("assignments.list.filterKind")} value={kind} onChange={(e) => setKind(e.target.value as AssignmentKind | "")}
-              options={[{ value: "", label: t("assignments.list.allKinds") }, ...(["quiz", "text", "file", "none"] as AssignmentKind[]).map((k) => ({ value: k, label: t(`assignments.kinds.${k}`) }))]} />
+            canReset={filtered} onReset={() => { setQuery(""); setFilters({ kind: null, published: null, category: null, needs_grading: null }); }}>
+            <Select label={t("assignments.list.filterKind")} value={kind} onChange={(e) => setFilters({ kind: e.target.value || null })}
+              options={[{ value: "", label: t("assignments.list.allKinds") }, ...KINDS.map((k) => ({ value: k, label: t(`assignments.kinds.${k}`) }))]} />
             {!trash && (
-              <Select label={t("assignments.list.filterPublished")} value={published} onChange={(e) => setPublished(e.target.value as "" | "yes" | "no")}
+              <Select label={t("assignments.list.filterPublished")} value={published} onChange={(e) => setFilters({ published: e.target.value || null })}
                 options={[{ value: "", label: t("assignments.list.allStates") }, { value: "yes", label: t("assignments.list.publishedBadge") }, { value: "no", label: t("assignments.list.draftBadge") }]} />
             )}
             {categories.length > 0 && (
-              <Select label={t("assignments.list.filterCategory")} value={category} onChange={(e) => setCategory(e.target.value)}
+              <Select label={t("assignments.list.filterCategory")} value={category} onChange={(e) => setFilters({ category: e.target.value || null })}
                 options={[{ value: "", label: t("assignments.list.allCategories") }, ...categories.map((c) => ({ value: c.id, label: pickLocalized(c.title, lang, course.default_language) || "—" }))]} />
+            )}
+            {!trash && (
+              <Checkbox label={t("assignments.page.filterNeedsGrading")} checked={needsGrading} containerClassName="sm:self-end sm:pb-2"
+                onChange={(e) => setFilters({ needs_grading: e.target.checked ? "1" : null })} />
             )}
           </FilterBar>
         )}
@@ -280,10 +315,12 @@ export function StaffAssignmentList() {
         )}
         pagination={{ nextCursor: cursor, loading, onLoadMore: () => void load(cursor) }}
       />
-      <AssignmentEditorDialog open={creating} onCancel={() => setCreating(false)}
+      <AssignmentEditorDialog open={creating} initialKind={createKind} onCancel={() => setCreating(false)}
         onCreated={(a) => {
           setCreating(false);
-          router.push(a.kind === "quiz" && a.assessment_id ? `${base}/assessments/${a.assessment_id}/edit` : `${base}/assignments/${a.id}/edit`);
+          router.push(a.kind === "quiz" && a.assessment_id
+            ? withFrom(`${base}/assessments/${a.assessment_id}/edit`, here)
+            : withFrom(`${base}/assignments/${a.id}?tab=settings`, here));
         }} />
       <ConfirmDialog open={!!confirm} tone={confirm?.kind === "delete" || confirm?.kind === "unrelease" ? "danger" : "primary"}
         busy={!!confirm && busyId === confirm.a.id} title={confirmTitle} object={confirm ? titleOf(confirm.a) : undefined}

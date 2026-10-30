@@ -21,3 +21,10 @@ ASSIGNMENT_POLICIES.update({
     ("GET", "/api/v1/courses/{course_id}/submissions/{submission_id}/files/{asset_id}"): "course:attempt.read_own",
 })
 # --- Phase 7a S2 end ---
+
+# --- Phase 8c S1 begin --- (PHASE_8C_DESIGN 7: content.read + teacher/assistant role; students and org admins 403;
+# concluded courses read (CONCLUDED_ACTIONS); join_code only for teachers)
+ASSIGNMENT_POLICIES.update({
+    ("GET", "/api/v1/courses/{course_id}/todo"): "course:content.read+staff",
+})
+# --- Phase 8c S1 end ---
