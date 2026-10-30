@@ -28,12 +28,25 @@ async def test_quiz_bank_row(db, api):
     assert quiz_banks.is_quiz_bank(b) and not quiz_banks.shareable(b) and quiz_banks.shareable(w.shared)
 
 
-def test_quiz_bank_not_shareable():
-    """Invariant 4.5: Phase 9 adds `visibility` to banks; it must refuse sharing quiz banks via `shareable()`.
-    This test fails on purpose when the column appears, so the guard cannot be forgotten."""
-    if hasattr(QuestionBank, "visibility"):  # pragma: no cover - Phase 9
-        pytest.fail("QuestionBank.visibility exists: enforce quiz_banks.shareable() wherever a bank is shared, "
-                    "then update this test")
+async def test_quiz_bank_not_shareable(db, api):
+    """Invariant 4.5 / PHASE_9_DESIGN invariant 1: a quiz bank is never shared. The service guard refuses with 422
+    `quiz_bank_not_shareable`, and the CHECK `quiz_bank_private` refuses the row even if a path skipped the guard."""
+    from sqlalchemy.exc import IntegrityError
+
+    from app.lms.core.errors import ValidationFailed
+
+    w = quiz_world(db)
+    await quiz_question(api, db, w)
+    b = _bank_of(db, w.quiz)
+    assert b.visibility == "private" and w.shared.visibility == "private"
+    with pytest.raises(ValidationFailed) as exc:
+        quiz_banks.assert_shareable(b)
+    assert exc.value.code == "quiz_bank_not_shareable"
+    quiz_banks.assert_shareable(w.shared)  # a course's shared bank may be shared
+    b.visibility = "organization"
+    with pytest.raises(IntegrityError):
+        db.commit()
+    db.rollback()
 
 
 async def test_quiz_soft_delete_and_restore_flip_the_bank(db, api):

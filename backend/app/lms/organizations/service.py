@@ -44,11 +44,11 @@ def _active_membership(user_id: str):
 
 
 def organizations_administered_by(db: Session, user_id: str) -> list[uuid.UUID]:
-    """Ids of the organizations where the user is an active org admin (one SQL)."""
-    return list(db.execute(
-        select(Organization.id).join(OrganizationMember, OrganizationMember.organization_id == Organization.id)
-        .where(_active_membership(user_id), OrganizationMember.role == "org_admin").order_by(Organization.name)
-    ).scalars())
+    """Ids of the organizations the user administers (one SQL). --- Phase 9 S1 --- (PHASE_9_DESIGN 4.1): the
+    organizations of their active org-admin memberships plus every descendant department (organizations.tree)."""
+    from app.lms.organizations import tree
+
+    return tree.organizations_administered_by(db, user_id)
 
 
 def organizations_of(db: Session, user_id: str) -> list[tuple[Organization, OrganizationMember]]:

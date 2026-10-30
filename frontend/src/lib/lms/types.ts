@@ -118,7 +118,7 @@ export interface CourseCreateIn {
   description?: LocalizedText;
   languages: Lang[];
   default_language: Lang;
-  enrollment_mode?: "invite_code" | "closed";
+  enrollment_mode?: EnrollmentMode; // Phase 9 S1: five modes (form modes: 422 form_required at create)
   enrollment_limit?: number | null;
   starts_at?: string | null;
   ends_at?: string | null;
@@ -129,7 +129,7 @@ export interface CourseUpdateIn {
   description?: LocalizedText;
   languages?: Lang[];
   default_language?: Lang;
-  enrollment_mode?: "invite_code" | "closed";
+  enrollment_mode?: EnrollmentMode; // Phase 9 S1 (form modes need an active form and visibility catalog)
   enrollment_limit?: number | null;
   starts_at?: string | null;
   ends_at?: string | null;
@@ -384,3 +384,231 @@ export interface TodoOut {
   join_code_active: boolean;
 }
 // --- Phase 8c S1 end ---
+
+// --- Phase 9 S1 begin --- (docs/phases/PHASE_9_DESIGN.md §2, §4, §10 "Interfaces fixed by S1"; S2-S4 build on these)
+
+/** Organization kinds; departments sit under a root (depth <= 2), personal organizations are always roots. */
+export type OrgKind = "platform" | "school" | "personal" | "department";
+
+/** Fields `OrganizationOut` gains in Phase 9 (merge into `lib/lms/organizations.ts` OrganizationOut in S2). */
+export interface OrganizationTreeFields {
+  kind: OrgKind;
+  /** "<root hex>/<dept hex>/<self hex>": 32 lowercase hex characters per segment. */
+  path: string;
+  depth: number;
+  parent_id: string | null;
+}
+
+export interface CatalogDefaults {
+  visibility: Visibility;
+  enrollment_mode: "invite_code" | "open" | "closed" | "form_review";
+}
+
+/** Effective settings of a tree (stored on the root; departments read the root's). */
+export interface OrganizationSettings {
+  teachers_can_create_courses: boolean;
+  bank_sharing_enabled: boolean;
+  catalog_defaults: CatalogDefaults;
+  /** 30-90 days (D7). */
+  application_retention_days: number;
+  student_invitations_enabled: boolean;
+}
+export type OrganizationSettingsIn = Partial<Omit<OrganizationSettings, "catalog_defaults">> & {
+  catalog_defaults?: CatalogDefaults;
+};
+
+export interface DepartmentOut {
+  id: string;
+  slug: string;
+  name: string;
+  parent_id: string | null;
+  depth: number;
+  path: string;
+  courses: number;
+  members: number;
+  created_at: string;
+}
+
+/** Fields `BankOut` (`lib/lms/contentTypes.ts`) gains in Phase 9. */
+export type BankVisibility = "private" | "organization";
+export interface BankSharingFields {
+  visibility: BankVisibility;
+  shared_at: string | null;
+  copied_from_bank_id: string | null;
+  /** `content.permissions.can_edit_bank` for the caller (course staff, or an org admin on a shared bank). */
+  can_edit: boolean;
+}
+
+export interface SharedBankRowOut {
+  id: string;
+  title: string;
+  description: string | null;
+  organization_id: string;
+  organization_name: string;
+  course_id: string;
+  course_title: LocalizedText;
+  default_language: Lang | null;
+  question_count: number;
+  passage_count: number;
+  shared_at: string | null;
+  shared_by: UserBrief | null;
+}
+
+export type RosterKind = "student" | "teacher";
+export type RosterStatus = "dry_run" | "applied" | "partial" | "failed";
+export type RosterRowResult =
+  | "invited" | "added" | "existing_member" | "already_enrolled" | "skipped_open_invitation"
+  | "invalid_email" | "duplicate_in_file" | "failed" | "valid";
+
+export interface RosterCounts {
+  valid: number;
+  invalid: number;
+  existing_member: number;
+  invited: number;
+  skipped_open_invitation: number;
+  failed: number;
+}
+
+export interface RosterReportRow {
+  line: number;
+  /** Masked email; the raw address is never stored. */
+  email_masked: string;
+  result: RosterRowResult;
+  error_code: string | null;
+}
+
+export interface RosterImportOut {
+  id: string;
+  organization_id: string;
+  kind: RosterKind;
+  course_id: string | null;
+  department_id: string | null;
+  status: RosterStatus;
+  file_name: string;
+  row_count: number;
+  counts: RosterCounts;
+  report: RosterReportRow[];
+  ignored_columns: string[];
+  created_by: UserBrief | null;
+  created_at: string;
+  applied_at: string | null;
+}
+
+export type FormFieldType =
+  | "short_text" | "long_text" | "single_choice" | "multi_choice" | "number" | "date" | "email" | "phone";
+export type PiiCategory = "none" | "contact" | "personal";
+export type FormStatus = "draft" | "active" | "retired";
+
+export interface FormFieldOption {
+  key: string;
+  label: LocalizedText;
+}
+
+export interface FieldIn {
+  key: string;
+  type: FormFieldType;
+  label: LocalizedText;
+  help?: LocalizedText | null;
+  options?: FormFieldOption[] | null;
+  bounds?: { min?: number | null; max?: number | null } | null;
+  required?: boolean;
+  pii_category: PiiCategory;
+  max_len?: number | null;
+}
+
+export interface FieldOut {
+  id: string;
+  key: string;
+  type: FormFieldType;
+  label: LocalizedText;
+  help: LocalizedText | null;
+  options: FormFieldOption[] | null;
+  bounds: { min?: number | null; max?: number | null } | null;
+  required: boolean;
+  position: number;
+  pii_category: PiiCategory;
+  max_len: number | null;
+}
+
+export interface EnrollmentFormOut {
+  id: string;
+  course_id: string;
+  version: number;
+  status: FormStatus;
+  title: LocalizedText | null;
+  intro: LocalizedText | null;
+  answered: boolean;
+  fields: FieldOut[];
+  created_at: string;
+  activated_at: string | null;
+  retired_at: string | null;
+}
+
+export interface EnrollmentFormIn {
+  title?: LocalizedText | null;
+  intro?: LocalizedText | null;
+  fields?: FieldIn[];
+}
+
+/** The active form as the catalog landing and the apply page show it. */
+export interface PublicFormOut {
+  id: string;
+  version: number;
+  title: LocalizedText | null;
+  intro: LocalizedText | null;
+  fields: FieldOut[];
+}
+
+export type ApplicationStatus = "pending" | "approved" | "rejected" | "withdrawn";
+export type AnswerValue = string | number | string[] | null;
+
+export interface MyApplicationBrief {
+  id: string;
+  status: ApplicationStatus;
+}
+
+/** Lists and every non-staff payload: statuses and counts, never answers. */
+export interface ApplicationOut {
+  id: string;
+  course_id: string;
+  form_id: string;
+  form_version: number;
+  applicant: UserBrief;
+  status: ApplicationStatus;
+  has_answers: boolean;
+  submitted_at: string;
+  decided_at: string | null;
+  decided_by: UserBrief | null;
+  enrollment_id: string | null;
+  purged_at: string | null;
+}
+
+/** One application for course staff (teacher, assistant): answers rendered with the form's fields. */
+export interface ApplicationStaffOut extends ApplicationOut {
+  answers: Record<string, AnswerValue> | null;
+  fields: FieldOut[];
+  decision_note: string | null;
+}
+
+/** The applicant's own view (`/me/applications`, submit response). */
+export interface ApplicationOwnOut {
+  id: string;
+  course_id: string;
+  course_title: LocalizedText;
+  status: ApplicationStatus;
+  submitted_at: string;
+  decided_at: string | null;
+  answers: Record<string, AnswerValue> | null;
+  decision_note: string | null;
+}
+
+export interface ApplicationSubmitIn {
+  form_id: string;
+  answers: Record<string, AnswerValue>;
+}
+
+export interface DecisionIn {
+  note?: string | null;
+  send_note?: boolean;
+}
+// --- Phase 9 S1 end ---

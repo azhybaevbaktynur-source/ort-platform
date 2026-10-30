@@ -2,14 +2,15 @@
 from __future__ import annotations
 
 import uuid
-from typing import Literal, Optional
+from typing import Callable, Literal, Optional
 
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.authz import A, AuthzContext, get_authz
+from app.core.authz import A, AuthzContext, can, get_authz
 from app.lms.content import repository as repo
+from app.lms.content.permissions import can_edit_bank  # Phase 9 S1
 from app.lms.content import schemas as sch
 from app.lms.content import service as svc
 from app.lms.content.models import BankQuestion, Passage, PassageVersion, QuestionBank, QuestionVersion
@@ -34,6 +35,58 @@ def _read(ctx: AuthzContext, course_id: uuid.UUID):
 
 def _manage(ctx: AuthzContext, course_id: uuid.UUID):
     return _course(ctx, course_id, A.CONTENT_MANAGE)
+
+
+# --- Phase 9 S1 begin --- (PHASE_9_DESIGN 4.2: policy strings unchanged, "+ org admin on shared banks")
+BanksOf = Callable[[Session, object], list]
+
+
+def _manage_bank(ctx: AuthzContext, course_id: uuid.UUID, banks_of: BanksOf):
+    """`course:content.manage`, or `can_edit_bank` on every bank the write touches (an org admin of the tree on
+    organization-shared banks). Course staff take exactly the `_manage` path; only a refusal looks at the banks:
+    `banks_of(db, course)` returns their ids (None for a row that is not found, and the usual refusal follows)."""
+    course = course_svc.load_course(ctx.db, course_id)
+    if not can(ctx, A.CONTENT_MANAGE, course):
+        ids = banks_of(ctx.db, course)
+        if ids and None not in ids:
+            found = ctx.db.execute(select(QuestionBank).where(
+                QuestionBank.id.in_(set(ids)), QuestionBank.course_id == course.id)).scalars().all()
+            if len(found) == len(set(ids)) and all(can_edit_bank(ctx, course, b) for b in found):
+                return course
+    course_svc.require_course(ctx, A.CONTENT_MANAGE, course)
+    return course
+
+
+def _banks(*bank_ids) -> BanksOf:
+    return lambda db, course: list(bank_ids)
+
+
+def _row_banks(model, *row_ids, extra_bank: Optional[uuid.UUID] = None) -> BanksOf:
+    """Banks of these questions / passages (live rows in live banks of the course), plus `extra_bank`."""
+    def banks_of(db: Session, course) -> list:
+        found = dict(db.execute(
+            select(model.id, model.bank_id).join(QuestionBank, QuestionBank.id == model.bank_id)
+            .where(model.id.in_(list(row_ids)), QuestionBank.course_id == course.id,
+                   QuestionBank.deleted_at.is_(None))
+        ).all())
+        return [found.get(i) for i in row_ids] + ([extra_bank] if extra_bank is not None else [])
+    return banks_of
+
+
+def _group_banks(question_id: uuid.UUID) -> BanksOf:
+    """Unlink touches the question and possibly the last other member of its translation group: every bank of the
+    group must be editable (the question's own bank when it has no group)."""
+    def banks_of(db: Session, course) -> list:
+        own = _row_banks(BankQuestion, question_id)(db, course)
+        if None in own:
+            return own
+        gid = db.execute(select(BankQuestion.translation_group_id).where(BankQuestion.id == question_id)).scalar()
+        if gid is None:
+            return own
+        return own + list(db.execute(select(BankQuestion.bank_id).where(
+            BankQuestion.translation_group_id == gid).distinct()).scalars())
+    return banks_of
+# --- Phase 9 S1 end ---
 
 
 def _name(u: Optional[User]) -> Optional[str]:
@@ -137,9 +190,9 @@ def _passage_version_out(pv: PassageVersion, author: Optional[str]) -> sch.Passa
     )
 
 
-def _bank_out(db: Session, course, bank_id: uuid.UUID) -> sch.BankOut:
-    row = db.execute(repo.bank_rows_stmt(course.id, bank_id=bank_id)).first()
-    return sch.bank_out(row)
+def _bank_out(ctx: AuthzContext, course, bank_id: uuid.UUID) -> sch.BankOut:
+    row = ctx.db.execute(repo.bank_rows_stmt(course.id, bank_id=bank_id)).first()
+    return sch.bank_out(row, can_edit=can_edit_bank(ctx, course, row[0]))  # Phase 9 S1: `can_edit`
 
 
 # ------------------------------------------------------------------ banks
@@ -153,43 +206,44 @@ def list_banks(course_id: uuid.UUID, deleted: bool = False, cursor: Optional[str
         ctx.db, repo.bank_rows_stmt(course.id, deleted=deleted, kind=kind), sort_col=QuestionBank.created_at,
         id_col=QuestionBank.id, entity_of=lambda r: r[0], cursor=cursor, limit=limit,
     )
-    return PageOut[sch.BankOut](items=[sch.bank_out(r) for r in rows], next_cursor=nxt)
+    items = [sch.bank_out(r, can_edit=can_edit_bank(ctx, course, r[0])) for r in rows]  # Phase 9 S1: `can_edit`
+    return PageOut[sch.BankOut](items=items, next_cursor=nxt)
 
 
 @router.post("/{course_id}/banks", status_code=201, response_model=sch.BankOut)
 def create_bank(course_id: uuid.UUID, data: sch.BankCreateIn, ctx: AuthzContext = Depends(get_authz)):
     course = _manage(ctx, course_id)
     bank = svc.create_bank(ctx.db, ctx, course, data)
-    return _bank_out(ctx.db, course, bank.id)
+    return _bank_out(ctx, course, bank.id)
 
 
 @router.get("/{course_id}/banks/{bank_id}", response_model=sch.BankOut)
 def get_bank(course_id: uuid.UUID, bank_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
     course = _read(ctx, course_id)
     repo.load_bank(ctx.db, course.id, bank_id, include_deleted=True)
-    return _bank_out(ctx.db, course, bank_id)
+    return _bank_out(ctx, course, bank_id)
 
 
 @router.patch("/{course_id}/banks/{bank_id}", response_model=sch.BankOut)
 def update_bank(course_id: uuid.UUID, bank_id: uuid.UUID, data: sch.BankUpdateIn,
                 ctx: AuthzContext = Depends(get_authz)):
-    course = _manage(ctx, course_id)
+    course = _manage_bank(ctx, course_id, _banks(bank_id))
     svc.update_bank(ctx.db, ctx, course, bank_id, data)
-    return _bank_out(ctx.db, course, bank_id)
+    return _bank_out(ctx, course, bank_id)
 
 
 @router.delete("/{course_id}/banks/{bank_id}", status_code=204, response_class=Response)
 def delete_bank(course_id: uuid.UUID, bank_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
-    course = _manage(ctx, course_id)
+    course = _manage_bank(ctx, course_id, _banks(bank_id))
     svc.soft_delete_bank(ctx.db, ctx, course, bank_id)
     return Response(status_code=204)
 
 
 @router.post("/{course_id}/banks/{bank_id}/restore", response_model=sch.BankOut)
 def restore_bank(course_id: uuid.UUID, bank_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
-    course = _manage(ctx, course_id)
+    course = _manage_bank(ctx, course_id, _banks(bank_id))
     svc.restore_bank(ctx.db, ctx, course, bank_id)
-    return _bank_out(ctx.db, course, bank_id)
+    return _bank_out(ctx, course, bank_id)
 
 
 # ------------------------------------------------------------------ questions
@@ -217,7 +271,7 @@ def list_questions(
 @router.post("/{course_id}/banks/{bank_id}/questions", status_code=201, response_model=sch.QuestionStaffOut)
 def create_question(course_id: uuid.UUID, bank_id: uuid.UUID, data: sch.QuestionCreateIn,
                     ctx: AuthzContext = Depends(get_authz)):
-    course = _manage(ctx, course_id)
+    course = _manage_bank(ctx, course_id, _banks(bank_id))
     bank = repo.load_bank(ctx.db, course.id, bank_id)
     q = svc.create_question(ctx.db, ctx, course, bank, data)
     return _staff_out(ctx.db, course, q)
@@ -233,21 +287,21 @@ def get_question(course_id: uuid.UUID, question_id: uuid.UUID, ctx: AuthzContext
 @router.patch("/{course_id}/questions/{question_id}", response_model=sch.QuestionPatchOut)
 def update_question(course_id: uuid.UUID, question_id: uuid.UUID, data: sch.QuestionUpdateIn,
                     ctx: AuthzContext = Depends(get_authz)):
-    course = _manage(ctx, course_id)
+    course = _manage_bank(ctx, course_id, _row_banks(BankQuestion, question_id))
     q, unchanged = svc.update_question(ctx.db, ctx, course, question_id, data)
     return sch.QuestionPatchOut(**_staff_fields(ctx.db, course, q), unchanged=unchanged)
 
 
 @router.delete("/{course_id}/questions/{question_id}", status_code=204, response_class=Response)
 def delete_question(course_id: uuid.UUID, question_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
-    course = _manage(ctx, course_id)
+    course = _manage_bank(ctx, course_id, _row_banks(BankQuestion, question_id))
     svc.soft_delete_question(ctx.db, ctx, course, question_id)
     return Response(status_code=204)
 
 
 @router.post("/{course_id}/questions/{question_id}/restore", response_model=sch.QuestionStaffOut)
 def restore_question(course_id: uuid.UUID, question_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
-    course = _manage(ctx, course_id)
+    course = _manage_bank(ctx, course_id, _row_banks(BankQuestion, question_id))
     q = svc.restore_question(ctx.db, ctx, course, question_id)
     return _staff_out(ctx.db, course, q)
 
@@ -255,7 +309,7 @@ def restore_question(course_id: uuid.UUID, question_id: uuid.UUID, ctx: AuthzCon
 @router.post("/{course_id}/questions/{question_id}/move", response_model=sch.QuestionSummaryOut)
 def move_question(course_id: uuid.UUID, question_id: uuid.UUID, data: sch.MoveIn,
                   ctx: AuthzContext = Depends(get_authz)):
-    course = _manage(ctx, course_id)
+    course = _manage_bank(ctx, course_id, _row_banks(BankQuestion, question_id))
     q = svc.move_question(ctx.db, ctx, course, question_id, data.direction)
     return _summary_of(ctx.db, q)
 
@@ -298,7 +352,7 @@ def get_question_version(course_id: uuid.UUID, question_id: uuid.UUID, version_i
              response_model=sch.QuestionStaffOut)
 def revert_question(course_id: uuid.UUID, question_id: uuid.UUID, version_id: uuid.UUID, data: sch.RevertIn,
                     ctx: AuthzContext = Depends(get_authz)):
-    course = _manage(ctx, course_id)
+    course = _manage_bank(ctx, course_id, _row_banks(BankQuestion, question_id))
     q = svc.revert_question(ctx.db, ctx, course, question_id, version_id, data.base_version_id)
     return _staff_out(ctx.db, course, q)
 
@@ -344,7 +398,7 @@ def list_translations(course_id: uuid.UUID, question_id: uuid.UUID, ctx: AuthzCo
              response_model=sch.QuestionStaffOut)
 def add_translation(course_id: uuid.UUID, question_id: uuid.UUID, data: sch.TranslationCreateIn,
                     ctx: AuthzContext = Depends(get_authz)):
-    course = _manage(ctx, course_id)
+    course = _manage_bank(ctx, course_id, _row_banks(BankQuestion, question_id, extra_bank=data.bank_id))
     q = svc.add_translation(ctx.db, ctx, course, question_id, data)
     return _staff_out(ctx.db, course, q)
 
@@ -352,14 +406,14 @@ def add_translation(course_id: uuid.UUID, question_id: uuid.UUID, data: sch.Tran
 @router.post("/{course_id}/questions/{question_id}/translation-link", status_code=204, response_class=Response)
 def link_translation(course_id: uuid.UUID, question_id: uuid.UUID, data: sch.TranslationLinkIn,
                      ctx: AuthzContext = Depends(get_authz)):
-    course = _manage(ctx, course_id)
+    course = _manage_bank(ctx, course_id, _row_banks(BankQuestion, question_id, data.question_id))
     svc.link_translation(ctx.db, ctx, course, question_id, data.question_id)
     return Response(status_code=204)
 
 
 @router.delete("/{course_id}/questions/{question_id}/translation-link", status_code=204, response_class=Response)
 def unlink_translation(course_id: uuid.UUID, question_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
-    course = _manage(ctx, course_id)
+    course = _manage_bank(ctx, course_id, _group_banks(question_id))
     svc.unlink_translation(ctx.db, ctx, course, question_id)
     return Response(status_code=204)
 
@@ -381,7 +435,7 @@ def list_passages(course_id: uuid.UUID, bank_id: uuid.UUID, deleted: bool = Fals
 @router.post("/{course_id}/banks/{bank_id}/passages", status_code=201, response_model=sch.PassageOut)
 def create_passage(course_id: uuid.UUID, bank_id: uuid.UUID, data: sch.PassageCreateIn,
                    ctx: AuthzContext = Depends(get_authz)):
-    course = _manage(ctx, course_id)
+    course = _manage_bank(ctx, course_id, _banks(bank_id))
     bank = repo.load_bank(ctx.db, course.id, bank_id)
     p = svc.create_passage(ctx.db, ctx, course, bank, data)
     return _passage_out(ctx.db, course, p)
@@ -397,21 +451,21 @@ def get_passage(course_id: uuid.UUID, passage_id: uuid.UUID, ctx: AuthzContext =
 @router.patch("/{course_id}/passages/{passage_id}", response_model=sch.PassagePatchOut)
 def update_passage(course_id: uuid.UUID, passage_id: uuid.UUID, data: sch.PassageUpdateIn,
                    ctx: AuthzContext = Depends(get_authz)):
-    course = _manage(ctx, course_id)
+    course = _manage_bank(ctx, course_id, _row_banks(Passage, passage_id))
     p, unchanged = svc.update_passage(ctx.db, ctx, course, passage_id, data)
     return _passage_out(ctx.db, course, p, unchanged=unchanged)
 
 
 @router.delete("/{course_id}/passages/{passage_id}", status_code=204, response_class=Response)
 def delete_passage(course_id: uuid.UUID, passage_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
-    course = _manage(ctx, course_id)
+    course = _manage_bank(ctx, course_id, _row_banks(Passage, passage_id))
     svc.soft_delete_passage(ctx.db, ctx, course, passage_id)
     return Response(status_code=204)
 
 
 @router.post("/{course_id}/passages/{passage_id}/restore", response_model=sch.PassageOut)
 def restore_passage(course_id: uuid.UUID, passage_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
-    course = _manage(ctx, course_id)
+    course = _manage_bank(ctx, course_id, _row_banks(Passage, passage_id))
     p = svc.restore_passage(ctx.db, ctx, course, passage_id)
     return _passage_out(ctx.db, course, p)
 
@@ -448,6 +502,6 @@ def get_passage_version(course_id: uuid.UUID, passage_id: uuid.UUID, version_id:
 @router.post("/{course_id}/passages/{passage_id}/versions/{version_id}/revert", response_model=sch.PassageOut)
 def revert_passage(course_id: uuid.UUID, passage_id: uuid.UUID, version_id: uuid.UUID, data: sch.RevertIn,
                    ctx: AuthzContext = Depends(get_authz)):
-    course = _manage(ctx, course_id)
+    course = _manage_bank(ctx, course_id, _row_banks(Passage, passage_id))
     p = svc.revert_passage(ctx.db, ctx, course, passage_id, version_id, data.base_version_id)
     return _passage_out(ctx.db, course, p)

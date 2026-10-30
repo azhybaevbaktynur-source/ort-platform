@@ -119,10 +119,16 @@ class BankOut(BaseModel):
     # --- Phase 7c S1 begin --- (PHASE_7C_DESIGN 6.1: the quiz of a quiz bank; None = shared bank)
     assessment: Optional[BankAssessmentOut] = None
     # --- Phase 7c S1 end ---
+    # --- Phase 9 S1 begin --- (PHASE_9_DESIGN 2.2, 4.2: sharing state; `can_edit` = content.permissions.can_edit_bank)
+    visibility: Literal["private", "organization"] = "private"
+    shared_at: Optional[datetime] = None
+    copied_from_bank_id: Optional[uuid.UUID] = None
+    can_edit: bool = False
+    # --- Phase 9 S1 end ---
 
 
 # --- Phase 7c S1 begin ---
-def bank_out(row) -> BankOut:
+def bank_out(row, *, can_edit: bool = False) -> BankOut:
     """Row of `repository.bank_rows_stmt`: (bank, question count, passage count, quiz title or None)."""
     bank, qc, pc, a_title = row
     assessment = (BankAssessmentOut(id=bank.assessment_id, title=a_title or {})
@@ -131,6 +137,8 @@ def bank_out(row) -> BankOut:
         id=bank.id, title=bank.title, description=bank.description, source_id=bank.source_id,
         default_language=bank.default_language, question_count=qc or 0, passage_count=pc or 0,
         created_at=bank.created_at, updated_at=bank.updated_at, deleted_at=bank.deleted_at, assessment=assessment,
+        visibility=bank.visibility or "private", shared_at=bank.shared_at,  # Phase 9 S1
+        copied_from_bank_id=bank.copied_from_bank_id, can_edit=can_edit,  # Phase 9 S1
     )
 # --- Phase 7c S1 end ---
 
