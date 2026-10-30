@@ -151,8 +151,9 @@ export function CourseLanding({ courseId }: { courseId: string }) {
       <PageHeader title={title} breadcrumbs={crumbs(title)} badge={<CatalogModeBadge mode={course.enrollment_mode} />}
         description={course.organization_name || undefined} />
 
-      {/* The student's application (pending, or decided with the teacher's note). */}
-      {course.my_application && !member && (
+      {/* The student's application (pending, or decided with the teacher's note). Phase 9 S5: an approved
+          applicant (now a member) still sees the teacher's note, as the inbox promises ("shown to the student"). */}
+      {course.my_application && (!member || (course.my_application.status === "approved" && !!mine?.decision_note)) && (
         <section aria-labelledby="landing-application" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 id="landing-application" className="text-lg font-semibold leading-7 text-slate-900">{t("applications.student.title")}</h2>
