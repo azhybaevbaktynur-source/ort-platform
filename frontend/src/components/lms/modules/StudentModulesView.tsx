@@ -6,6 +6,7 @@
 // link records the view, then opens it; "mark as done" items have a checkbox. A short line celebrates a completed
 // module. The same list renders read-only for an org admin (no state) and in the teacher's progress drawer.
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { isStudentView } from "@/lib/api"; // Phase 8c S1
 import Link from "next/link";
 import { CheckCircle2, Lock, PartyPopper } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
@@ -328,7 +329,9 @@ export function StudentModulesView({ fallback }: { fallback?: React.ReactNode })
   useEffect(() => { void load(); }, [load]);
 
   // concluded courses refuse new facts (403): the list stays readable, links still open
-  const readOnly = course.my_enrollment.role !== "student" || !!course.my_enrollment.read_only || course.status === "concluded";
+  // Phase 8c S1: so does the read-only Student view (no facts, no mark-done checkbox)
+  const readOnly = course.my_enrollment.role !== "student" || !!course.my_enrollment.read_only || course.status === "concluded"
+    || isStudentView(course.id);
 
   let content: React.ReactNode;
   if (error && !data) content = <ErrorState message={errorText(error)} onRetry={() => void load()} retrying={loading} />;

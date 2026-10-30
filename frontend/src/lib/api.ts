@@ -15,6 +15,41 @@ export async function getAuthHeader(): Promise<Record<string, string>> {
   return {};
 }
 
+// --- Phase 8c S1 begin --- (PHASE_8C_DESIGN §6.2: read-only Student view)
+// The "Student view" button sets `sessionStorage["studentView:{courseId}"] = "1"`; while it is set, every request to
+// that course's routes (`/courses/{courseId}` and below) carries `X-View-As: student`. Never other courses, `/me/*`
+// or platform routes. The server downgrades only a real teacher/assistant role, for reads; it refuses writes
+// (403 `student_view_read_only`) except the staff preview attempt. The mode ends with the tab (sessionStorage).
+const STUDENT_VIEW_PREFIX = "studentView:";
+const COURSE_PATH = /(?:^|\/api\/v1)\/courses\/([0-9a-fA-F-]{36})(?=[/?#]|$)/;
+
+export function isStudentView(courseId: string | null | undefined): boolean {
+  if (!courseId || typeof window === "undefined") return false;
+  try {
+    return window.sessionStorage.getItem(STUDENT_VIEW_PREFIX + courseId) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setStudentView(courseId: string, on: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (on) window.sessionStorage.setItem(STUDENT_VIEW_PREFIX + courseId, "1");
+    else window.sessionStorage.removeItem(STUDENT_VIEW_PREFIX + courseId);
+  } catch {
+    // storage blocked: the mode simply does not start
+  }
+}
+
+/** `{ "X-View-As": "student" }` for a request path of a course in Student view, else `{}`. `path` is relative to the
+ * API base (`/courses/...`) or a full URL path (`/api/v1/courses/...`). */
+export function viewAsHeader(path: string): Record<string, string> {
+  const m = path.split("?", 1)[0].match(COURSE_PATH);
+  return m && isStudentView(m[1]) ? { "X-View-As": "student" } : {};
+}
+// --- Phase 8c S1 end ---
+
 export async function apiClient<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
   const { params, headers = {}, ...customConfig } = options;
 
@@ -46,6 +81,7 @@ export async function apiClient<T>(endpoint: string, options: RequestOptions = {
   const reqHeaders: Record<string, string> = {
     ...(!isFormData && { "Content-Type": "application/json" }),
     ...authHeader,
+    ...viewAsHeader(cleanEndpoint), // Phase 8c S1
     ...(headers as Record<string, string>),
   };
 

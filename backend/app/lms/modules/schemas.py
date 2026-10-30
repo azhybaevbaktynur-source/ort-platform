@@ -13,7 +13,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal, Optional
+from typing import Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -299,3 +299,42 @@ class ModulesStudentOut(BaseModel):
     the facts routes return one `ModuleStudentOut`."""
     modules: list[ModuleStudentOut] = []
     up_next: Optional[ItemRefOut] = None
+
+
+# --- Phase 8c S1 begin --- (PHASE_8C_DESIGN 7: the "Unsorted" group of the teacher Course page)
+UnsortedKind = Literal["assignment", "page", "file"]
+
+
+class UnsortedVariantOut(BaseModel):
+    id: uuid.UUID
+    language: str
+
+
+class UnsortedItemOut(BaseModel):
+    """A live assignment, page group or course file that no live item of a live module references. `title` is a
+    LocalizedText for assignments and a plain string for pages (the listed variant's) and files."""
+    kind: UnsortedKind
+    id: uuid.UUID
+    title: Union[dict, str]
+    published: bool
+    assignment_kind: Optional[str] = None        # assignment: none | text | file | quiz
+    assessment_id: Optional[uuid.UUID] = None    # quiz assignment
+    language: Optional[str] = None               # page: the listed variant's language
+    translation_group_id: Optional[uuid.UUID] = None
+    variants: Optional[list[UnsortedVariantOut]] = None  # page: every live variant of the group
+    folder: Optional[str] = None                 # file
+    updated_at: Optional[datetime] = None
+
+
+class UnsortedPageOut(BaseModel):
+    items: list[UnsortedItemOut] = []
+    next_cursor: Optional[str] = None
+    total: int = 0
+
+
+class UnsortedOut(BaseModel):
+    """`GET _C/modules/unsorted`: one page per kind; with `?kind=` only that kind is set (the others are null)."""
+    assignments: Optional[UnsortedPageOut] = None
+    pages: Optional[UnsortedPageOut] = None
+    files: Optional[UnsortedPageOut] = None
+# --- Phase 8c S1 end ---

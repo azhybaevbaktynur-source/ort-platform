@@ -1,11 +1,12 @@
 """Authorization scaffolding. Phase 1 plugs in role resolution from enrollments."""
 from __future__ import annotations
 
+import re
 import uuid
 
 from typing import Callable, Iterable, Optional
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -156,6 +157,34 @@ def _norm(course_id):
         return course_id
 
 
+# --- Phase 8c S1 begin --- (PHASE_8C_DESIGN 6.2: read-only Student view, request state only, no migration)
+VIEW_AS_HEADER = "x-view-as"
+VIEW_AS_STUDENT = "student"
+STUDENT_VIEW_READ_ONLY = "student_view_read_only"
+STAFF_COURSE_ROLES = ("teacher", "assistant")
+READ_METHODS = ("GET", "HEAD")
+# every spelling FastAPI's `uuid.UUID` path parameter accepts here (with or without dashes)
+_UUID = r"[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}"
+# `_C/**`: the header applies only to the course named in the path (never to other courses, /me/*, platform routes)
+_COURSE_PATH = re.compile(rf"^/api/v1/courses/({_UUID})(?:/|$)")
+# `POST _A/preview`: the one write allowed in Student view, evaluated with the real role (the staff preview attempt)
+_PREVIEW_PATH = re.compile(rf"^/api/v1/courses/{_UUID}/assessments/{_UUID}/preview/?$")
+
+
+def view_as_course_id(path: str, header: Optional[str]) -> Optional[uuid.UUID]:
+    """The course a `X-View-As: student` header may apply to: the `{course_id}` of a `/api/v1/courses/{id}[/...]`
+    path, else None (the header is ignored everywhere else)."""
+    if (header or "").strip().lower() != VIEW_AS_STUDENT:
+        return None
+    m = _COURSE_PATH.match(path or "")
+    return uuid.UUID(m.group(1)) if m else None
+
+
+def is_preview_path(path: str) -> bool:
+    return bool(_PREVIEW_PATH.match(path or ""))
+# --- Phase 8c S1 end ---
+
+
 class AuthzContext:
     def __init__(self, user, db: Session, role_resolver: Callable = _no_role, allow_platform_admin: bool = False):
         self.user = user
@@ -165,6 +194,10 @@ class AuthzContext:
         self.allow_platform_admin = allow_platform_admin
         self.org_cache: dict = {}  # Phase 6 S1: organization_id -> (status, deleted, is_org_admin)
         self.sandbox_cache: dict = {}  # Phase 8b fix M1: sandbox course_id -> caller manages its template
+        # Phase 8c S1: the course a Student view header names (set by `get_authz` for reads only) and the cached
+        # decision whether it applies (the caller's real role is teacher/assistant there, see `view_as_student`)
+        self.view_as_course: Optional[uuid.UUID] = None
+        self._view_as_ok: Optional[bool] = None
 
     # --- Phase 6 S1 begin --- (organizations, PHASE_6_DESIGN 2.2)
     def _org(self, organization_id):
@@ -222,7 +255,8 @@ class AuthzContext:
     def is_platform_admin(self) -> bool:
         return bool(self.allow_platform_admin and getattr(self.user, "is_platform_admin", False))
 
-    def role_for(self, course_id) -> Optional[str]:
+    def real_role_for(self, course_id) -> Optional[str]:
+        """The caller's active enrollment role (never downgraded by the Student view header)."""
         course_id = _norm(course_id)
         if course_id not in self.enrollment_cache:
             role = self.role_resolver(course_id)
@@ -231,6 +265,39 @@ class AuthzContext:
                 role = None
             self.enrollment_cache[course_id] = role
         return self.enrollment_cache[course_id]
+
+    def role_for(self, course_id) -> Optional[str]:
+        role = self.real_role_for(course_id)
+        # --- Phase 8c S1 --- (Student view: a real teacher/assistant reads the course as a new student would)
+        if role in STAFF_COURSE_ROLES and self.view_as_course is not None and self.view_as_student(course_id):
+            return "student"
+        return role
+
+    # --- Phase 8c S1 begin --- (PHASE_8C_DESIGN 6.2, invariant 3)
+    def view_as_student(self, course_id) -> bool:
+        """True when this request reads `course_id` in Student view: the header named this course, the caller's real
+        role there is teacher or assistant, and the caller is neither a platform admin nor an org admin of the
+        course's organization, and the course is not a template sandbox. Everyone else: the header is ignored.
+        One extra statement per request, only when the header is present."""
+        if self.view_as_course is None or _norm(course_id) != self.view_as_course:
+            return False
+        if self._view_as_ok is None:
+            self._view_as_ok = self._view_as_applies(self.view_as_course)
+        return self._view_as_ok
+
+    def _view_as_applies(self, course_id) -> bool:
+        from app.lms.courses.models import Course
+
+        if self.real_role_for(course_id) not in STAFF_COURSE_ROLES:
+            return False
+        if getattr(self.user, "is_platform_admin", False):
+            return False
+        row = self.db.execute(select(Course.organization_id, Course.sandbox_for_template_id, Course.deleted_at)
+                              .where(Course.id == course_id)).first()
+        if row is None or row[1] is not None or row[2] is not None:
+            return False
+        return not self.org_admin_for(row[0])
+    # --- Phase 8c S1 end ---
 
     def prefetch(self, course_ids: Iterable) -> None:
         """Fill the role cache for several courses with one IN query."""
@@ -252,8 +319,19 @@ class AuthzContext:
             self.enrollment_cache[cid] = found.get(cid)
 
 
-def get_authz(user=Depends(get_lms_user), db: Session = Depends(get_db)) -> AuthzContext:
-    return AuthzContext(user, db, enrollment_role_resolver(db, user.id))
+def get_authz(request: Request, user=Depends(get_lms_user), db: Session = Depends(get_db)) -> AuthzContext:
+    ctx = AuthzContext(user, db, enrollment_role_resolver(db, user.id))
+    # --- Phase 8c S1 begin --- (Student view: reads downgrade a real staff role; every write is refused, except
+    # `POST _A/preview`, which keeps the real role; the header is ignored for everyone the downgrade does not apply to)
+    course_id = view_as_course_id(request.url.path, request.headers.get(VIEW_AS_HEADER))
+    if course_id is not None and not (request.method not in READ_METHODS and is_preview_path(request.url.path)):
+        ctx.view_as_course = course_id
+        if request.method not in READ_METHODS:
+            if ctx.view_as_student(course_id):
+                raise Forbidden("Student view is read-only", code=STUDENT_VIEW_READ_ONLY)
+            ctx.view_as_course, ctx._view_as_ok = None, None  # not staff here: the header is ignored
+    # --- Phase 8c S1 end ---
+    return ctx
 
 
 def can(ctx: AuthzContext, action: str, course) -> bool:
@@ -263,10 +341,13 @@ def can(ctx: AuthzContext, action: str, course) -> bool:
         return False
     org_id = getattr(course, "organization_id", None)
     role = ctx.role_for(course.id)
+    status = course.status
+    if status == "draft" and ctx.view_as_course is not None and ctx.view_as_student(course.id):
+        status = "published"  # Phase 8c S1: a draft course stays readable in Student view (reads only reach here)
     # the organization row is read only when needed (a write needs the suspension state; a miss needs the org
     # admin membership), so read-only requests of enrolled users cost no extra query
     suspended = action not in READ_ONLY_ACTIONS and ctx.org_suspended(org_id, course.id)
-    kw = dict(role=role, course_status=course.status, action=action, is_platform_admin=ctx.is_platform_admin,
+    kw = dict(role=role, course_status=status, action=action, is_platform_admin=ctx.is_platform_admin,
               org_suspended=suspended)
     if decide(**kw):
         return True

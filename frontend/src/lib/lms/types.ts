@@ -257,6 +257,8 @@ export const LMS_ERROR_CODES = [
   // Phase 8a S5: pages, course files and announcements (S3 codes; also in pages/courseFiles/announcements.errors)
   "page_not_found", "page_variant_exists", "course_file_not_found", "announcement_not_found", "folder_invalid",
   "course_files_quota", "page_conflict", "already_published",
+  // Phase 8c S1: a write sent in the read-only Student view
+  "student_view_read_only",
 ] as const;
 export type LmsErrorCode = (typeof LMS_ERROR_CODES)[number];
 
@@ -314,3 +316,71 @@ export interface CourseUpdateIn {
   home_page_id?: string | null;
 }
 // --- Phase 8a S4a end ---
+
+// --- Phase 8c S1 begin --- (PHASE_8C_DESIGN §7: Course page reads; S2 builds the UI on these shapes)
+export type UnsortedKind = "assignment" | "page" | "file";
+
+export interface UnsortedVariantOut {
+  id: string;
+  language: Lang;
+}
+
+/** A live assignment, page group or course file that no live item of a live module references. */
+export interface UnsortedItemOut {
+  kind: UnsortedKind;
+  id: string;
+  /** LocalizedText for assignments; a plain string for pages (the listed variant's title) and files. */
+  title: LocalizedText | string;
+  published: boolean;
+  assignment_kind?: "none" | "text" | "file" | "quiz" | null;
+  assessment_id?: string | null;
+  language?: Lang | null;
+  translation_group_id?: string | null;
+  variants?: UnsortedVariantOut[] | null;
+  folder?: string | null;
+  updated_at?: string | null;
+}
+
+export interface UnsortedPageOut {
+  items: UnsortedItemOut[];
+  next_cursor: string | null;
+  total: number;
+}
+
+/** `GET /courses/{id}/modules/unsorted`; with `kind` only that page is set. */
+export interface UnsortedOut {
+  assignments: UnsortedPageOut | null;
+  pages: UnsortedPageOut | null;
+  files: UnsortedPageOut | null;
+}
+
+export interface TodoGradeOut {
+  assignment_id: string;
+  title: LocalizedText;
+  kind: "none" | "text" | "file" | "quiz";
+  needs_grading: number;
+  oldest_submitted_at: string | null;
+}
+
+export interface TodoDraftOut {
+  assignment_id: string;
+  title: LocalizedText;
+  kind: "none" | "text" | "file" | "quiz";
+  assessment_id: string | null;
+  updated_at: string | null;
+}
+
+/** `GET /courses/{id}/todo` (teacher, assistant): at most 10 rows per group plus the totals. */
+export interface TodoOut {
+  to_grade: TodoGradeOut[];
+  to_grade_total: number;
+  drafts: TodoDraftOut[];
+  drafts_total: number;
+  unpublished_modules: number;
+  first_unpublished_module_id: string | null;
+  active_students: number;
+  /** Teachers only (assistants: null). */
+  join_code: string | null;
+  join_code_active: boolean;
+}
+// --- Phase 8c S1 end ---

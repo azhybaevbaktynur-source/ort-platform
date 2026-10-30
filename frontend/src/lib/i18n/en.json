@@ -255,7 +255,8 @@
       "preview_not_ready": "The preview cannot start yet: add sample questions to every section.",
       "nothing_to_preview": "There is nothing to preview yet: the template has no sections.",
       "language_not_in_assessment": "The sample questions are not available in this language.",
-      "sandbox_course": "This course holds a template's sample questions and cannot be changed here."
+      "sandbox_course": "This course holds a template's sample questions and cannot be changed here.",
+      "student_view_read_only": "Student view is read-only. Leave student view to make changes."
     }
   },
   "courses": {
@@ -296,7 +297,7 @@
       "noCode": "No code?"
     },
     "home": {
-      "tab": "Home",
+      "tab": "Course",
       "tabsLabel": "Course sections",
       "backToList": "Back to my courses",
       "draftNotice": "This course is a draft. Students cannot join until you publish it.",
@@ -627,7 +628,7 @@
     }
   },
   "bank": {
-    "tab": "Question bank",
+    "tab": "Question banks",
     "notAuthorized": "The question bank is available only to the teachers and assistants of this course.",
     "backToBanks": "Back to question banks",
     "backToQuestions": "Back to questions",
@@ -4477,5 +4478,22 @@
       "template_locked": "The course template fixes this setting."
     },
     "availableInAssignments": "Available from Assignments"
+  },
+  "courseNav": {
+    "menu": "Course menu",
+    "hiddenFromStudents": "Hidden from students: nothing published yet",
+    "hiddenHelp": "Links with a crossed-out eye are hidden from students until something is published there.",
+    "unavailable": {
+      "title": "Not available yet",
+      "body": "Your teacher has not published anything here.",
+      "back": "Back to course"
+    }
+  },
+  "studentView": {
+    "button": "Student view",
+    "banner": "You are viewing this course as a new student would. Nothing you do here is saved.",
+    "leave": "Leave student view",
+    "handInsOff": "Student view: hand-ins are off.",
+    "readOnlyError": "Student view is read-only. Leave student view to make changes."
   }
 }

@@ -5,6 +5,7 @@
 // confirmation before handing in; earlier hand-ins; after grading the grade, the feedback and its file. States: not
 // open yet, closed, already graded, offline (the text stays on this device; retry).
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { isStudentView } from "@/lib/api"; // Phase 8c S1
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Download, FileText, Paperclip, TriangleAlert, Upload } from "lucide-react";
@@ -96,6 +97,7 @@ export function StudentAssignmentView({ assignmentId }: { assignmentId: string }
   const gradeText = useGradeText();
   const errorText = useAssignmentErrorText();
   const readOnly = !!course.my_enrollment.read_only;
+  const viewing = isStudentView(course.id); // Phase 8c S1: Student view shows the form as off (server: 403)
   const base = `/${lang}/courses/${course.id}`;
   const [a, setA] = useState<AssignmentStudentDetailOut | null>(null);
   const [loadError, setLoadError] = useState<unknown>(null);
@@ -145,7 +147,7 @@ export function StudentAssignmentView({ assignmentId }: { assignmentId: string }
   const status = a.status ?? "not_started";
   const graded = status === "graded";
   // the server decides (window, graded latest hand-in, file limit, course state); the client checks only add to it
-  const canHandIn = !readOnly && a.can_hand_in && (a.kind === "text" || a.kind === "file") && !v.opensLater && !v.windowClosed && !graded && status !== "excused";
+  const canHandIn = !readOnly && !viewing && a.can_hand_in && (a.kind === "text" || a.kind === "file") && !v.opensLater && !v.windowClosed && !graded && status !== "excused";
   const resubmit = a.hand_ins.length > 0;
   const textTooLong = text.length > HAND_IN_TEXT_MAX;
   const ready = a.kind === "text" ? !!text.trim() && !textTooLong : !!(file && !fileProblem) || !!uploaded;
@@ -210,7 +212,8 @@ export function StudentAssignmentView({ assignmentId }: { assignmentId: string }
 
   let closedNote: string | null = null;
   if (!readOnly && (a.kind === "text" || a.kind === "file")) {
-    if (v.opensLater && a.available_from) closedNote = t("assignments.submit.notOpen", { date: fmtShortDateTime(a.available_from, lang) });
+    if (viewing) closedNote = t("studentView.handInsOff"); // Phase 8c S1
+    else if (v.opensLater && a.available_from) closedNote = t("assignments.submit.notOpen", { date: fmtShortDateTime(a.available_from, lang) });
     else if (graded) closedNote = t("assignments.submit.alreadyGraded");
     else if (v.windowClosed) closedNote = a.available_until ? t("assignments.submit.closedOn", { date: fmtShortDateTime(a.available_until, lang) }) : t("assignments.submit.closed");
     else if (a.reason === "already_graded") closedNote = t("assignments.submit.gradedNotReleased");
