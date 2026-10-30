@@ -16,7 +16,9 @@ The orchestrator approves the re-record in S4b and copies the new PNGs into `ORT
 
 Run: `E2E_PYTHON=<main repo>/backend/venv/bin/python bash docs/phases/PHASE_8C_screens/ort-before-after/record.sh`
 (`SKIP_BUILD=1` reuses the builds in `/tmp/ort_8c_ba`; ports 8871 / 3871; steps `before`, `after`, `compare`).
-The "after" set was recorded on the S1 shell only; **re-record it after S2 and S3 are merged** (S4b).
+2026-10-31 (`phase-8c-ux`): re-recorded after S1 + S2 + S3 and the UX fix slice; the same 17 screens changed (frame
+only), and their "after" PNGs were copied into `docs/phases/ORT_BASELINE/` (approved; dated line in its README).
+`ort-visual.spec.ts` then passed twice against the new baselines with zero diffs.
 
 ## The 17 changed screens (frame only)
 
