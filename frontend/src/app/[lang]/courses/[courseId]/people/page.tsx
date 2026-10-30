@@ -26,6 +26,10 @@ import { PeopleTabs, type PeopleTab } from "@/components/lms/people/PeopleTabs";
 import { InviteStudentsDialog } from "@/components/lms/people/InviteStudentsDialog";
 import { InvitationList } from "@/components/lms/people/InvitationList";
 // --- Phase 9 S3 end ---
+// --- Phase 9 S4: People → Applications ---
+import { ApplicationsInbox } from "@/components/lms/people/ApplicationsInbox";
+import { listApplications } from "@/lib/lms/applications";
+// --- Phase 9 S4 end ---
 
 // S6b: student view
 function StaffList({ courseId }: { courseId: string }) {
@@ -117,6 +121,13 @@ export default function PeoplePage() {
   }, [course.id, role, state, query]);
 
   useEffect(() => { if (staff) void load(); }, [staff, load]);
+  // --- Phase 9 S4: the Applications tab also shows after leaving a form mode while applications exist ---
+  const [hasApplications, setHasApplications] = useState(false);
+  useEffect(() => {
+    if (!staff) return;
+    listApplications(course.id, { limit: 1 }).then((p) => setHasApplications(p.items.length > 0)).catch(() => setHasApplications(false));
+  }, [staff, course.id]);
+  // --- Phase 9 S4 end ---
   const countText = useListCount(); // Phase 6b S5c
 
   if (!staff) return <StaffList courseId={course.id} />;
@@ -277,9 +288,12 @@ export default function PeoplePage() {
             onInvite={course.status !== "concluded" ? () => setInviteOpen(true) : undefined} />
         }
         showInvitations={canManage}
-        // S4: pass <ApplicationsInbox courseId={course.id} /> here and widen showApplications to "or any application"
-        applications={null}
-        showApplications={formMode}
+        // --- Phase 9 S4: the applications inbox (form modes, or any application exists) ---
+        applications={
+          <ApplicationsInbox courseId={course.id} canDecide={canManage} defaultLanguage={course.default_language}
+            courseOpen={course.status === "published"} onChanged={() => void load()} />
+        }
+        showApplications={formMode || hasApplications}
       />
       <InviteStudentsDialog open={inviteOpen} courseId={course.id} courseTitle={pickLocalized(course.title, lang)}
         onClose={() => setInviteOpen(false)}

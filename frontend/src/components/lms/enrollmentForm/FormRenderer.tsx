@@ -73,7 +73,7 @@ export function FormRenderer({
   idPrefix?: string;
 }) {
   const { t } = useTranslation();
-  const L = (v: LocalizedText | null | undefined) => pickLocalized(v ?? null, lang, defaultLanguage);
+  const L = (v: LocalizedText | null | undefined) => pickLocalized(v ?? null, lang as Lang, defaultLanguage);
   const intro = L(form.intro);
   const errorText = (key: string) => (errors[key] ? t(`applications.answerErrors.${errors[key]}`) : undefined);
 
@@ -95,7 +95,7 @@ export function FormRenderer({
             <fieldset key={f.key} aria-describedby={err ? `${id}-error` : hint ? `${id}-hint` : undefined}>
               <legend className="mb-1 text-sm font-medium leading-6 text-slate-800">
                 {label}
-                {optional && <span className="font-normal text-slate-500"> ({t("ui.optional")})</span>}
+                {optional && <span className="ml-1 font-normal text-slate-600">{t("ui.optional")}</span>}
               </legend>
               {hint && <p id={`${id}-hint`} className="mb-1 text-sm leading-6 text-slate-600">{hint}</p>}
               <div className="space-y-0.5">
