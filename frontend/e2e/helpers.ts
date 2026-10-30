@@ -53,7 +53,9 @@ export interface Seed {
     course_id: string;
     join_code: string;
     teacher: SeedUser;
-    students: Record<"sidebar" | "handin" | "phone", SeedUser>;
+    students: Record<"sidebar" | "handin" | "phone" | "assistant", SeedUser>;
+    /** A published one-question quiz of the course (Student view "Start"). */
+    view_quiz: string;
   };
   /** Phase 8b S3: the scrolling-player course (its published quizzes serve the Student view "Start" check). */
   scrolling: {

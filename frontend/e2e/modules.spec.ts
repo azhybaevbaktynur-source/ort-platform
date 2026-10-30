@@ -331,7 +331,7 @@ test.describe("modules walk (ru)", () => {
 
     // ---- "Re-apply rules" (whole course): M2 is no longer met at 60 %, M3 locks again
     await tp.goto(base);
-    await tp.getByRole("button", { name: t("modules.editor.actions"), exact: true }).first().click(); // course toolbar "⋯"
+    await tp.getByRole("button", { name: t("coursePage.moreActions"), exact: true }).click(); // course toolbar "⋯"
     await tp.getByRole("menuitem", { name: t("modules.editor.reapplyCourse") }).click();
     const re = tp.getByRole("alertdialog", { name: t("modules.editor.reapplyTitle") });
     await re.getByRole("button", { name: t("modules.editor.reapply") }).click();
@@ -425,7 +425,7 @@ test.describe("modules walk (ru)", () => {
       const ap = await open(browser, admin);
       await ap.goto(base);
       for (const name of [t("courses.home.tab"), t("assignments.tab"), t("courseFiles.title"), t("announcements.title")]) {
-        await expect(tabs(ap).getByRole("link", { name, exact: true })).toBeVisible();
+        await expect(tabs(ap).getByRole("link", { name: new RegExp(`^${name}(\\s|$)`) })).toBeVisible(); // staff links may carry the "hidden from students" mark text
       }
       await review(ap, "ort-teacher-course-home-after");
 

@@ -326,7 +326,7 @@ def seed_scrolling(api: Api, log: Path, admin_tok: str) -> dict:
 
 
 # --- Phase 8c S4a begin --- (course navigation, frontend/e2e/course-nav.spec.ts; written after every other row)
-NAV_STUDENTS = ["sidebar", "handin", "phone"]
+NAV_STUDENTS = ["sidebar", "handin", "phone", "assistant"]
 
 
 def seed_course_nav(api: Api, log: Path, admin_tok: str) -> dict:
@@ -348,7 +348,22 @@ def seed_course_nav(api: Api, log: Path, admin_tok: str) -> dict:
         s["profile"] = profile(api, s["token"])
         api.call("POST", "/courses/join", s["token"], {"code": course["join_code"]})
         students[key] = s
-    return {"course_id": cid, "join_code": course["join_code"], "teacher": teacher, "students": students}
+    # "assistant": promoted to course assistant. Student view downgrades a real teacher/assistant who is not an org
+    # admin of the course's organization; the owner teacher administers their own organization, so the Student view
+    # checks run as this assistant.
+    mine = api.call("GET", f"/courses/{cid}", students["assistant"]["token"])["my_enrollment"]["id"]
+    api.call("PATCH", f"/courses/{cid}/enrollments/{mine}", tok, {"role": "assistant"})
+    # one published quiz with one question (Student view "Start" opens a preview attempt)
+    bank = api.call("POST", f"/courses/{cid}/banks", tok, {"title": "Банк навигации", "default_language": "ru"})
+    qid = api.call("POST", f"/courses/{cid}/banks/{bank['id']}/questions", tok, sc("Сколько будет 1 + 1?", "2", "3"))["id"]
+    a = api.call("POST", f"/courses/{cid}/assessments", tok, {
+        "title": {"ru": "Квиз просмотра", "ky": "Квиз просмотра", "en": "Preview quiz"}, "preset": "none", "languages": ["ru"]})
+    abase = f"/courses/{cid}/assessments/{a['id']}"
+    sid = api.call("POST", f"{abase}/sections", tok, {"title": {"ru": "Часть 1", "ky": "Часть 1", "en": "Part 1"}})["id"]
+    api.call("POST", f"{abase}/sections/{sid}/items/bulk", tok, {"question_ids": [qid]})
+    api.call("POST", f"{abase}/publish", tok, {})
+    return {"course_id": cid, "join_code": course["join_code"], "teacher": teacher, "students": students,
+            "view_quiz": a["id"]}
 # --- Phase 8c S4a end ---
 
 

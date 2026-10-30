@@ -19,8 +19,8 @@ import { seed, settle, signIn, tr, VIEWPORTS, type SeedUser } from "./helpers";
  *
  * Data: `seed_backend.py` (`seed_course_nav`, written after every other row): course "Навигация E2E" of an approved
  * teacher, published and empty, three enrolled students (`sidebar`, `handin`, `phone`). The tests create their own
- * content through the API with unique titles, in order (serial). Student view "Start" uses the published quiz of the
- * scrolling course (`seed().scrolling`); its preview attempt is never counted or listed.
+ * content through the API with unique titles, in order (serial). Student view runs as the course ASSISTANT: the owner teacher administers their own organization, so the
+ * server never downgrades them (org admins are not downgraded). "Start" uses the seeded published quiz.
  *
  * Run (same harness as the ORT specs, docs/phases/ORT_BASELINE/README.md "Run"):
  *   cd frontend && E2E_WEB_DIR=/tmp/ort_e2e_fe npx playwright test e2e/course-nav.spec.ts
@@ -268,15 +268,14 @@ test.describe("course navigation (ru)", () => {
     const cid = nav().course_id;
     const taskId = await createTextAssignment("Задание для обзора");
     const outlineBefore = await api(nav().teacher, "GET", `/courses/${cid}/modules`);
-    const tp = await open(browser, nav().teacher);
+    const tp = await open(browser, nav().students.assistant);
     await tp.goto(base());
     await tp.getByRole("button", { name: t("studentView.button") }).click();
     // the banner (role=status) is sticky over the student frame; the sidebar is the student's
     const banner = tp.getByRole("status").filter({ hasText: t("studentView.banner") });
     await expect(banner).toBeVisible();
     await expect(banner.getByRole("button", { name: t("studentView.leave") })).toBeVisible();
-    await expect(link(tp, LINKS.settings)).toHaveCount(0);
-    await expect(link(tp, LINKS.bank)).toHaveCount(0);
+    await expect(link(tp, LINKS.bank)).toHaveCount(0); // staff-only link (assistants have no Settings)
     await expect(tp.getByRole("button", { name: t("studentView.button") })).toHaveCount(0);
     expect(await tp.evaluate((id) => window.sessionStorage.getItem(`studentView:${id}`), cid)).toBe("1");
     // every course request carries the header (the app's own reads succeed as student shapes)
@@ -289,7 +288,7 @@ test.describe("course navigation (ru)", () => {
     // a write with the header is refused and changes nothing
     const refused = await fetch(`${seed().api}/api/v1/courses/${cid}/modules`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${nav().teacher.token}`, "Content-Type": "application/json", "X-View-As": "student" },
+      headers: { Authorization: `Bearer ${nav().students.assistant.token}`, "Content-Type": "application/json", "X-View-As": "student" },
       body: JSON.stringify({ title: { ru: "Не должен появиться" } }),
     });
     expect(refused.status).toBe(403);
@@ -297,33 +296,34 @@ test.describe("course navigation (ru)", () => {
     const outlineAfter = await api(nav().teacher, "GET", `/courses/${cid}/modules`);
     expect(outlineAfter.modules.length).toBe(outlineBefore.modules.length);
     // reads with the header give student shapes; the same read without it is the staff outline
-    const asStudent = await fetch(`${seed().api}/api/v1/courses/${cid}/modules`, { headers: { Authorization: `Bearer ${nav().teacher.token}`, "X-View-As": "student" } });
+    const asStudent = await fetch(`${seed().api}/api/v1/courses/${cid}/modules`, { headers: { Authorization: `Bearer ${nav().students.assistant.token}`, "X-View-As": "student" } });
     expect(asStudent.status).toBe(200);
     expect("rules_version" in (await asStudent.json())).toBe(false);
     // leaving restores the staff frame
     await banner.getByRole("button", { name: t("studentView.leave") }).click();
     await expect(tp.getByRole("status").filter({ hasText: t("studentView.banner") })).toHaveCount(0);
-    await expect(link(tp, LINKS.settings)).toBeVisible();
+    await expect(link(tp, LINKS.bank)).toBeVisible();
     expect(await tp.evaluate((id) => window.sessionStorage.getItem(`studentView:${id}`), cid)).toBeNull();
     await tp.context().close();
   });
 
   test("Student view: 'Start' on a quiz lobby starts a preview attempt", async ({ browser }) => {
-    const sc = seed().scrolling;
-    const tp = await open(browser, sc.teacher);
-    await tp.goto(`/${L}/courses/${sc.course_id}`);
+    const cid = nav().course_id;
+    const tp = await open(browser, nav().students.assistant);
+    await tp.goto(base());
     await tp.getByRole("button", { name: t("studentView.button") }).click();
     await expect(tp.getByRole("status").filter({ hasText: t("studentView.banner") })).toBeVisible();
-    await tp.goto(`/${L}/courses/${sc.course_id}/assessments/${sc.page_quiz}`);
+    await tp.goto(`${base()}/assessments/${nav().view_quiz}`);
     await tp.getByRole("button", { name: t("assessments.lobby.start") }).click();
     await tp.waitForURL(/\/attempts\/[0-9a-f-]{36}/);
     const attemptId = /\/attempts\/([0-9a-f-]{36})/.exec(tp.url())![1];
-    const att = await api(sc.teacher, "GET", `/attempts/${attemptId}`);
+    const att = await api(nav().students.assistant, "GET", `/attempts/${attemptId}`);
     expect(att.is_preview).toBe(true);
+    expect(cid).toBeTruthy();
     await tp.context().close();
   });
 
-  // ---------------------------------------------------------------- 6. To do deep link (S2 + S3)
+// ---------------------------------------------------------------- 6. To do deep link (S2 + S3)
   test("To do: 'to grade' links to the assignment's Submissions tab, filter to_grade", async ({ browser }) => {
     const cid = nav().course_id;
     const id = await createTextAssignment(HAND_IN);
@@ -337,7 +337,7 @@ test.describe("course navigation (ru)", () => {
     await tp.waitForURL(new RegExp(`/assignments/${id}\\?.*tab=submissions`));
     expect(new URL(tp.url()).searchParams.get("filter")).toBe("to_grade");
     await expect(tp.getByRole("tab", { name: t("assignments.page.tabs.submissions") })).toHaveAttribute("aria-selected", "true");
-    await expect(tp.getByText("Nav handin")).toBeVisible();
+    await expect(tp.locator("button:visible", { hasText: "Nav handin" }).first()).toBeVisible();
     // the sidebar keeps Assignments active, not Grades
     await expect(link(tp, LINKS.assignments)).toHaveAttribute("aria-current", "page");
     await tp.context().close();
@@ -361,8 +361,8 @@ test.describe("course navigation (ru)", () => {
     await row.getByRole("button", { name: t("modules.editor.actions") }).click();
     await tp.getByRole("menuitem", { name: t("coursePage.unsorted.moveTo") }).click();
     const dlg = tp.getByRole("dialog");
-    await dlg.getByRole("radio", { name: new RegExp(MOD_A) }).check();
-    await dlg.getByRole("button", { name: t("modules.add.submit") }).click();
+    await dlg.getByLabel(t("modules.move.target")).selectOption({ label: MOD_A });
+    await dlg.getByRole("button", { name: t("modules.move.submit") }).click();
     await expect(dlg).toBeHidden();
     await expect(unsorted.getByText(PAGE_TITLE, { exact: true })).toHaveCount(0);
     await expect(tp.locator(`#m-${mod.id}`).getByText(PAGE_TITLE, { exact: true })).toBeVisible();
