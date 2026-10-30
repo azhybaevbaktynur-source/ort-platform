@@ -348,9 +348,8 @@ def seed_course_nav(api: Api, log: Path, admin_tok: str) -> dict:
         s["profile"] = profile(api, s["token"])
         api.call("POST", "/courses/join", s["token"], {"code": course["join_code"]})
         students[key] = s
-    # "assistant": promoted to course assistant. Student view downgrades a real teacher/assistant who is not an org
-    # admin of the course's organization; the owner teacher administers their own organization, so the Student view
-    # checks run as this assistant.
+    # "assistant": promoted to course assistant. Student view downgrades a real teacher/assistant, also the owner who
+    # administers their personal organization (fix 2); the Student view checks run as this assistant and as the owner.
     mine = api.call("GET", f"/courses/{cid}", students["assistant"]["token"])["my_enrollment"]["id"]
     api.call("PATCH", f"/courses/{cid}/enrollments/{mine}", tok, {"role": "assistant"})
     # one published quiz with one question (Student view "Start" opens a preview attempt)

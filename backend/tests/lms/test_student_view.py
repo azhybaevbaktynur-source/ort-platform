@@ -2,7 +2,10 @@
 
 `X-View-As: student` on a `/courses/{id}[/...]` request downgrades a real teacher or assistant role to "student" for
 reads (draft courses stay readable), refuses every write with 403 `student_view_read_only` (except `POST _A/preview`)
-and persists nothing. Students, org admins, platform admins, outsiders and sandbox staff: the header is ignored."""
+and persists nothing. Fix 2: an enrolled teacher/assistant who is also an org admin of the course's organization
+(every independent teacher in their personal organization) is downgraded too, with every org-admin power off for that
+course. Students, org admins without an enrollment, platform admins, outsiders and sandbox staff: the header is
+ignored."""
 import re
 import uuid
 from datetime import timedelta
@@ -17,10 +20,10 @@ from app.lms.enrollments.models import Enrollment
 from app.lms.grading.models import CourseGrade, Submission
 from app.lms.modules.models import CourseModule, ItemProgress, ItemRequirementStatus, ModuleItem, ModuleProgress
 from app.main import app
-from tests.lms.factories import auth, enroll, make_user
+from tests.lms.factories import auth, enroll, make_course, make_user, set_status
 from tests.lms.modules_support import (
-    C, I, M, add_prerequisite, make_assignment, make_course_file, make_item, make_module, make_page, published_quiz,
-    structure_world,
+    C, I, M, World, add_prerequisite, make_assignment, make_course_file, make_item, make_module, make_page,
+    published_quiz, structure_world,
 )
 from tests.lms.s3_support import api, clean_rate_limits, db  # noqa: F401
 
@@ -48,8 +51,8 @@ def code(res) -> str:
     return (res.json().get("error") or {}).get("code")
 
 
-def _world_with_structure(db, *, status="published"):
-    w = structure_world(db, status=status)
+def _world_with_structure(db, *, status="published", w=None):
+    w = w or structure_world(db, status=status)
     m1 = make_module(db, w.course, w.O, title={"en": "M1"})
     m2 = make_module(db, w.course, w.O, title={"en": "M2"})
     hidden = make_module(db, w.course, w.O, title={"en": "Draft module"}, published=False)
@@ -163,16 +166,109 @@ async def test_header_ignored_for_students_org_admins_platform_admins_and_outsid
     assert res.status_code == 403 and code(res) != "student_view_read_only"
 
 
-async def test_header_ignored_for_staff_who_are_org_admins_or_platform_admins(db):
+async def test_header_ignored_for_staff_who_are_platform_admins(db):
     w, *_ = _world_with_structure(db)
-    enroll(db, w.course, w.OA, role="assistant", source="owner")  # org admin who is also an assistant here
     admin = make_user(db, platform_admin=True)
     enroll(db, w.course, admin, role="assistant", source="owner")
-    for user in (w.OA, admin):
-        res = await call(user, "GET", C(w))
-        assert res.status_code == 200 and "join_code" in res.json(), res.text
-        res = await call(user, "POST", f"{C(w)}/modules", json={"title": {"en": "x"}})
-        assert res.status_code == 201, res.text
+    res = await call(admin, "GET", C(w))
+    assert res.status_code == 200 and "join_code" in res.json(), res.text
+    res = await call(admin, "POST", f"{C(w)}/modules", json={"title": {"en": "x"}})
+    assert res.status_code == 201, res.text
+
+
+async def test_org_admin_without_enrollment_header_ignored(db):
+    """Fix 2: an org admin with no enrollment has no student identity to preview: the org-admin view (A13) with or
+    without the header, and writes follow the normal rules (never the Student view code)."""
+    w, *_ = _world_with_structure(db)
+    before = counts(db)
+    for path in (C(w), f"{C(w)}/modules", f"{C(w)}/people", f"{C(w)}/modules/unsorted"):
+        plain = await call(w.OA, "GET", path, view=False)
+        viewed = await call(w.OA, "GET", path)
+        assert plain.status_code == 200, (path, plain.text)
+        assert (plain.status_code, plain.json()) == (viewed.status_code, viewed.json()), path
+    body = (await call(w.OA, "GET", C(w))).json()
+    assert "join_code" in body and body["my_enrollment"] is None  # the org admin's staff view (A13)
+    people = (await call(w.OA, "GET", f"{C(w)}/people")).json()["items"]
+    assert any(p["role"] == "student" for p in people) and all("user" in p for p in people)  # the full roster
+    for view in (False, True):
+        res = await call(w.OA, "POST", f"{C(w)}/modules", json={"title": {"en": "x"}}, view=view)
+        assert res.status_code == 403 and code(res) not in ("student_view_read_only",), res.text
+    assert counts(db) == before
+
+
+# ------------------------------------------------------------------ fix 2: enrolled staff who are also org admins
+
+def _personal_world(db) -> World:
+    """An independent teacher's course in their personal organization (decision A1: the owner is its org admin)."""
+    from app.lms.organizations.ids import personal_org_id
+    from app.lms.organizations.models import OrganizationMember
+
+    owner = make_user(db, teacher_status="approved")
+    course = make_course(db, owner, organization_id=personal_org_id(owner.id))
+    ta, s, s2, x = (make_user(db) for _ in range(4))
+    enroll(db, course, ta, role="assistant", source="owner")
+    e1, e2 = enroll(db, course, s), enroll(db, course, s2)
+    set_status(db, course, "published")
+    assert db.execute(select(OrganizationMember.id).where(
+        OrganizationMember.organization_id == course.organization_id, OrganizationMember.user_id == owner.id,
+        OrganizationMember.role == "org_admin", OrganizationMember.state == "active")).first() is not None
+    return World(course, owner, ta, s, s2, x, owner, e1, e2)
+
+
+async def _assert_student_view_for(db, w: World, user, *, staff_reads=()):
+    """`user` (an enrolled teacher/assistant who is also an org admin here) gets staff shapes without the header and
+    student shapes with it; `staff_reads` (org-admin/staff-only reads) answer 200 plain and 403 in Student view;
+    every course write is refused with the view code; no row changes (the student's own reads come first: a
+    student's outline read may cache its module progress)."""
+    student = await call(w.S, "GET", C(w), view=False)
+    student_outline = (await call(w.S, "GET", f"{C(w)}/modules", view=False)).json()
+    student_people = (await call(w.S, "GET", f"{C(w)}/people", view=False)).json()["items"]
+    before = counts(db)
+    plain = (await call(user, "GET", C(w), view=False)).json()
+    assert "join_code" in plain and plain["my_enrollment"]["role"] in ("teacher", "assistant")
+    plain_people = (await call(user, "GET", f"{C(w)}/people", view=False)).json()["items"]
+    assert any(p["role"] == "student" for p in plain_people) and all("user" in p for p in plain_people)
+    res = await call(user, "GET", C(w))
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert set(body) == set(student.json()) and "join_code" not in body and "active_student_count" not in body
+    assert body["my_enrollment"]["role"] == "student"
+    out = await call(user, "GET", f"{C(w)}/modules")
+    assert out.json() == student_outline
+    people = (await call(user, "GET", f"{C(w)}/people")).json()["items"]
+    assert people == student_people
+    assert {p["role"] for p in people} <= {"teacher", "assistant"} and all("user" not in p for p in people)
+    for path in (f"{C(w)}/modules/unsorted", f"{C(w)}/todo", *staff_reads):
+        assert (await call(user, "GET", path, view=False)).status_code == 200, path
+        assert (await call(user, "GET", path)).status_code == 403, path
+    for method, path in WRITE_ROUTES:
+        url = _fill(path, w.cid)[len("/api/v1"):]
+        res = await call(user, method, url, json={})
+        assert res.status_code == 403 and code(res) == "student_view_read_only", (method, path, res.text)
+    assert counts(db) == before
+
+
+async def test_independent_teacher_owner_in_personal_org_gets_student_view(db):
+    w, *_ = _world_with_structure(db, w=_personal_world(db))
+    await _assert_student_view_for(db, w, w.O)
+    # transfer to a member is an org-admin power (A13) and a write: refused, the owner unchanged
+    res = await call(w.O, "POST", f"{C(w)}/transfer-ownership", json={"new_owner_user_id": w.T.id})
+    assert res.status_code == 403 and code(res) == "student_view_read_only"
+    db.expire_all()
+    assert db.get(type(w.course), w.course.id).owner_id == w.O.id
+
+
+@pytest.mark.parametrize("role", ["teacher", "assistant"])
+async def test_school_org_admin_enrolled_as_staff_gets_student_view(db, role):
+    w, *_ = _world_with_structure(db)
+    enroll(db, w.course, w.OA, role=role, source="staff_add")
+    await _assert_student_view_for(db, w, w.OA)
+    # the org-admin-only answers (A13 staff view of a draft, roster read) are off in Student view too
+    set_status(db, w.course, "draft")
+    res = await call(w.OA, "GET", C(w))
+    assert res.status_code == 200 and "join_code" not in res.json() and res.json()["status"] == "draft"
+    people = (await call(w.OA, "GET", f"{C(w)}/people")).json()["items"]
+    assert all("user" not in p for p in people) and {p["role"] for p in people} <= {"teacher", "assistant"}
 
 
 async def test_other_course_and_other_paths(db):
