@@ -6,7 +6,7 @@ import uuid
 from typing import Callable, Iterable, Optional
 
 from fastapi import Depends, Request
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, aliased
 
 from app.db.session import get_db
@@ -117,6 +117,9 @@ def decide(*, role: Optional[str], course_status: str, action: str, is_platform_
     return org_admin and _org_admin_allows(course_status, action)
 
 
+_PATH_SEGMENT_LEN = 32  # Phase 9 fix 1: one `organizations.path` segment (`models.path_segment`, 32 hex characters)
+
+
 def _no_role(course_id) -> Optional[str]:
     return None
 
@@ -128,19 +131,24 @@ def enrollment_role_resolver(db: Session, user_id: str) -> Callable:
     from app.lms.courses.models import Course
     from app.lms.organizations.models import Organization
 
+    root = aliased(Organization)
+
     def resolve(course_id) -> Optional[str]:
         # Phase 6 S1: the organization status comes with the role (same statement), so the suspension gate
         # costs enrolled users no extra query on the hot paths (attempt start, autosave).
+        # Phase 9 fix 1 (L4, M2): the root comes in the same statement through the path (a root's path is its own
+        # 32-hex id, the first segment of every descendant's path), so departments get the hint too; suspended
+        # when the course's organization row or its root is suspended.
         row = db.execute(
-            select(Enrollment.role, Organization.status, Course.sandbox_for_template_id, Organization.depth)
+            select(Enrollment.role, Organization.status, Course.sandbox_for_template_id, root.status)
             .join(Course, Course.id == Enrollment.course_id)
             .join(Organization, Organization.id == Course.organization_id)
+            .outerjoin(root, root.path == func.substr(Organization.path, 1, _PATH_SEGMENT_LEN))
             .where(Enrollment.course_id == course_id, Enrollment.user_id == user_id, Enrollment.state == "active")
         ).first()
         if row is None:
             return None
-        if row[3] == 0:  # Phase 9 S1: a department's suspension is its root's (`_org` reads it through the path)
-            resolve.org_status[_norm(course_id)] = row[1]
+        resolve.org_status[_norm(course_id)] = "suspended" if "suspended" in (row[1], row[3]) else row[1]
         resolve.sandbox[_norm(course_id)] = row[2]  # Phase 8b fix M1: same statement, no extra query
         return row[0]
 
@@ -226,7 +234,8 @@ class AuthzContext:
         costs one statement as before (its row and the caller's org-admin membership on it). A department costs a
         second one: the root's status and deletion (suspension and deletion apply to the root, so they reach every
         department) and an org-admin membership on any non-deleted ancestor. Never downwards: the admin of a
-        department does not administer its parent or siblings."""
+        department does not administer its parent or siblings. Phase 9 fix 1 (M2): a department is suspended when
+        its own row or its root is suspended."""
         if organization_id is None:
             return ("active", False, False)
         key = _norm(organization_id)
@@ -256,7 +265,8 @@ class AuthzContext:
                 up_admin = admin_on(OrganizationMember.organization_id.in_(ancestors)).join(
                     up, up.id == OrganizationMember.organization_id).where(up.deleted_at.is_(None)).exists()
                 r2 = self.db.execute(select(root_status, root_deleted, up_admin)).first()
-                status = r2[0] or status
+                if status != "suspended":  # Phase 9 fix 1 (M2): the department's own suspension counts too
+                    status = r2[0] or status
                 deleted = r2[1] is not None
                 admin = admin or bool(r2[2])
             self.org_cache[key] = (status, deleted, admin and not deleted)
