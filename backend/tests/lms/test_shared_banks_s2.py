@@ -63,7 +63,7 @@ async def test_share_and_unshare(db, api):
     assert r.json() == {"enabled": True, "reason": None, "root_id": str(w.R.id), "root_name": "R", "can_copy": True}
     r = await _share(api, w.T, w.C, w.B)
     assert r.status_code == 200, r.text
-    assert (r.json()["visibility"], r.json()["can_edit"]) == ("organization", True)
+    assert (r.json()["visibility"], r.json()["can_edit"], r.json()["can_delete"]) == ("organization", True, True)
     assert (await _share(api, w.T, w.C, w.B)).status_code == 200  # idempotent
     # outsiders, students, a sibling department's teacher
     for user, code in ((w.TX, 404), (w.T2, 404), (w.stud, 403)):
@@ -250,7 +250,7 @@ async def test_org_admin_reads_only_shared_banks(db, api):
             r = await api.call(admin, "GET", path)
             assert r.status_code == 200, (admin.id, path, r.text)
         listed = (await api.call(admin, "GET", f"{C}/banks")).json()["items"]
-        assert [(b["title"], b["can_edit"]) for b in listed] == [("Algebra", True)]
+        assert [(b["title"], b["can_edit"], b["can_delete"]) for b in listed] == [("Algebra", True, False)]
         assert (await api.call(admin, "GET", f"{C}/banks", params={"deleted": "true"})).json()["items"] == []
         # private bank and its answer keys stay staff-only (A13)
         for path in (f"{C}/banks/{w.PB.id}", f"{C}/banks/{w.PB.id}/questions", f"{C}/questions/{pq.id}"):

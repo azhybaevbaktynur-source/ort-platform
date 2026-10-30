@@ -116,6 +116,8 @@ export interface BankOut {
   shared_at: string | null;
   copied_from_bank_id: string | null;
   can_edit: boolean;
+  /** Phase 9 S2: delete / restore the whole bank (course staff with content.manage only, never org admins). */
+  can_delete: boolean;
 }
 export interface BankCreateIn {
   title: string;

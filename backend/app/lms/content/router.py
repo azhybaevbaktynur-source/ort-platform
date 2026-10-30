@@ -218,7 +218,8 @@ def _passage_version_out(pv: PassageVersion, author: Optional[str]) -> sch.Passa
 
 def _bank_out(ctx: AuthzContext, course, bank_id: uuid.UUID) -> sch.BankOut:
     row = ctx.db.execute(repo.bank_rows_stmt(course.id, bank_id=bank_id)).first()
-    return sch.bank_out(row, can_edit=can_edit_bank(ctx, course, row[0]))  # Phase 9 S1: `can_edit`
+    return sch.bank_out(row, can_edit=can_edit_bank(ctx, course, row[0]),  # Phase 9 S1: `can_edit`
+                        can_delete=can(ctx, A.CONTENT_MANAGE, course))  # Phase 9 S2: staff only
 
 
 # ------------------------------------------------------------------ banks
@@ -241,7 +242,9 @@ def list_banks(course_id: uuid.UUID, deleted: bool = False, cursor: Optional[str
         ctx.db, stmt, sort_col=QuestionBank.created_at,
         id_col=QuestionBank.id, entity_of=lambda r: r[0], cursor=cursor, limit=limit,
     )
-    items = [sch.bank_out(r, can_edit=can_edit_bank(ctx, course, r[0])) for r in rows]  # Phase 9 S1: `can_edit`
+    staff = can(ctx, A.CONTENT_MANAGE, course)  # Phase 9 S2: `can_delete` (delete / restore are staff only)
+    items = [sch.bank_out(r, can_edit=can_edit_bank(ctx, course, r[0]), can_delete=staff)  # Phase 9 S1: `can_edit`
+             for r in rows]
     return PageOut[sch.BankOut](items=items, next_cursor=nxt)
 
 

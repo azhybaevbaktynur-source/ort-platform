@@ -111,7 +111,9 @@ class CopyFromIn(BaseModel):
 
 def _bank_out(ctx: AuthzContext, course, bank_id: uuid.UUID) -> sch.BankOut:
     row = ctx.db.execute(repo.bank_rows_stmt(course.id, bank_id=bank_id)).first()
-    return sch.bank_out(row, can_edit=can_edit_bank(ctx, course, row[0]))
+    from app.core.authz import can
+
+    return sch.bank_out(row, can_edit=can_edit_bank(ctx, course, row[0]), can_delete=can(ctx, A.CONTENT_MANAGE, course))
 
 
 def _editable_course(ctx: AuthzContext, course_id: uuid.UUID, bank_id: uuid.UUID):
