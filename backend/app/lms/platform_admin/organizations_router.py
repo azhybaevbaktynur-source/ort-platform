@@ -124,6 +124,17 @@ def organization_usage(organization_id: uuid.UUID, admin: User = Depends(require
     return UsageOut(**org_svc.usage(db, org_svc.load_org(db, organization_id)))
 
 
+# --- Phase 9 S2 begin --- (PHASE_9_DESIGN 5, 8.1: the Departments tab, read; status shows suspended departments)
+from app.lms.organizations.schemas import DepartmentOut  # noqa: E402
+
+
+@router.get("/organizations/{organization_id}/departments", response_model=list[DepartmentOut])
+def organization_departments(organization_id: uuid.UUID, admin: User = Depends(require_platform_admin),
+                             db: Session = Depends(get_db)):
+    return [DepartmentOut(**d) for d in org_svc.list_departments(db, org_svc.load_org(db, organization_id))]
+# --- Phase 9 S2 end ---
+
+
 @router.get("/organizations/{organization_id}/templates", response_model=list[OrgTemplateOut])
 def organization_templates(organization_id: uuid.UUID, admin: User = Depends(require_platform_admin),
                            db: Session = Depends(get_db)):

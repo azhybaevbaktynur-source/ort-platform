@@ -25,7 +25,7 @@ INVITATION_POLICIES: dict[tuple[str, str], str] = {
     ("POST", "/api/v1/invitations/{token}/accept"): "authenticated+ratelimit",
     ("GET", "/api/v1/me/invitations"): "authenticated",
     ("POST", "/api/v1/courses/{course_id}/staff/invitations"): "course:roster.manage",
-    # --- Phase 9 S3 begin --- (PHASE_9_DESIGN 4.4, 4.5; rows of route_inventory.PHASE_9_PLANNED_POLICIES["S3"])
+    # --- Phase 9 S3 begin --- (PHASE_9_DESIGN 4.4, 4.5; the S3 rows of design 5)
     # roster imports (organizations/roster.py, mounted through this package's router): org admin of the
     # organization or an ancestor, or the platform admin; multipart CSV, dry run by default, masked report
     ("POST", "/api/v1/org/{organization_id}/roster-imports"): "org_admin+ratelimit",

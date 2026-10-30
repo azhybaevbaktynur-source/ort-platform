@@ -278,3 +278,50 @@ def expand_images(value: Any) -> Any:
     if isinstance(value, list):
         return [expand_images(x) for x in value]
     return value
+
+
+# --- Phase 9 S2 begin --- (PHASE_9_DESIGN 4.2, invariants 2-3: the one SQL scope of organization-shared banks)
+def shared_banks_stmt(organization_scope):
+    """(QuestionBank, live question count, live passage count, home course title, organization name, sharer User or
+    None) of the live banks shared with the organization (`visibility = 'organization'`, never a quiz bank) whose
+    organization is in `organization_scope` (a SELECT of organization ids) and whose home course is live. A personal
+    organization never matches (invariant 2), whatever the scope says."""
+    from app.lms.courses.models import Course
+    from app.lms.organizations.models import Organization
+    from app.models.user import User
+
+    qc = (
+        select(func.count()).select_from(BankQuestion)
+        .where(BankQuestion.bank_id == QuestionBank.id, BankQuestion.deleted_at.is_(None))
+        .correlate(QuestionBank).scalar_subquery()
+    )
+    pc = (
+        select(func.count()).select_from(Passage)
+        .where(Passage.bank_id == QuestionBank.id, Passage.deleted_at.is_(None))
+        .correlate(QuestionBank).scalar_subquery()
+    )
+    return (
+        select(QuestionBank, qc.label("question_count"), pc.label("passage_count"), Course.title.label("course_title"),
+               Organization.name.label("organization_name"), User)
+        .join(Course, Course.id == QuestionBank.course_id)
+        .join(Organization, Organization.id == QuestionBank.organization_id)
+        .outerjoin(User, User.id == QuestionBank.shared_by_id)
+        .where(QuestionBank.visibility == "organization", QuestionBank.deleted_at.is_(None),
+               QuestionBank.assessment_id.is_(None), Course.deleted_at.is_(None),
+               Organization.kind != "personal", Organization.deleted_at.is_(None),
+               QuestionBank.organization_id.in_(organization_scope))
+    )
+
+
+def shared_banks_visible_to(db: Session, user_id: str, *, root_ids: Optional[Iterable] = None):
+    """Invariant 3: every list of other people's banks a teacher sees comes from this scope. The banks of the
+    **trees** the user belongs to (any active membership, teacher or org admin; the roots of those memberships),
+    optionally narrowed to some of those roots. Never `can()` in a loop."""
+    from app.lms.organizations import tree
+
+    roots = tree.member_tree_roots(db, user_id)
+    if root_ids is not None:
+        wanted = {uuid.UUID(str(r)) for r in root_ids}
+        roots = [r for r in roots if r in wanted]
+    return shared_banks_stmt(tree.trees_scope(roots))
+# --- Phase 9 S2 end ---

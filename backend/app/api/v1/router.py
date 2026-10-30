@@ -100,3 +100,11 @@ from app.lms.enrollment_forms.router import router as _enrollment_forms_router  
 
 api_router.include_router(_enrollment_forms_router, tags=["Enrollment forms"])
 # --- Phase 9 S4 end ---
+# --- Phase 9 S2 begin --- (organization-shared banks, PHASE_9_DESIGN 4.2)
+from app.lms.content.shared_banks_router import (  # noqa: E402
+    course_router as _shared_banks_course_router, org_router as _shared_banks_org_router,
+)
+
+api_router.include_router(_shared_banks_org_router, prefix="/org", tags=["Organizations"])
+api_router.include_router(_shared_banks_course_router, prefix="/courses", tags=["Question Bank (LMS)"])
+# --- Phase 9 S2 end ---

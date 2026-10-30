@@ -125,10 +125,12 @@ class BankOut(BaseModel):
     copied_from_bank_id: Optional[uuid.UUID] = None
     can_edit: bool = False
     # --- Phase 9 S1 end ---
+    # --- Phase 9 S2 --- (fix 1 follow-up: delete / restore stay course staff only; never the org-admin branch)
+    can_delete: bool = False
 
 
 # --- Phase 7c S1 begin ---
-def bank_out(row, *, can_edit: bool = False) -> BankOut:
+def bank_out(row, *, can_edit: bool = False, can_delete: bool = False) -> BankOut:
     """Row of `repository.bank_rows_stmt`: (bank, question count, passage count, quiz title or None)."""
     bank, qc, pc, a_title = row
     assessment = (BankAssessmentOut(id=bank.assessment_id, title=a_title or {})
@@ -139,6 +141,7 @@ def bank_out(row, *, can_edit: bool = False) -> BankOut:
         created_at=bank.created_at, updated_at=bank.updated_at, deleted_at=bank.deleted_at, assessment=assessment,
         visibility=bank.visibility or "private", shared_at=bank.shared_at,  # Phase 9 S1
         copied_from_bank_id=bank.copied_from_bank_id, can_edit=can_edit,  # Phase 9 S1
+        can_delete=can_delete and bank.assessment_id is None,  # Phase 9 S2 (a quiz bank follows its quiz)
     )
 # --- Phase 7c S1 end ---
 

@@ -123,46 +123,21 @@ POLICY_NAMES = POLICY_NAMES | frozenset(_EXAM_TEMPLATE_POLICY_NAMES_8B)
 # --- Phase 8c S1 end ---
 # --- Phase 9 S1 begin --- (PHASE_9_DESIGN 5: no new route in S1. S4 moves
 # `enrollment_forms.policies.PLANNED_POLICIES` into ENROLLMENT_FORM_POLICIES when it mounts its routers. The S2 and S3
-# routes live in packages those slices own exclusively, so their planned entries are listed here, unregistered: each
-# slice copies its rows into its own package dict (organizations / content / invitations / platform admin) in its own
-# delimited block; registering a row before its route exists fails the inventory test as "stale".
+# routes live in packages those slices own exclusively: each slice registered its rows in its own package dict
+# (organizations / content / invitations / platform admin) in its own delimited block.
 # `org_admin` (Phase 9): active org admin of {organization_id} **or of an ancestor** (organizations.tree), or the
 # platform admin. Shared-bank reads are `authenticated` + member of the tree in the service (404 otherwise).)
 from app.lms.enrollment_forms.policies import ENROLLMENT_FORM_POLICIES  # noqa: E402
 
 ROUTE_POLICIES.update(ENROLLMENT_FORM_POLICIES)
 
-_P9_O = "/api/v1/org/{organization_id}"
-_P9_C = "/api/v1/courses/{course_id}"
-PHASE_9_PLANNED_POLICIES: dict[str, dict[tuple[str, str], str]] = {
-    "S2": {
-        ("GET", f"{_P9_O}/settings"): "org_admin",
-        ("PATCH", f"{_P9_O}/settings"): "org_admin",                 # root only (409 settings_on_root), audited
-        ("GET", f"{_P9_O}/usage"): "org_admin",                      # tree roll-up
-        ("GET", f"{_P9_O}/departments"): "org_admin",
-        ("POST", f"{_P9_O}/departments"): "org_admin",               # audited
-        ("PATCH", f"{_P9_O}/departments/{{department_id}}"): "org_admin",  # rename / move, audited
-        ("PATCH", f"{_P9_O}/courses/{{course_id}}"): "org_admin",    # organization_id within the tree, audited
-        ("GET", f"{_P9_O}/shared-banks"): "authenticated",           # member of the tree, else 404
-        ("GET", f"{_P9_O}/shared-banks/{{bank_id}}"): "authenticated",
-        ("GET", f"{_P9_O}/shared-banks/{{bank_id}}/questions"): "authenticated",
-        ("GET", f"{_P9_O}/shared-banks/{{bank_id}}/passages"): "authenticated",
-        ("POST", f"{_P9_C}/banks/{{bank_id}}/share"): "course:content.manage",    # + can_edit_bank (org admin)
-        ("DELETE", f"{_P9_C}/banks/{{bank_id}}/share"): "course:content.manage",  # + can_edit_bank (org admin)
-        ("POST", f"{_P9_C}/banks/copy-from"): "course:content.manage+ratelimit",
-        ("GET", "/api/v1/platform/organizations/{organization_id}/departments"): "platform_admin",
-    },
-    "S3": {
-        ("POST", f"{_P9_O}/roster-imports"): "org_admin+ratelimit",   # multipart, dry run by default
-        ("GET", f"{_P9_O}/roster-imports"): "org_admin",
-        ("GET", f"{_P9_O}/roster-imports/{{import_id}}"): "org_admin",
-        ("POST", f"{_P9_O}/roster-imports/{{import_id}}/apply"): "org_admin+ratelimit",
-        ("POST", f"{_P9_C}/students/invitations"): "course:roster.manage+ratelimit",  # org admins via ORG_ADMIN_ACTIONS
-        ("GET", f"{_P9_C}/students/invitations"): "course:roster.manage",
-        ("POST", f"{_P9_C}/students/invitations/{{invitation_id}}/revoke"): "course:roster.manage",
-        ("POST", f"{_P9_C}/students/invitations/{{invitation_id}}/resend"): "course:roster.manage+ratelimit",
-    },
-}
+# --- Phase 9 S2 begin --- (S2 and S3 routes are mounted: their rows live in organizations/policies.py ORG_POLICIES,
+# platform_admin/organizations_policies.py, content/shared_banks_policies.py and invitations/policies.py; the
+# planned S2 / S3 rows that S1 listed here (PHASE_9_PLANNED_POLICIES) are dropped)
+from app.lms.content.shared_banks_policies import SHARED_BANK_POLICIES  # noqa: E402
+
+ROUTE_POLICIES.update(SHARED_BANK_POLICIES)
+# --- Phase 9 S2 end ---
 # `org_admin+ratelimit` is the one policy label Phase 9 adds (roster imports, design 5).
 POLICY_NAMES = POLICY_NAMES | frozenset({"org_admin+ratelimit"})
 # --- Phase 9 S1 end ---

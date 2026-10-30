@@ -85,6 +85,7 @@ class OrgCourseOut(BaseModel):
     template_key: Optional[str] = None
     active_student_count: int
     created_at: datetime
+    organization_id: Optional[uuid.UUID] = None  # --- Phase 9 S2 --- (the department of the course)
 
 
 class CatalogDefaultsIn(BaseModel):
@@ -167,7 +168,8 @@ def member_out(m, user) -> MemberOut:
 def org_course_out(course, owner, active_student_count: int) -> OrgCourseOut:
     return OrgCourseOut(id=course.id, title=course.title, owner=user_brief(owner), status=course.status,
                         visibility=course.visibility, template_key=course.template_key,
-                        active_student_count=active_student_count, created_at=course.created_at)
+                        active_student_count=active_student_count, created_at=course.created_at,
+                        organization_id=course.organization_id)  # Phase 9 S2
 
 
 # --- Phase 9 S1 begin --- (shapes of the S2/S3 routes, PHASE_9_DESIGN 4.1-4.4, 5; services fill them)
@@ -198,6 +200,9 @@ class DepartmentOut(BaseModel):
     courses: int = 0
     members: int = 0
     created_at: datetime
+    # --- Phase 9 S2 --- (architect M2: a suspended department suspends its subtree; shown in the departments tab)
+    status: str = "active"
+    suspended_reason: Optional[str] = None
 
 
 class OrgCourseMoveIn(BaseModel):
