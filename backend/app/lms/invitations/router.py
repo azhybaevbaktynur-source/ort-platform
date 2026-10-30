@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, Request
 from sqlalchemy.orm import Session
 
 from app.core.authz import AuthzContext, get_authz
@@ -17,8 +17,9 @@ from app.lms.invitations import service as svc
 from app.lms.invitations.policies import OrgAdmin, require_org_admin
 from app.lms.invitations.schemas import (
     InvitationAcceptOut, InvitationCreatedOut, InvitationLookupOut, InvitationOut, MyInvitationOut,
-    OrgInvitationIn, StaffInvitationIn,
+    OrgInvitationIn, StaffInvitationIn, StudentInvitationsIn, StudentInvitationsOut,
 )
+from app.lms.invitations import students as student_svc  # Phase 9 S3
 from app.models.user import User
 
 router = APIRouter(tags=["Invitations"])
@@ -90,3 +91,41 @@ def create_staff_invitation(course_id: uuid.UUID, data: StaffInvitationIn, reque
     course = course_svc.load_course(ctx.db, course_id)
     return svc.create_staff_invitation(ctx.db, ctx, course, email=data.email, role=data.role,
                                        message=data.message, language=data.language, request=request)
+
+
+# --- Phase 9 S3 begin --- (PHASE_9_DESIGN 4.4, 4.5: student invitations; roster imports from organizations/roster.py)
+@router.post("/courses/{course_id}/students/invitations", response_model=StudentInvitationsOut, status_code=201)
+def create_student_invitations(course_id: uuid.UUID, data: StudentInvitationsIn, request: Request,
+                               background: BackgroundTasks, ctx: AuthzContext = Depends(get_authz)):
+    course = course_svc.load_course(ctx.db, course_id)
+    return student_svc.create_student_invitations(ctx.db, ctx, course, addresses=data.emails, message=data.message,
+                                                  language=data.language, background=background, request=request)
+
+
+@router.get("/courses/{course_id}/students/invitations", response_model=PageOut[InvitationOut])
+def list_student_invitations(course_id: uuid.UUID, state: StateFilter = None, cursor: Optional[str] = None,
+                             limit: int = 25, ctx: AuthzContext = Depends(get_authz)):
+    course = course_svc.load_course(ctx.db, course_id)
+    items, nxt = student_svc.list_student_invitations(ctx.db, ctx, course, state=state, cursor=cursor, limit=limit)
+    return PageOut[InvitationOut](items=items, next_cursor=nxt)
+
+
+@router.post("/courses/{course_id}/students/invitations/{invitation_id}/revoke", response_model=InvitationOut)
+def revoke_student_invitation(course_id: uuid.UUID, invitation_id: uuid.UUID, request: Request,
+                              ctx: AuthzContext = Depends(get_authz)):
+    course = course_svc.load_course(ctx.db, course_id)
+    return student_svc.revoke_student_invitation(ctx.db, ctx, course, invitation_id, request=request)
+
+
+@router.post("/courses/{course_id}/students/invitations/{invitation_id}/resend",
+             response_model=InvitationCreatedOut, status_code=201)
+def resend_student_invitation(course_id: uuid.UUID, invitation_id: uuid.UUID, request: Request,
+                              ctx: AuthzContext = Depends(get_authz)):
+    course = course_svc.load_course(ctx.db, course_id)
+    return student_svc.resend_student_invitation(ctx.db, ctx, course, invitation_id, request=request)
+
+
+from app.lms.organizations.roster import router as _roster_router  # noqa: E402
+
+router.include_router(_roster_router)
+# --- Phase 9 S3 end ---

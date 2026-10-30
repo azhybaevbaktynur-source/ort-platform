@@ -19,7 +19,8 @@ export function InvitationAcceptedNotice() {
 
   if (!data) return null;
   const text = data.course
-    ? t(data.role === "assistant" ? "invitationAccepted.courseAssistant" : "invitationAccepted.courseTeacher", { course: data.course })
+    ? t(data.role === "student" ? "invitationAccepted.courseStudent" // Phase 9 S3
+      : data.role === "assistant" ? "invitationAccepted.courseAssistant" : "invitationAccepted.courseTeacher", { course: data.course })
     : t(data.role === "org_admin" ? "invitationAccepted.orgAdmin" : "invitationAccepted.orgTeacher", { org: data.org });
   return (
     <div role="status" className="mb-6 flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
