@@ -10,6 +10,17 @@ In: a short left course sidebar for staff and students (phone drawer), auto-hide
 
 Out: Settings → Navigation (hide/reorder links), Reports (none exist; Phase 10), a test-student account (§6), module copy between courses, any change to the ORT player, bank, builder, import, result content (§11), any change to the 7c quiz editor beyond a Close target (§5.3), announcement or file features.
 
+### 1.1 Invariants
+
+1. Navigation is computed from `CourseOut` (role, `features`, `home_kind`, template) on the client; the server stays authoritative for every list (a hidden link hides nothing the server would return).
+2. Student view never writes: no `module_progress`, `item_progress`, `submissions`, `attempts` (other than `is_preview`), audit or enrollment row is created or changed by a request carrying `X-View-As: student`.
+3. The header downgrades only a real `teacher|assistant` role; students, org admins, platform admins and sandbox staff are unaffected (the header is ignored, never an error).
+4. Every student-shaped payload in Student view is produced by the same serializer a student gets (8a invariant 9 applies unchanged).
+5. Every old URL in §4.2 resolves to a working page for every role; no 404 is introduced by this phase.
+6. ORT content screens are byte-identical in DOM inside the content region; only the frame around them changes (§11).
+7. Every object page can be closed with one control that leads to a validated same-site path (§5.3).
+8. The outline remains one document (8a caps); Unsorted and To do are paginated or capped (`LIMIT`) and never load a whole course's submissions.
+
 ---
 
 ## 2. Shell (S1)
@@ -177,6 +188,19 @@ None. No column, no flag; `view_as_student` is request state only.
 | `POST _C/modules/{mid}/duplicate` | `course:content.manage` | `ModuleStaffOut` of the copy: title + " (copy)" in every language, `published=false`, `unlock_at`/`sequential`/`completion_mode` copied, items and requirements copied (same targets), prerequisites not copied, placed after the original; caps enforced (422 `limit_reached`); under `lock_course` |
 | header `X-View-As: student` on any `_C/**` GET | real role must be staff (else ignored) | student shapes; non-GET → 403 `student_view_read_only` (except `POST _A/preview`) |
 
+### 7.1 Authorization matrix (server-side, roles from the DB)
+
+| Request | Teacher | Assistant | Student | Org admin (A13) | Platform admin (not enrolled) | Other course |
+|---|---|---|---|---|---|---|
+| `GET modules/unsorted` | staff shape | staff shape | 403 | 200 (read_admin, same shape: titles and publish state only) | 404 | 404 |
+| `GET todo` | full, with `join_code` | full, no `join_code` | 403 | 403 | 404 | 404 |
+| `POST modules/{mid}/duplicate` | yes | yes | 403 | 403 | 404 | 404 |
+| any `GET _C/**` + `X-View-As: student` | student shape, drafts readable | student shape | header ignored | header ignored | header ignored | 404 |
+| any non-GET `_C/**` + header | 403 `student_view_read_only` | 403 | header ignored (normal rules) | header ignored | header ignored | 404 |
+| `POST _A/preview` + header | 201 (real role) | 201 | 403 (as today) | 403 | 404 | 404 |
+
+Concluded courses: the three GET routes follow `CONCLUDED_ACTIONS` (reads allowed), `duplicate` is refused like every content write.
+
 Query bounds (6,000 concurrent students never hit these: they are staff routes, but each must be O(page)): unsorted = three `SELECT … WHERE NOT EXISTS (SELECT 1 FROM module_items mi JOIN course_modules m … WHERE mi.deleted_at IS NULL AND m.deleted_at IS NULL AND mi.<target>_id = t.id)` with the 8a indexes `ix_module_items_{assignment,page,file}_id`, cursor on (`position|title`, `id`), `limit ≤ 50`; totals are three `COUNT(*)` with the same predicate (each table is capped: assignments by `MAX_PAGE` paging, pages/files by course caps). To do = one grouped query `submissions.state = 'pending_review'` joined to live published assignments of the course (`LIMIT 10` after `ORDER BY min(submitted_at)`), one `COUNT`, one draft query (`LIMIT 10`), one `COUNT`, one `COUNT` over modules, `active_student_count` as today. Duplicate = bounded by 200 items. Student view adds no queries (same code paths as a student). Error ids: `student_view_read_only` (403), reuse `limit_reached`.
 
 ---
@@ -235,6 +259,8 @@ Branch `phase-8c` off `lms`; slice branches `phase-8c-s<n>-<name>`; delimited bl
 | **S4b** integration and gates | orchestrator + ux-reviewer (fable) + architect security review (fable) | contracts, full suites SQLite + PG, route inventory, ORT review §11 (baseline approval), UX gate §15, `/security-review` (view-as header: write refusal, org admin and platform admin never downgraded, draft-course read scope, `from` validation, unsorted/todo isolation), i18n parity, `next build` in the rsync copy, `PHASE_8C.md`, `PRODUCT_DECISIONS.md` (§17), `HANDOFF_NEXT_AGENT.md`, Neon backup branch, merge `lms` → `main`, `/health` check | docs, CI |
 
 Interfaces fixed by S1 so S2/S3 code against them: `courseNavItems`, `safeFrom`, `UnsortedOut`/`TodoOut` TypeScript types in `lib/lms/types.ts`, the `from` convention, the `X-View-As` header. S2 and S3 share no file (S2 owns `modules/**` and the course `page.tsx`; S3 owns `assignments/**`, `pages/**`, `quiz/**`). The only cross-slice touch is `AddItemDialog` (S2) linking to `/pages/new?module=` (S3 implements the parameter; until then the page is created without the item and S2's picker adds it).
+
+**Walkthrough (S4b, dated in `PHASE_8C.md`)**: teacher creates a general course → Course page empty state → "New module" M1, M2 → "+ Add → Page" in M1 (new page, saved, back on the Course page at M1) → "+ Add → Quiz" in M2 (editor opens, two questions, Back lands on M2) → "+ Add → Assignment" (text) in M2 → publish M1 and M2 with the icons → an existing unsorted file moved into M1 from the Unsorted group → Student view: M1 open, M2 open, quiz lobby Start opens a preview attempt, hand-in form shows the off notice, Leave → student (real) hands in → To do shows "1 to grade" → link lands on Submissions `to_grade` → grade → To do empty → phone (375 px): drawer, To do one-liner, "+ Add" sheet. ORT course: Course page shows the exam list, "New ORT exam" works, builder and attempts open from the Assignments link, sidebar visible, `ort-visual` content regions unchanged.
 
 **Release**: nothing deploys after S1 or S2. One release after S4b: `phase-8c` → `lms` → `main` (models unchanged, but the Neon backup branch is still taken because the release carries the 8c backend). The optional teacher test (§16) runs in production after this release; findings become slice **S5 follow-ups** (sonnet/opus by size).
 
