@@ -4,15 +4,15 @@ import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
-import { getPassage } from "@/lib/lms/content";
-import type { PassageOut } from "@/lib/lms/contentTypes";
+import { getBank, getPassage } from "@/lib/lms/content";
+import type { BankOut, PassageOut } from "@/lib/lms/contentTypes";
 import { EmptyState, LoadingState, PageHeader, TabPanel, Tabs, toast } from "@/components/ui";
 import { useTabCrumbs } from "@/components/lms/course/StaffCourseUi";
 import { useCourse } from "@/components/lms/CourseContext";
 import { ConflictDialog } from "@/components/lms/content/ConflictDialog";
 import { ContentError } from "@/components/lms/content/ContentError";
 import { PassageEditor, PassageHistory } from "@/components/lms/content/PassageEditor";
-import { useCanEditContent } from "@/components/lms/content/StaffGate";
+import { useCanEditBank } from "@/components/lms/content/StaffGate";
 
 type Tab = "edit" | "questions" | "history";
 
@@ -20,7 +20,6 @@ export default function PassagePage() {
   const { lang, t } = useTranslation();
   const { passageId } = useParams<{ passageId: string }>();
   const { course } = useCourse();
-  const canEdit = useCanEditContent();
   const [p, setP] = useState<PassageOut | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [tab, setTab] = useState<Tab>("edit");
@@ -33,6 +32,15 @@ export default function PassagePage() {
 
   const base = `/${lang}/courses/${course.id}/bank`;
   const bankId = p ? p.bank_id || p.questions[0]?.bank_id : undefined;
+  // --- Phase 9 S2 --- the bank's `can_edit` drives the edit controls (org admins on shared banks)
+  const [bank, setBank] = useState<BankOut | null>(null);
+  useEffect(() => {
+    if (!bankId) return;
+    let alive = true;
+    getBank(course.id, bankId).then((b) => { if (alive) setBank(b); }).catch(() => { if (alive) setBank(null); });
+    return () => { alive = false; };
+  }, [course.id, bankId]);
+  const canEdit = useCanEditBank(bank);
   const crumbs = useTabCrumbs("bank", [
     { label: t("bank.passages.crumb"), href: bankId ? `${base}/${bankId}/passages` : base },
     { label: p?.current_version.title || t("bank.passages.untitled") },

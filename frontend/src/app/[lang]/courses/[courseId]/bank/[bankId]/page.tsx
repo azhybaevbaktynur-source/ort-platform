@@ -12,7 +12,9 @@ import { BankFilters, EMPTY_FILTERS, type BankFilterState } from "@/components/l
 import { BankHeader } from "@/components/lms/content/BankHeader";
 import { ContentError } from "@/components/lms/content/ContentError";
 import { QuestionRow } from "@/components/lms/content/QuestionRow";
-import { useCanEditContent } from "@/components/lms/content/StaffGate";
+import { useCanEditBank } from "@/components/lms/content/StaffGate";
+import { ShareBankToggle, shareToggleVisible } from "@/components/lms/content/ShareBankToggle";
+import { getBankSharing, type BankSharingOut } from "@/lib/lms/organizations"; // Phase 9 S2
 import { Button, ConfirmDialog, EmptyState, LoadingState, MenuButton } from "@/components/ui";
 import { MoveToBankDialog } from "@/components/lms/content/MoveToBankDialog";
 import { useTemplateUi } from "@/lib/lms/templates";
@@ -23,10 +25,18 @@ export default function BankQuestionsPage() {
   const router = useRouter();
   const { bankId } = useParams<{ bankId: string }>();
   const { course } = useCourse();
-  const canEdit = useCanEditContent();
   const isOrt = useTemplateUi().key === "ort";
   const [toMove, setToMove] = useState<QuestionSummaryOut | null>(null);
   const [bank, setBank] = useState<BankOut | null>(null);
+  const canEdit = useCanEditBank(bank); // Phase 9 S2: `bank.can_edit` (org admins on shared banks)
+  // --- Phase 9 S2 --- sharing state for the "⋯" menu (never asked in ORT courses)
+  const [sharing, setSharing] = useState<BankSharingOut | null>(null);
+  useEffect(() => {
+    if (isOrt) return;
+    let alive = true;
+    getBankSharing(course.id).then((s) => { if (alive) setSharing(s); }).catch(() => { if (alive) setSharing(null); });
+    return () => { alive = false; };
+  }, [course.id, isOrt]);
   const [filters, setFilters] = useState<BankFilterState>(EMPTY_FILTERS);
   const [applied, setApplied] = useState<BankFilterState>(EMPTY_FILTERS);
   const [items, setItems] = useState<QuestionSummaryOut[]>([]);
@@ -91,7 +101,10 @@ export default function BankQuestionsPage() {
           <MenuButton label={t("bank.questions.new")} leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />}
             items={QUESTION_TYPES.map((ty) => ({ id: ty, label: t(`bank.types.${ty}.name`), description: t(`bank.types.${ty}.hint`) }))}
             onSelect={(ty) => newQuestion(ty as QuestionType)} />
-        )) : undefined} />
+        )) : undefined}
+        secondaryActions={!isOrt && bank && canEdit && shareToggleVisible(bank, sharing) ? (
+          <ShareBankToggle courseId={course.id} bank={bank} sharing={sharing} onChanged={setBank} />
+        ) : undefined} />
       <BankFilters value={filters} onChange={setFilters} />
       <ContentError error={error || actionError} onRetry={error ? () => load() : undefined} />
       {loading && items.length === 0 && !error && <LoadingState rows={3} />}

@@ -10,6 +10,7 @@ import { Button, Card, EmptyState, LoadingState, PageHeader, StatTile } from "@/
 import { useOrg } from "@/components/lms/org/OrgShell";
 import { InviteDialog, toastInvitationSent } from "@/components/lms/org/InviteDialog";
 import { OrgBadge, OrgError } from "@/components/lms/org/OrgUi";
+import { UsageByDepartment } from "@/components/lms/org/UsageTiles";
 
 export default function OrgOverviewPage() {
   const { lang, t } = useTranslation();
@@ -49,6 +50,8 @@ export default function OrgOverviewPage() {
         <StatTile href={`${base}/courses`} icon={<GraduationCap />} label={t("organizations.counts.courses")} value={c.courses} />
         <StatTile icon={<UsersRound />} label={t("organizations.counts.students")} value={c.students} />
       </div>
+      {/* Phase 9 S2: per-department roll-up (hidden without departments). */}
+      <UsageByDepartment orgId={org.id} />
       <Card
         title={t("invitations.pendingTitle")}
         padding={pending && pending.length > 0 ? "none" : "md"}

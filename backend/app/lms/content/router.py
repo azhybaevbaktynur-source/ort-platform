@@ -5,7 +5,7 @@ import uuid
 from typing import Callable, Literal, Optional
 
 from fastapi import APIRouter, Depends, Query, Response
-from sqlalchemy import func, select
+from sqlalchemy import false, func, select
 from sqlalchemy.orm import Session
 
 from app.core.authz import A, AuthzContext, can, get_authz
@@ -89,6 +89,30 @@ def _group_banks(*question_ids: uuid.UUID) -> BanksOf:
             BankQuestion.translation_group_id.in_(gids)).distinct()).scalars())
     return banks_of
 # --- Phase 9 S1 end ---
+
+
+# --- Phase 9 S2 begin --- (S1 open item 1 / architect L5: org admins read the banks they may edit, never the course)
+def _read_bank(ctx: AuthzContext, course_id: uuid.UUID, banks_of: BanksOf):
+    """`course:content.read_admin`, or `can_edit_bank` on every bank the read touches (an org admin of the tree on an
+    organization-shared bank). The rest of the course (private banks, answer keys) stays staff-only (A13)."""
+    course = course_svc.load_course(ctx.db, course_id)
+    if not can(ctx, A.CONTENT_READ_ADMIN, course):
+        ids = banks_of(ctx.db, course)
+        if ids and None not in ids:
+            found = ctx.db.execute(select(QuestionBank).where(
+                QuestionBank.id.in_(set(ids)), QuestionBank.course_id == course.id)).scalars().all()
+            if len(found) == len(set(ids)) and all(can_edit_bank(ctx, course, b) for b in found):
+                return course
+    course_svc.require_course(ctx, A.CONTENT_READ_ADMIN, course)
+    return course
+def _shared_listing_allowed(ctx: AuthzContext, course) -> bool:
+    """The course has a live organization-shared bank and `can_edit_bank` says yes for it (otherwise the usual
+    `content.read_admin` refusal stands, so an org admin of a course without shared banks sees no change)."""
+    bank = ctx.db.execute(select(QuestionBank).where(
+        QuestionBank.course_id == course.id, QuestionBank.visibility == "organization",
+        QuestionBank.deleted_at.is_(None)).limit(1)).scalar_one_or_none()
+    return bank is not None and can_edit_bank(ctx, course, bank)
+# --- Phase 9 S2 end ---
 
 
 def _name(u: Optional[User]) -> Optional[str]:
@@ -194,7 +218,8 @@ def _passage_version_out(pv: PassageVersion, author: Optional[str]) -> sch.Passa
 
 def _bank_out(ctx: AuthzContext, course, bank_id: uuid.UUID) -> sch.BankOut:
     row = ctx.db.execute(repo.bank_rows_stmt(course.id, bank_id=bank_id)).first()
-    return sch.bank_out(row, can_edit=can_edit_bank(ctx, course, row[0]))  # Phase 9 S1: `can_edit`
+    return sch.bank_out(row, can_edit=can_edit_bank(ctx, course, row[0]),  # Phase 9 S1: `can_edit`
+                        can_delete=can(ctx, A.CONTENT_MANAGE, course))  # Phase 9 S2: staff only
 
 
 # ------------------------------------------------------------------ banks
@@ -203,12 +228,23 @@ def _bank_out(ctx: AuthzContext, course, bank_id: uuid.UUID) -> sch.BankOut:
 def list_banks(course_id: uuid.UUID, deleted: bool = False, cursor: Optional[str] = None, limit: int = 25,
                kind: Literal["all", "shared", "quiz"] = "all",  # --- Phase 7c S1 --- (PHASE_7C_DESIGN 6.1)
                ctx: AuthzContext = Depends(get_authz)):
-    course = _read(ctx, course_id)
+    # --- Phase 9 S2 --- (L5): without content.read_admin, an org admin of the tree lists the organization-shared
+    # banks of the course (exactly those `can_edit_bank` allows; every one has the course's organization)
+    course = course_svc.load_course(ctx.db, course_id)
+    stmt = repo.bank_rows_stmt(course.id, deleted=deleted, kind=kind)
+    if not can(ctx, A.CONTENT_READ_ADMIN, course) and _shared_listing_allowed(ctx, course):
+        stmt = stmt.where(QuestionBank.visibility == "organization", QuestionBank.assessment_id.is_(None))
+        if deleted:
+            stmt = stmt.where(false())
+    else:
+        course = _read(ctx, course_id)
     rows, nxt = course_svc.paginate_rows(
-        ctx.db, repo.bank_rows_stmt(course.id, deleted=deleted, kind=kind), sort_col=QuestionBank.created_at,
+        ctx.db, stmt, sort_col=QuestionBank.created_at,
         id_col=QuestionBank.id, entity_of=lambda r: r[0], cursor=cursor, limit=limit,
     )
-    items = [sch.bank_out(r, can_edit=can_edit_bank(ctx, course, r[0])) for r in rows]  # Phase 9 S1: `can_edit`
+    staff = can(ctx, A.CONTENT_MANAGE, course)  # Phase 9 S2: `can_delete` (delete / restore are staff only)
+    items = [sch.bank_out(r, can_edit=can_edit_bank(ctx, course, r[0]), can_delete=staff)  # Phase 9 S1: `can_edit`
+             for r in rows]
     return PageOut[sch.BankOut](items=items, next_cursor=nxt)
 
 
@@ -221,7 +257,7 @@ def create_bank(course_id: uuid.UUID, data: sch.BankCreateIn, ctx: AuthzContext 
 
 @router.get("/{course_id}/banks/{bank_id}", response_model=sch.BankOut)
 def get_bank(course_id: uuid.UUID, bank_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
-    course = _read(ctx, course_id)
+    course = _read_bank(ctx, course_id, _banks(bank_id))  # Phase 9 S2
     repo.load_bank(ctx.db, course.id, bank_id, include_deleted=True)
     return _bank_out(ctx, course, bank_id)
 
@@ -258,7 +294,7 @@ def list_questions(
     passage_id: Optional[uuid.UUID] = None, deleted: bool = False, cursor: Optional[str] = None,
     limit: int = 25, ctx: AuthzContext = Depends(get_authz),
 ):
-    course = _read(ctx, course_id)
+    course = _read_bank(ctx, course_id, _banks(bank_id))  # Phase 9 S2
     bank = repo.load_bank(ctx.db, course.id, bank_id)
     f = repo.QuestionFilter(q=q, type=type, language=language, section=section, topic=topic,
                             difficulty=difficulty, tag=tag, passage_id=passage_id, deleted=deleted)
@@ -281,7 +317,7 @@ def create_question(course_id: uuid.UUID, bank_id: uuid.UUID, data: sch.Question
 
 @router.get("/{course_id}/questions/{question_id}", response_model=sch.QuestionStaffOut)
 def get_question(course_id: uuid.UUID, question_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
-    course = _read(ctx, course_id)
+    course = _read_bank(ctx, course_id, _row_banks(BankQuestion, question_id))  # Phase 9 S2
     q = repo.load_question(ctx.db, course.id, question_id, include_deleted=True)
     return _staff_out(ctx.db, course, q)
 
@@ -321,7 +357,7 @@ def move_question(course_id: uuid.UUID, question_id: uuid.UUID, data: sch.MoveIn
 @router.get("/{course_id}/questions/{question_id}/versions", response_model=PageOut[sch.VersionSummaryOut])
 def list_question_versions(course_id: uuid.UUID, question_id: uuid.UUID, cursor: Optional[str] = None,
                            limit: int = 25, ctx: AuthzContext = Depends(get_authz)):
-    course = _read(ctx, course_id)
+    course = _read_bank(ctx, course_id, _row_banks(BankQuestion, question_id))  # Phase 9 S2
     q = repo.load_question(ctx.db, course.id, question_id, include_deleted=True)
     stmt = (
         select(QuestionVersion, User.display_name, User.email)
@@ -343,7 +379,7 @@ def list_question_versions(course_id: uuid.UUID, question_id: uuid.UUID, cursor:
 @router.get("/{course_id}/questions/{question_id}/versions/{version_id}", response_model=sch.VersionOut)
 def get_question_version(course_id: uuid.UUID, question_id: uuid.UUID, version_id: uuid.UUID,
                          ctx: AuthzContext = Depends(get_authz)):
-    course = _read(ctx, course_id)
+    course = _read_bank(ctx, course_id, _row_banks(BankQuestion, question_id))  # Phase 9 S2
     q = repo.load_question(ctx.db, course.id, question_id, include_deleted=True)
     v = repo.load_question_version(ctx.db, q.id, version_id)
     author = _name(ctx.db.get(User, v.created_by_id)) if v.created_by_id else None
@@ -363,7 +399,7 @@ def revert_question(course_id: uuid.UUID, question_id: uuid.UUID, version_id: uu
 def preview_question(course_id: uuid.UUID, question_id: uuid.UUID, version_id: Optional[uuid.UUID] = None,
                      ctx: AuthzContext = Depends(get_authz)):
     """What a student would see: built only through the allowlisted student serializers."""
-    course = _read(ctx, course_id)
+    course = _read_bank(ctx, course_id, _row_banks(BankQuestion, question_id))  # Phase 9 S2
     db = ctx.db
     q = repo.load_question(db, course.id, question_id, include_deleted=True)
     v = repo.load_question_version(db, q.id, version_id) if version_id else db.get(QuestionVersion, q.current_version_id)
@@ -380,7 +416,7 @@ def preview_question(course_id: uuid.UUID, question_id: uuid.UUID, version_id: O
 
 @router.get("/{course_id}/questions/{question_id}/translations", response_model=list[sch.QuestionSummaryOut])
 def list_translations(course_id: uuid.UUID, question_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
-    course = _read(ctx, course_id)
+    course = _read_bank(ctx, course_id, _row_banks(BankQuestion, question_id))  # Phase 9 S2
     q = repo.load_question(ctx.db, course.id, question_id, include_deleted=True)
     if q.translation_group_id is None:
         return []
@@ -425,7 +461,7 @@ def unlink_translation(course_id: uuid.UUID, question_id: uuid.UUID, ctx: AuthzC
 @router.get("/{course_id}/banks/{bank_id}/passages", response_model=PageOut[sch.PassageSummaryOut])
 def list_passages(course_id: uuid.UUID, bank_id: uuid.UUID, deleted: bool = False, cursor: Optional[str] = None,
                   limit: int = 25, ctx: AuthzContext = Depends(get_authz)):
-    course = _read(ctx, course_id)
+    course = _read_bank(ctx, course_id, _banks(bank_id))  # Phase 9 S2
     bank = repo.load_bank(ctx.db, course.id, bank_id)
     rows, nxt = course_svc.paginate_rows(
         ctx.db, repo.passage_rows_stmt(bank.id, deleted=deleted), sort_col=Passage.created_at, id_col=Passage.id,
@@ -445,7 +481,7 @@ def create_passage(course_id: uuid.UUID, bank_id: uuid.UUID, data: sch.PassageCr
 
 @router.get("/{course_id}/passages/{passage_id}", response_model=sch.PassageOut)
 def get_passage(course_id: uuid.UUID, passage_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
-    course = _read(ctx, course_id)
+    course = _read_bank(ctx, course_id, _row_banks(Passage, passage_id))  # Phase 9 S2
     p = repo.load_passage(ctx.db, course.id, passage_id, include_deleted=True)
     return _passage_out(ctx.db, course, p)
 
@@ -475,7 +511,7 @@ def restore_passage(course_id: uuid.UUID, passage_id: uuid.UUID, ctx: AuthzConte
 @router.get("/{course_id}/passages/{passage_id}/versions", response_model=PageOut[sch.PassageVersionSummaryOut])
 def list_passage_versions(course_id: uuid.UUID, passage_id: uuid.UUID, cursor: Optional[str] = None,
                           limit: int = 25, ctx: AuthzContext = Depends(get_authz)):
-    course = _read(ctx, course_id)
+    course = _read_bank(ctx, course_id, _row_banks(Passage, passage_id))  # Phase 9 S2
     p = repo.load_passage(ctx.db, course.id, passage_id, include_deleted=True)
     stmt = (
         select(PassageVersion, User.display_name, User.email)
@@ -495,7 +531,7 @@ def list_passage_versions(course_id: uuid.UUID, passage_id: uuid.UUID, cursor: O
 @router.get("/{course_id}/passages/{passage_id}/versions/{version_id}", response_model=sch.PassageVersionOut)
 def get_passage_version(course_id: uuid.UUID, passage_id: uuid.UUID, version_id: uuid.UUID,
                         ctx: AuthzContext = Depends(get_authz)):
-    course = _read(ctx, course_id)
+    course = _read_bank(ctx, course_id, _row_banks(Passage, passage_id))  # Phase 9 S2
     p = repo.load_passage(ctx.db, course.id, passage_id, include_deleted=True)
     pv = repo.load_passage_version(ctx.db, p.id, version_id)
     return _passage_version_out(pv, _name(ctx.db.get(User, pv.created_by_id)) if pv.created_by_id else None)

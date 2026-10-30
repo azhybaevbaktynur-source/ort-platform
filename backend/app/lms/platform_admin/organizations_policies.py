@@ -19,4 +19,6 @@ PLATFORM_ORG_POLICIES: dict[tuple[str, str], str] = {
     ("GET", "/api/v1/platform/templates"): "platform_admin",
     # --- Phase 6 S4b --- (admin user detail: organizations and roles of one user)
     ("GET", "/api/v1/platform/users/{user_id}/organizations"): "platform_admin",
+    # --- Phase 9 S2 --- (departments tab, read; suspend/resume above also accept a department: its subtree)
+    ("GET", f"{_O}/departments"): "platform_admin",
 }
