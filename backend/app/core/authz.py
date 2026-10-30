@@ -241,7 +241,13 @@ class AuthzContext:
         return self.org_cache[key]
 
     def org_admin_for(self, organization_id) -> bool:
-        """Active org admin membership in a non-deleted organization (cached per request)."""
+        """Active org admin membership in a non-deleted organization (cached per request). Phase 8c fix 2: false for
+        the organization of the course this request reads in Student view, so no org-admin power (staff view,
+        roster read, structure read, any `ORG_ADMIN_ACTIONS` grant) survives the downgrade on that course."""
+        if (self.view_as_course is not None and organization_id is not None
+                and self.view_as_student(self.view_as_course)
+                and _norm(organization_id) == _norm(self._view_as_org)):
+            return False
         return self._org(organization_id)[2]
 
     def org_suspended(self, organization_id, course_id=None) -> bool:
@@ -294,12 +300,17 @@ class AuthzContext:
     # --- Phase 8c S1 begin --- (PHASE_8C_DESIGN 6.2, invariant 3)
     def view_as_student(self, course_id) -> bool:
         """True when this request reads `course_id` in Student view: the header named this course, the caller's real
-        role there is teacher or assistant, and the caller is neither a platform admin nor an org admin of the
-        course's organization, and the course is not a template sandbox. Everyone else: the header is ignored.
+        enrollment role there is teacher or assistant (also when they are an org admin of the course's organization:
+        Phase 8c fix 2, every independent teacher administers their personal organization; `org_admin_for` is then
+        false for that organization), the caller is not a platform admin, and the course is neither a template
+        sandbox nor deleted. Everyone else (an org admin without an enrollment included): the header is ignored.
         One extra statement per request, only when the header is present."""
         if self.view_as_course is None or _norm(course_id) != self.view_as_course:
             return False
         if self._view_as_ok is None:
+            # fix 2: provisional answer while deciding, so a nested `org_admin_for` (sandbox `can_manage` reached
+            # from `real_role_for`) reads the real membership instead of re-entering this decision
+            self._view_as_ok = False
             self._view_as_ok = self._view_as_applies(self.view_as_course)
         return self._view_as_ok
 
@@ -315,7 +326,7 @@ class AuthzContext:
         if row is None or row[1] is not None or row[2] is not None:
             return False
         self._view_as_org = row[0]
-        return not self.org_admin_for(row[0])
+        return True  # fix 2: an org-admin membership no longer cancels the downgrade (it is switched off instead)
     # --- Phase 8c S1 end ---
 
     def prefetch(self, course_ids: Iterable) -> None:

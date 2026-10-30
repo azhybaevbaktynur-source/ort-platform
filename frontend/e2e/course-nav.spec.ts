@@ -19,8 +19,9 @@ import { seed, settle, signIn, tr, VIEWPORTS, type SeedUser } from "./helpers";
  *
  * Data: `seed_backend.py` (`seed_course_nav`, written after every other row): course "Навигация E2E" of an approved
  * teacher, published and empty, three enrolled students (`sidebar`, `handin`, `phone`). The tests create their own
- * content through the API with unique titles, in order (serial). Student view runs as the course ASSISTANT: the owner teacher administers their own organization, so the
- * server never downgrades them (org admins are not downgraded). "Start" uses the seeded published quiz.
+ * content through the API with unique titles, in order (serial). Student view runs as the course ASSISTANT and as the
+ * OWNER teacher, who also administers their personal organization (fix 2: enrolled staff are downgraded even when they
+ * are org admins, with every org-admin power off for the course). "Start" uses the seeded published quiz.
  *
  * Run (same harness as the ORT specs, docs/phases/ORT_BASELINE/README.md "Run"):
  *   cd frontend && E2E_WEB_DIR=/tmp/ort_e2e_fe npx playwright test e2e/course-nav.spec.ts
@@ -304,6 +305,46 @@ test.describe("course navigation (ru)", () => {
     await expect(tp.getByRole("status").filter({ hasText: t("studentView.banner") })).toHaveCount(0);
     await expect(link(tp, LINKS.bank)).toBeVisible();
     expect(await tp.evaluate((id) => window.sessionStorage.getItem(`studentView:${id}`), cid)).toBeNull();
+    await tp.context().close();
+  });
+
+  test("Student view as the owner teacher (org admin of their personal organization): banner, student shape, write refused", async ({ browser }) => {
+    const cid = nav().course_id;
+    const owner = nav().teacher;
+    const outlineBefore = await api(owner, "GET", `/courses/${cid}/modules`);
+    const tp = await open(browser, owner);
+    await tp.goto(base());
+    await expect(link(tp, LINKS.settings)).toBeVisible(); // the owner's staff frame first
+    await tp.getByRole("button", { name: t("studentView.button") }).click();
+    const banner = tp.getByRole("status").filter({ hasText: t("studentView.banner") });
+    await expect(banner).toBeVisible();
+    await expect(link(tp, LINKS.settings)).toHaveCount(0);
+    await expect(link(tp, LINKS.bank)).toHaveCount(0);
+    await expect(tp.getByRole("button", { name: t("studentView.button") })).toHaveCount(0);
+    // the server answers the owner with the student shape only with the header
+    const headers = { Authorization: `Bearer ${owner.token}` };
+    const staff = await (await fetch(`${seed().api}/api/v1/courses/${cid}`, { headers })).json();
+    expect("join_code" in staff).toBe(true);
+    const viewed = await fetch(`${seed().api}/api/v1/courses/${cid}`, { headers: { ...headers, "X-View-As": "student" } });
+    expect(viewed.status).toBe(200);
+    const body = await viewed.json();
+    expect("join_code" in body).toBe(false);
+    expect(body.my_enrollment.role).toBe("student");
+    const people = await (await fetch(`${seed().api}/api/v1/courses/${cid}/people`, { headers: { ...headers, "X-View-As": "student" } })).json();
+    expect(people.items.every((p: { role: string; user?: unknown }) => p.role !== "student" && !("user" in p))).toBe(true);
+    // a write with the header is refused and changes nothing
+    const refused = await fetch(`${seed().api}/api/v1/courses/${cid}/modules`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json", "X-View-As": "student" },
+      body: JSON.stringify({ title: { ru: "Не должен появиться" } }),
+    });
+    expect(refused.status).toBe(403);
+    expect((await refused.json()).error.code).toBe("student_view_read_only");
+    const outlineAfter = await api(owner, "GET", `/courses/${cid}/modules`);
+    expect(outlineAfter.modules.length).toBe(outlineBefore.modules.length);
+    await banner.getByRole("button", { name: t("studentView.leave") }).click();
+    await expect(tp.getByRole("status").filter({ hasText: t("studentView.banner") })).toHaveCount(0);
+    await expect(link(tp, LINKS.settings)).toBeVisible();
     await tp.context().close();
   });
 
