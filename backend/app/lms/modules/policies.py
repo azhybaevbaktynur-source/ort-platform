@@ -41,7 +41,7 @@ MODULE_POLICIES.update(PLANNED_POLICIES)
 # --- Phase 8c S1 begin --- (PHASE_8C_DESIGN 7, 7.1)
 MODULE_POLICIES.update({
     # content.read + staff (teacher, assistant) or org admin (A13: titles and publish state); students 403
-    ("GET", f"{_C}/modules/unsorted"): "course:content.read",
+    ("GET", f"{_C}/modules/unsorted"): "course:content.read+staff",
     ("POST", f"{_M}/duplicate"): "course:content.manage",  # under lock_course; caps -> 422 limit_reached
 })
 # --- Phase 8c S1 end ---

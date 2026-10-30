@@ -44,10 +44,10 @@ def ids_of(page) -> set:
 
 
 def test_policies_declared():
-    assert ROUTE_POLICIES[("GET", "/api/v1/courses/{course_id}/modules/unsorted")] == "course:content.read"
+    assert ROUTE_POLICIES[("GET", "/api/v1/courses/{course_id}/modules/unsorted")] == "course:content.read+staff"
     assert ROUTE_POLICIES[("POST", "/api/v1/courses/{course_id}/modules/{module_id}/duplicate")] == \
         "course:content.manage"
-    assert ROUTE_POLICIES[("GET", "/api/v1/courses/{course_id}/todo")] == "course:content.read"
+    assert ROUTE_POLICIES[("GET", "/api/v1/courses/{course_id}/todo")] == "course:content.read+staff"
 
 
 async def test_unsorted_membership(db, api):

@@ -1,7 +1,6 @@
 """Authorization scaffolding. Phase 1 plugs in role resolution from enrollments."""
 from __future__ import annotations
 
-import re
 import uuid
 
 from typing import Callable, Iterable, Optional
@@ -163,25 +162,43 @@ VIEW_AS_STUDENT = "student"
 STUDENT_VIEW_READ_ONLY = "student_view_read_only"
 STAFF_COURSE_ROLES = ("teacher", "assistant")
 READ_METHODS = ("GET", "HEAD")
-# every spelling FastAPI's `uuid.UUID` path parameter accepts here (with or without dashes)
-_UUID = r"[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}"
+# Phase 8c fix 1 (Medium 1): the header is decided from the matched route template and the parsed `course_id` path
+# parameter, never from the raw path, so every spelling FastAPI's `uuid.UUID` parameter accepts (dashed, undashed,
+# `urn:uuid:`, `{...}`, percent-encoded) is covered. `get_authz` is a dependency, so routing has already run.
 # `_C/**`: the header applies only to the course named in the path (never to other courses, /me/*, platform routes)
-_COURSE_PATH = re.compile(rf"^/api/v1/courses/({_UUID})(?:/|$)")
+_COURSE_TEMPLATE = "/api/v1/courses/{course_id}"
 # `POST _A/preview`: the one write allowed in Student view, evaluated with the real role (the staff preview attempt)
-_PREVIEW_PATH = re.compile(rf"^/api/v1/courses/{_UUID}/assessments/{_UUID}/preview/?$")
+_PREVIEW_TEMPLATE = "/api/v1/courses/{course_id}/assessments/{assessment_id}/preview"
 
 
-def view_as_course_id(path: str, header: Optional[str]) -> Optional[uuid.UUID]:
-    """The course a `X-View-As: student` header may apply to: the `{course_id}` of a `/api/v1/courses/{id}[/...]`
-    path, else None (the header is ignored everywhere else)."""
-    if (header or "").strip().lower() != VIEW_AS_STUDENT:
+def route_template(request: Request) -> Optional[str]:
+    """The full path template (prefixes included) of the route this request matched, else None. Newer FastAPI wraps
+    included routers lazily: `scope["route"]` is then the original route with a router-relative template and the
+    full template lives on the effective route context; older FastAPI flattens routes, so `scope["route"]` is full."""
+    effective = (request.scope.get("fastapi") or {}).get("effective_route_context")
+    template = getattr(effective, "path_format", None)
+    if isinstance(template, str) and template:
+        return template
+    template = getattr(request.scope.get("route"), "path_format", None)
+    return template if isinstance(template, str) and template else None
+
+
+def view_as_course_id(request: Request) -> Optional[uuid.UUID]:
+    """The course a `X-View-As: student` header may apply to: the `{course_id}` of a
+    `/api/v1/courses/{course_id}[/...]` route, else None (the header is ignored everywhere else)."""
+    if (request.headers.get(VIEW_AS_HEADER) or "").strip().lower() != VIEW_AS_STUDENT:
         return None
-    m = _COURSE_PATH.match(path or "")
-    return uuid.UUID(m.group(1)) if m else None
+    template = route_template(request) or ""
+    if template != _COURSE_TEMPLATE and not template.startswith(_COURSE_TEMPLATE + "/"):
+        return None
+    try:
+        return uuid.UUID(str(request.path_params["course_id"]))
+    except (KeyError, ValueError, TypeError):
+        return None  # not a UUID: FastAPI answers 422 and the endpoint never runs
 
 
-def is_preview_path(path: str) -> bool:
-    return bool(_PREVIEW_PATH.match(path or ""))
+def is_preview_route(request: Request) -> bool:
+    return route_template(request) == _PREVIEW_TEMPLATE
 # --- Phase 8c S1 end ---
 
 
@@ -198,6 +215,7 @@ class AuthzContext:
         # decision whether it applies (the caller's real role is teacher/assistant there, see `view_as_student`)
         self.view_as_course: Optional[uuid.UUID] = None
         self._view_as_ok: Optional[bool] = None
+        self._view_as_org = None  # Phase 8c fix 1: that course's organization_id (read by `_view_as_applies`)
 
     # --- Phase 6 S1 begin --- (organizations, PHASE_6_DESIGN 2.2)
     def _org(self, organization_id):
@@ -296,6 +314,7 @@ class AuthzContext:
                               .where(Course.id == course_id)).first()
         if row is None or row[1] is not None or row[2] is not None:
             return False
+        self._view_as_org = row[0]
         return not self.org_admin_for(row[0])
     # --- Phase 8c S1 end ---
 
@@ -323,11 +342,14 @@ def get_authz(request: Request, user=Depends(get_lms_user), db: Session = Depend
     ctx = AuthzContext(user, db, enrollment_role_resolver(db, user.id))
     # --- Phase 8c S1 begin --- (Student view: reads downgrade a real staff role; every write is refused, except
     # `POST _A/preview`, which keeps the real role; the header is ignored for everyone the downgrade does not apply to)
-    course_id = view_as_course_id(request.url.path, request.headers.get(VIEW_AS_HEADER))
-    if course_id is not None and not (request.method not in READ_METHODS and is_preview_path(request.url.path)):
+    course_id = view_as_course_id(request)
+    if course_id is not None and not (request.method not in READ_METHODS and is_preview_route(request)):
         ctx.view_as_course = course_id
         if request.method not in READ_METHODS:
             if ctx.view_as_student(course_id):
+                # Phase 8c fix 1 (Low 3): a suspended organization answers as it does without the header
+                if ctx.org_suspended(ctx._view_as_org, course_id):
+                    raise Forbidden("Organization is suspended", code="organization_suspended")
                 raise Forbidden("Student view is read-only", code=STUDENT_VIEW_READ_ONLY)
             ctx.view_as_course, ctx._view_as_ok = None, None  # not staff here: the header is ignored
     # --- Phase 8c S1 end ---
