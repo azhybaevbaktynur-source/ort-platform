@@ -100,7 +100,7 @@ export function ApplicationPanel({
   const uiLang = lang as Lang;
 
   return (
-    <Dialog open={open} onClose={onClose} size="lg" busy={!!busy}
+    <Dialog open={open} onClose={onClose} size="full" busy={!!busy}
       title={app ? applicantName(app) : t("applications.panel.title")}
       description={app ? (
         <span className="flex flex-wrap items-center gap-2">
@@ -108,7 +108,6 @@ export function ApplicationPanel({
           <span>{t("applications.panel.submitted", { date: fmtShortDateTime(app.submitted_at, lang) })}</span>
         </span>
       ) : undefined}
-      className="max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:w-full max-sm:rounded-none"
       footer={app && pending && canDecide ? (
         <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-end">
           <Button variant="dangerOutline" loading={busy === "reject"} disabled={!!busy} onClick={() => void decide("reject")}>

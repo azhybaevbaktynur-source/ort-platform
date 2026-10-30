@@ -73,3 +73,26 @@ Written by the e2e walks `frontend/e2e/org-admin.spec.ts` and `frontend/e2e/cata
 | `student-invite-joined` | ru | After accepting: the course |
 
 204 images.
+
+## Re-taken after the UX-gate fixes (branch `phase-9-ux`)
+
+138 images were re-shot with the same names. They come from the same walks, run after the fixes.
+
+| Screens | What changed |
+|---|---|
+| `student-apply-errors` | The error box has the title «Check the form» |
+| `student-apply` | New ru privacy note |
+| `org-admin-shared-bank` | Org admin inside a course: Teaching area, Question banks in the sidebar, breadcrumb back to the organization's course page, no Settings and no Student view |
+| `course-settings-enrollment` | Design-system Select for the enrollment mode; the join-code hint names the real reason (draft, application mode, open, closed) |
+| `course-form-builder-edit`, `-preview`, `-versions` | Save and Activate in one row on phones; «Delete draft» is in the header's «More actions» menu |
+| `course-application-panel`, `course-application-approved` | The application panel is full screen on phones (`Dialog size="full"`) |
+| `course-people-invitations` | Revoked invitation cards have no empty action row |
+| `course-people-roster`, `course-applications-inbox`, `course-applications-decided`, `org-shared-banks` | English plural count line («1 result») |
+| `admin-org-summary`, `org-settings` | «In the catalog» label; enrollment mode names from the shared glossary |
+| `org-departments-empty`, `org-departments`, `org-department-move-dialog` | English plurals in the department counts («1 course · 0 members») |
+| `org-department-create-dialog` | Primary button «Create» |
+| `course-bank-copied` | The copied bank's title is localized («(копия)») |
+| `org-roster-upload` | «Choose file» button with the chosen file's name |
+| `student-catalog`, `student-catalog-search` | Mode badge names from the glossary; «{n} courses» under the filters after a search |
+| `student-landing-form`, `-auto`, `-approved`, `-withdrawn`, `-rejected` | Mode badge names from the glossary |
+| `student-landing-pending` | No «How to join» card while the application is pending |

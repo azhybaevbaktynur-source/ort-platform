@@ -147,7 +147,7 @@ export function ApplyPage({ courseId }: { courseId: string }) {
         </section>
         <div ref={errorRef} tabIndex={-1} className="focus:outline-none">
           {errorCount > 0 && (
-            <ErrorState variant="inline" message={t("applications.apply.fixFields", { count: errorCount })} />
+            <ErrorState variant="inline" title={t("applications.apply.checkForm")} message={t("applications.apply.fixFields", { count: errorCount })} />
           )}
           {submitError ? <ErrorState variant="inline" message={errorText(submitError)} /> : null}
         </div>

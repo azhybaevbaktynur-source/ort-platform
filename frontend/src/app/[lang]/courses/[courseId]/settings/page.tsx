@@ -24,7 +24,7 @@ import type { EnrollmentMode, Visibility } from "@/lib/lms/types";
 import { isFormMode } from "@/lib/lms/catalog";
 import { listFormVersions } from "@/lib/lms/enrollmentForms";
 import { templateUi } from "@/lib/lms/templates";
-import { ErrorState, Switch } from "@/components/ui";
+import { ErrorState, Select, Switch } from "@/components/ui";
 import { useApplicationErrorText } from "@/components/lms/catalog/useApplicationErrorText";
 
 const SETTINGS_MODES: EnrollmentMode[] = ["invite_code", "open", "form_review", "form_auto", "closed"];
@@ -181,29 +181,32 @@ function Settings({ course }: { course: CourseStaffOut }) {
           <p className="mb-2 text-sm font-medium text-slate-700">{t("courses.settings.joinCode")}</p>
           <JoinCodeDisplay code={course.join_code} />
           <p className="mt-2 text-xs text-slate-500">{t("courses.settings.joinCodeHint")}</p>
-          {(st !== "published" || course.enrollment_mode !== "invite_code") && (
-            <p className="mt-1 text-xs text-amber-700">{t("courses.settings.joinCodeInactive")}</p>
-          )}
+          {/* Phase 9 UX: the reason the code does not work: a draft course, or the saved enrollment mode */}
+          {st !== "published" ? (
+            <p className="mt-1 text-xs text-amber-700">{t("courses.settings.joinCodeInactiveUnpublished")}</p>
+          ) : course.enrollment_mode !== "invite_code" ? (
+            <p className="mt-1 text-xs text-amber-700">
+              {t(isFormMode(course.enrollment_mode) ? "courses.settings.joinCodeInactiveMode"
+                : course.enrollment_mode === "open" ? "courses.settings.joinCodeInactiveOpen" : "courses.settings.joinCodeInactiveClosed",
+              { code: t("enrollmentForm.modes.invite_code") })}
+            </p>
+          ) : null}
           <button type="button" className={`${secondaryBtn} mt-3`} disabled={busy === "enrollment"} onClick={() => { setError(null); setConfirm("regenerate"); }}>
             {t("courses.settings.regenerate")}
           </button>
         </div>
         <form onSubmit={saveEnrollment} className="space-y-4" noValidate>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="s-mode" className="mb-1 block text-sm font-medium text-slate-700">{t("courses.create.enrollmentMode")}</label>
-              {/* Phase 9 S4: five modes; form modes are fixed off on ORT courses (422 template_locked) */}
-              <select id="s-mode" value={mode} disabled={busy === "enrollment"} onChange={(e) => setMode(e.target.value as EnrollmentMode)}
-                aria-describedby="s-mode-hint"
-                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm">
-                {SETTINGS_MODES.map((m) => (
-                  <option key={m} value={m} disabled={ortLocked && isFormMode(m)}>
-                    {t(`enrollmentForm.modes.${m}`)}{ortLocked && isFormMode(m) ? ` (${t("templates.lockedNote")})` : ""}
-                  </option>
-                ))}
-              </select>
-              <p id="s-mode-hint" className="mt-1 text-xs text-slate-500">{t(`enrollmentForm.modeHints.${mode}`)}</p>
-            </div>
+            {/* Phase 9 S4: five modes; form modes are fixed off on ORT courses (422 template_locked).
+                Phase 9 UX: the design-system Select. */}
+            <Select id="s-mode" label={t("courses.create.enrollmentMode")} value={mode} disabled={busy === "enrollment"}
+              onChange={(e) => setMode(e.target.value as EnrollmentMode)}
+              hint={t(`enrollmentForm.modeHints.${mode}`)}
+              options={SETTINGS_MODES.map((m) => ({
+                value: m,
+                label: `${t(`enrollmentForm.modes.${m}`)}${ortLocked && isFormMode(m) ? ` (${t("templates.lockedNote")})` : ""}`,
+                disabled: ortLocked && isFormMode(m),
+              }))} />
             <div>
               <label htmlFor="s-limit" className="mb-1 block text-sm font-medium text-slate-700">{t("courses.create.limit")}</label>
               <input id="s-limit" type="number" min={1} max={10000} value={limit} disabled={busy === "enrollment"} onChange={(e) => setLimit(e.target.value)}

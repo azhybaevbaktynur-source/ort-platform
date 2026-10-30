@@ -346,7 +346,7 @@
       "enrollment": "Enrollment",
       "joinCode": "Join code",
       "joinCodeHint": "Share this code with your students. It works only while the course is published and enrollment is by code.",
-      "joinCodeInactive": "The code is not active right now: publish the course and set enrollment to a join code.",
+      "joinCodeInactiveUnpublished": "The code is not active right now: publish the course and set enrollment to a join code.",
       "regenerate": "Generate a new code",
       "regenerateTitle": "Generate a new code?",
       "regenerateBody": "The old code stops working immediately. Students already in the course are not affected.",
@@ -376,7 +376,10 @@
       "delete": "Delete course",
       "deleteTitle": "Delete this course?",
       "deleteBody": "The course disappears for everyone. You can restore it from deleted courses.",
-      "deleteHint": "Only the owner can delete or restore a course."
+      "deleteHint": "Only the owner can delete or restore a course.",
+      "joinCodeInactiveMode": "The code is off because students join by application form. Choose “{code}” to use it.",
+      "joinCodeInactiveOpen": "The code is off because students join from the catalog without it. Choose “{code}” to use it.",
+      "joinCodeInactiveClosed": "The code is off because enrollment is closed. Choose “{code}” to use it."
     },
     "status": {
       "draft": "Draft",
@@ -2105,8 +2108,8 @@
     },
     "modes": {
       "open": "Open to all",
-      "form_review": "By application",
-      "form_auto": "Form, instant entry",
+      "form_review": "By application (teacher approves)",
+      "form_auto": "By application (instant entry)",
       "invite_code": "By join code",
       "closed": "Enrollment closed"
     },
@@ -2138,7 +2141,17 @@
         "closed": "The teacher is not taking new students right now.",
         "formUnavailable": "Applications are not open yet. Check back later."
       }
-    }
+    },
+    "resultCount": "{count} courses",
+    "resultCount_one": "{count} course",
+    "resultCount_few": "{count} courses",
+    "resultCount_many": "{count} courses",
+    "resultCount_other": "{count} courses",
+    "resultCountMore": "{count} courses shown, more below",
+    "resultCountMore_one": "{count} course shown, more below",
+    "resultCountMore_few": "{count} courses shown, more below",
+    "resultCountMore_many": "{count} courses shown, more below",
+    "resultCountMore_other": "{count} courses shown, more below"
   },
   "storage": {
     "nav": "Storage",
@@ -2628,7 +2641,9 @@
     "file": {
       "label": "CSV file",
       "hint": "UTF-8 text, columns separated by ; or ,. Up to {rows} rows and {kib} KiB.",
-      "required": "Choose a CSV file."
+      "required": "Choose a CSV file.",
+      "choose": "Choose file",
+      "none": "No file chosen"
     },
     "help": {
       "title": "File format",
@@ -2785,7 +2800,11 @@
       "notSorted": "Not sorted",
       "sortOptionAsc": "{column}, ascending",
       "sortOptionDesc": "{column}, descending",
-      "actions": "Actions"
+      "actions": "Actions",
+      "count_one": "{count} result",
+      "count_few": "{count} results",
+      "count_many": "{count} results",
+      "count_other": "{count} results"
     },
     "reason": {
       "required": "Reason (required)",
@@ -4847,7 +4866,7 @@
     "studentInvitationsHint": "Students still accept the invitation themselves.",
     "defaultsTitle": "Defaults for new courses",
     "defaultsHint": "New courses start with these values. ORT courses keep their own.",
-    "visibility": "Catalog visibility",
+    "visibility": "In the catalog",
     "visibilityOptions": {
       "private": "Private (by code or link)",
       "catalog": "Shown in the catalog"
@@ -4857,7 +4876,8 @@
       "invite_code": "With a join code",
       "open": "Anyone can join",
       "closed": "Closed",
-      "form_review": "Application, approved by the teacher"
+      "form_review": "By application (teacher approves)",
+      "form_auto": "By application (instant entry)"
     },
     "retention": "Keep answers of rejected or withdrawn applications for",
     "retentionHint": "From 30 to 90 days. After that the answers are deleted.",
@@ -4884,7 +4904,7 @@
     "deleteTitle": "Delete the department?",
     "deleteBody": "Its members lose access to it. Only an empty department can be deleted: move or delete its courses and sub-departments first.",
     "actions": "Actions for {name}",
-    "counts": "{courses} courses · {members} members",
+    "counts": "{courses} · {members}",
     "whole": "Whole organization",
     "empty": "No departments yet",
     "emptyHint": "Create a department for each group of teachers, for example a subject or a school building.",
@@ -4906,7 +4926,18 @@
     "courseDepartment": "Department",
     "courseDepartmentHint": "Move the course to another department. Its students, staff and question banks stay with it.",
     "moveCourse": "Move course",
-    "courseMoved": "The course is now in {name}"
+    "courseMoved": "The course is now in {name}",
+    "courseCount": "{count} courses",
+    "courseCount_one": "{count} course",
+    "courseCount_few": "{count} courses",
+    "courseCount_many": "{count} courses",
+    "courseCount_other": "{count} courses",
+    "memberCount": "{count} members",
+    "memberCount_one": "{count} member",
+    "memberCount_few": "{count} members",
+    "memberCount_many": "{count} members",
+    "memberCount_other": "{count} members",
+    "submitCreate": "Create"
   },
   "sharedBanks": {
     "nav": "Shared banks",
@@ -4934,7 +4965,9 @@
     "unshare": "Stop sharing",
     "unshareHint": "Copies already made stay in their courses.",
     "sharedToast": "The bank is shared with the organization",
-    "unsharedToast": "The bank is no longer shared"
+    "unsharedToast": "The bank is no longer shared",
+    "teachersOnly": "Only the teachers of this course can share it",
+    "copyTitle": "{title} (copy)"
   },
   "enrollmentForm": {
     "title": "Enrollment form",
@@ -5044,8 +5077,8 @@
     "modes": {
       "invite_code": "With a join code",
       "open": "Open: anyone joins from the catalog",
-      "form_review": "Application form, teacher approves",
-      "form_auto": "Application form, instant entry",
+      "form_review": "By application (teacher approves)",
+      "form_auto": "By application (instant entry)",
       "closed": "Closed (nobody can join)"
     },
     "modeHints": {
@@ -5125,7 +5158,8 @@
         "pendingBody": "The teacher has not decided yet. The course page shows the status.",
         "notOpenTitle": "Applications are not open",
         "notOpenBody": "This course does not take applications right now."
-      }
+      },
+      "checkForm": "Check the form"
     },
     "student": {
       "title": "Your application",

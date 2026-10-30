@@ -53,7 +53,7 @@ export function DepartmentTree({ rows, readOnly = false, onAction, mode = "org" 
                 </p>
                 <p className="mt-0.5 text-sm text-slate-600">
                   {isTop && top === 0 ? `${t("departments.whole")} · ` : ""}
-                  {t("departments.counts", { courses: d.courses, members: d.members })}
+                  {t("departments.counts", { courses: t("departments.courseCount", { count: d.courses }), members: t("departments.memberCount", { count: d.members }) })}
                 </p>
               </div>
             </div>

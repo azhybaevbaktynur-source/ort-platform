@@ -11,7 +11,7 @@ import uuid
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, Query, Request
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.core.authz import A, AuthzContext, get_authz
@@ -107,6 +107,9 @@ class BankSharingOut(BaseModel):
 class CopyFromIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     bank_id: uuid.UUID
+    # Phase 9 UX: the copy's title as the UI words it ("Алгебра (копия)"); blank or missing: "<source> (copy)".
+    # Longer titles are cut to the bank title limit by the service.
+    title: Optional[str] = Field(default=None, max_length=1000)
 
 
 def _bank_out(ctx: AuthzContext, course, bank_id: uuid.UUID) -> sch.BankOut:
@@ -159,6 +162,6 @@ def unshare_bank(course_id: uuid.UUID, bank_id: uuid.UUID, request: Request, ctx
 def copy_from(course_id: uuid.UUID, body: CopyFromIn, request: Request, ctx: AuthzContext = Depends(get_authz)):
     course = course_svc.load_course(ctx.db, course_id)
     course_svc.require_course(ctx, A.CONTENT_MANAGE, course)
-    bank = svc.copy_bank(ctx.db, ctx, course, body.bank_id, request)
+    bank = svc.copy_bank(ctx.db, ctx, course, body.bank_id, request, title=body.title)
     return _bank_out(ctx, course, bank.id)
 

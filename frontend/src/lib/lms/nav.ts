@@ -49,7 +49,13 @@ function under(pathname: string, prefix: string): boolean {
 
 const LANG_RE = /^\/(en|ky|ru)(?=\/|$)/;
 
-export function courseNavItems(course: CourseNavCourse, role: CourseNavRole, pathname: string, t: T): CourseNavItem[] {
+/**
+ * `staffShape`: the server answered with the staff serializer (`isStaffCourse`): org admins reading a course of their
+ * organization (Phase 9 UX) also get Question banks (read-only there; the server decides every write). Settings stay
+ * for course teachers only (A13).
+ */
+export function courseNavItems(course: CourseNavCourse, role: CourseNavRole, pathname: string, t: T,
+  opts: { staffShape?: boolean } = {}): CourseNavItem[] {
   const lang = (pathname.match(LANG_RE) || [])[1] || "ru";
   const base = `/${lang}/courses/${course.id}`;
   const staff = role === "teacher" || role === "assistant";
@@ -69,7 +75,7 @@ export function courseNavItems(course: CourseNavCourse, role: CourseNavRole, pat
     ...item("grades", `${base}/grades`, t("gradebook.tab"), under(pathname, `${base}/grades`), true),
     ...item("people", `${base}/people`, t(role === "student" ? "courses.people.tabStudent" : "courses.people.tab"),
       under(pathname, `${base}/people`), true),
-    ...item("bank", `${base}/bank`, t("bank.tab"), under(pathname, `${base}/bank`), staff),
+    ...item("bank", `${base}/bank`, t("bank.tab"), under(pathname, `${base}/bank`), staff || (role === "observer" && !!opts.staffShape)),
     ...item("settings", `${base}/settings`, t("courses.settings.tab"), under(pathname, `${base}/settings`), role === "teacher"),
     ...item("files", `${base}/files`, t("courseFiles.title"), under(pathname, `${base}/files`), staff || f.files, f.files),
   ];

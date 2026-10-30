@@ -28,11 +28,11 @@ export function SharedBankPicker({ courseId, sharing, onCopied }: {
   const [copying, setCopying] = useState<string | null>(null);
   const [copyError, setCopyError] = useState<unknown>(null);
 
-  const copy = async (bankId: string) => {
+  const copy = async (bankId: string, sourceTitle: string) => {
     setCopying(bankId);
     setCopyError(null);
     try {
-      const out = await copySharedBank(courseId, bankId);
+      const out = await copySharedBank(courseId, bankId, t("sharedBanks.copyTitle", { title: sourceTitle }));
       toast.success(t("sharedBanks.copied", { title: out.title }));
       onCopied(out);
     } catch (e) {
@@ -56,7 +56,7 @@ export function SharedBankPicker({ courseId, sharing, onCopied }: {
             action={(b) => (
               <Button variant="secondary" size="sm" loading={copying === b.id} disabled={copying !== null && copying !== b.id}
                 aria-label={t("sharedBanks.copyLabel", { title: b.title })}
-                leftIcon={<Copy aria-hidden="true" className="h-4 w-4" />} onClick={() => void copy(b.id)}>
+                leftIcon={<Copy aria-hidden="true" className="h-4 w-4" />} onClick={() => void copy(b.id, b.title)}>
                 {t("sharedBanks.copy")}
               </Button>
             )} />

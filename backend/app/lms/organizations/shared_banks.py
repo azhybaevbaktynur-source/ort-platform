@@ -142,7 +142,7 @@ def load_visible_bank(db: Session, user: User, root: Organization, bank_id: uuid
 # ------------------------------------------------------------------ copy into a course
 
 def copy_bank(db: Session, ctx: AuthzContext, course, source_bank_id: uuid.UUID,
-              request: Optional[Request]) -> QuestionBank:
+              request: Optional[Request], title: Optional[str] = None) -> QuestionBank:
     """One transaction (design 4.2). The caller holds `course:content.manage` on the target course (router)."""
     from app.lms.courses import service as course_svc
 
@@ -180,7 +180,9 @@ def copy_bank(db: Session, ctx: AuthzContext, course, source_bank_id: uuid.UUID,
     if course.deleted_at is not None:
         raise course_svc.not_found_course()
     now = utcnow()
-    title = src.title[:TITLE_MAX - len(COPY_SUFFIX)] + COPY_SUFFIX
+    # Phase 9 UX: the client may word the title in the UI language; control characters out, cut to the limit
+    wanted = "".join(ch for ch in (title or "") if ch.isprintable()).strip()[:TITLE_MAX].strip()
+    title = wanted or (src.title[:TITLE_MAX - len(COPY_SUFFIX)] + COPY_SUFFIX)
     bank = QuestionBank(
         owner_id=actor.id, course_id=course.id, organization_id=course.organization_id, title=title,
         description=src.description,

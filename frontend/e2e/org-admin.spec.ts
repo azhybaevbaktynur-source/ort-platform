@@ -83,7 +83,7 @@ test("org admin: departments, course move, settings, usage by department", async
         await p.getByRole("dialog").getByLabel(tr(lang as "ru", "departments.name")).fill(name);
       });
     }
-    await dialog.getByRole("button", { name: t("departments.create") }).click();
+    await dialog.getByRole("button", { name: t("departments.submitCreate") }).click();
     await expect(page.getByText(t("departments.created")).first()).toBeVisible();
     await expect(page.getByRole("dialog")).toHaveCount(0);
   }
@@ -176,8 +176,8 @@ test("shared bank: teacher shares, org admin edits but cannot delete, another te
   await expect(lp.getByRole("heading", { name: t("sharedBanks.pickerTitle") })).toBeVisible();
   await uxShots(lp, SHOTS, "course-bank-picker", STAFF);
   await lp.getByRole("button", { name: t("sharedBanks.copyLabel", { title: "Алгебра E2E" }) }).click();
-  await expect(lp.getByText(t("sharedBanks.copied", { title: "Алгебра E2E (copy)" })).first()).toBeVisible();
-  await expect(lp.getByRole("link", { name: "Алгебра E2E (copy)" })).toBeVisible();
+  await expect(lp.getByText(t("sharedBanks.copied", { title: t("sharedBanks.copyTitle", { title: "Алгебра E2E" }) })).first()).toBeVisible();
+  await expect(lp.getByRole("link", { name: t("sharedBanks.copyTitle", { title: "Алгебра E2E" }) })).toBeVisible();
   await uxShots(lp, SHOTS, "course-bank-copied", STAFF);
   await lp.context().close();
 

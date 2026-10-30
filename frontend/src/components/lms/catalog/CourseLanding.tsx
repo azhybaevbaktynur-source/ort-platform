@@ -205,7 +205,8 @@ export function CourseLanding({ courseId }: { courseId: string }) {
         </dl>
       </section>
 
-      {!member && (
+      {/* Phase 9 UX: hidden while the student's application is pending (its card above says what happens next) */}
+      {!member && status !== "pending" && (
         <section aria-labelledby="landing-join" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <h2 id="landing-join" className="text-lg font-semibold leading-7 text-slate-900">{t("catalog.landing.howToJoin")}</h2>
           <p className="mt-1 text-base leading-6 text-slate-700 sm:text-sm">

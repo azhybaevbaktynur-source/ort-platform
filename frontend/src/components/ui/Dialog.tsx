@@ -6,12 +6,14 @@ import { useTranslation } from "@/lib/i18n/context";
 import { IconButton } from "./IconButton";
 import { cn } from "./utils";
 
-export type DialogSize = "sm" | "md" | "lg";
+export type DialogSize = "sm" | "md" | "lg" | "full";
 
 const SIZES: Record<DialogSize, string> = {
   sm: "sm:max-w-sm",
   md: "sm:max-w-md",
   lg: "sm:max-w-2xl",
+  // Phase 9 UX: full screen on phones (long panels such as an application), `lg` from `sm` up
+  full: "sm:max-w-2xl max-sm:inset-0 max-sm:m-0 max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:w-full max-sm:max-w-full max-sm:rounded-none",
 };
 
 export interface DialogProps {
