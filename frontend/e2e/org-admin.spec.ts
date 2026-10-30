@@ -77,7 +77,12 @@ test("org admin: departments, course move, settings, usage by department", async
     await page.getByRole("button", { name: t("departments.create") }).first().click();
     const dialog = page.getByRole("dialog");
     await dialog.getByLabel(t("departments.name")).fill(name);
-    if (name === "Языки") await uxShots(page, SHOTS, "org-department-create-dialog", ["ru"]);
+    if (name === "Языки") {
+      await uxShots(page, SHOTS, "org-department-create-dialog", STAFF, async (p, lang) => {
+        await p.getByRole("button", { name: tr(lang as "ru", "departments.create") }).first().click();
+        await p.getByRole("dialog").getByLabel(tr(lang as "ru", "departments.name")).fill(name);
+      });
+    }
     await dialog.getByRole("button", { name: t("departments.create") }).click();
     await expect(page.getByText(t("departments.created")).first()).toBeVisible();
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -132,7 +137,9 @@ test("shared bank: teacher shares, org admin edits but cannot delete, another te
   const tp = await as(browser, d.maths);
   await tp.goto(`/ru/courses/${d.maths_course_id}/bank/${d.bank_id}`);
   await tp.getByRole("button", { name: t("sharedBanks.menu") }).click();
-  await uxShots(tp, SHOTS, "course-bank-share-menu", ["ru"]);
+  await uxShots(tp, SHOTS, "course-bank-share-menu", STAFF, async (p, lang) => {
+    await p.getByRole("button", { name: tr(lang as "ru", "sharedBanks.menu") }).click();
+  });
   await tp.getByRole("menuitem", { name: new RegExp(t("sharedBanks.share")) }).click();
   await expect(tp.getByText(t("sharedBanks.sharedToast")).first()).toBeVisible();
   const reach = async (p: Page, lang: string) => { await p.getByRole("button", { name: tr(lang as "ru", "sharedBanks.menu") }).click(); };
@@ -147,7 +154,7 @@ test("shared bank: teacher shares, org admin edits but cannot delete, another te
   await ap.getByRole("link", { name: t("sharedBanks.open") }).click();
   await expect(ap).toHaveURL(new RegExp(`/bank/${d.bank_id}`));
   await expect(ap.getByRole("button", { name: t("bank.questions.new") })).toBeVisible();
-  await uxShots(ap, SHOTS, "org-admin-shared-bank", ["ru"]);
+  await uxShots(ap, SHOTS, "org-admin-shared-bank", STAFF);
   // edit the first question in the bank editor (a new version of the shared question)
   await ap.getByRole("link", { name: /Сколько будет 2 \+ 2\?/ }).click();
   await ap.getByLabel(t("bank.editor.stem")).fill("Сколько будет 2 + 2? (исправлено)");
@@ -171,7 +178,7 @@ test("shared bank: teacher shares, org admin edits but cannot delete, another te
   await lp.getByRole("button", { name: t("sharedBanks.copyLabel", { title: "Алгебра E2E" }) }).click();
   await expect(lp.getByText(t("sharedBanks.copied", { title: "Алгебра E2E (copy)" })).first()).toBeVisible();
   await expect(lp.getByRole("link", { name: "Алгебра E2E (copy)" })).toBeVisible();
-  await uxShots(lp, SHOTS, "course-bank-copied", ["ru"]);
+  await uxShots(lp, SHOTS, "course-bank-copied", STAFF);
   await lp.context().close();
 
   // an independent teacher: the school's shared banks are a 404
@@ -185,17 +192,17 @@ test("roster import: students (dry run, apply, same file again) and teachers int
   await page.goto(`${orgBase()}/roster-import`);
   await uxShots(page, SHOTS, "org-roster-upload", STAFF);
 
-  const runStudents = async () => {
-    await page.locator("#roster-kind").selectOption("student");
-    await page.locator("#roster-course").selectOption(d.languages_course_id);
-    await page.locator("#roster-file").setInputFiles({ name: "students.csv", mimeType: "text/csv", buffer: Buffer.from(studentCsv()) });
-    await page.getByRole("button", { name: t("rosterImport.check") }).click();
-    await expect(page.getByRole("heading", { name: t("rosterImport.preview.title", { name: "students.csv" }) })).toBeVisible();
+  const runStudents = async (p: Page = page, lang: string = L) => {
+    await p.locator("#roster-kind").selectOption("student");
+    await p.locator("#roster-course").selectOption(d.languages_course_id);
+    await p.locator("#roster-file").setInputFiles({ name: "students.csv", mimeType: "text/csv", buffer: Buffer.from(studentCsv()) });
+    await p.getByRole("button", { name: tr(lang as "ru", "rosterImport.check") }).click();
+    await expect(p.getByRole("heading", { name: tr(lang as "ru", "rosterImport.preview.title", { name: "students.csv" }) })).toBeVisible();
   };
   await runStudents();
   await expect(page.getByText(t("rosterImport.counts.valid", { n: 2 }))).toBeVisible();
   await expect(page.getByText(t("rosterImport.counts.invalid", { n: 1 }))).toBeVisible();
-  await uxShots(page, SHOTS, "org-roster-dryrun", ["ru"]);
+  await uxShots(page, SHOTS, "org-roster-dryrun", STAFF, runStudents); // a dry run sends nothing
   await page.getByRole("button", { name: t("rosterImport.preview.apply", { n: 2 }) }).click();
   await expect(page.getByRole("heading", { name: t("rosterImport.result.title") })).toBeVisible();
   await expect(page.getByText(t("rosterImport.counts.invited", { n: 2 }))).toBeVisible();
@@ -213,18 +220,22 @@ test("roster import: students (dry run, apply, same file again) and teachers int
   const invs2 = await api(d.languages, "GET", `/courses/${d.languages_course_id}/students/invitations?limit=50`);
   expect(invs2.items.length).toBe(invs.items.length);
 
-  // teachers into "Языки": the one with an account is added, the other invited
-  await page.getByRole("button", { name: t("rosterImport.preview.back") }).click();
+  // teachers into "Языки" (from the English page, so the result screen exists in en too): the one with an
+  // account is added, the other invited
+  const en = (key: string, vars: Record<string, string | number> = {}) => tr("en", key, vars);
   const depts: { id: string; name: string }[] = await api(d.org_admin, "GET", `/org/${d.organization_id}/departments`);
   const langs = depts.find((x) => x.name === "Языки")!;
+  await page.goto(`/en/org/${d.organization_id}/roster-import`);
   await page.locator("#roster-kind").selectOption("teacher");
   await page.locator("#roster-dept").selectOption(langs.id);
   await page.locator("#roster-file").setInputFiles({ name: "teachers.csv", mimeType: "text/csv", buffer: Buffer.from(teacherCsv()) });
-  await page.getByRole("button", { name: t("rosterImport.check") }).click();
-  await expect(page.getByText(t("rosterImport.counts.valid", { n: 2 }))).toBeVisible();
-  await page.getByRole("button", { name: t("rosterImport.preview.apply", { n: 2 }) }).click();
-  await expect(page.getByText(t("rosterImport.counts.added", { n: 1 }))).toBeVisible();
-  await expect(page.getByText(t("rosterImport.counts.invited", { n: 1 }))).toBeVisible();
+  await page.getByRole("button", { name: en("rosterImport.check") }).click();
+  await expect(page.getByText(en("rosterImport.counts.valid", { n: 2 }))).toBeVisible();
+  await uxShots(page, SHOTS, "org-roster-dryrun-teachers", ["en"]);
+  await page.getByRole("button", { name: en("rosterImport.preview.apply", { n: 2 }) }).click();
+  await expect(page.getByText(en("rosterImport.counts.added", { n: 1 }))).toBeVisible();
+  await expect(page.getByText(en("rosterImport.counts.invited", { n: 1 }))).toBeVisible();
+  await uxShots(page, SHOTS, "org-roster-applied-teachers", ["en"]);
   const members = await api(d.org_admin, "GET", `/org/${langs.id}/members?limit=50`);
   expect(members.items.some((m: { user: { email: string } }) => m.user.email === d.roster_teacher.email)).toBe(true);
   await page.context().close();
@@ -245,7 +256,10 @@ test("teacher invites students, sends one again, revokes one; the student accept
   await openInvite(page, "ru");
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel(t("studentInvite.dialog.emails")).fill(`${d.invite_student.email}\nrevoke-me@example.com`);
-  await uxShots(page, SHOTS, "course-invite-dialog", ["ru"]);
+  await uxShots(page, SHOTS, "course-invite-dialog", STAFF, async (p, lang) => {
+    await openInvite(p, lang);
+    await p.getByRole("dialog").getByLabel(tr(lang as "ru", "studentInvite.dialog.emails")).fill(`${d.invite_student.email}\nrevoke-me@example.com`);
+  });
   await dialog.getByRole("button", { name: t("studentInvite.dialog.sendN", { n: 2 }) }).click();
   await expect(dialog.getByText(t("studentInvite.result.invited", { n: 2 }))).toBeVisible();
   await uxShots(page, SHOTS, "course-invite-result", ["ru"]);

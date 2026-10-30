@@ -144,7 +144,9 @@ test("student finds the course, opens the landing and applies", async ({ browser
   await page.getByRole("button", { name: t("applications.apply.submit") }).click();
   await expect(page.getByText(t("applications.answerErrors.required"))).toBeVisible(); // required, client-side
   await shot(page, "apply-errors");
-  await uxShots(page, UX, "student-apply-errors", ["ru"]);
+  await uxShots(page, UX, "student-apply-errors", STUDENT, async (p, lang) => {
+    await p.getByRole("button", { name: tr(lang as "ru", "applications.apply.submit") }).click();
+  });
   await page.getByRole("textbox", { name: FIELD_LABEL }).fill(ANSWER);
   await page.getByRole("button", { name: t("applications.apply.submit") }).click();
   await expect(page.getByRole("heading", { name: t("applications.apply.sentTitle") })).toBeVisible();
