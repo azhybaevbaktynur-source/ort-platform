@@ -134,6 +134,58 @@ def _join(db: Session, user: User, course: Course, *, source: str,
     return enr, db.get(Course, course_id), False
 
 
+# --- Phase 9 S3 begin --- (PHASE_9_DESIGN 4.5, invariant 6, 7: the accept hook of student invitations)
+COURSE_FULL = "course_full"
+COURSE_NOT_OPEN = "course_not_open"
+
+
+def accept_student_invitation(db: Session, user: User, course: Course, *,
+                              invitation_id: uuid.UUID) -> tuple[Enrollment, bool]:
+    """Enroll `user` as a student of `course` for an accepted student invitation; returns (enrollment, already).
+
+    Same lock order and limit check as `_join` (course FOR UPDATE when limited, else FOR SHARE; then the enrollment
+    row FOR UPDATE). The invitation token proves legitimacy, so the refusals are honest instead of the join 404:
+    a draft, concluded, deleted or sandbox course is 409 `course_not_open`, a full course 409 `course_full`.
+    Enrollment mode and catalog visibility do not matter (the teacher invited this person). An active enrollment
+    in any role is kept as it is (never a downgrade). The caller marks the invitation accepted and commits; on a
+    refusal it rolls back, so the invitation stays usable."""
+    def not_open() -> Conflict:
+        return Conflict("The course is not open for enrollment", code=COURSE_NOT_OPEN)
+
+    if course.deleted_at is not None or course.sandbox_for_template_id is not None or course.status != "published":
+        raise not_open()
+    if course.enrollment_limit is not None:
+        lock_course(db, course)
+    else:
+        db.refresh(course, with_for_update={"read": True})
+    if course.deleted_at is not None or course.status != "published":
+        raise not_open()
+    existing = db.execute(
+        select(Enrollment).where(Enrollment.course_id == course.id, Enrollment.user_id == user.id).with_for_update()
+    ).scalar_one_or_none()
+    if existing is not None and existing.state == "active":
+        return existing, True
+    if course.enrollment_limit is not None and active_student_count(db, course.id) >= course.enrollment_limit:
+        raise Conflict("The course is full", code=COURSE_FULL)
+    now = utcnow()
+    details = {"invitation_id": str(invitation_id)}
+    if existing is None:
+        enr = Enrollment(course_id=course.id, user_id=user.id, role="student", state="active", source="invite",
+                         activated_at=now)
+        db.add(enr)
+        db.flush()
+        add_event(db, enr, "joined", user.id, to_role="student", to_state="active", details=details)
+        return enr, False
+    enr = existing
+    old_role, old_state = enr.role, enr.state
+    enr.role, enr.state, enr.source = "student", "active", "invite"
+    enr.activated_at, enr.removed_at, enr.removed_by_id = now, None, None
+    add_event(db, enr, "rejoined", user.id, from_role=old_role, to_role="student", from_state=old_state,
+              to_state="active", details=details)
+    return enr, False
+# --- Phase 9 S3 end ---
+
+
 def load_enrollment_in_course(db: Session, course_id: uuid.UUID, enrollment_id: uuid.UUID, *,
                               for_update: bool = False) -> Enrollment:
     stmt = select(Enrollment).where(Enrollment.id == enrollment_id, Enrollment.course_id == course_id)

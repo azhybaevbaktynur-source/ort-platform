@@ -19,6 +19,13 @@ import { toastInvitationSent } from "@/components/lms/org/InviteDialog";
 import { OrgError } from "@/components/lms/org/OrgUi";
 // --- Phase 6 S4b end ---
 import { AccommodationsSection } from "@/components/lms/accommodations/AccommodationsSection"; // Phase 7a S5
+// --- Phase 9 S3: People tabs (Roster · Invitations · Applications), invite students by email ---
+import { UserPlus } from "lucide-react";
+import { pickLocalized } from "@/lib/lms/localized";
+import { PeopleTabs, type PeopleTab } from "@/components/lms/people/PeopleTabs";
+import { InviteStudentsDialog } from "@/components/lms/people/InviteStudentsDialog";
+import { InvitationList } from "@/components/lms/people/InvitationList";
+// --- Phase 9 S3 end ---
 
 // S6b: student view
 function StaffList({ courseId }: { courseId: string }) {
@@ -89,6 +96,11 @@ export default function PeoplePage() {
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState<unknown>(null);
   // --- Phase 6 S4b end ---
+  // --- Phase 9 S3 ---
+  const [tab, setTab] = useState<PeopleTab>("roster");
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [invitationsKey, setInvitationsKey] = useState(0);
+  // --- Phase 9 S3 end ---
 
   const load = useCallback(async (next?: string | null) => {
     setLoading(true);
@@ -175,10 +187,15 @@ export default function PeoplePage() {
   };
   // --- Phase 6 S4b end ---
 
-  return (
+  // --- Phase 9 S3 --- Applications (S4 slot) appear for staff in form enrollment modes only (design 8.1).
+  const formMode = course.enrollment_mode === "form_auto" || course.enrollment_mode === "form_review";
+  const inviteButton = (
+    <Button leftIcon={<UserPlus aria-hidden="true" className="h-4 w-4" />} onClick={() => setInviteOpen(true)}>
+      {t("studentInvite.invite")}
+    </Button>
+  );
+  const rosterTab = (
     <div className="space-y-6">
-      {/* Phase 6b S5c: PageHeader, add-staff card with design-system fields, roster Table with phone cards (UX T2). */}
-      <PageHeader title={t("courses.people.tab")} className="mb-2" />
       {canManage && (
         <Card as="section" title={t("courses.people.addStaff")}>
         <form onSubmit={submitAdd} noValidate>
@@ -242,6 +259,31 @@ export default function PeoplePage() {
       {/* --- Phase 7a S5: accommodations per student (teacher only, PHASE_7A_DESIGN 4.4) --- */}
       {isTeacher && course.status !== "concluded" && <AccommodationsSection courseId={course.id} />}
       {/* --- Phase 7a S5 end --- */}
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Phase 6b S5c: PageHeader, add-staff card with design-system fields, roster Table with phone cards (UX T2). */}
+      {/* Phase 9 S3: "Invite students" is the page's primary action; the content sits in tabs. */}
+      <PageHeader title={t("courses.people.tab")} className="mb-2"
+        primaryAction={canManage && course.status !== "concluded" ? inviteButton : undefined} />
+      <PeopleTabs
+        value={tab}
+        onChange={setTab}
+        roster={rosterTab}
+        invitations={
+          <InvitationList courseId={course.id} canManage={canManage} reloadKey={invitationsKey}
+            onInvite={course.status !== "concluded" ? () => setInviteOpen(true) : undefined} />
+        }
+        showInvitations={canManage}
+        // S4: pass <ApplicationsInbox courseId={course.id} /> here and widen showApplications to "or any application"
+        applications={null}
+        showApplications={formMode}
+      />
+      <InviteStudentsDialog open={inviteOpen} courseId={course.id} courseTitle={pickLocalized(course.title, lang)}
+        onClose={() => setInviteOpen(false)}
+        onSent={() => setInvitationsKey((k) => k + 1)} />
 
       <ConfirmDialog open={!!removing} tone="danger" busy={!!busyId} title={t("courses.people.removeTitle")}
         object={removing ? `${removing.user.display_name || removing.user.email} · ${t(`courses.roles.${removing.role}`)}` : undefined}
