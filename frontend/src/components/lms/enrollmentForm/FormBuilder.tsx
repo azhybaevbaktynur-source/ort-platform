@@ -375,7 +375,7 @@ export function FormBuilder({ course }: { course: CourseStaffOut }) {
           ) : null}
 
           {editable && (
-            <div className="sticky bottom-0 z-10 -mx-4 flex flex-col gap-2 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:mx-0 sm:flex-row sm:flex-wrap sm:items-center sm:rounded-2xl sm:border">
+            <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-slate-200 bg-white/95 px-4 py-2 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border sm:py-3">
               <Button loading={busy === "save"} disabled={!dirty || !!busy} onClick={() => void save()}>{t("lms.common.save")}</Button>
               {form.status === "draft" && (
                 <Button variant="secondary" disabled={!!busy || rows.length === 0} loading={busy === "activate"}
