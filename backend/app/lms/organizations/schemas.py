@@ -248,6 +248,7 @@ class RosterCountsOut(BaseModel):
     invited: int = 0
     skipped_open_invitation: int = 0
     failed: int = 0
+    added: int = 0  # Phase 9 S3: teachers with an account added directly (design 4.4)
 
 
 class RosterReportRowOut(BaseModel):

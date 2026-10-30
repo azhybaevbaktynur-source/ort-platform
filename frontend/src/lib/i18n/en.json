@@ -2419,7 +2419,8 @@
     "roles": {
       "org_admin": "Organization admin",
       "teacher": "Teacher",
-      "assistant": "Assistant"
+      "assistant": "Assistant",
+      "student": "Student"
     },
     "state": {
       "pending": "Invited",
@@ -2473,6 +2474,170 @@
     "invitedByColumn": "Invited by",
     "validUntilColumn": "Valid until"
   },
+  "studentInvite": {
+    "invite": "Invite students",
+    "tabs": {
+      "label": "People sections",
+      "roster": "Roster",
+      "invitations": "Invitations",
+      "applications": "Applications"
+    },
+    "dialog": {
+      "title": "Invite students",
+      "body": "Each student gets an email with a link to «{course}». They join after logging in or signing up with that address.",
+      "emails": "Email addresses",
+      "emailsHint": "One per line, or separated by commas. Up to {max} at a time.",
+      "count": "Addresses: {n}",
+      "empty": "Enter at least one email address.",
+      "tooMany": "Up to {max} addresses at a time. Remove {extra}.",
+      "invalid": "Not an email address: {list}",
+      "message": "Message",
+      "messageHint": "Shown in the email. Replies go to your email address.",
+      "language": "Email language",
+      "expiry": "Each link works for 14 days and only for its email address.",
+      "send": "Send invitations",
+      "sendN": "Send invitations ({n})"
+    },
+    "languages": {
+      "ky": "Кыргызча",
+      "ru": "Русский",
+      "en": "English"
+    },
+    "result": {
+      "title": "Invitations sent",
+      "invited": "Invited: {n}",
+      "alreadyEnrolled": "Already in the course: {n}",
+      "invalid": "Skipped: {n}",
+      "hint": "Students appear in the roster after they accept. You can follow them on the Invitations tab.",
+      "rows": {
+        "invited": "Invited",
+        "already_enrolled": "Already in the course",
+        "invalid_email": "Not an email address",
+        "duplicate": "Repeated"
+      },
+      "inviteMore": "Invite more",
+      "done": "Done"
+    },
+    "list": {
+      "title": "Student invitations",
+      "status": "Status",
+      "all": "All",
+      "empty": "No invitations yet.",
+      "emptyHint": "Invite students by email: they join the course after accepting.",
+      "emptyFilter": "No invitations with this status."
+    },
+    "errors": {
+      "course_full": "This course is full. Ask the teacher to raise the student limit, then try again.",
+      "course_not_open": "This course is not open yet or has ended. Ask the teacher.",
+      "student_invitations_disabled": "Student invitations are turned off in this organization.",
+      "already_enrolled": "This student is already in the course."
+    }
+  },
+  "rosterImport": {
+    "title": "Roster import",
+    "intro": "Add many students or teachers from a CSV file. First the file is checked; nothing is sent until you confirm.",
+    "steps": {
+      "label": "Import steps",
+      "upload": "File",
+      "check": "Check",
+      "result": "Result"
+    },
+    "kind": {
+      "label": "Who is in the file",
+      "student": "Students of one course",
+      "teacher": "Teachers"
+    },
+    "course": {
+      "label": "Course",
+      "placeholder": "Choose a course",
+      "required": "Choose the course the students join.",
+      "hint": "Students get an invitation to this course.",
+      "more": "Only the first 100 courses are listed.",
+      "none": "This organization has no courses yet."
+    },
+    "department": {
+      "label": "Add teachers to",
+      "self": "This organization"
+    },
+    "file": {
+      "label": "CSV file",
+      "hint": "UTF-8 text, columns separated by ; or ,. Up to {rows} rows and {kib} KiB.",
+      "required": "Choose a CSV file."
+    },
+    "help": {
+      "title": "File format",
+      "students": "Columns: email (required) and display_name (optional).",
+      "teachers": "Columns: email (required), display_name (optional) and role: teacher or org_admin (optional, teacher by default).",
+      "header": "The first row names the columns; their order does not matter. Other columns are ignored.",
+      "noPassword": "Never put passwords in the file: a column named password, pass or pwd stops the import.",
+      "template": "Download a template"
+    },
+    "check": "Check file",
+    "preview": {
+      "title": "Check: {name}",
+      "forCourse": "Course «{course}» · rows: {rows}",
+      "forTeachers": "Teachers · rows: {rows}",
+      "ignored": "Ignored columns: {list}",
+      "studentsNote": "Students get an invitation email and join the course themselves after accepting. Nobody is added without their consent.",
+      "teachersNote": "Teachers who already have an account are added at once; the others get an invitation email.",
+      "nothing": "Nothing to send: no row is ready.",
+      "apply": "Confirm and send ({n})",
+      "back": "Choose another file"
+    },
+    "counts": {
+      "valid": "Ready: {n}",
+      "invalid": "With errors: {n}",
+      "existing": "Already in: {n}",
+      "skipped": "Already invited: {n}",
+      "invited": "Invited: {n}",
+      "added": "Added: {n}",
+      "failed": "Not done: {n}"
+    },
+    "rows": {
+      "caption": "Rows of the file",
+      "line": "Line",
+      "email": "Email",
+      "result": "Result"
+    },
+    "results": {
+      "valid": "Ready",
+      "invited": "Invited",
+      "added": "Added",
+      "existing_member": "Already a member",
+      "already_enrolled": "Already in the course",
+      "skipped_open_invitation": "Already invited",
+      "invalid_email": "Not an email address",
+      "duplicate_in_file": "Repeated in the file",
+      "failed": "Not done"
+    },
+    "errorCodes": {
+      "invalid_email": "Check the address in this line.",
+      "duplicate_in_file": "The same address appears earlier in the file.",
+      "invalid_role": "Role must be teacher or org_admin.",
+      "account_unavailable": "This account is disabled.",
+      "write_failed": "Could not be saved. Import this line again."
+    },
+    "result": {
+      "title": "Import done",
+      "partialTitle": "Import done with errors",
+      "students": "Invitations are on their way. Students appear in the course roster after they accept.",
+      "teachers": "Teachers with an account were added; invitations are on their way to the others.",
+      "partial": "Some rows were not saved. Put them in a new file and import it again.",
+      "again": "Import another file"
+    },
+    "errors": {
+      "forbidden_column": "The file has a password column. Remove it: passwords are never imported.",
+      "missing_column": "The file has no email column. The first row must name the columns.",
+      "roster_empty": "The file has no rows.",
+      "invalid_csv": "This is not a CSV file in UTF-8. Save it as CSV (UTF-8) and try again.",
+      "roster_too_large": "The file is too large: up to {rows} rows and {kib} KiB.",
+      "file_changed": "This file differs from the checked one. Check it again.",
+      "already_applied": "This file was already imported for this target.",
+      "roster_target_invalid": "This course or organization is not part of this organization.",
+      "student_invitations_disabled": "Student invitations are turned off in this organization.",
+      "roster_import_not_found": "This import no longer exists. Start again."
+    }
+  },
   "templates": {
     "field": "Course template",
     "general": "General course (no template)",
@@ -2515,6 +2680,7 @@
     "orgAdmin": "You joined «{org}» as an organization admin.",
     "courseTeacher": "You joined the course «{course}» as a teacher.",
     "courseAssistant": "You joined the course «{course}» as an assistant.",
+    "courseStudent": "You joined the course «{course}» as a student.",
     "dismiss": "Close message"
   },
   "ui": {

@@ -11,7 +11,8 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.lms.core.deps import get_lms_user
 from app.lms.core.errors import Forbidden, NotFound
-from app.lms.organizations.models import Organization, OrganizationMember
+from app.lms.organizations.models import Organization
+from app.lms.organizations.tree import is_org_admin_in_tree
 from app.models.user import User
 
 INVITATION_POLICIES: dict[tuple[str, str], str] = {
@@ -24,6 +25,21 @@ INVITATION_POLICIES: dict[tuple[str, str], str] = {
     ("POST", "/api/v1/invitations/{token}/accept"): "authenticated+ratelimit",
     ("GET", "/api/v1/me/invitations"): "authenticated",
     ("POST", "/api/v1/courses/{course_id}/staff/invitations"): "course:roster.manage",
+    # --- Phase 9 S3 begin --- (PHASE_9_DESIGN 4.4, 4.5; rows of route_inventory.PHASE_9_PLANNED_POLICIES["S3"])
+    # roster imports (organizations/roster.py, mounted through this package's router): org admin of the
+    # organization or an ancestor, or the platform admin; multipart CSV, dry run by default, masked report
+    ("POST", "/api/v1/org/{organization_id}/roster-imports"): "org_admin+ratelimit",
+    ("GET", "/api/v1/org/{organization_id}/roster-imports"): "org_admin",
+    ("GET", "/api/v1/org/{organization_id}/roster-imports/{import_id}"): "org_admin",
+    ("POST", "/api/v1/org/{organization_id}/roster-imports/{import_id}/apply"): "org_admin+ratelimit",
+    # student invitations (invitations/students.py): teacher roster.manage; org admins of the tree via
+    # ORG_ADMIN_ACTIONS (audited); assistants 403
+    ("POST", "/api/v1/courses/{course_id}/students/invitations"): "course:roster.manage+ratelimit",
+    ("GET", "/api/v1/courses/{course_id}/students/invitations"): "course:roster.manage",
+    ("POST", "/api/v1/courses/{course_id}/students/invitations/{invitation_id}/revoke"): "course:roster.manage",
+    ("POST", "/api/v1/courses/{course_id}/students/invitations/{invitation_id}/resend"):
+        "course:roster.manage+ratelimit",
+    # --- Phase 9 S3 end ---
 }
 
 
@@ -33,14 +49,14 @@ def load_organization(db: Session, organization_id: uuid.UUID) -> Optional[Organ
     ).scalar_one_or_none()
 
 
-def is_org_admin(db: Session, user: User, organization_id: uuid.UUID) -> bool:
-    """Active `org_admin` membership of that organization (one query)."""
-    return db.execute(
-        select(OrganizationMember.id).where(
-            OrganizationMember.organization_id == organization_id, OrganizationMember.user_id == user.id,
-            OrganizationMember.state == "active", OrganizationMember.role == "org_admin",
-        )
-    ).first() is not None
+def is_org_admin(db: Session, user: User, organization_id: uuid.UUID,
+                 org: Optional[Organization] = None) -> bool:
+    """Active `org_admin` membership of that organization **or of an ancestor** (Phase 9 S3: the admin of a root
+    administers its departments, never upwards; `organizations.tree.is_org_admin_in_tree`, one query when the
+    organization row is passed in)."""
+    if org is None or org.id != organization_id:
+        org = load_organization(db, organization_id)
+    return is_org_admin_in_tree(db, user.id, org)
 
 
 def org_access(db: Session, user: User, organization_id: uuid.UUID) -> tuple[Optional[Organization], bool]:
@@ -48,7 +64,7 @@ def org_access(db: Session, user: User, organization_id: uuid.UUID) -> tuple[Opt
     org = load_organization(db, organization_id)
     if org is None:
         return None, False
-    return org, bool(user.is_platform_admin) or is_org_admin(db, user, org.id)
+    return org, bool(user.is_platform_admin) or is_org_admin(db, user, org.id, org)
 
 
 def forbidden_org() -> Forbidden:
