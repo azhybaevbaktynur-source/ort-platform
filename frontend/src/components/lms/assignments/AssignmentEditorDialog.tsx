@@ -25,8 +25,10 @@ import { ExamTemplateError, isExamTemplateErrorCode } from "@/components/lms/exa
 
 const KINDS: AssignmentKind[] = ["text", "file", "none", "quiz"];
 
-export function AssignmentEditorDialog({ open, onCreated, onCancel }: {
+export function AssignmentEditorDialog({ open, onCreated, onCancel, initialKind = "text" }: {
   open: boolean;
+  /** Phase 8c S3: the kind chosen when the dialog opens (`?new=<kind>` on the Assignments list). */
+  initialKind?: AssignmentKind;
   onCreated: (a: AssignmentStaffOut) => void;
   onCancel: () => void;
 }) {
@@ -55,10 +57,10 @@ export function AssignmentEditorDialog({ open, onCreated, onCancel }: {
 
   useEffect(() => {
     if (open) {
-      setKind("text"); setTitle({}); setPoints("10"); setDue(""); setPreset("none"); setLanguages([defaultLanguage]);
+      setKind(initialKind); setTitle({}); setPoints("10"); setDue(""); setPreset("none"); setLanguages([defaultLanguage]);
       setSubject(firstSubject); setError(null); setTouched(false);
     }
-  }, [open, defaultLanguage, firstSubject]);
+  }, [open, defaultLanguage, firstSubject, initialKind]);
 
   const cleaned = cleanLocalized(title, courseLanguages);
   const titleOk = Object.keys(cleaned).length > 0;
