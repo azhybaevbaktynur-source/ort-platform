@@ -73,18 +73,20 @@ def _row_banks(model, *row_ids, extra_bank: Optional[uuid.UUID] = None) -> Banks
     return banks_of
 
 
-def _group_banks(question_id: uuid.UUID) -> BanksOf:
-    """Unlink touches the question and possibly the last other member of its translation group: every bank of the
-    group must be editable (the question's own bank when it has no group)."""
+def _group_banks(*question_ids: uuid.UUID) -> BanksOf:
+    """Unlink touches the question and possibly the last other member of its translation group; link joins two
+    groups (Phase 9 fix 1, L2): every bank of every group involved must be editable (the questions' own banks when
+    they have no group)."""
     def banks_of(db: Session, course) -> list:
-        own = _row_banks(BankQuestion, question_id)(db, course)
+        own = _row_banks(BankQuestion, *question_ids)(db, course)
         if None in own:
             return own
-        gid = db.execute(select(BankQuestion.translation_group_id).where(BankQuestion.id == question_id)).scalar()
-        if gid is None:
+        gids = {g for g in db.execute(select(BankQuestion.translation_group_id).where(
+            BankQuestion.id.in_(list(question_ids)))).scalars() if g is not None}
+        if not gids:
             return own
         return own + list(db.execute(select(BankQuestion.bank_id).where(
-            BankQuestion.translation_group_id == gid).distinct()).scalars())
+            BankQuestion.translation_group_id.in_(gids)).distinct()).scalars())
     return banks_of
 # --- Phase 9 S1 end ---
 
@@ -234,14 +236,14 @@ def update_bank(course_id: uuid.UUID, bank_id: uuid.UUID, data: sch.BankUpdateIn
 
 @router.delete("/{course_id}/banks/{bank_id}", status_code=204, response_class=Response)
 def delete_bank(course_id: uuid.UUID, bank_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
-    course = _manage_bank(ctx, course_id, _banks(bank_id))
+    course = _manage(ctx, course_id)  # Phase 9 fix 1 (L3): staff only, the org-admin branch never deletes a bank
     svc.soft_delete_bank(ctx.db, ctx, course, bank_id)
     return Response(status_code=204)
 
 
 @router.post("/{course_id}/banks/{bank_id}/restore", response_model=sch.BankOut)
 def restore_bank(course_id: uuid.UUID, bank_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
-    course = _manage_bank(ctx, course_id, _banks(bank_id))
+    course = _manage(ctx, course_id)  # Phase 9 fix 1 (L3): staff only, like delete
     svc.restore_bank(ctx.db, ctx, course, bank_id)
     return _bank_out(ctx, course, bank_id)
 
@@ -406,7 +408,7 @@ def add_translation(course_id: uuid.UUID, question_id: uuid.UUID, data: sch.Tran
 @router.post("/{course_id}/questions/{question_id}/translation-link", status_code=204, response_class=Response)
 def link_translation(course_id: uuid.UUID, question_id: uuid.UUID, data: sch.TranslationLinkIn,
                      ctx: AuthzContext = Depends(get_authz)):
-    course = _manage_bank(ctx, course_id, _row_banks(BankQuestion, question_id, data.question_id))
+    course = _manage_bank(ctx, course_id, _group_banks(question_id, data.question_id))  # Phase 9 fix 1 (L2)
     svc.link_translation(ctx.db, ctx, course, question_id, data.question_id)
     return Response(status_code=204)
 
