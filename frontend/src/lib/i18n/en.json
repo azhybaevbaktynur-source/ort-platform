@@ -346,7 +346,7 @@
       "enrollment": "Enrollment",
       "joinCode": "Join code",
       "joinCodeHint": "Share this code with your students. It works only while the course is published and enrollment is by code.",
-      "joinCodeInactive": "The code is not active right now: publish the course and set enrollment to a join code.",
+      "joinCodeInactiveUnpublished": "The code is not active right now: publish the course and set enrollment to a join code.",
       "regenerate": "Generate a new code",
       "regenerateTitle": "Generate a new code?",
       "regenerateBody": "The old code stops working immediately. Students already in the course are not affected.",
@@ -376,7 +376,10 @@
       "delete": "Delete course",
       "deleteTitle": "Delete this course?",
       "deleteBody": "The course disappears for everyone. You can restore it from deleted courses.",
-      "deleteHint": "Only the owner can delete or restore a course."
+      "deleteHint": "Only the owner can delete or restore a course.",
+      "joinCodeInactiveMode": "The code is off because students join by application form. Choose “{code}” to use it.",
+      "joinCodeInactiveOpen": "The code is off because students join from the catalog without it. Choose “{code}” to use it.",
+      "joinCodeInactiveClosed": "The code is off because enrollment is closed. Choose “{code}” to use it."
     },
     "status": {
       "draft": "Draft",
@@ -2086,7 +2089,69 @@
     "joining": "Joining…",
     "open": "Open",
     "needsCode": "Join with a code from your teacher",
-    "closed": "Enrollment is closed"
+    "closed": "Enrollment is closed",
+    "apply": "Apply",
+    "viewApplication": "View application",
+    "search": {
+      "label": "Search courses",
+      "placeholder": "Course title or topic"
+    },
+    "filters": {
+      "language": "Language",
+      "anyLanguage": "Any language",
+      "organization": "Organization",
+      "anyOrganization": "Any organization",
+      "mode": "How to join",
+      "anyMode": "Any way",
+      "toggle": "Filters",
+      "toggleCount": "Filters ({count})"
+    },
+    "modes": {
+      "open": "Open to all",
+      "form_review": "By application (teacher approves)",
+      "form_auto": "By application (instant entry)",
+      "invite_code": "By join code",
+      "closed": "Enrollment closed"
+    },
+    "noResults": {
+      "title": "No courses found",
+      "body": "Try other words or reset the filters."
+    },
+    "landing": {
+      "openCourse": "Open course",
+      "applyAgain": "Apply again",
+      "enterCode": "Enter a join code",
+      "backToCatalog": "Back to the catalog",
+      "notFoundTitle": "Course not found",
+      "notFoundBody": "This course is not in the catalog. It may be private or removed.",
+      "noDescription": "No description yet.",
+      "teachers": "Teachers",
+      "languages": "Languages",
+      "dates": "Dates",
+      "dateRange": "{start} – {end}",
+      "startsOn": "Starts {date}",
+      "endsOn": "Ends {date}",
+      "students": "Students",
+      "howToJoin": "How to join",
+      "modeHelp": {
+        "open": "Anyone can join with one click.",
+        "invite_code": "Ask the teacher for a join code, then enter it.",
+        "form_review": "Fill in a short form. The teacher reviews it, and you get an email with the decision.",
+        "form_auto": "Fill in a short form and you are in the course right away.",
+        "closed": "The teacher is not taking new students right now.",
+        "formUnavailable": "Applications are not open yet. Check back later."
+      }
+    },
+    "resultCount": "{count} courses",
+    "resultCount_one": "{count} course",
+    "resultCount_few": "{count} courses",
+    "resultCount_many": "{count} courses",
+    "resultCount_other": "{count} courses",
+    "resultCountMore": "{count} courses shown, more below",
+    "resultCountMore_one": "{count} course shown, more below",
+    "resultCountMore_few": "{count} courses shown, more below",
+    "resultCountMore_many": "{count} courses shown, more below",
+    "resultCountMore_other": "{count} courses shown, more below"
   },
   "storage": {
     "nav": "Storage",
@@ -2229,7 +2294,19 @@
       "invitation_conflict": "The invitation could not be accepted. Reload the page and try again.",
       "invalid_email": "Enter a valid email address.",
       "org_admin_required": "Only an admin of the organization can do this.",
-      "course_concluded": "The course has ended; this is no longer possible."
+      "course_concluded": "The course has ended; this is no longer possible.",
+      "settings_on_root": "Settings are changed on the whole organization, not on a department.",
+      "sharing_disabled": "Bank sharing is turned off for this organization.",
+      "quiz_bank_not_shareable": "A quiz's own bank cannot be shared.",
+      "bank_too_large": "This bank is too large to copy (at most 2,000 questions).",
+      "department_depth": "Departments can be nested two levels deep.",
+      "department_cycle": "A department cannot be moved inside itself.",
+      "department_cap": "This organization has reached the limit of 200 departments.",
+      "department_parent_invalid": "Choose a place inside this organization.",
+      "department_not_empty": "Move or delete the department's courses and sub-departments first.",
+      "department_self": "Delete this department from the organization above it.",
+      "course_move_invalid": "This course cannot be moved.",
+      "language_not_in_course": "The bank has questions in a language this course does not use. Add the language to the course first."
     },
     "admin": {
       "title": "Organizations",
@@ -2263,6 +2340,7 @@
         "admins": "Admins",
         "teachers": "Teachers",
         "courses": "Courses",
+        "departments": "Departments",
         "usage": "Usage",
         "templates": "Templates",
         "log": "Log"
@@ -2398,7 +2476,8 @@
       "overviewTitle": "Overview",
       "suspendedBanner": "This organization is suspended: its courses are read-only and changes are disabled. Contact the platform administrator.",
       "pickTitle": "Your organizations",
-      "pickEmpty": "You do not administer any organization."
+      "pickEmpty": "You do not administer any organization.",
+      "rosterImport": "Roster import"
     }
   },
   "invitations": {
@@ -2419,7 +2498,8 @@
     "roles": {
       "org_admin": "Organization admin",
       "teacher": "Teacher",
-      "assistant": "Assistant"
+      "assistant": "Assistant",
+      "student": "Student"
     },
     "state": {
       "pending": "Invited",
@@ -2473,6 +2553,172 @@
     "invitedByColumn": "Invited by",
     "validUntilColumn": "Valid until"
   },
+  "studentInvite": {
+    "invite": "Invite students",
+    "tabs": {
+      "label": "People sections",
+      "roster": "Roster",
+      "invitations": "Invitations",
+      "applications": "Applications"
+    },
+    "dialog": {
+      "title": "Invite students",
+      "body": "Each student gets an email with a link to «{course}». They join after logging in or signing up with that address.",
+      "emails": "Email addresses",
+      "emailsHint": "One per line, or separated by commas. Up to {max} at a time.",
+      "count": "Addresses: {n}",
+      "empty": "Enter at least one email address.",
+      "tooMany": "Up to {max} addresses at a time. Remove {extra}.",
+      "invalid": "Not an email address: {list}",
+      "message": "Message",
+      "messageHint": "Shown in the email. Replies go to your email address.",
+      "language": "Email language",
+      "expiry": "Each link works for 14 days and only for its email address.",
+      "send": "Send invitations",
+      "sendN": "Send invitations ({n})"
+    },
+    "languages": {
+      "ky": "Кыргызча",
+      "ru": "Русский",
+      "en": "English"
+    },
+    "result": {
+      "title": "Invitations sent",
+      "invited": "Invited: {n}",
+      "alreadyEnrolled": "Already in the course: {n}",
+      "invalid": "Skipped: {n}",
+      "hint": "Students appear in the roster after they accept. You can follow them on the Invitations tab.",
+      "rows": {
+        "invited": "Invited",
+        "already_enrolled": "Already in the course",
+        "invalid_email": "Not an email address",
+        "duplicate": "Repeated"
+      },
+      "inviteMore": "Invite more",
+      "done": "Done"
+    },
+    "list": {
+      "title": "Student invitations",
+      "status": "Status",
+      "all": "All",
+      "empty": "No invitations yet.",
+      "emptyHint": "Invite students by email: they join the course after accepting.",
+      "emptyFilter": "No invitations with this status."
+    },
+    "errors": {
+      "course_full": "This course is full. Ask the teacher to raise the student limit, then try again.",
+      "course_not_open": "This course is not open yet or has ended. Ask the teacher.",
+      "student_invitations_disabled": "Student invitations are turned off in this organization.",
+      "already_enrolled": "This student is already in the course."
+    }
+  },
+  "rosterImport": {
+    "title": "Roster import",
+    "intro": "Add many students or teachers from a CSV file. First the file is checked; nothing is sent until you confirm.",
+    "steps": {
+      "label": "Import steps",
+      "upload": "File",
+      "check": "Check",
+      "result": "Result"
+    },
+    "kind": {
+      "label": "Who is in the file",
+      "student": "Students of one course",
+      "teacher": "Teachers"
+    },
+    "course": {
+      "label": "Course",
+      "placeholder": "Choose a course",
+      "required": "Choose the course the students join.",
+      "hint": "Students get an invitation to this course.",
+      "more": "Only the first 100 courses are listed.",
+      "none": "This organization has no courses yet."
+    },
+    "department": {
+      "label": "Add teachers to",
+      "self": "This organization"
+    },
+    "file": {
+      "label": "CSV file",
+      "hint": "UTF-8 text, columns separated by ; or ,. Up to {rows} rows and {kib} KiB.",
+      "required": "Choose a CSV file.",
+      "choose": "Choose file",
+      "none": "No file chosen"
+    },
+    "help": {
+      "title": "File format",
+      "students": "Columns: email (required) and display_name (optional).",
+      "teachers": "Columns: email (required), display_name (optional) and role: teacher or org_admin (optional, teacher by default).",
+      "header": "The first row names the columns; their order does not matter. Other columns are ignored.",
+      "noPassword": "Never put passwords in the file: a column named password, pass or pwd stops the import.",
+      "template": "Download a template"
+    },
+    "check": "Check file",
+    "preview": {
+      "title": "Check: {name}",
+      "forCourse": "Course «{course}» · rows: {rows}",
+      "forTeachers": "Teachers · rows: {rows}",
+      "ignored": "Ignored columns: {list}",
+      "studentsNote": "Students get an invitation email and join the course themselves after accepting. Nobody is added without their consent.",
+      "teachersNote": "Teachers who already have an account are added at once; the others get an invitation email.",
+      "nothing": "Nothing to send: no row is ready.",
+      "apply": "Confirm and send ({n})",
+      "back": "Choose another file"
+    },
+    "counts": {
+      "valid": "Ready: {n}",
+      "invalid": "With errors: {n}",
+      "existing": "Already in: {n}",
+      "skipped": "Already invited: {n}",
+      "invited": "Invited: {n}",
+      "added": "Added: {n}",
+      "failed": "Not done: {n}"
+    },
+    "rows": {
+      "caption": "Rows of the file",
+      "line": "Line",
+      "email": "Email",
+      "result": "Result"
+    },
+    "results": {
+      "valid": "Ready",
+      "invited": "Invited",
+      "added": "Added",
+      "existing_member": "Already a member",
+      "already_enrolled": "Already in the course",
+      "skipped_open_invitation": "Already invited",
+      "invalid_email": "Not an email address",
+      "duplicate_in_file": "Repeated in the file",
+      "failed": "Not done"
+    },
+    "errorCodes": {
+      "invalid_email": "Check the address in this line.",
+      "duplicate_in_file": "The same address appears earlier in the file.",
+      "invalid_role": "Role must be teacher or org_admin.",
+      "account_unavailable": "This account is disabled.",
+      "write_failed": "Could not be saved. Import this line again."
+    },
+    "result": {
+      "title": "Import done",
+      "partialTitle": "Import done with errors",
+      "students": "Invitations are on their way. Students appear in the course roster after they accept.",
+      "teachers": "Teachers with an account were added; invitations are on their way to the others.",
+      "partial": "Some rows were not saved. Put them in a new file and import it again.",
+      "again": "Import another file"
+    },
+    "errors": {
+      "forbidden_column": "The file has a password column. Remove it: passwords are never imported.",
+      "missing_column": "The file has no email column. The first row must name the columns.",
+      "roster_empty": "The file has no rows.",
+      "invalid_csv": "This is not a CSV file in UTF-8. Save it as CSV (UTF-8) and try again.",
+      "roster_too_large": "The file is too large: up to {rows} rows and {kib} KiB.",
+      "file_changed": "This file differs from the checked one. Check it again.",
+      "already_applied": "This file was already imported for this target.",
+      "roster_target_invalid": "This course or organization is not part of this organization.",
+      "student_invitations_disabled": "Student invitations are turned off in this organization.",
+      "roster_import_not_found": "This import no longer exists. Start again."
+    }
+  },
   "templates": {
     "field": "Course template",
     "general": "General course (no template)",
@@ -2515,6 +2761,7 @@
     "orgAdmin": "You joined «{org}» as an organization admin.",
     "courseTeacher": "You joined the course «{course}» as a teacher.",
     "courseAssistant": "You joined the course «{course}» as an assistant.",
+    "courseStudent": "You joined the course «{course}» as a student.",
     "dismiss": "Close message"
   },
   "ui": {
@@ -2553,7 +2800,11 @@
       "notSorted": "Not sorted",
       "sortOptionAsc": "{column}, ascending",
       "sortOptionDesc": "{column}, descending",
-      "actions": "Actions"
+      "actions": "Actions",
+      "count_one": "{count} result",
+      "count_few": "{count} results",
+      "count_many": "{count} results",
+      "count_other": "{count} results"
     },
     "reason": {
       "required": "Reason (required)",
@@ -4597,5 +4848,370 @@
     "nothing": "Nothing to do",
     "more": "{n} more",
     "joinCodeOff": "The code is off. Turn on joining by code in Enrollment settings."
+  },
+  "orgSettings": {
+    "nav": "Settings",
+    "title": "Organization settings",
+    "intro": "These settings apply to the whole organization and every department in it.",
+    "readOnly": "Settings are shared by the whole organization {root}. Its administrators change them.",
+    "coursesTitle": "Courses",
+    "teachersCanCreate": "Teachers can create courses",
+    "teachersCanCreateHint": "Without it, only organization admins create courses.",
+    "banksTitle": "Question banks",
+    "bankSharing": "Teachers can share question banks with the organization",
+    "bankSharingHint": "Every teacher of the organization and its departments can read a shared bank and copy it into a course.",
+    "bankSharingPersonal": "Personal organizations cannot share question banks.",
+    "studentsTitle": "Students",
+    "studentInvitations": "Teachers can invite students by email",
+    "studentInvitationsHint": "Students still accept the invitation themselves.",
+    "defaultsTitle": "Defaults for new courses",
+    "defaultsHint": "New courses start with these values. ORT courses keep their own.",
+    "visibility": "In the catalog",
+    "visibilityOptions": {
+      "private": "Private (by code or link)",
+      "catalog": "Shown in the catalog"
+    },
+    "enrollmentMode": "How students join",
+    "modes": {
+      "invite_code": "With a join code",
+      "open": "Anyone can join",
+      "closed": "Closed",
+      "form_review": "By application (teacher approves)",
+      "form_auto": "By application (instant entry)"
+    },
+    "retention": "Keep answers of rejected or withdrawn applications for",
+    "retentionHint": "From 30 to 90 days. After that the answers are deleted.",
+    "days": "days",
+    "save": "Save settings",
+    "saved": "Settings saved"
+  },
+  "departments": {
+    "nav": "Departments",
+    "title": "Departments",
+    "intro": "Group teachers and courses into departments. Admins of the organization manage every department in it.",
+    "create": "New department",
+    "createTitle": "Create a department",
+    "name": "Name",
+    "slug": "Short address",
+    "slugHint": "2 to 64 characters: a-z, 0-9 or a hyphen.",
+    "parent": "Inside",
+    "rename": "Rename",
+    "renameTitle": "Rename the department",
+    "move": "Move",
+    "moveTitle": "Move the department",
+    "moveHint": "Departments can be nested two levels deep.",
+    "delete": "Delete",
+    "deleteTitle": "Delete the department?",
+    "deleteBody": "Its members lose access to it. Only an empty department can be deleted: move or delete its courses and sub-departments first.",
+    "actions": "Actions for {name}",
+    "counts": "{courses} · {members}",
+    "whole": "Whole organization",
+    "empty": "No departments yet",
+    "emptyHint": "Create a department for each group of teachers, for example a subject or a school building.",
+    "created": "Department created",
+    "saved": "Department saved",
+    "deleted": "Department deleted",
+    "usageTitle": "By department",
+    "usageDepartment": "Department",
+    "noneUsage": "No departments yet.",
+    "platformHint": "A suspended department suspends everything inside it: its courses and sub-departments become read-only.",
+    "save": "Save",
+    "cancel": "Cancel",
+    "suspendTitle": "Suspend this department?",
+    "suspendBody": "The courses of this department and of the departments inside it become read-only. You can resume it later.",
+    "resumeTitle": "Resume this department?",
+    "resumeBody": "The courses of this department and of the departments inside it can be edited again.",
+    "suspendedToast": "{name} is suspended.",
+    "resumedToast": "{name} is active again.",
+    "courseDepartment": "Department",
+    "courseDepartmentHint": "Move the course to another department. Its students, staff and question banks stay with it.",
+    "moveCourse": "Move course",
+    "courseMoved": "The course is now in {name}",
+    "courseCount": "{count} courses",
+    "courseCount_one": "{count} course",
+    "courseCount_few": "{count} courses",
+    "courseCount_many": "{count} courses",
+    "courseCount_other": "{count} courses",
+    "memberCount": "{count} members",
+    "memberCount_one": "{count} member",
+    "memberCount_few": "{count} members",
+    "memberCount_many": "{count} members",
+    "memberCount_other": "{count} members",
+    "submitCreate": "Create"
+  },
+  "sharedBanks": {
+    "nav": "Shared banks",
+    "title": "Shared question banks",
+    "intro": "Question banks that teachers shared with the whole organization. Teachers copy them into their courses on the course's Question banks page.",
+    "search": "Search by title",
+    "empty": "No shared banks yet",
+    "emptyHint": "A teacher shares a bank from its page, with More actions, once sharing is turned on in Settings.",
+    "emptySearch": "No shared banks match your search.",
+    "noAccess": "Only teachers and admins of this organization see its shared banks.",
+    "from": "{course} · {org}",
+    "sharedBy": "Shared by {name}",
+    "open": "Open bank",
+    "badge": "Shared",
+    "pickerTitle": "From my organization",
+    "pickerIntro": "Banks shared in {org}. A copy becomes a private bank of this course; later changes to the original do not reach it.",
+    "pickerEmpty": "No banks are shared in your organization yet.",
+    "copy": "Copy into this course",
+    "copyLabel": "Copy {title} into this course",
+    "copied": "Copied: {title}",
+    "more": "Show more",
+    "menu": "More actions",
+    "share": "Share with organization",
+    "shareHint": "Every teacher of {org} can read and copy this bank.",
+    "unshare": "Stop sharing",
+    "unshareHint": "Copies already made stay in their courses.",
+    "sharedToast": "The bank is shared with the organization",
+    "unsharedToast": "The bank is no longer shared",
+    "teachersOnly": "Only the teachers of this course can share it",
+    "copyTitle": "{title} (copy)"
+  },
+  "enrollmentForm": {
+    "title": "Enrollment form",
+    "versionN": "Version {n}",
+    "status": {
+      "draft": "Draft",
+      "active": "In use",
+      "retired": "Old version"
+    },
+    "tabs": {
+      "label": "Enrollment form sections",
+      "edit": "Edit",
+      "preview": "Preview"
+    },
+    "piiNotice": "Ask only what you need to decide. Never ask about health, religion, ethnicity or ID numbers: students may be children.",
+    "immutable": "Students have already answered this version, so it cannot change. Create a new version to edit it; earlier answers stay with this one.",
+    "retiredNote": "This is an old version, shown for reference only.",
+    "draftReplaces": "This is a draft. When you activate it, it replaces version {n} for new applications.",
+    "readOnly": "Only teachers of the course can edit the form.",
+    "formTitle": "Form title",
+    "intro": "Introduction for students",
+    "fields": "Fields",
+    "fieldCount": "{count} of {max} fields",
+    "noFields": "No fields yet. Add the first one.",
+    "addField": "Add field",
+    "saved": "Form saved",
+    "activated": "Form activated: students now see it",
+    "versionCreated": "New version created as a draft",
+    "saveAndActivate": "Save and activate",
+    "activate": "Activate",
+    "discard": "Discard changes",
+    "deleteDraft": "Delete draft",
+    "unsaved": "Unsaved changes",
+    "newVersion": "Create a new version",
+    "activateTitle": "Activate this form?",
+    "activateBody": "Students who apply will fill in this form.",
+    "activateBodyReplace": "It replaces version {n} for new applications. Earlier applications keep their answers.",
+    "deleteTitle": "Delete this draft?",
+    "deleteBody": "The draft is deleted. The version in use is not affected.",
+    "empty": {
+      "title": "No enrollment form yet",
+      "body": "Create a form to let students apply to the course.",
+      "create": "Create the form"
+    },
+    "errors": {
+      "labelRequired": "Every field needs a label in the course's default language.",
+      "optionRequired": "Choice fields need at least one option, each with a label in the default language."
+    },
+    "ortLocked": "Fixed by the ORT template: ORT courses do not use enrollment forms.",
+    "versions": {
+      "title": "Versions",
+      "saveFirst": "Save or discard your changes to look at another version.",
+      "answered": "Has answers",
+      "fields": "Fields: {count}",
+      "shown": "Shown",
+      "view": "View"
+    },
+    "field": {
+      "type": "Field type",
+      "pii": "Personal data",
+      "label": "Label",
+      "help": "Help text",
+      "required": "Required field",
+      "requiredBadge": "Required",
+      "options": "Options",
+      "option": "Option {n}",
+      "removeOption": "Remove option {n}",
+      "addOption": "Add option",
+      "min": "Minimum",
+      "max": "Maximum",
+      "maxLen": "Maximum length",
+      "maxLenHint": "Characters. Default {def}, at most {max}.",
+      "untitled": "Field {n} (no label)",
+      "actions": "Actions for the field: {name}",
+      "edit": "Edit",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "remove": "Remove field",
+      "removeTitle": "Remove this field?",
+      "removeBody": "The field disappears from this version when you save."
+    },
+    "types": {
+      "short_text": "Short text",
+      "long_text": "Long text",
+      "single_choice": "One choice",
+      "multi_choice": "Several choices",
+      "number": "Number",
+      "date": "Date",
+      "email": "Email",
+      "phone": "Phone"
+    },
+    "pii": {
+      "none": "Not personal",
+      "noneHint": "For example a choice of group or level.",
+      "contact": "Contact data",
+      "contactHint": "Email or phone: how to reach the student or a parent.",
+      "personal": "Personal data",
+      "personalHint": "Name, date of birth or other facts about the person."
+    },
+    "preview": {
+      "note": "This is how students see the form. Nothing is sent from here.",
+      "language": "Preview language",
+      "check": "Check answers",
+      "checkOk": "All answers are valid.",
+      "noFields": "This form has no fields yet."
+    },
+    "modes": {
+      "invite_code": "With a join code",
+      "open": "Open: anyone joins from the catalog",
+      "form_review": "By application (teacher approves)",
+      "form_auto": "By application (instant entry)",
+      "closed": "Closed (nobody can join)"
+    },
+    "modeHints": {
+      "invite_code": "Students join with the code above.",
+      "open": "Any student can join from the catalog with one click.",
+      "form_review": "Students fill in the enrollment form; you approve or reject them in People → Applications.",
+      "form_auto": "Students fill in the enrollment form and join at once (the student limit still applies).",
+      "closed": "Nobody can join. Students already in the course stay."
+    },
+    "settings": {
+      "catalog": "Show in the catalog",
+      "catalogHint": "Students can find the course in the catalog and open its page.",
+      "catalogNeeded": "Application modes need this on: students apply from the course page in the catalog.",
+      "noActive": "No form in use. Create one to use application modes.",
+      "active": "Version {n} in use",
+      "open": "Open the form",
+      "ortNote": "Fixed by the ORT template: ORT courses join by code, open or closed, without enrollment forms."
+    }
+  },
+  "applications": {
+    "privacyNote": "Only the teachers and assistants of this course see your answers. If you are not accepted, withdraw, or later leave the course, your answers are deleted within 90 days.",
+    "status": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "withdrawn": "Withdrawn"
+    },
+    "studentStatus": {
+      "pending": "Waiting for the teacher",
+      "approved": "Accepted",
+      "rejected": "Not accepted",
+      "withdrawn": "Withdrawn"
+    },
+    "answerErrors": {
+      "required": "Fill in this field.",
+      "too_long": "The answer is too long.",
+      "bad_option": "Choose one of the options.",
+      "bad_format": "Check the format of this answer."
+    },
+    "errors": {
+      "form_required": "Create and activate an enrollment form first, then choose this mode.",
+      "form_needs_catalog": "Application modes need the course in the catalog. Turn on \"Show in the catalog\".",
+      "form_answered": "Students have already answered this form. Create a new version to change it.",
+      "form_draft_exists": "There is already a draft. Open it to continue.",
+      "form_retired": "This version is no longer in use and cannot change.",
+      "form_not_draft": "Only a draft can be deleted.",
+      "form_not_found": "This form no longer exists. Reload the page.",
+      "too_many_fields": "A form can have at most 25 fields.",
+      "application_pending": "There is already an application waiting for the teacher.",
+      "application_decided": "This application has already been decided. Its current status is shown.",
+      "application_not_found": "This application no longer exists.",
+      "form_changed": "The teacher has just changed the form. Check your answers and send again.",
+      "course_full": "The course has no free places right now. The application stays pending.",
+      "course_not_open": "The course is not open: it is a draft or has ended.",
+      "template_locked": "Fixed by the ORT template: ORT courses do not use enrollment forms.",
+      "already_enrolled": "This student is already in the course.",
+      "validation_failed": "Some data is not valid. Check the fields and try again."
+    },
+    "home": {
+      "title": "Pending applications",
+      "sent": "Sent {date}"
+    },
+    "apply": {
+      "title": "Application",
+      "submit": "Send application",
+      "sentTitle": "Application sent",
+      "sentBody": "The teacher will review it. You will get an email when there is a decision.",
+      "approvedTitle": "You are in the course",
+      "approvedBody": "Your application was accepted at once. You can open the course now.",
+      "viewStatus": "See the status",
+      "backToCourse": "Back to the course",
+      "fixFields": "Fix the marked fields ({count}).",
+      "blocked": {
+        "memberTitle": "You are already in this course",
+        "memberBody": "Open the course to continue.",
+        "pendingTitle": "Your application is waiting",
+        "pendingBody": "The teacher has not decided yet. The course page shows the status.",
+        "notOpenTitle": "Applications are not open",
+        "notOpenBody": "This course does not take applications right now."
+      },
+      "checkForm": "Check the form"
+    },
+    "student": {
+      "title": "Your application",
+      "explain": {
+        "pending": "The teacher has not decided yet. You will get an email.",
+        "approved": "Your application was accepted.",
+        "rejected": "Your application was not accepted. You can apply again.",
+        "withdrawn": "You withdrew this application. You can apply again."
+      },
+      "sentOn": "Sent {date}",
+      "decidedOn": "decided {date}",
+      "note": "Note from the teacher",
+      "withdraw": "Withdraw application",
+      "withdrawTitle": "Withdraw your application?",
+      "withdrawBody": "The teacher will no longer review it. You can apply again later.",
+      "withdrawn": "Application withdrawn"
+    },
+    "inbox": {
+      "title": "Applications",
+      "applicant": "Applicant",
+      "status": "Status",
+      "submitted": "Sent",
+      "all": "All",
+      "search": "Search by name or email",
+      "review": "Review",
+      "view": "Open",
+      "empty": "No applications yet",
+      "emptyFilter": "No applications match",
+      "emptyHint": "Students apply from the course page in the catalog.",
+      "showAll": "Show all applications"
+    },
+    "panel": {
+      "title": "Application",
+      "submitted": "Sent {date}",
+      "decided": "Decided {date} by {name}",
+      "automatic": "automatic entry",
+      "answers": "Answers",
+      "answersStaffOnly": "Only the teachers and assistants of the course can see the answers.",
+      "answersPurged": "The answers were deleted after the retention period.",
+      "noAnswer": "No answer",
+      "formVersion": "Form version {n}",
+      "noteShown": "Note shown to the student",
+      "decision": "Decision",
+      "note": "Note to the student",
+      "noteHint": "The student sees the note on the course page. Up to {max} characters.",
+      "sendNote": "Also send the note by email",
+      "sendNoteHint": "Without the tick, the email only gives the decision.",
+      "approve": "Approve",
+      "reject": "Reject",
+      "approved": "{name} is now in the course",
+      "rejected": "Application of {name} rejected",
+      "concluded": "The course is concluded: you can reject, but not approve."
+    }
   }
 }

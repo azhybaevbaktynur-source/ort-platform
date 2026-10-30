@@ -23,9 +23,21 @@ def is_quiz_bank(bank) -> bool:
 
 
 def shareable(bank) -> bool:
-    """Phase 9 (org-shared banks, `visibility`) must call this before sharing a bank: a quiz bank is never shared
-    (invariant 4.5). `test_quiz_bank_not_shareable` fails as soon as a `visibility` column appears, as a reminder."""
+    """A quiz bank is never shared (PHASE_7C_DESIGN invariant 4.5; PHASE_9_DESIGN invariant 1)."""
     return not is_quiz_bank(bank)
+
+
+# --- Phase 9 S1 begin --- (PHASE_9_DESIGN 4.2: the share use case (S2) calls this; the CHECK `quiz_bank_private` on
+# question_banks is the backstop: `assessment_id IS NULL OR visibility = 'private'`)
+E_QUIZ_BANK_NOT_SHAREABLE = "quiz_bank_not_shareable"
+
+
+def assert_shareable(bank) -> None:
+    """422 `quiz_bank_not_shareable` for a quiz bank."""
+    if not shareable(bank):
+        raise ValidationFailed("A quiz's own bank cannot be shared", code=E_QUIZ_BANK_NOT_SHAREABLE,
+                               details=[{"loc": ["bank_id"], "msg": E_QUIZ_BANK_NOT_SHAREABLE}])
+# --- Phase 9 S1 end ---
 
 
 def assert_bank_usable(bank, a: Assessment) -> None:

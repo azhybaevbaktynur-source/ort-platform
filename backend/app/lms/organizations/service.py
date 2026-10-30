@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import Request
 from sqlalchemy import Select, and_, distinct, func, or_, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.lms.audit import service as audit
 from app.lms.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
@@ -17,6 +17,8 @@ from app.lms.core.models import utcnow
 from app.lms.organizations import defaults
 from app.lms.organizations.ids import personal_org_id
 from app.lms.organizations.models import Organization, OrganizationMember, OrganizationTemplateGrant
+
+PATH_SEGMENT_LEN = 32  # Phase 9 S2: one `path` segment (organizations.models.path_segment)
 from app.models.user import User
 
 SLUG_RE = re.compile(r"^[a-z0-9-]{2,64}$")
@@ -44,11 +46,11 @@ def _active_membership(user_id: str):
 
 
 def organizations_administered_by(db: Session, user_id: str) -> list[uuid.UUID]:
-    """Ids of the organizations where the user is an active org admin (one SQL)."""
-    return list(db.execute(
-        select(Organization.id).join(OrganizationMember, OrganizationMember.organization_id == Organization.id)
-        .where(_active_membership(user_id), OrganizationMember.role == "org_admin").order_by(Organization.name)
-    ).scalars())
+    """Ids of the organizations the user administers (one SQL). --- Phase 9 S1 --- (PHASE_9_DESIGN 4.1): the
+    organizations of their active org-admin memberships plus every descendant department (organizations.tree)."""
+    from app.lms.organizations import tree
+
+    return tree.organizations_administered_by(db, user_id)
 
 
 def organizations_of(db: Session, user_id: str) -> list[tuple[Organization, OrganizationMember]]:
@@ -61,17 +63,42 @@ def organizations_of(db: Session, user_id: str) -> list[tuple[Organization, Orga
 
 
 def _creator_predicate():
-    can_teach = func.coalesce(Organization.settings["teachers_can_create_courses"].as_boolean(), False)
-    return and_(Organization.status == "active",
-                or_(OrganizationMember.role == "org_admin", and_(OrganizationMember.role == "teacher", can_teach)))
+    """--- Phase 9 S2 --- (PHASE_9_DESIGN 2.1, 4.1): status, deletion and `teachers_can_create_courses` are read
+    from the **root** of the membership's tree (departments store `{}` and copy no status). The root is the
+    organization whose `path` is the first segment of the member organization's path (one correlated EXISTS)."""
+    root = aliased(Organization, name="creator_root")
+    root_ok = (select(root.id).where(root.path == func.substr(Organization.path, 1, PATH_SEGMENT_LEN),
+                                     root.status == "active", root.deleted_at.is_(None))
+               .correlate(Organization))
+    can_teach = func.coalesce(root.settings["teachers_can_create_courses"].as_boolean(), False)
+    # a suspended department suspends its subtree (architect M2): no suspended organization on the path
+    from app.lms.organizations import tree
+
+    up = aliased(Organization, name="creator_up")
+    suspended_on_path = (select(up.id).where(tree.within_clause(Organization.path, up.path), up.status == "suspended")
+                         .correlate(Organization).exists())
+    return and_(~suspended_on_path,
+                or_(and_(OrganizationMember.role == "org_admin", root_ok.exists()),
+                    and_(OrganizationMember.role == "teacher", root_ok.where(can_teach).exists())))
 
 
 def creator_organizations(db: Session, user_id: str) -> list[uuid.UUID]:
-    """Active organizations where the user may create courses (one SQL)."""
-    return list(db.execute(
-        select(Organization.id).join(OrganizationMember, OrganizationMember.organization_id == Organization.id)
+    """Active organizations where the user may create courses (one SQL; a second one for org admins).
+    --- Phase 9 S2 ---: an org admin may also create courses in every department below their organization."""
+    rows = db.execute(
+        select(Organization.id, Organization.path, OrganizationMember.role)
+        .join(OrganizationMember, OrganizationMember.organization_id == Organization.id)
         .where(_active_membership(user_id), _creator_predicate()).order_by(Organization.id)
-    ).scalars())
+    ).all()
+    ids = [r[0] for r in rows]
+    admin_paths = [r[1] for r in rows if r[2] == "org_admin"]
+    if admin_paths:
+        from app.lms.organizations import tree
+
+        ids += list(db.execute(select(Organization.id).where(
+            or_(*(tree.within_clause(Organization.path, p) for p in admin_paths)),
+            Organization.deleted_at.is_(None))).scalars())
+    return sorted(dict.fromkeys(ids), key=lambda i: i.hex)
 
 
 def can_create_courses(db: Session, user: User) -> bool:
@@ -94,9 +121,12 @@ def is_active_member(db: Session, organization_id: uuid.UUID, user_id: str) -> b
 
 
 def is_org_admin(db: Session, organization_id: uuid.UUID, user_id: str) -> bool:
-    return db.execute(select(OrganizationMember.id).where(
-        OrganizationMember.organization_id == organization_id, OrganizationMember.user_id == user_id,
-        OrganizationMember.state == "active", OrganizationMember.role == "org_admin")).first() is not None
+    """--- Phase 9 S2 --- (PHASE_9_DESIGN 4.1, invariant 4): an active org admin of the organization **or of any
+    non-deleted ancestor** (`tree.is_org_admin_in_tree`), so the admin of a school manages its departments."""
+    from app.lms.organizations import tree
+
+    org = db.execute(select(Organization).where(Organization.id == organization_id)).scalar_one_or_none()
+    return tree.is_org_admin_in_tree(db, user_id, org)
 
 
 def has_active_grant(db: Session, organization_id: uuid.UUID, template_key: str) -> bool:
@@ -125,8 +155,11 @@ def load_org_for_admin(db: Session, user: User, organization_id: uuid.UUID, *, w
         Organization.id == organization_id, Organization.deleted_at.is_(None))).scalar_one_or_none()
     if org is None or not (user.is_platform_admin or is_org_admin(db, org.id, user.id)):
         raise org_not_found()
-    if write and org.status == "suspended" and not user.is_platform_admin:
-        raise org_suspended_error()
+    if write and not user.is_platform_admin:
+        from app.lms.organizations.tree import suspended_on_path
+
+        if suspended_on_path(db, org):  # Phase 9 fix 2 (M1): a suspended ancestor makes the department read-only
+            raise org_suspended_error()
     return org
 
 
@@ -203,8 +236,9 @@ def update_org(db: Session, admin: User, org: Organization, data, request: Optio
     if "settings" in fields:
         if fields["settings"] is None:
             raise ValidationFailed("settings cannot be null")
-        new = dict(org.settings or {})
-        new.update(fields["settings"].model_dump(exclude_none=True))
+        from app.lms.organizations.settings import validate_settings_write  # Phase 9 S2: root only, P9-3
+
+        new = validate_settings_write(org, fields["settings"])
         changes["settings"] = [org.settings, new]
         org.settings = new
     audit.record(db, actor=admin, action="organization.update", target_type="organization", target_id=str(org.id),
@@ -291,13 +325,21 @@ def remove_member(db: Session, actor: User, org: Organization, user_id: str, rea
 
 # ------------------------------------------------------------------------------------------------ courses, usage
 
-def org_courses_query(organization_id: uuid.UUID, *, deleted: bool = False) -> Select:
-    """Rows of (Course, owner User, active_student_count) for one organization."""
+def org_courses_query(organization_id: uuid.UUID, *, deleted: bool = False,
+                      subtree_path: Optional[str] = None) -> Select:
+    """Rows of (Course, owner User, active_student_count) for one organization. --- Phase 9 S2 ---: with
+    `subtree_path`, the courses of that organization and of every department below it."""
     from app.lms.courses.models import Course
     from app.lms.courses.scopes import regular_courses  # Phase 8b S1
     from app.lms.courses.service import admin_courses_query
 
-    stmt = admin_courses_query().where(Course.organization_id == organization_id, regular_courses())
+    if subtree_path is not None:
+        from app.lms.organizations import tree
+
+        where_org = Course.organization_id.in_(tree.subtree_scope(subtree_path))
+    else:
+        where_org = Course.organization_id == organization_id
+    stmt = admin_courses_query().where(where_org, regular_courses())
     return stmt.where(Course.deleted_at.is_not(None) if deleted else Course.deleted_at.is_(None))
 
 
@@ -404,7 +446,7 @@ def join_as_teacher(db: Session, actor: User, org: Organization, course_id: uuid
     from app.lms.enrollments.models import Enrollment
 
     course = course_svc.load_course(db, course_id)
-    if course.organization_id != org.id:
+    if not in_subtree(db, org, course.organization_id):  # Phase 9 S2: courses of the departments too
         raise course_svc.not_found_course()
     course_svc.assert_not_sandbox(course)  # Phase 8b S2: sandbox staff = the template's managers (409 sandbox_course)
     course_svc.lock_course(db, course)
@@ -432,3 +474,266 @@ def join_as_teacher(db: Session, actor: User, org: Organization, course_id: uuid
                  details={"organization_id": str(org.id), "course_id": str(course.id)}, request=request)
     db.commit()
     return course, enr
+
+
+# --- Phase 9 S2 begin --- (PHASE_9_DESIGN 4.1 departments, 4.3 settings, course move; routes in router.py)
+E_DEPARTMENT_NOT_EMPTY = "department_not_empty"   # 409: delete with live sub-departments, courses, banks, templates
+E_DEPARTMENT_SELF = "department_self"             # 409: an admin cannot delete the organization of the route
+E_COURSE_MOVE_INVALID = "course_move_invalid"     # 422: sandbox course, or a personal organization as target
+
+
+def in_subtree(db: Session, org: Organization, organization_id) -> bool:
+    """`organization_id` is `org` itself or a non-deleted organization below it (one query unless it is `org`)."""
+    from app.lms.organizations import tree
+
+    if organization_id is None:
+        return False
+    if uuid.UUID(str(organization_id)) == org.id:
+        return True
+    path = db.execute(select(Organization.path).where(
+        Organization.id == organization_id, Organization.deleted_at.is_(None))).scalar_one_or_none()
+    return path is not None and tree.is_within(path, org.path)
+
+
+def subtree_org(db: Session, org: Organization, target_id: uuid.UUID, *, for_update: bool = False) -> Organization:
+    """A non-deleted organization inside `org`'s subtree (the organization of the route), else 404."""
+    from app.lms.organizations import tree
+
+    stmt = select(Organization).where(Organization.id == target_id, Organization.deleted_at.is_(None))
+    if for_update:
+        stmt = stmt.with_for_update().execution_options(populate_existing=True)
+    target = db.execute(stmt).scalar_one_or_none()
+    if target is None or not tree.is_within(target.path, org.path):
+        raise org_not_found()
+    return target
+
+
+def _subtree_rows(db: Session, path: str) -> list[Organization]:
+    from app.lms.organizations import tree
+    from app.lms.organizations.models import MAX_ORGS_PER_ROOT
+
+    return list(db.execute(select(Organization).where(
+        tree.within_clause(Organization.path, path), Organization.deleted_at.is_(None))
+        .order_by(Organization.depth, Organization.name, Organization.id).limit(MAX_ORGS_PER_ROOT)).scalars())
+
+
+def list_departments(db: Session, org: Organization) -> list[dict]:
+    """The subtree of `org` (itself first), depth-first with siblings by name, at most 200 rows, with live course
+    and active member counts (two grouped queries)."""
+    from app.lms.courses.models import Course
+    from app.lms.courses.scopes import regular_courses
+
+    rows = _subtree_rows(db, org.path)
+    ids = [o.id for o in rows]
+    courses = dict(db.execute(select(Course.organization_id, func.count()).where(
+        Course.organization_id.in_(ids), Course.deleted_at.is_(None), regular_courses())
+        .group_by(Course.organization_id)).all()) if ids else {}
+    members = dict(db.execute(select(OrganizationMember.organization_id, func.count()).where(
+        OrganizationMember.organization_id.in_(ids), OrganizationMember.state == "active")
+        .group_by(OrganizationMember.organization_id)).all()) if ids else {}
+    children: dict = {}
+    for o in rows:
+        children.setdefault(o.parent_id, []).append(o)
+    ordered: list[Organization] = []
+
+    def walk(node: Organization) -> None:
+        ordered.append(node)
+        for child in sorted(children.get(node.id, []), key=lambda c: (c.name.casefold(), c.id.hex)):
+            walk(child)
+
+    walk(next(o for o in rows if o.id == org.id))
+    return [dict(id=o.id, slug=o.slug, name=o.name, parent_id=o.parent_id, depth=o.depth, path=o.path,
+                 courses=courses.get(o.id, 0), members=members.get(o.id, 0), created_at=o.created_at,
+                 status=o.status, suspended_reason=o.suspended_reason)
+            for o in ordered]
+
+
+def create_department(db: Session, actor: User, org: Organization, data, request: Optional[Request]) -> Organization:
+    """Design 4.1: parent = `data.parent_id` (inside the route organization's subtree) or the route organization;
+    never a personal organization; depth <= 2; <= 200 organizations per root. Tree writes serialize on the root row
+    (`FOR UPDATE`). The department starts active and stores `{}` settings. Audited."""
+    from app.lms.organizations import ids as org_ids
+    from app.lms.organizations import tree
+    from app.lms.organizations.models import MAX_DEPTH, MAX_ORGS_PER_ROOT
+
+    parent = org if data.parent_id is None else subtree_org(db, org, data.parent_id)
+    root = tree.load_root(db, parent, for_update=True)
+    if parent.kind == "personal" or root.kind == "personal":
+        raise ValidationFailed("A personal organization has no departments", code=org_ids.E_DEPARTMENT_PARENT)
+    if parent.depth + 1 > MAX_DEPTH:
+        raise Conflict("Departments can be nested two levels deep", code=org_ids.E_DEPARTMENT_DEPTH)
+    count = db.execute(select(func.count()).select_from(Organization).where(
+        tree.within_clause(Organization.path, root.path), Organization.deleted_at.is_(None))).scalar_one()
+    if count >= MAX_ORGS_PER_ROOT:
+        raise Conflict("Too many departments in this organization", code=org_ids.E_DEPARTMENT_CAP)
+    slug = _check_slug(db, data.slug)
+    oid = uuid.uuid4()
+    # status "active": suspension is inherited through the path (a suspended root or department suspends its
+    # subtree), so a new row never needs its own copy of an ancestor's status
+    dept = Organization(id=oid, slug=slug, name=data.name.strip(), status="active", kind="department",
+                        parent_id=parent.id, path=tree.child_path(parent.path, oid), depth=parent.depth + 1,
+                        settings={}, created_by_id=actor.id)
+    db.add(dept)
+    db.flush()
+    audit.record(db, actor=actor, action="org.department_created", target_type="organization", target_id=str(oid),
+                 details={"organization_id": str(root.id), "department_id": str(oid),
+                          "parent_id": str(parent.id)}, request=request)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise Conflict("Slug already in use", code="slug_taken") from None
+    return dept
+
+
+def update_department(db: Session, actor: User, org: Organization, department_id: uuid.UUID, data,
+                      request: Optional[Request]) -> Organization:
+    """Rename and/or move (design 4.1). A move locks the root, refuses cycles (`department_cycle`) and a deepest
+    descendant deeper than 2 (`department_depth`), then rewrites `path`/`depth` of the subtree (<= 200 rows).
+    The new parent must be inside the route organization's subtree (a department admin moves inside their own)."""
+    from app.lms.organizations import ids as org_ids
+    from app.lms.organizations import tree
+
+    dept = subtree_org(db, org, department_id)
+    if dept.kind != "department":
+        raise org_not_found()
+    fields = data.model_fields_set
+    changes: dict = {}
+    if "parent_id" in fields and data.parent_id is not None and data.parent_id != dept.parent_id:
+        root = tree.load_root(db, dept, for_update=True)
+        dept = subtree_org(db, org, department_id, for_update=True)  # re-read the path under the root lock
+        new_parent = subtree_org(db, org, data.parent_id)
+        if new_parent.kind == "personal" or tree.root_id(new_parent.path) != root.id:
+            raise ValidationFailed("The new parent is not in this organization", code=org_ids.E_DEPARTMENT_PARENT)
+        if tree.is_within(new_parent.path, dept.path):
+            raise Conflict("A department cannot move under itself", code=org_ids.E_DEPARTMENT_CYCLE)
+        subtree = _subtree_rows(db, dept.path)
+        height = max(o.depth for o in subtree) - dept.depth
+        if not tree.fits_depth(new_parent.depth + 1, height):
+            raise Conflict("Departments can be nested two levels deep", code=org_ids.E_DEPARTMENT_DEPTH)
+        old_path, new_path = dept.path, tree.child_path(new_parent.path, dept.id)
+        changes["parent_id"] = [str(dept.parent_id), str(new_parent.id)]
+        for node in subtree:
+            node.path = tree.rebase(node.path, old_path, new_path)
+            node.depth = tree.depth_of(node.path)
+        dept.parent_id = new_parent.id
+    if "name" in fields and data.name is not None:
+        name = data.name.strip()
+        if not name:
+            raise ValidationFailed("name cannot be empty")
+        if name != dept.name:
+            changes["name"] = [dept.name, name]
+            dept.name = name
+    if changes:
+        audit.record(db, actor=actor, action="org.department_updated", target_type="organization",
+                     target_id=str(dept.id), details={"organization_id": str(tree.root_id(dept.path)),
+                                                      "department_id": str(dept.id), "changes": changes},
+                     request=request)
+    db.commit()
+    return dept
+
+
+def delete_department(db: Session, actor: User, org: Organization, department_id: uuid.UUID,
+                      request: Optional[Request]) -> None:
+    """Soft delete of an **empty** department (S1 open item 4). Status and deletion are read from the root only
+    (`AuthzContext._org`), so a deleted middle department must never leave live children behind: the delete is
+    refused (409 `department_not_empty`) while the department has live sub-departments, courses (sandboxes too),
+    banks or non-archived exam templates. Its active members are removed and its open invitations revoked in the
+    same transaction. The organization of the route itself cannot be deleted through it (`department_self`)."""
+    from app.lms.content.models import QuestionBank
+    from app.lms.courses.models import Course
+    from app.lms.exam_templates.models import ExamTemplate
+    from app.lms.organizations import tree
+    from app.lms.organizations.models import Invitation
+
+    dept = subtree_org(db, org, department_id)
+    if dept.kind != "department":
+        raise org_not_found()
+    if dept.id == org.id:
+        raise Conflict("Delete this department from its parent organization", code=E_DEPARTMENT_SELF)
+    tree.load_root(db, dept, for_update=True)
+    dept = subtree_org(db, org, department_id, for_update=True)
+    blockers = (
+        select(Organization.id).where(Organization.parent_id == dept.id, Organization.deleted_at.is_(None)),
+        select(Course.id).where(Course.organization_id == dept.id, Course.deleted_at.is_(None)),
+        select(QuestionBank.id).where(QuestionBank.organization_id == dept.id, QuestionBank.deleted_at.is_(None)),
+        select(ExamTemplate.id).where(ExamTemplate.organization_id == dept.id, ExamTemplate.status != "archived"),
+    )
+    if any(db.execute(b.limit(1)).first() is not None for b in blockers):
+        raise Conflict("Move or delete the department's sub-departments and courses first",
+                       code=E_DEPARTMENT_NOT_EMPTY)
+    now = utcnow()
+    members = list(db.execute(select(OrganizationMember).where(
+        OrganizationMember.organization_id == dept.id, OrganizationMember.state == "active")
+        .with_for_update()).scalars())
+    for m in members:
+        m.state, m.removed_at, m.removed_by_id = "removed", now, actor.id
+    open_invitations = list(db.execute(select(Invitation).where(
+        Invitation.organization_id == dept.id, Invitation.accepted_at.is_(None),
+        Invitation.revoked_at.is_(None))).scalars())
+    for inv in open_invitations:
+        inv.revoked_at, inv.revoked_by_id = now, actor.id
+    dept.deleted_at = now
+    audit.record(db, actor=actor, action="org.department_deleted", target_type="organization",
+                 target_id=str(dept.id), details={"organization_id": str(tree.root_id(dept.path)),
+                                                  "department_id": str(dept.id), "removed_members": len(members),
+                                                  "revoked_invitations": len(open_invitations)}, request=request)
+    db.commit()
+
+
+def settings_view(db: Session, org: Organization) -> dict:
+    """GET /org/{org}/settings: the tree's effective settings (stored on the root) and whether this organization
+    is the one that stores them (departments read them, design 4.3)."""
+    from app.lms.organizations import tree
+    from app.lms.organizations.settings import effective_settings
+
+    root = tree.load_root(db, org)
+    return dict(organization_id=org.id, root_id=root.id, root_name=root.name, kind=org.kind,
+                editable=org.id == root.id, settings=effective_settings(root.settings, root.kind))
+
+
+def patch_settings(db: Session, actor: User, org: Organization, patch, request: Optional[Request]) -> None:
+    """PATCH /org/{org}/settings: root only (409 `settings_on_root`), personal sharing refused (422
+    `sharing_disabled`), audited with before/after (settings hold no PII)."""
+    from app.lms.organizations.settings import validate_settings_write
+
+    org = load_org(db, org.id, for_update=True)
+    before = dict(org.settings or {})
+    after = validate_settings_write(org, patch)
+    if after != before:
+        org.settings = after
+        audit.record(db, actor=actor, action="organization.settings_update", target_type="organization",
+                     target_id=str(org.id), details={"organization_id": str(org.id), "before": before,
+                                                     "after": after}, request=request)
+    db.commit()
+
+
+def move_course(db: Session, actor: User, org: Organization, course_id: uuid.UUID, target_id: uuid.UUID,
+                request: Optional[Request]):
+    """PATCH /org/{org}/courses/{course_id} {organization_id} (design 4.1): an org admin of the route
+    organization moves one of its subtree's courses to another organization of that subtree (both administered by
+    the caller). The course's banks follow (a bank carries its course's organization); roster untouched. Audited."""
+    from app.lms.content.models import QuestionBank
+    from app.lms.courses import service as course_svc
+    from app.lms.organizations import tree
+
+    course = course_svc.load_course(db, course_id)
+    if not in_subtree(db, org, course.organization_id):
+        raise course_svc.not_found_course()
+    target = subtree_org(db, org, target_id)
+    if course.sandbox_for_template_id is not None or target.kind == "personal":
+        raise ValidationFailed("This course cannot be moved", code=E_COURSE_MOVE_INVALID)
+    course_svc.lock_course(db, course)
+    before = course.organization_id
+    if before == target.id:
+        db.commit()
+        return course
+    course.organization_id = target.id
+    db.execute(QuestionBank.__table__.update().where(QuestionBank.course_id == course.id)
+               .values(organization_id=target.id))
+    audit.record(db, actor=actor, action="org.course_moved", target_type="course", target_id=str(course.id),
+                 details={"organization_id": str(tree.root_id(target.path)), "course_id": str(course.id),
+                          "from": str(before), "to": str(target.id)}, request=request)
+    db.commit()
+    return course
+# --- Phase 9 S2 end ---

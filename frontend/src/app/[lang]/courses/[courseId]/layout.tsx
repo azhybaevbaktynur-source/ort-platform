@@ -60,7 +60,8 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
 
   // Phase 6b integration: course pages are Teaching for staff and Learning for students (header area switcher).
   // Phase 8c S1 (§2.5): inside a course the Teaching sub-menu is hidden; the sidebar is the course's navigation.
-  const staffRole = studentView || course?.my_enrollment?.role === "teacher" || course?.my_enrollment?.role === "assistant";
+  // Phase 9 UX: the server's staff serializer decides (org admins reading a course of their organization get it too).
+  const staffRole = studentView || (!!course && isStaffCourse(course));
   useDeclareArea(course ? (staffRole ? "teaching" : "learning") : null, { hideSections: true });
 
   const missing = (error as { status?: number } | null)?.status === 404;

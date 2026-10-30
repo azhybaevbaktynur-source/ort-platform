@@ -115,11 +115,22 @@ def reset_lms_state() -> None:
         for model in (OrganizationMember, Invitation, OrganizationTemplateGrant):
             conn.execute(delete(model.__table__))
         # --- Phase 6 S1 end ---
+        # --- Phase 9 S1 begin --- applications (enrollments, forms, courses, users: RESTRICT), form fields and forms,
+        # roster imports (organizations, courses: RESTRICT; invitations already gone) before courses and organizations
+        from app.lms.enrollment_forms.models import EnrollmentApplication, EnrollmentForm, EnrollmentFormField
+        from app.lms.organizations.roster_models import RosterImport
+
+        for model in (EnrollmentApplication, EnrollmentFormField, EnrollmentForm, RosterImport):
+            conn.execute(delete(model.__table__))
+        conn.execute(update(QuestionBank.__table__).values(copied_from_bank_id=None))
+        conn.execute(update(BankQuestion.__table__).values(copied_from_question_id=None))
+        # --- Phase 9 S1 end ---
         for model in tables:
             conn.execute(delete(model.__table__))
         # --- Phase 6 S1 begin --- organizations themselves after courses and banks
-        conn.execute(update(Organization.__table__).values(parent_id=None))
-        conn.execute(delete(Organization.__table__))
+        # Phase 9 S1: departments first, deepest first (a department keeps its parent: CHECK department_has_parent)
+        for depth in (2, 1, 0):
+            conn.execute(delete(Organization.__table__).where(Organization.depth >= depth))
         # --- Phase 6 S1 end ---
         conn.execute(delete(User.__table__).where(User.id.notin_(SEED_USER_IDS)))
     _reset_storage_caches()

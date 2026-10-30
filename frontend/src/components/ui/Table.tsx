@@ -168,7 +168,11 @@ export function Table<T>({
 
         {cards && (
           <ul aria-label={caption} className="space-y-3 sm:hidden">
-            {rows.map((row, ri) => (
+            {rows.map((row, ri) => {
+              // Phase 9 UX: no empty action row on a card whose action cells are all empty (a revoked invitation)
+              const actionCells = actionColumns.map((c) => ({ c, node: c.cell(row, ri) }))
+                .filter(({ node }) => node !== null && node !== undefined && node !== false);
+              return (
               <li key={rowKey(row)} className={cn("rounded-2xl border border-slate-200 bg-white p-4 shadow-sm", rowClassName?.(row))}>
                 {primary && <div className="break-words text-base font-semibold leading-6 text-slate-900">{primary.cell(row, ri)}</div>}
                 {cardColumns.some((c) => !c.hideInCard?.(row)) && (
@@ -181,13 +185,14 @@ export function Table<T>({
                     ))}
                   </dl>
                 )}
-                {actionColumns.length > 0 && (
+                {actionCells.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                    {actionColumns.map((c) => <React.Fragment key={c.key}>{c.cell(row, ri)}</React.Fragment>)}
+                    {actionCells.map(({ c, node }) => <React.Fragment key={c.key}>{node}</React.Fragment>)}
                   </div>
                 )}
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
 

@@ -46,10 +46,26 @@ class QuestionBank(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
         Uuid(as_uuid=True), ForeignKey("assessments.id", ondelete="RESTRICT"), nullable=True
     )
     # --- Phase 7c S1 end ---
+    # --- Phase 9 S1 begin --- (PHASE_9_DESIGN 2.2: organization-shared banks; every existing bank stays private)
+    visibility: Mapped[str] = mapped_column(String(16), nullable=False, default="private", server_default="private")
+    shared_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    shared_by_id: Mapped[Optional[str]] = mapped_column(
+        String(64), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    copied_from_bank_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("question_banks.id", ondelete="SET NULL"), nullable=True
+    )
+    # --- Phase 9 S1 end ---
 
     __table_args__ = (
         CheckConstraint("default_language IS NULL OR default_language IN ('en','ru','ky')",
                         name="default_language_valid"),
+        # --- Phase 9 S1 begin --- (invariant 1: a quiz bank is never shared; a shared bank has a home course)
+        CheckConstraint("visibility IN ('private','organization')", name="visibility_valid"),
+        CheckConstraint("assessment_id IS NULL OR visibility = 'private'", name="quiz_bank_private"),
+        CheckConstraint("visibility = 'private' OR course_id IS NOT NULL", name="shared_bank_has_course"),
+        Index("ix_question_banks_org_visibility", "organization_id", "visibility"),
+        # --- Phase 9 S1 end ---
         # --- Phase 7c S1 begin --- (one live quiz bank per assessment; a quiz bank has a course and no importer source)
         CheckConstraint("assessment_id IS NULL OR course_id IS NOT NULL", name="quiz_bank_has_course"),
         CheckConstraint("assessment_id IS NULL OR source_id IS NULL", name="quiz_bank_no_source"),
@@ -178,6 +194,10 @@ class BankQuestion(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
     source_meta: Mapped[Optional[dict]] = mapped_column(JSONType, nullable=True)
     search_text: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
     deleted_by_id: Mapped[Optional[str]] = _deleted_by()
+    # --- Phase 9 S1 --- (PHASE_9_DESIGN 2.2: the shared-bank question this one was copied from; informational only)
+    copied_from_question_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("bank_questions.id", ondelete="SET NULL"), nullable=True
+    )
 
     __table_args__ = (
         CheckConstraint(f"type IN {QUESTION_TYPES}", name="type_valid"),

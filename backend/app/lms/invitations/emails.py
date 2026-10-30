@@ -136,6 +136,92 @@ def build_invitation_email(*, to_email: str, token: str, lang: str, inviter_name
                            from_name=f"{header_fmt['inviter']} via {app}", reply_to=inviter_email)
 
 
+# --- Phase 9 S3 begin --- (PHASE_9_DESIGN 4.8: the student invitation email; same wrapper, From "{inviter} via
+# {appName}" and Reply-To = the inviter (Q7); course title in the invitation language and the expiry line)
+_STUDENT_TEXTS: dict[str, dict[str, str]] = {
+    "en": {
+        "subject": "{inviter} invites you to the course \"{course}\" on {app}",
+        "title": "You are invited to a course",
+        "intro": "{inviter} invites you to join the course \"{course}\" ({org}) on {app} as a student.",
+        "how": "Open the link, log in or create an account with this email address, and you will join the course.",
+        "message": "Message from {inviter}:",
+        "button": "Join the course",
+        "copy_hint": "Or copy this link into your browser:",
+        "expires": "The invitation is valid until {date} (UTC).",
+        "footer": "If you did not expect this invitation, you can ignore this email.",
+    },
+    "ru": {
+        "subject": "{inviter} приглашает вас в курс «{course}» на {app}",
+        "title": "Приглашение в курс",
+        "intro": "{inviter} приглашает вас в курс «{course}» ({org}) на {app}. Роль: ученик.",
+        "how": "Откройте ссылку, войдите или создайте аккаунт с этим адресом почты, и вы будете записаны в курс.",
+        "message": "Сообщение от {inviter}:",
+        "button": "Перейти в курс",
+        "copy_hint": "Или скопируйте ссылку в адресную строку браузера:",
+        "expires": "Приглашение действительно до {date} (UTC).",
+        "footer": "Если вы не ждали этого приглашения, просто проигнорируйте это письмо.",
+    },
+    "ky": {
+        "subject": "{inviter} сизди {app} платформасындагы «{course}» курсуна чакырат",
+        "title": "Курска чакыруу",
+        "intro": "{inviter} сизди {app} платформасындагы «{course}» курсуна ({org}) чакырат. Ролу: окуучу.",
+        "how": "Шилтемени ачыңыз, ушул почта дареги менен кириңиз же аккаунт түзүңүз, ошондо курска кошуласыз.",
+        "message": "{inviter} жазган билдирүү:",
+        "button": "Курска кошулуу",
+        "copy_hint": "Же шилтемени көчүрүп, браузерге чаптаңыз:",
+        "expires": "Чакыруу {date} (UTC) чейин жарактуу.",
+        "footer": "Эгер бул чакырууну күткөн эмес болсоңуз, катты этибарга албаңыз.",
+    },
+}
+
+
+def build_student_invitation_email(*, to_email: str, token: str, lang: str, inviter_name: str,
+                                   inviter_email: Optional[str], organization_name: str,
+                                   course_title: Optional[dict], message: Optional[str],
+                                   expires_at: datetime) -> InvitationEmail:
+    lang = clean_language(lang)
+    t = _STUDENT_TEXTS[lang]
+    app = APP_NAME[lang]
+    course = _course_title(course_title, lang)
+    fmt = dict(inviter=inviter_name, org=organization_name, app=app, course=course)
+    header_fmt = dict(fmt, inviter=email_service._header_safe(inviter_name),
+                      org=email_service._header_safe(organization_name), course=email_service._header_safe(course))
+    subject = t["subject"].format(**header_fmt)
+    intro = t["intro"].format(**fmt)
+    link = invite_link(token, lang, to_email)
+    expires = t["expires"].format(date=expires_at.strftime("%Y-%m-%d %H:%M"))
+    msg_label = t["message"].format(**fmt)
+    message = (message or "").strip()
+
+    text_parts = [intro, t["how"]]
+    if message:
+        text_parts.append(f"{msg_label}\n{message}")
+    text_parts += [link, expires, t["footer"]]
+    text = "\n\n".join(text_parts) + "\n"
+
+    safe_link = escape(link, quote=True)
+    message_html = ""
+    if message:
+        message_html = (
+            f'<p style="color: #475569; font-size: 13px; margin-bottom: 4px;">{escape(msg_label)}</p>'
+            f'<p style="color: #1e293b; font-size: 14px; white-space: pre-line; border-left: 3px solid #e2e8f0; '
+            f'padding-left: 12px; margin-top: 0;">{escape(message)}</p>'
+        )
+    html = email_service._wrap_html(t["title"], f"""
+  <p style="color: #475569; font-size: 14px;">{escape(intro)}</p>
+  <p style="color: #475569; font-size: 14px;">{escape(t["how"])}</p>
+  {message_html}
+  <div style="margin: 24px 0;">
+    <a href="{safe_link}" style="background-color: #4f46e5; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">{escape(t["button"])}</a>
+  </div>
+  <p style="color: #64748b; font-size: 12px;">{escape(t["copy_hint"])}<br><a href="{safe_link}">{safe_link}</a></p>
+  <p style="color: #64748b; font-size: 13px;">{escape(expires)}</p>
+""", t["footer"])
+    return InvitationEmail(to_email=to_email, subject=subject, text=text, html=html,
+                           from_name=f"{header_fmt['inviter']} via {app}", reply_to=inviter_email)
+# --- Phase 9 S3 end ---
+
+
 def send_invitation_email(mail: InvitationEmail) -> bool:
     """Never raises: the invitation exists either way and the API reports `email_sent`."""
     try:

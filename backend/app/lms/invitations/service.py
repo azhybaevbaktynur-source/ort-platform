@@ -16,7 +16,7 @@ from typing import Optional
 from fastapi import Request
 from sqlalchemy import and_, func, select, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from app.core.authz import A, AuthzContext, can, enrollment_role_resolver
 from app.lms.audit import service as audit
@@ -26,13 +26,14 @@ from app.lms.core.ratelimit import Limit
 from app.lms.courses.models import Course
 from app.lms.courses.service import add_event, assert_not_sandbox, get_enrollment, paginate_rows, require_course
 from app.lms.enrollments.models import Enrollment
-from app.lms.enrollments.service import require_staff_power
+from app.lms.enrollments.service import accept_student_invitation, require_staff_power
 from app.lms.invitations import emails
 from app.lms.invitations.policies import forbidden_org, load_organization, org_access
 from app.lms.invitations.schemas import (
     InvitationAcceptOut, InvitationCreatedOut, InvitationLookupOut, InvitationOut, MyInvitationOut,
 )
 from app.lms.organizations.models import Invitation, Organization, OrganizationMember
+from app.lms.organizations.tree import suspended_on_path
 from app.models.user import User
 
 INVITATION_TTL = timedelta(days=14)
@@ -152,11 +153,15 @@ def item_out(inv: Invitation, course_title: Optional[dict], inviter: Optional[Us
 
 
 def _ensure_active_org(org: Organization) -> None:
-    if org.status != "active":
+    """Phase 9 fix 2 (M1): the organization or any ancestor on its path suspended -> 403 (read from the org's own
+    session, so every caller gets the inherited check)."""
+    db = object_session(org)
+    if org.status != "active" or (db is not None and suspended_on_path(db, org)):
         raise Forbidden("Organization is suspended", code="organization_suspended")
 
 
-def _check_not_member(db: Session, org: Organization, email: str, course: Optional[Course]) -> None:
+def _check_not_member(db: Session, org: Organization, email: str, course: Optional[Course],
+                      role: Optional[str] = None) -> None:
     target = _user_by_email(db, email)
     if target is None:
         return
@@ -169,8 +174,8 @@ def _check_not_member(db: Session, org: Organization, email: str, course: Option
             raise Conflict("Already a member", code="already_member")
         return
     enr = get_enrollment(db, course.id, target.id)
-    if enr is not None and enr.state == "active" and enr.role in STAFF_ROLES:
-        raise Conflict("Already enrolled", code="already_enrolled")
+    if enr is not None and enr.state == "active" and (enr.role in STAFF_ROLES or role == "student"):
+        raise Conflict("Already enrolled", code="already_enrolled")  # Phase 9 S3: a student, in any active role
 
 
 def _revoke_open(db: Session, org_id: uuid.UUID, email: str, course_id: Optional[uuid.UUID], actor: User,
@@ -186,26 +191,38 @@ def _revoke_open(db: Session, org_id: uuid.UUID, email: str, course_id: Optional
 
 
 def _insert(db: Session, *, actor: User, org: Organization, email: str, role: str, course: Optional[Course],
-            message: Optional[str], language: str, now: datetime) -> tuple[Invitation, str]:
+            message: Optional[str], language: str, now: datetime,
+            roster_import_id: Optional[uuid.UUID] = None) -> tuple[Invitation, str]:
     token = new_token()
     inv = Invitation(
         id=uuid.uuid4(), token_hash=hash_token(token), email=email, organization_id=org.id, role=role,
         course_id=course.id if course else None, message=(message or "").strip() or None,
         language=emails.clean_language(language), invited_by_id=actor.id, expires_at=now + INVITATION_TTL,
-        created_at=now,
+        created_at=now, roster_import_id=roster_import_id,
     )
     db.add(inv)
     db.flush()
     return inv, token
 
 
-def _send(inv: Invitation, token: str, actor: User, org: Organization, course: Optional[Course]) -> bool:
-    mail = emails.build_invitation_email(
+def build_mail(inv: Invitation, token: str, actor: User, org: Organization,
+               course: Optional[Course]) -> emails.InvitationEmail:
+    """The email of one invitation (Phase 9 S3: student invitations use their own template, design 4.8)."""
+    if inv.role == "student":
+        return emails.build_student_invitation_email(
+            to_email=inv.email, token=token, lang=inv.language, inviter_name=_email_name(actor, org),
+            inviter_email=actor.email, organization_name=org.name, course_title=course.title if course else None,
+            message=inv.message, expires_at=_aware(inv.expires_at),
+        )
+    return emails.build_invitation_email(
         to_email=inv.email, token=token, lang=inv.language, inviter_name=_email_name(actor, org),
         inviter_email=actor.email, organization_name=org.name, role=inv.role,
         course_title=course.title if course else None, message=inv.message, expires_at=_aware(inv.expires_at),
     )
-    return emails.send_invitation_email(mail)
+
+
+def _send(inv: Invitation, token: str, actor: User, org: Organization, course: Optional[Course]) -> bool:
+    return emails.send_invitation_email(build_mail(inv, token, actor, org, course))
 
 
 def _create_and_send(db: Session, *, actor: User, org: Organization, email: str, role: str,
@@ -275,6 +292,8 @@ def list_org_invitations(db: Session, org: Organization, *, state: Optional[str]
         .outerjoin(Course, Course.id == Invitation.course_id)
         .outerjoin(User, User.id == Invitation.invited_by_id)
         .where(Invitation.organization_id == org.id)
+        # Phase 9 S3: student invitations are listed per course (GET /courses/{id}/students/invitations)
+        .where(Invitation.role != "student")
     )
     if state:
         stmt = stmt.where(_state_condition(state, now))
@@ -381,7 +400,7 @@ def resend(db: Session, user: User, organization_id: uuid.UUID, invitation_id: u
     org = load_organization(db, org.id)
     course = _course_of(db, inv)
     _ensure_active_org(org)
-    _check_not_member(db, org, inv.email, course)
+    _check_not_member(db, org, inv.email, course, inv.role)
     return _create_and_send(db, actor=user, org=org, email=inv.email, role=inv.role, course=course,
                             message=inv.message, language=inv.language, request=request,
                             action="invitation_resent", extra={"replaces_invitation_id": str(inv.id)})
@@ -513,14 +532,22 @@ def accept(db: Session, user: User, token: str, *, ip_hash: Optional[str],
             raise _accept_failure(db, ip_hash, not_found_invitation())
         raise _accept_failure(db, ip_hash, Forbidden("This invitation is for another email address",
                                                      code="invitation_email_mismatch"))
-    if org.status != "active":
+    if org.status != "active" or suspended_on_path(db, org):  # Phase 9 fix 2 (M1): a suspended ancestor too
         db.rollback()
         raise Forbidden("Organization is suspended", code="organization_suspended")
     course = _course_of(db, inv)
     if inv.course_id is not None and course is None:
         raise _accept_failure(db, ip_hash, not_found_invitation())
     now = clock.now()
-    if course is not None:
+    if course is not None and inv.role == "student":
+        # --- Phase 9 S3 --- (design 4.5): the enrollments accept hook (join lock order, honest refusals); on
+        # course_full / course_not_open the transaction rolls back and the invitation stays usable
+        try:
+            accept_student_invitation(db, user, course, invitation_id=inv.id)
+        except Conflict:
+            db.rollback()
+            raise
+    elif course is not None:
         _write_enrollment(db, user, inv, course, now)
     else:
         _write_membership(db, user, inv, now)

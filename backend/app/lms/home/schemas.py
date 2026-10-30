@@ -85,6 +85,18 @@ class HomeModuleNextOut(BaseModel):
 # --- Phase 8a S3 end ---
 
 
+# --- Phase 9 S4 begin --- (PHASE_9_DESIGN 8.1: "Pending applications" line; ids, titles and dates only)
+PENDING_APPLICATIONS_MAX = 3
+
+
+class HomeApplicationOut(BaseModel):
+    application_id: uuid.UUID
+    course_id: uuid.UUID
+    course_title: dict
+    submitted_at: datetime
+# --- Phase 9 S4 end ---
+
+
 class HomeOut(BaseModel):
     in_progress: list[HomeInProgressOut]
     next_up: list[HomeNextUpOut]
@@ -96,6 +108,7 @@ class HomeOut(BaseModel):
     modules_next: list[HomeModuleNextOut] = []
     announcements: list[AnnouncementHomeOut] = []  # latest three, never a body
     # --- Phase 8a S3 end ---
+    pending_applications: list[HomeApplicationOut] = []  # Phase 9 S4: newest three, never answers
 
 
 HOME_KEYS = frozenset(HomeOut.model_fields)
@@ -103,6 +116,7 @@ HOME_KEYS = frozenset(HomeOut.model_fields)
 MODULES_NEXT_KEYS = frozenset(HomeModuleNextOut.model_fields)
 ANNOUNCEMENT_KEYS = frozenset(AnnouncementHomeOut.model_fields)
 # --- Phase 8a S3 end ---
+PENDING_APPLICATION_KEYS = frozenset(HomeApplicationOut.model_fields)  # Phase 9 S4
 IN_PROGRESS_KEYS = frozenset(HomeInProgressOut.model_fields)
 NEXT_UP_KEYS = frozenset(HomeNextUpOut.model_fields)
 RESULT_KEYS = frozenset(HomeResultOut.model_fields)

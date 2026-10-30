@@ -63,8 +63,15 @@ export function OrgShell({ children }: { children: React.ReactNode }) {
     { href: base, label: t("organizations.org.nav.overview"), active: pathname === base },
     { href: `${base}/teachers`, label: t("organizations.org.nav.teachers"), active: pathname.startsWith(`${base}/teachers`) },
     { href: `${base}/courses`, label: t("organizations.org.nav.courses"), active: pathname.startsWith(`${base}/courses`) },
+    // --- Phase 9 S2 begin --- (PHASE_9_DESIGN 8.1: Overview · Teachers · Courses · Departments · Shared banks · Roster import · Exam templates · Settings)
+    { href: `${base}/departments`, label: t("departments.nav"), active: pathname.startsWith(`${base}/departments`) },
+    { href: `${base}/shared-banks`, label: t("sharedBanks.nav"), active: pathname.startsWith(`${base}/shared-banks`) },
+    { href: `${base}/roster-import`, label: t("organizations.org.rosterImport"), active: pathname.startsWith(`${base}/roster-import`) },
+    // --- Phase 9 S2 end ---
     // --- Phase 7b S4 ---
     { href: `${base}/exam-templates`, label: t("examTemplates.nav.title"), active: pathname.startsWith(`${base}/exam-templates`) },
+    // --- Phase 9 S2 ---
+    { href: `${base}/settings`, label: t("orgSettings.nav"), active: pathname.startsWith(`${base}/settings`) },
   ];
   const readOnly = org.status === "suspended";
   const crumbs = (...rest: Breadcrumb[]): Breadcrumb[] => [{ label: org.name, href: base }, ...rest];

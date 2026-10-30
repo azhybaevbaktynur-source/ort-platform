@@ -95,3 +95,16 @@ api_router.include_router(_pages_router, prefix="/courses", tags=["Pages"])
 api_router.include_router(_course_files_router, prefix="/courses", tags=["Course Files"])
 api_router.include_router(_announcements_router, prefix="/courses", tags=["Announcements"])
 # --- Phase 8a S3 end ---
+# --- Phase 9 S4 begin --- (enrollment forms, applications, /me/applications; PHASE_9_DESIGN 5)
+from app.lms.enrollment_forms.router import router as _enrollment_forms_router  # noqa: E402
+
+api_router.include_router(_enrollment_forms_router, tags=["Enrollment forms"])
+# --- Phase 9 S4 end ---
+# --- Phase 9 S2 begin --- (organization-shared banks, PHASE_9_DESIGN 4.2)
+from app.lms.content.shared_banks_router import (  # noqa: E402
+    course_router as _shared_banks_course_router, org_router as _shared_banks_org_router,
+)
+
+api_router.include_router(_shared_banks_org_router, prefix="/org", tags=["Organizations"])
+api_router.include_router(_shared_banks_course_router, prefix="/courses", tags=["Question Bank (LMS)"])
+# --- Phase 9 S2 end ---

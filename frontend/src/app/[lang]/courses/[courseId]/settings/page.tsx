@@ -18,6 +18,17 @@ import { CourseGradingSection } from "@/components/lms/grading/settings/CourseGr
 import { CourseHomeSection } from "@/components/lms/modules/CourseHomeSection"; // Phase 8a S4a
 import { ConfirmDialog, PageHeader, buttonClasses } from "@/components/ui";
 import { pickLocalized } from "@/lib/lms/localized";
+// --- Phase 9 S4: enrollment modes, catalog visibility, link to the enrollment form ---
+import Link from "next/link";
+import type { EnrollmentMode, Visibility } from "@/lib/lms/types";
+import { isFormMode } from "@/lib/lms/catalog";
+import { listFormVersions } from "@/lib/lms/enrollmentForms";
+import { templateUi } from "@/lib/lms/templates";
+import { ErrorState, Select, Switch } from "@/components/ui";
+import { useApplicationErrorText } from "@/components/lms/catalog/useApplicationErrorText";
+
+const SETTINGS_MODES: EnrollmentMode[] = ["invite_code", "open", "form_review", "form_auto", "closed"];
+// --- Phase 9 S4 end ---
 
 // Phase 6b S5c: design-system buttons; each settings card keeps its own save (one sticky save bar is Phase 7, UX T28).
 const card = "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6";
@@ -36,7 +47,8 @@ function Settings({ course }: { course: CourseStaffOut }) {
   const [defaultLanguage, setDefaultLanguage] = useState<Lang>(course.default_language);
   const [title, setTitle] = useState<LocalizedText>(course.title);
   const [description, setDescription] = useState<LocalizedText>(course.description ?? {});
-  const [mode, setMode] = useState<"invite_code" | "closed">(course.enrollment_mode === "closed" ? "closed" : "invite_code");
+  const [mode, setMode] = useState<EnrollmentMode>(course.enrollment_mode); // Phase 9 S4: five modes
+  const [visibility, setVisibility] = useState<Visibility>(course.visibility); // Phase 9 S4: catalog switch
   const [limit, setLimit] = useState(course.enrollment_limit ? String(course.enrollment_limit) : "");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<{ section: string; err: unknown } | null>(null);
@@ -44,6 +56,19 @@ function Settings({ course }: { course: CourseStaffOut }) {
   const [confirm, setConfirm] = useState<null | "regenerate" | "unpublish" | "conclude" | "delete" | "transfer">(null);
   const [teachers, setTeachers] = useState<RosterEntryOut[]>([]);
   const [newOwner, setNewOwner] = useState("");
+
+  // --- Phase 9 S4 ---
+  const ortLocked = templateUi(course).locked;
+  const formErrorText = useApplicationErrorText();
+  /** `undefined` while loading, `null` when the course has no active form. */
+  const [activeFormVersion, setActiveFormVersion] = useState<number | null | undefined>(undefined);
+  useEffect(() => {
+    if (ortLocked) return;
+    listFormVersions(course.id)
+      .then((vs) => setActiveFormVersion(vs.find((v) => v.status === "active")?.version ?? null))
+      .catch(() => setActiveFormVersion(null));
+  }, [course.id, ortLocked]);
+  // --- Phase 9 S4 end ---
 
   useEffect(() => {
     if (!isOwner) return;
@@ -87,7 +112,10 @@ function Settings({ course }: { course: CourseStaffOut }) {
   const saveEnrollment = (ev: React.FormEvent) => {
     ev.preventDefault();
     void run("enrollment", async () => {
-      apply(await updateCourse(course.id, { enrollment_mode: mode, enrollment_limit: limit.trim() ? parseInt(limit, 10) : null }));
+      apply(await updateCourse(course.id, {
+        enrollment_mode: mode, enrollment_limit: limit.trim() ? parseInt(limit, 10) : null,
+        ...(visibility !== course.visibility ? { visibility } : {}), // Phase 9 S4 (sent with the mode: form modes need the catalog)
+      }));
     });
   };
 
@@ -153,23 +181,32 @@ function Settings({ course }: { course: CourseStaffOut }) {
           <p className="mb-2 text-sm font-medium text-slate-700">{t("courses.settings.joinCode")}</p>
           <JoinCodeDisplay code={course.join_code} />
           <p className="mt-2 text-xs text-slate-500">{t("courses.settings.joinCodeHint")}</p>
-          {(st !== "published" || course.enrollment_mode !== "invite_code") && (
-            <p className="mt-1 text-xs text-amber-700">{t("courses.settings.joinCodeInactive")}</p>
-          )}
+          {/* Phase 9 UX: the reason the code does not work: a draft course, or the saved enrollment mode */}
+          {st !== "published" ? (
+            <p className="mt-1 text-xs text-amber-700">{t("courses.settings.joinCodeInactiveUnpublished")}</p>
+          ) : course.enrollment_mode !== "invite_code" ? (
+            <p className="mt-1 text-xs text-amber-700">
+              {t(isFormMode(course.enrollment_mode) ? "courses.settings.joinCodeInactiveMode"
+                : course.enrollment_mode === "open" ? "courses.settings.joinCodeInactiveOpen" : "courses.settings.joinCodeInactiveClosed",
+              { code: t("enrollmentForm.modes.invite_code") })}
+            </p>
+          ) : null}
           <button type="button" className={`${secondaryBtn} mt-3`} disabled={busy === "enrollment"} onClick={() => { setError(null); setConfirm("regenerate"); }}>
             {t("courses.settings.regenerate")}
           </button>
         </div>
         <form onSubmit={saveEnrollment} className="space-y-4" noValidate>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="s-mode" className="mb-1 block text-sm font-medium text-slate-700">{t("courses.create.enrollmentMode")}</label>
-              <select id="s-mode" value={mode} disabled={busy === "enrollment"} onChange={(e) => setMode(e.target.value as "invite_code" | "closed")}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm">
-                <option value="invite_code">{t("courses.create.modeInviteCode")}</option>
-                <option value="closed">{t("courses.create.modeClosed")}</option>
-              </select>
-            </div>
+            {/* Phase 9 S4: five modes; form modes are fixed off on ORT courses (422 template_locked).
+                Phase 9 UX: the design-system Select. */}
+            <Select id="s-mode" label={t("courses.create.enrollmentMode")} value={mode} disabled={busy === "enrollment"}
+              onChange={(e) => setMode(e.target.value as EnrollmentMode)}
+              hint={t(`enrollmentForm.modeHints.${mode}`)}
+              options={SETTINGS_MODES.map((m) => ({
+                value: m,
+                label: `${t(`enrollmentForm.modes.${m}`)}${ortLocked && isFormMode(m) ? ` (${t("templates.lockedNote")})` : ""}`,
+                disabled: ortLocked && isFormMode(m),
+              }))} />
             <div>
               <label htmlFor="s-limit" className="mb-1 block text-sm font-medium text-slate-700">{t("courses.create.limit")}</label>
               <input id="s-limit" type="number" min={1} max={10000} value={limit} disabled={busy === "enrollment"} onChange={(e) => setLimit(e.target.value)}
@@ -177,7 +214,30 @@ function Settings({ course }: { course: CourseStaffOut }) {
               <p className="mt-1 text-xs text-slate-500">{t("courses.settings.activeStudents", { count: course.active_student_count })}</p>
             </div>
           </div>
-          <ErrorMessage error={errFor("enrollment")} />
+          {/* --- Phase 9 S4: catalog visibility, the enrollment form, the ORT lock note --- */}
+          <Switch id="s-visibility" label={t("enrollmentForm.settings.catalog")} checked={visibility === "catalog"}
+            disabled={busy === "enrollment" || (course.unlisted_by_admin && visibility !== "catalog")}
+            hint={course.unlisted_by_admin ? t("lms.errors.unlisted_by_admin") : isFormMode(mode) ? t("enrollmentForm.settings.catalogNeeded") : t("enrollmentForm.settings.catalogHint")}
+            onChange={(on) => setVisibility(on ? "catalog" : "private")} />
+          {ortLocked ? (
+            <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">{t("enrollmentForm.settings.ortNote")}</p>
+          ) : (
+            <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-slate-900">{t("enrollmentForm.title")}</p>
+                <p className="text-sm text-slate-600">
+                  {activeFormVersion === undefined ? t("lms.common.loading")
+                    : activeFormVersion === null ? t("enrollmentForm.settings.noActive")
+                      : t("enrollmentForm.settings.active", { n: activeFormVersion })}
+                </p>
+              </div>
+              <Link href={`/${lang}/courses/${course.id}/settings/enrollment-form`} className={secondaryBtn}>
+                {t("enrollmentForm.settings.open")}
+              </Link>
+            </div>
+          )}
+          {/* --- Phase 9 S4 end --- */}
+          {errFor("enrollment") && !confirm ? <ErrorState variant="inline" message={formErrorText(errFor("enrollment"))} /> : null}
           <div className="flex items-center gap-3">
             <button type="submit" disabled={busy === "enrollment"} className={primaryBtn}>{busy === "enrollment" ? t("lms.common.loading") : t("lms.common.save")}</button>
             {savedFor("enrollment")}

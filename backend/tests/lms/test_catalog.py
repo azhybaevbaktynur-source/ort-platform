@@ -8,7 +8,7 @@ from sqlalchemy import event, select
 from app.core.route_inventory import ROUTE_POLICIES
 from app.db import session as db_session
 from app.lms.core.models import utcnow
-from app.lms.courses.catalog_router import catalog_page
+from app.lms.courses.catalog_router import CATALOG_CARD_KEYS, catalog_page
 from app.lms.courses.schemas import CATALOG_COURSE_KEYS, CatalogCourseOut
 from app.lms.enrollments.models import Enrollment, EnrollmentEvent
 from tests.lms.s3_support import api, clean_rate_limits, db, enroll, make_course, make_user, teacher  # noqa: F401
@@ -172,9 +172,12 @@ async def test_catalog_payload_is_an_allow_list(db, api):
     assert set(CatalogCourseOut.model_fields) == CATALOG_COURSE_KEYS == {
         "id", "title", "description", "languages", "default_language", "enrollment_mode", "student_count",
         "my_enrollment"}
+    # Phase 9 S4: cards add the root organization, the active-form flag and the caller's own application
+    assert CATALOG_CARD_KEYS == CATALOG_COURSE_KEYS | {
+        "organization_id", "organization_name", "has_active_form", "my_application"}
     r = await api.call(s, "GET", "/catalog/courses")
     body = r.json()
-    assert all(set(i) == CATALOG_COURSE_KEYS for i in body["items"])
+    assert all(set(i) == CATALOG_CARD_KEYS for i in body["items"])
     assert not (set(walk_keys(body)) & FORBIDDEN)
     for secret in (c.join_code, code_c.join_code, t.email, t.id):
         assert secret not in r.text

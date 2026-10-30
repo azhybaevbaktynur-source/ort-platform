@@ -1,7 +1,11 @@
 // Organizations API (docs/phases/PHASE_6_DESIGN.md §2.3): platform admin `/platform/organizations/*`,
 // org admin `/org/{orgId}/*`, and `/me/organizations`. Snake_case DTOs like the rest of lib/lms.
 import { lmsFetch } from "./client";
-import type { CourseCreateIn, CourseStatus, LocalizedText, PageOut, RosterEntryOut, UserBrief } from "./types";
+import type {
+  CourseCreateIn, CourseStatus, DepartmentOut as DepartmentBaseOut, LocalizedText, OrganizationSettings,
+  OrganizationSettingsIn, OrganizationTreeFields, OrgKind, PageOut, RosterEntryOut, SharedBankRowOut, UserBrief,
+} from "./types";
+import type { BankOut, PassageSummaryOut, QuestionStaffOut } from "./contentTypes";
 
 const enc = encodeURIComponent;
 const post = <T,>(path: string, body?: unknown) => lmsFetch<T>(path, { method: "POST", body: body ?? {} });
@@ -15,8 +19,8 @@ export interface OrgSettings {
   [k: string]: unknown;
 }
 
-/** `OrganizationOut` (POST/PATCH/suspend/resume of /platform/organizations). */
-export interface OrganizationOut {
+/** `OrganizationOut` (POST/PATCH/suspend/resume of /platform/organizations). Phase 9: + tree fields. */
+export interface OrganizationOut extends OrganizationTreeFields {
   id: string;
   slug: string;
   name: string;
@@ -82,6 +86,8 @@ export interface OrgCourseOut {
   template_key: string | null;
   active_student_count: number;
   created_at: string;
+  /** Phase 9 S2: the organization (department) the course belongs to. */
+  organization_id?: string | null;
 }
 
 /** GET /org/{orgId}: the organization, its usage counts and my role (null for the platform admin). */
@@ -120,7 +126,7 @@ export interface OrganizationCreateIn {
 export interface OrganizationUpdateIn {
   name?: string;
   slug?: string;
-  settings?: { teachers_can_create_courses?: boolean };
+  settings?: OrganizationSettingsIn;
 }
 
 /** Normalize a `{items, next_cursor}` page (every Phase 6 list is cursor-paginated). */
@@ -196,6 +202,90 @@ export async function searchOrgMembers(orgId: string, q: string, role?: OrgRole)
   const page = await listOrgMembers(orgId, { state: "active", role, limit: 100 });
   return page.items.filter((m) => memberMatches(m, q) && !isSystemAccount(m.user)).slice(0, 10).map((m) => m.user);
 }
+
+// --- Phase 9 S2 begin --- (docs/phases/PHASE_9_DESIGN.md §4.1-4.3, §5: departments, settings, usage, shared banks)
+
+/** A node of `GET /org/{orgId}/departments` (subtree, depth-first, the organization itself first). */
+export interface DepartmentOut extends DepartmentBaseOut {
+  status: OrgStatus;
+  suspended_reason: string | null;
+}
+export interface DepartmentCreateIn {
+  name: string;
+  slug: string;
+  parent_id?: string | null;
+}
+export interface DepartmentUpdateIn {
+  name?: string;
+  parent_id?: string;
+}
+
+/** `GET /org/{orgId}/settings`: effective settings of the tree; `editable` only on the root that stores them. */
+export interface OrgSettingsViewOut {
+  organization_id: string;
+  root_id: string;
+  root_name: string;
+  kind: OrgKind;
+  editable: boolean;
+  settings: OrganizationSettings;
+}
+
+export interface DepartmentUsageOut {
+  id: string;
+  name: string;
+  courses: number;
+  teachers: number;
+  students: number;
+}
+/** `GET /org/{orgId}/usage`: the subtree roll-up. */
+export interface TreeUsageOut extends OrgUsageOut {
+  by_department: DepartmentUsageOut[];
+  course_files_bytes: number;
+}
+
+/** `GET /courses/{courseId}/bank-sharing`: may this course's banks be shared, and may the caller copy into it. */
+export interface BankSharingOut {
+  enabled: boolean;
+  reason: "template_locked" | "personal" | "setting_off" | null;
+  root_id: string;
+  root_name: string;
+  can_copy: boolean;
+}
+
+export const getOrgSettings = (orgId: string) => lmsFetch<OrgSettingsViewOut>(`/org/${enc(orgId)}/settings`);
+export const updateOrgSettings = (orgId: string, body: OrganizationSettingsIn) =>
+  lmsFetch<OrgSettingsViewOut>(`/org/${enc(orgId)}/settings`, { method: "PATCH", body });
+export const getOrgUsage = (orgId: string) => lmsFetch<TreeUsageOut>(`/org/${enc(orgId)}/usage`);
+export const listDepartments = (orgId: string) => lmsFetch<DepartmentOut[]>(`/org/${enc(orgId)}/departments`);
+export const createDepartment = (orgId: string, body: DepartmentCreateIn) =>
+  post<DepartmentOut>(`/org/${enc(orgId)}/departments`, body);
+export const updateDepartment = (orgId: string, deptId: string, body: DepartmentUpdateIn) =>
+  lmsFetch<DepartmentOut>(`/org/${enc(orgId)}/departments/${enc(deptId)}`, { method: "PATCH", body });
+export const deleteDepartment = (orgId: string, deptId: string) =>
+  lmsFetch<void>(`/org/${enc(orgId)}/departments/${enc(deptId)}`, { method: "DELETE" });
+export const moveOrgCourse = (orgId: string, courseId: string, organizationId: string) =>
+  lmsFetch<OrgCourseOut>(`/org/${enc(orgId)}/courses/${enc(courseId)}`, { method: "PATCH", body: { organization_id: organizationId } });
+export const listPlatformDepartments = (orgId: string) =>
+  lmsFetch<DepartmentOut[]>(`/platform/organizations/${enc(orgId)}/departments`);
+
+export const listSharedBanks = (orgId: string, p: ListParams & { q?: string } = {}) =>
+  page(lmsFetch<PageOut<SharedBankRowOut>>(`/org/${enc(orgId)}/shared-banks`, { params: { limit: 25, ...p } }));
+export const getSharedBank = (orgId: string, bankId: string) =>
+  lmsFetch<SharedBankRowOut>(`/org/${enc(orgId)}/shared-banks/${enc(bankId)}`);
+export const listSharedBankQuestions = (orgId: string, bankId: string, p: ListParams & { q?: string } = {}) =>
+  page(lmsFetch<PageOut<QuestionStaffOut>>(`/org/${enc(orgId)}/shared-banks/${enc(bankId)}/questions`, { params: { limit: 25, ...p } }));
+export const listSharedBankPassages = (orgId: string, bankId: string, p: ListParams = {}) =>
+  page(lmsFetch<PageOut<PassageSummaryOut>>(`/org/${enc(orgId)}/shared-banks/${enc(bankId)}/passages`, { params: { limit: 25, ...p } }));
+
+export const getBankSharing = (courseId: string) => lmsFetch<BankSharingOut>(`/courses/${enc(courseId)}/bank-sharing`);
+export const shareBank = (courseId: string, bankId: string) =>
+  post<BankOut>(`/courses/${enc(courseId)}/banks/${enc(bankId)}/share`);
+export const unshareBank = (courseId: string, bankId: string) =>
+  lmsFetch<BankOut>(`/courses/${enc(courseId)}/banks/${enc(bankId)}/share`, { method: "DELETE" });
+// Phase 9 UX: `title` = the localized copy title ("{title} (copy)" in the UI language); the server adds " (copy)" without it
+export const copySharedBank = (courseId: string, bankId: string, title?: string) =>
+  post<BankOut>(`/courses/${enc(courseId)}/banks/copy-from`, title ? { bank_id: bankId, title } : { bank_id: bankId });
+// --- Phase 9 S2 end ---
 
 // --- Me ---
 

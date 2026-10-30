@@ -6,8 +6,8 @@ import uuid
 from typing import Callable, Iterable, Optional
 
 from fastapi import Depends, Request
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session, aliased
 
 from app.db.session import get_db
 from app.lms.core.deps import get_lms_user
@@ -117,6 +117,9 @@ def decide(*, role: Optional[str], course_status: str, action: str, is_platform_
     return org_admin and _org_admin_allows(course_status, action)
 
 
+_PATH_SEGMENT_LEN = 32  # Phase 9 fix 1: one `organizations.path` segment (`models.path_segment`, 32 hex characters)
+
+
 def _no_role(course_id) -> Optional[str]:
     return None
 
@@ -126,20 +129,32 @@ def enrollment_role_resolver(db: Session, user_id: str) -> Callable:
     from app.lms.enrollments.models import Enrollment
 
     from app.lms.courses.models import Course
-    from app.lms.organizations.models import Organization
+    from app.lms.organizations.models import MAX_DEPTH, PATH_SEP, Organization
+
+    anc = aliased(Organization)
+    # Phase 9 fix 2: every prefix of the course organization's path (root, middle department, itself), as exact
+    # path values (each segment has the same length), so one EXISTS sees a suspension anywhere on the path
+    prefixes = [func.substr(Organization.path, 1, _PATH_SEGMENT_LEN * (d + 1) + len(PATH_SEP) * d)
+                for d in range(MAX_DEPTH + 1)]
+    suspended_on_path = (select(anc.id).where(anc.path.in_(prefixes), anc.status == "suspended")
+                         .correlate(Organization).exists())
 
     def resolve(course_id) -> Optional[str]:
         # Phase 6 S1: the organization status comes with the role (same statement), so the suspension gate
         # costs enrolled users no extra query on the hot paths (attempt start, autosave).
+        # Phase 9 fix 1 (L4, M2): the root comes in the same statement through the path (a root's path is its own
+        # 32-hex id, the first segment of every descendant's path), so departments get the hint too; suspended
+        # when the course's organization row or its root is suspended. Phase 9 fix 2: or any row on the path (a
+        # suspended middle department), through an EXISTS in the same statement.
         row = db.execute(
-            select(Enrollment.role, Organization.status, Course.sandbox_for_template_id)
+            select(Enrollment.role, Organization.status, Course.sandbox_for_template_id, suspended_on_path)
             .join(Course, Course.id == Enrollment.course_id)
             .join(Organization, Organization.id == Course.organization_id)
             .where(Enrollment.course_id == course_id, Enrollment.user_id == user_id, Enrollment.state == "active")
         ).first()
         if row is None:
             return None
-        resolve.org_status[_norm(course_id)] = row[1]
+        resolve.org_status[_norm(course_id)] = "suspended" if (row[1] == "suspended" or row[3]) else row[1]
         resolve.sandbox[_norm(course_id)] = row[2]  # Phase 8b fix M1: same statement, no extra query
         return row[0]
 
@@ -219,25 +234,49 @@ class AuthzContext:
 
     # --- Phase 6 S1 begin --- (organizations, PHASE_6_DESIGN 2.2)
     def _org(self, organization_id):
-        """(status, deleted, is_org_admin) of one organization: one query per organization per request."""
+        """(status, deleted, is_org_admin) of one organization, cached per request.
+
+        --- Phase 9 S1 --- (PHASE_9_DESIGN 4.1, invariant 4): decided from the organization's ancestor `path`. A root
+        costs one statement as before (its row and the caller's org-admin membership on it). A department costs a
+        second one: the root's status and deletion (suspension and deletion apply to the root, so they reach every
+        department) and an org-admin membership on any non-deleted ancestor. Never downwards: the admin of a
+        department does not administer its parent or siblings. Phase 9 fix 1 (M2): a department is suspended when
+        its own row or its root is suspended. Phase 9 fix 2: or any ancestor (a middle department), same statement."""
         if organization_id is None:
             return ("active", False, False)
         key = _norm(organization_id)
         if key not in self.org_cache:
             from app.lms.organizations.models import Organization, OrganizationMember
+            from app.lms.organizations.tree import ancestor_ids
 
-            member = (
-                select(OrganizationMember.id).where(
-                    OrganizationMember.organization_id == Organization.id,
-                    OrganizationMember.user_id == self.user.id, OrganizationMember.state == "active",
-                    OrganizationMember.role == "org_admin",
-                ).correlate(Organization).exists()
-            )
+            def admin_on(*where):
+                return select(OrganizationMember.id).where(
+                    *where, OrganizationMember.user_id == self.user.id, OrganizationMember.state == "active",
+                    OrganizationMember.role == "org_admin")
+
+            member = admin_on(OrganizationMember.organization_id == Organization.id).correlate(Organization).exists()
             row = self.db.execute(
-                select(Organization.status, Organization.deleted_at, member).where(Organization.id == key)
+                select(Organization.status, Organization.deleted_at, Organization.path, member)
+                .where(Organization.id == key)
             ).first()
-            self.org_cache[key] = ("active", False, False) if row is None else (
-                row[0], row[1] is not None, bool(row[2]) and row[1] is None)
+            if row is None:
+                self.org_cache[key] = ("active", False, False)
+                return self.org_cache[key]
+            status, deleted, admin = row[0], row[1] is not None, bool(row[3])
+            ancestors = ancestor_ids(row[2])[:-1]
+            if ancestors and not deleted:
+                root, up = aliased(Organization), aliased(Organization)
+                # Phase 9 fix 2: suspended when any ancestor (the root or a middle department) is suspended
+                anc_suspended = select(root.id).where(root.id.in_(ancestors), root.status == "suspended").exists()
+                root_deleted = select(root.deleted_at).where(root.id == ancestors[0]).scalar_subquery()
+                up_admin = admin_on(OrganizationMember.organization_id.in_(ancestors)).join(
+                    up, up.id == OrganizationMember.organization_id).where(up.deleted_at.is_(None)).exists()
+                r2 = self.db.execute(select(anc_suspended, root_deleted, up_admin)).first()
+                if r2[0]:  # Phase 9 fix 1 (M2) / fix 2: own row, middle department or root suspended
+                    status = "suspended"
+                deleted = r2[1] is not None
+                admin = admin or bool(r2[2])
+            self.org_cache[key] = (status, deleted, admin and not deleted)
         return self.org_cache[key]
 
     def org_admin_for(self, organization_id) -> bool:

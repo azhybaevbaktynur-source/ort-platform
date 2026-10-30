@@ -463,3 +463,32 @@ Trigger: the owner reviewed the teacher side after 8b. Navigation was too deep (
 | 8c-8 | Course home per role | Teachers' "Course" always shows the outline (ORT courses: today's exam list). Students keep the course home chosen in Settings (8a `home_kind`). |
 | 8c-9 | Teacher test (owner, 2026-10-31 later the same day) | **No pause**: slices 1–4 run straight through to one release. The teacher test is optional, run by the owner any time after deploy; its findings become a follow-up slice. It no longer gates Phase 9. |
 | P8C-1 | FastAPI version | **Pinned `fastapi==0.141.1`** (2026-10-31). The Student view check (`core/authz.py::route_template`) reads FastAPI's matched-route scope, whose shape changed across versions; CI and Render previously installed the newest release on every deploy. Upgrades are deliberate and must pass `tests/lms/test_student_view.py` (the course-id spelling test fails if the header stops applying). |
+
+## Phase 9 decisions (agent, 2026-11-01)
+
+Design: `phases/PHASE_9_DESIGN.md` (§14, §15). Owner questions with the defaults in effect:
+
+| # | Question | Default in effect |
+|---|---|---|
+| 9-Q1 | Org admins editing shared-bank questions | **Yes** (content edits through `can_edit_bank`); org admins may **not** delete/restore banks and may **not** share a private bank (course staff do); they can unshare. |
+| 9-Q2 | Enrollment forms on ORT courses | **Refused** (ORT keeps `invite_code / open / closed`). |
+| 9-Q3 | Student roster rows | **Invitations** the student accepts; never forced enrollment. |
+| 9-Q4 | Email volume | Caps 500 rows per import, 1,000 rows per organization per day, 50 emails per bulk invite (inside the free email tier; raising them may cost money). |
+| 9-Q5 | Sharing scope | **Whole organization tree** (a department's shared bank is visible to the whole school). |
+| 9-Q6 | Retention of form answers | **30 days**, organization setting up to 90. |
+| 9-Q7 | Decision note to the student | Visible on the course page; emailed only when the teacher ticks it. |
+| 9-Q8 | Catalog search | Plain `LIKE` on a search column (trigram index later if the catalog grows). |
+
+Implementation decisions:
+
+| # | Decision |
+|---|---|
+| P9-1 | Departments are organization rows (`kind = department`) under a root, depth ≤ 2, ≤ 200 per root, with a materialized `path`; org-admin scope includes descendants; settings live on the root; delete is refused while a department is not empty. |
+| P9-2 | Shared banks are read by every teacher of the whole tree and reused across courses **by copy only**, within the same tree; quiz banks and sandbox banks are never shared; personal organizations can never share; moving a course rewrites its banks' organization. |
+| P9-3 | Suspension is inherited: a suspended organization or department (any level) makes everything below it read-only, including department management, roster imports and invitation acceptance. |
+| P9-4 | Roster import: ≤ 500 rows, ≤ 256 KiB, dry run first, idempotent per file hash, masked report only, no password column; a losing concurrent apply spends no daily budget. |
+| P9-5 | Student invitations reuse `invitations` (`role = student`), 14-day TTL, ≤ 50 per request, no account enumeration, Reply-To the inviter. |
+| P9-6 | Form modes need an active form and catalog visibility; forms are immutable once answered (new version instead); ≤ 25 fields, 8 types, no files; submit re-validates against the locked form. |
+| P9-7 | Answers visible to course staff and the applicant only, never in logs, audit, errors, exports or admin payloads; purged 30–90 days after rejection, withdrawal, unenroll or course deletion. The purge runs **opportunistically** (bounded, once per hour per process) because no scheduler exists in production; `POST /internal/purge-applications` (sweep token) is ready for a future free scheduler. |
+| P9-8 | No new sidebar link: invitations and applications are tabs under People; the form builder is under Settings → Enrollment; catalog, landing and apply are app-level pages. Org admins inside a course get the teacher frame with Question banks (read-only elsewhere, no Settings). |
+| P9-9 | ORT courses refuse form modes and bank sharing; student invitations are allowed there. |
