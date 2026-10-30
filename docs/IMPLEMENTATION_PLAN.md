@@ -256,8 +256,8 @@ Dependencies: 6b needs 6a; 7a needs 6a (organizations, course templates) and use
 **Why**: after 8b the owner found teacher navigation too deep and confusing (four navigation layers, 11 equal tabs, quizzes creatable in three places, a dashboard home, list → detail → edit chains). **Proposal and decisions**: `docs/phases/PHASE_8C_NAVIGATION_PROPOSAL.md`; design: `docs/phases/PHASE_8C_DESIGN.md`.
 **Frontend**: short left course sidebar (Course · Announcements · Assignments · Grades · People · Question banks · Settings · Files optional), phone drawer, students do not see empty areas; course page = modules outline with grouped "+ Add" per module, "Unsorted" group, To do panel; lighter controls (publish icon, one "⋯" menu, drag + menu alternative); Tests list removed (quiz filter in Assignments); one page per object with tabs (assignment: Details · Submissions and grading · Settings; page: Edit · Preview; quiz as in 7c); Student view; Teaching sub-menu removed inside courses; old URLs redirect.
 **Backend (small, no migration expected)**: unsorted items for the outline, To do summary, per-area "has published content" flags, whatever Student view needs.
-**Slices**: 1 course shell · 2 course page · **teacher test by the owner** · 3 one-page objects · 4 integration, ORT review, redirects, UX gate, deploy.
-**Exit criteria**: slices 1–4 deployed; teacher test done and findings addressed; UX gate and ORT review passed; old URLs redirect; e2e green. Phase 9 starts only then.
+**Slices**: 1 course shell · 2 course page · 3 one-page objects · 4 integration, ORT review, redirects, UX gate, one deploy (no pause; 8c-9). Optional teacher test by the owner after deploy; findings become a follow-up slice.
+**Exit criteria**: slices 1–4 deployed; UX gate and ORT review passed; old URLs redirect; e2e green. Phase 9 starts then.
 
 ## Phase 9 — Organizations completion, enrollment forms, invitations (M)
 

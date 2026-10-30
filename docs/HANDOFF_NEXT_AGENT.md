@@ -27,7 +27,7 @@ A teacher-owned, Canvas-style LMS where ORT/ЖРТ test prep is one course kind:
 | 8a modules, pages, files, announcements, gating | **Deployed 2026-10-28** (`main` 027d408, migration 0012) | `PHASE_8A.md`, `PHASE_8A_DESIGN.md` |
 | 8b exam templates II | **Deployed 2026-10-28** (`main` b716d78, migration 0013) | `PHASE_8B.md`, `PHASE_8B_DESIGN.md` |
 | Owner checkpoint after 8b | Closed 2026-10-31: owner asked for a navigation redesign first (8c) | `CHECKPOINT_8B.md`, `PHASE_8C_NAVIGATION_PROPOSAL.md` |
-| **8c teacher navigation** | **In progress** (design first; pause for the owner's teacher test after slices 1–2) | `PHASE_8C_NAVIGATION_PROPOSAL.md` |
+| **8c teacher navigation** | **In progress** (design first; slices 1–4 without pause, one deploy) | `PHASE_8C_NAVIGATION_PROPOSAL.md` |
 | Next | 8a modules, pages, files, announcements, gating → 8b exam templates II (visual constructor, scrolling display mode; **checkpoint after 8b**) → 9 → 10 → 11 | `IMPLEMENTATION_PLAN.md` |
 
 Production: Vercel https://ort-platform-nu.vercel.app + Render https://ort-platform-w77q.onrender.com (`/health` shows `commit`; Render deploys only when backend files change) + Neon project `noisy-sound-20763725` (production branch `br-cool-firefly-b227gbuy`, Alembic head `0013_phase8b_template_sandbox`) + Cloudflare R2. Production data is small: 6 users, 3 courses (2 ORT + the owner's draft), 299 question versions, ~4 attempts, 1 submission; one organization "Platform".
@@ -59,7 +59,7 @@ Neon backups (free plan: **max 10 branches, 1 manual snapshot — both nearly fu
 
 ## 5. What to do next
 
-1. Phase 8c (design `docs/phases/PHASE_8C_DESIGN.md`): slices 1–2 → deploy → **pause: owner runs the teacher test** → slices 3–4 → deploy. Exit criteria in `IMPLEMENTATION_PLAN.md` Phase 8c.
+1. Phase 8c (design `docs/phases/PHASE_8C_DESIGN.md`): slices 1–4 straight through, one deploy (8c-9: no pause; optional owner teacher test afterwards). Exit criteria in `IMPLEMENTATION_PLAN.md` Phase 8c.
 2. Open checkpoint questions (`CHECKPOINT_8B.md` §3) keep their defaults; apply answers when the owner gives them.
 3. Fix the flaky PG test `tests/lms/test_enrollments_api.py::test_ip_failure_limit_counts_failures_only`.
 4. Neon branches 9/10: ask the owner before the next migration deploy which old backup to delete.
