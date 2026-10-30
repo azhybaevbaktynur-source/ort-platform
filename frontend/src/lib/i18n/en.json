@@ -2086,7 +2086,59 @@
     "joining": "Joining…",
     "open": "Open",
     "needsCode": "Join with a code from your teacher",
-    "closed": "Enrollment is closed"
+    "closed": "Enrollment is closed",
+    "apply": "Apply",
+    "viewApplication": "View application",
+    "search": {
+      "label": "Search courses",
+      "placeholder": "Course title or topic"
+    },
+    "filters": {
+      "language": "Language",
+      "anyLanguage": "Any language",
+      "organization": "Organization",
+      "anyOrganization": "Any organization",
+      "mode": "How to join",
+      "anyMode": "Any way",
+      "toggle": "Filters",
+      "toggleCount": "Filters ({count})"
+    },
+    "modes": {
+      "open": "Open to all",
+      "form_review": "By application",
+      "form_auto": "Form, instant entry",
+      "invite_code": "By join code",
+      "closed": "Enrollment closed"
+    },
+    "noResults": {
+      "title": "No courses found",
+      "body": "Try other words or reset the filters."
+    },
+    "landing": {
+      "openCourse": "Open course",
+      "applyAgain": "Apply again",
+      "enterCode": "Enter a join code",
+      "backToCatalog": "Back to the catalog",
+      "notFoundTitle": "Course not found",
+      "notFoundBody": "This course is not in the catalog. It may be private or removed.",
+      "noDescription": "No description yet.",
+      "teachers": "Teachers",
+      "languages": "Languages",
+      "dates": "Dates",
+      "dateRange": "{start} – {end}",
+      "startsOn": "Starts {date}",
+      "endsOn": "Ends {date}",
+      "students": "Students",
+      "howToJoin": "How to join",
+      "modeHelp": {
+        "open": "Anyone can join with one click.",
+        "invite_code": "Ask the teacher for a join code, then enter it.",
+        "form_review": "Fill in a short form. The teacher reviews it, and you get an email with the decision.",
+        "form_auto": "Fill in a short form and you are in the course right away.",
+        "closed": "The teacher is not taking new students right now.",
+        "formUnavailable": "Applications are not open yet. Check back later."
+      }
+    }
   },
   "storage": {
     "nav": "Storage",
@@ -4879,5 +4931,249 @@
     "unshareHint": "Copies already made stay in their courses.",
     "sharedToast": "The bank is shared with the organization",
     "unsharedToast": "The bank is no longer shared"
+  },
+  "enrollmentForm": {
+    "title": "Enrollment form",
+    "versionN": "Version {n}",
+    "status": {
+      "draft": "Draft",
+      "active": "In use",
+      "retired": "Old version"
+    },
+    "tabs": {
+      "label": "Enrollment form sections",
+      "edit": "Edit",
+      "preview": "Preview"
+    },
+    "piiNotice": "Ask only what you need to decide. Never ask about health, religion, ethnicity or ID numbers: students may be children.",
+    "immutable": "Students have already answered this version, so it cannot change. Create a new version to edit it; earlier answers stay with this one.",
+    "retiredNote": "This is an old version, shown for reference only.",
+    "draftReplaces": "This is a draft. When you activate it, it replaces version {n} for new applications.",
+    "readOnly": "Only teachers of the course can edit the form.",
+    "formTitle": "Form title",
+    "intro": "Introduction for students",
+    "fields": "Fields",
+    "fieldCount": "{count} of {max} fields",
+    "noFields": "No fields yet. Add the first one.",
+    "addField": "Add field",
+    "saved": "Form saved",
+    "activated": "Form activated: students now see it",
+    "versionCreated": "New version created as a draft",
+    "saveAndActivate": "Save and activate",
+    "activate": "Activate",
+    "discard": "Discard changes",
+    "deleteDraft": "Delete draft",
+    "unsaved": "Unsaved changes",
+    "newVersion": "Create a new version",
+    "activateTitle": "Activate this form?",
+    "activateBody": "Students who apply will fill in this form.",
+    "activateBodyReplace": "It replaces version {n} for new applications. Earlier applications keep their answers.",
+    "deleteTitle": "Delete this draft?",
+    "deleteBody": "The draft is deleted. The version in use is not affected.",
+    "empty": {
+      "title": "No enrollment form yet",
+      "body": "Create a form to let students apply to the course.",
+      "create": "Create the form"
+    },
+    "errors": {
+      "labelRequired": "Every field needs a label in the course's default language.",
+      "optionRequired": "Choice fields need at least one option, each with a label in the default language."
+    },
+    "ortLocked": "Fixed by the ORT template: ORT courses do not use enrollment forms.",
+    "versions": {
+      "title": "Versions",
+      "saveFirst": "Save or discard your changes to look at another version.",
+      "answered": "Has answers",
+      "fields": "Fields: {count}",
+      "shown": "Shown",
+      "view": "View"
+    },
+    "field": {
+      "type": "Field type",
+      "pii": "Personal data",
+      "label": "Label",
+      "help": "Help text",
+      "required": "Required field",
+      "requiredBadge": "Required",
+      "options": "Options",
+      "option": "Option {n}",
+      "removeOption": "Remove option {n}",
+      "addOption": "Add option",
+      "min": "Minimum",
+      "max": "Maximum",
+      "maxLen": "Maximum length",
+      "maxLenHint": "Characters. Default {def}, at most {max}.",
+      "untitled": "Field {n} (no label)",
+      "actions": "Actions for the field: {name}",
+      "edit": "Edit",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "remove": "Remove field",
+      "removeTitle": "Remove this field?",
+      "removeBody": "The field disappears from this version when you save."
+    },
+    "types": {
+      "short_text": "Short text",
+      "long_text": "Long text",
+      "single_choice": "One choice",
+      "multi_choice": "Several choices",
+      "number": "Number",
+      "date": "Date",
+      "email": "Email",
+      "phone": "Phone"
+    },
+    "pii": {
+      "none": "Not personal",
+      "noneHint": "For example a choice of group or level.",
+      "contact": "Contact data",
+      "contactHint": "Email or phone: how to reach the student or a parent.",
+      "personal": "Personal data",
+      "personalHint": "Name, date of birth or other facts about the person."
+    },
+    "preview": {
+      "note": "This is how students see the form. Nothing is sent from here.",
+      "language": "Preview language",
+      "check": "Check answers",
+      "checkOk": "All answers are valid.",
+      "noFields": "This form has no fields yet."
+    },
+    "modes": {
+      "invite_code": "With a join code",
+      "open": "Open: anyone joins from the catalog",
+      "form_review": "Application form, teacher approves",
+      "form_auto": "Application form, instant entry",
+      "closed": "Closed (nobody can join)"
+    },
+    "modeHints": {
+      "invite_code": "Students join with the code above.",
+      "open": "Any student can join from the catalog with one click.",
+      "form_review": "Students fill in the enrollment form; you approve or reject them in People → Applications.",
+      "form_auto": "Students fill in the enrollment form and join at once (the student limit still applies).",
+      "closed": "Nobody can join. Students already in the course stay."
+    },
+    "settings": {
+      "catalog": "Show in the catalog",
+      "catalogHint": "Students can find the course in the catalog and open its page.",
+      "catalogNeeded": "Application modes need this on: students apply from the course page in the catalog.",
+      "noActive": "No form in use. Create one to use application modes.",
+      "active": "Version {n} in use",
+      "open": "Open the form",
+      "ortNote": "Fixed by the ORT template: ORT courses join by code, open or closed, without enrollment forms."
+    }
+  },
+  "applications": {
+    "privacyNote": "Only the teachers and assistants of this course see your answers. If you are not accepted, withdraw, or later leave the course, your answers are deleted within 90 days.",
+    "status": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "withdrawn": "Withdrawn"
+    },
+    "studentStatus": {
+      "pending": "Waiting for the teacher",
+      "approved": "Accepted",
+      "rejected": "Not accepted",
+      "withdrawn": "Withdrawn"
+    },
+    "answerErrors": {
+      "required": "Fill in this field.",
+      "too_long": "The answer is too long.",
+      "bad_option": "Choose one of the options.",
+      "bad_format": "Check the format of this answer."
+    },
+    "errors": {
+      "form_required": "Create and activate an enrollment form first, then choose this mode.",
+      "form_needs_catalog": "Application modes need the course in the catalog. Turn on \"Show in the catalog\".",
+      "form_answered": "Students have already answered this form. Create a new version to change it.",
+      "form_draft_exists": "There is already a draft. Open it to continue.",
+      "form_retired": "This version is no longer in use and cannot change.",
+      "form_not_draft": "Only a draft can be deleted.",
+      "form_not_found": "This form no longer exists. Reload the page.",
+      "too_many_fields": "A form can have at most 25 fields.",
+      "application_pending": "There is already an application waiting for the teacher.",
+      "application_decided": "This application has already been decided. Its current status is shown.",
+      "application_not_found": "This application no longer exists.",
+      "form_changed": "The teacher has just changed the form. Check your answers and send again.",
+      "course_full": "The course has no free places right now. The application stays pending.",
+      "course_not_open": "The course is not open: it is a draft or has ended.",
+      "template_locked": "Fixed by the ORT template: ORT courses do not use enrollment forms.",
+      "already_enrolled": "This student is already in the course.",
+      "validation_failed": "Some data is not valid. Check the fields and try again."
+    },
+    "home": {
+      "title": "Pending applications",
+      "sent": "Sent {date}"
+    },
+    "apply": {
+      "title": "Application",
+      "submit": "Send application",
+      "sentTitle": "Application sent",
+      "sentBody": "The teacher will review it. You will get an email when there is a decision.",
+      "approvedTitle": "You are in the course",
+      "approvedBody": "Your application was accepted at once. You can open the course now.",
+      "viewStatus": "See the status",
+      "backToCourse": "Back to the course",
+      "fixFields": "Fix the marked fields ({count}).",
+      "blocked": {
+        "memberTitle": "You are already in this course",
+        "memberBody": "Open the course to continue.",
+        "pendingTitle": "Your application is waiting",
+        "pendingBody": "The teacher has not decided yet. The course page shows the status.",
+        "notOpenTitle": "Applications are not open",
+        "notOpenBody": "This course does not take applications right now."
+      }
+    },
+    "student": {
+      "title": "Your application",
+      "explain": {
+        "pending": "The teacher has not decided yet. You will get an email.",
+        "approved": "Your application was accepted.",
+        "rejected": "Your application was not accepted. You can apply again.",
+        "withdrawn": "You withdrew this application. You can apply again."
+      },
+      "sentOn": "Sent {date}",
+      "decidedOn": "decided {date}",
+      "note": "Note from the teacher",
+      "withdraw": "Withdraw application",
+      "withdrawTitle": "Withdraw your application?",
+      "withdrawBody": "The teacher will no longer review it. You can apply again later.",
+      "withdrawn": "Application withdrawn"
+    },
+    "inbox": {
+      "title": "Applications",
+      "applicant": "Applicant",
+      "status": "Status",
+      "submitted": "Sent",
+      "all": "All",
+      "search": "Search by name or email",
+      "review": "Review",
+      "view": "Open",
+      "empty": "No applications yet",
+      "emptyFilter": "No applications match",
+      "emptyHint": "Students apply from the course page in the catalog.",
+      "showAll": "Show all applications"
+    },
+    "panel": {
+      "title": "Application",
+      "submitted": "Sent {date}",
+      "decided": "Decided {date} by {name}",
+      "automatic": "automatic entry",
+      "answers": "Answers",
+      "answersStaffOnly": "Only the teachers and assistants of the course can see the answers.",
+      "answersPurged": "The answers were deleted after the retention period.",
+      "noAnswer": "No answer",
+      "formVersion": "Form version {n}",
+      "noteShown": "Note shown to the student",
+      "decision": "Decision",
+      "note": "Note to the student",
+      "noteHint": "The student sees the note on the course page. Up to {max} characters.",
+      "sendNote": "Also send the note by email",
+      "sendNoteHint": "Without the tick, the email only gives the decision.",
+      "approve": "Approve",
+      "reject": "Reject",
+      "approved": "{name} is now in the course",
+      "rejected": "Application of {name} rejected",
+      "concluded": "The course is concluded: you can reject, but not approve."
+    }
   }
 }

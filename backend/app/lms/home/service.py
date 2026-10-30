@@ -370,6 +370,7 @@ def home(db: Session, user: User) -> sch.HomeOut:
         # --- Phase 8a S3 begin ---
         modules_next=_modules_next(db, uid), announcements=_announcements(db, uid),
         # --- Phase 8a S3 end ---
+        pending_applications=_pending_applications(db, uid),  # Phase 9 S4
     )
 
 
@@ -377,3 +378,22 @@ def _announcements(db: Session, uid: str):  # Phase 8a S3
     from app.lms.announcements.service import home_strip
 
     return home_strip(db, uid)
+
+
+# --- Phase 9 S4 begin --- (PHASE_9_DESIGN 8.1: one statement; pending applications of live courses)
+def _pending_applications(db: Session, uid: str) -> list:
+    from app.lms.courses.models import Course
+    from app.lms.enrollment_forms.models import EnrollmentApplication
+
+    rows = db.execute(
+        select(EnrollmentApplication.id, EnrollmentApplication.course_id, Course.title,
+               EnrollmentApplication.submitted_at)
+        .join(Course, Course.id == EnrollmentApplication.course_id)
+        .where(EnrollmentApplication.user_id == uid, EnrollmentApplication.status == "pending",
+               Course.deleted_at.is_(None))
+        .order_by(EnrollmentApplication.submitted_at.desc(), EnrollmentApplication.id.desc())
+        .limit(sch.PENDING_APPLICATIONS_MAX)
+    ).all()
+    return [sch.HomeApplicationOut(application_id=a, course_id=c, course_title=t, submitted_at=at)
+            for a, c, t, at in rows]
+# --- Phase 9 S4 end ---

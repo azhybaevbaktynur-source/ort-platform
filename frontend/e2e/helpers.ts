@@ -57,6 +57,8 @@ export interface Seed {
     /** A published one-question quiz of the course (Student view "Start"). */
     view_quiz: string;
   };
+  /** Phase 9 S4: a published private general course without a form and one applicant (catalog-apply.spec.ts). */
+  catalog_apply: { course_id: string; teacher: SeedUser; student: SeedUser };
   /** Phase 8b S3: the scrolling-player course (its published quizzes serve the Student view "Start" check). */
   scrolling: {
     course_id: string;

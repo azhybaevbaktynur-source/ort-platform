@@ -225,6 +225,7 @@ def leave(db: Session, ctx: AuthzContext, course: Course) -> None:
     enr.state, enr.removed_at, enr.removed_by_id = "removed", utcnow(), ctx.user.id
     add_event(db, enr, "left", ctx.user.id, from_role=old_role, to_role=old_role,
               from_state=old_state, to_state="removed")
+    _application_hook(db, enr)  # Phase 9 S4
     db.commit()
 
 
@@ -314,7 +315,16 @@ def remove(db: Session, ctx: AuthzContext, course: Course, enrollment_id: uuid.U
     enr.state, enr.removed_at, enr.removed_by_id = "removed", utcnow(), ctx.user.id
     add_event(db, enr, "removed", ctx.user.id, from_role=enr.role, to_role=enr.role,
               from_state=old_state, to_state="removed")
+    _application_hook(db, enr)  # Phase 9 S4
     db.commit()
+
+
+# --- Phase 9 S4 begin --- (PHASE_9_DESIGN 4.7: unenroll of an approved applicant starts the D7 retention clock)
+def _application_hook(db: Session, enr: Enrollment) -> None:
+    from app.lms.enrollment_forms.applications import on_enrollment_removed
+
+    on_enrollment_removed(db, enr)
+# --- Phase 9 S4 end ---
 
 
 def roster_query(course_id: uuid.UUID, *, role: Optional[str] = None, state: str = "active",

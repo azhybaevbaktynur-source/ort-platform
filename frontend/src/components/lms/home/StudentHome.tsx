@@ -21,6 +21,7 @@ import { HomeRow, HomeSection } from "./HomeRow";
 import { DueText } from "./StudentAssessmentCard";
 import { fmtShortDateTime } from "./format";
 import { useErrorText } from "./useErrorText";
+import { PendingApplicationsLine } from "@/components/lms/catalog/ApplicationStatus"; // Phase 9 S4
 
 // --- Phase 7a S5: next-up rows are assignments: a quiz opens its lobby, text / file the submit page ---
 function nextUpHref(coursesBase: string, r: HomeNextUpOut): string {
@@ -173,8 +174,12 @@ function Sections({ data }: { data: HomeOut }) {
     || (r.link?.assessment_id && shownAssessments.has(r.link.assessment_id))
   ));
 
+  // --- Phase 9 S4: "Pending applications" line (PHASE_9_DESIGN 8.1), shown above everything else ---
+  const pendingApps = <PendingApplicationsLine items={data.pending_applications ?? []} />;
   if (data.courses_total === 0 && data.in_progress.length === 0) {
     return (
+      <div className="space-y-8">
+      {pendingApps}
       <EmptyState icon={<BookOpen />} title={t("home.courses.emptyTitle")} description={t("home.courses.emptyBody")}
         action={(
           <>
@@ -182,11 +187,13 @@ function Sections({ data }: { data: HomeOut }) {
             <LinkButton size="lg" variant="secondary" href={`${base}/catalog`} leftIcon={<LayoutGrid aria-hidden="true" className="h-5 w-5" />}>{t("home.openCatalog")}</LinkButton>
           </>
         )} />
+      </div>
     );
   }
 
   return (
     <div className="space-y-8">
+      {pendingApps /* Phase 9 S4 */}
       {data.in_progress.length > 1 && (
         <HomeSection id="home-continue" title={t("home.continue.title")}>
           <ul className="divide-y divide-slate-100">

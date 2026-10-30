@@ -325,6 +325,25 @@ def seed_scrolling(api: Api, log: Path, admin_tok: str) -> dict:
 # --- Phase 8b S3 end ---
 
 
+# --- Phase 9 S4 begin --- (enrollment form, catalog, apply, inbox: frontend/e2e/catalog-apply.spec.ts; written after
+# every other row, so the ORT and earlier walks see exactly the rows they saw before)
+def seed_catalog_apply(api: Api, log: Path, admin_tok: str) -> dict:
+    """A published, private general course (ru, ky, en) of an approved teacher, no form yet, and one student who is
+    in no course (the applicant). The walk builds the form, opens the course to the catalog and applies."""
+    teacher = register(api, log, "e2e-apply-teacher@example.com", "Apply Teacher")
+    tp = profile(api, teacher["token"])
+    api.call("POST", f"/platform/users/{tp['id']}/teacher-status", admin_tok, {"status": "approved"})
+    teacher["profile"] = profile(api, teacher["token"])
+    tok = teacher["token"]
+    title = {"ru": "Курс с анкетой E2E", "ky": "Анкеталуу курс E2E", "en": "Application course E2E"}
+    course = api.call("POST", "/courses", tok, {"title": title, "languages": ["ru", "ky", "en"], "default_language": "ru"})
+    api.call("POST", f"/courses/{course['id']}/publish", tok, {})
+    student = register(api, log, "e2e-apply-student@example.com", "Айдана Заявка")
+    student["profile"] = profile(api, student["token"])
+    return {"course_id": course["id"], "teacher": teacher, "student": student}
+# --- Phase 9 S4 end ---
+
+
 # --- Phase 8c S4a begin --- (course navigation, frontend/e2e/course-nav.spec.ts; written after every other row)
 NAV_STUDENTS = ["sidebar", "handin", "phone", "assistant"]
 
@@ -487,6 +506,7 @@ def main() -> int:
     scrolling = seed_scrolling(api, log, tok)  # Phase 8b S3 (after every ORT, quiz-editor and modules row)
     exam_constructor = seed_constructor(api, log, tok)  # Phase 8b S5 (after every other row)
     course_nav = seed_course_nav(api, log, tok)  # Phase 8c S4a (after every other row)
+    catalog_apply = seed_catalog_apply(api, log, tok)  # Phase 9 S4 (after every other row)
 
     seed = {
         "quiz_editor": quiz_editor,
@@ -494,6 +514,7 @@ def main() -> int:
         "scrolling": scrolling,
         "exam_constructor": exam_constructor,
         "course_nav": course_nav,
+        "catalog_apply": catalog_apply,
         "api": args.api, "course_id": cid, "bank_id": bank_id, "exam": exam, "staff_exam": staff_exam,
         "picks": picks, "keys": keys, "comparison_question_id": comparison_qid, "passage_id": passage_id,
         "staff_attempt_id": staff_attempt, "admin": admin, "students": students,
