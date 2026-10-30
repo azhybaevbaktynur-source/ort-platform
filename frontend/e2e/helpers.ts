@@ -48,6 +48,22 @@ export interface Seed {
     student: SeedUser;
     ort_student: SeedUser;
   };
+  /** Phase 8c S4a: the general course of the navigation walk (course-nav.spec.ts), empty, three enrolled students. */
+  course_nav: {
+    course_id: string;
+    join_code: string;
+    teacher: SeedUser;
+    students: Record<"sidebar" | "handin" | "phone", SeedUser>;
+  };
+  /** Phase 8b S3: the scrolling-player course (its published quizzes serve the Student view "Start" check). */
+  scrolling: {
+    course_id: string;
+    long_quiz: string;
+    forward_quiz: string;
+    page_quiz: string;
+    teacher: SeedUser;
+    students: Record<string, SeedUser>;
+  };
 }
 
 export const E2E_DIR = process.env.E2E_DIR || "/tmp/ort_e2e";
