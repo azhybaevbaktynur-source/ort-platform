@@ -9,6 +9,7 @@ import { FileText, Plus } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { deletePage, listPages, restorePage } from "@/lib/lms/pages";
 import type { PageSummaryStaffOut, PageSummaryStudentOut } from "@/lib/lms/pagesTypes";
+import { withFrom } from "@/lib/lms/nav";
 import { useCourse } from "@/components/lms/CourseContext";
 import { useCanEditContent } from "@/components/lms/content/StaffGate";
 import { fmtShortDateTime } from "@/components/lms/home/format";
@@ -55,7 +56,7 @@ export function PageList() {
   };
 
   const newButton = canEdit ? (
-    <LinkButton href={`${base}/pages/new`} leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}>{t("pages.new")}</LinkButton>
+    <LinkButton href={withFrom(`${base}/pages/new`, `${base}/pages`)} leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}>{t("pages.new")}</LinkButton>
   ) : undefined;
 
   if (!isStaff) {
@@ -84,7 +85,7 @@ export function PageList() {
   const columns: TableColumn<PageSummaryStaffOut>[] = [
     {
       key: "title", header: t("pages.col.title"), label: t("pages.col.title"), primary: true,
-      cell: (p) => <Link href={`${base}/pages/${p.id}`} className="font-medium text-brand-700 hover:underline">{p.title}</Link>,
+      cell: (p) => <Link href={withFrom(`${base}/pages/${p.id}`, `${base}/pages`)} className="font-medium text-brand-700 hover:underline">{p.title}</Link>,
     },
     { key: "language", header: t("pages.col.language"), label: t("pages.col.language"), cell: (p) => t(`pages.lang.${p.language}`) },
     {
@@ -103,7 +104,7 @@ export function PageList() {
           items={[{ id: "edit", label: t("pages.edit") }, { id: "view", label: t("pages.view.open") }, { id: "delete", label: t("pages.delete") }]}
           onSelect={(id) => {
             if (id === "delete") setConfirm(p);
-            else router.push(`${base}/pages/${p.id}${id === "edit" ? "/edit" : ""}`);
+            else router.push(withFrom(`${base}/pages/${p.id}?tab=${id === "edit" ? "edit" : "preview"}`, `${base}/pages`)); // Phase 8c S3
           }} />
       ),
     }] : []),

@@ -1,23 +1,24 @@
 "use client";
 
-// Phase 7a S5: the assignment page. Students hand in here; staff are sent to the editor.
-import React, { useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { useTranslation } from "@/lib/i18n/context";
+// Phase 7a S5: the assignment page. Students hand in here. Phase 8c S3 (PHASE_8C_DESIGN §5.1): staff land on the
+// object page (Details, Submissions/Results, Settings by `?tab=`); the old redirect to `/edit` is gone.
+import React, { Suspense } from "react";
+import { useParams } from "next/navigation";
 import { useCourse } from "@/components/lms/CourseContext";
+import { AssignmentPage } from "@/components/lms/assignments/AssignmentPage";
 import { StudentAssignmentView } from "@/components/lms/assignments/StudentAssignmentView";
 import { LoadingState } from "@/components/ui";
 
-export default function AssignmentPage() {
-  const { lang } = useTranslation();
+export default function AssignmentRoute() {
   const { course } = useCourse();
-  const router = useRouter();
   const params = useParams<{ assignmentId: string }>();
   const role = course.my_enrollment.role;
-  const staff = role === "teacher" || role === "assistant";
-  useEffect(() => {
-    if (staff) router.replace(`/${lang}/courses/${course.id}/assignments/${params.assignmentId}/edit`);
-  }, [staff, router, lang, course.id, params.assignmentId]);
-  if (staff) return <LoadingState rows={2} />;
+  if (role === "teacher" || role === "assistant") {
+    return (
+      <Suspense fallback={<LoadingState rows={3} />}>
+        <AssignmentPage key={params.assignmentId} assignmentId={params.assignmentId} />
+      </Suspense>
+    );
+  }
   return <StudentAssignmentView assignmentId={params.assignmentId} />;
 }
