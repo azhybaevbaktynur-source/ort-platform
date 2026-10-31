@@ -28,12 +28,13 @@ A teacher-owned, Canvas-style LMS where ORT/ЖРТ test prep is one course kind:
 | 8b exam templates II | **Deployed 2026-10-28** (`main` b716d78, migration 0013) | `PHASE_8B.md`, `PHASE_8B_DESIGN.md` |
 | Owner checkpoint after 8b | Closed 2026-10-31: owner asked for a navigation redesign first (8c) | `CHECKPOINT_8B.md`, `PHASE_8C_NAVIGATION_PROPOSAL.md` |
 | 8c teacher navigation | **Deployed 2026-10-31** (`main` ff508a8, no migration) | `PHASE_8C.md`, `PHASE_8C_DESIGN.md` |
-| **9** | Next: organizations completion, enrollment forms, invitations — inside the 8c shell | `IMPLEMENTATION_PLAN.md` |
+| 9 organizations completion, enrollment forms, invitations | **Deployed 2026-11-01** (`main` 636d14a, migration 0014) | `PHASE_9.md`, `PHASE_9_DESIGN.md` |
+| **10** | Next: practice, analytics, quiz statistics, new question types (matching, fill-in-the-blank, ordering) | `IMPLEMENTATION_PLAN.md` |
 | Next | 8a modules, pages, files, announcements, gating → 8b exam templates II (visual constructor, scrolling display mode; **checkpoint after 8b**) → 9 → 10 → 11 | `IMPLEMENTATION_PLAN.md` |
 
-Production: Vercel https://ort-platform-nu.vercel.app + Render https://ort-platform-w77q.onrender.com (`/health` shows `commit`; Render deploys only when backend files change) + Neon project `noisy-sound-20763725` (production branch `br-cool-firefly-b227gbuy`, Alembic head `0013_phase8b_template_sandbox`) + Cloudflare R2. Production data is small: 6 users, 3 courses (2 ORT + the owner's draft), 299 question versions, ~4 attempts, 1 submission; one organization "Platform".
+Production: Vercel https://ort-platform-nu.vercel.app + Render https://ort-platform-w77q.onrender.com (`/health` shows `commit`; Render deploys only when backend files change) + Neon project `noisy-sound-20763725` (production branch `br-cool-firefly-b227gbuy`, Alembic head `0014_phase9_organizations_forms`) + Cloudflare R2. Production data is small: 6 users, 3 courses (2 ORT + the owner's draft), 299 question versions, ~4 attempts, 1 submission; one organization "Platform".
 
-Neon backups (free plan: **max 10 branches, 1 manual snapshot — both nearly full**): `backup-2026-10-23-before-phase5` (pre-cutover; owner: delete ≥ 2026-10-30), `backup-2026-10-25-before-phase6a`, `backup-2026-10-26-before-phase7a`, `backup-2026-10-26-before-phase7b`, `backup-2026-10-28-before-phase7c`, `backup-2026-10-28-before-phase8a`, `backup-2026-10-28-before-phase8b`, snapshot `before-phase6a-deploy-2026-10-25`. Before each `main` merge with a migration create `backup-<date>-before-<phase>`; when full, ask the owner which old backup to delete (owner OK'd deleting obsolete ones on 2026-10-26; deleting Neon data always needs the owner's OK).
+Neon backups (free plan: **max 10 branches, 1 manual snapshot — both nearly full**): `backup-2026-10-23-before-phase5` (pre-cutover; owner: delete ≥ 2026-10-30), `backup-2026-10-25-before-phase6a`, `backup-2026-10-26-before-phase7a`, `backup-2026-10-26-before-phase7b`, `backup-2026-10-28-before-phase7c`, `backup-2026-10-28-before-phase8a`, `backup-2026-10-28-before-phase8b`, `backup-2026-11-01-before-phase9` (**10/10 branches used**), snapshot `before-phase6a-deploy-2026-10-25`. Before each `main` merge with a migration create `backup-<date>-before-<phase>`; when full, ask the owner which old backup to delete (owner OK'd deleting obsolete ones on 2026-10-26; deleting Neon data always needs the owner's OK).
 
 ## 3b. Waiting for the owner
 
@@ -60,9 +61,9 @@ Neon backups (free plan: **max 10 branches, 1 manual snapshot — both nearly fu
 
 ## 5. What to do next
 
-1. Phase 9 (organizations completion, enrollment forms, invitations): architect design first; every screen inside the 8c shell (sidebar link hidden for students while empty, or a "+ Add" item; one page per object). Migration expected → Neon branches are 9/10: ask the owner which old backup to delete before the Phase 9 deploy (candidate `backup-2026-10-23-before-phase5`, owner cleared it for ≥ 2026-10-30).
-2. Optional owner teacher test of 8c (`PHASE_8C_DESIGN.md` §16); findings become a follow-up slice.
-3. Open checkpoint questions (`CHECKPOINT_8B.md` §3) keep their defaults.
+1. **Neon is full (10/10 branches).** Before the next deploy with a migration, ask the owner to delete an old backup (candidates: `backup-2026-10-23-before-phase5` — owner cleared it for ≥ 2026-10-30 — then `backup-2026-10-25-before-phase6a`).
+2. Phase 10 (practice, analytics, quiz statistics, new question types matching / fill-in-the-blank / ordering; `IMPLEMENTATION_PLAN.md`), architect design first, inside the 8c shell; new question types also extend the 7c type dropdown and the 7b general import format.
+3. Open owner questions keep their defaults: `CHECKPOINT_8B.md` §3, 8c design §17, 9-Q1…Q8 in `PRODUCT_DECISIONS.md`. Optional 8c teacher test.
 4. Fix the flaky PG test `tests/lms/test_enrollments_api.py::test_ip_failure_limit_counts_failures_only`.
 
 ## 6. Models and token usage (Claude Max subscription)
