@@ -9,10 +9,17 @@ export type QuestionType =
   | "comparison"
   | "numeric"
   | "short_text"
-  | "essay";
+  | "essay"
+  | "matching"
+  | "fill_blank"
+  | "ordering";
+/** The seven types ORT forms offer (unchanged). */
 export const QUESTION_TYPES: QuestionType[] = [
   "single_choice", "multiple_answers", "true_false", "comparison", "numeric", "short_text", "essay",
 ];
+/** Phase 10 S1: every type; non-ORT editors offer these. */
+export const ALL_QUESTION_TYPES: QuestionType[] = [...QUESTION_TYPES, "matching", "fill_blank", "ordering"];
+export const STRUCTURED_TYPES: QuestionType[] = ["matching", "fill_blank", "ordering"];
 export type Difficulty = "easy" | "medium" | "hard";
 export const DIFFICULTIES: Difficulty[] = ["easy", "medium", "hard"];
 export type VersionOrigin = "create" | "edit" | "import" | "revert";
@@ -78,6 +85,20 @@ export interface EssayData {
   rubric_note: string | null;
 }
 
+export interface MatchingData {
+  pairs: { left: string; right: string; left_id: string; right_id: string }[];
+  distractors: string[];
+  distractor_ids: string[];
+}
+export interface FillBlankData {
+  text: string;
+  blanks: { answers: string[] }[];
+  case_sensitive: boolean;
+}
+export interface OrderingData {
+  items: { id: string; text: string }[];
+}
+
 export type QuestionData =
   | SingleChoiceData
   | MultipleAnswersData
@@ -85,7 +106,10 @@ export type QuestionData =
   | ComparisonData
   | NumericData
   | ShortTextData
-  | EssayData;
+  | EssayData
+  | MatchingData
+  | FillBlankData
+  | OrderingData;
 
 /** Request-side data: choice images are referenced by asset id. */
 export type QuestionDataIn =
@@ -95,7 +119,10 @@ export type QuestionDataIn =
   | ComparisonData
   | NumericData
   | ShortTextData
-  | EssayData;
+  | EssayData
+  | { pairs: { left: string; right: string }[]; distractors: string[] }
+  | { text: string; blanks: { answers: string[] }[]; case_sensitive: boolean }
+  | { items: { text: string }[] };
 
 // ---- Banks ----
 export interface BankOut {
@@ -256,6 +283,14 @@ export interface StudentQuestionOut {
     column_a?: string;
     column_b?: string;
     word_limit?: number | null;
+    /** matching: both lists arrive sorted by id (no pairing leaks). */
+    lefts?: { id: string; text: string }[];
+    rights?: { id: string; text: string }[];
+    /** fill_blank: text with {{n}} tokens. */
+    text?: string;
+    blank_count?: number;
+    /** ordering: items in id order. */
+    items?: { id: string; text: string }[];
   };
   passage?: StudentPassageOut | null;
 }

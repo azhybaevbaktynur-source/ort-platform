@@ -53,7 +53,7 @@ def test_all_types_fixture_parses():
     assert codes(up) == [], up.issues.errors
     b = up.bundles[0]
     by = {it.source_ref: it for it in b.items}
-    assert sorted({it.type for it in b.items}) == sorted(TYPE_NAMES)
+    assert sorted({it.type for it in b.items}) == sorted(set(TYPE_NAMES) - {"matching", "fill_blank", "ordering"})  # Phase 10 S1: structured types have their own tests
     assert by["sc1"].payload["correct"] == "B" and [c["id"] for c in by["sc1"].payload["choices"]] == ["A", "B", "C"]
     assert by["sc1"].tags == ["geo", "capitals"] and by["sc1"].difficulty == "easy" and by["sc1"].topic == "Geography"
     assert by["ma1"].payload["correct"] == ["A", "C"]

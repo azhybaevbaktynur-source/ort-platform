@@ -5,7 +5,7 @@ import re
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 from typing import Any, Callable, Optional
 
 from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
@@ -67,6 +67,18 @@ class ScoreResult:
 
 def zero_result(max_points: Decimal) -> ScoreResult:
     return ScoreResult(Decimal("0.00"), max_points, False, False)
+
+
+# --- Phase 10 S1 begin --- (PHASE_10_DESIGN 2: partial credit for the structured types)
+def proportional(k: int, n: int, max_points: Decimal) -> ScoreResult:
+    """k of n parts right: full marks only when k == n; otherwise rounded down so partial never reaches max."""
+    if n > 0 and k == n:
+        return ScoreResult(quantize2(max_points), max_points, True, False)
+    if k <= 0 or n <= 0:
+        return zero_result(max_points)
+    pts = (max_points * k / n).quantize(_TWO_DP, rounding=ROUND_DOWN)
+    return ScoreResult(pts, max_points, False, False)
+# --- Phase 10 S1 end ---
 
 
 def full_or_zero(ok: bool, max_points: Decimal) -> ScoreResult:

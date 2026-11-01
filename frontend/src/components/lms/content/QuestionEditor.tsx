@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
+import { CourseContext } from "@/components/lms/CourseContext";
 import { useTranslation } from "@/lib/i18n/context";
 import { createQuestion, listPassages, updateQuestion } from "@/lib/lms/content";
 import {
-  QUESTION_TYPES, type PassageSummaryOut, type QuestionStaffOut, type QuestionType,
+  ALL_QUESTION_TYPES, QUESTION_TYPES, type PassageSummaryOut, type QuestionStaffOut, type QuestionType,
 } from "@/lib/lms/contentTypes";
 import type { Lang } from "@/lib/lms/types";
 import { ContentError } from "./ContentError";
@@ -29,6 +30,7 @@ export function QuestionEditor({
   onConflict: () => void;
 }) {
   const { t } = useTranslation();
+  const ort = useContext(CourseContext)?.course.template?.key === "ort"; // Phase 10 S1: ORT keeps the seven types
   const [form, setForm] = useState<QuestionForm>(() =>
     question ? formFromStaff(question) : emptyForm(createType || "single_choice", defaultLanguage));
   const [passages, setPassages] = useState<PassageSummaryOut[]>([]);
@@ -83,7 +85,7 @@ export function QuestionEditor({
     <form onSubmit={save} className="space-y-5">
       {/* Phase 7c S3 (PHASE_7C_DESIGN 8.4): the form body lives in QuestionCardForm (same markup), shared with the quiz editor. */}
       <QuestionCardForm form={form} onChange={patch} disabled={disabled} courseId={courseId} languages={courseLanguages}
-        typeOptions={QUESTION_TYPES} lockType={editing} lockLanguage={editing} passages={passages} />
+        typeOptions={ort ? QUESTION_TYPES : ALL_QUESTION_TYPES} lockType={editing} lockLanguage={editing} passages={passages} />
 
       {clientError && <p role="alert" className="text-sm text-red-700">{t(clientError)}</p>}
       <ContentError error={error} />

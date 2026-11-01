@@ -452,6 +452,8 @@ def create_question(db: Session, ctx: AuthzContext, course, bank: QuestionBank, 
                     *, origin: str = "create") -> BankQuestion:
     actor = ctx.user
     _check_language(course, data.language)
+    from app.lms.templates.service import assert_question_type_allowed  # Phase 10 S1
+    assert_question_type_allowed(course, data.type)
     content = prepare_content(db, actor, data, set())
     normalize_question_content(data.language, content)  # validate before any write
     topic = _clean_label(data.topic, 200)

@@ -34,7 +34,7 @@ def pts(t, data, resp, mx="10"):
 def test_registry_names():
     assert set(TYPE_NAMES) == {
         "single_choice", "multiple_answers", "true_false", "comparison",
-        "numeric", "short_text", "essay",
+        "numeric", "short_text", "essay", "matching", "fill_blank", "ordering",
     }
     for t in REGISTRY.values():
         assert t.schema_version == 1

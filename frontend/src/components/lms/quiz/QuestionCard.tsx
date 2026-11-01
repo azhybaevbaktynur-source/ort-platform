@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
+import { CourseContext } from "@/components/lms/CourseContext";
 import { AlertTriangle, ArrowDown, ArrowUp, Check, Copy, GripVertical, PencilLine } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { isLmsApiError } from "@/lib/lms/client";
 import { getQuestion } from "@/lib/lms/content";
-import { QUESTION_TYPES, type QuestionType } from "@/lib/lms/contentTypes";
+import { ALL_QUESTION_TYPES, QUESTION_TYPES, type QuestionType } from "@/lib/lms/contentTypes";
 import type { AssessmentStaffOut, ItemOut, SectionOut } from "@/lib/lms/assessmentTypes";
 import { commitDraft, createDraft, deleteDraft, rememberImage, resolvePayloadImages } from "@/lib/lms/quizEditor";
 import type {
@@ -38,10 +39,11 @@ export interface CardActions {
 }
 
 /** Type options of a card: the section's allowed types (template and preset rules live there), plus its current type. */
-export function cardTypeOptions(section: SectionOut | null, current?: QuestionType): QuestionType[] {
+export function cardTypeOptions(section: SectionOut | null, current?: QuestionType, ort = false): QuestionType[] {
+  const base = ort ? QUESTION_TYPES : ALL_QUESTION_TYPES; // Phase 10 S1: ORT keeps the seven types
   const allowed = section?.rules.allowed_types;
-  if (!allowed || allowed.length === 0) return QUESTION_TYPES;
-  return QUESTION_TYPES.filter((q) => allowed.includes(q) || q === current);
+  if (!allowed || allowed.length === 0) return base;
+  return base.filter((q) => allowed.includes(q) || q === current);
 }
 
 /** True when a new card holds nothing worth keeping (closing it discards the draft). */
@@ -50,7 +52,9 @@ function isBlank(f: QuestionForm): boolean {
     && f.choices.every((c) => !c.text.trim() && !c.image)
     && !f.columnA.trim() && !f.columnB.trim()
     && f.numeric.every((n) => !n.value.trim() && !n.min.trim() && !n.max.trim())
-    && !f.shortAnswers.trim() && !f.rubric.trim();
+    && !f.shortAnswers.trim() && !f.rubric.trim()
+    && f.matchPairs.every((p) => !p.left.trim() && !p.right.trim()) && f.matchDistractors.every((s) => !s.trim())
+    && !f.blankText.trim() && f.blankAnswers.every((s) => !s.trim()) && f.orderItems.every((s) => !s.trim());
 }
 
 /**
@@ -200,6 +204,7 @@ function CollapsedCard({ ctx, item, draft, label, onOpen, dragProps }: React.Com
 
 function OpenCard({ ctx, section, item, draft, label, onClosed, actions, childOf }: React.ComponentProps<typeof QuestionCard>) {
   const { t } = useTranslation();
+  const ort = useContext(CourseContext)?.course.template?.key === "ort"; // Phase 10 S1
   const { courseId, a } = ctx;
   const isNew = !item;
   const [form, setForm] = useState<QuestionForm | null>(null);
@@ -461,7 +466,7 @@ function OpenCard({ ctx, section, item, draft, label, onClosed, actions, childOf
       ) : (
         <div className="space-y-4">
           <QuestionCardForm form={form} onChange={change} disabled={busy || autosave.status === "conflict"} courseId={courseId}
-            languages={languages.length ? languages : a.languages} typeOptions={cardTypeOptions(section, form.type)}
+            languages={languages.length ? languages : a.languages} typeOptions={cardTypeOptions(section, form.type, ort)}
             lockLanguage={!isNew || languages.length <= 1} showMeta={false} idPrefix={`qc-${item?.id ?? draft?.id ?? "new"}`}
             keyboardAnswers compact errors={errors} hideLockedLanguage={a.languages.length <= 1 || languages.length <= 1} />
         </div>

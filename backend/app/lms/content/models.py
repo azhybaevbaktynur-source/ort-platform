@@ -17,7 +17,7 @@ from app.lms.core.models import SoftDeleteMixin, TimestampMixin, UUIDPKMixin, ut
 from app.lms.core.types import JSONType
 
 ORIGINS = "('create','edit','import','revert')"
-QUESTION_TYPES = "('single_choice','multiple_answers','true_false','comparison','numeric','short_text','essay')"
+QUESTION_TYPES = "('single_choice','multiple_answers','true_false','comparison','numeric','short_text','essay','matching','fill_blank','ordering')"
 
 
 def _deleted_by() -> Mapped[Optional[str]]:

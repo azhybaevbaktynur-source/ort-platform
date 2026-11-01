@@ -9,6 +9,7 @@ import { TemplatePassage } from "@/components/lms/PlainPassage";
 import type { Correctness, ReviewItemOut, StudentQuestion } from "@/lib/lms/attemptTypes";
 import { fmtPoints } from "@/components/lms/assessments/format";
 import type { PassageDisplay } from "@/lib/lms/blocks";
+import type { StudentQuestionOut } from "@/lib/lms/contentTypes";
 
 // Design-system Badge with an icon, so colour is never the only signal (S7b, cross-cutting).
 const TONE: Record<Correctness, BadgeTone> = {
@@ -74,6 +75,8 @@ export function ReviewItemCard({
   const key = item.key ?? null;
   const passage = item.passage ?? q.passage ?? null;
   const max = maxPoints ?? q.points ?? null;
+  const sd = q.data as StudentQuestionOut["data"]; // Phase 10 S1: structured fields
+  const keyList = (name: string): Record<string, unknown>[] => (key && Array.isArray(key[name]) ? (key[name] as Record<string, unknown>[]) : []);
 
   return (
     <article className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5" aria-label={t("results.questionN", { n: number })}>
@@ -165,6 +168,76 @@ export function ReviewItemCard({
           )}
         </dl>
       )}
+
+      {q.type === "matching" && (() => {
+        const given = (resp.pairs ?? {}) as Record<string, string>;
+        const rightText = new Map((sd.rights ?? []).map((r) => [r.id, r.text]));
+        const keyPairs = new Map(keyList("pairs").map((p) => [String(p.left_id), String(p.right_id)]));
+        return (
+          <ul className="space-y-2">
+            {(sd.lefts ?? []).map((l) => {
+              const g = given[l.id];
+              const ok = key ? keyPairs.get(l.id) === g : false;
+              const cls = !key ? "border-slate-200 bg-white" : ok ? "border-emerald-400 bg-emerald-50" : "border-red-300 bg-red-50";
+              return (
+                <li key={l.id} className={`rounded-xl border px-4 py-2.5 text-sm ${cls}`}>
+                  <MathRenderer content={l.text} className="font-medium text-slate-900" />
+                  <p className="text-slate-700">{answerLabel}: {g ? rightText.get(g) ?? g : t("results.noAnswer")}</p>
+                  {key && !ok && <p className="font-medium text-emerald-700">{t("results.correctAnswer")}: {rightText.get(keyPairs.get(l.id) ?? "") ?? ""}</p>}
+                </li>
+              );
+            })}
+          </ul>
+        );
+      })()}
+
+      {q.type === "fill_blank" && (() => {
+        const given = (resp.blanks ?? {}) as Record<string, string>;
+        const blanks = keyList("blanks");
+        const n = blanks.length || sd.blank_count || Object.keys(given).length;
+        return (
+          <ol className="space-y-1 text-sm">
+            {Array.from({ length: n }, (_, i) => {
+              const answers = Array.isArray(blanks[i]?.answers) ? (blanks[i].answers as string[]) : null;
+              return (
+                <li key={i} className="rounded-xl border border-slate-200 px-4 py-2">
+                  <span className="text-xs text-slate-500">{t("results.structured.blankN", { n: i + 1 })}</span>{" "}
+                  <span className="font-mono font-medium">{given[String(i + 1)] || t("results.noAnswer")}</span>
+                  {answers && <span className="block font-mono font-medium text-emerald-700">{t("results.acceptedAnswers")}: {answers.join(" ; ")}</span>}
+                </li>
+              );
+            })}
+          </ol>
+        );
+      })()}
+
+      {q.type === "ordering" && (() => {
+        const text = new Map((sd.items ?? []).map((i) => [i.id, i.text]));
+        const given = Array.isArray(resp.order) ? (resp.order as string[]) : [];
+        const correct = key && Array.isArray(key.order) ? (key.order as string[]) : null;
+        return (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <p className="mb-1 text-xs text-slate-500">{answerLabel}</p>
+              {given.length ? (
+                <ol className="space-y-1 text-sm">
+                  {given.map((id, i) => (
+                    <li key={`${id}-${i}`} className={`rounded-xl border px-3 py-1.5 ${correct ? (correct[i] === id ? "border-emerald-400 bg-emerald-50" : "border-red-300 bg-red-50") : "border-slate-200"}`}>
+                      {i + 1}. {text.get(id) ?? id}
+                    </li>
+                  ))}
+                </ol>
+              ) : <p className="text-sm text-slate-500">{t("results.noAnswer")}</p>}
+            </div>
+            {correct && (
+              <div>
+                <p className="mb-1 text-xs text-slate-500">{t("results.correctAnswer")}</p>
+                <ol className="space-y-1 text-sm">{correct.map((id, i) => <li key={id} className="rounded-xl border border-slate-200 px-3 py-1.5 text-emerald-700">{i + 1}. {text.get(id) ?? id}</li>)}</ol>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {q.type === "essay" && (
         <div>

@@ -77,6 +77,29 @@ export function StudentPreview({ q }: { q: StudentQuestionOut }) {
           <input disabled aria-label={t("bank.preview.answerField")} placeholder={t("bank.preview.answerField")}
             className="mt-4 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm" />
         )}
+        {q.type === "matching" && (
+          <ul className="mt-4 space-y-2">
+            {(d.lefts || []).map((l) => (
+              <li key={l.id} className="rounded-xl border border-slate-200 px-3 py-2 text-sm">{l.text}</li>
+            ))}
+            <li className="pt-1 text-xs font-bold uppercase text-slate-500">{t("player.structured.choose")}</li>
+            {(d.rights || []).map((r) => (
+              <li key={r.id} className="rounded-xl border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-700">{r.text}</li>
+            ))}
+          </ul>
+        )}
+        {q.type === "fill_blank" && (
+          <p className="mt-4 whitespace-pre-wrap text-sm leading-8">
+            {(d.text || "").split(/\{\{(\d+)\}\}/).map((part, i) => i % 2 === 0
+              ? <span key={i}>{part}</span>
+              : <span key={i} className="mx-1 inline-block w-28 border-b-2 border-slate-400" aria-label={t("player.structured.blankN", { n: part })}>&nbsp;</span>)}
+          </p>
+        )}
+        {q.type === "ordering" && (
+          <ol className="mt-4 list-inside list-decimal space-y-2">
+            {(d.items || []).map((i) => <li key={i.id} className="rounded-xl border border-slate-200 px-3 py-2 text-sm">{i.text}</li>)}
+          </ol>
+        )}
         {q.type === "essay" && (
           <div className="mt-4">
             <textarea disabled rows={5} aria-label={t("bank.preview.essayField")} placeholder={t("bank.preview.essayField")}
