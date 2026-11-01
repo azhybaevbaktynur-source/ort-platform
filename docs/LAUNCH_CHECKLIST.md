@@ -19,9 +19,9 @@ We tested on a laptop, not on the real servers (`docs/phases/PHASE_11_LOADTEST.m
 - [ ] Own web address for the site and for images.
 - [ ] Free Sentry account and its DSN (error reports). Logs work without it. Sentry is outside Kyrgyzstan: part of the legal point above.
 - [ ] First real run of: removing files of test students, and the practice-history retention (both stay off until you say so).
-- [ ] Delete an old Neon backup branch (we use 8 of 10). Only needed if branches run out.
+- [ ] Delete an old Neon backup branch (we use 9 of 10). Only needed if branches run out.
 - [ ] Set `PRIVACY_LEGACY_DEADLINE` (cut-off for old accounts) after the lawyer.
-- [ ] Run the restore drill (`docs/runbooks/RESTORE.md`) and fill `RESTORE_DRILL.md`.
+- [ ] Read how long Neon keeps history (Neon console) and write it in `docs/runbooks/RESTORE_DRILL.md`. The restore drill itself passed on 2026-11-02.
 
 ## C. Questions with a default (nothing waits for you)
 Confirm or change each. The default is already in use.

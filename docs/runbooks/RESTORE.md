@@ -7,8 +7,7 @@ Neon keeps a short history on the free plan. **How long is not recorded in the r
 
 **Check it before using it** (read-only):
 ```bash
-cd backend
-DRILL_DATABASE_URL='<branch connection string>' venv/bin/python ../scripts/restore_drill.py
+DRILL_DATABASE_URL='<branch connection string>' backend/venv/bin/python scripts/restore_drill.py
 ```
 It checks the Alembic revision equals the code's head, key table row counts, and that one student can open `/me/home` through a local server. It prints no row contents and never prints the URL. Exit 0 = PASS.
 

@@ -7,8 +7,7 @@ prints the database URL:
   3. A student read through a local `uvicorn` pointed at the branch (HTTP status only).
   4. Time taken.
 
-    cd backend
-    DRILL_DATABASE_URL='<branch url>' venv/bin/python ../scripts/restore_drill.py [--skip-head] [--port 8188]
+    DRILL_DATABASE_URL='<branch url>' backend/venv/bin/python scripts/restore_drill.py [--skip-head] [--port 8188]
 
 `--skip-head` is for a dev database made by create_all (no alembic_version table); never use it on a restored branch.
 Exit code 0 only if every check passed. The script only reads the database.
@@ -17,8 +16,10 @@ from __future__ import annotations
 
 import argparse
 import os
+import secrets
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -26,6 +27,10 @@ from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parent.parent / "backend"
 sys.path.insert(0, str(BACKEND))
+# Never load backend/.env (live keys): work from outside backend/, with a throwaway key shared with the local server.
+WORK_DIR = tempfile.mkdtemp(prefix="restore_drill_")
+os.chdir(WORK_DIR)
+os.environ["SECRET_KEY"] = secrets.token_hex(32)
 
 KEY_TABLES = [
     "users", "organizations", "courses", "enrollments", "assessments", "attempts", "attempt_items",
@@ -72,10 +77,10 @@ def pick_student(engine):
 def student_read(url: str, student: tuple[str, int], port: int) -> tuple[bool, str]:
     from app.core.security import create_access_token
 
-    env = {**os.environ, "DATABASE_URL": url, "ENVIRONMENT": "development", "LMS_STORAGE_DRIVER": "db"}
+    env = {**os.environ, "DATABASE_URL": url, "ENVIRONMENT": "development", "LMS_STORAGE_DRIVER": "db", "PYTHONPATH": str(BACKEND)}
     proc = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "app.main:app", "--port", str(port), "--log-level", "critical"],
-        cwd=str(BACKEND), env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        cwd=WORK_DIR, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
     try:
         base = f"http://127.0.0.1:{port}"
