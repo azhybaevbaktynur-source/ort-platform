@@ -94,7 +94,7 @@ test.describe("quiz editor walk (ru)", () => {
     // ---- multiple choice: all seven types offered, Enter adds answers, Backspace removes an empty one, mark correct
     await page.getByRole("button", { name: t("quizEditor.card.addQuestion") }).click();
     await expect(stemField(page)).toBeVisible();
-    await expect(page.getByRole("combobox", { name: t("bank.editor.type") }).locator("option")).toHaveCount(7);
+    await expect(page.getByRole("combobox", { name: t("bank.editor.type") }).locator("option")).toHaveCount(10); // seven + Phase 10 matching, fill_blank, ordering
     await stemField(page).fill(STEM_1);
     await answerField(page, "A").fill("3");
     await answerField(page, "A").press("Enter");

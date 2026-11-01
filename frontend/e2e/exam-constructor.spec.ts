@@ -193,7 +193,7 @@ test.describe("exam-template constructor walk (ru)", () => {
     await expect.poll(() => admin.context().pages().length).toBe(pagesBefore);
 
     await writeCard(admin, part1, "Сколько будет 2 + 2?", "3", "4", 1);
-    await writeCard(admin, part2, "Столица Кыргызстана?", "Ош", "Бишкек", 6);
+    await writeCard(admin, part2, "Столица Кыргызстана?", "Ош", "Бишкек", 9);
 
     // ---- Preview: the header "Preview" (8b UX: the same action as the Sample tab's launcher) opens the real player in
     // a new tab (desktop), amber banner, scrolling, forward-only, ORT-style result; "Back to the template" returns to
@@ -285,7 +285,7 @@ test.describe("exam-template constructor walk (ru)", () => {
     const sec = (name: string) => teacher.locator("section").filter({ has: teacher.getByRole("heading", { name }) });
     await writeCard(teacher, sec("Часть 1"), "Сколько будет 5 + 5?", "11", "10", 1);
     await writeCard(teacher, sec("Часть 1"), "Сколько будет 3 × 3?", "6", "9", 1);
-    await writeCard(teacher, sec("Часть 2"), "Самая длинная река Кыргызстана?", "Чу", "Нарын", 6);
+    await writeCard(teacher, sec("Часть 2"), "Самая длинная река Кыргызстана?", "Чу", "Нарын", 9);
     // lock scope "sections" on a locked template: "Add section" is disabled and the server refuses it (409)
     await expect(teacher.getByRole("button", { name: t("assessments.section.add") })).toBeDisabled();
     const addSec = await api(c.teacher, `/courses/${c.course_id}/assessments/${aid}/sections`, "POST", { title: { ru: "Часть 4" } });
