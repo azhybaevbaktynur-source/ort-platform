@@ -213,7 +213,7 @@ jobs:
           "backend log=/tmp/ort_e2e/backend.log"
       - name: Upload screenshot diffs and logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ort-e2e-diffs
           path: |
@@ -226,7 +226,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload recorded baselines (platform without committed baselines)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ort-e2e-recorded
           path: /tmp/ort_e2e/recorded
