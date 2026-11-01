@@ -25,6 +25,12 @@ _I = f"{_C}/modules/{{module_id}}/items/{{item_id}}"
 _T = f"{_V}/attempts/{{attempt_id}}"  # an attempt route: `attempt_owner`, so only the test student's own attempts
 
 TEST_STUDENT_ROUTES: frozenset[tuple[str, str]] = frozenset({
+    # --- Phase 10 S4 begin --- (progress, mistakes notebook, goal: the test student sees their own)
+    ("GET", f"{_C}/my/progress"),
+    ("GET", f"{_C}/my/mistakes"),
+    ("PUT", f"{_C}/my/goal"),
+    ("DELETE", f"{_C}/my/goal"),
+    # --- Phase 10 S4 end ---
     # the app frame and the student home
     ("GET", f"{_V}/auth/me"),
     ("GET", f"{_V}/me/lms"),

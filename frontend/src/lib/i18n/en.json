@@ -5147,7 +5147,44 @@
     "nav": "Practice"
   },
   "progress": {
-    "nav": "My progress"
+    "nav": "My progress",
+    "title": "Progress",
+    "tabsLabel": "Progress sections",
+    "tabs": {
+      "overview": "Overview",
+      "mistakes": "Mistakes"
+    },
+    "tiles": {
+      "current": "Current",
+      "goal": "Goal",
+      "attempts": "Attempts",
+      "mistakes": "Open mistakes",
+      "openNotebook": "Open notebook"
+    },
+    "goal": {
+      "label": "Goal, %",
+      "save": "Save",
+      "clear": "Remove",
+      "invalid": "Enter a number from 1 to 100."
+    },
+    "trend": "Recent results",
+    "sections": "By section",
+    "empty": "No results yet.",
+    "topics": {
+      "title": "Weakest topics",
+      "topic": "Topic",
+      "section": "Section",
+      "accuracy": "Correct",
+      "questions": "Questions"
+    },
+    "mistakes": {
+      "filter": "Mistakes filter",
+      "open": "Open",
+      "fixed": "Fixed",
+      "emptyOpen": "No open mistakes.",
+      "emptyFixed": "No fixed mistakes yet.",
+      "viewAttempt": "View attempt"
+    }
   },
   "quizStats": {},
   "analytics": {
