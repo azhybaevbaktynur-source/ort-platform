@@ -2,9 +2,10 @@
 
 import React from "react";
 import { useTranslation } from "@/lib/i18n/context";
-import { DIFFICULTIES, QUESTION_TYPES, ORT_SECTIONS, type Difficulty, type QuestionType } from "@/lib/lms/contentTypes";
+import { DIFFICULTIES, ORT_SECTIONS, type Difficulty, type QuestionType } from "@/lib/lms/contentTypes";
 import { LMS_LANGS, type Lang } from "@/lib/lms/types";
 import { Button, Checkbox, Input, SearchInput, Select } from "@/components/ui";
+import { useQuestionTypes } from "@/components/lms/content/useQuestionTypes"; // Phase 10
 
 export interface BankFilterState {
   q: string;
@@ -24,6 +25,7 @@ export const EMPTY_FILTERS: BankFilterState = { q: "", type: "", language: "", s
  */
 export function BankFilters({ value, onChange }: { value: BankFilterState; onChange: (v: BankFilterState) => void }) {
   const { t } = useTranslation();
+  const questionTypes = useQuestionTypes();
   const set = (p: Partial<BankFilterState>) => onChange({ ...value, ...p });
   const dirty = JSON.stringify(value) !== JSON.stringify(EMPTY_FILTERS);
   const all = { value: "", label: t("bank.filters.all") };
@@ -32,7 +34,7 @@ export function BankFilters({ value, onChange }: { value: BankFilterState; onCha
       <SearchInput label={t("bank.filters.search")} value={value.q} onChange={(q) => set({ q })} />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <Select label={t("bank.filters.type")} value={value.type} onChange={(e) => set({ type: e.target.value as QuestionType | "" })}
-          options={[all, ...QUESTION_TYPES.map((ty) => ({ value: ty, label: t(`bank.types.${ty}.name`) }))]} />
+          options={[all, ...questionTypes.map((ty) => ({ value: ty, label: t(`bank.types.${ty}.name`) }))]} />
         <Select label={t("bank.filters.language")} value={value.language} onChange={(e) => set({ language: e.target.value as Lang | "" })}
           options={[all, ...LMS_LANGS.map((l) => ({ value: l, label: t(`courses.languages.${l}`) }))]} />
         <Input label={t("bank.filters.section")} list="bank-filter-sections" value={value.section} onChange={(e) => set({ section: e.target.value })} />

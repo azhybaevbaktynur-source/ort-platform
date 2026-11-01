@@ -19,12 +19,14 @@ import { Button, ConfirmDialog, EmptyState, LoadingState, MenuButton } from "@/c
 import { MoveToBankDialog } from "@/components/lms/content/MoveToBankDialog";
 import { useTemplateUi } from "@/lib/lms/templates";
 import { MathRenderer } from "@/components/math/MathRenderer";
+import { useQuestionTypes } from "@/components/lms/content/useQuestionTypes"; // Phase 10
 
 export default function BankQuestionsPage() {
   const { lang, t } = useTranslation();
   const router = useRouter();
   const { bankId } = useParams<{ bankId: string }>();
   const { course } = useCourse();
+  const questionTypes = useQuestionTypes();
   const isOrt = useTemplateUi().key === "ort";
   const [toMove, setToMove] = useState<QuestionSummaryOut | null>(null);
   const [bank, setBank] = useState<BankOut | null>(null);
@@ -99,7 +101,7 @@ export default function BankQuestionsPage() {
           <Button leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />} onClick={() => newQuestion()}>{t("bank.questions.new")}</Button>
         ) : (
           <MenuButton label={t("bank.questions.new")} leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />}
-            items={QUESTION_TYPES.map((ty) => ({ id: ty, label: t(`bank.types.${ty}.name`), description: t(`bank.types.${ty}.hint`) }))}
+            items={questionTypes.map((ty) => ({ id: ty, label: t(`bank.types.${ty}.name`), description: t(`bank.types.${ty}.hint`) }))}
             onSelect={(ty) => newQuestion(ty as QuestionType)} />
         )) : undefined}
         secondaryActions={!isOrt && bank && canEdit && shareToggleVisible(bank, sharing) ? (

@@ -5,7 +5,7 @@ import { useTranslation } from "@/lib/i18n/context";
 import { addItem, addItemsBulk } from "@/lib/lms/assessments";
 import { listPassages, listQuestions } from "@/lib/lms/content";
 import {
-  DIFFICULTIES, QUESTION_TYPES, type Difficulty, type PassageSummaryOut, type QuestionSummaryOut, type QuestionType,
+  DIFFICULTIES, type Difficulty, type PassageSummaryOut, type QuestionSummaryOut, type QuestionType,
 } from "@/lib/lms/contentTypes";
 import { useTemplateUi } from "@/lib/lms/templates";
 import type { BulkAddOut } from "@/lib/lms/assessmentTypes";
@@ -17,6 +17,7 @@ import { ContentError } from "@/components/lms/content/ContentError";
 import { AssessmentError } from "./AssessmentError";
 import { Modal } from "./Modal";
 import { BankSelect, PickFields, useBanks, type PickValue } from "./PickFields";
+import { useQuestionTypes } from "@/components/lms/content/useQuestionTypes"; // Phase 10
 
 export type AddItemsTab = "questions" | "passage" | "pick";
 type Tab = AddItemsTab;
@@ -41,6 +42,7 @@ export function AddItemsDialog({
   quizEditor?: boolean;
 }) {
   const { t } = useTranslation();
+  const questionTypes = useQuestionTypes();
   const ui = useTemplateUi();
   const [tab, setTab] = useState<Tab>("questions");
   const { banks, error: banksError } = useBanks(courseId, open);
@@ -201,7 +203,7 @@ export function AddItemsDialog({
             <label className="text-xs font-medium text-slate-600">{t("bank.filters.type")}
               <select className={`${inputCls} mt-0.5`} value={filters.type} onChange={(e) => set({ type: e.target.value as QuestionType | "" })}>
                 <option value="">{t("bank.filters.all")}</option>
-                {QUESTION_TYPES.map((q) => <option key={q} value={q}>{t(`bank.types.${q}.name`)}</option>)}
+                {questionTypes.map((q) => <option key={q} value={q}>{t(`bank.types.${q}.name`)}</option>)}
               </select>
             </label>
             <label className="text-xs font-medium text-slate-600">{t("bank.filters.language")}
