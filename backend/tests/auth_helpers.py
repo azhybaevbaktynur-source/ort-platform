@@ -32,6 +32,9 @@ def ensure_test_accounts() -> None:
                 existing.password_hash = hash_password(TEST_PASSWORDS[email])
                 _refreshed.add(email)
         session.commit()
+        from app.lms.privacy.seed import ensure_policies
+
+        ensure_policies(session)  # Phase 11 S1: test setup seeds what the lifespan seeds
     finally:
         session.close()
 
@@ -49,10 +52,23 @@ def capture_email_codes():
         yield codes
 
 
+def signup_fields(age_band: str = "18_plus") -> dict:
+    """Phase 11: what `POST /auth/register` now requires: the band and the current policy ids."""
+    from app.db.session import SessionLocal
+    from app.lms.privacy.service import OWN_KINDS, current_policies
+
+    session = SessionLocal()
+    try:
+        current = current_policies(session)
+        return {"ageBand": age_band, "policyVersionIds": [str(current[k].id) for k in OWN_KINDS]}
+    finally:
+        session.close()
+
+
 async def register_and_verify(client, payload: dict) -> dict:
     """Registers through the API, enters the emailed code, and returns the login (token) response."""
     with capture_email_codes() as codes:
-        res = await client.post("/api/v1/auth/register", json=payload)
+        res = await client.post("/api/v1/auth/register", json={**signup_fields(), **payload})
         assert res.status_code == 200, res.text
         assert res.json()["verificationRequired"] is True
         email = payload["email"].strip().lower()

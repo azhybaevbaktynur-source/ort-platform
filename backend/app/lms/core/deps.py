@@ -46,6 +46,12 @@ def get_lms_user(authorization: Optional[str] = Header(None), db: Session = Depe
         from app.lms.student_view.allowlist import enforce
 
         enforce(request, user, db)
+    if user.consent_state in ("pending_guardian", "legacy"):  # Phase 11 S1: loaded columns only, no query
+        from app.lms.core import clock
+        from app.lms.privacy import gate as privacy_gate
+
+        if privacy_gate.is_gated(user, clock.now()):
+            privacy_gate.enforce(request)
     return user
 
 

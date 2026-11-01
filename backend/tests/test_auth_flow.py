@@ -14,7 +14,7 @@ from app.db.session import SessionLocal
 from app.main import app
 from app.models.user import User
 from app.services import email_service
-from tests.auth_helpers import capture_email_codes
+from tests.auth_helpers import capture_email_codes, signup_fields
 
 PASSWORD = "secretPass123"
 
@@ -48,7 +48,8 @@ def client() -> AsyncClient:
 
 async def register(c, email, codes, password=PASSWORD):
     res = await c.post("/api/v1/auth/register",
-                       json={"email": email, "password": password, "displayName": "Тест", "lang": "ru"})
+                       json={"email": email, "password": password, "displayName": "Тест", "lang": "ru",
+                             **signup_fields()})
     return res
 
 
@@ -166,7 +167,8 @@ async def test_register_reports_email_failure():
     email = new_email()
     async with client() as c:
         with patch("app.api.v1.endpoints.auth.send_verification_code_email", return_value=False):
-            res = await c.post("/api/v1/auth/register", json={"email": email, "password": PASSWORD})
+            res = await c.post("/api/v1/auth/register", json={"email": email, "password": PASSWORD,
+                                                               **signup_fields()})
         assert res.status_code == 503 and res.json()["detail"]["code"] == "email_send_failed"
         # A failed send starts no resend wait and leaves no code behind
         user = db_user(email)
@@ -180,7 +182,8 @@ async def test_register_reports_email_failure():
 
         # An immediate retry works and keeps one pending account
         with capture_email_codes() as codes:
-            res = await c.post("/api/v1/auth/register", json={"email": email, "password": PASSWORD})
+            res = await c.post("/api/v1/auth/register", json={"email": email, "password": PASSWORD,
+                                                               **signup_fields()})
         assert res.status_code == 200 and email in codes
 
 

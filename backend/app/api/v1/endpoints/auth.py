@@ -6,8 +6,8 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import text
-from sqlalchemy.orm import Session
+from sqlalchemy import select, text
+from sqlalchemy.orm import Session, object_session
 
 from app.core.config import settings
 from app.core.security import (
@@ -18,6 +18,9 @@ from app.core.security import (
     create_access_token,
 )
 from app.db.session import get_db
+from app.lms.core.errors import ValidationFailed
+from app.lms.guardian.models import GuardianLink
+from app.lms.privacy import service as privacy
 from app.models.user import User
 from app.schemas.user import (
     UserProfile,
@@ -86,6 +89,13 @@ def _issue_email_code(user: User, db: Session, lang: str) -> bool:
     return sent
 
 
+def _is_guardian(user: User) -> bool:
+    """Phase 11: from the database on every call, like every other permission."""
+    db = object_session(user)
+    return db is not None and db.execute(select(GuardianLink.id).where(
+        GuardianLink.guardian_user_id == user.id, GuardianLink.revoked_at.is_(None)).limit(1)).first() is not None
+
+
 def _profile(user: User) -> UserProfile:
     return UserProfile(
         id=user.id,
@@ -97,6 +107,7 @@ def _profile(user: User) -> UserProfile:
         teacher_status=user.teacher_status or "none",
         locale=user.locale,
         is_test_student=bool(user.is_test_student),
+        is_guardian=_is_guardian(user),
     )
 
 
@@ -130,6 +141,14 @@ def register_user(
     display_name = req.displayName.strip() if req.displayName and req.displayName.strip() else clean_email.split("@")[0]
     phone_clean = req.phone.strip() if req.phone and req.phone.strip() else None
 
+    # Phase 11 S1 (PHASE_11_DESIGN 3.2): the band and, from 14 up, the acceptance of the current policies
+    if req.ageBand not in privacy.AGE_BANDS:
+        raise _error(422, "age_band_required", "Choose an age band.")
+    try:
+        accepted = privacy.accepted_policies(db, req.ageBand, req.policyVersionIds)
+    except ValidationFailed as e:
+        raise _error(422, e.code, e.message) from None
+
     user = db.query(User).filter(User.email == clean_email).first()
     if user and user.email_verified:
         raise HTTPException(
@@ -154,6 +173,9 @@ def register_user(
     user.password_hash = hash_password(req.password)
     user.display_name = display_name
     user.phone = phone_clean
+    db.flush()
+    privacy.apply_age_band(db, user, req.ageBand, accepted, source="signup", locale=lang,
+                           due_at=privacy.now())  # under 14: gated from the first request after verification
     db.commit()
 
     if not _issue_email_code(user, db, lang):

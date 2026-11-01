@@ -237,7 +237,7 @@ async def test_expired_token_is_refused(db, api):
 
 @pytest.mark.parametrize("path,body", [
     ("/auth/login", {"password": "whatever-123"}),
-    ("/auth/register", {"password": "whatever-123", "displayName": "X"}),
+    ("/auth/register", {"password": "whatever-123", "displayName": "X", "ageBand": "18_plus"}),
     ("/auth/forgot-password", {}),
     ("/auth/resend-code", {}),
     ("/auth/verify-email", {"password": "whatever-123", "code": "123456"}),

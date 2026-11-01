@@ -182,7 +182,7 @@ async def test_register_display_name_capped_and_no_control_chars(db, api):
     for name in ("a" * 101, "Bad\r\nName", "Tab\tName", "Nul\x00"):
         r = await api.call(None, "POST", "/auth/register",
                            json={"email": f"{uuid.uuid4().hex[:8]}@example.com", "password": "secret123",
-                                 "displayName": name})
+                                 "displayName": name, "ageBand": "18_plus"})
         assert r.status_code == 422, (name, r.text)
         assert "detail" in r.json()  # the existing FastAPI validation shape of the auth routes
     assert UserRegisterRequest(email="ok@example.com", password="secret123", displayName="Ы" * 100).displayName

@@ -74,6 +74,7 @@ async def test_api_accepts_english_for_auth_emails():
     from httpx import ASGITransport, AsyncClient
 
     from app.main import app
+    from tests.auth_helpers import signup_fields
 
     email = f"en_{uuid.uuid4().hex[:8]}@example.com"
     langs = []
@@ -81,7 +82,8 @@ async def test_api_accepts_english_for_auth_emails():
         with patch("app.api.v1.endpoints.auth.send_verification_code_email",
                    side_effect=lambda to_email, code, lang="ky": langs.append(lang) or True):
             res = await c.post("/api/v1/auth/register", json={"email": email, "password": "secretPass123",
-                                                               "displayName": "Test", "lang": "en"})
+                                                               "displayName": "Test", "lang": "en",
+                                                               **signup_fields()})
             assert res.status_code == 200, res.text
         with patch("app.api.v1.endpoints.auth.send_password_reset_email", return_value=True):
             res = await c.post("/api/v1/auth/forgot-password", json={"email": email, "lang": "en"})

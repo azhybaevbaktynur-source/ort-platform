@@ -38,6 +38,8 @@ class Asset(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
     deleted_by_id: Mapped[Optional[str]] = mapped_column(
         String(64), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    # Phase 11 S1: personal-data erasure (`service.erase_asset`); no longer counts as a reference to its blob
+    erased_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("owner_id", "source_sha256", "visibility", name="uq_assets_owner_source"),
