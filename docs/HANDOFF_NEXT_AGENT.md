@@ -64,7 +64,7 @@ Neon backups (free plan: **max 10 branches, 1 manual snapshot**): `backup-2026-1
 
 ## 5. What to do next
 
-1. Phase 11 per `docs/phases/PHASE_11_DESIGN.md`; stop before launch with `LAUNCH_CHECKLIST.md`. Neon 8/10 branches. QA accounts disabled; re-enable by SQL for production checks, remove after the final check.
+1. Phase 11 per `docs/phases/PHASE_11_DESIGN.md` (S6 operations and launch docs done on `phase-11-s6`: logs, Sentry off, uptime, runbooks, drill script not yet run, COSTS, LAUNCH_CHECKLIST); stop before launch with `LAUNCH_CHECKLIST.md`. Neon 8/10 branches. QA accounts disabled; re-enable by SQL for production checks, remove after the final check.
 2. Phase 11 after the owner's OK. Back to the normal model rule (UR-6); Sonnet for Phase 10 only. Include: load test at scale, practice retention, sweep of retired test students' files.
 3. Open owner questions keep their defaults: `CHECKPOINT_8B.md` §3, 8c design §17, 9-Q1…Q8 in `PRODUCT_DECISIONS.md`. Optional 8c teacher test.
 4. Fix the flaky PG test `tests/lms/test_enrollments_api.py::test_ip_failure_limit_counts_failures_only`; an unidentified intermittent `backend-sqlite` CI failure was seen once (55e3348).
