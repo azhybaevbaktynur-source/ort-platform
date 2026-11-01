@@ -1,0 +1,323 @@
+{
+ "label": "baseline",
+ "limits": {
+  "ms": 200,
+  "seq_pct": 1.0
+ },
+ "counts": {
+  "users": 6254,
+  "courses": 202,
+  "enrollments": 21457,
+  "assessments": 425,
+  "attempts": 56031,
+  "attempt_items": 1404650,
+  "attempt_sections": 80155,
+  "submissions": 99768,
+  "grade_events": 200000,
+  "module_progress": 127350,
+  "practice_attempts": 50000,
+  "test_enrollments": 230,
+  "database_size": "448 MB"
+ },
+ "rows": {
+  "enrollments": 21457,
+  "attempts": 56031,
+  "attempt_items": 1404650,
+  "submissions": 99768
+ },
+ "cases": [
+  {
+   "case": "statistics.summary_fresh",
+   "statements": 5,
+   "explained": 5,
+   "service_ms": 6.1,
+   "sql_ms": 4.3,
+   "worst_statement_ms": 2.38,
+   "verdict": "FAIL",
+   "failures": [
+    "Seq Scan enrollments: 21457 rows read, 100.0 %",
+    "Seq Scan enrollments: 21457 rows read, 100.0 %"
+   ]
+  },
+  {
+   "case": "statistics.item_page",
+   "statements": 5,
+   "explained": 5,
+   "service_ms": 12.2,
+   "sql_ms": 2.3,
+   "worst_statement_ms": 2.09,
+   "verdict": "FAIL",
+   "failures": [
+    "Seq Scan enrollments: 21457 rows read, 100.0 %"
+   ]
+  },
+  {
+   "case": "statistics.refresh_compute_4000",
+   "statements": 4,
+   "explained": 4,
+   "service_ms": 1975.7,
+   "sql_ms": 3151.4,
+   "worst_statement_ms": 1087.1,
+   "verdict": "FAIL",
+   "failures": [
+    "Seq Scan enrollments: 21457 rows read, 100.0 %",
+    "989 ms > 200 ms",
+    "Seq Scan enrollments: 21457 rows read, 100.0 %",
+    "1070 ms > 200 ms",
+    "Seq Scan enrollments: 21457 rows read, 100.0 %",
+    "1087 ms > 200 ms",
+    "Seq Scan enrollments: 21457 rows read, 100.0 %"
+   ]
+  },
+  {
+   "case": "statistics.refresh_compute_500",
+   "statements": 4,
+   "explained": 4,
+   "service_ms": 273.0,
+   "sql_ms": 291.0,
+   "worst_statement_ms": 100.18,
+   "verdict": "FAIL",
+   "failures": [
+    "Seq Scan enrollments: 21457 rows read, 100.0 %",
+    "Seq Scan enrollments: 21457 rows read, 100.0 %",
+    "Seq Scan enrollments: 21457 rows read, 100.0 %",
+    "Seq Scan enrollments: 21457 rows read, 100.0 %"
+   ]
+  },
+  {
+   "case": "analytics.overview_6000",
+   "statements": 7,
+   "explained": 7,
+   "service_ms": 40.6,
+   "sql_ms": 41.3,
+   "worst_statement_ms": 18.4,
+   "verdict": "FAIL",
+   "failures": [
+    "Seq Scan enrollments: 21457 rows read, 100.0 %",
+    "Seq Scan enrollments: 21457 rows read, 100.0 %"
+   ]
+  },
+  {
+   "case": "analytics.overview_small",
+   "statements": 7,
+   "explained": 7,
+   "service_ms": 11.3,
+   "sql_ms": 7.8,
+   "worst_statement_ms": 3.69,
+   "verdict": "FAIL",
+   "failures": [
+    "Seq Scan enrollments: 21457 rows read, 100.0 %",
+    "Seq Scan enrollments: 21457 rows read, 100.0 %"
+   ]
+  },
+  {
+   "case": "analytics.modules_page",
+   "statements": 4,
+   "explained": 4,
+   "service_ms": 11.9,
+   "sql_ms": 12.1,
+   "worst_statement_ms": 11.27,
+   "verdict": "FAIL",
+   "failures": [
+    "Seq Scan enrollments: 21457 rows read, 100.0 %"
+   ]
+  },
+  {
+   "case": "analytics.assignments_page",
+   "statements": 4,
+   "explained": 4,
+   "service_ms": 9.1,
+   "sql_ms": 8.3,
+   "worst_statement_ms": 7.26,
+   "verdict": "FAIL",
+   "failures": [
+    "Seq Scan enrollments: 21457 rows read, 100.0 %"
+   ]
+  },
+  {
+   "case": "analytics.quizzes_page",
+   "statements": 3,
+   "explained": 3,
+   "service_ms": 6.6,
+   "sql_ms": 5.6,
+   "worst_statement_ms": 5.59,
+   "verdict": "FAIL",
+   "failures": [
+    "Seq Scan enrollments: 21457 rows read, 100.0 %"
+   ]
+  },
+  {
+   "case": "analytics.practice_page",
+   "statements": 3,
+   "explained": 3,
+   "service_ms": 53.4,
+   "sql_ms": 57.8,
+   "worst_statement_ms": 57.72,
+   "verdict": "FAIL",
+   "failures": [
+    "Seq Scan attempts: 56031 rows read, 100.0 %",
+    "Seq Scan enrollments: 21457 rows read, 100.0 %"
+   ]
+  },
+  {
+   "case": "org.overview",
+   "statements": 6,
+   "explained": 6,
+   "service_ms": 168.7,
+   "sql_ms": 187.7,
+   "worst_statement_ms": 113.56,
+   "verdict": "FAIL",
+   "failures": [
+    "Seq Scan enrollments: 21457 rows read, 100.0 %",
+    "Seq Scan submissions: 99768 rows read, 100.0 %",
+    "Seq Scan enrollments: 21457 rows read, 100.0 %",
+    "Seq Scan submissions: 99768 rows read, 100.0 %",
+    "Seq Scan enrollments: 42914 rows read, 200.0 %"
+   ]
+  },
+  {
+   "case": "org.courses_page",
+   "statements": 5,
+   "explained": 5,
+   "service_ms": 87.6,
+   "sql_ms": 71.5,
+   "worst_statement_ms": 23.08,
+   "verdict": "FAIL",
+   "failures": [
+    "Seq Scan enrollments: 21457 rows read, 100.0 %",
+    "Seq Scan enrollments: 21457 rows read, 100.0 %",
+    "Seq Scan enrollments: 21457 rows read, 100.0 %"
+   ]
+  },
+  {
+   "case": "org.courses_page_department",
+   "statements": 6,
+   "explained": 6,
+   "service_ms": 43.1,
+   "sql_ms": 44.9,
+   "worst_statement_ms": 14.39,
+   "verdict": "FAIL",
+   "failures": [
+    "Seq Scan enrollments: 21457 rows read, 100.0 %",
+    "Seq Scan enrollments: 21457 rows read, 100.0 %",
+    "Seq Scan enrollments: 21457 rows read, 100.0 %"
+   ]
+  },
+  {
+   "case": "org.quizzes_page",
+   "statements": 3,
+   "explained": 3,
+   "service_ms": 8.9,
+   "sql_ms": 6.9,
+   "worst_statement_ms": 6.55,
+   "verdict": "FAIL",
+   "failures": [
+    "Seq Scan enrollments: 21457 rows read, 100.0 %"
+   ]
+  },
+  {
+   "case": "progress.mistakes_open_heavy",
+   "statements": 4,
+   "explained": 4,
+   "service_ms": 15.7,
+   "sql_ms": 12.7,
+   "worst_statement_ms": 12.41,
+   "verdict": "FAIL",
+   "failures": [
+    "Seq Scan attempts: 56032 rows read, 100.0 %"
+   ]
+  },
+  {
+   "case": "progress.mistakes_fixed_heavy",
+   "statements": 4,
+   "explained": 4,
+   "service_ms": 18.3,
+   "sql_ms": 11.6,
+   "worst_statement_ms": 11.26,
+   "verdict": "FAIL",
+   "failures": [
+    "Seq Scan attempts: 56032 rows read, 100.0 %"
+   ]
+  },
+  {
+   "case": "progress.mistakes_page2_heavy",
+   "statements": 8,
+   "explained": 7,
+   "service_ms": 38.9,
+   "sql_ms": 33.0,
+   "worst_statement_ms": 16.73,
+   "verdict": "FAIL",
+   "failures": [
+    "Seq Scan attempts: 56032 rows read, 100.0 %",
+    "Seq Scan attempts: 56032 rows read, 100.0 %"
+   ]
+  },
+  {
+   "case": "progress.mistakes_open_typical",
+   "statements": 5,
+   "explained": 5,
+   "service_ms": 8.3,
+   "sql_ms": 0.8,
+   "worst_statement_ms": 0.56,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "progress.progress_heavy",
+   "statements": 7,
+   "explained": 7,
+   "service_ms": 23.9,
+   "sql_ms": 15.9,
+   "worst_statement_ms": 7.72,
+   "verdict": "FAIL",
+   "failures": [
+    "Seq Scan attempts: 56032 rows read, 100.0 %",
+    "Seq Scan attempts: 56032 rows read, 100.0 %"
+   ]
+  },
+  {
+   "case": "progress.progress_typical",
+   "statements": 7,
+   "explained": 7,
+   "service_ms": 5.6,
+   "sql_ms": 0.8,
+   "worst_statement_ms": 0.34,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "home.home_heavy",
+   "statements": 12,
+   "explained": 12,
+   "service_ms": 131.3,
+   "sql_ms": 10.6,
+   "worst_statement_ms": 3.39,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "home.home_typical",
+   "statements": 13,
+   "explained": 13,
+   "service_ms": 19.5,
+   "sql_ms": 1.2,
+   "worst_statement_ms": 0.31,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "retention.dry_run",
+   "statements": 2,
+   "explained": 2,
+   "service_ms": 30.1,
+   "sql_ms": 32.2,
+   "worst_statement_ms": 32.0,
+   "verdict": "FAIL",
+   "failures": [
+    "Seq Scan attempts: 56030 rows read, 100.0 %",
+    "Seq Scan attempts: 56030 rows read, 100.0 %",
+    "Seq Scan enrollments: 21457 rows read, 100.0 %"
+   ]
+  }
+ ]
+}

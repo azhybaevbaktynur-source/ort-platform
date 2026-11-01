@@ -240,6 +240,9 @@ class GradeEvent(UUIDPKMixin, Base):
     __table_args__ = (
         CheckConstraint(_EVENT_CHECK, name="event_valid"),  # Phase 7a S1: + manual_grade
         Index("ix_grade_events_submission_id_created_at", "submission_id", "created_at"),
+        # Phase 11 S5: the RESTRICT foreign key check when a practice attempt is deleted
+        Index("ix_grade_events_attempt_id", "attempt_id", postgresql_where=text("attempt_id IS NOT NULL"),
+              sqlite_where=text("attempt_id IS NOT NULL")),
     )
 
 

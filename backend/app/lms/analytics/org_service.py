@@ -91,7 +91,7 @@ def _completed_all(db: Session, course_ids: list) -> dict:
     per = (select(M.course_id.label("cid"), ModuleProgress.enrollment_id.label("eid"), func.count().label("c"))
            .select_from(ModuleProgress.__table__.join(M, M.id == ModuleProgress.module_id)
                         .join(_E, _E.c.id == ModuleProgress.enrollment_id))
-           .where(live, ModuleProgress.state == "completed", real_student(_E))
+           .where(live, ModuleProgress.state == "completed", _E.c.course_id.in_(course_ids), real_student(_E))
            .group_by(M.course_id, ModuleProgress.enrollment_id).subquery())
     rows = db.execute(select(per.c.cid, func.count()).join(totals, totals.c.cid == per.c.cid)
                       .where(per.c.c == totals.c.n).group_by(per.c.cid)).all()
@@ -104,8 +104,8 @@ def _course_means(db: Session, course_ids: list) -> dict:
     per = (select(S.course_id.label("cid"), S.enrollment_id.label("eid"), func.sum(S.effective_points).label("pts"),
                   func.sum(S.points_possible).label("poss"))
            .select_from(svc._live_sub_from())
-           .where(S.course_id.in_(course_ids), S.state == "graded", S.points_possible > 0,
-                  S.effective_points.isnot(None), real_student(_E), svc._live_published())
+           .where(S.course_id.in_(course_ids), _E.c.course_id.in_(course_ids), S.state == "graded",
+                  S.points_possible > 0, S.effective_points.isnot(None), real_student(_E), svc._live_published())
            .group_by(S.course_id, S.enrollment_id).subquery())
     rows = db.execute(select(per.c.cid, func.avg(svc._pct(per.c.pts, per.c.poss)))
                       .where(per.c.poss > 0).group_by(per.c.cid)).all()

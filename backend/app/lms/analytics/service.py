@@ -105,7 +105,7 @@ def _submission_stmt(cc: CC, now: datetime, group_col):
     if group_col is not None:
         cols.insert(0, group_col.label("course_id"))
     stmt = (select(*cols).select_from(_live_sub_from())
-            .where(cc(S.course_id), real_student(_E), _live_published()))
+            .where(cc(S.course_id), cc(_E.c.course_id), real_student(_E), _live_published()))
     return stmt.group_by(group_col) if group_col is not None else stmt
 
 
@@ -115,8 +115,8 @@ def score_distribution(db: Session, cc: CC) -> ScoreOut:
     per = (select(S.enrollment_id.label("eid"), func.sum(S.effective_points).label("pts"),
                   func.sum(S.points_possible).label("poss"))
            .select_from(_live_sub_from())
-           .where(cc(S.course_id), S.state == "graded", S.points_possible > 0, S.effective_points.isnot(None),
-                  real_student(_E), _live_published())
+           .where(cc(S.course_id), cc(_E.c.course_id), S.state == "graded", S.points_possible > 0,
+                  S.effective_points.isnot(None), real_student(_E), _live_published())
            .group_by(S.enrollment_id).subquery())
     shaped = select(percent_bucket(per.c.pts, per.c.poss).label("b"), _pct(per.c.pts, per.c.poss).label("p")
                     ).select_from(per).where(per.c.poss > 0).subquery()
@@ -138,7 +138,7 @@ def modules_total_and_completed(db: Session, course_id: uuid.UUID) -> tuple[int,
         return 0, 0
     done = (select(ModuleProgress.enrollment_id).join(CourseModule, CourseModule.id == ModuleProgress.module_id)
             .join(_E, _E.c.id == ModuleProgress.enrollment_id)
-            .where(live, ModuleProgress.state == "completed", real_student(_E))
+            .where(live, ModuleProgress.state == "completed", _E.c.course_id == course_id, real_student(_E))
             .group_by(ModuleProgress.enrollment_id).having(func.count() == total).subquery())
     return total, db.execute(select(func.count()).select_from(done)).scalar_one()
 
@@ -167,7 +167,7 @@ def modules_page(db: Session, course: Course, cursor: Optional[str], limit: Opti
     for mid, state, c in db.execute(
             select(ModuleProgress.module_id, ModuleProgress.state, func.count())
             .join(_E, _E.c.id == ModuleProgress.enrollment_id)
-            .where(ModuleProgress.module_id.in_(ids), real_student(_E))
+            .where(ModuleProgress.module_id.in_(ids), _E.c.course_id == course.id, real_student(_E))
             .group_by(ModuleProgress.module_id, ModuleProgress.state)).all():
         counts.setdefault(mid, {})[state] = c
     items = []
@@ -202,7 +202,7 @@ def assignments_page(db: Session, course: Course, cursor: Optional[str],
                func.avg(case((and_(S.state == "graded", S.points_possible > 0, S.effective_points.isnot(None)),
                               _pct(S.effective_points, S.points_possible)))).label("mean"))
         .select_from(S.__table__.join(_E, _E.c.id == S.enrollment_id))
-        .where(S.assignment_id.in_([r.id for r in rows]), real_student(_E))
+        .where(S.assignment_id.in_([r.id for r in rows]), _E.c.course_id == course.id, real_student(_E))
         .group_by(S.assignment_id)).all()}
     items = []
     for r in rows:

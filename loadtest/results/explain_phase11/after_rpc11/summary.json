@@ -1,0 +1,293 @@
+{
+ "label": "after_rpc11",
+ "limits": {
+  "ms": 200,
+  "seq_pct": 1.0
+ },
+ "counts": {
+  "users": 6254,
+  "courses": 202,
+  "enrollments": 21457,
+  "assessments": 425,
+  "attempts": 56031,
+  "attempt_items": 1404650,
+  "attempt_sections": 80155,
+  "submissions": 99768,
+  "grade_events": 200000,
+  "module_progress": 127350,
+  "practice_attempts": 50000,
+  "test_enrollments": 230,
+  "database_size": "448 MB"
+ },
+ "rows": {
+  "attempts": 56031,
+  "enrollments": 21457,
+  "submissions": 99768,
+  "attempt_items": 1404650
+ },
+ "load_average": [
+  4.2,
+  9.5,
+  11.2
+ ],
+ "setting": "random_page_cost=1.1",
+ "cases": [
+  {
+   "case": "statistics.summary_fresh",
+   "statements": 5,
+   "explained": 5,
+   "service_ms": 4.0,
+   "sql_ms": 1.9,
+   "worst_statement_ms": 1.04,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "statistics.item_page",
+   "statements": 5,
+   "explained": 5,
+   "service_ms": 5.5,
+   "sql_ms": 1.0,
+   "worst_statement_ms": 0.92,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "statistics.refresh_compute_4000",
+   "statements": 4,
+   "explained": 4,
+   "service_ms": 2809.5,
+   "sql_ms": 2165.2,
+   "worst_statement_ms": 903.07,
+   "verdict": "accepted",
+   "failures": [
+    "789 ms > 200 ms",
+    "903 ms > 200 ms",
+    "469 ms > 200 ms"
+   ]
+  },
+  {
+   "case": "statistics.refresh_compute_500",
+   "statements": 4,
+   "explained": 4,
+   "service_ms": 348.3,
+   "sql_ms": 365.6,
+   "worst_statement_ms": 143.11,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "analytics.overview_6000",
+   "statements": 7,
+   "explained": 7,
+   "service_ms": 46.7,
+   "sql_ms": 45.2,
+   "worst_statement_ms": 23.49,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "analytics.overview_small",
+   "statements": 7,
+   "explained": 7,
+   "service_ms": 7.3,
+   "sql_ms": 1.7,
+   "worst_statement_ms": 0.79,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "analytics.modules_page",
+   "statements": 4,
+   "explained": 4,
+   "service_ms": 12.3,
+   "sql_ms": 13.3,
+   "worst_statement_ms": 12.48,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "analytics.assignments_page",
+   "statements": 4,
+   "explained": 4,
+   "service_ms": 8.5,
+   "sql_ms": 6.8,
+   "worst_statement_ms": 5.69,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "analytics.quizzes_page",
+   "statements": 3,
+   "explained": 3,
+   "service_ms": 6.6,
+   "sql_ms": 5.2,
+   "worst_statement_ms": 5.12,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "analytics.practice_page",
+   "statements": 3,
+   "explained": 3,
+   "service_ms": 55.4,
+   "sql_ms": 61.9,
+   "worst_statement_ms": 61.9,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "org.overview",
+   "statements": 6,
+   "explained": 6,
+   "service_ms": 176.8,
+   "sql_ms": 254.7,
+   "worst_statement_ms": 134.82,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "org.courses_page",
+   "statements": 5,
+   "explained": 5,
+   "service_ms": 64.1,
+   "sql_ms": 54.5,
+   "worst_statement_ms": 20.24,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "org.courses_page_department",
+   "statements": 6,
+   "explained": 6,
+   "service_ms": 50.1,
+   "sql_ms": 32.3,
+   "worst_statement_ms": 13.22,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "org.quizzes_page",
+   "statements": 3,
+   "explained": 3,
+   "service_ms": 8.1,
+   "sql_ms": 5.9,
+   "worst_statement_ms": 5.5,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "progress.mistakes_open_heavy",
+   "statements": 5,
+   "explained": 4,
+   "service_ms": 12.7,
+   "sql_ms": 7.4,
+   "worst_statement_ms": 7.06,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "progress.mistakes_fixed_heavy",
+   "statements": 5,
+   "explained": 4,
+   "service_ms": 18.2,
+   "sql_ms": 6.9,
+   "worst_statement_ms": 6.63,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "progress.mistakes_page2_heavy",
+   "statements": 10,
+   "explained": 7,
+   "service_ms": 24.2,
+   "sql_ms": 12.4,
+   "worst_statement_ms": 6.11,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "progress.mistakes_open_typical",
+   "statements": 6,
+   "explained": 5,
+   "service_ms": 7.6,
+   "sql_ms": 0.7,
+   "worst_statement_ms": 0.5,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "progress.progress_heavy",
+   "statements": 8,
+   "explained": 7,
+   "service_ms": 15.3,
+   "sql_ms": 7.3,
+   "worst_statement_ms": 3.46,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "progress.progress_typical",
+   "statements": 8,
+   "explained": 7,
+   "service_ms": 6.6,
+   "sql_ms": 0.8,
+   "worst_statement_ms": 0.31,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "progress.mistakes_open_busiest",
+   "statements": 5,
+   "explained": 4,
+   "service_ms": 12.9,
+   "sql_ms": 6.5,
+   "worst_statement_ms": 6.19,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "progress.progress_busiest",
+   "statements": 8,
+   "explained": 7,
+   "service_ms": 13.2,
+   "sql_ms": 6.9,
+   "worst_statement_ms": 3.25,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "home.home_heavy",
+   "statements": 12,
+   "explained": 12,
+   "service_ms": 20.8,
+   "sql_ms": 1.9,
+   "worst_statement_ms": 0.52,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "home.home_typical",
+   "statements": 13,
+   "explained": 13,
+   "service_ms": 19.8,
+   "sql_ms": 1.1,
+   "worst_statement_ms": 0.31,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "retention.dry_run",
+   "statements": 2,
+   "explained": 2,
+   "service_ms": 26.7,
+   "sql_ms": 24.3,
+   "worst_statement_ms": 24.21,
+   "verdict": "accepted",
+   "failures": [
+    "Seq Scan attempts: 56030 rows read, 100.0 %",
+    "Seq Scan attempts: 56032 rows read, 100.0 %"
+   ]
+  }
+ ]
+}

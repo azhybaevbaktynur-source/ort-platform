@@ -38,6 +38,9 @@ class Enrollment(UUIDPKMixin, TimestampMixin, Base):
     is_test_student: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default=sa.false())
 
     __table_args__ = (
+        # Phase 11 S5: the `not_test_enrollment` anti join; the predicate must match `is_(True)` exactly
+        Index("ix_enrollments_test_student", "id", postgresql_where=sa.text("is_test_student IS TRUE"),
+              sqlite_where=sa.text("is_test_student = 1")),
         UniqueConstraint("course_id", "user_id", name="uq_enrollments_course_id_user_id"),
         CheckConstraint("role IN ('teacher','assistant','student')", name="role_valid"),
         CheckConstraint("state IN ('requested','invited','active','declined','removed')", name="state_valid"),
