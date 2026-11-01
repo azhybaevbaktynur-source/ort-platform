@@ -88,6 +88,26 @@ export function studentViewUnauthorized(status: number): void {
 }
 // --- UX rework S1 end ---
 
+// --- Phase 11 S3 begin --- (PHASE_11_DESIGN 3.3, invariant 1: the consent gate)
+const GATE_OPEN_PATH = /^\/(privacy|policies|parent)(\/|$)|^\/courses\/[^/]+\/attempts\/[^/]+$/;
+
+/**
+ * Pages that stay on screen on `consent_required`: the ones that lift the gate, the public policies, the player, and the
+ * parent's pages (there the code means the child's consent is pending, and the page itself shows the consent screen).
+ */
+export function gateOpenPath(rest: string): boolean {
+  return GATE_OPEN_PATH.test(rest);
+}
+
+/** A refused request (403 `consent_required`) sends the person to `/privacy`; an open attempt is never interrupted. */
+export function consentRequiredRedirect(code: string | undefined): void {
+  if (code !== "consent_required" || typeof window === "undefined") return;
+  const m = window.location.pathname.match(/^\/(en|ky|ru)(?=\/|$)/);
+  if (gateOpenPath(window.location.pathname.slice(m ? m[0].length : 0))) return;
+  window.location.assign(`/${m ? m[1] : "ru"}/privacy`);
+}
+// --- Phase 11 S3 end ---
+
 export async function getAuthHeader(): Promise<Record<string, string>> {
   // Backend JWT saved at login. Without it no header is sent and the API answers 401.
   if (typeof window !== "undefined") {
@@ -158,6 +178,7 @@ export async function apiClient<T>(endpoint: string, options: RequestOptions = {
       const contentType = response.headers.get("content-type") || "";
       if (contentType.includes("application/json")) {
         const errorJson = await response.json();
+        consentRequiredRedirect(errorJson?.error?.code); // Phase 11 S3
         errorDetail = errorJson.detail || errorDetail;
       } else {
         const text = await response.text();

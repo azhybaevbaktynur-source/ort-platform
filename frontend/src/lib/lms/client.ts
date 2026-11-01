@@ -1,4 +1,4 @@
-import { getAuthHeader, studentViewUnauthorized } from "@/lib/api";
+import { consentRequiredRedirect, getAuthHeader, studentViewUnauthorized } from "@/lib/api";
 import { API_BASE_URL } from "@/lib/apiBase";
 
 /** Error from LMS endpoints. `code` maps to the i18n key `lms.errors.<code>`. */
@@ -71,6 +71,7 @@ export async function lmsFetch<T>(path: string, opts: LmsFetchOptions = {}): Pro
   if (!res.ok) {
     const err = (data as { error?: { code?: string; message?: string; details?: Record<string, unknown> } } | undefined)?.error;
     if (err && typeof err === "object" && typeof err.code === "string") {
+      consentRequiredRedirect(err.code); // Phase 11 S3
       throw new LmsApiError(res.status, err.code, err.message || err.code, err.details || {});
     }
     // Old-style or unparseable error: map the status to a coarse code.

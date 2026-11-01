@@ -53,6 +53,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     { href: `${base}/exam-templates`, label: t("examTemplates.nav.title") }, // Phase 7b S4
     { href: `${base}/audit-log`, label: t("platformAdmin.nav.auditLog") },
     { href: `${base}/storage`, label: t("storage.nav") },
+    { href: `${base}/privacy`, label: t("privacy.admin.title") }, // Phase 11 S3
   ];
   const items = nav.map((i) => ({
     href: i.href, label: i.label, count: i.count,

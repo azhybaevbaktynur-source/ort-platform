@@ -363,3 +363,30 @@ test("Student view on People: no tabs, the new writes are refused", async ({ bro
     expect((await r.json()).error.code, `${method} ${p}`).toBe("test_student_forbidden");
   }
 });
+
+// Phase 11 S3: `/auth/register` requires the age band; the invitation's sign-up keeps the address and its way back
+test("invited with no account: sign-up asks the age first, keeps the address, then accepts", async ({ browser }) => {
+  const d = data();
+  const email = "invited-new@example.com";
+  await api(d.languages, "POST", `/courses/${d.languages_course_id}/students/invitations`, { emails: [email], language: "ru" });
+  const page = await (await browser.newContext({ viewport: VIEWPORTS.phone, locale: "ru-RU", timezoneId: "UTC" })).newPage();
+  // the emailed link carries `?email=`; `inviteLinkFor` keeps only its path
+  await page.goto(`${inviteLinkFor(email).replace(/^\/(ru|ky|en)\//, "/ru/")}?email=${encodeURIComponent(email)}`);
+  await page.getByRole("link", { name: tr("ru", "invitations.accept.register") }).click();
+  await page.getByRole("button", { name: tr("ru", "privacy.age.14_17") }).click();
+  await expect(page.getByLabel(tr("ru", "auth.email"))).toHaveValue(email);
+  await page.getByLabel(tr("ru", "auth.displayName")).fill("Новый Приглашённый");
+  await page.getByLabel(tr("ru", "auth.phone")).fill("+996700000001");
+  const password = `e2e-${Math.random().toString(36).slice(2)}-pass`;
+  await page.getByLabel(tr("ru", "auth.password")).fill(password);
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: tr("ru", "auth.signUpButton") }).click();
+  await expect(page.getByRole("heading", { name: tr("ru", "auth.verify.title") })).toBeVisible();
+  const blocks = fs.readFileSync(path.join(E2E_DIR, "backend.log"), "utf-8").split("[EMAIL console] To: ").filter((b) => b.startsWith(`${email} `));
+  const code = blocks[blocks.length - 1].match(/\b(\d{6})\b/);
+  expect(code, `no code in the last email to ${email}`).not.toBeNull();
+  await page.getByLabel(tr("ru", "auth.verify.codeLabel")).fill(code![1]);
+  await page.getByRole("button", { name: tr("ru", "auth.verify.button") }).click();
+  await expect(page).toHaveURL(new RegExp(`/courses/${d.languages_course_id}`));
+  await page.context().close();
+});

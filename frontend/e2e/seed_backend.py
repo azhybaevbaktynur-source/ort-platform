@@ -19,6 +19,7 @@ import json
 import os
 import re
 import secrets
+import sqlite3
 import subprocess
 import sys
 import time
@@ -498,6 +499,40 @@ def seed_constructor(api: Api, log: Path, admin_tok: str) -> dict:
 # --- Phase 8b S5 end ---
 
 
+# --- Phase 11 S3 begin --- (frontend/e2e/privacy.spec.ts; written after every other row)
+def scratch_sql(sql: str, *params) -> None:
+    """Puts an account in a state the API cannot reach (an account from before Phase 11, a closed grace period). Only the
+    scratch SQLite database of this run."""
+    url = os.environ["DATABASE_URL"]
+    assert url.startswith("sqlite:///"), url
+    with sqlite3.connect(url.removeprefix("sqlite:///")) as con:
+        con.execute(sql, params)
+
+
+def seed_privacy(api: Api, log: Path, ort_course_id: str, exam_id: str) -> dict:
+    """An account from before Phase 11 (no band, no consents); a student whose gate closed during an open ORT attempt;
+    a student with an open export request (the admin's table)."""
+    legacy = register(api, log, "e2e-privacy-legacy@example.com", "Legacy Student")
+    legacy["profile"] = profile(api, legacy["token"])
+    uid = legacy["profile"]["id"]
+    scratch_sql("DELETE FROM consent_records WHERE user_id = ?", uid)
+    scratch_sql("UPDATE users SET age_band = NULL, consent_state = 'legacy' WHERE id = ?", uid)
+
+    gated = register(api, log, "e2e-privacy-gated@example.com", "Gated Student")
+    gated["profile"] = profile(api, gated["token"])
+    api.call("POST", f"/courses/{ort_course_id}/join", gated["token"], {})
+    st = api.call("POST", f"/courses/{ort_course_id}/assessments/{exam_id}/attempts", gated["token"], {"language": "ru"})
+    gated["attempt_id"] = st["id"]
+    scratch_sql("UPDATE users SET age_band = 'under_14', consent_state = 'pending_guardian', "
+                "consent_due_at = '2020-01-01 00:00:00.000000' WHERE id = ?", gated["profile"]["id"])
+
+    requester = register(api, log, "e2e-privacy-requester@example.com", "Export Student")
+    requester["profile"] = profile(api, requester["token"])
+    api.call("POST", "/me/privacy/requests", requester["token"], {"kind": "export"})
+    return {"legacy": legacy, "gated": gated, "requester": requester}
+# --- Phase 11 S3 end ---
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--api", required=True)
@@ -573,6 +608,7 @@ def main() -> int:
     course_nav = seed_course_nav(api, log, tok)  # Phase 8c S4a (after every other row)
     catalog_apply = seed_catalog_apply(api, log, tok)  # Phase 9 S4 (after every other row)
     org_admin = seed_org_admin(api, log, tok)  # Phase 9 S5 (after every other row)
+    privacy = seed_privacy(api, log, cid, exam["id"])  # Phase 11 S3 (after every other row)
 
     seed = {
         "quiz_editor": quiz_editor,
@@ -582,6 +618,7 @@ def main() -> int:
         "course_nav": course_nav,
         "catalog_apply": catalog_apply,
         "org_admin": org_admin,
+        "privacy": privacy,
         "api": args.api, "course_id": cid, "bank_id": bank_id, "exam": exam, "staff_exam": staff_exam,
         "picks": picks, "keys": keys, "comparison_question_id": comparison_qid, "passage_id": passage_id,
         "staff_attempt_id": staff_attempt, "admin": admin, "students": students,

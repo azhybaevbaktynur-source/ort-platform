@@ -5360,5 +5360,134 @@
       "department": "Отдел",
       "submittedCount": "Сдано"
     }
+  },
+  "privacy": {
+    "nav": {
+      "parent": "Родитель"
+    },
+    "title": "Конфиденциальность",
+    "confirm": "Подтвердить",
+    "draftBadge": "Черновик: ожидает юридической проверки",
+    "parentLink": "Я родитель",
+    "parentOpen": "Ввести код",
+    "age": {
+      "question": "Сколько вам лет?",
+      "label": "Возраст",
+      "change": "Изменить",
+      "under_14": "Младше 14",
+      "14_17": "14–17 лет",
+      "18_plus": "18 и старше"
+    },
+    "accept": {
+      "label": "Я принимаю {privacy} и {terms}",
+      "privacy": "политику конфиденциальности",
+      "terms": "условия использования"
+    },
+    "policies": {
+      "privacy": "Политика конфиденциальности",
+      "terms": "Условия использования",
+      "guardian_consent": "Согласие родителя",
+      "notFound": "Документ не найден"
+    },
+    "banner": {
+      "age": "Подтвердите возраст",
+      "accept": "Примите обновлённые документы",
+      "parent": "Нужно согласие родителя до {date}"
+    },
+    "code": {
+      "title": "Передайте этот код родителю",
+      "get": "Получить код",
+      "new": "Новый код",
+      "valid": "Действует до {date}",
+      "due": "Нужно до {date}",
+      "check": "Проверить снова"
+    },
+    "documents": {
+      "title": "Документы",
+      "accepted": "Принято",
+      "missing": "Не принято",
+      "accept": "Принять"
+    },
+    "parents": {
+      "title": "Родители",
+      "none": "Родители не привязаны",
+      "remove": "Убрать",
+      "removeTitle": "Убрать этого родителя?",
+      "removeEffect": "Он больше не увидит ваши оценки.",
+      "holdsConsent": "Дал согласие"
+    },
+    "data": {
+      "title": "Ваши данные",
+      "download": "Скачать мои данные",
+      "delete": "Удалить аккаунт",
+      "deleteTitle": "Удалить ваш аккаунт?",
+      "deleteEffect": "Это выполнит администратор. Имя, email, телефон и сданные работы будут стёрты; оценки останутся без имени."
+    },
+    "requests": {
+      "title": "Запросы",
+      "cancel": "Отменить",
+      "kind": {
+        "export": "Скачивание данных",
+        "delete": "Удаление аккаунта"
+      },
+      "status": {
+        "pending": "Ожидает",
+        "completed": "Выполнен",
+        "rejected": "Отклонён",
+        "cancelled": "Отменён"
+      }
+    },
+    "admin": {
+      "title": "Запросы о данных",
+      "filter": "Фильтр запросов",
+      "filters": {
+        "pending": "Ожидают",
+        "all": "Все"
+      },
+      "empty": "Запросов нет",
+      "person": "Пользователь",
+      "kind": "Тип",
+      "due": "Срок",
+      "status": "Статус",
+      "actions": "Действия",
+      "overdue": "Просрочен",
+      "run": "Выполнить",
+      "reject": "Отклонить",
+      "runTitle": "Удалить этот аккаунт?",
+      "runEffect": "Имя, email, телефон и сданные работы будут стёрты. Это нельзя отменить.",
+      "rejectTitle": "Отклонить этот запрос?",
+      "rejectEffect": "Пользователь увидит причину.",
+      "rejectReason": "Причина",
+      "rejectCodes": {
+        "identity_unverified": "Личность не подтверждена",
+        "legal_obligation": "Нужно хранить по закону",
+        "duplicate": "Повторный запрос"
+      },
+      "ranToast": "Аккаунт удалён",
+      "rejectedToast": "Запрос отклонён"
+    },
+    "errors": {
+      "consent_required": "Сначала нужно подтверждение родителя",
+      "age_band_required": "Выберите возраст",
+      "age_band_set": "Возраст уже указан",
+      "policy_not_accepted": "Примите документы",
+      "policy_not_current": "Документы изменились. Обновите страницу",
+      "guardian_consent_required": "За этот аккаунт соглашается родитель",
+      "password_required": "Введите пароль",
+      "password_incorrect": "Неверный пароль",
+      "request_open": "Такой запрос уже открыт",
+      "request_not_pending": "Этот запрос закрыт",
+      "request_not_export": "Сохранить можно только скачивание данных",
+      "request_not_executable": "Скачивание завершается само",
+      "data_request_not_found": "Запрос не найден",
+      "reject_code_invalid": "Выберите причину",
+      "user_deleted": "Этот аккаунт удалён",
+      "delete_blocked_platform_admin": "Сначала снимите права администратора",
+      "delete_blocked_owns_courses": "Сначала передайте его курсы",
+      "delete_blocked_open_attempts": "Попытка ещё открыта",
+      "delete_blocked_test_student": "Тестовый студент",
+      "guardian_holds_consent": "Только этот родитель дал согласие",
+      "guardian_limit": "Привязано слишком много родителей"
+    }
   }
 }
