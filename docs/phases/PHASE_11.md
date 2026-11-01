@@ -1,6 +1,6 @@
 # Phase 11: report
 
-Deployed 2026-11-02 (migrations 0017, 0018; backup branch `backup-2026-11-02-before-phase11` br-floral-heart-b2opj8d8, holding a branch-only role `rehearsal_p11`). Design: `PHASE_11_DESIGN.md`. **Launch has not happened: it waits for the owner and `docs/LAUNCH_CHECKLIST.md`.**
+Deployed 2026-11-02 (`main` 10454b4, migrations 0017, 0018; backup branch `backup-2026-11-02-before-phase11` br-floral-heart-b2opj8d8, holding a branch-only role `rehearsal_p11`). Design: `PHASE_11_DESIGN.md`. **Launch has not happened: it waits for the owner and `docs/LAUNCH_CHECKLIST.md`.**
 
 ## What shipped
 - Parents: pairing code from the student, separate `guardian_links` (no course access), grades, due dates and announcements only; revoke at once.
@@ -12,7 +12,7 @@ Deployed 2026-11-02 (migrations 0017, 0018; backup branch `backup-2026-11-02-bef
 ## Checks
 - SQLite 4030 passed, 49 skipped; PG 4116 passed, 25 skipped before the IP flip (CI re-ran it after); migration tests 15; `alembic check` clean; CI seven jobs green; browser suite passed, zero ORT differences after approving one general phone baseline.
 - **Rehearsal on a production copy**: migrations ran through startup in production mode; attempts, attempt items and grade events hash identical before and after; all real accounts `legacy`. Local copy deleted.
-- **Production**: data unchanged; sign-up refuses a missing age band; security headers present; 40 of 40 browser checks (register, policies, student home, privacy, course, teacher, parent; no CSP blocks); IP chain check below.
+- **Production**: data unchanged; sign-up refuses a missing age band; security headers present; 40 of 40 browser checks (register, policies, student home, privacy, course, teacher, parent; no CSP blocks). IP rules after the flip: 30 ordinary answers then 429 on reset-password, 429 with a made-up `X-Forwarded-For`, probe 404, normal login 200. QA accounts disabled afterwards.
 - Security review (Fable): one medium, fixed (login lockout by email now per email and address); one low, fixed (erased assets unreadable); one operational (flip order), followed.
 
 ## Caught at the gate
