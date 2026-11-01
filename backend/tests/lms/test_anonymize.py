@@ -450,7 +450,10 @@ def test_links_revoke_both_ways_and_a_child_loses_its_consent_holder(db):
                 GuardianLink(guardian_user_id=parent.id, student_user_id=other_child.id),
                 GuardianLink(guardian_user_id=grandparent.id, student_user_id=other_child.id),
                 GuardianPairingCode(student_user_id=parent.id, code_hash="c" * 64,
-                                    expires_at=utcnow() + timedelta(hours=1))])
+                                    expires_at=utcnow() + timedelta(hours=1)),
+                ConsentRecord(user_id=other_child.id, granted_by_id=grandparent.id, kind="guardian_consent",
+                              policy_version_id=current_policies(db)["guardian_consent"].id, action="granted",
+                              locale="ky", source="guardian")])
     db.commit()
     _anon(db, parent)
     rows = db.scalars(select(GuardianLink).where(GuardianLink.guardian_user_id == parent.id)).all()

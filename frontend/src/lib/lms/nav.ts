@@ -13,6 +13,7 @@
  *   anything else gives `fallback`.
  */
 
+// `observer`: not the parent role, see `guardian`.
 export type CourseNavRole = "teacher" | "assistant" | "student" | "observer";
 export type CourseNavKey =
   | "course" | "announcements" | "assignments" | "grades" | "people" | "bank" | "settings" | "files"

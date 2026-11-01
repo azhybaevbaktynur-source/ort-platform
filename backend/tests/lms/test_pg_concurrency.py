@@ -439,3 +439,140 @@ def test_practice_parallel_checks_of_one_item_write_once(pg):
     assert [r[0] for r in results] == ["ok"] * 6
     assert {(r[1].correctness, r[1].score) for r in results} == {("correct", "1.00")}
 
+
+# --- Phase 11 S2 begin --- parents (PHASE_11_DESIGN 4, concurrency)
+def _pg_person(pg_engine, band="18_plus", state="ok") -> str:
+    with Session(pg_engine) as s:
+        uid = _mk_user(s, 0)
+        user = s.get(User, uid)
+        user.age_band, user.consent_state = band, state
+        s.commit()
+    return uid
+
+
+def _pg_code(pg_engine, student_id: str) -> str:
+    from app.lms.guardian import service as guardian
+
+    with Session(pg_engine) as s:
+        return guardian.create_pairing_code(s, s.get(User, student_id)).code
+
+
+def _pg_link(pg_engine, parent_id: str, student_id: str):
+    from app.lms.guardian import service as guardian
+
+    raw = _pg_code(pg_engine, student_id)
+    with Session(pg_engine) as s:
+        return guardian.redeem(s, s.get(User, parent_id), raw, None).id
+
+
+def _pg_consent(pg_engine, parent_id: str, link_id) -> None:
+    from app.lms.guardian import service as guardian
+    from app.lms.privacy.service import current_policies
+
+    with Session(pg_engine) as s:
+        policy_id = current_policies(s)["guardian_consent"].id
+        guardian.give_consent(s, s.get(User, parent_id), link_id, policy_id)
+
+
+def test_parents_redeeming_one_code_make_one_link(pg):
+    from app.lms.guardian import service as guardian
+    from app.lms.guardian.models import GuardianLink
+
+    student = _pg_person(pg, "14_17")
+    parents = [_pg_person(pg) for _ in range(6)]
+    raw = _pg_code(pg, student)
+    results = _run_parallel(pg, [lambda s, p=p: guardian.redeem(s, s.get(User, p), raw, None) for p in parents])
+    assert sorted(r[0] for r in results) == ["lms"] * 5 + ["ok"]
+    assert {r[1] for r in results if r[0] == "lms"} == {"invalid_code"}
+    with Session(pg) as s:
+        assert s.scalar(select(func.count()).select_from(GuardianLink).where(
+            GuardianLink.student_user_id == student)) == 1
+
+
+def test_one_parent_redeeming_for_many_students_keeps_their_cap(pg):
+    from app.lms.guardian import service as guardian
+    from app.lms.guardian.models import GuardianLink
+
+    parent = _pg_person(pg)
+    with Session(pg) as s:
+        for _ in range(guardian.MAX_STUDENTS_PER_GUARDIAN - 1):
+            s.add(GuardianLink(guardian_user_id=parent, student_user_id=_mk_user(s, 0)))
+        s.commit()
+    raws = [_pg_code(pg, _pg_person(pg, "14_17")) for _ in range(4)]
+    results = _run_parallel(pg, [lambda s, r=r: guardian.redeem(s, s.get(User, parent), r, None) for r in raws])
+    assert sorted(r[0] for r in results) == ["lms"] * 3 + ["ok"]
+    assert {r[1] for r in results if r[0] == "lms"} == {"guardian_limit"}
+    with Session(pg) as s:
+        assert s.scalar(select(func.count()).select_from(GuardianLink).where(
+            GuardianLink.guardian_user_id == parent, GuardianLink.revoked_at.is_(None))) == (
+                guardian.MAX_STUDENTS_PER_GUARDIAN)
+
+
+def test_two_withdrawals_leave_no_ok_without_a_holder(pg):
+    from app.lms.guardian import service as guardian
+    from app.lms.privacy.models import ConsentRecord
+
+    for _round in range(5):
+        kid = _pg_person(pg, "under_14", "pending_guardian")
+        parents = [_pg_person(pg) for _ in range(2)]
+        links = [_pg_link(pg, p, kid) for p in parents]
+        for p, link in zip(parents, links):
+            _pg_consent(pg, p, link)
+        results = _run_parallel(pg, [
+            lambda s, p=p, link=link: guardian.withdraw_consent(s, s.get(User, p), link)
+            for p, link in zip(parents, links)])
+        assert [r[0] for r in results] == ["ok", "ok"]
+        with Session(pg) as s:
+            assert s.get(User, kid).consent_state == "pending_guardian"
+            assert guardian.active_holders(s, kid) == set()
+            assert s.scalar(select(func.count()).select_from(ConsentRecord).where(
+                ConsentRecord.user_id == kid, ConsentRecord.action == "withdrawn")) == 2
+
+
+def test_one_parent_withdrawing_at_once_writes_one_withdrawal(pg):
+    from app.lms.guardian import service as guardian
+    from app.lms.privacy.models import ConsentRecord
+
+    kid, parent = _pg_person(pg, "under_14", "pending_guardian"), _pg_person(pg)
+    link = _pg_link(pg, parent, kid)
+    _pg_consent(pg, parent, link)
+    results = _run_parallel(pg, [lambda s: guardian.withdraw_consent(s, s.get(User, parent), link) for _ in range(4)])
+    assert [r[0] for r in results] == ["ok"] * 4
+    with Session(pg) as s:
+        assert s.scalar(select(func.count()).select_from(ConsentRecord).where(
+            ConsentRecord.user_id == kid, ConsentRecord.action == "withdrawn")) == 1
+
+
+def test_a_child_removing_one_holder_racing_the_other_withdrawing(pg):
+    """Either order: `ok` only with a holder left."""
+    from app.lms.guardian import service as guardian
+
+    for _round in range(5):
+        kid = _pg_person(pg, "under_14", "pending_guardian")
+        parents = [_pg_person(pg) for _ in range(2)]
+        links = [_pg_link(pg, p, kid) for p in parents]
+        for p, link in zip(parents, links):
+            _pg_consent(pg, p, link)
+        results = _run_parallel(pg, [lambda s: guardian.student_remove_link(s, s.get(User, kid), links[0]),
+                                     lambda s: guardian.withdraw_consent(s, s.get(User, parents[1]), links[1])])
+        assert [r for r in results if r[0] == "exc"] == []
+        with Session(pg) as s:
+            assert (s.get(User, kid).consent_state == "ok") == bool(guardian.active_holders(s, kid))
+
+
+def test_new_codes_racing_a_redeem_do_not_deadlock(pg):
+    from app.lms.guardian import service as guardian
+    from app.lms.guardian.models import GuardianPairingCode
+
+    student, parent = _pg_person(pg, "14_17"), _pg_person(pg)
+    raw = _pg_code(pg, student)
+    results = _run_parallel(pg, [lambda s: guardian.redeem(s, s.get(User, parent), raw, None),
+                                 lambda s: guardian.create_pairing_code(s, s.get(User, student)),
+                                 lambda s: guardian.create_pairing_code(s, s.get(User, student))])
+    assert [r for r in results if r[0] == "exc"] == []
+    with Session(pg) as s:
+        assert s.scalar(select(func.count()).select_from(GuardianPairingCode).where(
+            GuardianPairingCode.student_user_id == student, GuardianPairingCode.consumed_at.is_(None),
+            GuardianPairingCode.revoked_at.is_(None))) == 1
+# --- Phase 11 S2 end ---
+

@@ -5360,5 +5360,89 @@
       "department": "Department",
       "submittedCount": "Submitted"
     }
+  },
+  "guardian": {
+    "title": "Parent",
+    "back": "Parent",
+    "students": "Linked students",
+    "noStudents": "No linked students yet.",
+    "needsConsent": "Needs consent",
+    "code": {
+      "label": "Student's code",
+      "hint": "The student gets it under My data.",
+      "submit": "Link"
+    },
+    "adultOnly": {
+      "title": "For adult accounts",
+      "body": "Confirm your age to continue.",
+      "action": "My data"
+    },
+    "tabs": {
+      "label": "Student information",
+      "grades": "Grades",
+      "due": "Due",
+      "announcements": "Announcements"
+    },
+    "course": "Course",
+    "noCourses": "No courses yet.",
+    "dueOn": "Due {date}",
+    "noDate": "No due date",
+    "grades": {
+      "empty": "No grades yet.",
+      "total": "Course total: {percent}%",
+      "points": "{points} / {possible}"
+    },
+    "due": {
+      "empty": "Nothing due."
+    },
+    "announcements": {
+      "empty": "No announcements."
+    },
+    "state": {
+      "graded": "Graded",
+      "pending": "Waiting",
+      "submitted": "Handed in",
+      "missing": "Missing",
+      "excused": "Excused",
+      "hidden": "Not shown",
+      "not_started": "Not started"
+    },
+    "consent": {
+      "title": "Consent",
+      "body": "{name} is under 14. The account stays closed until a parent consents.",
+      "read": "Read the consent text",
+      "draft": "Draft: awaiting legal review",
+      "confirm": "I consent",
+      "held": "You gave consent."
+    },
+    "withdraw": {
+      "action": "Withdraw consent",
+      "title": "Withdraw consent?",
+      "effect": "If no other parent holds consent, this account closes at once."
+    },
+    "remove": {
+      "action": "Remove link",
+      "title": "Remove this link?",
+      "effect": "You stop seeing this student, and your consent ends. If no other parent holds consent, a student under 14 loses access at once."
+    },
+    "delete": {
+      "action": "Ask to delete account",
+      "title": "Ask to delete this account?",
+      "effect": "An administrator reviews the request. Deleting an account cannot be undone.",
+      "sent": "Request sent. It will be handled by {date}."
+    },
+    "errors": {
+      "invalid_code": "This code does not work. Ask the student for a new one.",
+      "already_linked": "This student is already linked.",
+      "guardian_limit": "Too many links for this student or this account.",
+      "guardian_must_be_adult": "Only an adult account can be a parent.",
+      "guardian_link_not_found": "This link no longer exists.",
+      "consent_required": "A parent's consent is needed first.",
+      "consent_not_needed": "This student does not need a parent's consent.",
+      "policy_not_current": "The consent text has changed. Reload the page.",
+      "guardian_not_holder": "Only the parent who gave consent can ask for this.",
+      "request_open": "A request is already open.",
+      "pairing_busy": "Try again."
+    }
   }
 }

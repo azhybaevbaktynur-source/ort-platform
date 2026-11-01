@@ -133,15 +133,14 @@ def apply_age_band(db: Session, user: User, band: str, accepted: list[PolicyVers
 
 
 def holder_lost(db: Session, student_id: str, at: datetime) -> None:
-    """A student under 14 whose last parent link has gone needs a new consent holder, with the grace period."""
-    from app.lms.guardian.models import GuardianLink
+    """A student under 14 whose last consent holder has gone needs a new one, with the grace period. Another parent who
+    is linked but never consented is not a holder (`guardian/service.py`)."""
+    from app.lms.guardian.service import active_holders
 
     student = db.get(User, student_id)
     if student is None or student.age_band != UNDER_14 or student.consent_state != "ok":
         return
-    other = db.execute(select(GuardianLink.id).where(GuardianLink.student_user_id == student_id,
-                                                     GuardianLink.revoked_at.is_(None)).limit(1)).first()
-    if other is None:
+    if not active_holders(db, student_id):
         student.consent_state = "pending_guardian"
         student.consent_due_at = at + timedelta(days=settings.PRIVACY_LEGACY_GRACE_DAYS)
 
