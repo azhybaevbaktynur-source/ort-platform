@@ -8,6 +8,7 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
+from app.lms.content.types.structured import STRUCTURED_TYPES
 from app.lms.content.importers import ImportOptions, parse_upload
 from app.lms.content.types import REGISTRY, TYPE_NAMES
 
@@ -109,6 +110,15 @@ def test_example_rows_parse_back_with_zero_errors(db, spec):
     assert got == [(s.position, s.allowed_types[0]) for s in fmt.sections]
 
 
+def test_new_type_example_rows_parse_back_with_zero_errors(db):
+    spec = general_spec(sections=[
+        {"key": t, "title": {"en": t}, "allowed_types": [t], "allow_passages": False} for t in STRUCTURED_TYPES])
+    fmt = format_for(db, publish_version(db, make_template(db), spec))
+    up = parse_upload(uncomment(csv_for(fmt, "en")), "f.csv", ImportOptions(language="en"), profile=profile_from_format(fmt))
+    assert up.issues.errors == [], up.issues.errors
+    assert [it.type for it in up.bundles[0].items] == list(STRUCTURED_TYPES)
+
+
 def test_csv_rows_header_and_titles(db):
     fmt = format_for(db, publish_version(db, make_template(db), ALL))
     body = csv_for(fmt, "ru")
@@ -117,7 +127,7 @@ def test_csv_rows_header_and_titles(db):
     assert rows[0] == fmt.header and len(rows) == 1 + len(fmt.sections)
     assert [r[0] for r in rows[1:]] == ["#Выбор", "#Comparison", "#Open"]   # title in the language, else another
     assert [r[0] for r in rows_of(csv_for(fmt, "ky"))[1:]] == ["#Choice", "#Comparison", "#Ачык"]
-    assert set(EXAMPLE_VALUES) == set(LEGACY_TYPES)
+    assert set(EXAMPLE_VALUES) == set(LEGACY_TYPES) | set(STRUCTURED_TYPES)
     # every example value is plain ASCII
     assert all(v.isascii() for d in EXAMPLE_VALUES.values() for v in d.values())
 
