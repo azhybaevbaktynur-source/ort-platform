@@ -42,6 +42,15 @@ def reset_lms_state() -> None:
             from app.lms.grading.models import ALLOW_PURGE_SQL
 
             conn.execute(text(ALLOW_PURGE_SQL))
+        # --- Phase 11 S1 begin --- privacy rows reference users and policy versions (RESTRICT); seed users are put back
+        from app.lms.guardian.models import GuardianLink, GuardianPairingCode
+        from app.lms.privacy.models import ConsentRecord, DataRequest, PolicyVersion
+
+        for model in (ConsentRecord, DataRequest, GuardianLink, GuardianPairingCode, PolicyVersion):
+            conn.execute(delete(model.__table__))
+        conn.execute(update(User.__table__).where(User.id.in_(SEED_USER_IDS)).values(
+            consent_state="legacy", consent_due_at=None, age_band=None, deleted_at=None, token_version=0))
+        # --- Phase 11 S1 end ---
         # --- Phase 7a S1 begin --- hand-ins, rubric scores, overrides, accommodations before the submissions
         from app.lms.accommodations.models import EnrollmentAccommodation
         from app.lms.assignments.models import (
@@ -142,6 +151,18 @@ def reset_lms_state() -> None:
     _reset_storage_caches()
     _reset_phase3_caches()
     _phase4_setup()
+    _privacy_setup()
+
+
+def _privacy_setup() -> None:
+    """Phase 11 S1: re-seed the policy versions from the manifest."""
+    from app.lms.privacy.seed import ensure_policies
+
+    db = db_session.SessionLocal()
+    try:
+        ensure_policies(db)
+    finally:
+        db.close()
 
 
 def _phase4_setup() -> None:

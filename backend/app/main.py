@@ -68,6 +68,23 @@ def _ensure_assignments() -> None:
 # --- Phase 7a S1 end ---
 
 
+# --- Phase 11 S1 begin ---
+def _ensure_policies() -> None:
+    """Phase 11 policy versions from `privacy/policies/manifest.json` (PHASE_11_DESIGN 3.1), idempotent; never fatal."""
+    from app.db.session import SessionLocal
+    from app.lms.privacy.seed import ensure_policies
+
+    db = SessionLocal()
+    try:
+        ensure_policies(db)
+    except Exception:
+        db.rollback()
+        logger.exception("Seeding the policy versions failed")
+    finally:
+        db.close()
+# --- Phase 11 S1 end ---
+
+
 def _seed_ort_courses() -> None:
     """Phase 5 ORT courses and the conversion of legacy_ort_export (P5-2); never fatal (ensure_ort_courses logs
     and stores every failure itself)."""
@@ -100,6 +117,7 @@ async def lifespan(app: FastAPI):
     _ensure_organizations()  # Phase 6 S1: after the schemes, before the ORT courses
     _ensure_assignments()  # Phase 7a S1: after the organizations, before the ORT courses
     _seed_ort_courses()
+    _ensure_policies()  # Phase 11 S1
     if is_production():
         if settings.SECRET_KEY == DEFAULT_SECRET_KEY:
             logger.critical("SECRET_KEY is the public default from the repository: anyone can forge login tokens. Set SECRET_KEY.")
@@ -160,6 +178,15 @@ from app.lms.assignments.router import router as _assignments_router  # noqa: E4
 
 app.include_router(_assignments_router, prefix=settings.API_V1_STR, tags=["Assignments"])
 # --- Phase 7a S2 end ---
+# --- Phase 11 S1 begin --- (privacy; empty routers of the parallel slices, so they never edit this wiring)
+from app.lms.guardian.router import router as _guardian_router  # noqa: E402
+from app.lms.practice.retention_router import router as _retention_router  # noqa: E402
+from app.lms.privacy.router import router as _privacy_router  # noqa: E402
+from app.lms.student_view.sweep_router import router as _sweep_router  # noqa: E402
+
+for _r in (_privacy_router, _guardian_router, _retention_router, _sweep_router):
+    app.include_router(_r, prefix=settings.API_V1_STR)
+# --- Phase 11 S1 end ---
 # Include API v1 router
 app.include_router(api_router, prefix=settings.API_V1_STR)
 register_error_handlers(app)

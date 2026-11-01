@@ -1,5 +1,5 @@
 import unicodedata
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 DISPLAY_NAME_MAX = 100
@@ -22,6 +22,7 @@ class UserProfile(BaseModel):
     teacher_status: str = "none"
     locale: Optional[str] = None
     is_test_student: bool = False
+    is_guardian: bool = False  # Phase 11: an active guardian link from the database
 
 
 class UserRegisterRequest(BaseModel):
@@ -30,6 +31,9 @@ class UserRegisterRequest(BaseModel):
     displayName: Optional[str] = Field(None, max_length=DISPLAY_NAME_MAX)
     phone: Optional[str] = None
     lang: Optional[str] = Field("ky", pattern="^(en|ky|ru)$", description="Language of the verification email")
+    # Phase 11 S1 (PHASE_11_DESIGN 3.2): checked in the route, so a missing band answers 422 `age_band_required`
+    ageBand: Optional[str] = Field(None, max_length=16)
+    policyVersionIds: Optional[List[str]] = Field(None, max_length=10)
 
     @field_validator("displayName")
     @classmethod

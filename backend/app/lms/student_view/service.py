@@ -68,7 +68,8 @@ def _create(db: Session, course_id: uuid.UUID, actor: User) -> User:
     uid = f"usr_{uuid.uuid4().hex[:12]}"
     user = User(id=uid, email=f"test-student-{uuid.uuid4().hex}@{RESERVED_EMAIL_DOMAIN}",
                 password_hash=UNUSABLE_PASSWORD_HASH, display_name=TEST_DISPLAY_NAME, email_verified=True,
-                teacher_status="none", locale=actor.locale, is_test_student=True)
+                teacher_status="none", locale=actor.locale, is_test_student=True,
+                consent_state="exempt")
     db.add(user)
     db.flush()
     enr = Enrollment(course_id=course_id, user_id=uid, role="student", state="active", source="admin",

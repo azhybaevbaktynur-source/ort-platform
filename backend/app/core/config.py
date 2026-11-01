@@ -1,5 +1,6 @@
 import json
-from typing import Annotated, List, Union
+from datetime import datetime
+from typing import Annotated, List, Optional, Union
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
@@ -201,6 +202,17 @@ class Settings(BaseSettings):
     # --- Phase 8b S1 begin --- (exam template preview, docs/phases/PHASE_8B_DESIGN.md 5.1, P8B-2)
     SANDBOX_PREVIEW_KEEP: int = 20  # finished preview attempts kept per author on a template's sample quiz
     # --- Phase 8b S1 end ---
+    # --- Phase 11 S1 begin --- (docs/phases/PHASE_11_DESIGN.md 2; defaults of the owner questions in 9)
+    PRIVACY_UNDER14_GATE: bool = True  # restrict an under-14 account until a parent consents
+    PRIVACY_LEGACY_DEADLINE: Optional[datetime] = None  # legacy accounts past this are gated; None: never
+    PRIVACY_LEGACY_GRACE_DAYS: int = 30  # days before the gate closes on an existing account that turns out under 14
+    DATA_REQUEST_DUE_DAYS: int = 30
+    GUARDIAN_PAIRING_TTL_HOURS: int = 24
+    PRACTICE_RETENTION_DAYS: int = 0  # 0 = off
+    SECRET_KEY_PREVIOUS: str = ""
+    SENTRY_DSN: str = ""
+    LOG_SAMPLE_2XX: float = 0.1
+    # --- Phase 11 S1 end ---
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

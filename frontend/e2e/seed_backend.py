@@ -94,9 +94,15 @@ def code_from_log(log: Path, email: str, timeout: float = 30) -> str:
     raise SystemExit(f"seed: no verification code for {email} in {log}")
 
 
+def _policy_ids(api: Api) -> list[str]:
+    """Phase 11: the sign-up accepts the current privacy and terms."""
+    return [p["id"] for p in api.call("GET", "/privacy/policies/current") if p["kind"] in ("privacy", "terms")]
+
+
 def register(api: Api, log: Path, email: str, name: str, lang: str = "ru") -> dict:
     password = secrets.token_urlsafe(18)
-    api.call("POST", "/auth/register", body={"email": email, "password": password, "displayName": name, "lang": lang})
+    api.call("POST", "/auth/register", body={"email": email, "password": password, "displayName": name, "lang": lang,
+                                             "ageBand": "18_plus", "policyVersionIds": _policy_ids(api)})
     code = code_from_log(log, email)
     out = api.call("POST", "/auth/verify-email", body={"email": email, "password": password, "code": code})
     return {"email": email, "name": name, "token": out["access_token"]}
