@@ -132,8 +132,11 @@ def sandbox_open_limit() -> Limit:
     return Limit("sandbox_open_1h", SANDBOX_OPEN_RATE_PER_HOUR, 3600)
 
 # --- Phase 11 S4 begin --- (PHASE_11_DESIGN 5.1)
-LOGIN_EMAIL_FAIL_10M = Limit("login_email_fail_10m", 10, 600)
-LOGIN_EMAIL_FAIL_24H = Limit("login_email_fail_24h", 50, 86400)
+# Security review: an email-only rule low enough to stop guessing lets anyone lock a student out of sign-in, so the
+# tight rule is per email and address; the email-only caps stay high, for guessing spread over many addresses.
+LOGIN_EMAIL_IP_FAIL_10M = Limit("login_email_ip_fail_10m", 10, 600)
+LOGIN_EMAIL_FAIL_10M = Limit("login_email_fail_10m", 100, 600)
+LOGIN_EMAIL_FAIL_24H = Limit("login_email_fail_24h", 500, 86400)
 LOGIN_IP_FAIL_10M = Limit("login_ip_fail_10m", 300, 600, is_ip_rule=True)
 REGISTER_IP_1H = Limit("register_ip_1h", 120, 3600, is_ip_rule=True)
 VERIFY_IP_FAIL_10M = Limit("verify_ip_fail_10m", 60, 600, is_ip_rule=True)

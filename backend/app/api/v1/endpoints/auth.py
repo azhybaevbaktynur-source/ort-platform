@@ -317,7 +317,9 @@ def login_user(
     whole school signing in from one address never adds up (PHASE_11_DESIGN 5.1).
     """
     clean_email = req.email.strip().lower()
-    rules = [(f"email:{clean_email}", ratelimit.LOGIN_EMAIL_FAIL_10M),
+    ip_key = client_ip_hash(request) if request is not None else None
+    rules = [(f"email:{clean_email}:ip:{ip_key or 'none'}", ratelimit.LOGIN_EMAIL_IP_FAIL_10M),
+             (f"email:{clean_email}", ratelimit.LOGIN_EMAIL_FAIL_10M),
              (f"email:{clean_email}", ratelimit.LOGIN_EMAIL_FAIL_24H),
              *_ip_rule(request, ratelimit.LOGIN_IP_FAIL_10M)]
     _check_failures(rules)

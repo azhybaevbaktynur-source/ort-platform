@@ -387,7 +387,8 @@ def list_my_assets(db: Session, actor: User, cursor: Optional[str], limit: Optio
 
 def load_my_asset(db: Session, actor: User, asset_id: uuid.UUID) -> Asset:
     a = db.execute(
-        select(Asset).where(Asset.id == asset_id, Asset.owner_id == actor.id, Asset.deleted_at.is_(None))
+        select(Asset).where(Asset.id == asset_id, Asset.owner_id == actor.id, Asset.deleted_at.is_(None),
+                            Asset.erased_at.is_(None))
     ).scalar_one_or_none()
     if a is None:
         raise NotFound("Asset not found", code="asset_not_found")

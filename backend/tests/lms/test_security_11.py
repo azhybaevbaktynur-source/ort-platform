@@ -153,8 +153,9 @@ async def test_forgot_and_resend_share_one_allowance(api, frozen):
 
 
 def test_design_values():
-    assert (ratelimit.LOGIN_EMAIL_FAIL_10M.limit, ratelimit.LOGIN_EMAIL_FAIL_10M.window_seconds) == (10, 600)
-    assert (ratelimit.LOGIN_EMAIL_FAIL_24H.limit, ratelimit.LOGIN_EMAIL_FAIL_24H.window_seconds) == (50, 86400)
+    assert (ratelimit.LOGIN_EMAIL_IP_FAIL_10M.limit, ratelimit.LOGIN_EMAIL_IP_FAIL_10M.window_seconds) == (10, 600)
+    assert (ratelimit.LOGIN_EMAIL_FAIL_10M.limit, ratelimit.LOGIN_EMAIL_FAIL_10M.window_seconds) == (100, 600)
+    assert (ratelimit.LOGIN_EMAIL_FAIL_24H.limit, ratelimit.LOGIN_EMAIL_FAIL_24H.window_seconds) == (500, 86400)
     assert (ratelimit.PAIR_CREATE_USER_1H.limit, ratelimit.PAIR_CREATE_USER_1H.window_seconds) == (5, 3600)
     assert (ratelimit.PAIR_REDEEM_USER_10M.limit, ratelimit.PAIR_REDEEM_USER_24H.limit) == (10, 30)
     assert ratelimit.PAIR_REDEEM_IP_FAIL_10M.limit == 60 and ratelimit.PAIR_REDEEM_IP_FAIL_10M.is_ip_rule
@@ -178,6 +179,16 @@ async def test_email_limit_blocks_guessing_even_with_the_right_password(db, api,
     assert (await login(api, user.email)).status_code == 200
 
 
+async def test_a_classmate_cannot_lock_a_student_out_from_another_address(db, api, frozen):
+    """Security review: failed guesses from one address block that address, not the student signing in elsewhere."""
+    user = account(db)
+    attacker, student = "203.0.113.50", "203.0.113.51"
+    for _ in range(ratelimit.LOGIN_EMAIL_IP_FAIL_10M.limit):
+        assert (await login(api, user.email, "wrong-password", ip=attacker)).status_code == 401
+    assert (await login(api, user.email, ip=attacker)).status_code == 429  # guessing stops, even with the right password
+    assert (await login(api, user.email, ip=student)).status_code == 200
+
+
 async def test_the_24h_limit_outlasts_the_10_minute_windows(db, api, frozen):
     user = account(db)
     fill(f"email:{user.email}", ratelimit.LOGIN_EMAIL_FAIL_24H, ratelimit.LOGIN_EMAIL_FAIL_24H.limit)
@@ -187,7 +198,7 @@ async def test_the_24h_limit_outlasts_the_10_minute_windows(db, api, frozen):
 
 async def test_unknown_email_is_counted_like_a_known_one(api, frozen):
     email = f"{uuid.uuid4().hex}@test.example"
-    for _ in range(ratelimit.LOGIN_EMAIL_FAIL_10M.limit):
+    for _ in range(ratelimit.LOGIN_EMAIL_IP_FAIL_10M.limit):
         assert (await login(api, email, "wrong-password")).status_code == 401
     assert (await login(api, email, "wrong-password")).status_code == 429
 
@@ -234,7 +245,7 @@ async def test_a_successful_login_costs_one_read_and_no_write(db, api, enforce_i
 async def test_a_failed_login_counts_on_every_rule(db, api, enforce_ip, frozen):
     user = account(db)
     assert (await login(api, user.email, "wrong-password")).status_code == 401
-    assert buckets(db) == 3
+    assert buckets(db) == 4
 
 
 async def test_unknown_email_pays_for_bcrypt(db, api, frozen, monkeypatch):
@@ -295,12 +306,14 @@ def claims(token: str) -> dict:
     return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
 
 
-async def test_token_lifetime_and_claims(db, api, frozen):
+async def test_token_lifetime_and_claims(db, api, frozen, monkeypatch):
+    # the lifetime under test is the code default; a local environment may override it
+    monkeypatch.setattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", type(settings).model_fields["ACCESS_TOKEN_EXPIRE_MINUTES"].default)
     user = account(db)
     res = await login(api, user.email)
     c = claims(res.json()["access_token"])
     assert c["sub"] == user.id and c["tv"] == 0
-    assert settings.ACCESS_TOKEN_EXPIRE_MINUTES == 60 * 24 * 3
+    assert type(settings).model_fields["ACCESS_TOKEN_EXPIRE_MINUTES"].default == 60 * 24 * 3  # the code default, not the local environment
     assert 3 * 86400 - 60 <= c["exp"] - datetime.now(timezone.utc).timestamp() <= 3 * 86400
     assert abs(c["iat"] - datetime.now(timezone.utc).timestamp()) < 60
 
