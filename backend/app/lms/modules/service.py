@@ -22,6 +22,7 @@ from app.lms.core import clock, ratelimit
 from app.lms.core.errors import Conflict, NotFound, ValidationFailed
 from app.lms.courses import service as course_svc
 from app.lms.courses.models import Course
+from app.lms.enrollments.models import not_test_enrollment
 from app.lms.modules import evaluator as ev_mod
 from app.lms.modules import ids
 from app.lms.modules import schemas as sch
@@ -514,8 +515,10 @@ def reapply(db: Session, ctx: AuthzContext, course: Course, module_id: Optional[
     scope_ids = list(db.execute(scope).scalars())
     items = select(ModuleItem.id).where(ModuleItem.module_id.in_(scope_ids))
     students = union(
-        select(ModuleProgress.enrollment_id).where(ModuleProgress.module_id.in_(scope_ids)),
-        select(ItemRequirementStatus.enrollment_id).where(ItemRequirementStatus.item_id.in_(items)),
+        select(ModuleProgress.enrollment_id).where(ModuleProgress.module_id.in_(scope_ids),
+                                                   not_test_enrollment(ModuleProgress.enrollment_id)),
+        select(ItemRequirementStatus.enrollment_id).where(ItemRequirementStatus.item_id.in_(items),
+                                                          not_test_enrollment(ItemRequirementStatus.enrollment_id)),
     ).subquery()
     cleared = db.execute(select(func.count()).select_from(students)).scalar_one()
     db.execute(delete(ModuleProgress).where(ModuleProgress.module_id.in_(scope_ids)))
@@ -699,9 +702,6 @@ def outline_for(db: Session, ctx: AuthzContext, course: Course, *, include_delet
     role = ctx.role_for(course.id)
     if role in STAFF_ROLES:
         return staff_outline(db, course, include_deleted=include_deleted)
-    if role == "student" and ctx.view_as_student(course.id):  # Phase 8c S1: Student view, nothing persisted
-        st, _mem, ev = ev_mod.evaluate_new_student(db, course, clock.now())
-        return student_outline(st, ev)
     if role == "student":
         enr = course_svc.get_enrollment(db, course.id, ctx.user.id)
         st, _mem, ev = ev_mod.evaluate(db, course, enr.id, clock.now())
@@ -717,7 +717,8 @@ def student_progress(db: Session, ctx: AuthzContext, course: Course, enrollment_
 
     course_svc.require_course(ctx, A.ATTEMPT_READ_ALL, course)
     enr = db.execute(select(Enrollment).where(Enrollment.id == enrollment_id, Enrollment.course_id == course.id,
-                                              Enrollment.role == "student")).scalar_one_or_none()
+                                              Enrollment.role == "student",
+                                              Enrollment.is_test_student.is_(False))).scalar_one_or_none()
     if enr is None:
         raise NotFound("Enrollment not found", code="enrollment_not_found")
     st, _mem, ev = ev_mod.evaluate(db, course, enr.id, clock.now(), persist_changes=enr.state == "active")

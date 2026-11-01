@@ -94,7 +94,9 @@ def _guard(attempt_id: uuid.UUID, user_id: str, cutoff: datetime):
         _X.c.id == _A.c.assessment_id, _X.c.deleted_at.is_(None),
         or_(
             and_(_A.c.is_preview.is_(True), _E.c.role.in_(engine.STAFF_ROLES), _C.c.status.in_(("draft", "published"))),
-            and_(_A.c.is_preview.is_(False), _E.c.role == "student", _C.c.status == "published"),
+            and_(_A.c.is_preview.is_(False), _E.c.role == "student",
+                 or_(_C.c.status == "published",
+                     and_(_C.c.status == "draft", _E.c.is_test_student.is_(True)))),  # UX rework S1
         ),
     ))
 

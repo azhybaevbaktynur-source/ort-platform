@@ -30,6 +30,7 @@ from app.lms.core import clock, ratelimit
 from app.lms.core.errors import Conflict, NotFound, ValidationFailed
 from app.lms.courses.models import Course
 from app.lms.courses.service import require_course
+from app.lms.enrollments.models import not_test_enrollment
 from app.lms.grading import late as late_mod
 from app.lms.grading import schemas as gs
 from app.lms.grading import serializers as ser
@@ -253,6 +254,9 @@ def _release_chunks(db: Session, ctx: AuthzContext, course: Course, assignment_i
     now = clock.now()
     course_id, actor_id = course.id, ctx.user.id  # plain values: ORM rows expire at each chunk commit
     total, last = 0, None
+    # UX rework S1: a test student's row is released with the class (its result follows the same rules), and the
+    # number staff read does not count it; the flag comes with each chunk's rows, so there is no extra statement
+    real = not_test_enrollment(S.c.enrollment_id).label("real")
     while True:
         sel = select(S.c.id).where(S.c.assignment_id == assignment_id, S.c.course_id == course_id)
         sel = sel.where(S.c.released_at.is_(None) if release else S.c.released_at.is_not(None))
@@ -264,10 +268,10 @@ def _release_chunks(db: Session, ctx: AuthzContext, course: Course, assignment_i
         if release:
             # one statement: the subquery locks the chunk in id order, the UPDATE writes it
             rows = db.execute(update(S).where(S.c.id.in_(sel)).values(released_at=now)
-                              .returning(S.c.id)).all()
+                              .returning(S.c.id, real)).all()
             pairs = [(r[0], None) for r in rows]
         else:
-            locked = db.execute(sel.with_only_columns(S.c.id, S.c.released_at)).all()
+            rows = locked = db.execute(sel.with_only_columns(S.c.id, S.c.released_at, real)).all()
             pairs = [(r[0], r[1]) for r in locked]
             if pairs:
                 db.execute(update(S).where(S.c.id.in_([p[0] for p in pairs])).values(released_at=None))
@@ -279,7 +283,7 @@ def _release_chunks(db: Session, ctx: AuthzContext, course: Course, assignment_i
                                      now=now, old={"released_at": old}, new={"released_at": now if release else None})
                            for sid, old in pairs])
         db.commit()
-        total += len(pairs)
+        total += sum(1 for r in rows if r[-1])
         last = max(p[0] for p in pairs)
         if len(pairs) < chunk:  # LockRows sits under LIMIT: a short chunk means nothing is left
             break

@@ -32,6 +32,9 @@ class User(Base):
     disabled_at = Column(DateTime(timezone=True), nullable=True)
     disabled_by_id = Column(String(64), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     disabled_reason = Column(String(500), nullable=True)
+    # UX rework S1: the per-course test student of Student view (app/lms/student_view); never signs in, limited by a
+    # deny-by-default route allow-list and excluded from every staff list, count and lock
+    is_test_student = Column(Boolean, default=False, nullable=False, server_default=sa.false())
 
     __table_args__ = (
         CheckConstraint("teacher_status IN ('none','pending','approved','revoked')", name="teacher_status_valid"),

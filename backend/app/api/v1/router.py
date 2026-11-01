@@ -100,6 +100,11 @@ from app.lms.enrollment_forms.router import router as _enrollment_forms_router  
 
 api_router.include_router(_enrollment_forms_router, tags=["Enrollment forms"])
 # --- Phase 9 S4 end ---
+# --- UX rework S1 begin --- (Student view, UX_REWORK_DESIGN F)
+from app.lms.student_view.router import router as _student_view_router  # noqa: E402
+
+api_router.include_router(_student_view_router, prefix="/courses", tags=["Student view"])
+# --- UX rework S1 end ---
 # --- Phase 9 S2 begin --- (organization-shared banks, PHASE_9_DESIGN 4.2)
 from app.lms.content.shared_banks_router import (  # noqa: E402
     course_router as _shared_banks_course_router, org_router as _shared_banks_org_router,

@@ -34,7 +34,7 @@ from app.lms.core.pagination import clamp_limit
 from app.lms.courses import service as course_svc
 from app.lms.courses.models import Course
 from app.lms.enrollments import service as enr_svc
-from app.lms.enrollments.models import Enrollment
+from app.lms.enrollments.models import Enrollment, not_test_enrollment
 from app.lms.grading import late as late_mod
 from app.lms.grading import repository as repo
 from app.lms.grading import serializers as ser
@@ -131,7 +131,7 @@ def _assignment_rows(db: Session, course_id: uuid.UUID, *, staff: bool, late_pol
                    func.sum(case((stale, 1), else_=0)).label("stale"))
             .join(A, A.id == Submission.assignment_id)
             .outerjoin(Q, Q.id == A.assessment_id)
-            .where(Submission.course_id == course_id)
+            .where(Submission.course_id == course_id, not_test_enrollment(Submission.enrollment_id))
             .group_by(Submission.assignment_id)
             .subquery()
         )
@@ -169,7 +169,8 @@ def visible_column_ids(db: Session, rows: Iterable[Any], now: datetime) -> set:
     if candidates:
         open_ = set(db.execute(
             select(Attempt.assessment_id).where(Attempt.assessment_id.in_(list(candidates)),
-                                                Attempt.status == "in_progress", Attempt.is_preview.is_(False))
+                                                Attempt.status == "in_progress", Attempt.is_preview.is_(False),
+                                                not_test_enrollment(Attempt.enrollment_id))
             .distinct()).scalars())
         visible.update(aid for qid, aid in candidates.items() if qid not in open_)
     return visible

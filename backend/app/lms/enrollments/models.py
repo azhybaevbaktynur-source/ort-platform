@@ -4,7 +4,10 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, UniqueConstraint, Uuid
+import sqlalchemy as sa
+from sqlalchemy import (
+    Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, UniqueConstraint, Uuid, exists, text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -30,6 +33,9 @@ class Enrollment(UUIDPKMixin, TimestampMixin, Base):
     removed_by_id: Mapped[Optional[str]] = mapped_column(
         String(64), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    # UX rework S1: the enrollment of a Student view test student. Kept after a reset (state `removed`), so a retired
+    # test student stays excluded. Staff queries filter on it directly or through `not_test_enrollment`.
+    is_test_student: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default=sa.false())
 
     __table_args__ = (
         UniqueConstraint("course_id", "user_id", name="uq_enrollments_course_id_user_id"),
@@ -45,7 +51,22 @@ class Enrollment(UUIDPKMixin, TimestampMixin, Base):
         ),
         Index("ix_enrollments_user_id_state", "user_id", "state"),
         Index("ix_enrollments_course_id_role_state", "course_id", "role", "state"),
+        # UX rework S1: at most one active test student per course (the race guard of `POST _C/student-view`)
+        Index("uq_enrollments_active_test_student", "course_id", unique=True,
+              postgresql_where=text("is_test_student AND state = 'active'"),
+              sqlite_where=text("is_test_student AND state = 'active'")),
     )
+
+
+_TEST_ENROLLMENT = Enrollment.__table__.alias("test_enrollment")
+
+
+def not_test_enrollment(enrollment_id_col):
+    """Predicate for staff queries over attempts, submissions and other per-enrollment rows: `enrollment_id_col` is
+    not a test student's enrollment (active or retired). A primary-key lookup per row; every aggregate, list or lock
+    that staff see must use it (UX_REWORK_DESIGN F)."""
+    t = _TEST_ENROLLMENT
+    return ~exists().where(t.c.id == enrollment_id_col, t.c.is_test_student.is_(True)).correlate_except(t)
 
 
 class EnrollmentEvent(UUIDPKMixin, Base):

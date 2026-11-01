@@ -14,13 +14,14 @@ def _no_control_chars(value: Optional[str]) -> Optional[str]:
 
 class UserProfile(BaseModel):
     id: str
-    email: EmailStr
+    email: str  # a response: a test student's reserved `.invalid` address is not an EmailStr (requests keep EmailStr)
     displayName: str
     phone: Optional[str] = None
     preferredLanguage: str = Field(default="ky", pattern="^(ky|ru)$")
     is_platform_admin: bool = False
     teacher_status: str = "none"
     locale: Optional[str] = None
+    is_test_student: bool = False
 
 
 class UserRegisterRequest(BaseModel):

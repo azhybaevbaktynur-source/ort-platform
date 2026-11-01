@@ -31,6 +31,7 @@ from app.lms.assignments.ids import assignment_id_for
 from app.lms.assignments.models import AssignmentOverride
 from app.lms.core import clock, ratelimit
 from app.lms.courses.models import Course
+from app.lms.enrollments.models import not_test_enrollment
 from app.lms.grading import schemas as gs
 from app.lms.grading import submissions as subs
 from app.lms.grading.actions import _gate
@@ -58,8 +59,8 @@ def _missing(assessment_id):
 
 def missing_count(db: Session, assessment_id) -> int:
     at = subs.AT
-    return int(db.execute(select(func.count(distinct(at.c.enrollment_id))).where(_missing(assessment_id)))
-               .scalar_one())
+    return int(db.execute(select(func.count(distinct(at.c.enrollment_id))).where(
+        _missing(assessment_id), not_test_enrollment(at.c.enrollment_id))).scalar_one())
 
 
 def ensure_chunk(db: Session, ctx_row, assessment_id, *, limit: int) -> int:
@@ -97,7 +98,7 @@ def _context(db: Session, course_id, assignment_id):
 
 def pending_count(db: Session, assessment_id, ctx_row) -> int:
     return int(db.execute(select(func.count()).select_from(S).where(
-        S.c.assessment_id == assessment_id, _target(ctx_row))).scalar_one())
+        S.c.assessment_id == assessment_id, _target(ctx_row), not_test_enrollment(S.c.enrollment_id))).scalar_one())
 
 
 def regrade_chunk(db: Session, ctx_row, assessment_id, *, actor_id: Optional[str], limit: int, after=None) -> list:
@@ -154,7 +155,8 @@ def _manual_target(arow):
 
 
 def pending_manual_count(db: Session, arow) -> int:
-    return int(db.execute(select(func.count()).select_from(S).where(_manual_target(arow))).scalar_one())
+    return int(db.execute(select(func.count()).select_from(S).where(
+        _manual_target(arow), not_test_enrollment(S.c.enrollment_id))).scalar_one())
 
 
 def regrade_manual_chunk(db: Session, arow, *, actor_id: Optional[str], limit: int, after=None) -> list:
@@ -186,17 +188,24 @@ def regrade_manual_chunk(db: Session, arow, *, actor_id: Optional[str], limit: i
     return [r["id"] for r in rows]
 
 
+def _real_rows(db: Session, ids: list) -> int:
+    """UX rework S1: test students are regraded with the class, and the numbers staff read do not count them."""
+    return int(db.execute(select(func.count()).select_from(S).where(
+        S.c.id.in_(ids), not_test_enrollment(S.c.enrollment_id))).scalar_one())
+
+
 def _regrade_manual(db: Session, arow, *, actor_id: Optional[str], cap: int, chunk: int) -> gs.RegradeOut:
-    done, after = 0, None
+    done, real, after = 0, 0, None
     while done < cap:
         ids = regrade_manual_chunk(db, arow, actor_id=actor_id, limit=min(chunk, cap - done), after=after)
         if not ids:
             break
         done += len(ids)
+        real += _real_rows(db, ids)
         after = ids[-1]
     pending = pending_manual_count(db, arow)
     db.rollback()
-    return gs.RegradeOut(regraded=done, pending=pending, scheme_version_id=arow.grading_scheme_version_id)
+    return gs.RegradeOut(regraded=real, pending=pending, scheme_version_id=arow.grading_scheme_version_id)
 
 
 # ------------------------------------------------------------------ entry point
@@ -217,13 +226,14 @@ def regrade(db: Session, ctx: AuthzContext, course: Course, assignment_id) -> gs
         if not n:
             break
         created += n
-    done, after = 0, None
+    done, real, after = 0, 0, None
     while done < cap:
         ids = regrade_chunk(db, ctx_row, aid, actor_id=actor_id, limit=min(chunk, cap - done), after=after)
         if not ids:
             break
         done += len(ids)
+        real += _real_rows(db, ids)
         after = ids[-1]
     pending = pending_count(db, aid, ctx_row) + missing_count(db, aid)
     db.rollback()
-    return gs.RegradeOut(regraded=done, pending=pending, scheme_version_id=ctx_row.grading_scheme_version_id)
+    return gs.RegradeOut(regraded=real, pending=pending, scheme_version_id=ctx_row.grading_scheme_version_id)

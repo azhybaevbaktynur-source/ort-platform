@@ -258,7 +258,7 @@ export const LMS_ERROR_CODES = [
   "page_not_found", "page_variant_exists", "course_file_not_found", "announcement_not_found", "folder_invalid",
   "course_files_quota", "page_conflict", "already_published",
   // Phase 8c S1: a write sent in the read-only Student view
-  "student_view_read_only",
+  "test_student_forbidden",
 ] as const;
 export type LmsErrorCode = (typeof LMS_ERROR_CODES)[number];
 

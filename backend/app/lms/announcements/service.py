@@ -12,7 +12,7 @@ from __future__ import annotations
 import uuid
 from typing import Optional
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.authz import A, AuthzContext
@@ -123,7 +123,8 @@ def home_strip(db: Session, user_id: str) -> list[sch.AnnouncementHomeOut]:
         .select_from(Enrollment).join(Course, Course.id == Enrollment.course_id)
         .join(Announcement, Announcement.course_id == Course.id)
         .where(Enrollment.user_id == user_id, Enrollment.role == "student", Enrollment.state == "active",
-               Course.deleted_at.is_(None), Course.status != "draft", Announcement.deleted_at.is_(None),
+               Course.deleted_at.is_(None), Announcement.deleted_at.is_(None),
+               or_(Course.status != "draft", Enrollment.is_test_student.is_(True)),  # UX rework S1
                Announcement.published_at.isnot(None), Announcement.published_at <= now)
         .order_by(Announcement.published_at.desc(), Announcement.id.desc()).limit(ids.HOME_ANNOUNCEMENTS_LIMIT)
     ).all()

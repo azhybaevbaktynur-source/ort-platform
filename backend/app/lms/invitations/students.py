@@ -73,7 +73,8 @@ def send_mails(mails: Iterable[emails.InvitationEmail]) -> None:
 def users_by_email(db: Session, addresses: list[str]) -> dict[str, User]:
     if not addresses:
         return {}
-    rows = db.execute(select(User).where(func.lower(User.email).in_(addresses))).scalars()
+    rows = db.execute(select(User).where(func.lower(User.email).in_(addresses),
+                                         User.is_test_student.is_(False))).scalars()
     return {(u.email or "").strip().lower(): u for u in rows}
 
 

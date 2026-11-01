@@ -15,7 +15,7 @@ import { E2E_DIR, seed, signIn, tr, uxShots, VIEWPORTS, type SeedUser } from "./
  *     into the "Языки" department (an account → added).
  *  4. People → Invitations: the languages teacher invites two students, sends one again, revokes the other; the
  *     invited student accepts from the emailed link and is in the course.
- *  5. Student view on People: no tabs, and the new writes are refused (403 `student_view_read_only`).
+ *  5. Student view on People: no tabs, and the new writes are refused (403 `test_student_forbidden`).
  *
  * Data: `seed_backend.py` (`seed_org_admin`). UX-gate screens go to `$E2E_DIR/phase9-s5/` (375 px and 1440 px; staff
  * screens ru + en, student screens ru + ky + en); they are not compared against baselines.
@@ -347,9 +347,10 @@ test("Student view on People: no tabs, the new writes are refused", async ({ bro
   await expect(page.getByRole("status").filter({ hasText: t("studentView.banner") })).toBeVisible();
   await expect(page.getByRole("tab", { name: t("studentInvite.tabs.invitations") })).toHaveCount(0);
   await expect(page.getByRole("button", { name: t("studentInvite.invite") })).toHaveCount(0);
+  const session = await page.evaluate(() => JSON.parse(window.sessionStorage.getItem("studentView") || "{}"));
   await page.context().close();
 
-  const headers = { Authorization: `Bearer ${d.languages.token}`, "Content-Type": "application/json", "X-View-As": "student" };
+  const headers = { Authorization: `Bearer ${session.token}`, "Content-Type": "application/json" };
   const writes: [string, string, unknown][] = [
     ["POST", `/courses/${cid}/students/invitations`, { emails: ["sv@example.com"] }],
     ["POST", `/courses/${cid}/banks/copy-from`, { bank_id: d.bank_id }],
@@ -358,6 +359,6 @@ test("Student view on People: no tabs, the new writes are refused", async ({ bro
   for (const [method, p, body] of writes) {
     const r = await fetch(`${seed().api}/api/v1${p}`, { method, headers, body: JSON.stringify(body) });
     expect(r.status, `${method} ${p}`).toBe(403);
-    expect((await r.json()).error.code, `${method} ${p}`).toBe("student_view_read_only");
+    expect((await r.json()).error.code, `${method} ${p}`).toBe("test_student_forbidden");
   }
 });

@@ -256,7 +256,7 @@
       "nothing_to_preview": "There is nothing to preview yet: the template has no sections.",
       "language_not_in_assessment": "The sample questions are not available in this language.",
       "sandbox_course": "This course holds a template's sample questions and cannot be changed here.",
-      "student_view_read_only": "Student view is read-only. Leave student view to make changes."
+      "test_student_forbidden": "Not available in student view."
     }
   },
   "courses": {
@@ -604,6 +604,8 @@
       "empty": "No entries."
     },
     "auditActions": {
+      "student_view_enter": "Entered student view",
+      "student_view_reset": "Reset the test student",
       "teacher_request_approve": "Approved teacher request",
       "teacher_request_reject": "Rejected teacher request",
       "user_teacher_status_set": "Changed teacher status",
@@ -4780,11 +4782,15 @@
     }
   },
   "studentView": {
+    "resetShort": "Reset",
+    "leaveShort": "Leave",
     "button": "Student view",
-    "banner": "You are viewing this course as a new student would. Nothing you do here is saved.",
+    "banner": "You are viewing the course as a student",
     "leave": "Leave student view",
-    "handInsOff": "Student view: hand-ins are off.",
-    "readOnlyError": "Student view is read-only. Leave student view to make changes."
+    "reset": "Reset test student",
+    "resetTitle": "Reset the test student?",
+    "resetBody": "A new test student starts from the beginning. The current one's work is no longer shown.",
+    "testStudentName": "Test student"
   },
   "coursePage": {
     "add": "Add to “{title}”",

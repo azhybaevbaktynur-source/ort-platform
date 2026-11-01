@@ -188,7 +188,8 @@ def accept_student_invitation(db: Session, user: User, course: Course, *,
 
 def load_enrollment_in_course(db: Session, course_id: uuid.UUID, enrollment_id: uuid.UUID, *,
                               for_update: bool = False) -> Enrollment:
-    stmt = select(Enrollment).where(Enrollment.id == enrollment_id, Enrollment.course_id == course_id)
+    stmt = select(Enrollment).where(Enrollment.id == enrollment_id, Enrollment.course_id == course_id,
+                                    Enrollment.is_test_student.is_(False))  # never managed from the roster
     if for_update:
         stmt = stmt.with_for_update()
     enr = db.execute(stmt).scalar_one_or_none()
@@ -240,7 +241,8 @@ def add_staff(db: Session, ctx: AuthzContext, course: Course, email: str, role: 
     actor = ctx.user
     ratelimit.enforce(f"staff_add:{actor.id}", ratelimit.STAFF_ADD_1H)
     target = db.execute(
-        select(User).where(func.lower(User.email) == (email or "").strip().lower(), User.email_verified.is_(True))
+        select(User).where(func.lower(User.email) == (email or "").strip().lower(), User.email_verified.is_(True),
+                           User.is_test_student.is_(False))
     ).scalar_one_or_none()
     if target is None or target.disabled_at is not None or (role == "teacher" and not _approved_teacher(target)):
         raise NotFound("User not found", code="user_not_found")  # one answer for every miss (no enumeration)
@@ -331,7 +333,7 @@ def roster_query(course_id: uuid.UUID, *, role: Optional[str] = None, state: str
                  q: Optional[str] = None) -> Select:
     """Rows of (Enrollment, User); users are joined once (no N+1)."""
     stmt = select(Enrollment, User).join(User, User.id == Enrollment.user_id).where(
-        Enrollment.course_id == course_id, Enrollment.state == state
+        Enrollment.course_id == course_id, Enrollment.state == state, Enrollment.is_test_student.is_(False)
     )
     if role:
         stmt = stmt.where(Enrollment.role == role)

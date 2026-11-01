@@ -118,7 +118,7 @@ POLICY_NAMES = POLICY_NAMES | frozenset(_EXAM_TEMPLATE_POLICY_NAMES_8B)
 # --- Phase 8b S1 end ---
 # --- Phase 8c S1 begin --- (PHASE_8C_DESIGN 7: no new policy name; the three routes live in their packages' dicts,
 # already registered above: MODULE_POLICIES `GET _C/modules/unsorted`, `POST _C/modules/{mid}/duplicate`;
-# ASSIGNMENT_POLICIES `GET _C/todo`. The `X-View-As: student` header is request state in `core/authz.get_authz`.)
+# ASSIGNMENT_POLICIES `GET _C/todo`.)
 # Label `course:content.read+staff` (fix 1): content.read plus a staff role in the service (students get 403).
 # --- Phase 8c S1 end ---
 # --- Phase 9 S1 begin --- (PHASE_9_DESIGN 5: no new route in S1. S4 moves
@@ -141,6 +141,11 @@ ROUTE_POLICIES.update(SHARED_BANK_POLICIES)
 # `org_admin+ratelimit` is the one policy label Phase 9 adds (roster imports, design 5).
 POLICY_NAMES = POLICY_NAMES | frozenset({"org_admin+ratelimit"})
 # --- Phase 9 S1 end ---
+# --- UX rework S1 begin --- (Student view; a test student's own limits: `student_view/allowlist.py`)
+from app.lms.student_view.policies import STUDENT_VIEW_POLICIES  # noqa: E402
+
+ROUTE_POLICIES.update(STUDENT_VIEW_POLICIES)
+# --- UX rework S1 end ---
 
 
 def iter_routes(app):

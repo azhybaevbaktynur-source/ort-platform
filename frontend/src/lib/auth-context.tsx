@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
+import { getStudentView, leaveStudentView } from "@/lib/api";
 
 /** Minimal signed-in user (the app authenticates with its own backend JWT, not Firebase). */
 export interface AuthUser {
@@ -19,6 +20,8 @@ export interface AuthUserProfile {
   is_platform_admin: boolean;
   teacher_status: string;
   locale?: string;
+  /** Student view: this tab is the course's test student (UX rework S1). */
+  is_test_student?: boolean;
 }
 
 export interface RegisterResult {
@@ -77,6 +80,7 @@ function toProfile(u: any): AuthUserProfile {
     is_platform_admin: Boolean(u.is_platform_admin),
     teacher_status: u.teacher_status || "none",
     locale: u.locale || undefined,
+    is_test_student: Boolean(u.is_test_student),
   };
 }
 
@@ -138,6 +142,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Restore the session instantly from the cached profile, then confirm it with the backend in the
   // background. Pages no longer wait for /auth/me (slow while the server wakes up) before rendering.
   useEffect(() => {
+    // --- UX rework S1 begin --- Student view: this tab's session is the test student's. Nothing is written to the
+    // stored session of the teacher (shared with other tabs), and a dead token ends the mode, not the teacher's login.
+    const studentView = getStudentView();
+    if (studentView) {
+      const use = (profile: AuthUserProfile) => {
+        setUserProfile(profile);
+        setUser(toAuthUser(profile, studentView.token));
+      };
+      (async () => {
+        try {
+          const res = await fetch("/api/v1/auth/me", { headers: { Authorization: `Bearer ${studentView.token}` } });
+          if (res.status === 401 || res.status === 403) {
+            leaveStudentView();
+            return;
+          }
+          use(toProfile(res.ok ? await res.json() : { id: "", email: "", is_test_student: true }));
+        } catch (e) {
+          console.warn("Could not verify session with backend:", e);
+          use(toProfile({ id: "", email: "", is_test_student: true })); // the backend checks the token on every call
+        } finally {
+          setLoading(false);
+        }
+      })();
+      return;
+    }
+    // --- UX rework S1 end ---
     const storedToken = localStorage.getItem("ort_token");
     if (!storedToken) {
       setLoading(false);
@@ -210,6 +240,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    if (getStudentView()) { // UX rework S1: never the teacher's login from a Student view tab
+      leaveStudentView();
+      return;
+    }
     clearSession();
   };
 

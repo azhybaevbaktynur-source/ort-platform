@@ -16,6 +16,7 @@ from app.lms.core import clock, ratelimit
 from app.lms.core.errors import NotFound, ValidationFailed
 from app.lms.core.pagination import PageOut, paginate
 from app.lms.courses import service as course_svc
+from app.lms.enrollments.models import not_test_enrollment
 from app.lms.grading.schemas import VoidIn
 from app.models.user import User
 
@@ -46,7 +47,8 @@ def list_attempts(course_id: uuid.UUID, assessment_id: uuid.UUID, status: Option
         raise ValidationFailed("Invalid status filter", code="validation_failed",
                                details=[{"loc": ["query", "status"], "msg": "invalid status"}])
     grading.finalize_expired_for(db, assessment.id, now=clock.now(), limit=20)  # the sweep does the rest
-    stmt = select(Attempt).where(Attempt.assessment_id == assessment.id, Attempt.course_id == course.id)
+    stmt = select(Attempt).where(Attempt.assessment_id == assessment.id, Attempt.course_id == course.id,
+                                 not_test_enrollment(Attempt.enrollment_id))
     if not preview:
         stmt = stmt.where(Attempt.is_preview.is_(False))
     if status:

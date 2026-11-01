@@ -104,7 +104,7 @@ def load_assignment(db: Session, course_id, assignment_id) -> SimpleNamespace:
 def active_student(db: Session, course_id, enrollment_id) -> Enrollment:
     enr = db.execute(select(Enrollment).where(
         Enrollment.id == enrollment_id, Enrollment.course_id == course_id, Enrollment.role == "student",
-        Enrollment.state == "active")).scalar_one_or_none()
+        Enrollment.state == "active", Enrollment.is_test_student.is_(False))).scalar_one_or_none()
     if enr is None:
         raise enrollment_not_found()
     return enr
