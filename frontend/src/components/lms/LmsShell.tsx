@@ -2,9 +2,10 @@
 
 import React, { createContext, Suspense, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { BookOpen, Building2, Presentation, ShieldCheck, UserPlus } from "lucide-react";
+import { BookOpen, Building2, Lock, Presentation, ShieldCheck, UserPlus, Users } from "lucide-react";
 import { useTranslation, type Language } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
+import { gateOpenPath } from "@/lib/api"; // Phase 11 S3
 import { LmsMeProvider, useLmsMeLoader } from "@/lib/lms/useLmsMe";
 import { listMyOrganizations, type MyOrganizationOut } from "@/lib/lms/organizations";
 import { AppHeader, Brand, type AppHeaderArea, type AreaKey } from "@/components/ui/AppHeader";
@@ -14,6 +15,7 @@ import { lmsErrorKey } from "./ErrorMessage";
 import { PendingInvitationsBanner } from "./PendingInvitationsBanner"; // Phase 6 S4b
 import { InvitationAcceptedNotice } from "./InvitationAcceptedNotice"; // Phase 6 S8
 import { StudentViewBanner } from "./course/StudentViewBanner"; // UX rework S1
+import { PrivacyBanner } from "@/components/privacy/PrivacyBanner"; // Phase 11 S3
 
 /*
  * Phase 6b S5b: the frame of every signed-in page (courses/*, admin/*, org/*, grading-schemes, teacher-access).
@@ -59,6 +61,7 @@ function ViewParam({ onChange }: { onChange: (v: string | null) => void }) {
 function areaFromUrl(rest: string, view: string | null, coursesDefault: AreaKey = "learning"): AreaKey {
   if (rest === "/admin" || rest.startsWith("/admin/")) return "platform";
   if (rest === "/org" || rest.startsWith("/org/")) return "organization";
+  if (rest === "/parent" || rest.startsWith("/parent/")) return "parent"; // Phase 11
   if (rest.startsWith("/grading-schemes") || rest === "/courses/new" || rest === "/courses/trash") return "teaching";
   if (rest.startsWith("/exam-templates")) return "teaching"; // Phase 7b S4
   if (rest === "/courses") {
@@ -86,6 +89,8 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const declared = declaredArea?.area ?? null;
   const [orgs, setOrgs] = useState<MyOrganizationOut[]>([]);
   const testStudent = !!userProfile?.is_test_student; // UX rework S1: Student view
+  const isGuardian = !!userProfile?.is_guardian; // Phase 11
+  const consentBlocked = meState.error?.code === "consent_required"; // Phase 11 S3: the gate refuses the profile too
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -162,9 +167,10 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
         choices: orgs.map((o) => ({ href: `${base}/org/${o.id}`, label: o.name, active: rest === `/org/${o.id}` || rest.startsWith(`/org/${o.id}/`) })),
       });
     }
+    if (isGuardian || urlArea === "parent") list.push({ key: "parent", label: t("privacy.nav.parent"), href: `${base}/parent`, icon: <Users /> }); // Phase 11
     if (isAdmin) list.push({ key: "platform", label: t("shell.areas.platform"), href: `${base}/admin`, icon: <ShieldCheck /> });
     return hideSections ? list.map((a) => ({ ...a, sections: undefined })) : list;
-  }, [lang, t, hasTeaching, isAdmin, canCreate, orgs, rest, urlArea, hideSections]);
+  }, [lang, t, hasTeaching, isAdmin, canCreate, isGuardian, orgs, rest, urlArea, hideSections]);
 
   if (authLoading || !user || unauthorized) {
     // Student finding S16: the frame (header + skeleton content) shows at once, never a blank screen.
@@ -189,15 +195,20 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const accountLinks = canRequestTeacher
     ? [{ href: `/${lang}/teacher-access`, label: t("teacherAccess.navLink"), icon: <UserPlus />, active: rest === "/teacher-access" }]
     : [];
+  if (!testStudent) accountLinks.push({ href: `/${lang}/privacy`, label: t("privacy.title"), icon: <Lock />, active: rest === "/privacy" }); // Phase 11 S3
 
-  const meError = meState.error && !me ? meState.error : null;
+  const meError = meState.error && !me && !consentBlocked ? meState.error : null;
   const content = (
     <>
       {/* --- Phase 6 S4b / S8: invitation banner and notice stay under the header --- */}
       <PendingInvitationsBanner enabled={!!me && !testStudent} />
       <InvitationAcceptedNotice />
+      {/* Phase 11 S3: the one small home-page line; never on the player's paths */}
+      {rest === "/courses" && signedIn && !testStudent && !consentBlocked && <PrivacyBanner />}
       {meError ? (
         <ErrorState message={t(lmsErrorKey(meError.code))} onRetry={() => void meState.reload()} />
+      ) : consentBlocked && !gateOpenPath(rest) ? (
+        <LoadingState label={t("lms.common.loading")} />
       ) : children}
     </>
   );

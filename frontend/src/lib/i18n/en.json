@@ -5360,5 +5360,134 @@
       "department": "Department",
       "submittedCount": "Submitted"
     }
+  },
+  "privacy": {
+    "nav": {
+      "parent": "Parent"
+    },
+    "title": "Privacy",
+    "confirm": "Confirm",
+    "draftBadge": "Draft: awaiting legal review",
+    "parentLink": "I'm a parent",
+    "parentOpen": "Enter a code",
+    "age": {
+      "question": "How old are you?",
+      "label": "Age",
+      "change": "Change",
+      "under_14": "Under 14",
+      "14_17": "14–17",
+      "18_plus": "18 or older"
+    },
+    "accept": {
+      "label": "I accept the {privacy} and {terms}",
+      "privacy": "privacy policy",
+      "terms": "terms of use"
+    },
+    "policies": {
+      "privacy": "Privacy policy",
+      "terms": "Terms of use",
+      "guardian_consent": "Parent consent",
+      "notFound": "Document not found"
+    },
+    "banner": {
+      "age": "Confirm your age",
+      "accept": "Accept the updated documents",
+      "parent": "Parent consent needed by {date}"
+    },
+    "code": {
+      "title": "Give this code to a parent",
+      "get": "Get code",
+      "new": "New code",
+      "valid": "Valid until {date}",
+      "due": "Needed by {date}",
+      "check": "Check again"
+    },
+    "documents": {
+      "title": "Documents",
+      "accepted": "Accepted",
+      "missing": "Not accepted",
+      "accept": "Accept"
+    },
+    "parents": {
+      "title": "Parents",
+      "none": "No parents linked",
+      "remove": "Remove",
+      "removeTitle": "Remove this parent?",
+      "removeEffect": "They will no longer see your grades.",
+      "holdsConsent": "Gave consent"
+    },
+    "data": {
+      "title": "Your data",
+      "download": "Download my data",
+      "delete": "Delete account",
+      "deleteTitle": "Delete your account?",
+      "deleteEffect": "An admin carries this out. Your name, email, phone and hand-ins are erased; grades stay without your name."
+    },
+    "requests": {
+      "title": "Requests",
+      "cancel": "Cancel",
+      "kind": {
+        "export": "Data download",
+        "delete": "Account deletion"
+      },
+      "status": {
+        "pending": "Pending",
+        "completed": "Done",
+        "rejected": "Rejected",
+        "cancelled": "Cancelled"
+      }
+    },
+    "admin": {
+      "title": "Data requests",
+      "filter": "Filter requests",
+      "filters": {
+        "pending": "Pending",
+        "all": "All"
+      },
+      "empty": "No requests",
+      "person": "Person",
+      "kind": "Kind",
+      "due": "Due",
+      "status": "Status",
+      "actions": "Actions",
+      "overdue": "Overdue",
+      "run": "Run",
+      "reject": "Reject",
+      "runTitle": "Delete this account?",
+      "runEffect": "Name, email, phone and hand-ins are erased. This cannot be undone.",
+      "rejectTitle": "Reject this request?",
+      "rejectEffect": "The person sees the reason.",
+      "rejectReason": "Reason",
+      "rejectCodes": {
+        "identity_unverified": "Identity not confirmed",
+        "legal_obligation": "Must be kept by law",
+        "duplicate": "Duplicate request"
+      },
+      "ranToast": "Account deleted",
+      "rejectedToast": "Request rejected"
+    },
+    "errors": {
+      "consent_required": "A parent must confirm first",
+      "age_band_required": "Choose your age",
+      "age_band_set": "Your age is already set",
+      "policy_not_accepted": "Accept the documents",
+      "policy_not_current": "Documents changed. Reload the page",
+      "guardian_consent_required": "A parent consents for this account",
+      "password_required": "Enter your password",
+      "password_incorrect": "Wrong password",
+      "request_open": "This request is already open",
+      "request_not_pending": "This request is closed",
+      "request_not_export": "Only a data download can be saved",
+      "request_not_executable": "A download completes by itself",
+      "data_request_not_found": "Request not found",
+      "reject_code_invalid": "Choose a reason",
+      "user_deleted": "This account was deleted",
+      "delete_blocked_platform_admin": "Remove admin rights first",
+      "delete_blocked_owns_courses": "Transfer their courses first",
+      "delete_blocked_open_attempts": "An attempt is still open",
+      "delete_blocked_test_student": "Test student",
+      "guardian_holds_consent": "This parent is the only one who gave consent",
+      "guardian_limit": "Too many parents linked"
+    }
   }
 }

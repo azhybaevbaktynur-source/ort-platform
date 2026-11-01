@@ -49,6 +49,9 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
   const staffRole = !!course && isStaffCourse(course);
   useDeclareArea(course ? (staffRole ? "teaching" : "learning") : null, { hideSections: true });
 
+  // Phase 11 S3 (invariant 1): the gate refuses the course but never an open attempt; the player needs no course frame
+  if ((error as { code?: string } | null)?.code === "consent_required" && /\/attempts\/[^/]+$/.test(pathname)) return <>{children}</>;
+
   const missing = (error as { status?: number } | null)?.status === 404;
   if (missing && !course) {
     return (

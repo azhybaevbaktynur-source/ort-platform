@@ -15,7 +15,7 @@ import { cn, focusRing } from "./utils";
  * first row they overlapped the account name); with all four areas the account name shows from 1280 px.
  */
 
-export type AreaKey = "learning" | "teaching" | "organization" | "platform";
+export type AreaKey = "learning" | "teaching" | "organization" | "platform" | "parent"; // Phase 11: "parent"
 
 export interface AppHeaderLink {
   href: string;

@@ -22,6 +22,14 @@ export interface AuthUserProfile {
   locale?: string;
   /** Student view: this tab is the course's test student (UX rework S1). */
   is_test_student?: boolean;
+  /** Phase 11: has an active link to a student; shows the Parent area. */
+  is_guardian?: boolean;
+}
+
+/** Phase 11 S3: the age step of the sign-up form (PHASE_11_DESIGN 3.2). */
+export interface SignUpConsent {
+  ageBand: string;
+  policyVersionIds: string[];
 }
 
 export interface RegisterResult {
@@ -52,7 +60,7 @@ interface AuthContextType {
   userProfile: AuthUserProfile | null;
   loading: boolean;
   signIn: (email: string, pass: string) => Promise<void>;
-  signUp: (email: string, pass: string, displayName: string, phone?: string) => Promise<RegisterResult>;
+  signUp: (email: string, pass: string, displayName: string, phone: string | undefined, consent: SignUpConsent) => Promise<RegisterResult>;
   verifyEmail: (email: string, pass: string, code: string) => Promise<void>;
   resendCode: (email: string) => Promise<{ resendAfterSeconds: number }>;
   signOut: () => Promise<void>;
@@ -81,6 +89,7 @@ function toProfile(u: any): AuthUserProfile {
     teacher_status: u.teacher_status || "none",
     locale: u.locale || undefined,
     is_test_student: Boolean(u.is_test_student),
+    is_guardian: Boolean(u.is_guardian),
   };
 }
 
@@ -220,13 +229,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     finishLogin(data);
   };
 
-  const signUp = async (email: string, pass: string, displayName: string, phone?: string): Promise<RegisterResult> => {
+  const signUp = async (email: string, pass: string, displayName: string, phone: string | undefined, consent: SignUpConsent): Promise<RegisterResult> => {
     return postJson("/api/v1/auth/register", {
       email: email.trim(),
       password: pass,
       displayName: displayName.trim(),
       phone: phone?.trim() || undefined,
       lang,
+      ageBand: consent.ageBand,
+      policyVersionIds: consent.policyVersionIds,
     });
   };
 
