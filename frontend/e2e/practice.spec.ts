@@ -1,5 +1,5 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
-import { seed, settle, signIn, tr, VIEWPORTS, type SeedUser } from "./helpers";
+import { seed, settle, signIn, tr, VIEWPORTS, type SeedUser, goToReviewPage } from "./helpers";
 
 /**
  * Phase 10 S3 practice walk (PHASE_10_DESIGN 3): a teacher creates a practice set from a bank in the dialog, a student
@@ -94,6 +94,8 @@ test.describe("practice walk (ru)", () => {
 
     const check = sp.getByRole("button", { name: t("practice.check") });
     await expect(check).toBeDisabled();
+    // no timer in practice: the top bar's center says so
+    await expect(sp.getByTestId("player-top-bar").getByText(t("player.timer.unlimited"))).toBeVisible();
     await sp.getByRole("radio", { name: /Неверно/ }).click();
     await check.click();
     const fb = sp.getByTestId("practice-feedback");
@@ -112,6 +114,7 @@ test.describe("practice walk (ru)", () => {
     await sp.getByRole("radio", { name: RIGHT }).click();
     await sp.getByRole("button", { name: t("practice.check") }).click();
     await expect(sp.getByTestId("practice-feedback")).toHaveAttribute("data-correctness", /correct|incorrect/);
+    await goToReviewPage(sp);
     await sp.getByRole("button", { name: t("player.finishTest") }).first().click();
     await sp.getByRole("dialog").getByRole("button", { name: t("player.submit.confirm") }).click();
     await sp.waitForURL(/\/result/);

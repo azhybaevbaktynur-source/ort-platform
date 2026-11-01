@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type Browser, type BrowserContextOptions, type Locator, type Page, type TestInfo } from "@playwright/test";
-import { expectScreen, seed, settle, signIn, tr, VIEWPORTS, type SeedUser, type ShotOptions, type ViewportName } from "./helpers";
+import { expectScreen, goToReviewPage, questionMapToggle, seed, settle, signIn, tr, VIEWPORTS, type SeedUser, type ShotOptions, type ViewportName } from "./helpers";
 
 /**
  * Phase 8b S3: the scrolling display mode of the general player (PHASE_8B_DESIGN 8, 12). A 48-item quiz (section 1:
@@ -74,7 +74,7 @@ async function start(page: Page, user: SeedUser, quizId: string, lang: L3 = L): 
 const listItems = (page: Page) => page.locator('section[id^="item-"]');
 const item = (page: Page, pos: number) => page.locator(`#item-${pos}`);
 const choice = (page: Page, pos: number, n: number) => item(page, pos).getByRole("radio").nth(n);
-const desktopPalette = (page: Page, lang: L3 = L) => page.getByRole("navigation", { name: t("player.palette.title", {}, lang) });
+const questionMap = (page: Page, lang: L3 = L) => page.getByRole("dialog", { name: t("player.palette.title", {}, lang) });
 const paletteButton = (scope: Locator, label: number, lang: L3 = L) =>
   scope.getByRole("button", { name: new RegExp(`^${t("player.question", {}, lang)} ${label}(,|$)`) });
 const scrollRoot = (page: Page) => page.locator("div.fixed.inset-0.overflow-y-auto").first();
@@ -84,7 +84,23 @@ async function readerScrollTo(page: Page, pos: number) {
   await item(page, pos).evaluate((el) => el.scrollIntoView({ block: "start" }));
 }
 
+/** The question map's highlighted entry: open the popup, check, close it again. */
+async function expectMapCurrent(page: Page, label: string) {
+  await questionMapToggle(page).click();
+  await expect(questionMap(page).locator('button[aria-current="true"]')).toHaveText(label);
+  await page.keyboard.press("Escape");
+  await expect(questionMap(page)).toBeHidden();
+}
+
+/** Jump to a question through the question map popup. */
+async function jumpInMap(page: Page, label: number, lang: L3 = L) {
+  await questionMapToggle(page).click();
+  await paletteButton(questionMap(page, lang), label, lang).click();
+  await expect(questionMap(page, lang)).toBeHidden();
+}
+
 async function finishTest(page: Page) {
+  await goToReviewPage(page);
   await page.getByRole("button", { name: t("player.finishTest") }).first().click();
   await page.getByRole("dialog").getByRole("button", { name: t("player.submit.confirm") }).click();
   await page.waitForURL(/\/result/);
@@ -123,21 +139,20 @@ test.describe("scrolling display mode (general player)", () => {
     await expect(item(page, p(1)).getByRole("heading", { name: t("player.questionOf", { n: 1, total: 48 }) })).toBeVisible();
     await expect(page.getByRole("timer")).toBeVisible();
     await expect(page.getByRole("timer")).toHaveText(/\d{1,2}:\d{2}/);
-    const palette = desktopPalette(page);
-    await expect(palette.locator('button[aria-current="true"]')).toHaveText("1");
+    await expectMapCurrent(page, "1");
 
     // ---- answer item 1, scroll like a reader to item 10: the palette highlight follows, answer it below the fold
     await choice(page, p(1), 1).click();
     await readerScrollTo(page, p(10));
     await expect(item(page, p(10))).toHaveAttribute("aria-current", "true");
-    await expect(palette.locator('button[aria-current="true"]')).toHaveText("10");
+    await expectMapCurrent(page, "10");
     await choice(page, p(10), 1).click();
     await readerScrollTo(page, p(25));
-    await expect(palette.locator('button[aria-current="true"]')).toHaveText("25");
+    await expectMapCurrent(page, "25");
     await choice(page, p(25), 1).click();
 
     // ---- palette click scrolls to item 20 and focuses it
-    await paletteButton(palette, 20).click();
+    await jumpInMap(page, 20);
     await expect(item(page, p(20))).toBeFocused();
     await expect(item(page, p(20))).toBeInViewport();
     await expect(item(page, p(20))).toHaveAttribute("aria-current", "true");
@@ -170,10 +185,10 @@ test.describe("scrolling display mode (general player)", () => {
     await expect(page.getByText(t("player.scrolling.windowOf", { from: 31, to: 45, total: 45 }))).toBeVisible();
     await expect(page.getByRole("button", { name: t("player.scrolling.showPrevious", { n: 30 }) })).toBeVisible();
     // a palette target outside the window moves the window first
-    await paletteButton(palette, 5).click();
+    await jumpInMap(page, 5);
     await expect(item(page, p(5))).toBeFocused();
     await expect(listItems(page)).toHaveCount(30);
-    await paletteButton(palette, 40).click();
+    await jumpInMap(page, 40);
     await expect(item(page, p(40))).toBeFocused();
 
     // ---- next section: the passage is shown once above its two questions, with numbered lines
@@ -187,7 +202,7 @@ test.describe("scrolling display mode (general player)", () => {
     await expect(page.getByRole("button", { name: t("player.scrolling.previousSection") })).toBeVisible();
     await choice(page, sec2[0].position, 1).click();
 
-    // ---- finish from the footer, result with five correct answers, review with numbered passage lines
+    // ---- finish on the review page, result with five correct answers, review with numbered passage lines
     await expect(page.getByRole("status").filter({ hasText: t("player.save.saved") })).toBeVisible({ timeout: 20_000 });
     await finishTest(page);
     await expect(page.getByRole("heading", { name: t("results.title") })).toBeVisible();
@@ -216,6 +231,7 @@ test.describe("scrolling display mode (general player)", () => {
     await expect(page.getByRole("timer")).toBeVisible();
     await choice(page, first[0].position, 1).click();
     await choice(page, first[1].position, 1).click();
+    await goToReviewPage(page);
     await page.getByRole("button", { name: t("player.finishSection") }).first().click();
     await page.getByRole("dialog").getByRole("button", { name: t("player.sectionEnd.confirm") }).click();
     await expect(page.locator("header").getByText("Этап 2")).toBeVisible();
@@ -341,7 +357,7 @@ test.describe("scrolling display mode (general player)", () => {
         await page.goto(playerUrl(lang));
         await expect(listItems(page)).toHaveCount(30);
         await shot(page, `scrolling-top-${vp}-${lang}`);
-        if (vp === "desktop") await paletteButton(desktopPalette(page, lang), 12, lang).click();
+        if (vp === "desktop") await jumpInMap(page, 12, lang);
         else await readerScrollTo(page, items[11].position);
         await expect(item(page, items[11].position)).toHaveAttribute("aria-current", "true");
         await page.waitForTimeout(700);
@@ -350,8 +366,8 @@ test.describe("scrolling display mode (general player)", () => {
         await page.waitForTimeout(300);
         await shot(page, `scrolling-footer-${vp}-${lang}`);
         if (vp === "phone") {
-          await page.locator('header button[aria-haspopup="dialog"]').click();
-          await expect(page.getByRole("dialog", { name: t("player.palette.title", {}, lang) })).toBeVisible();
+          await questionMapToggle(page).click();
+          await expect(questionMap(page, lang)).toBeVisible();
           await shot(page, `scrolling-sheet-phone-${lang}`);
           await page.keyboard.press("Escape");
           await expect(page.getByRole("dialog")).toBeHidden();

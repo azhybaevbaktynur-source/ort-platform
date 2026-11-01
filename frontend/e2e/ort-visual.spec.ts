@@ -49,9 +49,13 @@ for (const vp of VIEWPORT_NAMES) {
         await exam.next();
         await exam.assertPaletteEntry(1, { answered: true, flagged: true, current: false });
         await exam.assertPaletteEntry(2, { answered: false, flagged: false, current: true });
-        // desktop: the side panel; phones: the palette sheet opened from the header (S7b, P1)
+        // the palette popup opened from the bottom bar
         await exam.showPalette();
         await shot("flagged-palette", timerMask(page));
+
+        // the review page of the section
+        await exam.openFinish();
+        await shot("review-page", timerMask(page));
 
         // section-end dialog
         await exam.openSectionEnd(1, { unanswered: 2, flagged: 1 });
@@ -107,7 +111,7 @@ test.describe("ORT player loading phone ru", () => {
     await page.goto(`/ru/courses/${s.course_id}/attempts/${s.staff_attempt_id}`);
     const loading = page.getByRole("status").filter({ hasText: tr("ru", "player.loading") });
     await expect(loading).toHaveCount(1);
-    await expect(page.getByRole("progressbar")).toHaveCount(0);
+    await expect(page.getByTestId("player-top-bar")).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(VIEWPORTS.phone.width);
     await expectScreen(page, info, "player-loading-phone-ru", { waitNetwork: false });
   });

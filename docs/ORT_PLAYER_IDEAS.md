@@ -123,3 +123,9 @@ Look, phone layout and accessibility only; navigation, timing, question layout a
 | O7 | Vibration (phone) at the 5-minute and 1-minute marks. | Not color-only; works with the phone face down. | Guidelines say no sounds in exams; vibration is borderline and not available on desktop. | No such signal in the paper exam. |
 | O8 | Swipe left/right between questions on the phone. | Fast one-handed navigation. | Accidental swipes while scrolling long passages. | Navigation freedom inside a section is the same; only the gesture is new. |
 | O9 | Let the student pause an in-progress attempt (stop the clock). | Phone calls, poor network. | Breaks timing integrity; opens cheating paths. | Impossible in the real ORT. |
+
+---
+
+## Idea: answer elimination (owner, 2026-11-01; optional, not built)
+A Bluebook-style toggle to cross out an answer option. Needs decisions on persistence across devices and hotkeys, so it stays an idea.
+

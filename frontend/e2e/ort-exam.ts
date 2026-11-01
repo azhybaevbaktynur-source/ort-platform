@@ -55,6 +55,14 @@ export class OrtExam {
   }
 
   // ---- player
+  topBar(): Locator {
+    return this.page.getByTestId("player-top-bar");
+  }
+
+  bottomBar(): Locator {
+    return this.page.getByTestId("player-bottom-bar");
+  }
+
   palette(): Locator {
     return this.page.getByRole("navigation", { name: this.t("player.palette.title") });
   }
@@ -63,38 +71,33 @@ export class OrtExam {
     return this.palette().getByRole("button");
   }
 
-  /** Phones and tablets (S7b, P1): the header button that opens the palette sheet. Hidden on desktop. */
+  /** The bottom bar's "Question n of N" button that opens the palette popup. */
   paletteToggle(): Locator {
     // accessible name "Question list: question n of total", any n / total
     const label = this.t("player.palette.openLabel", { n: 999, total: 999 });
     const pattern = label.replace(/[.*+?^$()|[\]\\{}]/g, "\\$&").replace(/999/g, "\\d+");
-    return this.page.locator("header").getByRole("button", { name: new RegExp(`^${pattern}$`) });
+    return this.bottomBar().getByRole("button", { name: new RegExp(`^${pattern}$`) });
   }
 
   paletteSheet(): Locator {
     return this.page.getByRole("dialog", { name: this.t("player.palette.title") });
   }
 
-  /** Make the palette visible: on phones open the sheet (and leave it open); on desktop it is always there. */
+  /** Make the palette visible: open the popup (and leave it open). */
   async showPalette() {
-    if (await this.paletteToggle().isVisible()) {
-      if (!(await this.paletteSheet().isVisible())) await this.paletteToggle().click();
-      await expect(this.paletteSheet()).toBeVisible();
-    } else {
-      await this.palette().scrollIntoViewIfNeeded();
-    }
+    if (!(await this.paletteSheet().isVisible())) await this.paletteToggle().click();
+    await expect(this.paletteSheet()).toBeVisible();
     await expect(this.palette()).toBeVisible();
   }
 
-  /** Run palette checks; on phones inside the sheet, which is closed again unless it was already open. */
+  /** Run palette checks inside the popup, which is closed again unless it was already open. */
   async withPalette(fn: () => Promise<void>) {
-    // the header is rendered once the attempt has loaded
-    await expect(this.page.getByRole("progressbar", { name: this.t("player.progressBar") })).toBeVisible();
-    const phone = await this.paletteToggle().isVisible();
-    const wasOpen = phone && (await this.paletteSheet().isVisible());
-    if (phone && !wasOpen) await this.showPalette();
+    // the top bar is rendered once the attempt has loaded
+    await expect(this.topBar()).toBeVisible();
+    const wasOpen = await this.paletteSheet().isVisible();
+    if (!wasOpen) await this.showPalette();
     await fn();
-    if (phone && !wasOpen) {
+    if (!wasOpen) {
       await this.page.keyboard.press("Escape");
       await expect(this.paletteSheet()).toBeHidden();
     }
@@ -116,27 +119,36 @@ export class OrtExam {
     return this.page.getByText(this.t("player.save.saved"), { exact: true });
   }
 
-  /** On phones the aside finish button lives in the palette sheet: open it first. */
-  async openFinish() {
-    if (await this.paletteToggle().isVisible()) await this.showPalette();
+  reviewPage(): Locator {
+    return this.page.getByRole("region", { name: this.t("player.review.title") });
   }
 
-  /**
-   * The "finish section / finish test" button (present on every question): desktop in the side panel, phones in
-   * the palette sheet's footer (S11a, F4). Only the visible one.
-   */
+  /** The popup's "Go to review page", pinned in its footer. */
+  reviewButton(): Locator {
+    return this.paletteSheet().getByRole("button", { name: this.t("player.review.open") });
+  }
+
+  /** The finish button lives on the review page: go there unless already there. */
+  async openFinish() {
+    if (await this.reviewPage().isVisible()) return;
+    await this.showPalette();
+    await this.reviewButton().click();
+    await expect(this.reviewPage()).toBeVisible();
+  }
+
+  /** The "finish section / finish test" button of the review page. */
   finishButton(last: boolean): Locator {
     const name = this.t(last ? "player.finishTest" : "player.finishSection");
-    return this.page.locator("aside").or(this.paletteSheet()).getByRole("button", { name, exact: true }).filter({ visible: true });
+    return this.reviewPage().getByRole("button", { name, exact: true });
   }
 
   dialog(): Locator {
     return this.page.getByRole("dialog");
   }
 
-  /** Header: section name and "section n of 5"; palette: one button per item of the section; timer shown. */
+  /** Top bar: section name and "section n of 5"; palette: one button per item of the section; timer shown. */
   async assertSection(pos: number) {
-    const header = this.page.locator("header").filter({ has: this.page.getByRole("progressbar") });
+    const header = this.topBar();
     await expect(header).toContainText(this.sectionName(pos));
     await expect(header).toContainText(this.t("player.sectionOf", { n: pos, total: 5 }));
     await this.withPalette(async () => {

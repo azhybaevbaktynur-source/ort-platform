@@ -240,6 +240,19 @@ export const VIEWPORTS = {
 } as const;
 export type ViewportName = keyof typeof VIEWPORTS;
 
+// ----------------------------------------------------------------------------- exam player (BLUEBOOK_PLAYER)
+
+/** The bottom bar's "Question n of N": opens the question map popup. */
+export const questionMapToggle = (page: Page): Locator =>
+  page.getByTestId("player-bottom-bar").locator('button[aria-haspopup="dialog"]');
+
+/** The finish buttons live on the review page: reach it from any question through the question map. */
+export async function goToReviewPage(page: Page, lang: Lang | "en" = "ru"): Promise<void> {
+  await questionMapToggle(page).click();
+  await page.getByRole("dialog", { name: tr(lang, "player.palette.title") }).getByRole("button", { name: tr(lang, "player.review.open") }).click();
+  await expect(page.getByRole("region", { name: tr(lang, "player.review.title") })).toBeVisible();
+}
+
 // ----------------------------------------------------------------------------- UX gate screens (Phase 9 S5)
 
 /**
