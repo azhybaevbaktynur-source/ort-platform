@@ -99,10 +99,6 @@ def test_gates_of_the_org_admin_branch(db):
     w.C.deleted_at = None
     db.commit()
     assert can_edit_bank(ctx_for(db, admin), w.C, w.B)
-    # Student view: the org admin power is switched off for that course's organization
-    c = ctx_for(db, w.T)
-    c.view_as_course = w.C.id
-    assert not can_edit_bank(c, w.C, w.B)
 
 
 def test_ort_course_bank_never_editable_by_org_admin(db):

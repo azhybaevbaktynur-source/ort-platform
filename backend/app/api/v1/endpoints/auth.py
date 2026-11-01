@@ -96,6 +96,7 @@ def _profile(user: User) -> UserProfile:
         is_platform_admin=bool(user.is_platform_admin),
         teacher_status=user.teacher_status or "none",
         locale=user.locale,
+        is_test_student=bool(user.is_test_student),
     )
 
 

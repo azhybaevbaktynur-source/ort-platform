@@ -8,8 +8,8 @@ import { seed, settle, signIn, tr, VIEWPORTS, type SeedUser } from "./helpers";
  *  2. phone drawer ("Course menu" button + sheet) for a student at 375 px
  *  3. auto-hide for students (Announcements and Files appear with published content; the "not available" page)
  *  4. redirects of the old URLs (section 4.2), query strings kept
- *  5. Student view: banner, student sidebar, a write is refused (403 `student_view_read_only`), "Start" in view mode
- *     starts a preview attempt, hand-ins are off
+ *  5. Student view: a real test-student session in this tab (banner, student sidebar, hand-ins and quizzes work and stay
+ *     out of the staff lists, staff routes 403 `test_student_forbidden`), reset, a dead token returns to the teacher
  *  6. "To grade" list -> assignment page on the Submissions tab with `filter=to_grade`
  *  7. "Not in modules" row and "Move to module"
  *  8. grouped "+ -> Quiz": inline title, the row links to the 7c editor, Back returns to the module (`from=...#m-{id}`)
@@ -264,7 +264,11 @@ test.describe("course navigation (ru)", () => {
   });
 
   // ---------------------------------------------------------------- 5. Student view
-  test("Student view: banner, student sidebar, writes refused, hand-ins off, leave", async ({ browser }) => {
+  /** The test student's token this tab holds (per-tab `sessionStorage`). */
+  const tabSession = (tp: Page) => tp.evaluate(() => JSON.parse(window.sessionStorage.getItem("studentView") || "null"));
+  const SV_NAME = () => t("studentView.testStudentName");
+
+  test("Student view: banner, student sidebar, a hand-in stays out of the staff lists, staff routes refused, leave", async ({ browser }) => {
     const cid = nav().course_id;
     const taskId = await createTextAssignment("Задание для обзора");
     const outlineBefore = await api(nav().teacher, "GET", `/courses/${cid}/modules`);
@@ -275,42 +279,46 @@ test.describe("course navigation (ru)", () => {
     const banner = tp.getByRole("status").filter({ hasText: t("studentView.banner") });
     await expect(banner).toBeVisible();
     await expect(banner.getByRole("button", { name: t("studentView.leave") })).toBeVisible();
+    await expect(banner.getByRole("button", { name: t("studentView.reset") })).toBeVisible();
     await expect(link(tp, LINKS.bank)).toHaveCount(0); // staff-only link (assistants have no Settings)
     await expect(tp.getByRole("button", { name: t("studentView.button") })).toHaveCount(0);
-    expect(await tp.evaluate((id) => window.sessionStorage.getItem(`studentView:${id}`), cid)).toBe("1");
-    // every course request carries the header (the app's own reads succeed as student shapes)
-    const sawHeader = tp.waitForRequest((r) => r.url().includes(`/api/v1/courses/${cid}/`) && r.headers()["x-view-as"] === "student");
+    const session = await tabSession(tp);
+    expect(session.courseId).toBe(cid);
+    const testStudent = { ...nav().students.assistant, token: session.token };
+    const me = await api(testStudent, "GET", "/auth/me");
+    expect(me.is_test_student).toBe(true);
+    // every request of this tab is the test student's
+    const sawToken = tp.waitForRequest((r) => r.url().includes(`/api/v1/courses/${cid}/`) && r.headers()["authorization"] === `Bearer ${session.token}`);
     await tp.goto(`${base()}/assignments`);
-    await sawHeader;
-    // hand-ins are off in the student view of an assignment
-    await tp.goto(`${base()}/assignments/${taskId}`);
-    await expect(tp.getByText(t("studentView.handInsOff"))).toBeVisible();
-    // a write with the header is refused and changes nothing
+    await sawToken;
+    // a real hand-in works, and staff do not see it
+    await api(testStudent, "POST", `/courses/${cid}/assignments/${taskId}/submissions`, { body_text: "Проверка." }, [200, 201]);
+    const rows = await api(nav().teacher, "GET", `/courses/${cid}/assignments/${taskId}/submissions`);
+    expect(rows.rows.some((r: { user_id: string }) => r.user_id === me.id)).toBe(false);
+    // staff routes are refused and change nothing
     const refused = await fetch(`${seed().api}/api/v1/courses/${cid}/modules`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${nav().students.assistant.token}`, "Content-Type": "application/json", "X-View-As": "student" },
+      headers: { Authorization: `Bearer ${session.token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ title: { ru: "Не должен появиться" } }),
     });
     expect(refused.status).toBe(403);
-    expect((await refused.json()).error.code).toBe("student_view_read_only");
+    expect((await refused.json()).error.code).toBe("test_student_forbidden");
     const outlineAfter = await api(nav().teacher, "GET", `/courses/${cid}/modules`);
     expect(outlineAfter.modules.length).toBe(outlineBefore.modules.length);
-    // reads with the header give student shapes; the same read without it is the staff outline
-    const asStudent = await fetch(`${seed().api}/api/v1/courses/${cid}/modules`, { headers: { Authorization: `Bearer ${nav().students.assistant.token}`, "X-View-As": "student" } });
-    expect(asStudent.status).toBe(200);
-    expect("rules_version" in (await asStudent.json())).toBe(false);
-    // leaving restores the staff frame
+    // the assistant's own token is untouched: still staff
+    expect((await api(nav().students.assistant, "GET", `/courses/${cid}`)).my_enrollment.role).toBe("assistant");
+    // leaving restores the staff frame, on the course page
     await banner.getByRole("button", { name: t("studentView.leave") }).click();
     await expect(tp.getByRole("status").filter({ hasText: t("studentView.banner") })).toHaveCount(0);
+    await tp.waitForURL(new RegExp(`/courses/${cid}$`));
     await expect(link(tp, LINKS.bank)).toBeVisible();
-    expect(await tp.evaluate((id) => window.sessionStorage.getItem(`studentView:${id}`), cid)).toBeNull();
+    expect(await tabSession(tp)).toBeNull();
     await tp.context().close();
   });
 
-  test("Student view as the owner teacher (org admin of their personal organization): banner, student shape, write refused", async ({ browser }) => {
+  test("Student view as the owner teacher: header name, student shape, reset, a dead token returns to the teacher", async ({ browser }) => {
     const cid = nav().course_id;
     const owner = nav().teacher;
-    const outlineBefore = await api(owner, "GET", `/courses/${cid}/modules`);
     const tp = await open(browser, owner);
     await tp.goto(base());
     await expect(link(tp, LINKS.settings)).toBeVisible(); // the owner's staff frame first
@@ -320,34 +328,37 @@ test.describe("course navigation (ru)", () => {
     await expect(link(tp, LINKS.settings)).toHaveCount(0);
     await expect(link(tp, LINKS.bank)).toHaveCount(0);
     await expect(tp.getByRole("button", { name: t("studentView.button") })).toHaveCount(0);
-    // the server answers the owner with the student shape only with the header
-    const headers = { Authorization: `Bearer ${owner.token}` };
-    const staff = await (await fetch(`${seed().api}/api/v1/courses/${cid}`, { headers })).json();
+    await expect(tp.getByText(SV_NAME()).first()).toBeAttached();
+    // the owner's token keeps the staff shape; the tab's token gets the student shape
+    const staff = await api(owner, "GET", `/courses/${cid}`);
     expect("join_code" in staff).toBe(true);
-    const viewed = await fetch(`${seed().api}/api/v1/courses/${cid}`, { headers: { ...headers, "X-View-As": "student" } });
-    expect(viewed.status).toBe(200);
-    const body = await viewed.json();
+    const first = await tabSession(tp);
+    const body = await api({ ...owner, token: first.token }, "GET", `/courses/${cid}`);
     expect("join_code" in body).toBe(false);
     expect(body.my_enrollment.role).toBe("student");
-    const people = await (await fetch(`${seed().api}/api/v1/courses/${cid}/people`, { headers: { ...headers, "X-View-As": "student" } })).json();
+    const people = await api({ ...owner, token: first.token }, "GET", `/courses/${cid}/people`);
     expect(people.items.every((p: { role: string; user?: unknown }) => p.role !== "student" && !("user" in p))).toBe(true);
-    // a write with the header is refused and changes nothing
-    const refused = await fetch(`${seed().api}/api/v1/courses/${cid}/modules`, {
-      method: "POST",
-      headers: { ...headers, "Content-Type": "application/json", "X-View-As": "student" },
-      body: JSON.stringify({ title: { ru: "Не должен появиться" } }),
+    // reset: confirm, a new token, the old one is dead
+    await banner.getByRole("button", { name: t("studentView.reset") }).click();
+    await tp.getByRole("alertdialog").getByRole("button", { name: t("studentView.reset") }).click();
+    await expect.poll(async () => (await tabSession(tp))?.token).not.toBe(first.token);
+    const dead = await fetch(`${seed().api}/api/v1/auth/me`, { headers: { Authorization: `Bearer ${first.token}` } });
+    expect(dead.status).toBe(401);
+    await expect(banner).toBeVisible();
+    // a dead token in the tab returns to the course as the teacher, who stays signed in
+    await tp.evaluate(() => {
+      const v = JSON.parse(window.sessionStorage.getItem("studentView") || "{}");
+      window.sessionStorage.setItem("studentView", JSON.stringify({ ...v, token: "dead.token.value" }));
     });
-    expect(refused.status).toBe(403);
-    expect((await refused.json()).error.code).toBe("student_view_read_only");
-    const outlineAfter = await api(owner, "GET", `/courses/${cid}/modules`);
-    expect(outlineAfter.modules.length).toBe(outlineBefore.modules.length);
-    await banner.getByRole("button", { name: t("studentView.leave") }).click();
-    await expect(tp.getByRole("status").filter({ hasText: t("studentView.banner") })).toHaveCount(0);
+    await tp.reload();
+    await tp.waitForURL(new RegExp(`/courses/${cid}$`));
     await expect(link(tp, LINKS.settings)).toBeVisible();
+    expect(await tabSession(tp)).toBeNull();
+    expect(await tp.evaluate(() => !!localStorage.getItem("ort_token"))).toBe(true);
     await tp.context().close();
   });
 
-  test("Student view: 'Start' on a quiz lobby starts a preview attempt", async ({ browser }) => {
+  test("Student view: 'Start' on a quiz lobby starts a real attempt, not on the staff list", async ({ browser }) => {
     const cid = nav().course_id;
     const tp = await open(browser, nav().students.assistant);
     await tp.goto(base());
@@ -357,9 +368,11 @@ test.describe("course navigation (ru)", () => {
     await tp.getByRole("button", { name: t("assessments.lobby.start") }).click();
     await tp.waitForURL(/\/attempts\/[0-9a-f-]{36}/);
     const attemptId = /\/attempts\/([0-9a-f-]{36})/.exec(tp.url())![1];
-    const att = await api(nav().students.assistant, "GET", `/attempts/${attemptId}`);
-    expect(att.is_preview).toBe(true);
-    expect(cid).toBeTruthy();
+    const session = await tabSession(tp);
+    const att = await api({ ...nav().students.assistant, token: session.token }, "GET", `/attempts/${attemptId}`);
+    expect(att.is_preview).toBe(false);
+    const list = await api(nav().teacher, "GET", `/courses/${cid}/assessments/${nav().view_quiz}/attempts`);
+    expect(list.items.some((x: { id: string }) => x.id === attemptId)).toBe(false);
     await tp.context().close();
   });
 

@@ -1,4 +1,4 @@
-import { getAuthHeader } from "@/lib/api";
+import { getAuthHeader, studentViewUnauthorized } from "@/lib/api";
 import { API_BASE_URL } from "@/lib/apiBase";
 import { LmsApiError, lmsFetch } from "./client";
 import type {
@@ -40,6 +40,7 @@ export async function getAttemptContent(state: Pick<AttemptState, "content_url">
     throw new LmsApiError(0, "network", "Network error");
   }
   if (!res.ok) {
+    studentViewUnauthorized(res.status); // UX rework S1
     let code = res.status === 404 ? "attempt_not_found" : res.status === 403 ? "forbidden" : "unknown";
     try {
       const j = await res.json();

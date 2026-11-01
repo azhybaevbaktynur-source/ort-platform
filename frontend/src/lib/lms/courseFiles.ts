@@ -1,5 +1,5 @@
 // Phase 8a S4b: course files API client (design 7.2, 5.3). Types in pagesTypes.ts.
-import { getAuthHeader } from "@/lib/api";
+import { getAuthHeader, studentViewUnauthorized } from "@/lib/api";
 import { API_BASE_URL } from "@/lib/apiBase";
 import { LmsApiError, lmsFetch } from "./client";
 import type { CourseFilesPageOut, CourseFileStaffOut, CourseFileUpdateIn, DownloadOut } from "./pagesTypes";
@@ -64,7 +64,10 @@ export async function downloadCourseFile(courseId: string, fileId: string, filen
   let res: Response;
   try { res = await fetch(target.toString(), { headers: { ...(await getAuthHeader()) }, cache: "no-store" }); }
   catch { throw new LmsApiError(0, "network", "Network error"); }
-  if (!res.ok) throw toError(res.status, await res.text());
+  if (!res.ok) {
+    studentViewUnauthorized(res.status); // UX rework S1
+    throw toError(res.status, await res.text());
+  }
   const objectUrl = URL.createObjectURL(await res.blob());
   const a = document.createElement("a");
   a.href = objectUrl;

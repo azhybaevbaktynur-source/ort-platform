@@ -105,7 +105,8 @@ def add_event(db: Session, enrollment: Enrollment, event: str, actor_id: Optiona
 def active_student_count(db: Session, course_id: uuid.UUID) -> int:
     return db.execute(
         select(func.count()).select_from(Enrollment).where(
-            Enrollment.course_id == course_id, Enrollment.role == "student", Enrollment.state == "active"
+            Enrollment.course_id == course_id, Enrollment.role == "student", Enrollment.state == "active",
+            Enrollment.is_test_student.is_(False),
         )
     ).scalar_one()
 
@@ -538,7 +539,8 @@ def admin_courses_query() -> Select:
     """Rows of (Course, owner User, active_student_count); the count is one correlated scalar subquery."""
     cnt = (
         select(func.count()).select_from(Enrollment)
-        .where(Enrollment.course_id == Course.id, Enrollment.role == "student", Enrollment.state == "active")
+        .where(Enrollment.course_id == Course.id, Enrollment.role == "student", Enrollment.state == "active",
+               Enrollment.is_test_student.is_(False))
         .correlate(Course).scalar_subquery()
     )
     return select(Course, User, cnt.label("active_student_count")).join(User, User.id == Course.owner_id)

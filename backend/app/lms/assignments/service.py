@@ -32,7 +32,7 @@ from app.lms.core import clock
 from app.lms.core.errors import Conflict, ValidationFailed
 from app.lms.courses import service as course_svc
 from app.lms.courses.models import Course
-from app.lms.enrollments.models import Enrollment
+from app.lms.enrollments.models import Enrollment, not_test_enrollment
 from app.lms.grading import repository as grading_repo
 from app.lms.grading.models import Submission
 from app.lms.grading.schemes import load_usable_version
@@ -307,7 +307,8 @@ def rubric_locked(db: Session, assignment_id: uuid.UUID) -> bool:
     return db.execute(
         select(SubmissionRubricScore.submission_id)
         .join(Submission, Submission.id == SubmissionRubricScore.submission_id)
-        .where(Submission.assignment_id == assignment_id, Submission.state == "graded").limit(1)
+        .where(Submission.assignment_id == assignment_id, Submission.state == "graded",
+               not_test_enrollment(Submission.enrollment_id)).limit(1)
     ).first() is not None
 
 
@@ -360,7 +361,8 @@ def counts(db: Session, ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, sch.Assignm
     rows = db.execute(
         select(Submission.assignment_id, one(submitted), one(pending), one(graded),
                one(Submission.released_at.is_not(None)))
-        .where(Submission.assignment_id.in_(list(ids))).group_by(Submission.assignment_id)
+        .where(Submission.assignment_id.in_(list(ids)), not_test_enrollment(Submission.enrollment_id))
+        .group_by(Submission.assignment_id)
     ).all()
     out = {i: sch.AssignmentCountsOut() for i in ids}
     for aid, s, p, g, r in rows:

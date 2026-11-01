@@ -7,7 +7,6 @@
 // module. The same list renders read-only for an org admin (no state) and in the teacher's progress drawer. From `xl`
 // a right column lists this course's to-do.
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { isStudentView } from "@/lib/api"; // Phase 8c S1
 import Link from "next/link";
 import { CheckCircle2, Lock, PartyPopper } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
@@ -298,9 +297,7 @@ export function StudentModulesView({ fallback }: { fallback?: React.ReactNode })
   useEffect(() => { void load(); }, [load]);
 
   // concluded courses refuse new facts (403): the list stays readable, links still open
-  // Phase 8c S1: so does the read-only Student view (no facts, no mark-done checkbox)
-  const readOnly = course.my_enrollment.role !== "student" || !!course.my_enrollment.read_only || course.status === "concluded"
-    || isStudentView(course.id);
+  const readOnly = course.my_enrollment.role !== "student" || !!course.my_enrollment.read_only || course.status === "concluded";
 
   const todo = useCourseTodo(course.id, !readOnly);
 

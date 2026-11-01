@@ -23,6 +23,7 @@ from app.lms.core import clock
 from app.lms.core.errors import Conflict, ValidationFailed
 from app.lms.courses.models import Course
 from app.lms.courses.service import assert_not_sandbox, require_course
+from app.lms.enrollments.models import not_test_enrollment
 from app.lms.exam_templates import ids, scopes
 from app.lms.exam_templates.models import ExamTemplate, ExamTemplateVersion
 from app.lms.exam_templates.spec import ExamTemplateSpec
@@ -145,7 +146,8 @@ def instantiate(db: Session, ctx: AuthzContext, course: Course, version: ExamTem
 
 def _attempt_count(db: Session, assessment_id: uuid.UUID) -> int:
     return db.execute(select(func.count()).select_from(Attempt).where(
-        Attempt.assessment_id == assessment_id, Attempt.is_preview.is_(False))).scalar() or 0
+        Attempt.assessment_id == assessment_id, Attempt.is_preview.is_(False),
+        not_test_enrollment(Attempt.enrollment_id))).scalar() or 0
 
 
 def _reapply_parameters(spec: ExamTemplateSpec, old_sections: list[AssessmentSection]) -> dict[int, str]:

@@ -13,6 +13,7 @@ import { EXAM_COLUMN_INNER, EXAM_COLUMN_OUTER } from "@/components/ui/shellWidth
 import { lmsErrorKey } from "./ErrorMessage";
 import { PendingInvitationsBanner } from "./PendingInvitationsBanner"; // Phase 6 S4b
 import { InvitationAcceptedNotice } from "./InvitationAcceptedNotice"; // Phase 6 S8
+import { StudentViewBanner } from "./course/StudentViewBanner"; // UX rework S1
 
 /*
  * Phase 6b S5b: the frame of every signed-in page (courses/*, admin/*, org/*, grading-schemes, teacher-access).
@@ -84,6 +85,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const [declaredArea, setDeclared] = useState<DeclaredArea | null>(null);
   const declared = declaredArea?.area ?? null;
   const [orgs, setOrgs] = useState<MyOrganizationOut[]>([]);
+  const testStudent = !!userProfile?.is_test_student; // UX rework S1: Student view
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -101,13 +103,13 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
 
   // Organizations the person administers (Organization area). Navigation only: fails silently.
   useEffect(() => {
-    if (!me) return;
+    if (!me || testStudent) return;
     let alive = true;
     listMyOrganizations()
       .then((rows) => { if (alive) setOrgs((Array.isArray(rows) ? rows : []).filter((o) => o.role === "org_admin")); })
       .catch(() => { if (alive) setOrgs([]); });
     return () => { alive = false; };
-  }, [me]);
+  }, [me, testStudent]);
 
   const switchLang = (l: Language) => {
     setLang(l);
@@ -118,6 +120,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     await signOut();
+    if (testStudent) return; // UX rework S1: this only ended Student view; the teacher stays signed in
     router.replace(`/${lang}/login`);
   };
 
@@ -128,7 +131,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   // Phase 6 S8 (UX S1): "I am a teacher" only for people who teach nowhere yet.
   const isTeacher = me ? me.is_teacher : teacherStatus === "approved";
   const hasTeaching = isTeacher || canCreate;
-  const canRequestTeacher = !isAdmin && !isTeacher;
+  const canRequestTeacher = !isAdmin && !isTeacher && !testStudent;
 
   const rest = pathname.replace(/^\/(en|ky|ru)(?=\/|$)/, "") || "/";
   // Same default as the /courses page: its Teaching tab opens first for teachers and course creators.
@@ -181,8 +184,8 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const name = me?.display_name || userProfile?.displayName || user.email || "";
-  const email = me?.email || user.email || "";
+  const name = testStudent ? t("studentView.testStudentName") : me?.display_name || userProfile?.displayName || user.email || "";
+  const email = testStudent ? name : me?.email || user.email || ""; // the header hides an email equal to the name
   const accountLinks = canRequestTeacher
     ? [{ href: `/${lang}/teacher-access`, label: t("teacherAccess.navLink"), icon: <UserPlus />, active: rest === "/teacher-access" }]
     : [];
@@ -191,7 +194,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const content = (
     <>
       {/* --- Phase 6 S4b / S8: invitation banner and notice stay under the header --- */}
-      <PendingInvitationsBanner enabled={!!me} />
+      <PendingInvitationsBanner enabled={!!me && !testStudent} />
       <InvitationAcceptedNotice />
       {meError ? (
         <ErrorState message={t(lmsErrorKey(meError.code))} onRetry={() => void meState.reload()} />
@@ -217,6 +220,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
             onLogout={() => void logout()}
             routeKey={pathname}
           />
+          <StudentViewBanner />
           <main id="main" tabIndex={-1} className={cn("py-6 focus:outline-none sm:py-8", SHELL_WIDTH)}>
             {/* UX rework (PUR-6): the attempt pages (result, review) keep their column; the player is its own overlay */}
             {/^\/courses\/[^/]+\/attempts(\/|$)/.test(rest)

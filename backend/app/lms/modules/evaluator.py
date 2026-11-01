@@ -510,22 +510,10 @@ def persist(db: Session, ev: Evaluation, mem: Memory, now: datetime) -> int:
 
 # =========================================================================== one call
 
-def evaluate(db: Session, course: Course, enrollment_id: uuid.UUID, now: datetime, *, persist_changes: bool = True,
-             structure: Optional[Structure] = None) -> tuple[Structure, Memory, Evaluation]:
-    """`evaluate_course` of the design: load (<= 7 queries), compute, optionally write the changed rows (no commit)."""
-    structure = structure or load_structure(db, course)
-    mem = load_memory(db, structure, enrollment_id)
-    ev = compute(structure, mem, now)
-    if persist_changes:
-        persist(db, ev, mem, now)
-    return structure, mem, ev
-
-
-# --- Phase 8c S1 begin --- (PHASE_8C_DESIGN 6.2: Student view = the state of a new student, never persisted)
-
 class _AsPublished:
-    """Read-only stand-in for a draft course in Student view: `compute` sees `status = "published"` (a draft course
-    stays previewable); every other attribute is the course's own."""
+    """Read-only stand-in for a draft course evaluated for its test student (UX rework S1): `compute` sees
+    `status = "published"`, so Student view works before the course is published; every other attribute is the
+    course's own."""
 
     status = "published"
 
@@ -536,27 +524,27 @@ class _AsPublished:
         return getattr(self._course, name)
 
 
-def evaluate_new_student(db: Session, course: Course, now: datetime, *, structure: Optional[Structure] = None
-                         ) -> tuple[Structure, Memory, Evaluation]:
-    """`evaluate(..., persist=False, enrollment=None)` of the design: the course as a student with no facts, no
-    submissions, no cached progress and no requirement status would see it now. Reads the structure only (3 queries,
-    no per-enrollment query) and writes nothing: no `module_progress`, `item_requirement_status` or fact row exists or
-    is created for anyone (8a invariant 5 holds for staff). A draft course is evaluated as published."""
+def _is_test_enrollment(db: Session, enrollment_id: uuid.UUID) -> bool:
+    from app.lms.enrollments.models import Enrollment
+
+    return bool(db.execute(select(Enrollment.is_test_student).where(Enrollment.id == enrollment_id)).scalar())
+
+
+def evaluate(db: Session, course: Course, enrollment_id: uuid.UUID, now: datetime, *, persist_changes: bool = True,
+             structure: Optional[Structure] = None) -> tuple[Structure, Memory, Evaluation]:
+    """`evaluate_course` of the design: load (<= 7 queries), compute, optionally write the changed rows (no commit)."""
     structure = structure or load_structure(db, course)
-    mem = Memory(enrollment_id=None)  # type: ignore[arg-type]  # nobody's memory
+    mem = load_memory(db, structure, enrollment_id)
     view = structure
-    if course.status == "draft":
+    if course.status == "draft" and _is_test_enrollment(db, enrollment_id):  # one statement, drafts only
         view = Structure(course=_AsPublished(course), modules=structure.modules,  # type: ignore[arg-type]
                          prereqs=structure.prereqs, items=structure.items,
                          deleted_modules=structure.deleted_modules)
     ev = compute(view, mem, now)
-    ev.persist_allowed = False
-    for me in ev.modules.values():
-        me.persistable = False
+    if persist_changes:
+        persist(db, ev, mem, now)
     return structure, mem, ev
-# --- Phase 8c S1 end ---
 
 
 __all__ = ["Structure", "ItemRow", "Memory", "Facts", "Evaluation", "ModuleEval", "ItemEval", "load_structure",
-           "load_memory", "compute", "persist", "evaluate", "requirement_met_now", "sequential_blocker", "utc",
-           "evaluate_new_student"]
+           "load_memory", "compute", "persist", "evaluate", "requirement_met_now", "sequential_blocker", "utc"]

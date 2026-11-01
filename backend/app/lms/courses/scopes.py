@@ -24,7 +24,8 @@ def _visible_predicate(user_id: str):
         Enrollment.state == "active",
         Course.deleted_at.is_(None),
         regular_courses(),  # Phase 8b S1
-        or_(Enrollment.role.in_(("teacher", "assistant")), Course.status != "draft"),
+        or_(Enrollment.role.in_(("teacher", "assistant")), Course.status != "draft",
+            Enrollment.is_test_student.is_(True)),  # UX rework S1: a test student works in its draft course
     )
 
 
@@ -140,6 +141,6 @@ def active_student_counts(course_ids) -> Select:
     return (
         select(Enrollment.course_id, func.count())
         .where(Enrollment.course_id.in_(list(course_ids)), Enrollment.role == "student",
-               Enrollment.state == "active")
+               Enrollment.state == "active", Enrollment.is_test_student.is_(False))
         .group_by(Enrollment.course_id)
     )

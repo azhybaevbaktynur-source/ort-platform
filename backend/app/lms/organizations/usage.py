@@ -37,7 +37,8 @@ def tree_usage(db: Session, org: Organization) -> dict:
         org_admins=roles.get("org_admin", 0), teachers=roles.get("teacher", 0),
         courses=db.execute(select(func.count()).select_from(courses.subquery())).scalar_one(),
         students=db.execute(select(func.count(distinct(Enrollment.user_id))).where(
-            Enrollment.course_id.in_(courses), Enrollment.role == "student", Enrollment.state == "active")
+            Enrollment.course_id.in_(courses), Enrollment.role == "student", Enrollment.state == "active",
+            Enrollment.is_test_student.is_(False))
         ).scalar_one(),
         banks=db.execute(select(func.count()).select_from(banks.subquery())).scalar_one(),
         questions=db.execute(select(func.count()).select_from(BankQuestion).where(
@@ -59,7 +60,7 @@ def tree_usage(db: Session, org: Organization) -> dict:
         select(Course.organization_id, func.count(distinct(Enrollment.user_id)))
         .join(Enrollment, Enrollment.course_id == Course.id)
         .where(Course.organization_id.in_(ids), Course.deleted_at.is_(None), regular_courses(),
-               Enrollment.role == "student", Enrollment.state == "active")
+               Enrollment.role == "student", Enrollment.state == "active", Enrollment.is_test_student.is_(False))
         .group_by(Course.organization_id)).all())
     out["by_department"] = [dict(id=o.id, name=o.name, courses=per_courses.get(o.id, 0),
                                  teachers=per_teachers.get(o.id, 0), students=per_students.get(o.id, 0))

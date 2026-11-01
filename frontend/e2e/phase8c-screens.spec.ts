@@ -196,9 +196,6 @@ test.describe("phase 8c screens", () => {
         await a.page.getByRole("button", { name: tl("studentView.button") }).click();
         await expect(a.page.getByRole("status").filter({ hasText: tl("studentView.banner") })).toBeVisible();
         await shoot(a.page, "student-view-banner", vp, lang);
-        await a.page.goto(`${base}/assignments/${ids.text}`);
-        await expect(a.page.getByText(tl("studentView.handInsOff"))).toBeVisible();
-        await shoot(a.page, "student-view-handins-off", vp, lang);
         await a.ctx.close();
         await ctx.close();
       });

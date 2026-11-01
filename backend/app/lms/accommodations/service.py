@@ -164,7 +164,7 @@ def _student_enrollment(db: Session, course: Course, enrollment_id) -> tuple[Enr
     row = db.execute(
         select(Enrollment, User).join(User, User.id == Enrollment.user_id)
         .where(Enrollment.id == enrollment_id, Enrollment.course_id == course.id, Enrollment.state == "active",
-               Enrollment.role == "student")
+               Enrollment.role == "student", Enrollment.is_test_student.is_(False))
     ).first()
     if row is None:
         raise NotFound("Enrollment not found", code="enrollment_not_found")
@@ -198,7 +198,8 @@ def list_accommodations(db: Session, ctx: AuthzContext, course: Course, *, curso
     stmt = (select(Enrollment, User, EnrollmentAccommodation)
             .join(User, User.id == Enrollment.user_id)
             .outerjoin(EnrollmentAccommodation, EnrollmentAccommodation.enrollment_id == Enrollment.id)
-            .where(Enrollment.course_id == course.id, Enrollment.state == "active", Enrollment.role == "student"))
+            .where(Enrollment.course_id == course.id, Enrollment.state == "active", Enrollment.role == "student",
+                   Enrollment.is_test_student.is_(False)))
     rows, nxt = paginate_rows(db, stmt, sort_col=Enrollment.created_at, id_col=Enrollment.id,
                               entity_of=lambda r: r[0], cursor=cursor, limit=min(limit or 25, LIST_MAX),
                               descending=False)

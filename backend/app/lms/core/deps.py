@@ -32,14 +32,20 @@ def _user_id_from_authorization(authorization: Optional[str]) -> Optional[str]:
     raise UnauthorizedException("Invalid or expired token")
 
 
-def get_lms_user(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)) -> User:
-    """P3-27: authenticate with the request's own session (one pool checkout per request)."""
+def get_lms_user(authorization: Optional[str] = Header(None), db: Session = Depends(get_db),
+                 request: Request = None) -> User:
+    """P3-27: authenticate with the request's own session (one pool checkout per request). A test student (Student
+    view) passes the deny-by-default route allow-list here, so no route can forget it; `request` is FastAPI's."""
     user_id = _user_id_from_authorization(authorization)
     user = db.get(User, user_id) if user_id else None
     if user is None:
         raise UnauthorizedException("User account not found")
     if user.disabled_at is not None:
         raise UnauthorizedException("Account disabled")
+    if user.is_test_student:
+        from app.lms.student_view.allowlist import enforce
+
+        enforce(request, user, db)
     return user
 
 

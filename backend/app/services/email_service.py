@@ -28,6 +28,15 @@ logger = logging.getLogger(__name__)
 HTTP_TIMEOUT_SECONDS = 10
 
 
+# UX rework S1: the domain of Student view test students (`.invalid` can never be delivered, RFC 2606; `EmailStr` on
+# every auth request refuses it, so nobody can register, sign in or reset with it).
+RESERVED_EMAIL_DOMAIN = "student-view.invalid"
+
+
+def is_reserved_address(address: Optional[str]) -> bool:
+    return (address or "").strip().lower().endswith("@" + RESERVED_EMAIL_DOMAIN)
+
+
 def active_provider() -> str:
     provider = (settings.EMAIL_PROVIDER or "").strip().lower()
     if provider:
@@ -127,6 +136,8 @@ def _send_smtp(to_email: str, subject: str, text: str, html: str, from_name: Opt
 def send_email(to_email: str, subject: str, text: str, html: str, *, from_name: Optional[str] = None,
                reply_to: Optional[str] = None) -> bool:
     """from_name / reply_to default to None: the configured sender name and no Reply-To (as before)."""
+    if is_reserved_address(to_email):  # UX rework S1: Student view test students never get mail; nothing to deliver
+        return True
     reply_to = _clean_reply_to(reply_to)
     provider = active_provider()
     if provider == "console":

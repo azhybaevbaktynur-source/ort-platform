@@ -240,14 +240,15 @@ test("an applicant withdraws; another is rejected with a note and sees it", asyn
 
 test("Student view: the application writes are refused", async () => {
   const cid = data().course_id;
-  const sv = { "X-View-As": "student" };
+  const session = await api(data().teacher, "POST", `/courses/${cid}/student-view`);
+  const testStudent = { ...data().teacher, token: session.access_token };
   const apps = await api(data().teacher, "GET", `/courses/${cid}/applications?status=rejected&limit=5`);
   const id = apps.items[0].id;
   for (const [p, body] of [[`/courses/${cid}/applications/${id}/approve`, {}], [`/courses/${cid}/enrollment-forms`, { fields: [] }]] as const) {
-    const out = await api(data().teacher, "POST", p, body, [403], sv);
-    expect(out.error.code, p).toBe("student_view_read_only");
+    const out = await api(testStudent, "POST", p, body, [403]);
+    expect(out.error.code, p).toBe("test_student_forbidden");
   }
-  await api(data().teacher, "GET", `/courses/${cid}/applications?limit=5`, undefined, [403, 404], sv);
+  await api(testStudent, "GET", `/courses/${cid}/applications?limit=5`, undefined, [403]);
 });
 
 test("teacher makes a new form version and switches to automatic approval; the next applicant is in at once", async ({ browser }) => {

@@ -17,6 +17,7 @@ from app.lms.attempts.models import Attempt, AttemptItem
 from app.lms.content import repository as content_repo
 from app.lms.courses.models import Course  # Phase 8b S1
 from app.lms.courses.service import _aware
+from app.lms.enrollments.models import not_test_enrollment
 from app.models.user import User
 
 FINAL_STATUSES = ("needs_review", "graded")
@@ -31,7 +32,7 @@ def after_close_open(db: Optional[Session], assessment: Assessment, now: datetim
         return True
     open_ = db.execute(select(Attempt.id).where(
         Attempt.assessment_id == assessment.id, Attempt.status == "in_progress",
-        Attempt.is_preview.is_(False)).limit(1)).first()
+        Attempt.is_preview.is_(False), not_test_enrollment(Attempt.enrollment_id)).limit(1)).first()
     return open_ is None
 
 

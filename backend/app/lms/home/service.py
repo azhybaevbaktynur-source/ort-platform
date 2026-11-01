@@ -58,9 +58,16 @@ def _utc(dt: Optional[datetime]) -> Optional[datetime]:
 
 
 def _mine(user_id: str):
-    """The caller's active student enrollments in live, non-draft courses (students cannot read drafts)."""
+    """The caller's active student enrollments in live, non-draft courses (students cannot read drafts; a test
+    student works in its draft course, UX rework S1)."""
     return and_(Enrollment.user_id == user_id, Enrollment.role == "student", Enrollment.state == "active",
-                Course.id == Enrollment.course_id, Course.deleted_at.is_(None), Course.status != "draft")
+                Course.id == Enrollment.course_id, Course.deleted_at.is_(None),
+                or_(Course.status != "draft", Enrollment.is_test_student.is_(True)))
+
+
+def _open_course():
+    """A published course, or the draft course of the caller's test student enrollment (UX rework S1)."""
+    return or_(Course.status == "published", and_(Course.status == "draft", Enrollment.is_test_student.is_(True)))
 
 
 def _used(user_id: str):
@@ -124,7 +131,7 @@ def _listable(user_id: str, now: datetime, used):
                    Assignment.deleted_at.is_(None), ~handed_in)
     until = _eff_until()
     return and_(
-        Course.status == "published", Organization.status == "active", Organization.deleted_at.is_(None),
+        _open_course(), Organization.status == "active", Organization.deleted_at.is_(None),
         or_(until.is_(None), until > now),
         or_(quiz, hand_in),
     )
@@ -327,7 +334,7 @@ def _modules_next(db: Session, uid: str) -> list[sch.HomeModuleNextOut]:
         .select_from(Enrollment).join(Course, Course.id == Enrollment.course_id)
         .join(ModuleProgress, ModuleProgress.enrollment_id == Enrollment.id)
         .join(CourseModule, CourseModule.id == ModuleProgress.module_id)
-        .where(_mine(uid), Course.status == "published", CourseModule.course_id == Course.id,
+        .where(_mine(uid), _open_course(), CourseModule.course_id == Course.id,
                CourseModule.deleted_at.is_(None), CourseModule.published.is_(True),
                ModuleProgress.state.in_(("unlocked", "started")))
         .order_by(Course.id, CourseModule.position, CourseModule.id).limit(MODULES_SCAN_MAX)
