@@ -226,6 +226,6 @@ def progress(db: Session, course: Course, user_id: str, enrollment_id: uuid.UUID
             topics.append(TopicStat(topic=top, section=sec, correct=corr, total=tot, accuracy=_acc(corr, tot)))
     out.by_section = [SectionStat(section=k, correct=v[0], total=int(v[1]), accuracy=_acc(v[0], int(v[1])))
                       for k, v in sorted(sections.items())]
-    out.by_topic = sorted(topics, key=lambda t: (t.accuracy, -t.total, t.topic))[:30]
+    out.by_topic = sorted(topics, key=lambda t: (t.accuracy, -t.total, t.topic, t.section or ""))[:30]
     out.open_mistakes = count_open(db, user_id, course.id, visible)
     return out

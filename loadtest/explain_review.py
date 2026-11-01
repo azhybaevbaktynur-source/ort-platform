@@ -70,9 +70,10 @@ def walk(node):
 
 def cases(db, st):
     """(name, callable) in report order; every callable takes the session."""
-    from sqlalchemy import select
+    from sqlalchemy import func, select
 
     from app.lms.analytics import org_service, service as analytics
+    from app.lms.attempts.models import Attempt
     from app.lms.courses.models import Course
     from app.lms.enrollments.models import Enrollment
     from app.lms.home import service as home
@@ -97,6 +98,9 @@ def cases(db, st):
 
     now = clock.now()
     heavy_eid, typical_eid = eid(heavy), eid(typical)
+    busiest = db.execute(select(Attempt.user_id).where(Attempt.course_id == ort.id).group_by(Attempt.user_id)
+                         .order_by(func.count().desc()).limit(1)).scalar()
+    busiest_eid = eid(busiest)
 
     def page2(db):
         first = progress.mistakes(db, ort, heavy, status="open", cursor=None, limit=25, now=now)
@@ -127,6 +131,9 @@ def cases(db, st):
                                                                        limit=25, now=now)),
         ("progress.progress_heavy", lambda d: progress.progress(d, ort, heavy, heavy_eid, now=now)),
         ("progress.progress_typical", lambda d: progress.progress(d, ort, typical, typical_eid, now=now)),
+        ("progress.mistakes_open_busiest", lambda d: progress.mistakes(d, ort, busiest, status="open", cursor=None,
+                                                                       limit=25, now=now)),
+        ("progress.progress_busiest", lambda d: progress.progress(d, ort, busiest, busiest_eid, now=now)),
         ("home.home_heavy", lambda d: home.home(d, db.get(User, heavy))),
         ("home.home_typical", lambda d: home.home(d, db.get(User, typical))),
         ("retention.dry_run", lambda d: retention.sweep(d, days=365, apply=False)),

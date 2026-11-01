@@ -1,0 +1,149 @@
+{
+ "label": "n1000",
+ "autosave_students": 1000,
+ "readers": 40,
+ "steady_s": 180,
+ "ramp_s": 40,
+ "procs": 4,
+ "server_env": {
+  "workers": "2",
+  "pool": "10+10",
+  "tokens": "20"
+ },
+ "counters": {
+  "started_ok": 1000,
+  "gen_cpu_s": 33.300000000000004
+ },
+ "endpoints": {
+  "analytics_modules": {
+   "n": 98,
+   "rps": 0.6,
+   "p50_ms": 20.76,
+   "p95_ms": 56.76,
+   "p99_ms": 231.15,
+   "max_ms": 231.15,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "analytics_overview": {
+   "n": 100,
+   "rps": 0.6,
+   "p50_ms": 57.51,
+   "p95_ms": 122.91,
+   "p99_ms": 250.85,
+   "max_ms": 250.85,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "analytics_quizzes": {
+   "n": 97,
+   "rps": 0.6,
+   "p50_ms": 15.75,
+   "p95_ms": 42.48,
+   "p99_ms": 169.78,
+   "max_ms": 169.78,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "autosave": {
+   "n": 8983,
+   "rps": 49.9,
+   "p50_ms": 10.25,
+   "p95_ms": 37.76,
+   "p99_ms": 139.29,
+   "max_ms": 575.25,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "home": {
+   "n": 416,
+   "rps": 2.3,
+   "p50_ms": 27.79,
+   "p95_ms": 102.23,
+   "p99_ms": 193.9,
+   "max_ms": 531.19,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "notebook": {
+   "n": 407,
+   "rps": 2.3,
+   "p50_ms": 20.04,
+   "p95_ms": 72.64,
+   "p99_ms": 169.39,
+   "max_ms": 266.28,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "org_courses": {
+   "n": 100,
+   "rps": 0.6,
+   "p50_ms": 71.82,
+   "p95_ms": 164.35,
+   "p99_ms": 212.93,
+   "max_ms": 212.93,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "org_overview": {
+   "n": 102,
+   "rps": 0.6,
+   "p50_ms": 184.9,
+   "p95_ms": 385.79,
+   "p99_ms": 460.69,
+   "max_ms": 713.47,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "org_quizzes": {
+   "n": 98,
+   "rps": 0.6,
+   "p50_ms": 16.02,
+   "p95_ms": 32.69,
+   "p99_ms": 98.87,
+   "max_ms": 98.87,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "progress": {
+   "n": 400,
+   "rps": 2.3,
+   "p50_ms": 17.03,
+   "p95_ms": 52.77,
+   "p99_ms": 177.09,
+   "max_ms": 279.64,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "statistics": {
+   "n": 105,
+   "rps": 0.6,
+   "p50_ms": 13.19,
+   "p95_ms": 129.79,
+   "p99_ms": 2742.37,
+   "max_ms": 3979.92,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "statistics_items": {
+   "n": 101,
+   "rps": 0.6,
+   "p50_ms": 14.91,
+   "p95_ms": 38.6,
+   "p99_ms": 127.52,
+   "max_ms": 127.6,
+   "err_pct": 0.0,
+   "codes": {}
+  }
+ },
+ "requests_steady": 11007,
+ "server_cpu_cores": 0.32,
+ "postgres_cpu_cores": 0.35,
+ "server_rss_mb_max": 157,
+ "machine_load1_max": 4.43,
+ "machine_load1_mean": 3.1,
+ "verify": {
+  "acks": 18801,
+  "lost": 0
+ }
+}

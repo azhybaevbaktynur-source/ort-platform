@@ -10,7 +10,7 @@ The predicate must stay `IS TRUE`: PostgreSQL does not prove `is_test_student IS
 
 Plain CREATE INDEX, not CONCURRENTLY: `app.db.migrate.run_migrations` runs every migration at startup in one transaction
 holding the advisory lock, and CONCURRENTLY cannot run inside a transaction. The build blocks writes to these two tables
-only; measured on the perf seed (21k enrollments, 200k grade events, busy machine): 0.5 s and 1.9 s.
+only; measured on the perf seed (21k enrollments, 200k grade events): 8 ms and 61 ms, 0.5 s and 1.9 s on a busy machine.
 """
 from typing import Sequence, Union
 
