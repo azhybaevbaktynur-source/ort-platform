@@ -152,6 +152,12 @@ async def test_forgot_and_resend_share_one_allowance(api, frozen):
     assert (await api.call(None, "POST", "/auth/resend-code", json={"email": email}, ip=IP)).status_code == 429
 
 
+def test_production_defaults_enforce_ip_rules_with_the_verified_chain():
+    """docs/runbooks/IP_CHAIN.md: client, Cloudflare, Render internal. Test runs pin their own values in conftest."""
+    fields = type(settings).model_fields
+    assert fields["RATE_LIMIT_PROXY_HOPS"].default == 3 and fields["RATE_LIMIT_IP_ENFORCE"].default is True
+
+
 def test_design_values():
     assert (ratelimit.LOGIN_EMAIL_IP_FAIL_10M.limit, ratelimit.LOGIN_EMAIL_IP_FAIL_10M.window_seconds) == (10, 600)
     assert (ratelimit.LOGIN_EMAIL_FAIL_10M.limit, ratelimit.LOGIN_EMAIL_FAIL_10M.window_seconds) == (100, 600)

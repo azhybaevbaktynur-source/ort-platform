@@ -48,9 +48,9 @@ class Settings(BaseSettings):
 
     # Number of trusted proxies appending to X-Forwarded-For; 0 = ignore the header. Not verified yet: the browser calls
     # Render directly, so 2 is probably wrong. docs/runbooks/IP_CHAIN.md finds the real value.
-    RATE_LIMIT_PROXY_HOPS: int = 2
+    RATE_LIMIT_PROXY_HOPS: int = 3
     # IP-keyed rate-limit rules count and log but never deny until the proxy chain is verified (IP_CHAIN.md; kill switch).
-    RATE_LIMIT_IP_ENFORCE: bool = False
+    RATE_LIMIT_IP_ENFORCE: bool = True
 
     # --- Phase 2: files and content library (docs/phases/PHASE_2_DESIGN.md) ---
     # Blob storage driver: "local" (tests/dev), "db" (asset_blobs table, production until R2), "r2".
