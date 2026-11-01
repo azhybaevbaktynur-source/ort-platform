@@ -5151,6 +5151,43 @@
   },
   "quizStats": {},
   "analytics": {
-    "nav": "Analytics"
+    "nav": "Analytics",
+    "title": "Analytics",
+    "tabs": {
+      "overview": "Overview",
+      "quizzes": "Quizzes"
+    },
+    "meanScore": "Mean score",
+    "scoredStudents": "{n} students with a score",
+    "graded": "Graded",
+    "pendingReview": "To grade",
+    "missing": "Missing",
+    "distribution": "Score distribution",
+    "noScores": "No graded scores yet",
+    "students": "Students",
+    "completedAll": "Finished all modules",
+    "ofModules": "of {n} modules",
+    "courses": "Courses",
+    "modules": "Modules",
+    "assignments": "Assignments",
+    "allDepartments": "All departments",
+    "col": {
+      "module": "Module",
+      "completed": "Completed",
+      "started": "Started",
+      "unlocked": "Open",
+      "locked": "Locked",
+      "notStarted": "Not started",
+      "assignment": "Assignment",
+      "due": "Due",
+      "submitted": "Handed in",
+      "late": "Late",
+      "mean": "Mean",
+      "quiz": "Quiz",
+      "attempts": "Attempts",
+      "course": "Course",
+      "department": "Department",
+      "submittedCount": "Submitted"
+    }
   }
 }

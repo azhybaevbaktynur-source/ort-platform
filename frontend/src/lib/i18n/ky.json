@@ -5151,6 +5151,43 @@
   },
   "quizStats": {},
   "analytics": {
-    "nav": "Аналитика"
+    "nav": "Аналитика",
+    "title": "Аналитика",
+    "tabs": {
+      "overview": "Жалпы көрүнүш",
+      "quizzes": "Тесттер"
+    },
+    "meanScore": "Орточо балл",
+    "scoredStudents": "Баасы бар студенттер: {n}",
+    "graded": "Бааланды",
+    "pendingReview": "Текшерүүнү күтөт",
+    "missing": "Тапшырылган жок",
+    "distribution": "Баллдардын бөлүштүрүлүшү",
+    "noScores": "Азырынча баа жок",
+    "students": "Студенттер",
+    "completedAll": "Бардык модулду бүтүрдү",
+    "ofModules": "{n} модулдан",
+    "courses": "Курстар",
+    "modules": "Модулдар",
+    "assignments": "Тапшырмалар",
+    "allDepartments": "Бардык бөлүмдөр",
+    "col": {
+      "module": "Модуль",
+      "completed": "Бүтүрдү",
+      "started": "Баштады",
+      "unlocked": "Ачык",
+      "locked": "Жабык",
+      "notStarted": "Баштаган жок",
+      "assignment": "Тапшырма",
+      "due": "Мөөнөтү",
+      "submitted": "Тапшырды",
+      "late": "Кечигип",
+      "mean": "Орточо",
+      "quiz": "Тест",
+      "attempts": "Аракеттер",
+      "course": "Курс",
+      "department": "Бөлүм",
+      "submittedCount": "Тапшырылды"
+    }
   }
 }

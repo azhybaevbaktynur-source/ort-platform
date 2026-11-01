@@ -5151,6 +5151,43 @@
   },
   "quizStats": {},
   "analytics": {
-    "nav": "Аналитика"
+    "nav": "Аналитика",
+    "title": "Аналитика",
+    "tabs": {
+      "overview": "Обзор",
+      "quizzes": "Тесты"
+    },
+    "meanScore": "Средний балл",
+    "scoredStudents": "Студентов с оценкой: {n}",
+    "graded": "Оценено",
+    "pendingReview": "Ждут проверки",
+    "missing": "Не сдано",
+    "distribution": "Распределение баллов",
+    "noScores": "Оценок пока нет",
+    "students": "Студенты",
+    "completedAll": "Прошли все модули",
+    "ofModules": "из {n} модулей",
+    "courses": "Курсы",
+    "modules": "Модули",
+    "assignments": "Задания",
+    "allDepartments": "Все отделы",
+    "col": {
+      "module": "Модуль",
+      "completed": "Завершили",
+      "started": "Начали",
+      "unlocked": "Открыт",
+      "locked": "Закрыт",
+      "notStarted": "Не начали",
+      "assignment": "Задание",
+      "due": "Срок",
+      "submitted": "Сдали",
+      "late": "С опозданием",
+      "mean": "Средний",
+      "quiz": "Тест",
+      "attempts": "Попытки",
+      "course": "Курс",
+      "department": "Отдел",
+      "submittedCount": "Сдано"
+    }
   }
 }
