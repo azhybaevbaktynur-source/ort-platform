@@ -88,3 +88,20 @@ async def test_teacher_sees_only_own_org_courses_students_unaffected(db, api):
         assert r.status_code == 200 and r.json()["my_enrollment"]["role"] == "student"
         assert "join_code" not in r.json()
     assert (await api.call(s, "GET", "/me/organizations")).json()["items"] == []
+
+
+async def test_org_analytics_isolation(db, api):
+    """Phase 10 S6: org admin A reads no analytics of org B."""
+    a, b = make_org(db, "A"), make_org(db, "B")
+    oa_a, oa_b, tb = make_user(db), make_user(db), make_user(db)
+    add_member(db, a, oa_a, "org_admin")
+    add_member(db, b, oa_b, "org_admin")
+    add_member(db, b, tb, "teacher")
+    cb = make_course(db, tb, organization_id=b.id, status="published")
+    for p in ("overview", "courses", "quizzes"):
+        assert (await api.call(oa_a, "GET", f"/org/{b.id}/analytics/{p}")).status_code == 404
+        assert (await api.call(oa_b, "GET", f"/org/{b.id}/analytics/{p}")).status_code == 200
+    assert (await api.call(oa_a, "GET", f"/courses/{cb.id}/analytics/overview")).status_code == 404
+    assert (await api.call(oa_a, "GET", f"/org/{a.id}/analytics/courses")).json()["items"] == []
+    seen = (await api.call(oa_b, "GET", f"/org/{b.id}/analytics/courses")).json()["items"]
+    assert [x["course_id"] for x in seen] == [str(cb.id)]
