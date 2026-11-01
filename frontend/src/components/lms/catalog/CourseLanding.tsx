@@ -81,11 +81,11 @@ export function CourseLanding({ courseId }: { courseId: string }) {
   const catalogHref = `/${lang}/courses/catalog`;
   const crumbs = (title?: string) => [{ label: t("catalog.title"), href: catalogHref }, ...(title ? [{ label: title }] : [])];
 
-  if (loading && !course) return <div className="mx-auto w-full max-w-3xl"><LoadingState rows={4} /></div>;
+  if (loading && !course) return <div className="w-full max-w-3xl"><LoadingState rows={4} /></div>;
   if (error || !course) {
     const notFound = (error as { status?: number } | null)?.status === 404;
     return (
-      <div className="mx-auto w-full max-w-3xl">
+      <div className="w-full max-w-3xl">
         <PageHeader title={t("catalog.title")} breadcrumbs={crumbs()} />
         <ErrorState title={notFound ? t("catalog.landing.notFoundTitle") : undefined}
           message={notFound ? t("catalog.landing.notFoundBody") : errorText(error)}
@@ -147,7 +147,7 @@ export function CourseLanding({ courseId }: { courseId: string }) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
+    <div className="w-full max-w-3xl space-y-6">
       <PageHeader title={title} breadcrumbs={crumbs(title)} badge={<CatalogModeBadge mode={course.enrollment_mode} />}
         description={course.organization_name || undefined} />
 

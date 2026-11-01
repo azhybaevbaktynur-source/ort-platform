@@ -341,13 +341,11 @@ test.describe("modules walk (ru)", () => {
     await expect(badge(sp, M3, "locked")).toBeVisible();
     await expect(badge(sp, M1, "completed")).toBeVisible();
 
-    // ---- student home: the quiz (the first open item with an unmet requirement) is listed once: "Next up" when it is
-    // there, else "continue in your courses" (8a UX M4: no row repeats the hero or a "Next up" row)
+    // ---- student dashboard (UX rework C): the quiz with attempts left is listed once under "To do"; no greeting, no "up next"
     await sp.goto(`/${L}/courses`);
-    await expect(sp.locator('section[aria-labelledby="home-next"]')).toBeVisible();
-    const inNext = await sp.locator('section[aria-labelledby="home-next"]').getByText(QUIZ).count();
-    const inModulesNext = await sp.locator('section[aria-labelledby="home-modules-next"]').getByText(QUIZ).count();
-    expect(inNext + inModulesNext).toBe(1);
+    await expect(sp.getByRole("heading", { level: 1, name: t("home.dashboard") })).toBeVisible();
+    await expect(sp.locator('section[aria-labelledby="home-todo"]').getByText(QUIZ)).toHaveCount(1);
+    await expect(sp.locator(`section[aria-labelledby="home-courses"] a[href="${base}"]`)).toBeVisible();
 
     // ---- announcement: draft (students do not see it), then posted -> course list and the student home
     await tp.goto(`${base}/announcements`);
@@ -453,7 +451,9 @@ test.describe("modules walk (ru)", () => {
       // after: the student sees Modules and Files; the ORT module lists the exam as locked, yet the exam starts
       await sp.goto(base);
       await expect(tabs(sp).getByRole("link", { name: t("courseFiles.title"), exact: true })).toBeVisible();
-      await expect(sp.getByRole("link", { name: "ОРТ E2E", exact: true }).first()).toBeVisible(); // home unchanged
+      // UX rework B: published modules are the home, ORT included; the exam row opens the same lobby
+      await expect(badge(sp, "Пробный ОРТ", "locked")).toBeVisible();
+      await expect(moduleCard(sp, "Пробный ОРТ").getByRole("link")).toHaveAttribute("href", `${base}/assessments/${s.exam.id}`);
       await review(sp, "ort-student-course-home-with-structure");
       await sp.goto(`${base}/modules`);
       await expect(badge(sp, "Пробный ОРТ", "locked")).toBeVisible();
@@ -559,7 +559,7 @@ test.describe("modules walk (ru)", () => {
         await expect(sp.getByRole("heading", { name: ANN_TITLE })).toBeVisible();
         await shoot(sp, "student-announcements", vp, lang);
         await sp.goto(`/${lang}/courses`);
-        await expect(sp.locator('section[aria-labelledby="home-next"]')).toBeVisible();
+        await expect(sp.locator('section[aria-labelledby="home-todo"]')).toBeVisible();
         await shoot(sp, "student-home-strip", vp, lang);
         // the quiz lobby inside a module that is locked (M3 is after M2; M2's quiz is open, so lock M2 by date briefly)
         await api(md.teacher, "PATCH", `/courses/${cid}/modules/${byRu(M2).id}`, { unlock_at: new Date(Date.UTC(2026, 11, 1, 9, 0)).toISOString() });

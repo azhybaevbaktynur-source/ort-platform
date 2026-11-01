@@ -43,17 +43,18 @@ export default function CourseHomePage() {
   }
   // --- Phase 8c S2 end ---
   // --- Phase 6 S6b begin --- (student view: next assessment, latest result, about; UX S5)
-  // --- Phase 8a S4a: course home switch (PHASE_8A_DESIGN 8.1). `modules` falls back to today's home while no module is
-  // published (`features.modules`, and an empty list); `page` shows the chosen page; `assignments` (and an older backend
-  // without `home_kind`, and every ORT course) is today's home unchanged. ---
+  // --- UX rework B (PUR-4): `page` shows the chosen page, then the modules below it; otherwise published modules are
+  // the home whatever `home_kind` says, ORT included (its exam rows open the same lobby); without them, today's home.
   if (course.my_enrollment.role === "student") {
-    const kind = course.home_kind ?? "assignments";
-    if (kind === "modules" && course.features?.modules) {
-      return <StudentModulesView fallback={<StudentCourseHome />} />;
+    if (course.home_kind === "page" && course.home_page_id) {
+      return (
+        <div className="space-y-6">
+          <PageView pageId={course.home_page_id} embedded />
+          {course.features?.modules && <StudentModulesView fallback={null} />}
+        </div>
+      );
     }
-    if (kind === "page" && course.home_page_id) {
-      return <div className="mx-auto w-full max-w-3xl"><PageView pageId={course.home_page_id} embedded /></div>;
-    }
+    if (course.features?.modules) return <StudentModulesView fallback={<StudentCourseHome />} />;
     return <StudentCourseHome />;
   }
   // --- Phase 8a S4a end ---

@@ -43,10 +43,10 @@ export function ApplyPage({ courseId }: { courseId: string }) {
   const landingHref = `/${lang}/courses/catalog/${courseId}`;
   const catalogHref = `/${lang}/courses/catalog`;
 
-  if (loading && !course) return <div className="mx-auto w-full max-w-2xl"><LoadingState rows={5} /></div>;
+  if (loading && !course) return <div className="w-full max-w-3xl"><LoadingState rows={5} /></div>;
   if (loadError || !course) {
     return (
-      <div className="mx-auto w-full max-w-2xl">
+      <div className="w-full max-w-3xl">
         <PageHeader title={t("applications.apply.title")} breadcrumbs={[{ label: t("catalog.title"), href: catalogHref }]} />
         <ErrorState message={errorText(loadError)} onRetry={() => void load()} retrying={loading}
           action={<LinkButton variant="secondary" href={catalogHref}>{t("catalog.landing.backToCatalog")}</LinkButton>} />
@@ -62,7 +62,7 @@ export function ApplyPage({ courseId }: { courseId: string }) {
   if (result) {
     const approved = result.status === "approved";
     return (
-      <div className="mx-auto w-full max-w-2xl">
+      <div className="w-full max-w-3xl">
         <PageHeader title={title} breadcrumbs={crumbs} />
         <section role="status" className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
           {approved
@@ -91,7 +91,7 @@ export function ApplyPage({ courseId }: { courseId: string }) {
       : !isFormMode(course.enrollment_mode) || !form ? "notOpen" : null;
   if (blocked || !form) {
     return (
-      <div className="mx-auto w-full max-w-2xl">
+      <div className="w-full max-w-3xl">
         <PageHeader title={title} breadcrumbs={crumbs} />
         <ErrorState title={t(`applications.apply.blocked.${blocked ?? "notOpen"}Title`)} message={t(`applications.apply.blocked.${blocked ?? "notOpen"}Body`)}
           action={blocked === "member"
@@ -134,7 +134,7 @@ export function ApplyPage({ courseId }: { courseId: string }) {
   const formTitle = pickLocalized(form.title, lang, course.default_language);
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
+    <div className="w-full max-w-3xl">
       <PageHeader title={formTitle || t("applications.apply.title")} description={title} breadcrumbs={crumbs} />
       <form onSubmit={submit} noValidate className="space-y-6">
         <div className="flex items-start gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-4 text-base leading-6 text-brand-900 sm:text-sm">

@@ -223,7 +223,7 @@ export function StudentAssignmentView({ assignmentId }: { assignmentId: string }
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-5">
+    <div className="w-full max-w-3xl space-y-5">
       <Link href={`${base}/assignments`} className="inline-flex min-h-11 items-center text-sm font-medium text-brand-700 hover:underline sm:min-h-0">{t("assignments.backToList")}</Link>
       <PageHeader title={title} className="mb-0" badge={a.status ? <AssignmentStatusBadge status={status} /> : undefined}>
         <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm leading-6 text-slate-600">

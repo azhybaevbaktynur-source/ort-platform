@@ -628,7 +628,8 @@ def _gating_exempt(course: Course, r: ev_mod.ItemRow) -> bool:
     return tpl.is_locked(course, LOCK_GATING, preset=r.preset)
 
 
-def _item_student_out(course: Course, ie: ev_mod.ItemEval, *, evaluated: bool) -> sch.ItemStudentOut:
+def _item_student_out(course: Course, ie: ev_mod.ItemEval, *, evaluated: bool,
+                      due_overrides: Optional[dict] = None) -> sch.ItemStudentOut:
     lang = course.default_language
     r = ie.row
     req = None
@@ -645,12 +646,13 @@ def _item_student_out(course: Course, ie: ev_mod.ItemEval, *, evaluated: bool) -
         link = sch.ItemLinkOut(assignment_kind=r.assignment_kind) if r.kind == "assignment" else None
         if r.kind == "url" and not r.item.title_override:
             title = {}  # the fallback title of a url item is the url itself (the UI shows "Untitled item")
+    due = None if locked else (due_overrides or {}).get(r.item.assignment_id) or r.due_at
     return sch.ItemStudentOut(id=r.id, kind=r.kind, title=title, indent=r.item.indent,
-                              locked=locked, requirement=req, link=link)
+                              locked=locked, requirement=req, link=link, due_at=_utc(due))
 
 
-def module_student_out(st: ev_mod.Structure, me: ev_mod.ModuleEval, *, evaluated: bool = True
-                       ) -> sch.ModuleStudentOut:
+def module_student_out(st: ev_mod.Structure, me: ev_mod.ModuleEval, *, evaluated: bool = True,
+                       due_overrides: Optional[dict] = None) -> sch.ModuleStudentOut:
     from app.lms.modules.gate import lock_details
 
     m = me.module
@@ -661,7 +663,7 @@ def module_student_out(st: ev_mod.Structure, me: ev_mod.ModuleEval, *, evaluated
         id=m.id, title=m.title or {}, state=me.state if evaluated else None, unlock_at=_utc(m.unlock_at),
         sequential=bool(m.sequential), completion_mode=m.completion_mode,
         current_position=me.current_position if evaluated else None, lock_reasons=reasons,
-        items=[_item_student_out(st.course, ie, evaluated=evaluated) for ie in me.items])
+        items=[_item_student_out(st.course, ie, evaluated=evaluated, due_overrides=due_overrides) for ie in me.items])
 
 
 def _up_next(st: ev_mod.Structure, ev: ev_mod.Evaluation) -> Optional[sch.ItemRefOut]:
@@ -676,8 +678,22 @@ def _up_next(st: ev_mod.Structure, ev: ev_mod.Evaluation) -> Optional[sch.ItemRe
     return None
 
 
-def student_outline(st: ev_mod.Structure, ev: ev_mod.Evaluation) -> sch.ModulesStudentOut:
-    return sch.ModulesStudentOut(modules=[module_student_out(st, me) for me in ev.modules.values() if me.visible],
+def _due_overrides(db: Session, st: ev_mod.Structure, enrollment_id: uuid.UUID) -> dict:
+    """UX rework: the student's own due dates (assignment id -> date) for the outline's assignment rows; one statement."""
+    assignment_ids = {r.item.assignment_id for rows in st.items.values() for r in rows if r.item.assignment_id}
+    if not assignment_ids:
+        return {}
+    from app.lms.assignments.models import AssignmentOverride as O
+
+    return dict(db.execute(select(O.assignment_id, O.due_at).where(
+        O.enrollment_id == enrollment_id, O.assignment_id.in_(assignment_ids), O.due_at.isnot(None))).all())
+
+
+def student_outline(st: ev_mod.Structure, ev: ev_mod.Evaluation, *, db: Optional[Session] = None,
+                    enrollment_id: Optional[uuid.UUID] = None) -> sch.ModulesStudentOut:
+    overrides = _due_overrides(db, st, enrollment_id) if db is not None and enrollment_id is not None else None
+    return sch.ModulesStudentOut(modules=[module_student_out(st, me, due_overrides=overrides)
+                                          for me in ev.modules.values() if me.visible],
                                  up_next=_up_next(st, ev))
 
 
@@ -706,7 +722,7 @@ def outline_for(db: Session, ctx: AuthzContext, course: Course, *, include_delet
         enr = course_svc.get_enrollment(db, course.id, ctx.user.id)
         st, _mem, ev = ev_mod.evaluate(db, course, enr.id, clock.now())
         db.commit()
-        return student_outline(st, ev)
+        return student_outline(st, ev, db=db, enrollment_id=enr.id)
     return observer_outline(ev_mod.load_structure(db, course))
 
 
@@ -722,7 +738,7 @@ def student_progress(db: Session, ctx: AuthzContext, course: Course, enrollment_
         raise NotFound("Enrollment not found", code="enrollment_not_found")
     st, _mem, ev = ev_mod.evaluate(db, course, enr.id, clock.now(), persist_changes=enr.state == "active")
     db.commit()
-    return student_outline(st, ev)
+    return student_outline(st, ev, db=db, enrollment_id=enr.id)
 
 
 # --- Phase 8c S1 begin --- (PHASE_8C_DESIGN 3.4, 7: the "Unsorted" group and module duplicate)

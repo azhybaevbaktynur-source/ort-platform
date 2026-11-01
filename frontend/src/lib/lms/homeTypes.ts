@@ -57,6 +57,20 @@ export interface HomeCourseOut {
   in_progress: boolean;
 }
 
+/** UX rework: one "To do" row of the dashboard. `attempt_id`: an attempt in progress. Dates are the caller's own. */
+export interface HomeTodoOut {
+  kind: "none" | "text" | "file" | "quiz";
+  assignment_id: string | null;
+  assessment_id: string | null;
+  attempt_id: string | null;
+  course_id: string;
+  course_title: LocalizedText;
+  title: LocalizedText;
+  due_at: string | null;
+  available_until: string | null;
+  overdue: boolean;
+}
+
 export interface HomeOut {
   in_progress: HomeInProgressOut[];
   next_up: HomeNextUpOut[];
@@ -72,6 +86,8 @@ export interface HomeOut {
   announcements?: HomeAnnouncementOut[];
   /** Phase 9 S4: the newest three pending applications (absent before Phase 9; never answers) */
   pending_applications?: HomePendingApplicationOut[];
+  /** UX rework: at most 20 rows, in-progress attempts first, then soonest due (absent on an older backend) */
+  todo?: HomeTodoOut[];
 }
 
 /** Phase 9 S4: one "Pending applications" row on the student home. */

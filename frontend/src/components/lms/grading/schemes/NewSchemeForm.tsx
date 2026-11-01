@@ -71,7 +71,7 @@ export function NewSchemeForm({ fromId, fromVersionId }: { fromId: string | null
   if (meLoading || loadingFrom) return <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p>;
   if (me && !me.can_create_courses) {
     return (
-      <div className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-6">
+      <div className="max-w-xl rounded-2xl border border-slate-200 bg-white p-6">
         <p className="text-sm text-slate-700">{t("schemes.editor.teacherOnly")}</p>
         <Link href={`/${lang}/grading-schemes`} className="mt-3 inline-block text-sm font-semibold text-brand-700 underline">{t("schemes.editor.back")}</Link>
       </div>

@@ -1,5 +1,6 @@
 // Design system (Phase 6b S5a). Pages import from "@/components/ui" instead of re-styling raw elements.
 export { cn, focusRing } from "./utils";
+export { SHELL_WIDTH } from "./shellWidth";
 export { Spinner } from "./Spinner";
 export { Button, LinkButton, buttonClasses } from "./Button";
 export type { ButtonProps, LinkButtonProps, ButtonVariant, ButtonSize, ButtonStyleOptions } from "./Button";

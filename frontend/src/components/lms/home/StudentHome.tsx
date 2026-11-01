@@ -1,140 +1,47 @@
 "use client";
 
-// Phase 6b S6b: the student home (PHASE_6_DESIGN 8.4; UX S3, S5, S13, S16). One call (`GET /me/home`), sections in
-// order: greeting + one primary button, Continue, Next up, Latest results, My courses. Phone: one column with the
-// shell's 16 px gutters; desktop: a 720 px column.
+// UX rework (UX_REWORK_DESIGN C): the student dashboard, one call (`GET /me/home`). Title with two secondary actions,
+// banners when needed, course cards on the left, "To do", recent grades and announcements on the right. Phone: to-do
+// first when there is any, then the cards. A teacher's Learning tab is the same screen.
 import React, { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { BookOpen, KeyRound, LayoutGrid, Trophy } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
-import { useAuth } from "@/lib/auth-context";
-import { useLmsMe } from "@/lib/lms/useLmsMe";
 import { getHome } from "@/lib/lms/home";
-import type { HomeCourseOut, HomeNextUpOut, HomeOut } from "@/lib/lms/homeTypes";
-import { KindIcon } from "@/components/lms/assignments/assignmentUi"; // Phase 7a S5
+import type { HomeOut } from "@/lib/lms/homeTypes";
 import { listMyCourses } from "@/lib/lms/courses";
 import type { CourseCard } from "@/lib/lms/types";
 import { pickLocalized } from "@/lib/lms/localized";
-import { Badge, Button, EmptyState, ErrorState, LinkButton, Pagination, Skeleton, cn, focusRing } from "@/components/ui";
+import { Badge, Button, EmptyState, ErrorState, LinkButton, Pagination, Skeleton, cn } from "@/components/ui";
 import { useGradeText } from "@/components/lms/results/GradeBadge";
-import { HomeRow, HomeSection } from "./HomeRow";
-import { DueText } from "./StudentAssessmentCard";
-import { fmtShortDateTime } from "./format";
-import { useErrorText } from "./useErrorText";
 import { PendingApplicationsLine } from "@/components/lms/catalog/ApplicationStatus"; // Phase 9 S4
+import { DashboardCourseCard } from "./DashboardCourseCard";
+import { fmtDayMonthTime } from "./format";
+import { SideRow, SideSection, TodoRows } from "./TodoList";
+import { useErrorText } from "./useErrorText";
 
-// --- Phase 7a S5: next-up rows are assignments: a quiz opens its lobby, text / file the submit page ---
-function nextUpHref(coursesBase: string, r: HomeNextUpOut): string {
-  if ((!r.kind || r.kind === "quiz") && r.assessment_id) return `${coursesBase}/${r.course_id}/assessments/${r.assessment_id}`;
-  if (r.assignment_id) return `${coursesBase}/${r.course_id}/assignments/${r.assignment_id}`;
-  return `${coursesBase}/${r.course_id}`;
-}
-// --- Phase 7a S5 end ---
-
-const linkCls = cn("inline-flex min-h-11 items-center gap-1.5 rounded text-sm font-semibold text-brand-700 hover:underline sm:min-h-0", focusRing);
+const CARD_GRID = "grid gap-4 sm:grid-cols-2 xl:grid-cols-3 min-[1700px]:grid-cols-4";
 
 /** Small celebration: gold is for achievements only (UX §5). */
-export function PersonalBestBadge() {
+function PersonalBestBadge() {
   const { t } = useTranslation();
   return (
     <Badge icon={<Trophy aria-hidden="true" />} className="border-gold-300 bg-gold-100 text-gold-900">{t("home.personalBest")}</Badge>
   );
 }
 
-function Greeting({ data, name, headingLevel, pending }: { data: HomeOut | null; name: string; headingLevel: 1 | 2; pending: boolean }) {
-  const { lang, t } = useTranslation();
-  const H = headingLevel === 1 ? "h1" : "h2";
-  const title = name ? t("home.greeting", { name }) : t("home.greetingNoName");
-  let line: React.ReactNode = null;
-  let primary: React.ReactNode = null;
-  if (data) {
-    const running = data.in_progress[0];
-    const next = data.next_up[0];
-    if (running) {
-      const runTitle = pickLocalized(running.assessment_title, lang) || t("assessments.untitled");
-      // S11a, F2: a single unfinished attempt lives in the hero only (with its start date); no Continue section.
-      line = data.in_progress.length === 1
-        ? t("home.lead.continueStarted", { title: runTitle, date: fmtShortDateTime(running.started_at, lang) })
-        : t("home.lead.continue", { title: runTitle });
-      primary = <LinkButton size="lg" href={`/${lang}/courses/${running.course_id}/attempts/${running.attempt_id}`}>{t("home.primary.continue")}</LinkButton>;
-    } else if (next) {
-      line = t("home.lead.next", { title: pickLocalized(next.title, lang) || t("assessments.untitled") });
-      primary = <LinkButton size="lg" href={nextUpHref(`/${lang}/courses`, next)}>{t("home.primary.start")}</LinkButton>; // Phase 7a S5
-    } else if (data.courses_total > 0) {
-      line = t("home.lead.caughtUp");
-      primary = <LinkButton size="lg" href={`/${lang}/courses/join`} leftIcon={<KeyRound aria-hidden="true" className="h-5 w-5" />}>{t("home.primary.join")}</LinkButton>;
-    }
-    // A new student: the My courses empty state below is the hero and carries the one primary button.
-  }
-  return (
-    <header className="space-y-3">
-      <H className="break-words text-2xl font-bold leading-8 text-slate-900">{title}</H>
-      {data ? (
-        <>
-          {line && <p className="text-base leading-6 text-slate-700">{line}</p>}
-          {primary && <div className="[&>*]:w-full sm:[&>*]:w-auto">{primary}</div>}
-        </>
-      ) : pending && (
-        <div aria-hidden="true" className="space-y-3">
-          <Skeleton className="h-5 w-3/4" />
-          <Skeleton className="h-12 w-full rounded-xl sm:w-56" />
-        </div>
-      )}
-    </header>
-  );
-}
-
-function SectionSkeleton({ rows = 2 }: { rows?: number }) {
-  return (
-    <div aria-hidden="true">
-      <Skeleton className="mb-3 h-6 w-40" />
-      <div className="space-y-1 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-        {Array.from({ length: rows }, (_, i) => (
-          <div key={i} className="flex min-h-11 items-center gap-3 px-1 py-2">
-            <div className="flex-1 space-y-2"><Skeleton className="h-5 w-2/3" /><Skeleton className="h-4 w-1/2" /></div>
-            <Skeleton className="h-5 w-16" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-export function HomeSkeleton() {
-  const { t } = useTranslation();
-  return (
-    <div role="status" aria-live="polite" className="space-y-6">
-      <span className="sr-only">{t("ui.loading")}</span>
-      <SectionSkeleton rows={2} />
-      <SectionSkeleton rows={2} />
-      <SectionSkeleton rows={3} />
-    </div>
-  );
-}
-
-function CourseMeta({ c }: { c: HomeCourseOut }) {
-  const { lang, t } = useTranslation();
-  return (
-    <>
-      <span>{c.is_platform_course ? t("home.platformCourse") : t("courses.list.owner", { name: c.owner_display_name })}</span>
-      {c.next_due_at ? <DueText value={c.next_due_at} lang={lang} /> : <span>{t("home.noDue")}</span>}
-    </>
-  );
-}
-
-function AllCourses() {
+function CourseCards({ data }: { data: HomeOut }) {
   const { lang, t } = useTranslation();
   const errorText = useErrorText();
-  const [items, setItems] = useState<CourseCard[]>([]);
+  const [more, setMore] = useState<CourseCard[] | null>(null); // every course, once the student asked for them
   const [cursor, setCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const load = useCallback(async (next?: string | null) => {
     setLoading(true);
     setError(null);
     try {
       const page = await listMyCourses("learning", next);
-      setItems((p) => (next ? [...p, ...page.items] : page.items));
+      setMore((p) => (next && p ? [...p, ...page.items] : page.items));
       setCursor(page.next_cursor);
     } catch (e) {
       setError(e);
@@ -142,188 +49,150 @@ function AllCourses() {
       setLoading(false);
     }
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  const known = new Map(data.courses.map((c) => [c.id, c]));
+  const teacherOf = (id: string, name: string | null) => (known.get(id)?.is_platform_course ? t("home.platformCourse") : name);
   return (
     <>
-      {error ? <ErrorState variant="inline" message={errorText(error)} onRetry={() => void load(cursor)} className="m-2" /> : null}
-      <ul className="divide-y divide-slate-100">
-        {items.map((c) => (
-          <HomeRow key={c.id} href={`/${lang}/courses/${c.id}`} title={pickLocalized(c.title, lang, c.default_language) || t("courses.list.untitled")}
-            meta={c.owner_display_name ? <span>{t("courses.list.owner", { name: c.owner_display_name })}</span> : null} />
-        ))}
+      <ul className={CARD_GRID}>
+        {more
+          ? more.map((c) => (
+            <DashboardCourseCard key={c.id} id={c.id} title={pickLocalized(c.title, lang, c.default_language) || t("courses.list.untitled")}
+              teacher={teacherOf(c.id, c.owner_display_name)} nextDue={known.get(c.id)?.next_due_at} />
+          ))
+          : data.courses.map((c) => (
+            <DashboardCourseCard key={c.id} id={c.id} title={pickLocalized(c.title, lang) || t("courses.list.untitled")}
+              teacher={teacherOf(c.id, c.owner_display_name)} nextDue={c.next_due_at} />
+          ))}
       </ul>
-      {loading && items.length === 0 && <div className="p-3"><Skeleton className="h-5 w-2/3" /></div>}
-      <Pagination nextCursor={cursor} loading={loading} onLoadMore={() => void load(cursor)} className="pb-2" />
+      {error ? <ErrorState variant="inline" message={errorText(error)} onRetry={() => void load(cursor)} className="mt-3" /> : null}
+      {more
+        ? <Pagination nextCursor={cursor} loading={loading} onLoadMore={() => void load(cursor)} className="mt-2" />
+        : data.courses_total > data.courses.length && (
+          <div className="mt-3">
+            <Button variant="link" loading={loading} onClick={() => void load()}>{t("home.courses.showAll", { n: data.courses_total })}</Button>
+          </div>
+        )}
     </>
   );
 }
 
-function Sections({ data }: { data: HomeOut }) {
+function Dashboard({ data }: { data: HomeOut }) {
   const { lang, t } = useTranslation();
   const gradeText = useGradeText();
-  const [showAll, setShowAll] = useState(false);
   const base = `/${lang}/courses`;
   const untitled = t("assessments.untitled");
-  // Phase 8a UX (M4): a module step that is already the hero or a "Next up" row is not listed a second time.
-  const shownAssignments = new Set(data.next_up.map((r) => r.assignment_id).filter(Boolean));
-  const shownAssessments = new Set([
-    ...data.next_up.map((r) => r.assessment_id), ...data.in_progress.map((r) => r.assessment_id),
-  ].filter(Boolean));
-  const modulesNext = (data.modules_next ?? []).filter((r) => !(
-    (r.link?.assignment_id && shownAssignments.has(r.link.assignment_id))
-    || (r.link?.assessment_id && shownAssessments.has(r.link.assessment_id))
-  ));
-
-  // --- Phase 9 S4: "Pending applications" line (PHASE_9_DESIGN 8.1), shown above everything else ---
+  const todo = data.todo ?? [];
+  const grades = data.latest_results.slice(0, 3);
+  const news = (data.announcements ?? []).slice(0, 3);
   const pendingApps = <PendingApplicationsLine items={data.pending_applications ?? []} />;
-  if (data.courses_total === 0 && data.in_progress.length === 0) {
+
+  if (data.courses_total === 0 && todo.length === 0) {
     return (
-      <div className="space-y-8">
-      {pendingApps}
-      <EmptyState icon={<BookOpen />} title={t("home.courses.emptyTitle")} description={t("home.courses.emptyBody")}
-        action={(
-          <>
-            <LinkButton size="lg" href={`${base}/join`} leftIcon={<KeyRound aria-hidden="true" className="h-5 w-5" />}>{t("home.primary.join")}</LinkButton>
-            <LinkButton size="lg" variant="secondary" href={`${base}/catalog`} leftIcon={<LayoutGrid aria-hidden="true" className="h-5 w-5" />}>{t("home.openCatalog")}</LinkButton>
-          </>
-        )} />
+      <div className="space-y-6">
+        {pendingApps}
+        <EmptyState icon={<BookOpen />} title={t("home.courses.emptyTitle")} description={t("home.courses.emptyBody")}
+          action={(
+            <>
+              <LinkButton size="lg" href={`${base}/join`} leftIcon={<KeyRound aria-hidden="true" className="h-5 w-5" />}>{t("home.primary.join")}</LinkButton>
+              <LinkButton size="lg" href={`${base}/catalog`} leftIcon={<LayoutGrid aria-hidden="true" className="h-5 w-5" />}>{t("home.openCatalog")}</LinkButton>
+            </>
+          )} />
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
-      {pendingApps /* Phase 9 S4 */}
-      {data.in_progress.length > 1 && (
-        <HomeSection id="home-continue" title={t("home.continue.title")}>
-          <ul className="divide-y divide-slate-100">
-            {data.in_progress.map((r) => (
-              <HomeRow key={r.attempt_id} href={`${base}/${r.course_id}/attempts/${r.attempt_id}`}
-                title={pickLocalized(r.assessment_title, lang) || untitled}
-                meta={<><span>{pickLocalized(r.course_title, lang)}</span><span>{t("home.startedAt", { date: fmtShortDateTime(r.started_at, lang) })}</span></>}
-                actionLabel={t("home.action.continue")} />
-            ))}
-          </ul>
-        </HomeSection>
-      )}
-
-      {/* --- Phase 8a S4a: "up next" in modules, one row per course ("Continue in Course: Item"), above assignments --- */}
-      {modulesNext.length > 0 && (
-        <HomeSection id="home-modules-next" title={t("home.modulesNext.title")}>
-          <ul className="divide-y divide-slate-100">
-            {modulesNext.map((r) => (
-              <HomeRow key={`${r.course_id}-${r.item_id}`} href={`${base}/${r.course_id}/modules`}
-                title={pickLocalized(r.title, lang) || t("modules.untitledItem")}
-                meta={(
-                  <>
-                    <span>{t("home.modulesNext.inCourse", { course: pickLocalized(r.course_title, lang) || t("courses.list.untitled") })}</span>
-                    {r.module_title && <span>{pickLocalized(r.module_title, lang)}</span>}
-                  </>
-                )}
-                actionLabel={t("home.modulesNext.action")} />
-            ))}
-          </ul>
-        </HomeSection>
-      )}
-      {/* --- Phase 8a S4a end --- */}
-
-      <HomeSection id="home-next" title={t("home.next.title")}>
-        {data.next_up.length === 0 ? (
-          <p className="px-3 py-4 text-base leading-6 text-slate-600 sm:px-4">{t("home.next.empty")}</p>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {data.next_up.map((r) => (
-              <HomeRow key={r.assignment_id ?? r.assessment_id ?? r.course_id} href={nextUpHref(base, r) /* Phase 7a S5 */}
-                title={pickLocalized(r.title, lang) || untitled}
-                meta={(
-                  <>
-                    {/* Phase 7a S5: kind icon + text */}
-                    {r.kind && <span className="inline-flex items-center gap-1"><KindIcon kind={r.kind} />{t(`assignments.kinds.${r.kind}`)}</span>}
-                    <span>{pickLocalized(r.course_title, lang)}</span>
-                    {r.due_at ? <DueText value={r.due_at} lang={lang} />
-                      : r.available_until ? <span>{t("home.until", { date: fmtShortDateTime(r.available_until, lang) })}</span> : null}
-                    {r.attempts_left !== null && r.attempts_left !== undefined && <span>{t("home.attemptsLeft", { n: r.attempts_left })}</span>}
-                  </>
-                )}
-                actionLabel={t("home.action.open")} />
-            ))}
-          </ul>
-        )}
-      </HomeSection>
-
-      <HomeSection id="home-results" title={t("home.results.title")}>
-        {data.latest_results.length === 0 ? (
-          <p className="px-3 py-4 text-base leading-6 text-slate-600 sm:px-4">{t("home.results.empty")}</p>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {data.latest_results.map((r) => {
-              const value = gradeText(r, r.scheme_type ?? undefined);
-              // Phase 7a S5: a released manual grade opens its assignment page (grade and feedback)
-              const href = r.kept_attempt_id ? `${base}/${r.course_id}/attempts/${r.kept_attempt_id}/result`
-                : r.assignment_id && r.kind && r.kind !== "quiz" ? `${base}/${r.course_id}/assignments/${r.assignment_id}` : `${base}/${r.course_id}/grades`;
-              return (
-                <HomeRow key={r.assignment_id ?? r.assessment_id ?? href} href={href} title={pickLocalized(r.title, lang) || untitled}
-                  meta={(
-                    <>
-                      <span>{pickLocalized(r.course_title, lang)}</span>
-                      {r.is_personal_best && <PersonalBestBadge />}
-                    </>
-                  )}
-                  aside={value ? <span className="text-lg font-bold leading-6 text-slate-900">{value}</span> : null}
-                  actionLabel={t("home.action.result")} />
-              );
-            })}
-          </ul>
-        )}
-      </HomeSection>
-
-      {/* --- Phase 8a S5: the latest three announcements of the student's courses (design 7.2, 8.1; never a body);
-          below "Latest results" since 8a UX (M4) --- */}
-      {(data.announcements?.length ?? 0) > 0 && (
-        <HomeSection id="home-announcements" title={t("home.announcements.title")}>
-          <ul className="divide-y divide-slate-100">
-            {data.announcements!.map((r) => (
-              <HomeRow key={r.id} href={`${base}/${r.course_id}/announcements`} title={r.title}
-                meta={(
-                  <>
-                    <span>{pickLocalized(r.course_title, lang) || t("courses.list.untitled")}</span>
-                    <span>{fmtShortDateTime(r.published_at, lang)}</span>
-                  </>
-                )}
-                actionLabel={t("home.announcements.action")} />
-            ))}
-          </ul>
-        </HomeSection>
-      )}
-
-      <HomeSection id="home-courses" title={t("home.courses.title")}
-        footer={(
-          <>
-            {!showAll && data.courses_total > data.courses.length && (
-              <Button variant="link" onClick={() => setShowAll(true)}>{t("home.courses.showAll", { n: data.courses_total })}</Button>
+    <div className="space-y-6">
+      {pendingApps}
+      {/* phones: to-do (when there is any), cards, the rest. From `lg` the cards span the left column. */}
+      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-[auto_1fr] lg:items-start">
+        <div className={cn("min-w-0 lg:col-start-2 lg:row-start-1", todo.length === 0 && "order-2 lg:order-none")}>
+          <SideSection id="home-todo" title={t("home.todo.title")}>
+            {todo.length > 0
+              ? <TodoRows rows={todo} />
+              : <p className="px-3 py-3 text-base leading-6 text-slate-600 sm:text-sm">{t("home.todo.empty")}</p>}
+          </SideSection>
+        </div>
+        <section aria-labelledby="home-courses" className="min-w-0 lg:col-start-1 lg:row-span-2 lg:row-start-1">
+          <h2 id="home-courses" className="mb-2 text-lg font-semibold leading-7 text-slate-900">{t("home.courses.title")}</h2>
+          <CourseCards data={data} />
+        </section>
+        {(grades.length > 0 || news.length > 0) && (
+          <div className="order-3 min-w-0 space-y-6 lg:order-none lg:col-start-2 lg:row-start-2">
+            {grades.length > 0 && (
+              <SideSection id="home-results" title={t("home.results.title")}>
+                <ul className="divide-y divide-slate-100">
+                  {grades.map((r) => {
+                    // a released manual grade opens its assignment page (grade and feedback)
+                    const href = r.kept_attempt_id ? `${base}/${r.course_id}/attempts/${r.kept_attempt_id}/result`
+                      : r.assignment_id && r.kind && r.kind !== "quiz" ? `${base}/${r.course_id}/assignments/${r.assignment_id}` : `${base}/${r.course_id}/grades`;
+                    return (
+                      <SideRow key={r.assignment_id ?? r.assessment_id ?? href} href={href} title={pickLocalized(r.title, lang) || untitled}
+                        lines={(
+                          <>
+                            <span className="block break-words">{pickLocalized(r.course_title, lang)}</span>
+                            {r.is_personal_best && <span className="mt-1 block"><PersonalBestBadge /></span>}
+                          </>
+                        )}
+                        aside={gradeText(r, r.scheme_type ?? undefined) || null} />
+                    );
+                  })}
+                </ul>
+              </SideSection>
             )}
-            <Link href={`${base}/join`} className={linkCls}><KeyRound aria-hidden="true" className="h-4 w-4" />{t("home.primary.join")}</Link>
-            <Link href={`${base}/catalog`} className={linkCls}><LayoutGrid aria-hidden="true" className="h-4 w-4" />{t("home.openCatalog")}</Link>
-          </>
-        )}>
-        {showAll ? <AllCourses /> : (
-          <ul className="divide-y divide-slate-100">
-            {data.courses.map((c) => (
-              <HomeRow key={c.id} href={`${base}/${c.id}`} title={pickLocalized(c.title, lang) || t("courses.list.untitled")}
-                meta={<CourseMeta c={c} />}
-                aside={c.in_progress ? <Badge tone="info">{t("home.status.in_progress")}</Badge> : null} />
-            ))}
-          </ul>
+            {news.length > 0 && (
+              <SideSection id="home-announcements" title={t("home.announcements.title")}>
+                <ul className="divide-y divide-slate-100">
+                  {news.map((r) => (
+                    <SideRow key={r.id} href={`${base}/${r.course_id}/announcements`} title={r.title}
+                      lines={(
+                        <>
+                          <span className="block break-words">{pickLocalized(r.course_title, lang) || t("courses.list.untitled")}</span>
+                          <span className="block">{fmtDayMonthTime(r.published_at, lang)}</span>
+                        </>
+                      )} />
+                  ))}
+                </ul>
+              </SideSection>
+            )}
+          </div>
         )}
-      </HomeSection>
+      </div>
     </div>
   );
 }
 
-/** The student home. `embedded`: inside the Teaching/Learning tabs (the page already has its h1). */
+function DashboardSkeleton() {
+  const { t } = useTranslation();
+  return (
+    <div role="status" aria-live="polite">
+      <span className="sr-only">{t("ui.loading")}</span>
+      <div aria-hidden="true" className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+        <div className="min-w-0 lg:col-start-1 lg:row-start-1">
+          <Skeleton className="mb-3 h-6 w-32" />
+          <div className={CARD_GRID}>
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <Skeleton className="h-24 w-full rounded-none" />
+                <div className="space-y-2 p-4"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-4 w-1/2" /></div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="min-w-0 lg:col-start-2 lg:row-start-1">
+          <Skeleton className="mb-3 h-6 w-32" />
+          <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <Skeleton className="h-5 w-3/4" /><Skeleton className="h-5 w-2/3" /><Skeleton className="h-5 w-3/4" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** The student dashboard. `embedded`: inside the Teaching/Learning tabs (the page already has its h1). */
 export function StudentHome({ embedded = false }: { embedded?: boolean }) {
-  const { me } = useLmsMe();
-  const { userProfile } = useAuth();
+  const { lang, t } = useTranslation();
   const errorText = useErrorText();
   const [data, setData] = useState<HomeOut | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -342,17 +211,25 @@ export function StudentHome({ embedded = false }: { embedded?: boolean }) {
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  // The cached profile gives the name at once; MeOut replaces it when loaded.
-  const name = (me?.display_name || userProfile?.displayName || "").trim();
+  const Title = embedded ? "h2" : "h1";
+  const isNew = !!data && data.courses_total === 0 && (data.todo ?? []).length === 0; // its empty state has the two actions
   return (
-    <div className="mx-auto w-full max-w-[720px] space-y-8">
-      <Greeting data={data} name={name} headingLevel={embedded ? 2 : 1} pending={!data && !error} />
+    <div className="w-full space-y-6">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <Title className="text-2xl font-bold leading-8 text-slate-900">{t("home.dashboard")}</Title>
+        {!isNew && (
+          <div className="flex flex-wrap gap-2">
+            <LinkButton variant="secondary" href={`/${lang}/courses/join`} leftIcon={<KeyRound aria-hidden="true" className="h-4 w-4" />}>{t("home.primary.join")}</LinkButton>
+            <LinkButton variant="secondary" href={`/${lang}/courses/catalog`} leftIcon={<LayoutGrid aria-hidden="true" className="h-4 w-4" />}>{t("lms.nav.catalog")}</LinkButton>
+          </div>
+        )}
+      </header>
       {error && !data ? (
         <ErrorState message={errorText(error)} onRetry={() => void load()} retrying={loading} />
       ) : !data ? (
-        <HomeSkeleton />
+        <DashboardSkeleton />
       ) : (
-        <Sections data={data} />
+        <Dashboard data={data} />
       )}
     </div>
   );

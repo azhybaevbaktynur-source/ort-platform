@@ -2999,29 +2999,14 @@
     "ownerStays": "The owner cannot be removed. Transfer the course in Settings."
   },
   "home": {
-    "greeting": "Hi, {name}!",
-    "greetingNoName": "Hi!",
-    "lead": {
-      "continue": "You have an unfinished assignment: «{title}».",
-      "next": "Next up: «{title}».",
-      "caughtUp": "You are all caught up. No new assignments right now.",
-      "continueStarted": "You have an unfinished assignment: «{title}». Started {date}."
-    },
     "primary": {
-      "continue": "Continue",
-      "start": "Start the next assignment",
       "join": "Join with code"
     },
-    "continue": {
-      "title": "Continue"
-    },
     "next": {
-      "title": "Next up",
       "empty": "No new assignments. Check back later."
     },
     "results": {
-      "title": "Latest results",
-      "empty": "Results appear after your first assignment."
+      "title": "Recent grades"
     },
     "courses": {
       "title": "My courses",
@@ -3036,7 +3021,6 @@
     },
     "personalBest": "Personal best",
     "platformCourse": "Platform course",
-    "noDue": "No deadlines",
     "due": "Due {date}",
     "dueSoon": "Due soon: {date}",
     "until": "Open until {date}",
@@ -3054,7 +3038,6 @@
     "scoreOf": "{score} of {total}",
     "resultValue": "Result: {value}",
     "resultLater": "The result appears when your teacher releases it.",
-    "startedAt": "Started {date}",
     "status": {
       "not_started": "Not started",
       "in_progress": "In progress",
@@ -3096,14 +3079,16 @@
         "void": "Cancelled"
       }
     },
-    "modulesNext": {
-      "title": "Continue in your courses",
-      "inCourse": "Course: {course}",
-      "action": "Continue"
-    },
     "announcements": {
-      "title": "Announcements",
-      "action": "Read"
+      "title": "Announcements"
+    },
+    "dashboard": "Dashboard",
+    "todo": {
+      "title": "To do",
+      "empty": "You are all caught up. No new assignments right now.",
+      "due": "Due {date}",
+      "overdue": "Overdue",
+      "inProgress": "Attempt in progress"
     }
   },
   "shell": {
@@ -4590,11 +4575,6 @@
     "emptyStudentTitle": "No modules yet",
     "emptyStudentBody": "Your teacher has not published any modules yet. Check your assignments in the meantime.",
     "celebrate": "Module “{title}” completed. Well done!",
-    "upNext": {
-      "title": "Up next",
-      "action": "Open",
-      "allDone": "You have finished every module. Well done!"
-    },
     "editor": {
       "title": "Modules",
       "description": "Students see published modules in this order.",

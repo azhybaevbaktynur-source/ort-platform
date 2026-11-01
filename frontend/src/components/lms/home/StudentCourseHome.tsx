@@ -4,10 +4,7 @@
 // the page's one primary button, the latest released result, then the description. No teacher states, no roadmap
 // text; "Leave course" is a quiet link at the bottom.
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { LogOut } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
-import { leaveCourse } from "@/lib/lms/courses";
 // --- Phase 7a S5: the course home reads assignments ---
 import { listAssignments } from "@/lib/lms/assignments";
 import type { AssignmentStudentOut } from "@/lib/lms/assignmentTypes";
@@ -20,14 +17,14 @@ import type { MyGradeOut } from "@/lib/lms/gradingTypes";
 import { pickLocalized } from "@/lib/lms/localized";
 import { parseApiDate } from "@/lib/format";
 import { useCourse } from "@/components/lms/CourseContext";
-import { Button, Card, ConfirmDialog, DescriptionList, ErrorState, LinkButton, LoadingState } from "@/components/ui";
+import { Card, DescriptionList, ErrorState, LinkButton, LoadingState } from "@/components/ui";
 import { useGradeText } from "@/components/lms/results/GradeBadge";
 import { fmtShortDateTime } from "./format";
+import { LeaveCourseLink } from "./LeaveCourseLink";
 import { useErrorText } from "./useErrorText";
 
 export function StudentCourseHome() {
   const { lang, t } = useTranslation();
-  const router = useRouter();
   const { course } = useCourse();
   const errorText = useErrorText();
   const gradeText = useGradeText();
@@ -36,9 +33,6 @@ export function StudentCourseHome() {
   const [grades, setGrades] = useState<MyGradeOut[]>([]);
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
-  const [leaving, setLeaving] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [leaveError, setLeaveError] = useState<unknown>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -75,26 +69,13 @@ export function StudentCourseHome() {
     return graded.reduce((best, g) => (ts(g) > ts(best) ? g : best));
   }, [grades]);
 
-  const leave = async () => {
-    setBusy(true);
-    setLeaveError(null);
-    try {
-      await leaveCourse(course.id);
-      router.push(`/${lang}/courses`);
-    } catch (e) {
-      setLeaveError(e);
-      setBusy(false);
-    }
-  };
-
   const description = pickLocalized(course.description, lang, course.default_language);
-  const title = pickLocalized(course.title, lang, course.default_language) || t("courses.list.untitled");
   // S11a, F1: a locked platform template (ORT) has no teacher to name; say who runs it instead.
   const platformRun = !!course.template?.locked;
   const teacher = platformRun ? t("courses.home.providerPlatform") : course.owner_display_name || "—";
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
+    <div className="w-full max-w-3xl space-y-6">
       {course.status === "concluded" && (
         <p role="status" className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-base leading-6 text-slate-700 sm:text-sm">{t("courses.home.concludedNotice")}</p>
       )}
@@ -138,14 +119,7 @@ export function StudentCourseHome() {
         ]} />
       </Card>
 
-      {!course.my_enrollment.read_only && <div className="border-t border-slate-200 pt-4">
-        <Button variant="link" className="text-slate-600 hover:text-danger-700" leftIcon={<LogOut aria-hidden="true" className="h-4 w-4" />} onClick={() => setLeaving(true)}>
-          {t("courses.home.leave")}
-        </Button>
-      </div>}
-      <ConfirmDialog open={leaving} tone="danger" busy={busy} error={leaveError ? errorText(leaveError) : undefined}
-        title={t("courses.home.leaveTitle")} object={title} effect={t("courses.home.leaveBody")}
-        confirmLabel={t("courses.home.leave")} onConfirm={() => void leave()} onCancel={() => setLeaving(false)} />
+      {!course.my_enrollment.read_only && <LeaveCourseLink />}
     </div>
   );
 }

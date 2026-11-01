@@ -268,6 +268,7 @@ class ItemStudentOut(BaseModel):
     locked: bool
     requirement: Optional[RequirementStudentOut] = None
     link: Optional[ItemLinkOut] = None
+    due_at: Optional[datetime] = None  # UX rework: assignment rows, the student's effective date (never on a locked row)
 
 
 class ModuleStudentOut(BaseModel):
