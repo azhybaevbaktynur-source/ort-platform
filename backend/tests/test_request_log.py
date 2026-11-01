@@ -59,6 +59,16 @@ def test_request_log_has_no_email_ip_query_token_or_body(captured):
     assert {"request_id", "ms", "method"} <= set(first)
 
 
+def test_production_logs_are_json_and_masked_and_development_logs_are_plain(monkeypatch):
+    from app.core import logging as app_logging
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+    assert isinstance(app_logging._formatter(), app_logging.JsonFormatter)
+    monkeypatch.setattr(settings, "ENVIRONMENT", "development")
+    assert not isinstance(app_logging._formatter(), app_logging.JsonFormatter)
+
+
 def test_a_forged_token_writes_no_user_id():
     import jwt
 

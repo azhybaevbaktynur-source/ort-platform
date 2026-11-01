@@ -39,13 +39,21 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(out, default=lambda o: scrub(str(o)), ensure_ascii=False)
 
 
+def _formatter() -> logging.Formatter:
+    """JSON with masking in production. Plain outside it: the dev-only console email provider must show the address and
+    code to the developer, and the browser test seed reads them from this log."""
+    from app.core.config import is_production
+
+    return JsonFormatter() if is_production() else logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s")
+
+
 def configure_logging(level: int = logging.INFO) -> None:
-    """Idempotent: one JSON stream handler on the root logger. uvicorn's own access log (it prints the query string)
+    """Idempotent: one stream handler on the root logger. uvicorn's own access log (it prints the query string)
     is silenced; core/request_log.py replaces it."""
     root = logging.getLogger()
     if not any(getattr(h, "_ort_json", False) for h in root.handlers):
         handler = logging.StreamHandler(sys.stdout)
-        handler.setFormatter(JsonFormatter())
+        handler.setFormatter(_formatter())
         handler._ort_json = True  # type: ignore[attr-defined]
         root.addHandler(handler)
     if root.level in (logging.WARNING, logging.NOTSET):
