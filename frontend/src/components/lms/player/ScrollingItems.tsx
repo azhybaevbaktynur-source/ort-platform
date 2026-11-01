@@ -8,6 +8,7 @@ import type { AttemptContent, AttemptItemState, AttemptState, StudentPassage } f
 import type { PassageDisplay } from "@/lib/lms/blocks";
 import { ItemView } from "./ItemView";
 import { PassagePane } from "./PassagePane";
+import { BOTTOM_BAR_OFFSET } from "./PlayerBottomBar";
 import { itemPassage, itemQuestion, type ResponseObj } from "./playerUtils";
 import { prefersReducedMotion, useScrollSpy } from "./useScrollSpy";
 
@@ -29,8 +30,8 @@ export interface ScrollRequest { pos: number; n: number }
  */
 export function ScrollingItems({
   state, content, visibleItems, currentPos, answers, onAnswer, onToggleFlag, onCurrentChange, onNavigate,
-  scrollRequest, scrollRootRef, headerHeight, stickyTop, passageDisplay, instructions, sectionTitle,
-  forwardOnly, finishLabel, onFinish,
+  scrollRequest, scrollRootRef, headerHeight, stickyTop, passageDisplay, sectionTitle,
+  forwardOnly, onReview,
 }: {
   state: AttemptState;
   content: AttemptContent;
@@ -47,11 +48,10 @@ export function ScrollingItems({
   headerHeight: number;
   stickyTop: number;
   passageDisplay: PassageDisplay | null;
-  instructions: string;
   sectionTitle: (pos: number) => string;
   forwardOnly: boolean;
-  finishLabel: string;
-  onFinish: () => void;
+  /** The last window's way on: the review page, which holds the finish button (BLUEBOOK_PLAYER). */
+  onReview: () => void;
 }) {
   const { t } = useTranslation();
   const itemRefs = useRef<Map<number, HTMLElement>>(new Map());
@@ -158,14 +158,7 @@ export function ScrollingItems({
 
   const lastWindow = !hasNextWindow;
   return (
-    <div className="space-y-4" role="region" aria-label={sectionTitle(sectionPos)}>
-      {instructions ? (
-        <details key={sectionPos} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700" open>
-          <summary className="cursor-pointer py-1 font-semibold text-slate-800">{t("player.instructions")}</summary>
-          <p className="mt-2 whitespace-pre-line">{instructions}</p>
-        </details>
-      ) : null}
-
+    <div className="mx-auto w-full max-w-4xl space-y-4" role="region" aria-label={sectionTitle(sectionPos)}>
       {hasPrevWindow ? (
         <Button variant="secondary" fullWidth onClick={() => onNavigate(sectionItems[windowStart - SCROLL_WINDOW].position)}
           leftIcon={<ChevronUp className="h-4 w-4" aria-hidden="true" />}>
@@ -181,7 +174,7 @@ export function ScrollingItems({
       {blocks.length > 0 ? blocks : <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">{t("player.noQuestion")}</p>}
 
       {/* The window footer: where the list is, and the visible way on (UX section 4: no hidden features). */}
-      <div className="sticky bottom-0 z-[5] -mx-4 border-t border-slate-200 bg-white px-4 py-3 sm:mx-0 sm:rounded-2xl sm:border">
+      <div className={cn("sticky z-[5] -mx-4 border-t border-slate-200 bg-white px-4 py-3 sm:mx-0 sm:rounded-2xl sm:border", BOTTOM_BAR_OFFSET)}>
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <p className="text-sm text-slate-700" aria-live="polite">
             {t("player.scrolling.windowOf", { from: windowStart + 1, to: windowEnd, total: sectionItems.length })}
@@ -198,12 +191,11 @@ export function ScrollingItems({
                 {t("player.scrolling.nextSection")}
               </Button>
             ) : lastWindow ? (
-              <Button className="sm:min-h-10" onClick={onFinish}>{finishLabel}</Button>
+              <Button className="sm:min-h-10" onClick={onReview}>{t("player.review.open")}</Button>
             ) : null}
           </div>
         </div>
       </div>
-      <p className="hidden text-xs text-slate-500 lg:block">{t("player.shortcuts")}</p>
     </div>
   );
 }

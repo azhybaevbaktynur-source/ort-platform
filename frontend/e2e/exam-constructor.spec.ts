@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
-import { seed, settle, signIn, tr, VIEWPORTS, type SeedUser, type ViewportName } from "./helpers";
+import { seed, settle, signIn, tr, VIEWPORTS, type SeedUser, type ViewportName, goToReviewPage } from "./helpers";
 
 /**
  * Phase 8b S5: the exam-template constructor walk (PHASE_8B_DESIGN 11 "S5", 12, 12.1), end to end in the browser.
@@ -206,10 +206,12 @@ test.describe("exam-template constructor walk (ru)", () => {
     await expect(player.getByRole("timer")).toBeVisible();
     await shot(player, "ctor-preview-player-desktop-ru");
     await player.locator('section[id^="item-"]').first().getByRole("radio").nth(1).click();
+    await goToReviewPage(player);
     await player.getByRole("button", { name: t("player.finishSection") }).first().click();
     await player.getByRole("dialog").getByRole("button", { name: t("player.sectionEnd.confirm") }).click();
     await expect(player.getByText("Столица Кыргызстана?")).toBeVisible();
     await player.locator('section[id^="item-"]').first().getByRole("radio").nth(1).click();
+    await goToReviewPage(player);
     await player.getByRole("button", { name: t("player.finishTest") }).first().click();
     await player.getByRole("dialog").getByRole("button", { name: t("player.submit.confirm") }).click();
     await player.waitForURL(/\/result/);
@@ -306,11 +308,13 @@ test.describe("exam-template constructor walk (ru)", () => {
       await expect(student.getByText(t("player.previewBanner"))).toHaveCount(0);
       for (const n of [0, 1]) await items.nth(n).getByRole("radio").nth(1).click();
       if (vp === "phone") expect(await student.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+      await goToReviewPage(student);
       await student.getByRole("button", { name: t("player.finishSection") }).first().click();
       await student.getByRole("dialog").getByRole("button", { name: t("player.sectionEnd.confirm") }).click();
       await expect(student.getByText("Самая длинная река Кыргызстана?")).toBeVisible();
       await expect(items).toHaveCount(1);
       await items.first().getByRole("radio").nth(1).click();
+      await goToReviewPage(student);
       await student.getByRole("button", { name: t("player.finishTest") }).first().click();
       await student.getByRole("dialog").getByRole("button", { name: t("player.submit.confirm") }).click();
       await student.waitForURL(/\/result/);

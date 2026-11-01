@@ -1,5 +1,5 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
-import { seed, settle, signIn, tr, VIEWPORTS, type SeedUser } from "./helpers";
+import { seed, settle, signIn, tr, VIEWPORTS, type SeedUser, goToReviewPage } from "./helpers";
 
 /**
  * Phase 7c quiz editor walk (PHASE_7C_DESIGN 11, 10 "Frontend"): a teacher of a general (non-ORT) course writes a quiz
@@ -243,6 +243,7 @@ test.describe("quiz editor walk (ru)", () => {
     const answerB = sp.getByRole("radiogroup", { name: t("player.answers") }).getByRole("radio").nth(1);
     await answerB.click();
     await expect(answerB).toHaveAttribute("aria-checked", "true");
+    await goToReviewPage(sp);
     await sp.getByRole("button", { name: t("player.finishTest") }).click();
     await sp.getByRole("dialog").getByRole("button", { name: t("player.submit.confirm") }).click();
     await expect.poll(async () => (await apiGet(qe.student, `/attempts/${attemptId}`)).status, { timeout: 20_000 }).toMatch(/^(submitted|needs_review|graded)$/); // the essay waits for review

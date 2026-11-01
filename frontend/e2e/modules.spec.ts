@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
-import { sectionCounts, seed, settle, signIn, tr, VIEWPORTS, type SeedUser } from "./helpers";
+import { sectionCounts, seed, settle, signIn, tr, VIEWPORTS, type SeedUser, goToReviewPage } from "./helpers";
 import { OrtExam } from "./ort-exam";
 
 /**
@@ -324,6 +324,7 @@ test.describe("modules walk (ru)", () => {
         await expect(radio).toHaveAttribute("aria-checked", "true");
         if (i < answers.length - 1) await sp.getByRole("button", { name: t("player.next") }).click();
       }
+      await goToReviewPage(sp);
       await sp.getByRole("button", { name: t("player.finishTest") }).first().click();
       await sp.getByRole("dialog").getByRole("button", { name: t("player.submit.confirm") }).click();
       await expect.poll(async () => (await api(md.student, "GET", `/attempts/${attemptId}`)).status, { timeout: 20_000 }).toBe("graded");

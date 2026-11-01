@@ -7,9 +7,9 @@ import type { QueueSnapshot } from "@/lib/lms/attemptClient";
 import { Button } from "@/components/ui";
 
 /**
- * `compact` (Phase 8b UX, scrolling player): below `sm` the calm states (saved, saving) show only their icon, so the
- * phone header keeps the timer and the "Questions n/48" button on one line; the words stay for screen readers and
- * as the tooltip. Problem states always keep their words. The one-per-page (ORT) player does not pass it.
+ * `compact` (the player's top bar): below `sm` the calm states (saved, saving) show only their icon, so the phone bar
+ * keeps the section name and the timer on one line; the words stay for screen readers and as the tooltip. Problem
+ * states always keep their words.
  */
 export function SaveStatus({ snap, onRetry, compact = false }: { snap: QueueSnapshot; onRetry?: () => void; compact?: boolean }) {
   const { t } = useTranslation();

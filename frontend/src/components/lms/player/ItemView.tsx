@@ -59,9 +59,9 @@ export function ItemView({
   const hId = headingId ?? `q-${question.id}-h`;
 
   return (
-    <article className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs md:p-7" aria-labelledby={hId}>
-      <header className="flex items-center justify-between border-b border-slate-100 pb-4">
-        <h2 id={hId} className="rounded-lg bg-brand-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-brand-700">
+    <article className="space-y-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs sm:p-5 md:p-7" aria-labelledby={hId}>
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-4">
+        <h2 id={hId} className="rounded-lg bg-brand-50 px-2 py-1 text-xs font-bold uppercase tracking-normal text-brand-700 sm:px-3 sm:tracking-wide">
           {t("player.questionOf", { n: number, total })}
         </h2>
         {!hideFlag && <button
@@ -69,12 +69,12 @@ export function ItemView({
           onClick={onToggleFlag}
           aria-pressed={flagged}
           className={cn(
-            "inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-3 text-sm font-semibold transition-all sm:min-h-9 sm:text-xs",
+            "inline-flex min-h-11 items-center gap-1 rounded-xl border px-2 text-xs font-semibold transition-all sm:min-h-9 sm:gap-1.5 sm:px-3",
             focusRing,
             flagged ? "border-amber-400 bg-amber-100 text-amber-900" : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100",
           )}
         >
-          <Bookmark className={`h-4 w-4 sm:h-3.5 sm:w-3.5 ${flagged ? "fill-amber-600 text-amber-600" : ""}`} aria-hidden="true" />
+          <Bookmark className={`h-3.5 w-3.5 ${flagged ? "fill-amber-600 text-amber-600" : ""}`} aria-hidden="true" />
           {flagged ? t("player.unflag") : t("player.flag")}
         </button>}
       </header>

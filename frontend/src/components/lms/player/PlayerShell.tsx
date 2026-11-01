@@ -3,11 +3,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Eye, LayoutGrid, TriangleAlert } from "lucide-react";
+import { Eye, TriangleAlert } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
-import { Button, Dialog, LoadingState, Skeleton, SkeletonText, cn, focusRing } from "@/components/ui";
+import { Button, LoadingState, Skeleton, SkeletonText, cn } from "@/components/ui";
 import { pickLocalized } from "@/lib/lms/localized";
 import {
   closeSection, getAttempt, getAttemptContent, saveAnswers, saveAnswersKeepalive, submitAttempt,
@@ -28,7 +28,13 @@ import {
 import { DeadlineTimer } from "./DeadlineTimer";
 import { ItemView } from "./ItemView";
 import { PassagePane, PassageToggle } from "./PassagePane";
-import { Palette, type PaletteGroup } from "./Palette";
+import type { PaletteGroup } from "./Palette";
+import { PlayerTopBar, type BarPopup } from "./PlayerTopBar";
+import { PlayerBottomBar } from "./PlayerBottomBar";
+import { QuestionMap } from "./QuestionMap";
+import { SectionReview } from "./SectionReview";
+import { SplitPassage } from "./SplitPassage";
+import { StudentViewBanner } from "@/components/lms/course/StudentViewBanner";
 import { SaveStatus } from "./SaveStatus";
 import { ClosedDialog, SectionEndDialog, SubmitDialog, TimeUpDialog } from "./PlayerDialogs";
 import { isAnswered, isTypingTarget, itemPassage, itemQuestion, mergeContent, type ResponseObj } from "./playerUtils";
@@ -69,11 +75,23 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
   const [sectionLoading, setSectionLoading] = useState(false);
   const [sectionError, setSectionError] = useState<unknown>(null);
   const [sectionRetry, setSectionRetry] = useState(0);
-  // Phone / tablet (S7b, P1): the palette opens as a sheet from the header instead of sitting below the question.
+  // BLUEBOOK_PLAYER: the question map popup of the bottom bar, the top bar's popups, the review page. The review page
+  // belongs to a section (its pos), so it closes by itself when the section advances (close, timer, another tab).
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [barPopup, setBarPopup] = useState<BarPopup>(null);
+  const [reviewFor, setReviewFor] = useState<number | null>(null);
+  const focusQuestionRef = useRef(false);
+  const timerKey = `ort_player_timer_hidden:${attemptId}`;
+  const [timerHidden, setTimerHidden] = useState<boolean>(() => {
+    try {
+      return typeof window !== "undefined" && window.sessionStorage.getItem(timerKey) === "1";
+    } catch {
+      return false;
+    }
+  });
   const paletteCurrentRef = useRef<HTMLButtonElement>(null);
   const paletteButtonRef = useRef<HTMLButtonElement>(null);
-  // Phone / tablet (S7b, P6): the reading text folds away under a sticky bar; open by default, per passage.
+  // Below `lg` (S7b, P6): the reading text folds away under a sticky bar; open by default, per passage.
   const [passageClosed, setPassageClosed] = useState<Record<string, boolean>>({});
   const headerRef = useRef<HTMLElement>(null);
   const [headerH, setHeaderH] = useState(0);
@@ -523,12 +541,34 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
     setDialog(forwardOnly && !isLastSection ? "section" : "submit");
   };
 
+  // ---- review page ----
+  const reviewOpen = !!state && reviewFor === state.current_section_pos;
+  const openReview = useCallback(() => {
+    const s = stateRef.current;
+    if (!s) return;
+    setPaletteOpen(false);
+    setReviewFor(s.current_section_pos);
+  }, []);
+  /** Back to a question from the review page: the current one, or the one the student picked. */
+  const leaveReview = useCallback((position: number) => {
+    setReviewFor(null);
+    focusQuestionRef.current = true;
+    if (scrolling) scrollToItem(position);
+    else setCurrentPos(position);
+  }, [scrolling, scrollToItem]);
+  const closeReview = useCallback(() => leaveReview(currentPos), [leaveReview, currentPos]);
+
   // ---- keyboard shortcuts: arrows move, F flags, 1-5 / A-E pick a choice ----
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (dialog || paletteOpen || timeUp || closedInfo || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (dialog || paletteOpen || barPopup || timeUp || closedInfo || e.ctrlKey || e.metaKey || e.altKey) return;
       if (isTypingTarget(e.target) || !state || !content || !curItem) return;
       const k = e.key;
+      // The review page shows no question: nothing to flag or answer here, the left arrow is its "Back".
+      if (reviewOpen) {
+        if (k === "ArrowLeft") { e.preventDefault(); closeReview(); }
+        return;
+      }
       if (k === "ArrowRight") { e.preventDefault(); go(1); return; }
       if (k === "ArrowLeft") { e.preventDefault(); go(-1); return; }
       // S7b, P9: physical keys (`e.code`), so F, A-E and 1-5 also work with a Russian or Kyrgyz layout.
@@ -549,7 +589,7 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [dialog, paletteOpen, timeUp, closedInfo, state, content, curItem, go, onToggleFlag, onAnswer]);
+  }, [dialog, paletteOpen, barPopup, reviewOpen, closeReview, timeUp, closedInfo, state, content, curItem, go, onToggleFlag, onAnswer]);
 
 
   // Header height, for the sticky passage bar under it (the header wraps differently per language and width).
@@ -565,21 +605,53 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
     return () => ro.disconnect();
   }, [ready]);
 
-  const selectFromSheet = useCallback((position: number) => {
+  const selectFromMap = useCallback((position: number) => {
+    setReviewFor(null);
     if (scrolling) scrollToItem(position); // Phase 8b S3
     else setCurrentPos(position);
     setPaletteOpen(false);
   }, [scrolling, scrollToItem]);
 
-  // S11a, F5: the sheet's own button disappears with the sheet. Open the finish dialog one frame later, from the
-  // header button, so the dialog's Cancel returns focus to a live element.
-  const finishFromSheet = () => {
-    setPaletteOpen(false);
-    requestAnimationFrame(() => {
-      paletteButtonRef.current?.focus();
-      finishPressed();
+  const toggleTimer = useCallback(() => {
+    setTimerHidden((hidden) => {
+      try {
+        window.sessionStorage.setItem(timerKey, hidden ? "0" : "1");
+      } catch { /* storage unavailable: the choice lasts until a reload */ }
+      return !hidden;
     });
-  };
+  }, [timerKey]);
+
+  // One question per page: another question starts at its top. Under the same text the text stays where it is (its own
+  // pane from `lg`; below that the page goes to the question); a new text starts at its top.
+  const shownRef = useRef<{ pos: number; passage: string | null } | null>(null);
+  const curPosition = curItem?.position;
+  // A section's content arrives after its first item is current: the id changes then, for the same position.
+  const passageId = state && content && curItem ? itemPassage(content, curItem, itemQuestion(state, content, curItem))?.id ?? null : null;
+  useEffect(() => {
+    if (!curItem || scrolling || reviewOpen) return;
+    const prev = shownRef.current;
+    shownRef.current = { pos: curItem.position, passage: passageId };
+    const area = questionAreaRef.current;
+    if (focusQuestionRef.current) {
+      focusQuestionRef.current = false;
+      area?.focus({ preventScroll: true });
+    }
+    if (!prev || prev.pos === curItem.position) return;
+    if (area) area.scrollTop = 0;
+    const root = scrollRootRef.current;
+    if (passageId && prev.passage === passageId) {
+      const headerBottom = headerRef.current?.getBoundingClientRect().bottom ?? 0;
+      if (area && area.getBoundingClientRect().top < headerBottom) area.scrollIntoView({ block: "start" });
+    } else {
+      if (passageRef.current) passageRef.current.scrollTop = 0;
+      root?.scrollTo({ top: 0 });
+    }
+  }, [curPosition, passageId, scrolling, reviewOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The review page starts at the top of the player.
+  useEffect(() => {
+    if (reviewOpen) scrollRootRef.current?.scrollTo({ top: 0 });
+  }, [reviewOpen]);
 
   // ---- render ----
   if (loadError) {
@@ -598,24 +670,21 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
     // S7b, P11: the player's own layout as a skeleton, never a blank page with a sentence.
     return (
       <LoadingState label={t("player.loading")} className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-slate-50">
-        <div aria-hidden="true" className="border-b border-slate-200 bg-white">
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-2.5">
-            <div className="w-48 space-y-2">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-3 w-2/3" />
-            </div>
-            <Skeleton className="h-8 w-24 rounded-xl" />
+        <div aria-hidden="true" className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border-b border-slate-200 bg-white px-4 py-2.5 lg:px-8">
+          <div className="max-w-48 space-y-2">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-3 w-2/3" />
           </div>
-          <div className="h-1 w-full bg-slate-100" />
+          <Skeleton className="h-8 w-24 rounded-xl" />
+          <Skeleton className="ml-auto h-8 w-10 rounded-xl" />
         </div>
-        <div aria-hidden="true" className="mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 gap-5 px-4 py-5 lg:grid-cols-[minmax(0,1fr)_17rem]">
-          <QuestionSkeleton />
-          <div className="hidden rounded-2xl border border-slate-200 bg-white p-4 lg:block">
-            <Skeleton className="mb-3 h-4 w-24" />
-            <div className="grid grid-cols-5 gap-2">
-              {Array.from({ length: 10 }, (_, i) => <Skeleton key={i} className="h-10 rounded-xl" />)}
-            </div>
-          </div>
+        <div aria-hidden="true" className="w-full flex-1 px-4 py-5 lg:px-8">
+          <div className="mx-auto w-full max-w-4xl"><QuestionSkeleton /></div>
+        </div>
+        <div aria-hidden="true" className="grid h-16 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 border-t border-slate-200 bg-white px-4 lg:px-8">
+          <span />
+          <Skeleton className="h-11 w-36 rounded-xl" />
+          <Skeleton className="ml-auto h-11 w-24 rounded-xl" />
         </div>
       </LoadingState>
     );
@@ -628,7 +697,10 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
   const curSection = content.sections.find((s) => s.pos === (curItem?.section_pos ?? state.current_section_pos));
   const curInstructions = sectionText(curSection?.instructions, content.language ?? lang);
   const lastInSection = curIndex >= visibleItems.length - 1;
-  const progressPct = visibleItems.length ? Math.round((counts.answered / visibleItems.length) * 100) : 0;
+  const sectionOf = forwardOnly ? t("player.sectionOf", { n: state.current_section_pos, total: lastSectionPos }) : null;
+  const progressText = t("player.progress", { answered: counts.answered, total: visibleItems.length });
+  const saveProblem = ["offline", "error", "auth", "closed"].includes(snap.status);
+  const passageShown = !scrolling && !reviewOpen && !sectionError && !sectionLoading && !!passage && !!q;
   const finishLabel = forwardOnly && !isLastSection ? t("player.finishSection") : t("player.finishTest");
   const stickyTop = Math.round(headerH) + 8;
 
@@ -643,185 +715,144 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
     });
   };
 
+  const questionBlock = (item: AttemptItemState, question: NonNullable<typeof q>) => (
+    <>
+      <ItemView
+        key={item.position}
+        question={question}
+        choiceOrder={item.choice_order}
+        number={curIndex + 1}
+        total={visibleItems.length}
+        response={answers[item.position]?.response ?? null}
+        flagged={!!answers[item.position]?.flagged}
+        disabled={state.is_practice ? !!practice.fb[item.position] : undefined}
+        onChange={(r) => onAnswer(item.position, r)}
+        onToggleFlag={() => onToggleFlag(item.position)}
+      />
+      {state.is_practice ? (
+        <PracticeCheck
+          key={`practice-${item.position}`}
+          attemptId={attemptId}
+          position={item.position}
+          question={question}
+          feedback={practice.fb[item.position]}
+          answered={isAnswered(question.type, answers[item.position]?.response)}
+          flush={async () => queueRef.current?.flushNow()}
+          onChecked={practice.add}
+        />
+      ) : null}
+    </>
+  );
+
   return (
     <div ref={scrollRootRef} className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-slate-50">
-      <header ref={headerRef} className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2.5">
-          <div className="min-w-0 basis-full sm:basis-auto">
-            <p className="truncate text-sm font-bold text-slate-900">{sectionTitle(curItem?.section_pos ?? state.current_section_pos)}</p>
-            <p className="text-xs text-slate-600">
-              {t("player.progress", { answered: counts.answered, total: visibleItems.length })}
-              {forwardOnly ? ` · ${t("player.sectionOf", { n: state.current_section_pos, total: lastSectionPos })}` : ""}
-            </p>
-          </div>
-          {/* S11a, F7: a problem state (offline, error) may take its own line on phones instead of squeezing to one word per line.
-              Phase 8b UX: in scrolling mode the save pill is icon-only on phones and the row wraps rather than clipping
-              it if it still does not fit; one-per-page (ORT) keeps its layout. */}
-          <div className={cn(
-            "flex min-w-0 flex-1 items-center justify-between gap-3 sm:flex-none sm:justify-end",
-            (["offline", "error", "auth", "closed"].includes(snap.status) || deadline === null || scrolling) && "flex-wrap gap-y-2",
-          )}>
-            <SaveStatus snap={snap} onRetry={() => queueRef.current?.retryNow()} compact={scrolling} />
-            <div className="ml-auto flex shrink-0 items-center gap-2">
-              <DeadlineTimer deadlineMs={deadline} getNowMs={() => clock.now()} onExpire={onTimerExpire}
-                label={forwardOnly ? t("player.timer.sectionLeft") : t("player.timer.left")}
-                onTick={(rem) => queueRef.current?.setContinuous(rem <= LAST_MINUTE_MS)} />
-              <button
-                ref={paletteButtonRef}
-                type="button"
-                onClick={() => setPaletteOpen(true)}
-                aria-haspopup="dialog"
-                aria-expanded={paletteOpen}
-                aria-label={t("player.palette.openLabel", { n: curIndex + 1, total: visibleItems.length })}
-                className={cn(
-                  "relative inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50 lg:hidden",
-                  focusRing,
-                )}
-              >
-                <LayoutGrid className="h-4 w-4" aria-hidden="true" />
-                {t("player.palette.open", { n: curIndex + 1, total: visibleItems.length })}
-                {counts.flagged > 0 ? (
-                  <span aria-hidden="true" className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border border-white bg-amber-500" />
-                ) : null}
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className="h-1 w-full bg-slate-100" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPct} aria-label={t("player.progressBar")}>
-          <div className="h-1 bg-brand-600 transition-all" style={{ width: `${progressPct}%` }} />
-        </div>
-      </header>
-
+      <StudentViewBanner />
       {state.is_preview ? (
-        <div className="flex items-center justify-center gap-2 bg-amber-100 px-4 py-2 text-sm font-medium text-amber-900">
+        <div className="flex shrink-0 items-center justify-center gap-2 bg-amber-100 px-4 py-2 text-sm font-medium text-amber-900">
           <Eye className="h-4 w-4 shrink-0" aria-hidden="true" />
           {t("player.previewBanner")}
         </div>
       ) : null}
+
+      <PlayerTopBar
+        ref={headerRef}
+        sectionTitle={sectionTitle(curItem?.section_pos ?? state.current_section_pos)}
+        sectionOf={sectionOf}
+        instructions={curInstructions}
+        popup={barPopup}
+        onPopup={setBarPopup}
+        saveProblem={saveProblem}
+        save={<SaveStatus snap={snap} onRetry={() => queueRef.current?.retryNow()} compact />}
+        timer={(
+          <DeadlineTimer deadlineMs={deadline} getNowMs={() => clock.now()} onExpire={onTimerExpire}
+            label={forwardOnly ? t("player.timer.sectionLeft") : t("player.timer.left")}
+            onTick={(rem) => queueRef.current?.setContinuous(rem <= LAST_MINUTE_MS)}
+            hidden={timerHidden} onToggleHidden={toggleTimer} />
+        )}
+      />
+
       {otherTab ? (
-        <div role="alert" className="flex items-center justify-center gap-2 bg-red-50 px-4 py-2 text-sm font-medium text-red-800">
+        <div role="alert" className="flex shrink-0 items-center justify-center gap-2 bg-red-50 px-4 py-2 text-sm font-medium text-red-800">
           <TriangleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
           {t("player.otherTab")}
         </div>
       ) : null}
       {rejected.length > 0 ? (
-        <div role="alert" className="flex flex-wrap items-center justify-center gap-2 bg-red-50 px-4 py-2 text-sm text-red-800">
+        <div role="alert" className="flex shrink-0 flex-wrap items-center justify-center gap-2 bg-red-50 px-4 py-2 text-sm text-red-800">
           <TriangleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
           {t("player.rejected", { list: rejected.map((p) => p + 1).join(", ") })}
           <Button variant="link" size="sm" className="text-red-800" onClick={() => setRejected([])}>{t("player.dismiss")}</Button>
         </div>
       ) : null}
 
-      <main className="mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 gap-5 px-4 py-5 lg:grid-cols-[minmax(0,1fr)_17rem]">
-        <div className="min-w-0 space-y-4">
-          {/* --- Phase 8b S3 --- scrolling display mode (PHASE_8B_DESIGN 8.1); one-per-page (ORT) below is unchanged */}
-          {scrolling ? (
-            sectionError ? (
+      <main className={cn("w-full flex-1 px-4 py-5 lg:px-8", passageShown && "lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden lg:p-0")}>
+        {reviewOpen ? (
+          <SectionReview groups={paletteGroups} currentPosition={curItem?.position ?? -1} summary={progressText} finishLabel={finishLabel}
+            onJump={leaveReview} onFinish={finishPressed} />
+        ) : null}
+        {/* --- Phase 8b S3 --- scrolling display mode (PHASE_8B_DESIGN 8.1). The list stays mounted under the review
+            page (hidden), so coming back finds it as it was. */}
+        {scrolling ? (
+          <div className={reviewOpen ? "hidden" : undefined}>
+            {sectionError ? (
               <ErrorMessage error={sectionError} onRetry={() => setSectionRetry((n) => n + 1)} />
             ) : sectionLoading ? (
-              <LoadingState label={t("player.loading")}><QuestionSkeleton /></LoadingState>
+              <LoadingState label={t("player.loading")}><div className="mx-auto w-full max-w-4xl"><QuestionSkeleton /></div></LoadingState>
             ) : (
               <ScrollingItems state={state} content={content} visibleItems={visibleItems} currentPos={currentPos} answers={answers}
                 onAnswer={onAnswer} onToggleFlag={onToggleFlag} onCurrentChange={setCurrentPos} onNavigate={scrollToItem}
                 scrollRequest={scrollReq} scrollRootRef={scrollRootRef} headerHeight={headerH} stickyTop={stickyTop}
-                passageDisplay={state.passage_display ?? null} instructions={curInstructions} sectionTitle={sectionTitle}
-                forwardOnly={forwardOnly} finishLabel={finishLabel} onFinish={finishPressed} />
-            )
-          ) : (<>
-          {curInstructions ? (
-            <details className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700" open={curIndex === 0}>
-              <summary className="cursor-pointer py-1 font-semibold text-slate-800">{t("player.instructions")}</summary>
-              <p className="mt-2 whitespace-pre-line">{curInstructions}</p>
-            </details>
-          ) : null}
-
-          {sectionError ? (
-            <ErrorMessage error={sectionError} onRetry={() => setSectionRetry((n) => n + 1)} />
-          ) : sectionLoading ? (
-            <LoadingState label={t("player.loading")}><QuestionSkeleton /></LoadingState>
-          ) : curItem && q ? (
-            <>
-              {passage ? (
-                <PassageToggle passage={passage} open={passageOpen} controls={`passage-${passage.id}`} top={stickyTop} onToggle={togglePassage} />
-              ) : null}
-              <div ref={questionAreaRef} style={{ scrollMarginTop: stickyTop + 52 }} className={passage ? "grid grid-cols-1 gap-4 xl:grid-cols-2" : ""}>
-                {passage ? (
-                  <PassagePane ref={passageRef} id={`passage-${passage.id}`} passage={passage} open={passageOpen} scrollMarginTop={stickyTop + 52} display={state.passage_display} />
-                ) : null}
-                <ItemView
-                  key={curItem.position}
-                  question={q}
-                  choiceOrder={curItem.choice_order}
-                  number={curIndex + 1}
-                  total={visibleItems.length}
-                  response={answers[curItem.position]?.response ?? null}
-                  flagged={!!answers[curItem.position]?.flagged}
-                  disabled={state.is_practice ? !!practice.fb[curItem.position] : undefined}
-                  onChange={(r) => onAnswer(curItem.position, r)}
-                  onToggleFlag={() => onToggleFlag(curItem.position)}
-                />
-                {state.is_practice && q ? (
-                  <PracticeCheck
-                    key={`practice-${curItem.position}`}
-                    attemptId={attemptId}
-                    position={curItem.position}
-                    question={q}
-                    feedback={practice.fb[curItem.position]}
-                    answered={isAnswered(q.type, answers[curItem.position]?.response)}
-                    flush={async () => queueRef.current?.flushNow()}
-                    onChecked={practice.add}
-                  />
-                ) : null}
-              </div>
-            </>
-          ) : (
-            <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">{t("player.noQuestion")}</p>
-          )}
-
-          <div className="flex items-center justify-between gap-3">
-            <Button variant="secondary" className="sm:min-h-10" onClick={() => go(-1)} disabled={curIndex <= 0} leftIcon={<ChevronLeft className="h-4 w-4" aria-hidden="true" />}>
-              {t("player.prev")}
-            </Button>
-            {lastInSection ? (
-              <Button className="sm:min-h-10" onClick={finishPressed}>{finishLabel}</Button>
-            ) : (
-              <Button className="sm:min-h-10" onClick={() => go(1)} rightIcon={<ChevronRight className="h-4 w-4" aria-hidden="true" />}>
-                {t("player.next")}
-              </Button>
+                passageDisplay={state.passage_display ?? null} sectionTitle={sectionTitle}
+                forwardOnly={forwardOnly} onReview={openReview} />
             )}
           </div>
-          <p className="hidden text-xs text-slate-500 lg:block">{t("player.shortcuts")}</p>
-          </>)}
-        </div>
-
-        {/* Desktop: palette and the finish action beside the question. Phones and tablets use the sheet below. */}
-        {/* Phase 8b S3: in scrolling mode the palette stays in view while the list scrolls (one-per-page: unchanged) */}
-        <aside className={cn("hidden space-y-3 lg:block", scrolling && "lg:sticky lg:self-start")} style={scrolling ? { top: stickyTop } : undefined}>
-          <Palette groups={paletteGroups} currentPosition={curItem?.position ?? -1} onSelect={scrolling ? scrollToItem : setCurrentPos} />
-          <Button variant="secondary" fullWidth onClick={finishPressed} className="border-brand-600 text-brand-700 hover:bg-brand-50">
-            {finishLabel}
-          </Button>
-        </aside>
+        ) : reviewOpen ? null : sectionError ? (
+          <ErrorMessage error={sectionError} onRetry={() => setSectionRetry((n) => n + 1)} />
+        ) : sectionLoading ? (
+          <LoadingState label={t("player.loading")}><div className="mx-auto w-full max-w-4xl"><QuestionSkeleton /></div></LoadingState>
+        ) : curItem && q ? (
+          passage ? (
+            <>
+              <PassageToggle passage={passage} open={passageOpen} controls={`passage-${passage.id}`} top={stickyTop} onToggle={togglePassage} />
+              <SplitPassage
+                questionRef={questionAreaRef}
+                questionStyle={{ scrollMarginTop: stickyTop + 52 }}
+                passage={<PassagePane ref={passageRef} id={`passage-${passage.id}`} passage={passage} open={passageOpen} scrollMarginTop={stickyTop + 52} display={state.passage_display} fill />}
+              >
+                {questionBlock(curItem, q)}
+              </SplitPassage>
+            </>
+          ) : (
+            <div ref={questionAreaRef} tabIndex={-1} className="mx-auto w-full max-w-4xl space-y-4 outline-none">
+              {questionBlock(curItem, q)}
+            </div>
+          )
+        ) : (
+          <p className="mx-auto w-full max-w-4xl rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">{t("player.noQuestion")}</p>
+        )}
       </main>
 
-      <Dialog
+      <PlayerBottomBar
+        ref={paletteButtonRef}
+        onBack={reviewOpen ? closeReview : curIndex > 0 ? () => go(-1) : null}
+        onNext={reviewOpen ? null : lastInSection ? openReview : () => go(1)}
+        n={curIndex + 1}
+        total={visibleItems.length}
+        mapOpen={paletteOpen}
+        anyFlagged={counts.flagged > 0}
+        onOpenMap={() => setPaletteOpen(true)}
+      />
+
+      <QuestionMap
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
-        title={t("player.palette.title")}
-        description={t("player.progress", { answered: counts.answered, total: visibleItems.length })}
-        initialFocusRef={paletteCurrentRef}
-        className="mb-0 w-full max-w-none rounded-b-none sm:mb-auto sm:w-[calc(100%-2rem)] sm:max-w-md sm:rounded-b-2xl"
-        // S11a, F4: the finish action stays pinned in the footer; only the palette scrolls.
-        footer={(
-          <Button variant="secondary" fullWidth onClick={finishFromSheet} className="border-brand-600 text-brand-700 hover:bg-brand-50 sm:flex-1">
-            {finishLabel}
-          </Button>
-        )}
-      >
-        <aside>
-          <Palette groups={paletteGroups} currentPosition={curItem?.position ?? -1} onSelect={selectFromSheet} hideTitle currentRef={paletteCurrentRef} />
-        </aside>
-      </Dialog>
+        groups={paletteGroups}
+        currentPosition={curItem?.position ?? -1}
+        description={sectionOf ? `${progressText} · ${sectionOf}` : progressText}
+        currentRef={paletteCurrentRef}
+        onSelect={selectFromMap}
+        onReview={openReview}
+      />
 
       {dialog === "section" ? (
         <SectionEndDialog sectionTitle={sectionTitle(state.current_section_pos)} unanswered={counts.unanswered} flagged={counts.flagged}
