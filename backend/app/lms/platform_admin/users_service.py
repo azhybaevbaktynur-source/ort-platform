@@ -23,6 +23,8 @@ from app.models.user import User
 
 def get_user_or_404(db: Session, user_id: str) -> User:
     user = db.get(User, user_id)
+    if user is not None and user.is_test_student:  # Student view test students are not accounts to manage
+        user = None
     if user is None:
         raise NotFound("User not found", code="user_not_found")
     return user
@@ -55,7 +57,7 @@ def enable_user(db: Session, admin: User, user_id: str, request: Request) -> Use
 
 
 def search_users(q: Optional[str], teacher_status: Optional[str], disabled: Optional[bool]):
-    stmt = select(User)
+    stmt = select(User).where(User.is_test_student.is_(False))
     if q:
         term = q.strip().lower()
         if term:

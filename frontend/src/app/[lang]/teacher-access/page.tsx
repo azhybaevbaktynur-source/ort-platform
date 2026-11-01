@@ -49,7 +49,7 @@ export default function TeacherAccessPage() {
   }, [lang, reloadMe, router]);
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="max-w-3xl">
       <Link href={`/${lang}/courses`} className="inline-flex min-h-11 items-center text-sm font-medium text-brand-700 hover:underline sm:min-h-0">{t("teacherRequest.back")}</Link>
       <h1 className="mb-2 mt-2 text-2xl font-bold text-slate-900">{t("teacherAccess.title")}</h1>
       <p className="mb-6 text-base leading-6 text-slate-600 sm:text-sm">{t("teacherAccess.intro")}</p>

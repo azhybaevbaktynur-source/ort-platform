@@ -13,7 +13,7 @@ from tests.lms.s3_support import api, clean_rate_limits, db  # noqa: F401
 
 MODULE_KEYS = {"id", "title", "state", "unlock_at", "sequential", "completion_mode", "current_position",
                "lock_reasons", "items"}
-ITEM_KEYS = {"id", "kind", "title", "indent", "locked", "requirement", "link"}
+ITEM_KEYS = {"id", "kind", "title", "indent", "locked", "requirement", "link", "due_at"}
 REQ_KEYS = {"type", "threshold", "met", "best_score_percent"}
 LINK_KEYS = {"page_id", "file_id", "assignment_id", "assessment_id", "assignment_kind", "url"}
 FORBIDDEN = ("rules_version", "warnings", "created_by_id", "deleted_at", "body_md", "evaluated_rules_version",
@@ -118,3 +118,37 @@ async def test_staff_shape(db, api):
     codes = {(it["kind"], w_["code"]) for it in mod["items"] for w_ in it["warnings"]}
     assert ("page", "target_unpublished") in codes and ("assignment", "target_unpublished") in codes
     assert all("state" not in it and "locked" not in it for it in mod["items"])
+
+
+async def test_student_item_due_date_is_the_effective_one(db, api):
+    """UX rework: assignment rows carry the student's own due date; a locked row carries none."""
+    from datetime import timedelta
+
+    from app.lms.assignments.models import AssignmentOverride
+    from app.lms.core import clock
+
+    w = structure_world(db)
+    m = make_module(db, w.course, w.O)
+    n = clock.now()
+    plain = make_assignment(db, w.course, w.O, kind="text", due_at=n + timedelta(days=3))
+    moved = make_assignment(db, w.course, w.O, kind="text", due_at=n + timedelta(days=3))
+    plain_item = make_item(db, m, plain)
+    moved_item = make_item(db, m, moved)
+    page_item = make_item(db, m, make_page(db, w.course, w.O))
+    later = make_module(db, w.course, w.O, unlock_at=n + timedelta(days=1))  # locked by a future opening date
+    locked_item = make_item(db, later, make_assignment(db, w.course, w.O, kind="text", due_at=n + timedelta(days=3)))
+    db.add(AssignmentOverride(assignment_id=moved.id, enrollment_id=w.enr.id, course_id=w.course.id,
+                              due_at=n + timedelta(days=7)))
+    db.commit()
+    body = (await api.call(w.S, "GET", f"{C(w)}/modules")).json()
+    by_id = {it["id"]: it for it in body["modules"][0]["items"]}
+    assert by_id[str(plain_item.id)]["due_at"][:16] == (n + timedelta(days=3)).isoformat()[:16]
+    assert by_id[str(moved_item.id)]["due_at"][:16] == (n + timedelta(days=7)).isoformat()[:16]
+    assert by_id[str(page_item.id)]["due_at"] is None
+    # another student keeps the assignment's own date
+    body = (await api.call(w.S2, "GET", f"{C(w)}/modules")).json()
+    by_id = {it["id"]: it for it in body["modules"][0]["items"]}
+    assert by_id[str(moved_item.id)]["due_at"][:16] == (n + timedelta(days=3)).isoformat()[:16]
+    locked = body["modules"][1]["items"][0]
+    assert locked["id"] == str(locked_item.id) and locked["locked"] is True and locked["due_at"] is None
+

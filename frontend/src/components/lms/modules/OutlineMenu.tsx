@@ -15,6 +15,8 @@ export interface MenuGroup {
   id: string;
   /** Group heading (shown above its items); omit for an ungrouped list. */
   heading?: string;
+  /** A rule above a group without a heading. */
+  separated?: boolean;
   items: OutlineMenuItem[];
 }
 
@@ -23,8 +25,12 @@ export interface OutlineMenuProps {
   label: string;
   groups: MenuGroup[];
   onSelect: (id: string) => void;
-  /** `icon`: a 44 px "⋯" button; `button`: a labelled button with a chevron. */
+  /** `icon`: a 44 px icon button ("⋯" unless `icon` says otherwise); `button`: a labelled button with a chevron. */
   trigger?: "icon" | "button";
+  /** The icon of an `icon` trigger. */
+  icon?: React.ReactNode;
+  /** `button` trigger: show the chevron (default). */
+  chevron?: boolean;
   /** Visible text of a `button` trigger (default: `label`). */
   text?: React.ReactNode;
   leftIcon?: React.ReactNode;
@@ -37,7 +43,7 @@ export interface OutlineMenuProps {
 }
 
 export function OutlineMenu({
-  label, groups: rawGroups, onSelect, trigger = "icon", text, leftIcon, variant = "secondary", fullWidth, disabled, sheetTitle, className,
+  label, groups: rawGroups, onSelect, trigger = "icon", icon, chevron = true, text, leftIcon, variant = "secondary", fullWidth, disabled, sheetTitle, className,
 }: OutlineMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -101,11 +107,12 @@ export function OutlineMenu({
             "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900",
             "disabled:cursor-not-allowed disabled:opacity-60", focusRing,
           )}>
-          <Ellipsis aria-hidden="true" className="h-5 w-5" />
+          {icon ?? <Ellipsis aria-hidden="true" className="h-5 w-5" />}
         </button>
       ) : (
         <Button ref={buttonRef} variant={variant} size="sm" leftIcon={leftIcon} fullWidth={fullWidth} {...triggerProps}
-          rightIcon={<ChevronDown aria-hidden="true" className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />}>
+          aria-label={text !== undefined && text !== label ? label : undefined}
+          rightIcon={chevron ? <ChevronDown aria-hidden="true" className={cn("h-4 w-4 transition-transform", open && "rotate-180")} /> : undefined}>
           {text ?? label}
         </Button>
       )}
@@ -151,7 +158,12 @@ export function OutlineMenu({
                   <p id={headingId} className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-600">{g.heading}</p>
                   {body}
                 </div>
-              ) : <React.Fragment key={g.id}>{body}</React.Fragment>;
+              ) : (
+                <React.Fragment key={g.id}>
+                  {g.separated && <div role="separator" className="my-1 border-t border-slate-100" />}
+                  {body}
+                </React.Fragment>
+              );
             })}
           </div>
         </>

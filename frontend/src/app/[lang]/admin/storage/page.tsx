@@ -74,7 +74,7 @@ export default function AdminStoragePage() {
 
   return (
     <div>
-      <PageHeader title={t("storage.title")} description={t("storage.intro")} breadcrumbs={crumbs({ label: t("storage.nav") })} />
+      <PageHeader title={t("storage.title")} breadcrumbs={crumbs({ label: t("storage.nav") })} />
       {error && !summary ? <LoadError error={error} onRetry={() => void load()} /> : null}
       {error && summary ? <OrgError error={error} onRetry={() => void load()} className="mb-4" /> : null}
       {!summary && !error ? <LoadingState label={t("lms.common.loading")} /> : null}
@@ -89,7 +89,7 @@ export default function AdminStoragePage() {
           ) : null}
 
           <Card title={t("storage.totals.title")}>
-            <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <dl title={t("storage.totals.everWritten")} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div><dt className={dt}>{t("storage.totals.driver")}</dt><dd className={dd}>{summary.driver}</dd></div>
               <div><dt className={dt}>{t("storage.totals.stored")}</dt><dd className={dd}>{bytes(summary.stored_bytes)}</dd></div>
               <div><dt className={dt}>{t("storage.totals.objects")}</dt><dd className={dd}>{num(summary.object_count)}</dd></div>
@@ -103,18 +103,16 @@ export default function AdminStoragePage() {
             <p className="mt-2 text-sm text-slate-600">
               {t("storage.totals.limits", { warn: bytes(summary.warn_bytes), hard: bytes(summary.hard_bytes) })}
             </p>
-            <p className="mt-1 text-sm text-slate-600">{t("storage.totals.everWritten")}</p>
           </Card>
 
           <Card title={t("storage.month.title", { month: summary.month.month })}>
-            <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <dl title={t("storage.month.estimateNote")} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div><dt className={dt}>{t("storage.month.objectsWritten")}</dt><dd className={dd}>{num(summary.month.objects_written)}</dd></div>
               <div><dt className={dt}>{t("storage.month.bytesWritten")}</dt><dd className={dd}>{bytes(summary.month.bytes_written)}</dd></div>
               <div><dt className={dt}>{t("storage.month.classA")}</dt><dd className={dd}>{t("storage.month.ofFree", { n: num(summary.month.class_a), free: num(R2_FREE_CLASS_A) })}</dd></div>
               <div><dt className={dt}>{t("storage.month.classBBackend")}</dt><dd className={dd}>{num(summary.month.class_b_backend)}</dd></div>
               <div><dt className={dt}>{t("storage.month.classBEstimated")}</dt><dd className={dd}>{t("storage.month.ofFree", { n: num(summary.month.class_b_estimated), free: num(R2_FREE_CLASS_B) })}</dd></div>
             </dl>
-            <p className="mt-3 text-sm text-slate-600">{t("storage.month.estimateNote")}</p>
           </Card>
 
           <Card title={t("storage.smoke.title")} description={t("storage.smoke.hint")}>

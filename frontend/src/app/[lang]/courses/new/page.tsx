@@ -44,7 +44,7 @@ export default function NewCoursePage() {
   if (loading) return <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p>;
   if (me && !me.can_create_courses) {
     return (
-      <div className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-6">
+      <div className="max-w-xl rounded-2xl border border-slate-200 bg-white p-6">
         <p className="text-sm text-slate-700">{t("lms.errors.teacher_not_approved")}</p>
         <Link href={`/${lang}/courses/become-teacher`} className="mt-3 inline-block text-sm font-semibold text-brand-700 underline">{t("lms.nav.becomeTeacher")}</Link>
       </div>
@@ -83,7 +83,7 @@ export default function NewCoursePage() {
   };
 
   return (
-    <form onSubmit={submit} noValidate className="mx-auto max-w-2xl space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <form onSubmit={submit} noValidate className="max-w-3xl space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <h1 className="text-xl font-bold text-slate-900">{t("courses.create.title")}</h1>
       {/* --- Phase 6 S4b --- */}
       {chooseOrg && (

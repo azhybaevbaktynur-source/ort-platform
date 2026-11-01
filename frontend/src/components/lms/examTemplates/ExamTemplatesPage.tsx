@@ -87,7 +87,7 @@ export function ExamTemplatesPage({ area, breadcrumbs }: { area: TemplateArea; b
   const filtered = !!(status || scope);
   return (
     <div>
-      <PageHeader title={t("examTemplates.list.pageTitle")} description={t(`examTemplates.list.intro.${area.kind}`)}
+      <PageHeader title={t("examTemplates.list.pageTitle")}
         breadcrumbs={breadcrumbs} primaryAction={newButton} />
       <Table
         caption={t("examTemplates.list.pageTitle")}

@@ -11,7 +11,9 @@ from app.core.route_inventory import ROUTE_POLICIES
 from app.db import session as db_session
 from app.lms.assignments.ids import assignment_id_for
 from app.lms.core import clock
-from app.lms.home.schemas import COURSE_KEYS, HOME_KEYS, IN_PROGRESS_KEYS, NEXT_UP_KEYS, RESULT_KEYS
+from app.lms.home.schemas import (
+    COURSE_KEYS, HOME_KEYS, IN_PROGRESS_KEYS, NEXT_UP_KEYS, RESULT_KEYS, TODO_KEYS, TODO_MAX,
+)
 from app.lms.invitations.service import hash_token, new_token
 from app.lms.organizations.defaults import ensure_platform_org
 from app.lms.organizations.ids import platform_org_id
@@ -92,7 +94,8 @@ async def test_empty_home(db, api):
     assert set(body) == HOME_KEYS
     assert body == {"in_progress": [], "next_up": [], "latest_results": [], "courses": [], "courses_total": 0,
                     "pending_invitations": 0, "modules_next": [], "announcements": [],  # + Phase 8a S3
-                    "pending_applications": []}  # + Phase 9 S4
+                    "pending_applications": [],  # + Phase 9 S4
+                    "todo": []}  # + UX rework
 
 
 async def test_full_shape_and_no_private_fields(db, api):
@@ -425,8 +428,9 @@ async def test_statement_count_is_fixed(db, api):
             assert len(body["in_progress"]) == 3 and len(body["next_up"]) == 3 and len(body["latest_results"]) == 3
         counts[name] = len(c.statements)
         # user, courses (+total, in_progress), next_due, in_progress, next_up, results, attempts, invitations;
-        # Phase 8a S3: modules strip (+ its current items when any module is open), announcements
-        assert counts[name] <= 11, "\n".join(st[:120] for st in c.statements)
+        # Phase 8a S3: modules strip (+ its current items when any module is open), announcements;
+        # UX rework: todo's in-progress attempts (its other rows are the next_up statement's)
+        assert counts[name] <= 12, "\n".join(st[:120] for st in c.statements)
     assert counts["small"] == counts["big"], counts
 
 
@@ -619,3 +623,98 @@ async def test_modules_next_reads_caches_only(db, api):
     open_.published = False
     db.commit()
     assert (await home(api, w.S))["modules_next"] == []
+
+
+# ------------------------------------------------------------------ todo (UX_REWORK_DESIGN C)
+
+async def test_todo_order_overdue_and_links(db, api):
+    t = teacher(db)
+    s = make_user(db)
+    c = course(db, t)
+    enr = enroll(db, c, s)
+    n = now()
+    no_date = hand_in_assignment(db, c, t, "text")
+    later, _ = assessment(db, c, t, due_at=n + timedelta(days=3))
+    running, running_v = assessment(db, c, t, due_at=n + timedelta(days=9))
+    soon = hand_in_assignment(db, c, t, "file", due_at=n + timedelta(days=1))
+    late = hand_in_assignment(db, c, t, "text", due_at=n - timedelta(days=1))
+    attempt = make_attempt(db, running, running_v, s, enrollment=enr)
+    body = await home(api, s)
+    rows = body["todo"]
+    assert {frozenset(x) for x in rows} == {TODO_KEYS}
+    assert not (set(walk_keys(rows)) & FORBIDDEN), set(walk_keys(rows)) & FORBIDDEN
+    # in progress first (even with the latest date), then soonest due (overdue on top), no date last
+    assert [x["assignment_id"] for x in rows] == [str(assignment_id_for(running.id)), str(late.id), str(soon.id),
+                                                  str(assignment_id_for(later.id)), str(no_date.id)]
+    assert rows[0]["attempt_id"] == str(attempt.id) and rows[0]["assessment_id"] == str(running.id)
+    assert rows[0]["kind"] == "quiz" and rows[0]["overdue"] is False
+    assert all(x["attempt_id"] is None for x in rows[1:])
+    assert [x["overdue"] for x in rows] == [False, True, False, False, False]
+    assert rows[3]["assessment_id"] == str(later.id) and rows[1]["assessment_id"] is None
+    assert rows[1]["course_id"] == str(c.id) and rows[1]["course_title"] == {"en": "Course", "ru": "Course ru"}
+    assert rows[4]["due_at"] is None and rows[4]["available_until"] is None
+
+
+async def test_todo_excludes_what_cannot_be_done(db, api):
+    t = teacher(db)
+    s = make_user(db)
+    c = course(db, t)
+    enr = enroll(db, c, s)
+    n = now()
+    keep = hand_in_assignment(db, c, t, "text", due_at=n + timedelta(days=1))
+    hand_in_assignment(db, c, t, "text", published=False)  # unpublished
+    hand_in_assignment(db, c, t, "none")  # nothing to hand in
+    hand_in_assignment(db, c, t, "text", available_until=n - timedelta(minutes=1))  # closed
+    gone = hand_in_assignment(db, c, t, "file")
+    gone.deleted_at = n
+    done = hand_in_assignment(db, c, t, "file")
+    hand_in(db, done, enr, s)
+    draft, _ = assessment(db, c, t)
+    draft.status = "draft"  # unpublished quiz
+    db.commit()
+    used, used_v = assessment(db, c, t)  # its only attempt is used
+    grade_row(db, used, used_v, enr, s, 7)
+    # a draft course and another student's course never appear
+    hidden = course(db, t, title="Hidden", status="draft")
+    enroll(db, hidden, s)
+    hand_in_assignment(db, hidden, t, "text")
+    hand_in_assignment(db, course(db, t, title="Other"), t, "text")
+    assert [x["assignment_id"] for x in (await home(api, s))["todo"]] == [str(keep.id)]
+
+
+async def test_todo_uses_own_effective_dates(db, api):
+    t = teacher(db)
+    s, other = make_user(db), make_user(db)
+    c = course(db, t)
+    enr, other_enr = enroll(db, c, s), enroll(db, c, other)
+    n = now()
+    a, _ = assessment(db, c, t, due_at=n - timedelta(days=1))
+    b, bv = assessment(db, c, t, due_at=n + timedelta(days=5))
+    add_override(db, a, enr, due_at=n + timedelta(days=2))  # extended: no longer overdue
+    add_override(db, b, enr, due_at=n + timedelta(days=4))
+    add_override(db, b, other_enr, due_at=n + timedelta(days=6))
+    make_attempt(db, b, bv, s, enrollment=enr)
+    rows = (await home(api, s))["todo"]
+    assert [x["assessment_id"] for x in rows] == [str(b.id), str(a.id)]
+    assert rows[0]["due_at"][:16] == (n + timedelta(days=4)).isoformat()[:16]  # the running attempt's own date
+    assert rows[1]["due_at"][:16] == (n + timedelta(days=2)).isoformat()[:16] and rows[1]["overdue"] is False
+    rows = (await home(api, other))["todo"]
+    assert [x["assessment_id"] for x in rows] == [str(a.id), str(b.id)] and rows[0]["overdue"] is True
+
+
+async def test_todo_is_limited_in_progress_kept_and_next_up_is_its_head(db, api):
+    t = teacher(db)
+    s = make_user(db)
+    c = course(db, t)
+    enr = enroll(db, c, s)
+    n = now()
+    a, v = assessment(db, c, t)
+    make_attempt(db, a, v, s, enrollment=enr)
+    for i in range(TODO_MAX + 2):
+        hand_in_assignment(db, c, t, "text", due_at=n + timedelta(days=i + 1))
+    body = await home(api, s)
+    rows = body["todo"]
+    assert len(rows) == TODO_MAX
+    assert rows[0]["attempt_id"] is not None
+    assert all(x["attempt_id"] is None for x in rows[1:])
+    assert [x["assignment_id"] for x in body["next_up"]] == [x["assignment_id"] for x in rows[1:4]]

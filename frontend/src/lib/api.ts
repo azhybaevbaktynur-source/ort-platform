@@ -4,51 +4,100 @@ interface RequestOptions extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>;
 }
 
+// --- UX rework S1 begin --- (UX_REWORK_DESIGN F: Student view is a real session of the course's test student)
+// Per tab: `sessionStorage["studentView"] = {courseId, token, expiresAt}`. While it is set, every request of this tab
+// uses that token, so the server treats the tab as an ordinary student. The teacher's own `ort_token` stays untouched
+// in localStorage (other tabs keep working as the teacher); only entering and resetting send it.
+const STUDENT_VIEW_KEY = "studentView";
+
+export interface StudentViewSession {
+  courseId: string;
+  token: string;
+  /** ms since the epoch */
+  expiresAt: number;
+}
+
+export function getStudentView(): StudentViewSession | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(STUDENT_VIEW_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw) as StudentViewSession;
+    return v && v.token && v.courseId ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeStudentView(v: StudentViewSession | null): void {
+  try {
+    if (v) window.sessionStorage.setItem(STUDENT_VIEW_KEY, JSON.stringify(v));
+    else window.sessionStorage.removeItem(STUDENT_VIEW_KEY);
+  } catch {
+    // storage blocked: the tab simply stays the teacher's
+  }
+}
+
+function coursePage(courseId: string): string {
+  const m = window.location.pathname.match(/^\/(en|ky|ru)(?=\/|$)/);
+  return `/${m ? m[1] : "ru"}/courses/${encodeURIComponent(courseId)}`;
+}
+
+/** POST with the real teacher token (never the tab's test student). Errors carry `status` and `code`, as `LmsApiError`. */
+async function studentViewPost(path: string): Promise<StudentViewSession> {
+  const token = localStorage.getItem("ort_token");
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    cache: "no-store",
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    const code = data?.error?.code || (res.status === 403 ? "forbidden" : res.status === 404 ? "not_found" : "unknown");
+    throw Object.assign(new Error(code), { status: res.status, code, details: data?.error?.details || {} });
+  }
+  return { courseId: data.course_id, token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 };
+}
+
+/** Starts the mode in this tab and opens the course home as the test student. */
+export async function enterStudentView(courseId: string): Promise<void> {
+  const session = await studentViewPost(`/courses/${encodeURIComponent(courseId)}/student-view`);
+  storeStudentView(session);
+  window.location.assign(coursePage(courseId));
+}
+
+/** Retires the test student and continues as a new one (same tab, the course home). */
+export async function resetStudentView(): Promise<void> {
+  const current = getStudentView();
+  if (!current) return;
+  const session = await studentViewPost(`/courses/${encodeURIComponent(current.courseId)}/student-view/reset`);
+  storeStudentView(session);
+  window.location.assign(coursePage(current.courseId));
+}
+
+/** Ends the mode: back to the course as the teacher. */
+export function leaveStudentView(): void {
+  const current = getStudentView();
+  storeStudentView(null);
+  if (current) window.location.assign(coursePage(current.courseId));
+}
+
+/** Call on a 401: a dead test-student token ends the mode, and the teacher is never logged out by it. */
+export function studentViewUnauthorized(status: number): void {
+  if (status === 401 && getStudentView()) leaveStudentView();
+}
+// --- UX rework S1 end ---
+
 export async function getAuthHeader(): Promise<Record<string, string>> {
   // Backend JWT saved at login. Without it no header is sent and the API answers 401.
   if (typeof window !== "undefined") {
-    const token = localStorage.getItem("ort_token");
+    const token = getStudentView()?.token ?? localStorage.getItem("ort_token");
     if (token) {
       return { Authorization: `Bearer ${token}` };
     }
   }
   return {};
 }
-
-// --- Phase 8c S1 begin --- (PHASE_8C_DESIGN §6.2: read-only Student view)
-// The "Student view" button sets `sessionStorage["studentView:{courseId}"] = "1"`; while it is set, every request to
-// that course's routes (`/courses/{courseId}` and below) carries `X-View-As: student`. Never other courses, `/me/*`
-// or platform routes. The server downgrades only a real teacher/assistant role, for reads; it refuses writes
-// (403 `student_view_read_only`) except the staff preview attempt. The mode ends with the tab (sessionStorage).
-const STUDENT_VIEW_PREFIX = "studentView:";
-const COURSE_PATH = /(?:^|\/api\/v1)\/courses\/([0-9a-fA-F-]{36})(?=[/?#]|$)/;
-
-export function isStudentView(courseId: string | null | undefined): boolean {
-  if (!courseId || typeof window === "undefined") return false;
-  try {
-    return window.sessionStorage.getItem(STUDENT_VIEW_PREFIX + courseId) === "1";
-  } catch {
-    return false;
-  }
-}
-
-export function setStudentView(courseId: string, on: boolean): void {
-  if (typeof window === "undefined") return;
-  try {
-    if (on) window.sessionStorage.setItem(STUDENT_VIEW_PREFIX + courseId, "1");
-    else window.sessionStorage.removeItem(STUDENT_VIEW_PREFIX + courseId);
-  } catch {
-    // storage blocked: the mode simply does not start
-  }
-}
-
-/** `{ "X-View-As": "student" }` for a request path of a course in Student view, else `{}`. `path` is relative to the
- * API base (`/courses/...`) or a full URL path (`/api/v1/courses/...`). */
-export function viewAsHeader(path: string): Record<string, string> {
-  const m = path.split("?", 1)[0].match(COURSE_PATH);
-  return m && isStudentView(m[1]) ? { "X-View-As": "student" } : {};
-}
-// --- Phase 8c S1 end ---
 
 export async function apiClient<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
   const { params, headers = {}, ...customConfig } = options;
@@ -81,7 +130,6 @@ export async function apiClient<T>(endpoint: string, options: RequestOptions = {
   const reqHeaders: Record<string, string> = {
     ...(!isFormData && { "Content-Type": "application/json" }),
     ...authHeader,
-    ...viewAsHeader(cleanEndpoint), // Phase 8c S1
     ...(headers as Record<string, string>),
   };
 
@@ -104,6 +152,7 @@ export async function apiClient<T>(endpoint: string, options: RequestOptions = {
   }
 
   if (!response.ok) {
+    studentViewUnauthorized(response.status);
     let errorDetail = `API Request Failed (${response.status})`;
     try {
       const contentType = response.headers.get("content-type") || "";

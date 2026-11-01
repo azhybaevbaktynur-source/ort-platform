@@ -90,4 +90,7 @@ The backfill was checked on production-shaped data.
   - `frontend/e2e/catalog-apply.spec.ts`: form, catalog, landing, apply, approve or reject, withdraw, `form_auto`.
 
 ## Deploy
-(filled in after the gates and the deploy)
+- Gates on merged `phase-9` (f40609f): SQLite 3623 passed / 45 skipped; PG 3698 passed / 24 skipped; fresh PG `alembic upgrade head && alembic check` clean; PG migration tests 42 passed; importers diff empty; i18n parity OK (4265 keys); `tsc` clean; `next build` OK; e2e (9 specs incl. `org-admin`, `catalog-apply`, `ort`, `ort-visual`) green twice, ORT zero diffs.
+- Read-only production preflight before the migration: 1 organization (no parents), 4 banks (1 quiz bank), 3 courses, 0 invitations.
+- Neon backup branch `backup-2026-11-01-before-phase9` (`br-gentle-pine-b2devg4p`) — **Neon branches now 10/10**: the next migration deploy needs the owner's OK to delete an old backup.
+- `phase-9` → `lms` (21ec372) → `main` (636d14a). `/health` = 636d14a; Neon `alembic_version` = `0014_phase9_organizations_forms`; backfill verified (platform org kind/depth, all banks private, every course has `catalog_search`); data intact (300 question versions, 2 ORT exams).

@@ -1,17 +1,20 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/context";
 import { addStaff, changeEnrollmentRole, listPeople, removeEnrollment } from "@/lib/lms/courses";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
 import { isStaffCourse, type CourseRole, type RosterEntryOut, type StaffPublicOut } from "@/lib/lms/types";
 import { useCourse } from "@/components/lms/CourseContext";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
+import { JoinCodeDisplay } from "@/components/lms/JoinCodeDisplay";
+import { Disclosure } from "@/components/lms/admin/Disclosure";
 import { Pager } from "@/components/lms/Pager";
 import { RosterTable } from "@/components/lms/RosterTable";
 // --- Phase 6b S5c: staff people tab on the design system ---
 import { useListCount } from "@/components/lms/course/StaffCourseUi";
-import { Button, Card, ConfirmDialog, EmptyState, Input, LoadingState, PageHeader, SearchInput, Select } from "@/components/ui";
+import { Button, ConfirmDialog, EmptyState, Input, LoadingState, PageHeader, SearchInput, Select } from "@/components/ui";
 // --- Phase 6b S5c end ---
 // --- Phase 6 S4b: invite staff without an account ---
 import { createCourseStaffInvitation } from "@/lib/lms/invitations";
@@ -207,32 +210,6 @@ export default function PeoplePage() {
   );
   const rosterTab = (
     <div className="space-y-6">
-      {canManage && (
-        <Card as="section" title={t("courses.people.addStaff")}>
-        <form onSubmit={submitAdd} noValidate>
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
-            <Input id="staff-email" type="email" label={t("courses.people.email")} value={email} disabled={adding || inviting}
-              onChange={(e) => { setEmail(e.target.value); setInviteEmail(null); }} />
-            <Select id="staff-role" label={t("courses.people.role")} value={addRole} disabled={adding || inviting}
-              onChange={(e) => setAddRole(e.target.value as "teacher" | "assistant")}
-              options={[{ value: "assistant", label: t("courses.roles.assistant") }, ...(isOwner ? [{ value: "teacher", label: t("courses.roles.teacher") }] : [])]} />
-            <Button type="submit" variant="secondary" loading={adding} disabled={!email.trim()}>{t("courses.people.add")}</Button>
-          </div>
-          <ErrorMessage error={addError} className="mt-3" />
-          {/* --- Phase 6 S4b --- */}
-          {inviteEmail && (
-            <div role="status" className="mt-3 space-y-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
-              <p>{t("invitations.staff.noAccount", { email: inviteEmail })}</p>
-              <Button variant="secondary" loading={inviting} onClick={() => void sendInvite()}>{t("invitations.staff.send")}</Button>
-              <p className="text-xs">{t("invitations.staff.sentHint")}</p>
-              <OrgError error={inviteError} />
-            </div>
-          )}
-          {/* --- Phase 6 S4b end --- */}
-        </form>
-        </Card>
-      )}
-
       <div className="grid gap-3 sm:grid-cols-[auto_auto_minmax(0,1fr)] sm:items-end">
         <Select id="f-role" label={t("courses.people.role")} value={role} onChange={(e) => setRole(e.target.value)}
           options={[
@@ -267,6 +244,32 @@ export default function PeoplePage() {
         />
       )}
 
+      {canManage && (
+        <Disclosure title={t("courses.people.addStaff")}>
+        <form onSubmit={submitAdd} noValidate>
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
+            <Input id="staff-email" type="email" label={t("courses.people.email")} value={email} disabled={adding || inviting}
+              onChange={(e) => { setEmail(e.target.value); setInviteEmail(null); }} />
+            <Select id="staff-role" label={t("courses.people.role")} value={addRole} disabled={adding || inviting}
+              onChange={(e) => setAddRole(e.target.value as "teacher" | "assistant")}
+              options={[{ value: "assistant", label: t("courses.roles.assistant") }, ...(isOwner ? [{ value: "teacher", label: t("courses.roles.teacher") }] : [])]} />
+            <Button type="submit" variant="secondary" loading={adding} disabled={!email.trim()}>{t("courses.people.add")}</Button>
+          </div>
+          <ErrorMessage error={addError} className="mt-3" />
+          {/* --- Phase 6 S4b --- */}
+          {inviteEmail && (
+            <div role="status" className="mt-3 space-y-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
+              <p>{t("invitations.staff.noAccount", { email: inviteEmail })}</p>
+              <Button variant="secondary" loading={inviting} onClick={() => void sendInvite()}>{t("invitations.staff.send")}</Button>
+              <p className="text-xs">{t("invitations.staff.sentHint")}</p>
+              <OrgError error={inviteError} />
+            </div>
+          )}
+          {/* --- Phase 6 S4b end --- */}
+        </form>
+        </Disclosure>
+      )}
+
       {/* --- Phase 7a S5: accommodations per student (teacher only, PHASE_7A_DESIGN 4.4) --- */}
       {isTeacher && course.status !== "concluded" && <AccommodationsSection courseId={course.id} />}
       {/* --- Phase 7a S5 end --- */}
@@ -279,6 +282,23 @@ export default function PeoplePage() {
       {/* Phase 9 S3: "Invite students" is the page's primary action; the content sits in tabs. */}
       <PageHeader title={t("courses.people.tab")} className="mb-2"
         primaryAction={canManage && course.status !== "concluded" ? inviteButton : undefined} />
+      {/* UX rework D: the join code (it was in the Course page's To do panel). Teachers and assistants; settings for teachers. */}
+      {(isTeacher || myRole === "assistant") && !course.my_enrollment.read_only && course.join_code && (
+        <section aria-labelledby="people-join-code" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-slate-200 bg-white px-4 py-3">
+          <h2 id="people-join-code" className="text-sm font-semibold text-slate-800">{t("courses.settings.joinCode")}</h2>
+          <JoinCodeDisplay code={course.join_code} />
+          {isTeacher && (
+            <Link href={`/${lang}/courses/${course.id}/settings`} className="inline-flex min-h-11 items-center rounded text-sm font-medium text-brand-700 underline-offset-2 hover:underline sm:min-h-0">
+              {t("teaching.manageEnrollment")}
+            </Link>
+          )}
+          {!(course.status === "published" && course.enrollment_mode === "invite_code") && (
+            <p className="w-full text-sm leading-6 text-warning-800">
+              {course.status === "published" ? t("todo.joinCodeOff") : t("courses.settings.joinCodeInactiveUnpublished")}
+            </p>
+          )}
+        </section>
+      )}
       <PeopleTabs
         value={tab}
         onChange={setTab}

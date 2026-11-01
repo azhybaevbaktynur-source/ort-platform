@@ -5,7 +5,8 @@ Server-limited, no N+1: a fixed number of statements whatever the number of cour
 1. courses page (max 10) + total (window count) + per-course `in_progress` (correlated EXISTS);
 2. per-course `next_due_at` for that page (one grouped query; skipped without courses);
 3. in-progress attempts (max 3);
-4. next up (max 3; attempts left as a correlated count);
+4. listable assignments (max `TODO_MAX`; attempts left as a correlated count): `todo` and, its first 3 rows, next up;
+4b. in-progress attempts with their effective dates (max `TODO_MAX`): the head of `todo`;
 5. latest released results (max 3; quiz: the results-policy gate is in SQL, same rule as `/grades/mine`; manual
    grades: released);
 6. the caller's counted attempts on those quiz results (personal best; skipped without quiz results);
@@ -57,9 +58,16 @@ def _utc(dt: Optional[datetime]) -> Optional[datetime]:
 
 
 def _mine(user_id: str):
-    """The caller's active student enrollments in live, non-draft courses (students cannot read drafts)."""
+    """The caller's active student enrollments in live, non-draft courses (students cannot read drafts; a test
+    student works in its draft course, UX rework S1)."""
     return and_(Enrollment.user_id == user_id, Enrollment.role == "student", Enrollment.state == "active",
-                Course.id == Enrollment.course_id, Course.deleted_at.is_(None), Course.status != "draft")
+                Course.id == Enrollment.course_id, Course.deleted_at.is_(None),
+                or_(Course.status != "draft", Enrollment.is_test_student.is_(True)))
+
+
+def _open_course():
+    """A published course, or the draft course of the caller's test student enrollment (UX rework S1)."""
+    return or_(Course.status == "published", and_(Course.status == "draft", Enrollment.is_test_student.is_(True)))
 
 
 def _used(user_id: str):
@@ -123,7 +131,7 @@ def _listable(user_id: str, now: datetime, used):
                    Assignment.deleted_at.is_(None), ~handed_in)
     until = _eff_until()
     return and_(
-        Course.status == "published", Organization.status == "active", Organization.deleted_at.is_(None),
+        _open_course(), Organization.status == "active", Organization.deleted_at.is_(None),
         or_(until.is_(None), until > now),
         or_(quiz, hand_in),
     )
@@ -171,26 +179,63 @@ def _in_progress(db: Session, uid: str) -> list[sch.HomeInProgressOut]:
             for aid, asid, at, cid, ct, started in rows]
 
 
-def _next_up(db: Session, uid: str, now: datetime) -> list[sch.HomeNextUpOut]:
+def _listable_rows(db: Session, uid: str, now: datetime) -> list:
+    """What the student can still do, soonest due first, no date last. One statement behind `next_up` and `todo`."""
     used = _used(uid)
     due, until, allowed = _eff_due(), _eff_until(), _eff_allowed()
-    rows = db.execute(
+    return db.execute(
         _assignments_of_mine(
             select(Assignment.id, Assignment.kind, Assignment.assessment_id, Assignment.course_id, Course.title,
                    Assignment.title, due.label("due"), until.label("until"), allowed.label("allowed"),
                    used.label("used")))
         .where(_mine(uid), _listable(uid, now, used))
         .order_by(due.is_(None), due, until.is_(None), until, Assignment.id)
-        .limit(sch.NEXT_UP_MAX)
+        .limit(sch.TODO_MAX)
     ).all()
+
+
+def _next_up(rows: list) -> list[sch.HomeNextUpOut]:
     out = []
-    for r in rows:
+    for r in rows[:sch.NEXT_UP_MAX]:
         left = None
         if r.kind == "quiz" and r.allowed is not None and r.allowed != -1:
             left = max(int(r.allowed) - int(r.used or 0), 0)
         out.append(sch.HomeNextUpOut(
             assignment_id=r.id, kind=r.kind, assessment_id=r.assessment_id, course_id=r.course_id,
             course_title=r[4], title=r[5], due_at=_utc(r.due), available_until=_utc(r.until), attempts_left=left))
+    return out
+
+
+def _todo(db: Session, uid: str, now: datetime, listable: list) -> list[sch.HomeTodoOut]:
+    """The dashboard's "to do": in-progress attempts first, then `_listable_rows` order, at most `TODO_MAX` rows. An
+    assessment with an open attempt is never in `listable`, so nothing is listed twice. Dates are the caller's
+    effective ones; the attempt's assessment is the truth for a quiz (same rule as `_base`)."""
+    due, until = func.coalesce(O.due_at, Assessment.due_at), func.coalesce(O.available_until, Assessment.available_until)
+    running = db.execute(
+        select(Attempt.id, Attempt.assessment_id, Assignment.id.label("assignment_id"), Attempt.course_id,
+               Course.title.label("course_title"), Assessment.title.label("title"), due.label("due"),
+               until.label("until"))
+        .select_from(Attempt).join(Enrollment, Enrollment.id == Attempt.enrollment_id)
+        .join(Course, Course.id == Enrollment.course_id)
+        .join(Assessment, Assessment.id == Attempt.assessment_id)
+        .outerjoin(Assignment, Assignment.assessment_id == Assessment.id)
+        .outerjoin(O, and_(O.assignment_id == Assignment.id, O.enrollment_id == Enrollment.id))
+        .where(_mine(uid), Attempt.user_id == uid, Attempt.status == "in_progress", Attempt.is_preview.is_(False),
+               Assessment.deleted_at.is_(None))
+        .order_by(due.is_(None), due, Attempt.started_at.desc(), Attempt.id.desc()).limit(sch.TODO_MAX)
+    ).all()
+
+    def overdue(value) -> bool:
+        return value is not None and _utc(value) < _utc(now)
+
+    out = [sch.HomeTodoOut(kind="quiz", assignment_id=r.assignment_id, assessment_id=r.assessment_id, attempt_id=r.id,
+                           course_id=r.course_id, course_title=r.course_title, title=r.title, due_at=_utc(r.due),
+                           available_until=_utc(r.until), overdue=overdue(r.due))
+           for r in running]
+    for r in listable[:sch.TODO_MAX - len(out)]:
+        out.append(sch.HomeTodoOut(kind=r.kind, assignment_id=r.id, assessment_id=r.assessment_id, course_id=r.course_id,
+                                   course_title=r[4], title=r[5], due_at=_utc(r.due), available_until=_utc(r.until),
+                                   overdue=overdue(r.due)))
     return out
 
 
@@ -289,7 +334,7 @@ def _modules_next(db: Session, uid: str) -> list[sch.HomeModuleNextOut]:
         .select_from(Enrollment).join(Course, Course.id == Enrollment.course_id)
         .join(ModuleProgress, ModuleProgress.enrollment_id == Enrollment.id)
         .join(CourseModule, CourseModule.id == ModuleProgress.module_id)
-        .where(_mine(uid), Course.status == "published", CourseModule.course_id == Course.id,
+        .where(_mine(uid), _open_course(), CourseModule.course_id == Course.id,
                CourseModule.deleted_at.is_(None), CourseModule.published.is_(True),
                ModuleProgress.state.in_(("unlocked", "started")))
         .order_by(Course.id, CourseModule.position, CourseModule.id).limit(MODULES_SCAN_MAX)
@@ -363,8 +408,9 @@ def home(db: Session, user: User) -> sch.HomeOut:
                                  is_platform_course=org_id == platform, next_due_at=due.get(cid),
                                  in_progress=bool(in_prog))
                for cid, title, org_id, owner, in_prog, _total in course_rows]
+    listable = _listable_rows(db, uid, now)
     return sch.HomeOut(
-        in_progress=_in_progress(db, uid), next_up=_next_up(db, uid, now),
+        in_progress=_in_progress(db, uid), next_up=_next_up(listable), todo=_todo(db, uid, now, listable),
         latest_results=_latest_results(db, uid, now), courses=courses, courses_total=total,
         pending_invitations=_pending_invitations(db, user, now),
         # --- Phase 8a S3 begin ---

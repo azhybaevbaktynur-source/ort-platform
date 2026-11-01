@@ -15,6 +15,7 @@ import {
 import { useOrg } from "@/components/lms/org/OrgShell";
 import { InviteDialog, toastInvitationSent } from "@/components/lms/org/InviteDialog";
 import { OrgBadge, OrgError } from "@/components/lms/org/OrgUi";
+import { OutlineMenu } from "@/components/lms/modules/OutlineMenu";
 import { useCursorList, useDebounced } from "@/components/lms/admin/useCursorList";
 import { MoreError, useTableState } from "@/components/lms/admin/ListParts";
 
@@ -96,9 +97,9 @@ export default function OrgTeachersPage() {
     {
       key: "actions", header: "", actions: true, align: "right",
       cell: (m) => m.user.id === me?.id ? null : (
-        <Button variant="secondary" size="sm" disabled={readOnly} onClick={() => { setDialogError(null); setRemoving(m); }}>
-          {t("organizations.members.remove")}
-        </Button>
+        <OutlineMenu label={t("organizations.members.actionsFor", { name: m.user.display_name || m.user.email })} disabled={readOnly}
+          groups={[{ id: "member", items: [{ id: "remove", label: t("organizations.members.remove"), danger: true }] }]}
+          onSelect={() => { setDialogError(null); setRemoving(m); }} />
       ),
     },
   ];
@@ -126,12 +127,17 @@ export default function OrgTeachersPage() {
     {
       key: "actions", header: "", actions: true, align: "right",
       cell: (i) => (i.state === "pending" || i.state === "expired") ? (
-        <span className="flex w-full flex-wrap gap-2 sm:w-auto sm:flex-col sm:items-end">
-          <Button variant="secondary" size="sm" disabled={readOnly} loading={resendingId === i.id} onClick={() => void resend(i)}>{t("invitations.resend")}</Button>
-          {i.state === "pending" && (
-            <Button variant="secondary" size="sm" disabled={readOnly} onClick={() => { setDialogError(null); setRevoking(i); }}>{t("invitations.revoke")}</Button>
-          )}
-        </span>
+        <OutlineMenu label={t("organizations.members.actionsFor", { name: i.email })} disabled={readOnly || resendingId === i.id}
+          groups={[{
+            id: "invitation", items: [
+              { id: "resend", label: t("invitations.resend") },
+              ...(i.state === "pending" ? [{ id: "revoke", label: t("invitations.revoke"), danger: true }] : []),
+            ],
+          }]}
+          onSelect={(id) => {
+            if (id === "resend") void resend(i);
+            else { setDialogError(null); setRevoking(i); }
+          }} />
       ) : null,
     },
   ];

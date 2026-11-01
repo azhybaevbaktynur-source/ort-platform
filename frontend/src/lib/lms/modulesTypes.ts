@@ -158,6 +158,8 @@ export interface ItemStudentOut {
   locked: boolean;
   requirement: RequirementStudentOut | null;
   link: ItemLinkOut | null;
+  /** UX rework: assignment rows, the student's own due date (absent on an older backend) */
+  due_at?: string | null;
 }
 
 export interface ModuleStudentOut {

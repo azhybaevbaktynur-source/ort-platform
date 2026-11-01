@@ -25,6 +25,7 @@ from app.lms.assignments.models import Assignment
 from app.lms.core.errors import Forbidden
 from app.lms.courses import service as course_svc
 from app.lms.courses.models import Course
+from app.lms.enrollments.models import not_test_enrollment
 from app.lms.grading.models import Submission
 
 STAFF_ROLES = ("teacher", "assistant")
@@ -54,7 +55,7 @@ def todo(db: Session, ctx: AuthzContext, course: Course) -> sch.TodoOut:
 
     pending = and_(Submission.course_id == course.id, Submission.state == "pending_review",
                    Assignment.course_id == course.id, Assignment.deleted_at.is_(None),
-                   Assignment.published.is_(True))
+                   Assignment.published.is_(True), not_test_enrollment(Submission.enrollment_id))
     joined = select(Submission.assignment_id).join(Assignment, Assignment.id == Submission.assignment_id)
     grouped = db.execute(
         select(Submission.assignment_id, func.count(), func.min(Submission.computed_at))

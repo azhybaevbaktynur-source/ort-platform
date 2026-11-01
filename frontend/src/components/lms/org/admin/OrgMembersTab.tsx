@@ -84,7 +84,7 @@ export function OrgMembersTab({ org, role, onChanged }: { org: OrganizationOut; 
   const addLabel = t(isAdmins ? "organizations.members.assignAdmin" : "organizations.members.addTeacher");
   return (
     <div className="space-y-4">
-      <Card title={addLabel} headingLevel={3} description={t(isAdmins ? "organizations.members.assignAdminHint" : "organizations.members.addTeacherHint")}>
+      <Card title={addLabel} headingLevel={3}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="min-w-0 flex-1">
             <UserPicker label={t("organizations.members.person")} value={picked} onChange={setPicked} search={search}

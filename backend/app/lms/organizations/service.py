@@ -365,7 +365,8 @@ def usage(db: Session, org: Organization) -> dict:
         org_admins=roles.get("org_admin", 0), teachers=roles.get("teacher", 0),
         courses=db.execute(select(func.count()).select_from(courses.subquery())).scalar_one(),
         students=db.execute(select(func.count(distinct(Enrollment.user_id))).where(
-            Enrollment.course_id.in_(courses), Enrollment.role == "student", Enrollment.state == "active")
+            Enrollment.course_id.in_(courses), Enrollment.role == "student", Enrollment.state == "active",
+            Enrollment.is_test_student.is_(False))
         ).scalar_one(),
         banks=db.execute(select(func.count()).select_from(banks.subquery())).scalar_one(),
         questions=db.execute(select(func.count()).select_from(BankQuestion).where(

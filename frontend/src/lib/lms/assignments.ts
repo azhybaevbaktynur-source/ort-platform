@@ -1,5 +1,5 @@
 // Phase 7a S5: assignments API client (docs/phases/PHASE_7A_DESIGN.md sections 4.1-4.3). Types in assignmentTypes.ts.
-import { getAuthHeader } from "@/lib/api";
+import { getAuthHeader, studentViewUnauthorized } from "@/lib/api";
 import { API_BASE_URL } from "@/lib/apiBase";
 import { LmsApiError, lmsFetch } from "./client";
 import type { PageOut } from "./types";
@@ -104,6 +104,7 @@ export async function openSubmissionFile(courseId: string, submissionId: string,
     throw new LmsApiError(0, "network", "Network error");
   }
   if (!res.ok) {
+    studentViewUnauthorized(res.status); // UX rework S1
     let data: unknown = undefined;
     try { data = JSON.parse(await res.text()); } catch { data = undefined; }
     throw parseError(res, data);

@@ -3,8 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
-import { startAssessmentAttempt, startPreview } from "@/lib/lms/assessments";
-import { isStudentView } from "@/lib/api"; // Phase 8c S1
+import { startAssessmentAttempt } from "@/lib/lms/assessments";
 import { LOBBY_REASONS, previewAttemptId, type AssessmentLobbyOut } from "@/lib/lms/assessmentTypes";
 import { pickLocalized } from "@/lib/lms/localized";
 import type { Lang } from "@/lib/lms/types";
@@ -57,16 +56,11 @@ export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {
   // --- Phase 7a S5 end ---
 
   const start = async () => {
-    // Phase 8c S1 (PHASE_8C_DESIGN 6.2): in the read-only Student view "Start" opens the staff preview attempt (never
-    // counted, graded or listed); every other start is refused there by the server
-    const viewing = isStudentView(course.id);
-    if (!viewing && needsCode && !accessCode.trim()) { setError({ code: "access_code_required" }); return; } // Phase 7a S5
+    if (needsCode && !accessCode.trim()) { setError({ code: "access_code_required" }); return; } // Phase 7a S5
     setBusy(true);
     setError(null);
     try {
-      const out = viewing
-        ? await startPreview(course.id, lobby.id, language)
-        : needsCode // Phase 7a S5
+      const out = needsCode // Phase 7a S5
         ? await startAttemptWithCode(course.id, lobby.id, language, accessCode)
         : await startAssessmentAttempt(course.id, lobby.id, language);
       const id = previewAttemptId(out);

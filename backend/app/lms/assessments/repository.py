@@ -16,6 +16,7 @@ from app.lms.attempts.models import Attempt
 from app.lms.content import repository as content_repo
 from app.lms.content.models import BankQuestion
 from app.lms.core.errors import NotFound
+from app.lms.enrollments.models import not_test_enrollment
 
 CHUNK = 500
 SUBMITTED_STATUSES = ("submitted", "needs_review", "graded")
@@ -162,7 +163,8 @@ def attempt_counts(db: Session, assessment_ids: list[uuid.UUID]) -> dict[uuid.UU
         return out
     rows = db.execute(
         select(Attempt.assessment_id, Attempt.status, func.count())
-        .where(Attempt.assessment_id.in_(assessment_ids), Attempt.is_preview.is_(False))
+        .where(Attempt.assessment_id.in_(assessment_ids), Attempt.is_preview.is_(False),
+               not_test_enrollment(Attempt.enrollment_id))
         .group_by(Attempt.assessment_id, Attempt.status)
     ).all()
     for aid, status, n in rows:
@@ -179,7 +181,8 @@ def version_attempt_counts(db: Session, version_ids: list[uuid.UUID]) -> dict[uu
         return out
     rows = db.execute(
         select(Attempt.assessment_version_id, Attempt.status, func.count())
-        .where(Attempt.assessment_version_id.in_(version_ids), Attempt.is_preview.is_(False))
+        .where(Attempt.assessment_version_id.in_(version_ids), Attempt.is_preview.is_(False),
+               not_test_enrollment(Attempt.enrollment_id))
         .group_by(Attempt.assessment_version_id, Attempt.status)
     ).all()
     for vid, status, n in rows:
@@ -193,7 +196,8 @@ def version_attempt_counts(db: Session, version_ids: list[uuid.UUID]) -> dict[uu
 def has_open_attempts(db: Session, assessment_id: uuid.UUID) -> bool:
     return db.execute(
         select(Attempt.id).where(Attempt.assessment_id == assessment_id, Attempt.status == "in_progress",
-                                 Attempt.is_preview.is_(False)).limit(1)
+                                 Attempt.is_preview.is_(False),
+                                 not_test_enrollment(Attempt.enrollment_id)).limit(1)
     ).first() is not None
 
 

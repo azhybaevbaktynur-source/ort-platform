@@ -3,7 +3,8 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { listDepartments, moveOrgCourse, type DepartmentOut } from "@/lib/lms/organizations";
-import { Button, Card, Select, toast } from "@/components/ui";
+import { Button, Select, toast } from "@/components/ui";
+import { Disclosure } from "@/components/lms/admin/Disclosure";
 import { OrgError } from "./OrgUi";
 
 /**
@@ -55,7 +56,7 @@ export function CourseDepartmentCard({ orgId, courseId, current, readOnly, onMov
   };
 
   return (
-    <Card title={t("departments.courseDepartment")} description={t("departments.courseDepartmentHint")}>
+    <Disclosure title={t("departments.courseDepartment")}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="min-w-0 flex-1">
           <Select id="course-department" label={t("departments.usageDepartment")} value={target}
@@ -66,6 +67,6 @@ export function CourseDepartmentCard({ orgId, courseId, current, readOnly, onMov
         </Button>
       </div>
       {error ? <div className="mt-3"><OrgError error={error} /></div> : null}
-    </Card>
+    </Disclosure>
   );
 }

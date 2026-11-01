@@ -492,3 +492,31 @@ Implementation decisions:
 | P9-7 | Answers visible to course staff and the applicant only, never in logs, audit, errors, exports or admin payloads; purged 30–90 days after rejection, withdrawal, unenroll or course deletion. The purge runs **opportunistically** (bounded, once per hour per process) because no scheduler exists in production; `POST /internal/purge-applications` (sweep token) is ready for a future free scheduler. |
 | P9-8 | No new sidebar link: invitations and applications are tabs under People; the form builder is under Settings → Enrollment; catalog, landing and apply are app-level pages. Org admins inside a course get the teacher frame with Question banks (read-only elsewhere, no Settings). |
 | P9-9 | ORT courses refuse form modes and bank sharing; student invitations are allowed there. |
+
+## Owner decisions 2026-11-01: UX rework before Phase 10 (design: `phases/UX_REWORK_DESIGN.md`)
+
+The owner tested production as teacher and student and found it hard to use. Reference: institutional Canvas.
+
+| # | Decision |
+|---|---|
+| UR-1 | **Width**: no narrow centered column. Layouts use the available width with sensible maximums at phone 375 px, tablet, laptop 1280–1440 px and wide 1920 px. Course pages: left course nav + wide main area, optional right column on wide screens. |
+| UR-2 | **Student course home**: the modules view whenever the course has published modules (items in order with locked/unlocked and done states). ORT courses without modules keep today's ORT home. |
+| UR-3 | **Student dashboard**: the "what to do next" hero and the "Что дальше" list are removed. Canvas-style instead: course cards in a grid (name, color, teacher) and a simple to-do list of upcoming and due work with dates. |
+| UR-4 | **Teacher pages simplified**: inline add/edit in the modules list, rarely used actions inside "…" menus, short labels, no explanatory paragraphs where a tooltip or empty state is enough. Same review for org admin and platform admin pages. |
+| UR-5 | **Student view rebuilt the Canvas way**: a test-student enrollment in the course, a banner with "Reset test student" and "Leave student view", test-student attempts excluded from grades and analytics. If it could not work properly it would be removed and noted in the plan. |
+| UR-6 | **Token rules (replaces D21 and the ux-reviewer step)**: the `ux-reviewer` agent is no longer used and the per-language and full screenshot sets are gone. The orchestrator checks the changed screens itself at 375 / 1440 / 1920 px in one language (ru) and fixes what is wrong. Fable only for hard design and security reviews; implementers on Opus, Sonnet for simple work; short briefs and outputs. The trilingual rule for strings and the ORT review stay. |
+| UR-7 | **Order**: the rework ships first, then the owner reviews. Phase 10 starts only after the owner's OK; stop after Phase 10 and again before launch. |
+| UR-7b | **Owner, 2026-11-01 (later the same day; replaces the wait in UR-7)**: Phase 10 starts right after the rework is deployed and verified, with no wait for the owner's OK. The stop after Phase 10 and the stop before launch stay. **Phase 10 only**: implementers on Sonnet when Sonnet can build it (escalate to Opus only after a failure); optimize token usage. |
+| UR-8 | **Neon**: `backup-2026-10-23-before-phase5` deleted with the owner's OK (2026-11-01). Ask before deleting anything else. |
+
+Implementation decisions (agent):
+
+| # | Decision |
+|---|---|
+| PUR-1 | Student view is a real student session: a per-course test user with a student enrollment and a short-lived token held per browser tab. The server treats it as an ordinary student, so no role switching stays in `authz.py`; the 8c `X-View-As` header is removed. |
+| PUR-2 | "Reset" retires the test user (disabled, enrollment removed) and creates a new one on the next entry. Nothing is deleted, so append-only grade events and immutable attempts stay intact; retired test users stay excluded everywhere. |
+| PUR-3 | Test users are limited by a deny-by-default route allow-list: their own course and the student reads the student screens need. They cannot sign in, join, apply, leave, or reach any staff, org or admin route, and no email is ever sent to them. |
+| PUR-4 | A course whose teacher explicitly chose a home page shows that page with the modules below it, so the teacher's choice and UR-2 both hold. |
+| PUR-5 | Course card colors come from a fixed palette keyed on the course id: no migration, no new setting. |
+| PUR-7 | ORT (Russian) has 3 published modules built by the owner, holding both published exams and a file, so UR-2 gives it the modules home; ORT (Kyrgyz) has none and keeps today's home. The exam itself (lobby, player, scoring) is unchanged. |
+| PUR-6 | Player, result and review pages under `/attempts/**` keep today's width, so ORT exam screens are unaffected by UR-1. |

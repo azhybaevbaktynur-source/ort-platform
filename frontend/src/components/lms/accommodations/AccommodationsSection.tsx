@@ -2,12 +2,13 @@
 
 // Phase 7a S5: accommodations on the People tab (teacher only; PHASE_7A_DESIGN 4.4, 5): every student with a summary
 // badge ("+25 % time, +1 attempt") and a "Accommodations" button that opens the dialog. Roster-paginated.
+import { Disclosure } from "@/components/lms/admin/Disclosure"; // UX rework: rarely used, folded
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Accessibility } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { accommodationParts, listAccommodations, type AccommodationOut, type AccommodationRowOut } from "@/lib/lms/accommodations";
 import { useTemplateUi } from "@/lib/lms/templates";
-import { Badge, Button, Card, SearchInput, Table, type TableColumn } from "@/components/ui";
+import { Badge, Button, SearchInput, Table, type TableColumn } from "@/components/ui";
 import { AssignmentError } from "@/components/lms/assignments/assignmentUi";
 import { AccommodationDialog } from "./AccommodationDialog";
 
@@ -74,7 +75,7 @@ export function AccommodationsSection({ courseId }: { courseId: string }) {
   ];
 
   return (
-    <Card title={t("accommodations.section.title")} description={t("accommodations.section.subtitle")}>
+    <Disclosure title={t("accommodations.section.title")}>
       <Table<AccommodationRowOut>
         caption={t("accommodations.section.title")}
         rows={visible}
@@ -90,6 +91,6 @@ export function AccommodationsSection({ courseId }: { courseId: string }) {
       <AccommodationDialog open={!!editing} courseId={courseId} row={editing} ortCourse={ui.key === "ort"}
         onClose={() => setEditing(null)}
         onSaved={(id, acc) => { setRows((rs) => rs.map((r) => (r.enrollment_id === id ? { ...r, accommodation: acc } : r))); setEditing(null); }} />
-    </Card>
+    </Disclosure>
   );
 }

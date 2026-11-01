@@ -140,7 +140,8 @@ def _audit(db: Session, actor: User, action: str, inv: Invitation, request: Opti
 
 
 def _user_by_email(db: Session, email: str) -> Optional[User]:
-    return db.execute(select(User).where(func.lower(User.email) == email)).scalars().first()
+    return db.execute(select(User).where(func.lower(User.email) == email,
+                                         User.is_test_student.is_(False))).scalars().first()
 
 
 def item_out(inv: Invitation, course_title: Optional[dict], inviter: Optional[User],

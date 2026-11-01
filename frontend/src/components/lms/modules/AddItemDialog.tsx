@@ -1,13 +1,13 @@
 "use client";
 
-// Phase 8a S4a (PHASE_8A_DESIGN 8.1 `AddItemMenu`): add an item to a module. Page, file and assignment pick an existing
-// target (with a way to create one); "New quiz" creates the 7a quiz assignment and its item in one call, then opens
-// the 7c quiz editor; a link takes a web address; a header is a title only. Optional: the title shown in the module,
-// visibility and a completion requirement (types allowed by the kind).
-// Phase 8c S2 (PHASE_8C_DESIGN §3.3, §3.4): opened from the grouped "+ Add" menu with `initialKind` (the kind radios
-// are then hidden). "New page" leads to `/pages/new?module=&from=`; "Upload" and "New assignment" open their dialogs
-// over this one and add the new target to the module; the quiz editor and the assignment page get `from` (back to
-// the module). `PlaceInModuleDialog` puts an unsorted target into a module at a chosen position.
+// Phase 8a S4a (PHASE_8A_DESIGN 8.1 `AddItemMenu`): add an existing page, file or assignment to a module (with a way to
+// create one). Optional: the title shown in the module, visibility and a completion requirement (types allowed by the
+// kind).
+// Phase 8c S2 (PHASE_8C_DESIGN §3.3, §3.4): "New page" leads to `/pages/new?module=&from=`; "Upload" and "New assignment"
+// open their dialogs over this one and add the new target to the module; the assignment page gets `from` (back to the
+// module). `PlaceInModuleDialog` puts an unsorted target into a module at a chosen position.
+// UX rework D: new pages, quizzes, assignments, links and headers are added inline in the outline (`InlineForm`). This
+// dialog stays for what needs a picker: a file (`initialKind`, kind radios hidden) and "Add existing".
 import React, { useCallback, useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Upload } from "lucide-react";
@@ -15,20 +15,20 @@ import { useTranslation } from "@/lib/i18n/context";
 import { cleanLocalized, pickLocalized } from "@/lib/lms/localized";
 import { listAssignments } from "@/lib/lms/assignments";
 import type { AssignmentStaffOut, AssignmentStaffSummaryOut } from "@/lib/lms/assignmentTypes";
-import { addItem, createQuizItem, listCourseFilesForPicker, listPagesForPicker } from "@/lib/lms/modules";
-import type { ItemIn, ItemKind, ItemStaffOut, ModuleStaffOut, RequirementType } from "@/lib/lms/modulesTypes";
+import { addItem, listCourseFilesForPicker, listPagesForPicker } from "@/lib/lms/modules";
+import type { ItemIn, ItemStaffOut, ModuleStaffOut, RequirementType } from "@/lib/lms/modulesTypes";
 import { withFrom } from "@/lib/lms/nav";
 import type { CourseFileStaffOut } from "@/lib/lms/pagesTypes";
 import type { Lang, LocalizedText } from "@/lib/lms/types";
-import { Badge, Button, Checkbox, Dialog, FieldLabel, Input, LinkButton, Pagination, Select, Skeleton, Switch } from "@/components/ui";
+import { Badge, Button, Dialog, LinkButton, Pagination, Select, Skeleton, Switch } from "@/components/ui";
 import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
 import { AssignmentEditorDialog } from "@/components/lms/assignments/AssignmentEditorDialog";
 import { UploadFileDialog } from "@/components/lms/courseFiles/UploadFileDialog";
 import { ItemKindIcon, useItemKindText, useModuleErrorText } from "./moduleUi";
 import { RequirementFields, requirementBody, type CourseLangs } from "./OutlineDialogs";
 
-export type AddKind = ItemKind | "quiz";
-const ADD_KINDS: AddKind[] = ["page", "file", "assignment", "quiz", "url", "header"];
+export type AddKind = "page" | "file" | "assignment";
+const ADD_KINDS: AddKind[] = ["page", "file", "assignment"];
 
 /** The Course page fragment of a module: the `from` of every object opened from the outline (§5.3). */
 export const moduleAnchor = (base: string, moduleId: string) => `${base}#m-${moduleId}`;
@@ -132,11 +132,9 @@ export function AddItemDialog({ open, module, courseId, base, langs, initialKind
   const kindName = useId();
   const [kind, setKind] = useState<AddKind>(initialKind ?? "page");
   const [target, setTarget] = useState<string | null>(null);
-  const [url, setUrl] = useState("");
   const [title, setTitle] = useState<LocalizedText>({});
   const [visible, setVisible] = useState(true);
   const [req, setReq] = useState<{ type: RequirementType | null; threshold: string }>({ type: null, threshold: "" });
-  const [quizLangs, setQuizLangs] = useState<Lang[]>([langs.defaultLanguage]);
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
@@ -185,13 +183,8 @@ export function AddItemDialog({ open, module, courseId, base, langs, initialKind
 
   const cleaned = cleanLocalized(title, langs.languages);
   const hasTitle = Object.keys(cleaned).length > 0;
-  const urlOk = /^https?:\/\/\S+$/i.test(url.trim());
   const reqBody = requirementBody(req);
-  const valid =
-    kind === "quiz" ? hasTitle && quizLangs.length > 0
-      : kind === "header" ? hasTitle
-        : kind === "url" ? urlOk && reqBody !== undefined
-          : !!target && reqBody !== undefined;
+  const valid = !!target && reqBody !== undefined;
 
   const submit = async (ev: React.FormEvent) => {
     ev.preventDefault();
@@ -200,18 +193,12 @@ export function AddItemDialog({ open, module, courseId, base, langs, initialKind
     setBusy(true);
     setError(null);
     try {
-      if (kind === "quiz") {
-        const out = await createQuizItem(courseId, module.id, { kind: "quiz", title: cleaned, quiz: { preset: "none", languages: quizLangs } });
-        router.push(withFrom(`${base}/assessments/${out.assessment_id}/edit`, from));
-        return;
-      }
       const body: ItemIn = { kind, published: visible };
       if (kind === "page") body.page_id = target!;
       if (kind === "file") body.file_id = target!;
       if (kind === "assignment") body.assignment_id = target!;
-      if (kind === "url") body.url = url.trim();
       if (hasTitle) body.title_override = cleaned;
-      if (kind !== "header" && reqBody) body.requirement = reqBody;
+      if (reqBody) body.requirement = reqBody;
       await addItem(courseId, module.id, body);
       onAdded();
     } catch (e) {
@@ -245,31 +232,29 @@ export function AddItemDialog({ open, module, courseId, base, langs, initialKind
     void addCreated({ kind: "assignment", assignment_id: a.id, published: true }, next);
   };
 
-  const toggleLang = (l: Lang) => setQuizLangs((p) => (p.includes(l) ? p.filter((x) => x !== l) : [...p, l]));
-  const itemKind: ItemKind = kind === "quiz" ? "assignment" : kind;
   const plus = <Plus aria-hidden="true" className="h-4 w-4" />;
 
   return (
     <Dialog open={open} onClose={onClose} busy={busy} size="lg" title={t("modules.add.title")}
       description={initialKind
-        ? t("coursePage.addDescription", { kind: initialKind === "quiz" ? t("coursePage.addItems.quiz") : kindText(initialKind), module: moduleName })
+        ? t("coursePage.addDescription", { kind: kindText(initialKind), module: moduleName })
         : moduleName}
       footer={(
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>{t("lms.common.cancel")}</Button>
-          <Button type="submit" form={formId} loading={busy}>{kind === "quiz" ? t("modules.add.createQuiz") : t("modules.add.submit")}</Button>
+          <Button type="submit" form={formId} loading={busy}>{t("modules.add.submit")}</Button>
         </>
       )}>
       <form id={formId} onSubmit={(e) => void submit(e)} noValidate className="space-y-5">
         {!initialKind && (
           <fieldset>
             <legend className="mb-1 text-sm font-medium leading-6 text-slate-800">{t("modules.add.kindLabel")}</legend>
-            <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-1 sm:grid-cols-3">
               {ADD_KINDS.map((k) => (
                 <label key={k} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-slate-200 px-3 py-2 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
                   <input type="radio" name={kindName} className="h-4 w-4 shrink-0 accent-brand-600" checked={kind === k} disabled={busy} onChange={() => chooseKind(k)} />
-                  <ItemKindIcon kind={k === "quiz" ? "assignment" : k} assignmentKind={k === "quiz" ? "quiz" : undefined} className="h-5 w-5 text-slate-600" />
-                  <span className="text-base leading-6 text-slate-900 sm:text-sm">{k === "quiz" ? t("modules.add.newQuiz") : kindText(k)}</span>
+                  <ItemKindIcon kind={k} className="h-5 w-5 text-slate-600" />
+                  <span className="text-base leading-6 text-slate-900 sm:text-sm">{kindText(k)}</span>
                 </label>
               ))}
             </div>
@@ -301,48 +286,16 @@ export function AddItemDialog({ open, module, courseId, base, langs, initialKind
               <Button variant="link" disabled={busy} onClick={() => setSub("assignment")} leftIcon={plus}>{t("modules.add.createAssignment")}</Button>
             ) : undefined} />
         )}
-        {touched && !target && (kind === "page" || kind === "file" || kind === "assignment") && (
+        {touched && !target && (
           <p role="alert" className="text-sm text-danger-700">{t("modules.add.pickRequired")}</p>
         )}
 
-        {kind === "url" && (
-          <Input type="url" inputMode="url" label={t("modules.add.url")} hint={t("modules.add.urlHint")} value={url} disabled={busy}
-            placeholder="https://" onChange={(e) => setUrl(e.target.value)} error={touched && !urlOk ? t("modules.errors.url_invalid") : undefined} />
-        )}
-
-        {kind === "quiz" ? (
-          <>
-            <LocalizedTextInput label={t("modules.add.quizTitle")} languages={langs.languages} defaultLanguage={langs.defaultLanguage}
-              value={title} onChange={setTitle} maxLength={200} required disabled={busy} />
-            {touched && !hasTitle && <p role="alert" className="text-sm text-danger-700">{t("modules.settings.titleRequired")}</p>}
-            {langs.languages.length > 1 && (
-              <div>
-                <FieldLabel>{t("assessments.create.languages")}</FieldLabel>
-                <div className="flex flex-wrap gap-x-5">
-                  {langs.languages.map((l) => (
-                    <Checkbox key={l} label={t(`courses.languages.${l}`)} checked={quizLangs.includes(l)} disabled={busy} onChange={() => toggleLang(l)} />
-                  ))}
-                </div>
-              </div>
-            )}
-            <p className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">{t("modules.add.quizNext")}</p>
-          </>
-        ) : (
-          <>
-            <LocalizedTextInput label={kind === "header" ? t("modules.add.headerTitle") : t("modules.add.titleOverride")}
-              languages={langs.languages} defaultLanguage={langs.defaultLanguage} value={title} onChange={setTitle} maxLength={200}
-              required={kind === "header"} disabled={busy} />
-            {kind !== "header" && <p className="-mt-3 text-sm text-slate-600">{t("modules.add.titleOverrideHint")}</p>}
-            {touched && kind === "header" && !hasTitle && <p role="alert" className="text-sm text-danger-700">{t("modules.add.headerRequired")}</p>}
-            <Switch label={t("modules.add.visible")} hint={t("modules.add.visibleHint")} checked={visible} disabled={busy} onChange={setVisible} />
-            {kind !== "header" && (
-              <>
-                <RequirementFields kind={itemKind} value={req} onChange={setReq} disabled={busy} />
-                {touched && reqBody === undefined && <p role="alert" className="text-sm text-danger-700">{t("modules.reqPicker.thresholdInvalid")}</p>}
-              </>
-            )}
-          </>
-        )}
+        <LocalizedTextInput label={t("modules.add.titleOverride")} languages={langs.languages} defaultLanguage={langs.defaultLanguage}
+          value={title} onChange={setTitle} maxLength={200} disabled={busy} />
+        <p className="-mt-3 text-sm text-slate-600">{t("modules.add.titleOverrideHint")}</p>
+        <Switch label={t("modules.add.visible")} hint={t("modules.add.visibleHint")} checked={visible} disabled={busy} onChange={setVisible} />
+        <RequirementFields kind={kind} value={req} onChange={setReq} disabled={busy} />
+        {touched && reqBody === undefined && <p role="alert" className="text-sm text-danger-700">{t("modules.reqPicker.thresholdInvalid")}</p>}
         {error ? <p role="alert" className="rounded-xl border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-800">{errorText(error)}</p> : null}
       </form>
       {sub === "upload" && (

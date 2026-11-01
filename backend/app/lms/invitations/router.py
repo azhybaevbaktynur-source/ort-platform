@@ -36,6 +36,8 @@ def _optional_user(authorization: Optional[str] = Header(None), db: Session = De
     except UnauthorizedException:
         return None
     user = db.get(User, user_id) if user_id else None
+    if user is not None and user.is_test_student:  # UX rework S1: never an identity on invitation routes
+        return None
     return user if user is not None and user.disabled_at is None else None
 
 

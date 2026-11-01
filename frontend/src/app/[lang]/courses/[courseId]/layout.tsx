@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { getCourse } from "@/lib/lms/courses";
-import { isStudentView, setStudentView } from "@/lib/api";
 import { pickLocalized } from "@/lib/lms/localized";
 import { courseNavRole, hiddenAreaFor } from "@/lib/lms/nav";
 import { isStaffCourse, type CourseOut } from "@/lib/lms/types";
@@ -16,7 +15,6 @@ import { StaffCourseBar } from "@/components/lms/course/StaffCourseUi"; // Phase
 import { useDeclareArea } from "@/components/lms/LmsShell"; // Phase 6b integration
 // --- Phase 8c S1 begin --- (course sidebar, Student view, hidden areas: PHASE_8C_DESIGN §2, §6)
 import { CourseSidebar } from "@/components/lms/course/CourseSidebar";
-import { StudentViewBanner } from "@/components/lms/course/StudentViewBanner";
 import { AreaUnavailable } from "@/components/lms/course/AreaUnavailable";
 // --- Phase 8c S1 end ---
 // --- Phase 6 S6b begin --- (student course frame, skeleton)
@@ -30,8 +28,6 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
   const courseId = params.courseId;
   const [course, setCourse] = useState<CourseOut | null>(null);
   const [error, setError] = useState<unknown>(null);
-  // Phase 8c S1: the per-tab Student view flag (read after mount; the request header follows the same flag)
-  const [viewing, setViewing] = useState(false);
 
   const reload = useCallback(async () => {
     try {
@@ -44,24 +40,13 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     setCourse(null);
-    setViewing(isStudentView(courseId));
     void reload();
   }, [reload, courseId]);
-
-  // Phase 8c S1: the server ignores the header for anyone but real course staff (org admins, platform admins,
-  // sandbox staff, students): a staff-shaped answer means the mode does not apply here, so the flag is dropped.
-  const studentView = viewing && !!course && !isStaffCourse(course);
-  useEffect(() => {
-    if (viewing && course && isStaffCourse(course)) {
-      setStudentView(courseId, false);
-      setViewing(false);
-    }
-  }, [viewing, course, courseId]);
 
   // Phase 6b integration: course pages are Teaching for staff and Learning for students (header area switcher).
   // Phase 8c S1 (§2.5): inside a course the Teaching sub-menu is hidden; the sidebar is the course's navigation.
   // Phase 9 UX: the server's staff serializer decides (org admins reading a course of their organization get it too).
-  const staffRole = studentView || (!!course && isStaffCourse(course));
+  const staffRole = !!course && isStaffCourse(course);
   useDeclareArea(course ? (staffRole ? "teaching" : "learning") : null, { hideSections: true });
 
   const missing = (error as { status?: number } | null)?.status === 404;
@@ -105,10 +90,9 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
   // today's full-width column without the sidebar, so the ORT result and review stay pixel-identical) ---
   const attemptsPage = pathname === `${base}/attempts` || pathname.startsWith(`${base}/attempts/`);
   const staffFrame = staff && (role === "teacher" || role === "assistant") && !course.my_enrollment.read_only;
-  const banner = studentView ? <StudentViewBanner courseId={course.id} /> : null;
   const header = staffFrame
     ? <StaffCourseBar course={course} titleAsHeading={pathname === base} studentViewButton />
-    : role === "student" || studentView
+    : role === "student"
       ? <StudentCourseHeader course={course} />
       : (
         // Fallback frame (any other role), unchanged.
@@ -121,7 +105,6 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
   if (attemptsPage) {
     return (
       <CourseContext.Provider value={ctx}>
-        {banner}
         {header}
         {children}
       </CourseContext.Provider>
@@ -131,7 +114,6 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
   const hidden = hiddenAreaFor(course, courseNavRole(course), pathname);
   return (
     <CourseContext.Provider value={ctx}>
-      {banner}
       {header}
       <CourseSidebar course={course}>
         {hidden ? <AreaUnavailable courseId={course.id} /> : children}

@@ -1,4 +1,4 @@
-// Phase 8c S1 (PHASE_8C_DESIGN §3.5, §7): the teacher Course page "To do" panel (S2 builds `TodoPanel` on it).
+// Phase 8c S1 (PHASE_8C_DESIGN §3.5, §7): the teacher Course page's "To grade" list (`course/ToGrade.tsx`).
 import { lmsFetch } from "./client";
 import type { TodoOut } from "./types";
 

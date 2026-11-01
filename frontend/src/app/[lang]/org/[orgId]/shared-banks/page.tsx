@@ -25,7 +25,7 @@ export default function OrgSharedBanksPage() {
 
   return (
     <div>
-      <PageHeader title={t("sharedBanks.title")} description={t("sharedBanks.intro")} breadcrumbs={crumbs({ label: t("sharedBanks.nav") })} />
+      <PageHeader title={t("sharedBanks.title")} breadcrumbs={crumbs({ label: t("sharedBanks.nav") })} />
       {status === 404 ? (
         <EmptyState icon={<Library />} title={t("sharedBanks.noAccess")} />
       ) : (

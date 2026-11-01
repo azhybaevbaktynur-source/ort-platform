@@ -76,6 +76,7 @@ class ItemRow:
     assessment_id: Optional[uuid.UUID] = None  # quiz assignment
     points_possible: Optional[Decimal] = None  # assignment
     preset: Optional[str] = None               # quiz assignment: the assessment's preset (8a UX M6, gating exemption)
+    due_at: Optional[datetime] = None          # assignment: its due date; a quiz's assessment is the truth (UX rework)
 
     @property
     def id(self) -> uuid.UUID:
@@ -140,7 +141,8 @@ def load_structure(db: Session, course: Course, *, include_deleted: bool = False
                Page.title, Page.language, Page.published, Page.deleted_at,
                CourseFile.title, CourseFile.published, CourseFile.deleted_at,
                Assignment.title, Assignment.published, Assignment.deleted_at, Assignment.kind,
-               Assignment.assessment_id, Assignment.points_possible, Assessment.preset)
+               Assignment.assessment_id, Assignment.points_possible, Assessment.preset, Assignment.due_at,
+               Assessment.due_at)
         .join(CourseModule, CourseModule.id == ModuleItem.module_id)
         .outerjoin(ItemCompletionRequirement, ItemCompletionRequirement.item_id == ModuleItem.id)
         .outerjoin(Page, Page.id == ModuleItem.page_id)
@@ -152,7 +154,7 @@ def load_structure(db: Session, course: Course, *, include_deleted: bool = False
         .execution_options(populate_existing=True)
     ).all()
     for (it, rtype, thr, p_title, p_lang, p_pub, p_del, f_title, f_pub, f_del, a_title, a_pub, a_del, a_kind,
-         a_assessment, a_points, a_preset) in rows:
+         a_assessment, a_points, a_preset, a_due, q_due) in rows:
         row = ItemRow(item=it, req_type=rtype, threshold=thr)
         if it.kind == "page":
             row.target_published, row.target_deleted = bool(p_pub), p_del is not None
@@ -166,6 +168,7 @@ def load_structure(db: Session, course: Course, *, include_deleted: bool = False
             row.target_title = dict(a_title) if a_title else None
             row.assignment_kind, row.assessment_id, row.points_possible = a_kind, a_assessment, a_points
             row.preset = a_preset
+            row.due_at = q_due if a_kind == "quiz" else a_due
         items.setdefault(it.module_id, []).append(row)
     return Structure(course=course, modules=live, prereqs=prereqs, items=items, deleted_modules=deleted)
 
@@ -507,22 +510,10 @@ def persist(db: Session, ev: Evaluation, mem: Memory, now: datetime) -> int:
 
 # =========================================================================== one call
 
-def evaluate(db: Session, course: Course, enrollment_id: uuid.UUID, now: datetime, *, persist_changes: bool = True,
-             structure: Optional[Structure] = None) -> tuple[Structure, Memory, Evaluation]:
-    """`evaluate_course` of the design: load (<= 7 queries), compute, optionally write the changed rows (no commit)."""
-    structure = structure or load_structure(db, course)
-    mem = load_memory(db, structure, enrollment_id)
-    ev = compute(structure, mem, now)
-    if persist_changes:
-        persist(db, ev, mem, now)
-    return structure, mem, ev
-
-
-# --- Phase 8c S1 begin --- (PHASE_8C_DESIGN 6.2: Student view = the state of a new student, never persisted)
-
 class _AsPublished:
-    """Read-only stand-in for a draft course in Student view: `compute` sees `status = "published"` (a draft course
-    stays previewable); every other attribute is the course's own."""
+    """Read-only stand-in for a draft course evaluated for its test student (UX rework S1): `compute` sees
+    `status = "published"`, so Student view works before the course is published; every other attribute is the
+    course's own."""
 
     status = "published"
 
@@ -533,27 +524,27 @@ class _AsPublished:
         return getattr(self._course, name)
 
 
-def evaluate_new_student(db: Session, course: Course, now: datetime, *, structure: Optional[Structure] = None
-                         ) -> tuple[Structure, Memory, Evaluation]:
-    """`evaluate(..., persist=False, enrollment=None)` of the design: the course as a student with no facts, no
-    submissions, no cached progress and no requirement status would see it now. Reads the structure only (3 queries,
-    no per-enrollment query) and writes nothing: no `module_progress`, `item_requirement_status` or fact row exists or
-    is created for anyone (8a invariant 5 holds for staff). A draft course is evaluated as published."""
+def _is_test_enrollment(db: Session, enrollment_id: uuid.UUID) -> bool:
+    from app.lms.enrollments.models import Enrollment
+
+    return bool(db.execute(select(Enrollment.is_test_student).where(Enrollment.id == enrollment_id)).scalar())
+
+
+def evaluate(db: Session, course: Course, enrollment_id: uuid.UUID, now: datetime, *, persist_changes: bool = True,
+             structure: Optional[Structure] = None) -> tuple[Structure, Memory, Evaluation]:
+    """`evaluate_course` of the design: load (<= 7 queries), compute, optionally write the changed rows (no commit)."""
     structure = structure or load_structure(db, course)
-    mem = Memory(enrollment_id=None)  # type: ignore[arg-type]  # nobody's memory
+    mem = load_memory(db, structure, enrollment_id)
     view = structure
-    if course.status == "draft":
+    if course.status == "draft" and _is_test_enrollment(db, enrollment_id):  # one statement, drafts only
         view = Structure(course=_AsPublished(course), modules=structure.modules,  # type: ignore[arg-type]
                          prereqs=structure.prereqs, items=structure.items,
                          deleted_modules=structure.deleted_modules)
     ev = compute(view, mem, now)
-    ev.persist_allowed = False
-    for me in ev.modules.values():
-        me.persistable = False
+    if persist_changes:
+        persist(db, ev, mem, now)
     return structure, mem, ev
-# --- Phase 8c S1 end ---
 
 
 __all__ = ["Structure", "ItemRow", "Memory", "Facts", "Evaluation", "ModuleEval", "ItemEval", "load_structure",
-           "load_memory", "compute", "persist", "evaluate", "requirement_met_now", "sequential_blocker", "utc",
-           "evaluate_new_student"]
+           "load_memory", "compute", "persist", "evaluate", "requirement_met_now", "sequential_blocker", "utc"]

@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, ChevronDown, GraduationCap, LogOut } from "lucide-react";
 import { useTranslation, type Language } from "@/lib/i18n/context";
+import { SHELL_WIDTH } from "./shellWidth";
 import { cn, focusRing } from "./utils";
 
 /*
@@ -201,7 +202,7 @@ function AccountMenu({ user, links, onLanguageChange, onLogout, routeKey, nameFr
         <ChevronDown aria-hidden="true" className={cn("hidden h-4 w-4 shrink-0 text-slate-600 transition-transform lg:block", pop.open && "rotate-180")} />
       </button>
       {pop.open && (
-        <div id={panelId} className={cn(PANEL, "left-4 right-4 sm:left-auto sm:right-4 sm:w-80")}>
+        <div id={panelId} className={cn(PANEL, "left-4 right-4 sm:left-auto sm:right-6 sm:w-80 lg:right-8")}>
           <div className="px-3 pb-3 pt-2">
             <p className="text-xs font-medium uppercase tracking-wide text-slate-600">{t("shell.account.signedInAs")}</p>
             <p className="mt-1 break-words text-base font-semibold leading-6 text-slate-900">{user.name}</p>
@@ -253,7 +254,7 @@ export function AppHeader({ brandHref, areas, activeArea, user, accountLinks = [
   const sections = multi && active?.sections && active.sections.length > 0 ? active.sections : null;
   return (
     <header className="border-b border-slate-200 bg-white">
-      <div className="relative mx-auto flex h-14 max-w-6xl items-center gap-2 px-4 sm:h-16 sm:gap-3">
+      <div className={cn("relative flex h-14 items-center gap-2 sm:h-16 sm:gap-3", SHELL_WIDTH)}>
         <Brand href={brandHref} hideNameOnPhone={multi} />
         {multi && (
           <>
@@ -283,17 +284,19 @@ export function AppHeader({ brandHref, areas, activeArea, user, accountLinks = [
       </div>
       {sections && active && (
         <nav aria-label={active.label} className="hidden border-t border-slate-100 lg:block">
-          {/* px-1: the pills' own padding lines their text up with the page content below */}
-          <ul className="mx-auto flex h-12 max-w-6xl items-center gap-1 px-1">
-            {sections.map((s) => (
-              <li key={s.href}>
-                <Link href={s.href} aria-current={s.active ? "page" : undefined}
-                  className={cn(PILL, "font-medium", focusRing, s.active ? "text-brand-800 underline decoration-2 underline-offset-8" : PILL_OFF)}>
-                  {s.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <div className={SHELL_WIDTH}>
+            {/* -mx-3: the pills' own padding lines their text up with the page content below */}
+            <ul className="-mx-3 flex h-12 items-center gap-1">
+              {sections.map((s) => (
+                <li key={s.href}>
+                  <Link href={s.href} aria-current={s.active ? "page" : undefined}
+                    className={cn(PILL, "font-medium", focusRing, s.active ? "text-brand-800 underline decoration-2 underline-offset-8" : PILL_OFF)}>
+                    {s.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         </nav>
       )}
     </header>

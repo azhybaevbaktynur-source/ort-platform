@@ -8,11 +8,11 @@ import { seed, settle, signIn, tr, VIEWPORTS, type SeedUser } from "./helpers";
  *  2. phone drawer ("Course menu" button + sheet) for a student at 375 px
  *  3. auto-hide for students (Announcements and Files appear with published content; the "not available" page)
  *  4. redirects of the old URLs (section 4.2), query strings kept
- *  5. Student view: banner, student sidebar, a write is refused (403 `student_view_read_only`), "Start" in view mode
- *     starts a preview attempt, hand-ins are off
- *  6. To do panel -> assignment page on the Submissions tab with `filter=to_grade`
- *  7. "Unsorted" group and "Move to module"
- *  8. grouped "+ Add -> Quiz": lands in the 7c editor, Back returns to the module (`from=...#m-{id}`)
+ *  5. Student view: a real test-student session in this tab (banner, student sidebar, hand-ins and quizzes work and stay
+ *     out of the staff lists, staff routes 403 `test_student_forbidden`), reset, a dead token returns to the teacher
+ *  6. "To grade" list -> assignment page on the Submissions tab with `filter=to_grade`
+ *  7. "Not in modules" row and "Move to module"
+ *  8. grouped "+ -> Quiz": inline title, the row links to the 7c editor, Back returns to the module (`from=...#m-{id}`)
  *
  * Parts 1-3 and the S1 half of 4 and 5 run against the S1 shell. The rest is written against the design's roles and
  * i18n keys (`todo.*`, `coursePage.*`, `assignments.page.*`) and waits for S2 (Course page) and S3 (one-page objects).
@@ -39,6 +39,7 @@ const LOOSE_TASK = "Задание вне модуля";
 const QUIZ_VIEW = "Квиз из карточки";
 const MOD_A = "Модуль навигации А";
 const MOD_B = "Модуль навигации Б";
+const MOD_C = "Модуль навигации В";
 const PDF = Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n");
 
 const nav = () => seed().course_nav;
@@ -120,12 +121,11 @@ test.describe("course navigation (ru)", () => {
     // eight links in the design order; staff see them all (2.2)
     expect(await linkNames(tp)).toEqual(Object.values(LINKS).map((k) => t(k)));
     await expect(link(tp, LINKS.course)).toHaveAttribute("aria-current", "page");
-    // Announcements and Files have nothing published: marked "hidden from students" (2.3) with a help line
+    // Announcements and Files have nothing published: marked "hidden from students" (2.3); the mark carries its own tooltip
     for (const k of [LINKS.announcements, LINKS.files]) {
       await expect(mark(link(tp, k))).toHaveAttribute("aria-label", t("courseNav.hiddenFromStudents"));
     }
     await expect(mark(link(tp, LINKS.assignments))).toHaveCount(0);
-    await expect(tp.getByText(t("courseNav.hiddenHelp"))).toBeVisible();
     // the Teaching sub-menu (Courses / Create / Grading schemes / Exam templates) is gone inside a course (2.5)
     await expect(tp.getByRole("link", { name: t("lms.nav.gradingSchemes"), exact: true })).toHaveCount(0);
     // Student view button in the course bar (2.4)
@@ -184,7 +184,6 @@ test.describe("course navigation (ru)", () => {
     // before: Course, Assignments, Grades, Teachers (people) only
     await expect(link(sp, LINKS.course)).toHaveAttribute("aria-current", "page");
     expect(await linkNames(sp)).toEqual([t(LINKS.course), t(LINKS.assignments), t(LINKS.grades), t("courses.people.tabStudent")]);
-    await expect(sp.getByText(t("courseNav.hiddenHelp"))).toHaveCount(0);
     // opening a hidden area by URL: the "not available" page, no list
     for (const area of ["announcements", "files"]) {
       await sp.goto(`${base()}/${area}`);
@@ -265,7 +264,11 @@ test.describe("course navigation (ru)", () => {
   });
 
   // ---------------------------------------------------------------- 5. Student view
-  test("Student view: banner, student sidebar, writes refused, hand-ins off, leave", async ({ browser }) => {
+  /** The test student's token this tab holds (per-tab `sessionStorage`). */
+  const tabSession = (tp: Page) => tp.evaluate(() => JSON.parse(window.sessionStorage.getItem("studentView") || "null"));
+  const SV_NAME = () => t("studentView.testStudentName");
+
+  test("Student view: banner, student sidebar, a hand-in stays out of the staff lists, staff routes refused, leave", async ({ browser }) => {
     const cid = nav().course_id;
     const taskId = await createTextAssignment("Задание для обзора");
     const outlineBefore = await api(nav().teacher, "GET", `/courses/${cid}/modules`);
@@ -276,42 +279,46 @@ test.describe("course navigation (ru)", () => {
     const banner = tp.getByRole("status").filter({ hasText: t("studentView.banner") });
     await expect(banner).toBeVisible();
     await expect(banner.getByRole("button", { name: t("studentView.leave") })).toBeVisible();
+    await expect(banner.getByRole("button", { name: t("studentView.reset") })).toBeVisible();
     await expect(link(tp, LINKS.bank)).toHaveCount(0); // staff-only link (assistants have no Settings)
     await expect(tp.getByRole("button", { name: t("studentView.button") })).toHaveCount(0);
-    expect(await tp.evaluate((id) => window.sessionStorage.getItem(`studentView:${id}`), cid)).toBe("1");
-    // every course request carries the header (the app's own reads succeed as student shapes)
-    const sawHeader = tp.waitForRequest((r) => r.url().includes(`/api/v1/courses/${cid}/`) && r.headers()["x-view-as"] === "student");
+    const session = await tabSession(tp);
+    expect(session.courseId).toBe(cid);
+    const testStudent = { ...nav().students.assistant, token: session.token };
+    const me = await api(testStudent, "GET", "/auth/me");
+    expect(me.is_test_student).toBe(true);
+    // every request of this tab is the test student's
+    const sawToken = tp.waitForRequest((r) => r.url().includes(`/api/v1/courses/${cid}/`) && r.headers()["authorization"] === `Bearer ${session.token}`);
     await tp.goto(`${base()}/assignments`);
-    await sawHeader;
-    // hand-ins are off in the student view of an assignment
-    await tp.goto(`${base()}/assignments/${taskId}`);
-    await expect(tp.getByText(t("studentView.handInsOff"))).toBeVisible();
-    // a write with the header is refused and changes nothing
+    await sawToken;
+    // a real hand-in works, and staff do not see it
+    await api(testStudent, "POST", `/courses/${cid}/assignments/${taskId}/submissions`, { body_text: "Проверка." }, [200, 201]);
+    const rows = await api(nav().teacher, "GET", `/courses/${cid}/assignments/${taskId}/submissions`);
+    expect(rows.rows.some((r: { user_id: string }) => r.user_id === me.id)).toBe(false);
+    // staff routes are refused and change nothing
     const refused = await fetch(`${seed().api}/api/v1/courses/${cid}/modules`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${nav().students.assistant.token}`, "Content-Type": "application/json", "X-View-As": "student" },
+      headers: { Authorization: `Bearer ${session.token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ title: { ru: "Не должен появиться" } }),
     });
     expect(refused.status).toBe(403);
-    expect((await refused.json()).error.code).toBe("student_view_read_only");
+    expect((await refused.json()).error.code).toBe("test_student_forbidden");
     const outlineAfter = await api(nav().teacher, "GET", `/courses/${cid}/modules`);
     expect(outlineAfter.modules.length).toBe(outlineBefore.modules.length);
-    // reads with the header give student shapes; the same read without it is the staff outline
-    const asStudent = await fetch(`${seed().api}/api/v1/courses/${cid}/modules`, { headers: { Authorization: `Bearer ${nav().students.assistant.token}`, "X-View-As": "student" } });
-    expect(asStudent.status).toBe(200);
-    expect("rules_version" in (await asStudent.json())).toBe(false);
-    // leaving restores the staff frame
+    // the assistant's own token is untouched: still staff
+    expect((await api(nav().students.assistant, "GET", `/courses/${cid}`)).my_enrollment.role).toBe("assistant");
+    // leaving restores the staff frame, on the course page
     await banner.getByRole("button", { name: t("studentView.leave") }).click();
     await expect(tp.getByRole("status").filter({ hasText: t("studentView.banner") })).toHaveCount(0);
+    await tp.waitForURL(new RegExp(`/courses/${cid}$`));
     await expect(link(tp, LINKS.bank)).toBeVisible();
-    expect(await tp.evaluate((id) => window.sessionStorage.getItem(`studentView:${id}`), cid)).toBeNull();
+    expect(await tabSession(tp)).toBeNull();
     await tp.context().close();
   });
 
-  test("Student view as the owner teacher (org admin of their personal organization): banner, student shape, write refused", async ({ browser }) => {
+  test("Student view as the owner teacher: header name, student shape, reset, a dead token returns to the teacher", async ({ browser }) => {
     const cid = nav().course_id;
     const owner = nav().teacher;
-    const outlineBefore = await api(owner, "GET", `/courses/${cid}/modules`);
     const tp = await open(browser, owner);
     await tp.goto(base());
     await expect(link(tp, LINKS.settings)).toBeVisible(); // the owner's staff frame first
@@ -321,34 +328,37 @@ test.describe("course navigation (ru)", () => {
     await expect(link(tp, LINKS.settings)).toHaveCount(0);
     await expect(link(tp, LINKS.bank)).toHaveCount(0);
     await expect(tp.getByRole("button", { name: t("studentView.button") })).toHaveCount(0);
-    // the server answers the owner with the student shape only with the header
-    const headers = { Authorization: `Bearer ${owner.token}` };
-    const staff = await (await fetch(`${seed().api}/api/v1/courses/${cid}`, { headers })).json();
+    await expect(tp.getByText(SV_NAME()).first()).toBeAttached();
+    // the owner's token keeps the staff shape; the tab's token gets the student shape
+    const staff = await api(owner, "GET", `/courses/${cid}`);
     expect("join_code" in staff).toBe(true);
-    const viewed = await fetch(`${seed().api}/api/v1/courses/${cid}`, { headers: { ...headers, "X-View-As": "student" } });
-    expect(viewed.status).toBe(200);
-    const body = await viewed.json();
+    const first = await tabSession(tp);
+    const body = await api({ ...owner, token: first.token }, "GET", `/courses/${cid}`);
     expect("join_code" in body).toBe(false);
     expect(body.my_enrollment.role).toBe("student");
-    const people = await (await fetch(`${seed().api}/api/v1/courses/${cid}/people`, { headers: { ...headers, "X-View-As": "student" } })).json();
+    const people = await api({ ...owner, token: first.token }, "GET", `/courses/${cid}/people`);
     expect(people.items.every((p: { role: string; user?: unknown }) => p.role !== "student" && !("user" in p))).toBe(true);
-    // a write with the header is refused and changes nothing
-    const refused = await fetch(`${seed().api}/api/v1/courses/${cid}/modules`, {
-      method: "POST",
-      headers: { ...headers, "Content-Type": "application/json", "X-View-As": "student" },
-      body: JSON.stringify({ title: { ru: "Не должен появиться" } }),
+    // reset: confirm, a new token, the old one is dead
+    await banner.getByRole("button", { name: t("studentView.reset") }).click();
+    await tp.getByRole("alertdialog").getByRole("button", { name: t("studentView.reset") }).click();
+    await expect.poll(async () => (await tabSession(tp))?.token).not.toBe(first.token);
+    const dead = await fetch(`${seed().api}/api/v1/auth/me`, { headers: { Authorization: `Bearer ${first.token}` } });
+    expect(dead.status).toBe(401);
+    await expect(banner).toBeVisible();
+    // a dead token in the tab returns to the course as the teacher, who stays signed in
+    await tp.evaluate(() => {
+      const v = JSON.parse(window.sessionStorage.getItem("studentView") || "{}");
+      window.sessionStorage.setItem("studentView", JSON.stringify({ ...v, token: "dead.token.value" }));
     });
-    expect(refused.status).toBe(403);
-    expect((await refused.json()).error.code).toBe("student_view_read_only");
-    const outlineAfter = await api(owner, "GET", `/courses/${cid}/modules`);
-    expect(outlineAfter.modules.length).toBe(outlineBefore.modules.length);
-    await banner.getByRole("button", { name: t("studentView.leave") }).click();
-    await expect(tp.getByRole("status").filter({ hasText: t("studentView.banner") })).toHaveCount(0);
+    await tp.reload();
+    await tp.waitForURL(new RegExp(`/courses/${cid}$`));
     await expect(link(tp, LINKS.settings)).toBeVisible();
+    expect(await tabSession(tp)).toBeNull();
+    expect(await tp.evaluate(() => !!localStorage.getItem("ort_token"))).toBe(true);
     await tp.context().close();
   });
 
-  test("Student view: 'Start' on a quiz lobby starts a preview attempt", async ({ browser }) => {
+  test("Student view: 'Start' on a quiz lobby starts a real attempt, not on the staff list", async ({ browser }) => {
     const cid = nav().course_id;
     const tp = await open(browser, nav().students.assistant);
     await tp.goto(base());
@@ -358,20 +368,22 @@ test.describe("course navigation (ru)", () => {
     await tp.getByRole("button", { name: t("assessments.lobby.start") }).click();
     await tp.waitForURL(/\/attempts\/[0-9a-f-]{36}/);
     const attemptId = /\/attempts\/([0-9a-f-]{36})/.exec(tp.url())![1];
-    const att = await api(nav().students.assistant, "GET", `/attempts/${attemptId}`);
-    expect(att.is_preview).toBe(true);
-    expect(cid).toBeTruthy();
+    const session = await tabSession(tp);
+    const att = await api({ ...nav().students.assistant, token: session.token }, "GET", `/attempts/${attemptId}`);
+    expect(att.is_preview).toBe(false);
+    const list = await api(nav().teacher, "GET", `/courses/${cid}/assessments/${nav().view_quiz}/attempts`);
+    expect(list.items.some((x: { id: string }) => x.id === attemptId)).toBe(false);
     await tp.context().close();
   });
 
 // ---------------------------------------------------------------- 6. To do deep link (S2 + S3)
-  test("To do: 'to grade' links to the assignment's Submissions tab, filter to_grade", async ({ browser }) => {
+  test("To grade: the list links to the assignment's Submissions tab, filter to_grade", async ({ browser }) => {
     const cid = nav().course_id;
     const id = await createTextAssignment(HAND_IN);
     await api(nav().students.handin, "POST", `/courses/${cid}/assignments/${id}/submissions`, { body_text: "Мой ответ." }, [200, 201]);
     const tp = await open(browser, nav().teacher);
     await tp.goto(base());
-    await expect(tp.getByRole("heading", { name: t("todo.title") })).toBeVisible();
+    await expect(tp.getByRole("heading", { name: t("todo.toGrade") })).toBeVisible();
     const toGrade = tp.locator(`a[href*="/assignments/${id}?tab=submissions"]`).first();
     await expect(toGrade).toContainText(HAND_IN);
     await toGrade.click();
@@ -385,18 +397,20 @@ test.describe("course navigation (ru)", () => {
   });
 
   // ---------------------------------------------------------------- 7. Unsorted (S2)
-  test("Unsorted group lists loose targets and moves one into a module", async ({ browser }) => {
+  test("'Not in modules' lists loose targets and moves one into a module", async ({ browser }) => {
     const cid = nav().course_id;
     const mod = await api(nav().teacher, "POST", `/courses/${cid}/modules`, { title: { ru: MOD_A }, published: true });
     await createTextAssignment(LOOSE_TASK);
     const pg = await api(nav().teacher, "POST", `/courses/${cid}/pages`, { title: PAGE_TITLE, language: "ru", body_md: "Текст.", published: true });
     const tp = await open(browser, nav().teacher);
     await tp.goto(base());
-    const unsorted = tp.locator("section, details").filter({ has: tp.getByRole("heading", { name: t("coursePage.unsorted.title") }) }).first();
-    await expect(unsorted).toBeVisible();
+    // one collapsed row at the end of the outline; expanded, a flat list
+    const unsorted = tp.locator("#unsorted");
+    const toggle = unsorted.getByRole("button", { name: new RegExp(`^${t("coursePage.unsorted.row", { n: 0 }).replace(/\d+$/, "")}\\d+$`) });
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(unsorted.getByText(PAGE_TITLE, { exact: true })).toBeHidden();
+    await toggle.click();
     for (const title of [LOOSE_TASK, PAGE_TITLE, FILE_TITLE]) await expect(unsorted.getByText(title, { exact: true })).toBeVisible();
-    await expect(unsorted.getByRole("link", { name: t("coursePage.unsorted.allPages") })).toHaveAttribute("href", new RegExp(`/courses/${cid}/pages`));
-    await expect(unsorted.getByRole("link", { name: t("coursePage.unsorted.allFiles") })).toHaveAttribute("href", new RegExp(`/courses/${cid}/files`));
     // move the page into the module
     const row = unsorted.locator("li").filter({ hasText: PAGE_TITLE });
     await row.getByRole("button", { name: t("modules.editor.actions") }).click();
@@ -414,7 +428,7 @@ test.describe("course navigation (ru)", () => {
   });
 
   // ---------------------------------------------------------------- 8. grouped "+ Add -> Quiz" (S2 + S3)
-  test("'+ Add -> Quiz' opens the 7c editor and Back returns to the module", async ({ browser }) => {
+  test("'+ -> Quiz' creates it inline, its row opens the 7c editor and Back returns to the module", async ({ browser }) => {
     const cid = nav().course_id;
     const mod = await api(nav().teacher, "POST", `/courses/${cid}/modules`, { title: { ru: MOD_B }, published: false });
     const tp = await open(browser, nav().teacher);
@@ -422,22 +436,20 @@ test.describe("course navigation (ru)", () => {
     const card = tp.locator(`#m-${mod.id}`);
     await expect(card).toBeVisible();
     // the menu groups: Content (page, file, link, header) and Assessment (quiz, assignment)
-    await card.getByRole("button", { name: t("modules.editor.addItem") }).first().click();
+    await card.getByRole("button", { name: t("coursePage.add", { title: MOD_B }) }).first().click();
     const menu = tp.getByRole("menu");
     await expect(menu.getByText(t("coursePage.addGroups.content"))).toBeVisible();
     await expect(menu.getByText(t("coursePage.addGroups.assessment"))).toBeVisible();
     for (const k of ["page", "file", "link", "header", "quiz", "assignment"]) {
       await expect(menu.getByRole("menuitem", { name: t(`coursePage.addItems.${k}`) })).toBeVisible();
     }
+    await expect(menu.getByRole("menuitem", { name: t("coursePage.addExisting") })).toBeVisible();
     await menu.getByRole("menuitem", { name: t("coursePage.addItems.quiz") }).click();
-    const dlg = tp.getByRole("dialog", { name: t("modules.add.title") });
-    await dlg.getByRole("textbox", { name: t("modules.add.quizTitle") }).fill(QUIZ_VIEW);
-    for (const other of ["ky", "en"]) {
-      const box = dlg.getByRole("checkbox", { name: t(`courses.languages.${other}`) });
-      if (await box.isChecked()) await box.uncheck();
-    }
-    await dlg.getByRole("button", { name: t("modules.add.createQuiz") }).click();
-    // the 7c editor, with the way back to the module in `from`
+    const input = card.getByRole("textbox", { name: t("coursePage.inlineTitle", { kind: t("coursePage.addItems.quiz") }) });
+    await input.fill(QUIZ_VIEW);
+    await input.press("Enter");
+    // the quiz stays in the list; its row is the 7c editor, with the way back to the module in `from`
+    await card.getByRole("link", { name: QUIZ_VIEW, exact: true }).click();
     await tp.waitForURL(/\/assessments\/[0-9a-f-]{36}\/edit/);
     const from = new URL(tp.url()).searchParams.get("from");
     expect(from).toBe(`${base()}#m-${mod.id}`);
@@ -454,6 +466,72 @@ test.describe("course navigation (ru)", () => {
     await expect(tp.getByText(t("quizEditor.section.emptyQuizTitle"))).toBeVisible();
     await expect(tp.locator('a[href^="https://evil.example"]')).toHaveCount(0);
     await settle(tp);
+    await tp.context().close();
+  });
+
+  // ---------------------------------------------------------------- 9. inline forms (UX rework D)
+  test("inline: rename a module and an item (Esc cancels), add a page, an assignment and a header", async ({ browser }) => {
+    const cid = nav().course_id;
+    const mod = await api(nav().teacher, "POST", `/courses/${cid}/modules`, { title: { ru: MOD_C }, published: false });
+    const renamed = `${MOD_C} (новое)`;
+    const tp = await open(browser, nav().teacher);
+    await tp.goto(base());
+    const card = tp.locator(`#m-${mod.id}`);
+    await expect(card).toBeVisible();
+
+    const renameModule = async () => {
+      await card.getByRole("button", { name: t("modules.editor.actions") }).first().click();
+      await tp.getByRole("menuitem", { name: t("coursePage.rename") }).click();
+      return card.getByRole("textbox", { name: t("coursePage.rename") });
+    };
+    let input = await renameModule();
+    await input.fill("Не сохранять");
+    await input.press("Escape");
+    await expect(input).toHaveCount(0);
+    await expect(card.getByRole("heading", { name: MOD_C, exact: true })).toBeVisible();
+    input = await renameModule();
+    await input.fill(renamed);
+    await input.press("Enter");
+    await expect(card.getByRole("heading", { name: renamed, exact: true })).toBeVisible();
+
+    const add = async (kind: "page" | "assignment" | "header", title: string, assignmentKind?: string) => {
+      await card.getByRole("button", { name: t("coursePage.add", { title: renamed }) }).first().click();
+      await tp.getByRole("menuitem", { name: t(`coursePage.addItems.${kind}`) }).click();
+      const field = card.getByRole("textbox", { name: t("coursePage.inlineTitle", { kind: t(`coursePage.addItems.${kind}`) }) });
+      await field.fill(title);
+      if (assignmentKind) await card.getByRole("combobox", { name: t("assignments.create.kind") }).selectOption(assignmentKind);
+      await field.press("Enter");
+      await expect(card.locator("li").filter({ hasText: title })).toBeVisible();
+    };
+    await add("page", "Новая страница");
+    await add("assignment", "Новая сдача файла", "file");
+    await add("header", "Новый заголовок");
+    // page and assignment stay in the list with a link to edit
+    await expect(card.getByRole("link", { name: "Новая страница", exact: true })).toHaveAttribute("href", /\/pages\/[0-9a-f-]{36}/);
+    await expect(card.getByRole("link", { name: "Новая сдача файла", exact: true })).toHaveAttribute("href", /\/assignments\/[0-9a-f-]{36}/);
+
+    // by id: while it is renamed, the row's title is an input value, not text
+    const row = tp.locator(`#${await card.locator("li").filter({ hasText: "Новый заголовок" }).getAttribute("id")}`);
+    await row.getByRole("button", { name: t("modules.editor.actions") }).click();
+    await tp.getByRole("menuitem", { name: t("coursePage.rename") }).click();
+    input = row.getByRole("textbox", { name: t("coursePage.rename") });
+    await input.fill("Другой заголовок");
+    await input.press("Enter");
+    await expect(card.locator("li").filter({ hasText: "Другой заголовок" })).toBeVisible();
+
+    const outline = await api(nav().teacher, "GET", `/courses/${cid}/modules`);
+    const m = outline.modules.find((x: { id: string }) => x.id === mod.id);
+    expect(m.title.ru).toBe(renamed);
+    expect(m.items.map((i: { kind: string }) => i.kind)).toEqual(["page", "assignment", "header"]);
+    expect(m.items[1].target.assignment_kind).toBe("file");
+    expect(m.items[2].title_override.ru).toBe("Другой заголовок");
+
+    // the join code moved to People, with the copy button and the way to the enrollment settings
+    await tp.goto(`${base()}/people`);
+    const code = tp.locator("section", { has: tp.getByRole("heading", { name: t("courses.settings.joinCode") }) });
+    await expect(code.locator("code")).toBeVisible();
+    await expect(code.getByRole("button", { name: t("lms.common.copy") })).toBeVisible();
+    await expect(code.getByRole("link", { name: t("teaching.manageEnrollment") })).toHaveAttribute("href", new RegExp(`/courses/${cid}/settings`));
     await tp.context().close();
   });
 });

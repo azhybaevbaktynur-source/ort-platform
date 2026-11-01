@@ -52,6 +52,16 @@ TEACHER_REQUEST_24H = Limit("teacher_request_24h", 3, 86400)
 STAFF_ADD_1H = Limit("staff_add_1h", 30, 3600)
 
 
+def student_view_limit() -> Limit:
+    """UX rework S1: entering Student view (a token and, the first time, a test student)."""
+    return Limit("student_view_1h", 120, 3600)
+
+
+def student_view_reset_limit() -> Limit:
+    """UX rework S1: every reset leaves one retired test student behind, so resets are bounded."""
+    return Limit("student_view_reset_1h", 30, 3600)
+
+
 def attempt_start_limit() -> Limit:
     """Phase 3 (P3-28): attempt starts, per user. Built per call so settings overrides apply."""
     return Limit("attempt_start_10m", settings.ATTEMPT_START_RATE_PER_10M, 600)
