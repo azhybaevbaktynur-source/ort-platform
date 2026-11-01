@@ -412,13 +412,11 @@
       "label": "Students see first",
       "kinds": {
         "modules": "Modules",
-        "page": "A page",
-        "assignments": "Assignments and results"
+        "page": "A page"
       },
       "hints": {
-        "modules": "Until a module is published, students see assignments and results.",
-        "page": "A page you wrote, for example a welcome text.",
-        "assignments": "The next assignment and the latest result."
+        "modules": "With no published modules, students see assignments and results.",
+        "page": "The page on top, modules below it."
       },
       "page": "Page",
       "choosePage": "Choose a page",

@@ -125,7 +125,7 @@ export default function AdminOrganizationDetailPage() {
         {tab === "summary" && (
           <div className="space-y-4">
             {usageError ? <LoadError error={usageError} onRetry={loadUsage} /> : null}
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <StatTile label={t("organizations.counts.orgAdmins")} value={dash(org.org_admins)} />
               <StatTile label={t("organizations.counts.teachers")} value={usage ? usage.teachers : dash(org.teachers)} />
               <StatTile label={t("organizations.counts.courses")} value={usage ? usage.courses : dash(org.courses)} />

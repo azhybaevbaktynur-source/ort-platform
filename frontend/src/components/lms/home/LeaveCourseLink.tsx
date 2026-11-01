@@ -5,6 +5,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
+import { useAuth } from "@/lib/auth-context";
 import { leaveCourse } from "@/lib/lms/courses";
 import { pickLocalized } from "@/lib/lms/localized";
 import { useCourse } from "@/components/lms/CourseContext";
@@ -15,6 +16,7 @@ export function LeaveCourseLink() {
   const { lang, t } = useTranslation();
   const router = useRouter();
   const { course } = useCourse();
+  const { userProfile } = useAuth();
   const errorText = useErrorText();
   const [leaving, setLeaving] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -31,6 +33,8 @@ export function LeaveCourseLink() {
       setBusy(false);
     }
   };
+
+  if (userProfile?.is_test_student) return null; // Student view: the test student cannot leave
 
   return (
     <>

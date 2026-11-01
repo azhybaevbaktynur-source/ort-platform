@@ -478,7 +478,7 @@ test.describe("modules walk (ru)", () => {
       await review(sp, "ort-student-course-home-with-structure");
       await sp.goto(`${base}/modules`);
       await expect(badge(sp, "Пробный ОРТ", "locked")).toBeVisible();
-      await expect(badge(sp, "Подготовка", "completed")).toBeVisible(); // no requirement: complete once open
+      await expect(badge(sp, "Подготовка", "completed")).toHaveCount(0); // UX rework: no requirement, so no state badge
       // 8a UX M6: the exam row inside the locked module is open (gating-exempt) and says where it lives
       await expect(moduleCard(sp, "Пробный ОРТ").getByRole("link")).toContainText(t("modules.availableInAssignments"));
       await review(sp, "ort-student-modules");

@@ -14,13 +14,15 @@ import { useCourse } from "@/components/lms/CourseContext";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { Button, Select } from "@/components/ui";
 
-const KINDS: HomeKind[] = ["modules", "page", "assignments"];
+// UX rework (UR-2): published modules are always the student home unless a page is chosen; the stored `assignments`
+// value behaves the same way as `modules` (no published modules: assignments and results), so it is not offered.
+const KINDS: HomeKind[] = ["modules", "page"];
 
 export function CourseHomeSection({ course }: { course: CourseStaffOut }) {
   const { t } = useTranslation();
   const { setCourse } = useCourse();
   const locked = templateUi(course).locked;
-  const [kind, setKind] = useState<HomeKind>(course.home_kind ?? "assignments");
+  const [kind, setKind] = useState<HomeKind>(course.home_kind === "page" ? "page" : "modules");
   const [pageId, setPageId] = useState(course.home_page_id ?? "");
   const [pages, setPages] = useState<PagePickOut[] | null>(null);
   const [busy, setBusy] = useState(false);

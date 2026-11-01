@@ -44,7 +44,7 @@ export default function OrgOverviewPage() {
         }
       />
       {/* 6a carry-over: tiles link to the list they count. */}
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <StatTile href={`${base}/teachers`} icon={<Users />} label={t("organizations.counts.teachers")} value={c.teachers} />
         <StatTile href={`${base}/courses`} icon={<GraduationCap />} label={t("organizations.counts.courses")} value={c.courses} />
         <StatTile icon={<UsersRound />} label={t("organizations.counts.students")} value={c.students} />

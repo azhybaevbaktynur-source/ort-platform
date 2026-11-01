@@ -192,7 +192,8 @@ function ModuleCard({ module, ctx }: { module: ModuleStudentOut; ctx: ListCtx })
         <h2 id={headingId} className="min-w-0 flex-1 basis-40 break-words text-base font-semibold leading-6 text-slate-900">{title}</h2>
         <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
           {withReq.length > 0 && <span className="text-sm leading-6 text-slate-600">{t("modules.progressCount", { done, total: withReq.length })}</span>}
-          {module.state && <ModuleStateBadge state={module.state} />}
+          {/* no requirements = nothing to finish: "Completed" would be untrue for a new student */}
+          {module.state && (module.state === "locked" || withReq.length > 0) && <ModuleStateBadge state={module.state} />}
         </div>
       </header>
       {module.state === "locked" && module.lock_reasons.length > 0 && (
