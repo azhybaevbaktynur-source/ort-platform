@@ -32,12 +32,12 @@ A teacher-owned, Canvas-style LMS where ORT/ЖРТ test prep is one course kind:
 | UX rework (UR-1…8) | **Deployed 2026-11-01** (`main` ace2476, migration 0015) | `UX_REWORK.md`, `UX_REWORK_DESIGN.md` |
 | 10 practice, notebook, progress, statistics, analytics, new question types | **Deployed 2026-11-01** (migration 0016); **waiting for the owner's review** | `PHASE_10.md`, `PHASE_10_DESIGN.md` |
 | Bluebook player (BB-1) | **Deployed 2026-11-02** (`main` 10c0855, frontend only) | `BLUEBOOK_PLAYER.md` |
-| **11** | **In progress** on branch `phase-11` (owner OK 2026-11-01), `PHASE_11_DESIGN.md`: observer/parent with consent, hardening, launch; stop before launch | `IMPLEMENTATION_PLAN.md` |
+| 11 parents, privacy, hardening, performance, operations | **Deployed 2026-11-02** (migrations 0017, 0018). **Launch waits for the owner** | `PHASE_11.md`, `LAUNCH_CHECKLIST.md` |
 | Next | 8a modules, pages, files, announcements, gating → 8b exam templates II (visual constructor, scrolling display mode; **checkpoint after 8b**) → 9 → 10 → 11 | `IMPLEMENTATION_PLAN.md` |
 
-Production: Vercel https://ort-platform-nu.vercel.app + Render https://ort-platform-w77q.onrender.com (`/health` shows `commit`; Render deploys only when backend files change) + Neon project `noisy-sound-20763725` (production branch `br-cool-firefly-b227gbuy`, Alembic head `0016_phase10_practice_analytics`) + Cloudflare R2. Production data is small: 6 users, 3 courses (2 ORT + the owner's draft), 299 question versions, ~4 attempts, 1 submission; one organization "Platform".
+Production: Vercel https://ort-platform-nu.vercel.app + Render https://ort-platform-w77q.onrender.com (`/health` shows `commit`; Render deploys only when backend files change) + Neon project `noisy-sound-20763725` (production branch `br-cool-firefly-b227gbuy`, Alembic head `0018_phase11_indexes`) + Cloudflare R2. Production data is small: 6 users, 3 courses (2 ORT + the owner's draft), 299 question versions, ~4 attempts, 1 submission; one organization "Platform".
 
-Neon backups (free plan: **max 10 branches, 1 manual snapshot**): `backup-2026-10-26-before-phase7b`, `backup-2026-10-28-before-phase7c`, `backup-2026-10-28-before-phase8a`, `backup-2026-10-28-before-phase8b`, `backup-2026-11-01-before-phase9`, `backup-2026-11-01-before-ux-rework`, `backup-2026-11-01-before-phase10` (**8/10 branches used**; 6a and 7a deleted with the owner's OK; ask before deleting any other), snapshot `before-phase6a-deploy-2026-10-25`. Before each `main` merge with a migration create `backup-<date>-before-<phase>`; when full, ask the owner which old backup to delete (owner OK'd deleting obsolete ones on 2026-10-26; deleting Neon data always needs the owner's OK).
+Neon backups (free plan: **max 10 branches, 1 manual snapshot**): `backup-2026-10-26-before-phase7b`, `backup-2026-10-28-before-phase7c`, `backup-2026-10-28-before-phase8a`, `backup-2026-10-28-before-phase8b`, `backup-2026-11-01-before-phase9`, `backup-2026-11-01-before-ux-rework`, `backup-2026-11-01-before-phase10`, `backup-2026-11-02-before-phase11` (**9/10 branches used**; 6a and 7a deleted with the owner's OK; ask before deleting any other), snapshot `before-phase6a-deploy-2026-10-25`. Before each `main` merge with a migration create `backup-<date>-before-<phase>`; when full, ask the owner which old backup to delete (owner OK'd deleting obsolete ones on 2026-10-26; deleting Neon data always needs the owner's OK).
 
 ## 3b. Waiting for the owner
 
@@ -64,8 +64,8 @@ Neon backups (free plan: **max 10 branches, 1 manual snapshot**): `backup-2026-1
 
 ## 5. What to do next
 
-1. Phase 11 per `docs/phases/PHASE_11_DESIGN.md` (S6 operations and launch docs done on `phase-11-s6`: logs, Sentry off, uptime, runbooks, drill script not yet run, COSTS, LAUNCH_CHECKLIST); stop before launch with `LAUNCH_CHECKLIST.md`. Neon 8/10 branches. QA accounts disabled; re-enable by SQL for production checks, remove after the final check.
-2. Phase 11 after the owner's OK. Back to the normal model rule (UR-6); Sonnet for Phase 10 only. Include: load test at scale, practice retention, sweep of retired test students' files.
+1. All phases deployed. **Stopped before launch**: the owner works through `docs/LAUNCH_CHECKLIST.md`. Do nothing launch-related without them. Neon 9/10 branches. QA accounts disabled; remove them after the final check (owner OK given).
+2. Local Postgres in `/tmp/agy_pg` can vanish (macOS cleanup): re-run initdb. A suite that fails on everything: check that first.
 3. Open owner questions keep their defaults: `CHECKPOINT_8B.md` §3, 8c design §17, 9-Q1…Q8 in `PRODUCT_DECISIONS.md`. Optional 8c teacher test.
 4. Fix the flaky PG test `tests/lms/test_enrollments_api.py::test_ip_failure_limit_counts_failures_only`; an unidentified intermittent `backend-sqlite` CI failure was seen once (55e3348).
 5. Phase 11 hardening list: sweep retired test students' hand-in files.

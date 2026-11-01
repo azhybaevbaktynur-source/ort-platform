@@ -115,3 +115,7 @@ The same-origin path stays open as a second route and resolves to a Vercel addre
 
 <!-- date, hops found, masked outputs of step 2 -->
 Not run yet.
+
+## Result (2026-11-02, agent)
+Chain on production: `client, Cloudflare, Render internal`. `by_hops[3]` was the real address in all three calls (plain, one and two made-up entries) and never `1.2.3.4` or `5.6.7.8`; `by_hops[2]` (the old default) was a Cloudflare address. The Vercel path gave `by_hops[3]` = Vercel's own egress address, also the true connecting client, as a second source; `true-client-ip` agreed both times. **Set `RATE_LIMIT_PROXY_HOPS=3`, `RATE_LIMIT_IP_ENFORCE=True`.** Not done: the second network (a phone hotspot), which needs a person. If Render or Cloudflare changes its proxy chain, this value must be checked again; the kill switch is above.
+

@@ -291,6 +291,8 @@ Width, student course home, student dashboard, simpler teacher and admin pages, 
 
 ## Phase 11 — Privacy (observer/parent with consent), hardening, launch (M)
 
+**Deployed 2026-11-02**: `phases/PHASE_11.md`. Launch waits for the owner: `LAUNCH_CHECKLIST.md`.
+
 - **Observer (parent) role**: enrollment role `observer` linked to one student by a pairing code the student generates; sees the student's grades, due dates and announcements, never answers of others; gives guardian consent for under-14s (D5). Consent capture at sign-up by age band, `consent_records`, `policy_versions`, data export/delete requests with due dates, anonymized attempts of deleted users (D17), personal-data column registry, legal review of wording and cross-border basis.
 - **Security**: full `/security-review`; dependency audit; rate limits everywhere guesses are possible (login, codes, join, invitations, access codes); JWT lifetime/revocation; HttpOnly cookie sessions evaluation; CSP; backups and restore drill; secrets rotation.
 - **Performance**: indexes reviewed with `EXPLAIN` on realistic data; full-scale load test at 6,000 concurrent students on production-like infrastructure (owner decides the Render plan); cost per month documented.

@@ -23,6 +23,9 @@ We tested on a laptop, not on the real servers (`docs/phases/PHASE_11_LOADTEST.m
 - [ ] Set `PRIVACY_LEGACY_DEADLINE` (cut-off for old accounts) after the lawyer.
 - [ ] Read how long Neon keeps history (Neon console) and write it in `docs/runbooks/RESTORE_DRILL.md`. The restore drill itself passed on 2026-11-02.
 
+## Before a big sign-up day
+Only 120 sign-ups per hour are allowed from one internet address. If a whole school signs up together from one network, some will wait. Tell the agent before such a day: the limit is easy to raise.
+
 ## C. Questions with a default (nothing waits for you)
 Confirm or change each. The default is already in use.
 
