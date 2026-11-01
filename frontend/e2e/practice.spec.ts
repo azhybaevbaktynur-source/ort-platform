@@ -55,18 +55,22 @@ test.describe("practice walk (ru)", () => {
 
     // ---- teacher: new set from the bank
     const tp = await pageFor(browser, teacher);
-    // Phase 10: the bank offers the new question types on a general course, and never on ORT
+    // Phase 10: a general course offers the new question types in the editor's type list and the bank filter; ORT never
     await tp.goto(`/${L}/courses/${course.id}/bank/${bank.id}`);
     await settle(tp);
+    for (const ty of ["matching", "fill_blank", "ordering"]) await expect(tp.locator(`option[value="${ty}"]`)).toHaveCount(1); // the filter
     await tp.getByRole("button", { name: t("bank.questions.new") }).click();
-    for (const ty of ["matching", "fill_blank", "ordering"]) await expect(tp.getByRole("menuitem", { name: new RegExp(`^${t(`bank.types.${ty}.name`)}`) })).toBeVisible();
-    await tp.keyboard.press("Escape");
+    await tp.waitForURL(/\/new/);
+    for (const ty of ["matching", "fill_blank", "ordering"]) await expect(tp.locator(`option[value="${ty}"]`)).toHaveCount(1); // the type list
     const ort = await pageFor(browser, seed().admin);
     await ort.goto(`/${L}/courses/${seed().course_id}/bank/${seed().bank_id}`);
     await settle(ort);
     await ort.getByRole("button", { name: t("bank.questions.new") }).click();
     await expect(ort.getByRole("menuitem", { name: new RegExp(`^${t("bank.types.single_choice.name")}`) })).toBeVisible();
-    for (const ty of ["matching", "fill_blank", "ordering"]) await expect(ort.getByRole("menuitem", { name: new RegExp(`^${t(`bank.types.${ty}.name`)}`) })).toHaveCount(0);
+    for (const ty of ["matching", "fill_blank", "ordering"]) {
+      await expect(ort.getByRole("menuitem", { name: new RegExp(`^${t(`bank.types.${ty}.name`)}`) })).toHaveCount(0);
+      await expect(ort.locator(`option[value="${ty}"]`)).toHaveCount(0);
+    }
     await ort.context().close();
     await tp.goto(`/${L}/courses/${course.id}/practice`);
     await expect(tp.getByText(t("practice.emptyStaff"))).toBeVisible();
