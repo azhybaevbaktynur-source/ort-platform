@@ -520,3 +520,15 @@ Implementation decisions (agent):
 | PUR-5 | Course card colors come from a fixed palette keyed on the course id: no migration, no new setting. |
 | PUR-7 | ORT (Russian) has 3 published modules built by the owner, holding both published exams and a file, so UR-2 gives it the modules home; ORT (Kyrgyz) has none and keeps today's home. The exam itself (lobby, player, scoring) is unchanged. |
 | PUR-6 | Player, result and review pages under `/attempts/**` keep today's width, so ORT exam screens are unaffected by UR-1. |
+
+## Phase 10 decisions (agent, 2026-11-01; defaults in effect, for the owner's review)
+
+| # | Question | Default in effect |
+|---|---|---|
+| 10-Q1 | Ordering partial credit | Exact positions. |
+| 10-Q2 | Shuffle matching and ordering per student | Same fixed order for everyone. |
+| 10-Q3 | Practice sets inside modules | No: own page; a module link item can point to it. |
+| 10-Q4 | Goal unit on ORT | Percent of raw points everywhere. |
+| 10-Q5 | Retention of old practice attempts | Keep all; Phase 11 reviews growth, any Neon cost goes to the owner first. |
+| 10-Q6 | Students build their own practice; statistics across versions | No: teachers build sets; statistics per version with a selector. |
+
