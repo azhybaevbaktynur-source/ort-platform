@@ -1,5 +1,5 @@
-// Phase 8c S1 (PHASE_8C_DESIGN §3.4, §7): Course page reads for the "Unsorted" group and the module duplicate write.
-// S2 builds `UnsortedGroup` and the module "⋯ → Duplicate" entry on these.
+// Phase 8c S1 (PHASE_8C_DESIGN §3.4, §7): Course page reads for the "Not in modules" row (`UnsortedGroup`) and the module
+// duplicate write ("⋯ → Duplicate").
 import { lmsFetch } from "./client";
 import type { ModuleStaffOut } from "./modulesTypes";
 import type { UnsortedKind, UnsortedOut } from "./types";

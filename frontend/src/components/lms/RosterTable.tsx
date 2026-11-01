@@ -4,8 +4,9 @@ import React from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import type { CourseRole, RosterEntryOut } from "@/lib/lms/types";
 import { fmtApiDate } from "@/lib/format";
-import { Badge, type BadgeTone, type PaginationProps, Table, buttonClasses, cn } from "@/components/ui";
+import { Badge, type BadgeTone, type PaginationProps, Table, cn } from "@/components/ui";
 import { fieldBase } from "@/components/ui/utils";
+import { OutlineMenu } from "@/components/lms/modules/OutlineMenu";
 
 const ROLE_TONE: Record<string, BadgeTone> = { teacher: "info", assistant: "neutral", student: "neutral" };
 
@@ -51,7 +52,7 @@ export function RosterTable({
           cell: (e) => (
             <span className="inline-flex flex-wrap items-center gap-2">
               <span className="break-words">{name(e)}</span>
-              {e.is_owner && <Badge tone="info">{t("courses.roles.owner")}</Badge>}
+              {e.is_owner && <Badge tone="info" title={t("teaching.ownerStays")}>{t("courses.roles.owner")}</Badge>}
             </span>
           ),
         },
@@ -81,11 +82,10 @@ export function RosterTable({
         ...(entries.some(canRemove) ? [{
           key: "actions", header: "", actions: true, align: "right" as const,
           cell: (e: RosterEntryOut) => canRemove(e) ? (
-            <button type="button" disabled={busyId === e.enrollment_id} onClick={() => onRemove(e)}
-              className={buttonClasses({ variant: "secondary", size: "sm", className: "border-danger-200 text-danger-700 hover:bg-danger-50" })}>
-              {t("courses.people.remove")}<span className="sr-only">: {name(e)}</span>
-            </button>
-          ) : e.is_owner ? <span className="whitespace-normal text-sm text-slate-600">{t("teaching.ownerStays")}</span> : null,
+            <OutlineMenu label={t("modules.editor.actionsFor", { title: name(e) })} disabled={busyId === e.enrollment_id}
+              groups={[{ id: "person", items: [{ id: "remove", label: t("courses.people.remove"), danger: true }] }]}
+              onSelect={() => onRemove(e)} />
+          ) : null,
         }] : []),
       ]}
     />

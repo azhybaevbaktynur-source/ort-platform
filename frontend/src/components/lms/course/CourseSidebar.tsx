@@ -31,13 +31,11 @@ export function CourseSidebar({ course, children }: { course: CourseOut; childre
   const role = courseNavRole(course);
   // Phase 9 UX: same predicate as the course layout's Teaching area (org admins get the staff serializer)
   const links = courseNavItems(course, role, pathname, t, { staffShape: isStaffCourse(course) });
-  const anyHidden = links.some((l) => l.hiddenFromStudents);
   return (
     <AreaShell
       label={t("courses.home.tabsLabel")}
       phone="drawer"
       menuLabel={t("courseNav.menu")}
-      navFooter={anyHidden ? t("courseNav.hiddenHelp") : undefined}
       items={links.map((l) => ({
         href: l.href, label: l.label, active: l.active, icon: ICONS[l.key],
         marker: l.hiddenFromStudents ? { icon: <EyeOff />, label: t("courseNav.hiddenFromStudents") } : null,

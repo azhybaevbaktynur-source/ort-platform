@@ -52,7 +52,7 @@ export function OrgSettingsForm({ view, readOnly, onSaved }: { view: OrgSettings
   };
 
   return (
-    <form onSubmit={save} noValidate className="space-y-4">
+    <form onSubmit={save} noValidate className="max-w-3xl space-y-4">
       {!view.editable && (
         <p role="status" className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
           <Info aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" />
@@ -79,7 +79,7 @@ export function OrgSettingsForm({ view, readOnly, onSaved }: { view: OrgSettings
           value={Number.isFinite(value.application_retention_days) ? String(value.application_retention_days) : ""}
           onChange={(e) => set("application_retention_days", e.target.value === "" ? NaN : Number(e.target.value))} />
       </Card>
-      <Card title={t("orgSettings.defaultsTitle")} description={t("orgSettings.defaultsHint")}>
+      <Card title={t("orgSettings.defaultsTitle")}>
         <div className="grid gap-4 sm:grid-cols-2">
           <Select label={t("orgSettings.visibility")} value={value.catalog_defaults.visibility} disabled={locked}
             options={(["private", "catalog"] as const).map((v) => ({ value: v, label: t(`orgSettings.visibilityOptions.${v}`) }))}

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui";
 import { useOrg } from "@/components/lms/org/OrgShell";
 import { CourseStatusBadge, LoadError, OrgError } from "@/components/lms/org/OrgUi";
+import { Disclosure } from "@/components/lms/admin/Disclosure";
 
 /** Org admin course summary (design §3): facts, staff, assign owner, open course, join as teacher (A13). */
 export default function OrgCourseSummaryPage() {
@@ -145,7 +146,7 @@ export default function OrgCourseSummaryPage() {
         {/* Phase 9 S5: the course's department (PATCH /org/{org}/courses/{id}) */}
         <CourseDepartmentCard orgId={org.id} courseId={course.id} current={course.organization_id ?? ""} readOnly={readOnly}
           onMoved={() => void load()} />
-        <Card title={t("organizations.course.assignOwner")} description={t("organizations.course.assignOwnerHint")}>
+        <Disclosure title={t("organizations.course.assignOwner")}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="min-w-0 flex-1">
               <UserPicker label={t("organizations.course.newOwner")} value={newOwner} onChange={setNewOwner}
@@ -155,7 +156,8 @@ export default function OrgCourseSummaryPage() {
               {t("organizations.course.assignOwner")}
             </Button>
           </div>
-        </Card>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{t("organizations.course.assignOwnerHint")}</p>
+        </Disclosure>
       </div>
       <ConfirmDialog
         open={dialog !== null}

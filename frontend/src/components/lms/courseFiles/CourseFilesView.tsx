@@ -76,7 +76,7 @@ export function CourseFilesView() {
     <div>
       <PageHeader
         title={t("courseFiles.title")}
-        description={t(isStaff ? "courseFiles.descriptionStaff" : "courseFiles.descriptionStudent")}
+        description={isStaff ? undefined : t("courseFiles.descriptionStudent")}
         primaryAction={canEdit ? <Button leftIcon={<Upload className="h-4 w-4" aria-hidden="true" />} onClick={() => setUpload(true)}>{t("courseFiles.upload")}</Button> : undefined}
       />
       {isStaff && quota && (

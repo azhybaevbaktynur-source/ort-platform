@@ -106,6 +106,7 @@ test("org admin: departments, course move, settings, usage by department", async
   const depts: { id: string; name: string }[] = await api(data().org_admin, "GET", `/org/${data().organization_id}/departments`);
   const maths = depts.find((d) => d.name === "Математика")!;
   await page.goto(`${orgBase()}/courses/${data().maths_course_id}`);
+  await page.locator("summary", { hasText: t("departments.courseDepartment") }).click(); // a disclosure (UX rework E)
   await page.locator("#course-department").selectOption(maths.id);
   await page.getByRole("button", { name: t("departments.moveCourse") }).click();
   await expect(page.getByText(t("departments.courseMoved", { name: "Математика" })).first()).toBeVisible();
@@ -304,7 +305,7 @@ test("platform admin: the organization's Departments tab and settings", async ({
   await uxShots(page, SHOTS, "admin-org-summary", STAFF);
   const toDepartments = async (p: Page, lang: string) => {
     await p.getByRole("tab", { name: tr(lang as "ru", "organizations.admin.tabs.departments") }).click();
-    await expect(p.getByText(tr(lang as "ru", "departments.platformHint"))).toBeVisible();
+    await expect(p.getByRole("tab", { name: tr(lang as "ru", "organizations.admin.tabs.departments") })).toHaveAttribute("aria-selected", "true");
   };
   await toDepartments(page, "ru");
   await expect(page.getByText("Математика", { exact: true })).toBeVisible();

@@ -29,7 +29,7 @@ export default function OrgPickerPage() {
   useEffect(() => { void load(); }, [load]);
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div>
       <PageHeader title={t("organizations.org.pickTitle")} />
       {error ? <LoadError error={error} onRetry={load} /> : !orgs ? <LoadingState label={t("lms.common.loading")} /> : orgs.length === 0 ? (
         <EmptyState icon={<Building2 />} title={t("organizations.org.pickEmpty")}

@@ -1,10 +1,10 @@
 "use client";
 
-// Phase 8c S2 (PHASE_8C_DESIGN §3.4): the "Unsorted" group, last in the teacher outline. Live assignments (quizzes
-// included), pages (one row per translation group, with language chips) and course files that no live item of a live
-// module references (`GET _C/modules/unsorted`, S1): 20 rows per kind with "Show more" per kind. Each row: kind icon,
-// title, draft mark and a "⋯" menu (Move to module…, Open, Delete). Collapsed when empty ("Everything is in a module").
-import React, { useCallback, useEffect, useRef, useState } from "react";
+// Phase 8c S2 (PHASE_8C_DESIGN §3.4): live assignments (quizzes included), pages (one row per translation group) and
+// course files that no live item of a live module references (`GET _C/modules/unsorted`, S1): 20 rows per kind with
+// "Show more". UX rework D (UR-4): one collapsed row at the end of the outline, "Not in modules · N", absent when N = 0;
+// expanded, a flat list of one-line rows (kind icon, title, kind text, "⋯" with Move to module, Edit, Delete).
+import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
@@ -17,10 +17,10 @@ import { withFrom } from "@/lib/lms/nav";
 import { deletePage } from "@/lib/lms/pages";
 import type { Lang, UnsortedItemOut, UnsortedKind, UnsortedOut, UnsortedPageOut } from "@/lib/lms/types";
 import { getUnsorted } from "@/lib/lms/unsorted";
-import { ItemKindIcon, useModuleErrorText } from "@/components/lms/modules/moduleUi";
+import { ItemKindIcon, useItemKindText, useModuleErrorText } from "@/components/lms/modules/moduleUi";
 import { OutlineMenu } from "@/components/lms/modules/OutlineMenu";
 import { PlaceInModuleDialog, type PlaceTarget } from "@/components/lms/modules/AddItemDialog";
-import { Badge, Button, ConfirmDialog, Skeleton, cn, focusRing, toast } from "@/components/ui";
+import { Button, ConfirmDialog, cn, focusRing, toast } from "@/components/ui";
 
 const KINDS: { kind: UnsortedKind; key: keyof UnsortedOut }[] = [
   { kind: "assignment", key: "assignments" },
@@ -28,28 +28,27 @@ const KINDS: { kind: UnsortedKind; key: keyof UnsortedOut }[] = [
   { kind: "file", key: "files" },
 ];
 
-export function UnsortedGroup({ courseId, defaultLang, modules, canEdit, open, onOpenChange, refreshKey = 0, onPlaced, onChanged }: {
+export function UnsortedGroup({ courseId, defaultLang, modules, canEdit, refreshKey = 0, onPlaced, onChanged }: {
   courseId: string;
   defaultLang: Lang;
   /** Live modules (targets of "Move to module…"). */
   modules: ModuleStaffOut[];
   canEdit: boolean;
-  /** Expanded state (the Course page opens it from "Add existing items"). */
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   refreshKey?: number;
   /** A target went into a module: the outline reloads. */
   onPlaced: (moduleId: string) => void;
-  /** A target was deleted (To do counts may change). */
+  /** A target was deleted (the "to grade" count may change). */
   onChanged?: () => void;
 }) {
   const { lang, t } = useTranslation();
   const errorText = useModuleErrorText();
+  const kindText = useItemKindText();
   const router = useRouter();
   const base = `/${lang}/courses/${courseId}`;
+  const [open, setOpen] = useState(false);
   const [data, setData] = useState<UnsortedOut | null>(null);
   const [error, setError] = useState<unknown>(null);
-  const [more, setMore] = useState<UnsortedKind | null>(null);
+  const [more, setMore] = useState(false);
   const [placing, setPlacing] = useState<PlaceTarget | null>(null);
   const [toDelete, setToDelete] = useState<UnsortedItemOut | null>(null);
   const [busy, setBusy] = useState(false);
@@ -65,18 +64,27 @@ export function UnsortedGroup({ courseId, defaultLang, modules, canEdit, open, o
   }, [courseId]);
   useEffect(() => { void load(); }, [load, refreshKey]);
 
-  const showMore = async (kind: UnsortedKind, key: keyof UnsortedOut) => {
-    const page = data?.[key];
-    if (!page?.next_cursor) return;
-    setMore(kind);
+  const pageOf = (d: UnsortedOut, key: keyof UnsortedOut) => d[key] as UnsortedPageOut | null | undefined;
+  /** "Show more" continues every kind that has more rows. */
+  const showMore = async () => {
+    if (!data) return;
+    setMore(true);
     try {
-      const out = await getUnsorted(courseId, { kind, cursor: page.next_cursor });
-      const next = out[key];
-      if (next) setData((d) => (d ? { ...d, [key]: { ...next, items: [...(d[key]?.items ?? []), ...next.items] } } : d));
+      const pending = KINDS.filter(({ key }) => pageOf(data, key)?.next_cursor);
+      const pages = await Promise.all(pending.map(({ kind, key }) => getUnsorted(courseId, { kind, cursor: pageOf(data, key)!.next_cursor })));
+      setData((d) => {
+        if (!d) return d;
+        const next: UnsortedOut = { ...d };
+        pending.forEach(({ key }, i) => {
+          const page = pageOf(pages[i], key);
+          if (page) Object.assign(next, { [key]: { ...page, items: [...(pageOf(d, key)?.items ?? []), ...page.items] } });
+        });
+        return next;
+      });
     } catch (e) {
       toast.error(errorText(e));
     } finally {
-      setMore(null);
+      setMore(false);
     }
   };
 
@@ -111,33 +119,31 @@ export function UnsortedGroup({ courseId, defaultLang, modules, canEdit, open, o
     }
   };
 
-  const totals = { assignments: data?.assignments?.total ?? 0, pages: data?.pages?.total ?? 0, files: data?.files?.total ?? 0 };
-  const total = totals.assignments + totals.pages + totals.files;
-  const empty = !!data && total === 0;
-  // collapsed when empty on the first load ("Everything is in a module"); the teacher can still open it
-  const firstLoad = useRef(true);
-  useEffect(() => {
-    if (!data || !firstLoad.current) return;
-    firstLoad.current = false;
-    if (empty) onOpenChange(false);
-  }, [data, empty, onOpenChange]);
+  const total = (data?.assignments?.total ?? 0) + (data?.pages?.total ?? 0) + (data?.files?.total ?? 0);
+  if (!data || total === 0) {
+    if (!error || data) return null;
+    return (
+      <div className="flex flex-wrap items-center gap-3 px-1 text-sm text-danger-800">
+        <span role="alert">{errorText(error)}</span>
+        <Button size="sm" variant="secondary" onClick={() => void load()}>{t("lms.common.retry")}</Button>
+      </div>
+    );
+  }
 
   const row = (it: UnsortedItemOut) => {
     const name = titleOf(it);
+    const languages = it.kind === "page" ? (it.variants?.length ? it.variants : it.language ? [{ id: it.id, language: it.language }] : []) : [];
+    const tip = [name, it.kind === "file" ? it.folder : "", ...languages.map((v) => t(`courses.languages.${v.language}`))].filter(Boolean).join(" · ");
     return (
-      <li key={`${it.kind}-${it.id}`} className="flex items-start gap-1 px-2 py-1.5 sm:px-3">
-        <ItemKindIcon kind={it.kind} assignmentKind={it.assignment_kind ?? undefined} className="mt-3 h-5 w-5 text-slate-500" />
-        <div className="min-w-0 flex-1 py-2 pl-2">
-          <Link href={hrefOf(it)} className={cn("break-words rounded text-base font-medium leading-6 text-slate-900 hover:text-brand-700 hover:underline sm:text-sm", focusRing)}>
+      <li key={`${it.kind}-${it.id}`} className="flex min-h-11 items-center gap-1 px-1 sm:px-2">
+        <ItemKindIcon kind={it.kind} assignmentKind={it.assignment_kind ?? undefined} className="ml-1 h-4 w-4 text-slate-500" />
+        <div className="min-w-0 flex-1 py-1.5 pl-2 sm:flex sm:items-center sm:gap-3" title={tip}>
+          <Link href={hrefOf(it)} className={cn("block break-words rounded text-base font-medium leading-6 text-slate-900 hover:text-brand-700 hover:underline sm:truncate sm:text-sm", focusRing)}>
             {name}
           </Link>
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm leading-6 text-slate-600">
-            {it.kind === "assignment" && it.assignment_kind && <span>{t(`assignments.kinds.${it.assignment_kind}`)}</span>}
-            {it.kind === "file" && it.folder && <span className="break-all">{it.folder}</span>}
+          <p className="flex flex-wrap items-center gap-x-2 text-sm leading-5 text-slate-600 sm:shrink-0">
+            <span>{kindText(it.kind, it.assignment_kind)}</span>
             {!it.published && <span>{t("modules.editor.draft")}</span>}
-            {it.kind === "page" && (it.variants?.length ? it.variants : it.language ? [{ id: it.id, language: it.language }] : []).map((v) => (
-              <Badge key={v.id}>{t(`courses.languages.${v.language}`)}</Badge>
-            ))}
           </p>
         </div>
         <OutlineMenu label={t("modules.editor.actionsFor", { title: name })} onSelect={(id) => {
@@ -147,7 +153,7 @@ export function UnsortedGroup({ courseId, defaultLang, modules, canEdit, open, o
         }} groups={[{
           id: "row", items: [
             ...(canEdit ? [{ id: "place", label: t("coursePage.unsorted.moveTo"), disabled: modules.length === 0 }] : []),
-            { id: "open", label: t("modules.editor.openTarget") },
+            { id: "open", label: t("coursePage.unsorted.edit") },
             ...(canEdit ? [{ id: "delete", label: t("modules.editor.delete"), danger: true }] : []),
           ],
         }]} />
@@ -156,59 +162,26 @@ export function UnsortedGroup({ courseId, defaultLang, modules, canEdit, open, o
   };
 
   const sectionId = "unsorted-items";
+  const rows = KINDS.flatMap(({ key }) => pageOf(data, key)?.items ?? []);
+  const hasMore = KINDS.some(({ key }) => pageOf(data, key)?.next_cursor);
   return (
-    <section id="unsorted" aria-labelledby="unsorted-title" className="scroll-mt-24 rounded-2xl border border-dashed border-slate-300 bg-slate-50/60">
-      <div className="flex items-start gap-1 px-2 py-2 sm:px-3">
-        <button type="button" aria-expanded={open} aria-controls={sectionId} onClick={() => onOpenChange(!open)}
-          aria-label={t("coursePage.toggleModule", { title: t("coursePage.unsorted.title") })}
-          className={cn("inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100", focusRing)}>
-          <ChevronRight aria-hidden="true" className={cn("h-5 w-5 transition-transform", open && "rotate-90")} />
+    <section id="unsorted" aria-labelledby="unsorted-title" className="scroll-mt-24 rounded-xl border border-slate-200 bg-white">
+      <h3 id="unsorted-title">
+        <button type="button" aria-expanded={open} aria-controls={sectionId} onClick={() => setOpen((o) => !o)} title={t("coursePage.unsorted.hint")}
+          className={cn("flex min-h-11 w-full items-center gap-1 rounded-xl px-1 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:px-2", focusRing)}>
+          <span aria-hidden="true" className="inline-flex h-11 w-9 shrink-0 items-center justify-center text-slate-600">
+            <ChevronRight className={cn("h-5 w-5 transition-transform", open && "rotate-90")} />
+          </span>
+          {t("coursePage.unsorted.row", { n: total })}
         </button>
-        <div className="min-w-0 flex-1 py-2">
-          <h3 id="unsorted-title" className="text-lg font-semibold leading-7 text-slate-900">{t("coursePage.unsorted.title")}</h3>
-          <div className="mt-0.5 text-sm leading-6 text-slate-600">
-            {!data && !error ? <Skeleton className="h-4 w-40" />
-              : empty ? t("coursePage.unsorted.empty")
-                : t("coursePage.unsorted.totals", totals)}
+      </h3>
+      <div id={sectionId} hidden={!open} className="border-t border-slate-200">
+        <ul className="divide-y divide-slate-100">{rows.map(row)}</ul>
+        {hasMore && (
+          <div className="border-t border-slate-100 px-3 py-1">
+            <Button variant="link" size="sm" loading={more} onClick={() => void showMore()}>{t("coursePage.unsorted.more")}</Button>
           </div>
-        </div>
-      </div>
-      <div id={sectionId} hidden={!open} className="space-y-4 border-t border-slate-200 px-2 pb-4 pt-3 sm:px-3">
-        <p className="px-2 text-sm leading-6 text-slate-600">{t("coursePage.unsorted.hint")}</p>
-        {error && !data ? (
-          <div className="flex flex-wrap items-center gap-3 px-2 text-sm text-danger-800">
-            <span role="alert">{errorText(error)}</span>
-            <Button size="sm" variant="secondary" onClick={() => void load()}>{t("lms.common.retry")}</Button>
-          </div>
-        ) : !data ? (
-          <div aria-hidden="true" className="space-y-2 px-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
-        ) : (
-          KINDS.map(({ kind, key }) => {
-            const page = data[key] as UnsortedPageOut | null;
-            if (!page || page.items.length === 0) return null;
-            return (
-              <div key={kind} className="rounded-xl border border-slate-200 bg-white">
-                <h4 className="px-4 pt-3 text-sm font-semibold uppercase tracking-wide text-slate-600">
-                  {t(`coursePage.unsorted.groups.${key}`, { n: page.total })}
-                </h4>
-                <ul className="divide-y divide-slate-100">{page.items.map(row)}</ul>
-                {page.next_cursor && (
-                  <div className="px-4 pb-3">
-                    <Button variant="link" size="sm" loading={more === kind} onClick={() => void showMore(kind, key)}>{t("coursePage.unsorted.more")}</Button>
-                  </div>
-                )}
-              </div>
-            );
-          })
         )}
-        <div className="flex flex-wrap gap-x-5 px-2">
-          <Link href={`${base}/pages`} className={cn("inline-flex min-h-11 items-center rounded text-sm font-medium text-brand-700 hover:underline sm:min-h-0", focusRing)}>
-            {t("coursePage.unsorted.allPages")}
-          </Link>
-          <Link href={`${base}/files`} className={cn("inline-flex min-h-11 items-center rounded text-sm font-medium text-brand-700 hover:underline sm:min-h-0", focusRing)}>
-            {t("coursePage.unsorted.allFiles")}
-          </Link>
-        </div>
       </div>
 
       {placing && (

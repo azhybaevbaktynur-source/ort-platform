@@ -53,10 +53,7 @@ export function CourseHomeSection({ course }: { course: CourseStaffOut }) {
 
   return (
     <form id="course-home" onSubmit={(e) => void save(e)} noValidate className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-      <div>
-        <h2 className="text-lg font-bold text-slate-900">{t("courses.homeKind.title")}</h2>
-        <p className="mt-1 text-sm text-slate-600">{t("courses.homeKind.hint")}</p>
-      </div>
+      <h2 className="text-lg font-bold text-slate-900">{t("courses.homeKind.title")}</h2>
       <div className="grid gap-4 sm:grid-cols-2">
         <Select label={t("courses.homeKind.label")} value={kind} disabled={busy || locked}
           hint={locked ? t("templates.lockedNote") : t(`courses.homeKind.hints.${kind}`)}

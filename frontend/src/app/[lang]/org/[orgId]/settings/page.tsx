@@ -26,7 +26,7 @@ export default function OrgSettingsPage() {
 
   return (
     <div>
-      <PageHeader title={t("orgSettings.title")} description={t("orgSettings.intro")} breadcrumbs={crumbs({ label: t("orgSettings.nav") })} />
+      <PageHeader title={t("orgSettings.title")} breadcrumbs={crumbs({ label: t("orgSettings.nav") })} />
       {error && !view ? <LoadError error={error} onRetry={load} /> : !view ? <LoadingState label={t("lms.common.loading")} /> : (
         <OrgSettingsForm view={view} readOnly={readOnly} onSaved={(v) => { setView(v); void reload(); }} />
       )}

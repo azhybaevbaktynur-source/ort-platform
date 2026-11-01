@@ -104,23 +104,17 @@ test.describe("phase 8c screens", () => {
           await shoot(page, "teacher-drawer", vp, lang);
           await page.keyboard.press("Escape");
         }
-        // filled course page: sidebar (desktop) / drawer button (phone), outline, Unsorted, To do
+        // filled course page: sidebar (desktop) / drawer button (phone), outline, "Not in modules", To grade
         await page.goto(base);
-        await expect(page.getByRole("heading", { name: tl("todo.title") }).first()).toBeVisible().catch(() => null);
+        await expect(page.getByRole("heading", { name: tl("todo.toGrade") }).first()).toBeVisible().catch(() => null);
         await settle(page);
         await shoot(page, "teacher-course-filled", vp, lang);
         await shoot(page, "teacher-course-filled-full", vp, lang, true);
-        if (vp === "phone") {
-          // the collapsed To do line, then expanded
-          const line = page.getByRole("button", { expanded: false }).filter({ hasText: /\d/ }).first();
-          if (await line.count()) { await line.scrollIntoViewIfNeeded(); await shoot(page, "teacher-todo-collapsed", vp, lang); await line.click(); await shoot(page, "teacher-todo-expanded", vp, lang); }
-        } else {
-          await shoot(page, "teacher-sidebar", vp, lang);
-        }
+        if (vp !== "phone") await shoot(page, "teacher-sidebar", vp, lang);
         // grouped "+ Add" and the "⋯" menus
         const card = page.locator(`#m-${ids.m1}`);
         await card.scrollIntoViewIfNeeded();
-        await card.getByRole("button", { name: tl("modules.editor.addItem") }).first().click();
+        await card.locator('button[aria-haspopup="menu"]').first().click(); // the module's "+" menu
         await shoot(page, "teacher-add-menu", vp, lang);
         await page.keyboard.press("Escape");
         await card.getByRole("button", { name: tl("modules.editor.actions") }).first().click();
@@ -129,8 +123,9 @@ test.describe("phase 8c screens", () => {
         await card.locator("li").first().getByRole("button", { name: /./ }).last().click().catch(() => null);
         await shoot(page, "teacher-item-menu", vp, lang);
         await page.keyboard.press("Escape");
-        const un = page.locator("section, details").filter({ has: page.getByRole("heading", { name: tl("coursePage.unsorted.title") }) }).first();
+        const un = page.locator("#unsorted");
         await un.scrollIntoViewIfNeeded();
+        await un.getByRole("button").first().click();
         await shoot(page, "teacher-unsorted", vp, lang);
         // assignment page: tabs
         const ap = `${base}/assignments/${ids.text}`;

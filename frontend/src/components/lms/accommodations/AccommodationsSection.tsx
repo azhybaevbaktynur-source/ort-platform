@@ -74,7 +74,7 @@ export function AccommodationsSection({ courseId }: { courseId: string }) {
   ];
 
   return (
-    <Card title={t("accommodations.section.title")} description={t("accommodations.section.subtitle")}>
+    <Card title={t("accommodations.section.title")}>
       <Table<AccommodationRowOut>
         caption={t("accommodations.section.title")}
         rows={visible}

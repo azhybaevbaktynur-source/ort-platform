@@ -17,6 +17,7 @@ import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
 import { CourseGradingSection } from "@/components/lms/grading/settings/CourseGradingSection";
 import { CourseHomeSection } from "@/components/lms/modules/CourseHomeSection"; // Phase 8a S4a
 import { ConfirmDialog, PageHeader, buttonClasses } from "@/components/ui";
+import { Disclosure } from "@/components/lms/admin/Disclosure";
 import { pickLocalized } from "@/lib/lms/localized";
 // --- Phase 9 S4: enrollment modes, catalog visibility, link to the enrollment form ---
 import Link from "next/link";
@@ -154,7 +155,7 @@ function Settings({ course }: { course: CourseStaffOut }) {
     c === "transfer" && ownerName ? `${courseName} → ${ownerName.user.display_name || ownerName.user.email}` : c === "regenerate" ? formatCode(course.join_code) : courseName;
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-3xl space-y-6">
       <PageHeader title={t("courses.settings.tab")} className="mb-2" />
       <form onSubmit={saveGeneral} className={`${card} space-y-5`} noValidate>
         <h2 className="text-lg font-bold text-slate-900">{t("courses.settings.general")}</h2>
@@ -180,7 +181,6 @@ function Settings({ course }: { course: CourseStaffOut }) {
         <div>
           <p className="mb-2 text-sm font-medium text-slate-700">{t("courses.settings.joinCode")}</p>
           <JoinCodeDisplay code={course.join_code} />
-          <p className="mt-2 text-xs text-slate-500">{t("courses.settings.joinCodeHint")}</p>
           {/* Phase 9 UX: the reason the code does not work: a draft course, or the saved enrollment mode */}
           {st !== "published" ? (
             <p className="mt-1 text-xs text-amber-700">{t("courses.settings.joinCodeInactiveUnpublished")}</p>
@@ -265,8 +265,8 @@ function Settings({ course }: { course: CourseStaffOut }) {
       </section>
 
       {isOwner && (
-        <section className="space-y-5 rounded-2xl border border-danger-200 bg-white p-4 shadow-sm sm:p-6">
-          <h2 className="text-lg font-bold text-danger-700">{t("courses.settings.danger")}</h2>
+        <Disclosure title={<span className="text-danger-700">{t("courses.settings.danger")}</span>} className="border-danger-200">
+          <div className="space-y-5">
           <div>
             <label htmlFor="s-owner" className="mb-1 block text-sm font-medium text-slate-700">{t("courses.settings.newOwner")}</label>
             <div className="flex flex-wrap items-center gap-2">
@@ -285,9 +285,9 @@ function Settings({ course }: { course: CourseStaffOut }) {
             <button type="button" onClick={() => { setError(null); setConfirm("delete"); }} className={dangerBtn}>
               {t("courses.settings.delete")}
             </button>
-            <p className="mt-1 text-xs text-slate-500">{t("courses.settings.deleteHint")}</p>
           </div>
-        </section>
+          </div>
+        </Disclosure>
       )}
 
       {cfg && (

@@ -62,7 +62,7 @@ export default function OrgDepartmentsPage() {
   );
   return (
     <div>
-      <PageHeader title={t("departments.title")} description={t("departments.intro")}
+      <PageHeader title={t("departments.title")}
         breadcrumbs={crumbs({ label: t("departments.nav") })} primaryAction={personal ? undefined : createButton("primary")} />
       {error && !rows ? <LoadError error={error} onRetry={load} /> : !rows ? <LoadingState label={t("lms.common.loading")} /> : (
         <>
