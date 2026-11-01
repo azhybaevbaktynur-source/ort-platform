@@ -59,6 +59,17 @@ def test_request_log_has_no_email_ip_query_token_or_body(captured):
     assert {"request_id", "ms", "method"} <= set(first)
 
 
+def test_a_forged_token_writes_no_user_id():
+    import jwt
+
+    from app.core.request_log import _user_id
+
+    forged = jwt.encode({"sub": "someone-else"}, "not-the-real-key-not-the-real-key", algorithm="HS256")
+    assert _user_id({"headers": [(b"authorization", f"Bearer {forged}".encode())]}) is None
+    real = create_access_token({"sub": "user-123"})
+    assert _user_id({"headers": [(b"authorization", f"Bearer {real}".encode())]}) == "user-123"
+
+
 def test_2xx_not_logged_when_sampling_is_zero(monkeypatch, captured):
     monkeypatch.setattr(settings, "LOG_SAMPLE_2XX", 0.0)
     TestClient(app).get("/health")

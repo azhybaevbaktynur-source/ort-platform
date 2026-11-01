@@ -9,7 +9,6 @@ import time
 import uuid
 from typing import Optional
 
-import jwt
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
@@ -20,16 +19,16 @@ SLOW_MS = 1000.0
 
 
 def _user_id(scope: Scope) -> Optional[str]:
-    """`sub` of the bearer token, for the log only (never used to authorize, so no signature check or DB read)."""
+    """`sub` of a validly signed bearer token, for the log only: a forged token must not write a user id into the log."""
+    from app.lms.core.deps import _claims_from_authorization  # local: deps imports the app's settings and models
+
     for name, value in scope["headers"]:
         if name == b"authorization":
-            parts = value.decode("latin-1").split(" ", 1)
-            if len(parts) == 2 and parts[0].lower() == "bearer":
-                try:
-                    sub = jwt.decode(parts[1], options={"verify_signature": False}).get("sub")
-                except Exception:
-                    return None
-                return str(sub)[:64] if sub is not None else None
+            try:
+                sub = _claims_from_authorization(value.decode("latin-1")).get("sub")
+            except Exception:
+                return None
+            return str(sub)[:64] if sub is not None else None
     return None
 
 
