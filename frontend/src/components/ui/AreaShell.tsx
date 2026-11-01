@@ -113,12 +113,12 @@ export function AreaShell({ label, items, heading, banner, children, className, 
       ) : (
         <TabsNav
           label={label}
-          className="-mx-4 mb-5 bg-white px-1 md:hidden"
+          className="-mx-4 mb-5 bg-white px-1 sm:-mx-6 md:hidden"
           items={items.map((i) => ({ href: i.href, label: i.label, active: i.active, count: i.count ? i.count : undefined }))}
         />
       )}
-      <div className="md:flex md:items-start md:gap-8">
-        <nav aria-label={label} className="hidden md:block md:w-56 md:shrink-0">
+      <div className="md:flex md:items-start md:gap-6 lg:gap-8">
+        <nav aria-label={label} className="hidden md:block md:w-52 md:shrink-0 lg:w-60">
           {heading && <div className="mb-3 px-3">{heading}</div>}
           <NavList items={items} />
           {navFooter && <p className="mt-4 px-3 text-xs leading-5 text-slate-600">{navFooter}</p>}

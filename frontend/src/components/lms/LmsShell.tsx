@@ -8,7 +8,8 @@ import { useAuth } from "@/lib/auth-context";
 import { LmsMeProvider, useLmsMeLoader } from "@/lib/lms/useLmsMe";
 import { listMyOrganizations, type MyOrganizationOut } from "@/lib/lms/organizations";
 import { AppHeader, Brand, type AppHeaderArea, type AreaKey } from "@/components/ui/AppHeader";
-import { ErrorState, LoadingState, Skeleton } from "@/components/ui";
+import { ErrorState, LoadingState, SHELL_WIDTH, Skeleton, cn } from "@/components/ui";
+import { EXAM_COLUMN_INNER, EXAM_COLUMN_OUTER } from "@/components/ui/shellWidth";
 import { lmsErrorKey } from "./ErrorMessage";
 import { PendingInvitationsBanner } from "./PendingInvitationsBanner"; // Phase 6 S4b
 import { InvitationAcceptedNotice } from "./InvitationAcceptedNotice"; // Phase 6 S8
@@ -167,12 +168,12 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
     return (
       <div className="min-h-screen bg-slate-50">
         <header className="border-b border-slate-200 bg-white">
-          <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:h-16">
+          <div className={cn("flex h-14 items-center gap-3 sm:h-16", SHELL_WIDTH)}>
             <Brand href={`/${lang}/courses`} />
             <Skeleton className="ml-auto h-9 w-9 rounded-full" />
           </div>
         </header>
-        <main className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+        <main className={cn("py-6 sm:py-8", SHELL_WIDTH)}>
           <Skeleton className="mb-6 h-8 w-2/3 max-w-sm" />
           <LoadingState label={t("lms.common.loading")} />
         </main>
@@ -187,6 +188,16 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
     : [];
 
   const meError = meState.error && !me ? meState.error : null;
+  const content = (
+    <>
+      {/* --- Phase 6 S4b / S8: invitation banner and notice stay under the header --- */}
+      <PendingInvitationsBanner enabled={!!me} />
+      <InvitationAcceptedNotice />
+      {meError ? (
+        <ErrorState message={t(lmsErrorKey(meError.code))} onRetry={() => void meState.reload()} />
+      ) : children}
+    </>
+  );
   return (
     <AreaDeclareContext.Provider value={setDeclared}>
       <LmsMeProvider value={meState}>
@@ -206,13 +217,11 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
             onLogout={() => void logout()}
             routeKey={pathname}
           />
-          <main id="main" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-6 focus:outline-none sm:py-8">
-            {/* --- Phase 6 S4b / S8: invitation banner and notice stay under the header --- */}
-            <PendingInvitationsBanner enabled={!!me} />
-            <InvitationAcceptedNotice />
-            {meError ? (
-              <ErrorState message={t(lmsErrorKey(meError.code))} onRetry={() => void meState.reload()} />
-            ) : children}
+          <main id="main" tabIndex={-1} className={cn("py-6 focus:outline-none sm:py-8", SHELL_WIDTH)}>
+            {/* UX rework (PUR-6): the attempt pages (result, review) keep their column; the player is its own overlay */}
+            {/^\/courses\/[^/]+\/attempts(\/|$)/.test(rest)
+              ? <div className={EXAM_COLUMN_OUTER}><div className={EXAM_COLUMN_INNER}>{content}</div></div>
+              : content}
           </main>
         </div>
       </LmsMeProvider>

@@ -13,6 +13,7 @@ IN_PROGRESS_MAX = 3
 NEXT_UP_MAX = 3
 LATEST_RESULTS_MAX = 3
 COURSES_MAX = 10
+TODO_MAX = 20
 
 
 class HomeInProgressOut(BaseModel):
@@ -36,6 +37,22 @@ class HomeNextUpOut(BaseModel):
     due_at: Optional[datetime] = None
     available_until: Optional[datetime] = None
     attempts_left: Optional[int] = None  # None = unlimited attempts (or a hand-in assignment)
+
+
+class HomeTodoOut(BaseModel):
+    """UX rework (UX_REWORK_DESIGN C): one dashboard "to do" row. `attempt_id` set: an attempt in progress (opens the
+    player). Otherwise a quiz opens its lobby (`assessment_id`), text/file the submit page (`assignment_id`). Dates
+    are the caller's effective ones (override-aware); `overdue`: the effective due date has passed."""
+    kind: str
+    assignment_id: Optional[uuid.UUID] = None
+    assessment_id: Optional[uuid.UUID] = None  # quiz only
+    attempt_id: Optional[uuid.UUID] = None
+    course_id: uuid.UUID
+    course_title: dict
+    title: dict
+    due_at: Optional[datetime] = None
+    available_until: Optional[datetime] = None
+    overdue: bool = False
 
 
 class HomeResultOut(BaseModel):
@@ -109,6 +126,7 @@ class HomeOut(BaseModel):
     announcements: list[AnnouncementHomeOut] = []  # latest three, never a body
     # --- Phase 8a S3 end ---
     pending_applications: list[HomeApplicationOut] = []  # Phase 9 S4: newest three, never answers
+    todo: list[HomeTodoOut] = []  # UX rework: at most TODO_MAX rows, in-progress attempts first
 
 
 HOME_KEYS = frozenset(HomeOut.model_fields)
@@ -119,5 +137,6 @@ ANNOUNCEMENT_KEYS = frozenset(AnnouncementHomeOut.model_fields)
 PENDING_APPLICATION_KEYS = frozenset(HomeApplicationOut.model_fields)  # Phase 9 S4
 IN_PROGRESS_KEYS = frozenset(HomeInProgressOut.model_fields)
 NEXT_UP_KEYS = frozenset(HomeNextUpOut.model_fields)
+TODO_KEYS = frozenset(HomeTodoOut.model_fields)
 RESULT_KEYS = frozenset(HomeResultOut.model_fields)
 COURSE_KEYS = frozenset(HomeCourseOut.model_fields)

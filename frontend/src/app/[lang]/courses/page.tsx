@@ -78,7 +78,7 @@ function TeachingList() {
         <EmptyState title={t("courses.list.emptyTeaching")}
           action={me?.can_create_courses ? <LinkButton href={`/${lang}/courses/new`}>{t("courses.list.create")}</LinkButton> : undefined} />
       )}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 min-[1700px]:grid-cols-4">
         {items.map((c) => <CourseCard key={c.id} course={c} />)}
       </div>
       <Pagination nextCursor={cursor} loading={loading} onLoadMore={() => void load(cursor)} />

@@ -76,6 +76,7 @@ class ItemRow:
     assessment_id: Optional[uuid.UUID] = None  # quiz assignment
     points_possible: Optional[Decimal] = None  # assignment
     preset: Optional[str] = None               # quiz assignment: the assessment's preset (8a UX M6, gating exemption)
+    due_at: Optional[datetime] = None          # assignment: its due date; a quiz's assessment is the truth (UX rework)
 
     @property
     def id(self) -> uuid.UUID:
@@ -140,7 +141,8 @@ def load_structure(db: Session, course: Course, *, include_deleted: bool = False
                Page.title, Page.language, Page.published, Page.deleted_at,
                CourseFile.title, CourseFile.published, CourseFile.deleted_at,
                Assignment.title, Assignment.published, Assignment.deleted_at, Assignment.kind,
-               Assignment.assessment_id, Assignment.points_possible, Assessment.preset)
+               Assignment.assessment_id, Assignment.points_possible, Assessment.preset, Assignment.due_at,
+               Assessment.due_at)
         .join(CourseModule, CourseModule.id == ModuleItem.module_id)
         .outerjoin(ItemCompletionRequirement, ItemCompletionRequirement.item_id == ModuleItem.id)
         .outerjoin(Page, Page.id == ModuleItem.page_id)
@@ -152,7 +154,7 @@ def load_structure(db: Session, course: Course, *, include_deleted: bool = False
         .execution_options(populate_existing=True)
     ).all()
     for (it, rtype, thr, p_title, p_lang, p_pub, p_del, f_title, f_pub, f_del, a_title, a_pub, a_del, a_kind,
-         a_assessment, a_points, a_preset) in rows:
+         a_assessment, a_points, a_preset, a_due, q_due) in rows:
         row = ItemRow(item=it, req_type=rtype, threshold=thr)
         if it.kind == "page":
             row.target_published, row.target_deleted = bool(p_pub), p_del is not None
@@ -166,6 +168,7 @@ def load_structure(db: Session, course: Course, *, include_deleted: bool = False
             row.target_title = dict(a_title) if a_title else None
             row.assignment_kind, row.assessment_id, row.points_possible = a_kind, a_assessment, a_points
             row.preset = a_preset
+            row.due_at = q_due if a_kind == "quiz" else a_due
         items.setdefault(it.module_id, []).append(row)
     return Structure(course=course, modules=live, prereqs=prereqs, items=items, deleted_modules=deleted)
 

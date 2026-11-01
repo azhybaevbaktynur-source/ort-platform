@@ -16,6 +16,13 @@ export function fmtShortDateTime(value: string | null | undefined, lang: string)
   return d.toLocaleString(locale(lang), { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+/** "12 нояб., 23:59" / "12 Nov, 23:59": a date this year's lists read at a glance, or "" for an empty/invalid value. */
+export function fmtDayMonthTime(value: string | null | undefined, lang: string): string {
+  const d = parseApiDate(value);
+  if (!d) return "";
+  return d.toLocaleString(locale(lang), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
 /** True when `value` is in the future but less than 24 hours away (shown in red with a clock icon). */
 export function isDueSoon(value: string | null | undefined, now: number = Date.now()): boolean {
   const d = parseApiDate(value);

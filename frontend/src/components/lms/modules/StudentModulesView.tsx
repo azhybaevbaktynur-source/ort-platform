@@ -1,10 +1,11 @@
 "use client";
 
-// Phase 8a S4a (PHASE_8A_DESIGN 8.1): a student's modules. "Up next" on top with the page's one primary action, then
-// the modules as cards (state badge, lock reasons in plain words) and their items as rows (kind icon + text, check
-// mark when met, requirement text, locked rows greyed with a lock icon and text). Tapping a page, file, assignment or
-// link records the view, then opens it; "mark as done" items have a checkbox. A short line celebrates a completed
-// module. The same list renders read-only for an org admin (no state) and in the teacher's progress drawer.
+// Phase 8a S4a (PHASE_8A_DESIGN 8.1), UX rework B: a student's modules as Canvas-style groups: a module header (title,
+// state, done / total; lock reasons in plain words) over compact rows in order (kind icon, title, kind + due date in
+// small text, check mark when met, locked rows greyed with a lock icon and the reason). Tapping a page, file, assignment
+// or link records the view, then opens it; "mark as done" items have a checkbox. A short line celebrates a completed
+// module. The same list renders read-only for an org admin (no state) and in the teacher's progress drawer. From `xl`
+// a right column lists this course's to-do.
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { isStudentView } from "@/lib/api"; // Phase 8c S1
 import Link from "next/link";
@@ -13,10 +14,15 @@ import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
 import { getModules, recordView, setDone } from "@/lib/lms/modules";
 import { downloadCourseFile } from "@/lib/lms/courseFiles";
-import type { ItemRefOut, ItemStudentOut, ModuleStudentOut, ModulesStudentOut } from "@/lib/lms/modulesTypes";
+import { getHome } from "@/lib/lms/home";
+import type { HomeTodoOut } from "@/lib/lms/homeTypes";
+import type { ItemStudentOut, ModuleStudentOut, ModulesStudentOut } from "@/lib/lms/modulesTypes";
 import type { Lang } from "@/lib/lms/types";
 import { useCourse } from "@/components/lms/CourseContext";
-import { Button, Card, Checkbox, EmptyState, ErrorState, LinkButton, LoadingState, cn, focusRing } from "@/components/ui";
+import { fmtDayMonthTime } from "@/components/lms/home/format";
+import { LeaveCourseLink } from "@/components/lms/home/LeaveCourseLink";
+import { SideSection, TodoRows } from "@/components/lms/home/TodoList";
+import { Checkbox, EmptyState, ErrorState, LoadingState, cn, focusRing } from "@/components/ui";
 import { ExternalIcon, ItemKindIcon, ModuleStateBadge, itemHref, useItemKindText, useLockReasonText, useModuleErrorText, useRequirementText } from "./moduleUi";
 
 type Mode = "student" | "readonly" | "progress";
@@ -93,85 +99,79 @@ function ItemRow({ item, module, ctx }: { item: ItemStudentOut; module: ModuleSt
   // 8a UX M5: a file row names its action in the meta line at every width (like a page row's "View")
   const canDownload = canOpen && item.kind === "file" && !!item.link?.file_id;
   const meta = (
-    <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm leading-6 text-slate-600">
-      <span className="inline-flex items-center gap-1"><ItemKindIcon kind={item.kind} assignmentKind={assignmentKind} />{kindText(item.kind, assignmentKind)}</span>
-      {req && req.type !== "mark_done" && (
-        <span className={cn("inline-flex items-center gap-1", met && "text-success-800")}>
-          {met && <CheckCircle2 aria-hidden="true" className="h-4 w-4" />}
-          {reqText(req.type, req.threshold)}
-          {met && <span className="sr-only">{t("modules.req.met")}</span>}
-        </span>
-      )}
+    <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm leading-5 text-slate-600 sm:text-xs">
+      <span>{kindText(item.kind, assignmentKind)}</span>
+      {item.due_at && <span>{t("home.todo.due", { date: fmtDayMonthTime(item.due_at, lang) })}</span>}
+      {req && req.type !== "mark_done" && <span className={cn(met && "text-success-800")}>{reqText(req.type, req.threshold)}</span>}
       {req && req.best_score_percent !== null && req.best_score_percent !== undefined && !met && (
         <span>{t("modules.req.best", { percent: Math.round(req.best_score_percent) })}</span>
       )}
-      {locked && !moduleLocked && (
-        <span className="inline-flex items-center gap-1 text-slate-700"><Lock aria-hidden="true" className="h-4 w-4" />{t("modules.reason.sequentialItem")}</span>
-      )}
+      {locked && !moduleLocked && <span className="text-slate-700">{t("modules.reason.sequentialItem")}</span>}
       {exempt && <span>{t("modules.availableInAssignments")}</span>}
       {canDownload && <span className="font-semibold text-brand-700">{t("modules.download")}</span>}
     </span>
   );
 
-  const titleEl = <span className="block break-words text-base font-semibold leading-6">{title}</span>;
-  const rowCls = cn("flex min-h-11 w-full items-start gap-3 rounded-xl px-3 py-3 text-left sm:px-4", pad);
-  const leading = locked
-    ? <Lock aria-hidden="true" className="mt-1 h-5 w-5 shrink-0 text-slate-400" />
+  const titleEl = <span className="block break-words text-base font-medium leading-6 sm:text-sm sm:leading-5">{title}</span>;
+  const rowCls = cn("flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left sm:px-4", pad);
+  const linkFocus = cn(focusRing, "focus-visible:ring-inset focus-visible:ring-offset-0");
+  const leading = <ItemKindIcon kind={item.kind} assignmentKind={assignmentKind} className={cn("h-5 w-5", locked ? "text-slate-400" : "text-slate-500")} />;
+  // the state at the end of the row: a lock, or the check mark when the requirement is met
+  const trailing = locked
+    ? <Lock aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400" />
     : met
-      ? <CheckCircle2 aria-hidden="true" className="mt-1 h-5 w-5 shrink-0 text-success-700" />
-      : <ItemKindIcon kind={item.kind} assignmentKind={assignmentKind} className="mt-1 h-5 w-5 text-slate-500" />;
+      ? <span className="inline-flex shrink-0"><CheckCircle2 aria-hidden="true" className="h-5 w-5 text-success-700" /><span className="sr-only">{t("modules.req.met")}</span></span>
+      : null;
 
   const href = itemHref(ctx.base, item.kind, item.link);
   let body: React.ReactNode;
   if (canOpen && href) {
     body = (
-      <Link href={href} onClick={() => void record()} className={cn(rowCls, "text-slate-900 hover:bg-slate-50", focusRing)}>
-        {leading}<span className="min-w-0 flex-1">{titleEl}{meta}</span>
+      <Link href={href} onClick={() => void record()} className={cn(rowCls, "text-slate-900 hover:bg-slate-50", linkFocus)}>
+        {leading}<span className="min-w-0 flex-1">{titleEl}{meta}</span>{trailing}
       </Link>
     );
   } else if (canOpen && item.kind === "url" && item.link?.url) {
     body = (
       <a href={item.link.url} target="_blank" rel="noopener noreferrer" onClick={() => void record()}
-        className={cn(rowCls, "text-slate-900 hover:bg-slate-50", focusRing)}>
+        className={cn(rowCls, "text-slate-900 hover:bg-slate-50", linkFocus)}>
         {leading}
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5">{titleEl}<ExternalIcon /><span className="sr-only">{t("modules.opensNewTab")}</span></span>
           {meta}
         </span>
+        {trailing}
       </a>
     );
   } else if (canOpen && item.kind === "file" && item.link?.file_id) {
     body = (
       <button type="button" onClick={() => void openFile()} disabled={busy} aria-busy={busy || undefined}
-        className={cn(rowCls, "text-slate-900 hover:bg-slate-50 disabled:opacity-70", focusRing)}>
-        {leading}<span className="min-w-0 flex-1">{titleEl}{meta}</span>
+        className={cn(rowCls, "text-slate-900 hover:bg-slate-50 disabled:opacity-70", linkFocus)}>
+        {leading}<span className="min-w-0 flex-1">{titleEl}{meta}</span>{trailing}
       </button>
     );
   } else {
     body = (
       <div className={cn(rowCls, locked ? "text-slate-500" : "text-slate-900")} aria-disabled={locked || undefined}>
-        {leading}<span className="min-w-0 flex-1">{titleEl}{meta}</span>
+        {leading}<span className="min-w-0 flex-1">{titleEl}{meta}</span>{trailing}
       </div>
     );
   }
 
+  if (req?.type !== "mark_done") return <li>{body}</li>;
+  // "mark as done": under the row on phones, at its end from `sm`
   return (
-    <li>
-      {body}
-      {req?.type === "mark_done" && (
-        <div className={cn("px-3 pb-3 sm:px-4", pad)}>
-          <div className="pl-8">
-            {student && !locked ? (
-              <Checkbox label={t("modules.markDone")} checked={met} disabled={busy} onChange={(e) => void toggleDone(e.target.checked)} />
-            ) : (
-              <span className={cn("inline-flex items-center gap-1 text-sm", met ? "text-success-800" : "text-slate-600")}>
-                {met && <CheckCircle2 aria-hidden="true" className="h-4 w-4" />}
-                {met ? t("modules.req.markedDone") : t("modules.req.mark_done")}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
+    <li className="sm:flex sm:items-center">
+      <div className="min-w-0 sm:flex-1">{body}</div>
+      <div className="shrink-0 pl-11 pr-3 sm:pl-0 sm:pr-4">
+        {student && !locked ? (
+          <Checkbox label={t("modules.markDone")} checked={met} disabled={busy} onChange={(e) => void toggleDone(e.target.checked)} />
+        ) : (
+          <span className={cn("inline-flex min-h-8 items-center gap-1 text-sm", met ? "text-success-800" : "text-slate-600")}>
+            {met ? t("modules.req.markedDone") : t("modules.req.mark_done")}
+          </span>
+        )}
+      </div>
     </li>
   );
 }
@@ -183,84 +183,34 @@ function ModuleCard({ module, ctx }: { module: ModuleStudentOut; ctx: ListCtx })
   const withReq = module.items.filter((i) => i.requirement);
   const done = withReq.filter((i) => i.requirement?.met).length;
   const headingId = `module-${module.id}`;
+  const hints = [
+    withReq.length > 1 && module.completion_mode === "any" ? t("modules.completionAny") : "",
+    module.sequential ? t("modules.sequentialHint") : "",
+  ].filter(Boolean).join(" ");
   return (
-    <section aria-labelledby={headingId} className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <header className="flex flex-col gap-2 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
-        <div className="min-w-0">
-          <h2 id={headingId} className="break-words text-lg font-semibold leading-7 text-slate-900">{title}</h2>
-          <p className="mt-0.5 flex flex-wrap gap-x-3 text-sm leading-6 text-slate-600">
-            {withReq.length > 0 && <span>{t("modules.progressCount", { done, total: withReq.length })}</span>}
-            {withReq.length > 1 && module.completion_mode === "any" && <span>{t("modules.completionAny")}</span>}
-            {module.sequential && <span>{t("modules.sequentialHint")}</span>}
-          </p>
+    <section aria-labelledby={headingId} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-200 bg-slate-50 px-3 py-2.5 sm:px-4" title={hints || undefined}>
+        <h2 id={headingId} className="min-w-0 flex-1 basis-40 break-words text-base font-semibold leading-6 text-slate-900">{title}</h2>
+        <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
+          {withReq.length > 0 && <span className="text-sm leading-6 text-slate-600">{t("modules.progressCount", { done, total: withReq.length })}</span>}
+          {module.state && <ModuleStateBadge state={module.state} />}
         </div>
-        {module.state && <div className="shrink-0"><ModuleStateBadge state={module.state} /></div>}
       </header>
       {module.state === "locked" && module.lock_reasons.length > 0 && (
-        <ul className="space-y-1 border-b border-slate-100 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700 sm:px-6">
+        <ul className="space-y-1 border-b border-slate-100 px-3 py-2 text-sm leading-6 text-slate-700 sm:px-4">
           {module.lock_reasons.map((r, i) => (
             <li key={i} className="flex items-start gap-2"><Lock aria-hidden="true" className="mt-1 h-4 w-4 shrink-0" /><span className="break-words">{reasonText(r, ctx.defaultLang)}</span></li>
           ))}
         </ul>
       )}
       {module.items.length === 0 ? (
-        <p className="px-4 py-4 text-base text-slate-600 sm:px-6">{t("modules.noItemsStudent")}</p>
+        <p className="px-3 py-3 text-base leading-6 text-slate-600 sm:px-4 sm:text-sm">{t("modules.noItemsStudent")}</p>
       ) : (
-        <ul className="divide-y divide-slate-100 p-1 sm:p-2">
+        <ul className="divide-y divide-slate-100">
           {module.items.map((item) => <ItemRow key={item.id} item={item} module={module} ctx={ctx} />)}
         </ul>
       )}
     </section>
-  );
-}
-
-function UpNext({ up, ctx, allDone }: { up: ItemRefOut | null; ctx: ListCtx; allDone: boolean }) {
-  const { lang, t } = useTranslation();
-  const kindText = useItemKindText();
-  const errorText = useModuleErrorText();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<unknown>(null);
-  if (!up) {
-    if (!allDone) return null;
-    return (
-      <p role="status" className="flex items-start gap-2 rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-base leading-6 text-success-900">
-        <CheckCircle2 aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" />{t("modules.upNext.allDone")}
-      </p>
-    );
-  }
-  const title = pickLocalized(up.title, lang, ctx.defaultLang) || t("modules.untitledItem");
-  const moduleTitle = pickLocalized(up.module_title, lang, ctx.defaultLang) || t("modules.untitledModule");
-  const record = () => { if (ctx.mode === "student") void recordView(ctx.courseId, up.module_id, up.item_id).then((m) => ctx.onFact(up.module_id, m)).catch(() => undefined); };
-  const href = itemHref(ctx.base, up.kind, up.link);
-  const label = t("modules.upNext.action");
-  let action: React.ReactNode = null;
-  if (href) action = <LinkButton size="lg" href={href} onClick={record}>{label}</LinkButton>;
-  else if (up.kind === "url" && up.link?.url) {
-    action = (
-      <a href={up.link.url} target="_blank" rel="noopener noreferrer" onClick={record}
-        className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brand-600 px-5 text-base font-semibold text-white shadow-sm hover:bg-brand-700">
-        {label}<ExternalIcon /><span className="sr-only">{t("modules.opensNewTab")}</span>
-      </a>
-    );
-  } else if (up.kind === "file" && up.link?.file_id) {
-    const fileId = up.link.file_id;
-    action = (
-      <Button size="lg" loading={busy} onClick={async () => {
-        setBusy(true); setError(null); record();
-        try { await downloadCourseFile(ctx.courseId, fileId); } catch (e) { setError(e); } finally { setBusy(false); }
-      }}>{t("modules.download")}</Button>
-    );
-  }
-  return (
-    <Card title={t("modules.upNext.title")} headingLevel={2}>
-      <p className="text-sm leading-6 text-slate-600">{moduleTitle}</p>
-      <p className="mt-0.5 flex items-start gap-2 break-words text-lg font-semibold leading-7 text-slate-900">
-        <ItemKindIcon kind={up.kind} assignmentKind={up.link?.assignment_kind} className="mt-1.5 h-5 w-5 text-slate-500" />
-        <span className="min-w-0">{title}<span className="sr-only">, {kindText(up.kind, up.link?.assignment_kind)}</span></span>
-      </p>
-      {action && <div className="mt-4 [&>*]:w-full sm:[&>*]:w-auto">{action}</div>}
-      {error ? <p role="alert" className="mt-2 text-sm text-danger-700">{errorText(error)}</p> : null}
-    </Card>
   );
 }
 
@@ -289,19 +239,38 @@ export function ModuleList({ data, mode, onChange }: {
         !!prev && prev.state !== next.state);
     },
   };
-  const allDone = data.modules.length > 0 && data.modules.every((m) => m.state === "completed");
   return (
-    <div className="space-y-6">
-      {mode === "student" && <UpNext up={data.up_next} ctx={ctx} allDone={allDone} />}
+    <div className="space-y-4">
       {error ? <ErrorState variant="inline" message={errorText(error)} /> : null}
       {data.modules.map((m) => <ModuleCard key={m.id} module={m} ctx={ctx} />)}
     </div>
   );
 }
 
+/** This course's to-do rows (section C data), read only while the right column can show them (`xl`, 1280 px). */
+function useCourseTodo(courseId: string, enabled: boolean): HomeTodoOut[] {
+  const [rows, setRows] = useState<HomeTodoOut[]>([]);
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 1280px)");
+    const onChange = () => setWide(query.matches);
+    onChange();
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+  const fetched = useRef(false);
+  useEffect(() => {
+    if (!wide || !enabled || fetched.current) return;
+    fetched.current = true;
+    // a convenience next to the list: without it the modules simply take the full width
+    getHome().then((home) => setRows((home.todo ?? []).filter((r) => r.course_id === courseId))).catch(() => undefined);
+  }, [wide, enabled, courseId]);
+  return rows;
+}
+
 /**
- * `/courses/[id]/modules` for students and org admins, and the course home when `home_kind = modules`. `fallback`:
- * rendered instead of the empty state when no module is published (the course home falls back to today's layout).
+ * `/courses/[id]/modules` for students and org admins, and the course home when modules are published. `fallback`:
+ * rendered instead of the empty state when no module is visible (the course home falls back to today's layout).
  */
 export function StudentModulesView({ fallback }: { fallback?: React.ReactNode }) {
   const { t } = useTranslation();
@@ -319,7 +288,7 @@ export function StudentModulesView({ fallback }: { fallback?: React.ReactNode })
     setError(null);
     try {
       const out = (await getModules(course.id)) as ModulesStudentOut;
-      if (mounted.current) setData({ modules: out.modules ?? [], up_next: out.up_next ?? null });
+      if (mounted.current) setData({ modules: out.modules ?? [], up_next: null }); // UX rework: no "up next" block
     } catch (e) {
       if (mounted.current) setError(e);
     } finally {
@@ -333,36 +302,46 @@ export function StudentModulesView({ fallback }: { fallback?: React.ReactNode })
   const readOnly = course.my_enrollment.role !== "student" || !!course.my_enrollment.read_only || course.status === "concluded"
     || isStudentView(course.id);
 
+  const todo = useCourseTodo(course.id, !readOnly);
+
   let content: React.ReactNode;
   if (error && !data) content = <ErrorState message={errorText(error)} onRetry={() => void load()} retrying={loading} />;
   else if (!data) content = <LoadingState rows={3} />;
   else if (data.modules.length === 0) {
-    if (fallback) return <>{fallback}</>;
+    if (fallback !== undefined) return <>{fallback}</>;
     content = <EmptyState title={t("modules.emptyStudentTitle")} description={t("modules.emptyStudentBody")} />;
   } else {
     content = (
       <ModuleList data={data} mode={readOnly ? "readonly" : "student"} onChange={(next, completedTitle, reload) => {
         setData(next);
         if (completedTitle) setCelebrate(completedTitle);
-        // a completed module may open later ones (prerequisites) and moves "up next": refresh quietly
+        // a completed module may open later ones (prerequisites): refresh quietly
         if (reload) void load(true);
       }} />
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
+    <div className="flex w-full flex-col gap-4">{/* gap: the empty live region below takes no space */}
       {course.status === "concluded" && (
         <p role="status" className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-base leading-6 text-slate-700 sm:text-sm">{t("courses.home.concludedNotice")}</p>
       )}
-      <div aria-live="polite">
+      <div aria-live="polite" className="empty:hidden">
         {celebrate && (
           <p className="flex items-start gap-2 rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-base leading-6 text-success-900">
             <PartyPopper aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" />{t("modules.celebrate", { title: celebrate })}
           </p>
         )}
       </div>
-      {content}
+      <div className={cn(todo.length > 0 && "xl:grid xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start xl:gap-6")}>
+        <div className="min-w-0">{content}</div>
+        {todo.length > 0 && (
+          <aside className="hidden min-w-0 xl:block">
+            <SideSection id="course-todo" title={t("home.todo.title")}><TodoRows rows={todo} showCourse={false} /></SideSection>
+          </aside>
+        )}
+      </div>
+      {data && data.modules.length > 0 && !readOnly && <LeaveCourseLink />}
     </div>
   );
 }

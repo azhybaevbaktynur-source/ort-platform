@@ -126,7 +126,7 @@ export function CatalogView() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-5xl">
+    <div className="w-full">
       <PageHeader title={t("catalog.title")} description={t("catalog.subtitle")}
         breadcrumbs={[{ label: t("lms.nav.myCourses"), href: `/${lang}/courses` }, { label: t("catalog.title") }]}
         secondaryActions={<LinkButton variant="secondary" href={`/${lang}/courses/join`} leftIcon={<KeyRound className="h-4 w-4" aria-hidden="true" />}>{t("home.primary.join")}</LinkButton>} />
@@ -150,7 +150,7 @@ export function CatalogView() {
           action={<LinkButton href={`/${lang}/courses/join`}>{t("home.primary.join")}</LinkButton>} />
       ))}
       {items.length > 0 && (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy={loading || undefined}>
+        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 min-[1700px]:grid-cols-4" aria-busy={loading || undefined}>
           {items.map((c) => {
             const title = pickLocalized(c.title, lang, c.default_language) || t("courses.list.untitled");
             const description = pickLocalized(c.description, lang, c.default_language);

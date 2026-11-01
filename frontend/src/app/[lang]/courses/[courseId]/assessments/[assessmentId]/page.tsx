@@ -62,7 +62,7 @@ export default function AssessmentPage() {
     const exhausted = !data.can_start && data.reason === "attempts_exhausted";
     const attempts = <MyAttemptsPanel courseId={course.id} assessmentId={data.id} exhausted={exhausted} />;
     return (
-      <div className="space-y-4">
+      <div className="mx-auto w-full max-w-[54rem] space-y-4">{/* UX rework (PUR-6): today's lobby column */}
         <Link href={base} className="inline-flex min-h-11 items-center text-sm font-medium text-brand-700 hover:underline sm:min-h-0">{t("assessments.backToList")}</Link>
         {exhausted && attempts}
         <LobbyView lobby={data} />
