@@ -47,6 +47,7 @@ for (const lang of ["ru", "ky"] as Lang[]) {
       await exam.assertPaletteEntry(2, { answered: true, flagged: false, current: true });
       await exam.assertPaletteEntry(3, { answered: false, flagged: false, current: false });
       // unflag and flag again: the state follows the button
+      await exam.showPalette();
       await exam.paletteButtons().nth(0).click();
       await exam.assertQuestionNumber(1, counts[0]);
       await exam.toggleFlag(false);
@@ -61,7 +62,9 @@ for (const lang of ["ru", "ky"] as Lang[]) {
       await exam.openSectionEnd(1, { unanswered: 1, flagged: 1 });
       await exam.confirmSectionEnd(2);
       // forward-only: only the new section is offered
-      await expect(exam.paletteButtons()).toHaveCount(counts[1]);
+      await exam.withPalette(async () => {
+        await expect(exam.paletteButtons()).toHaveCount(counts[1]);
+      });
       await expect(exam.question().getByText(exam.t("player.comparison.columnA"), { exact: true })).toHaveCount(0);
 
       await exam.skipSection(2);
@@ -77,6 +80,7 @@ for (const lang of ["ru", "ky"] as Lang[]) {
 
       // ---- section 5 (grammar, last): the submit dialog
       await exam.assertSection(5);
+      await exam.openFinish();
       await expect(exam.finishButton(true)).toBeVisible();
       await exam.openSubmit({ unanswered: counts[4], flagged: 0 });
       await exam.dialog().getByRole("button", { name: exam.t("player.submit.back") }).click();
@@ -94,12 +98,12 @@ for (const lang of ["ru", "ky"] as Lang[]) {
   });
 }
 
-// S11a (F4, F5): on phones "finish section" sits in the palette sheet's pinned footer, and after the sheet closes
-// the section-end dialog's "stay" returns focus to the header palette button (a live element).
-test.describe("ORT palette sheet (phone, ru)", () => {
+// S11a (F4, F5), BLUEBOOK_PLAYER: on phones the popup's "Go to review page" stays pinned in its footer, the finish button
+// is on the review page, and the section-end dialog's "stay" returns focus to that button (a live element).
+test.describe("ORT palette popup (phone, ru)", () => {
   test.use({ viewport: VIEWPORTS.phone });
 
-  test("finish from the palette sheet (phone, ru)", async ({ page }) => {
+  test("finish through the palette popup and the review page (phone, ru)", async ({ page }) => {
     const s = seed();
     await signIn(page, s.students["flow-phone-ru"]);
     const exam = new OrtExam(page, "ru");
@@ -109,7 +113,7 @@ test.describe("ORT palette sheet (phone, ru)", () => {
     await exam.assertSection(1);
 
     await exam.showPalette();
-    const finish = exam.finishButton(false);
+    const finish = exam.reviewButton();
     await expect(finish).toBeVisible();
     await expect(finish).toBeInViewport();
     // pinned: inside the sheet, but not inside its scrolling body (the palette alone scrolls)
@@ -128,7 +132,7 @@ test.describe("ORT palette sheet (phone, ru)", () => {
     await expect(exam.paletteSheet()).toBeHidden();
     await exam.dialog().getByRole("button", { name: exam.t("player.sectionEnd.stay") }).click();
     await expect(exam.dialog()).toBeHidden();
-    await expect(exam.paletteToggle()).toBeFocused();
+    await expect(exam.finishButton(false)).toBeFocused();
     await exam.assertSection(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(VIEWPORTS.phone.width);
   });

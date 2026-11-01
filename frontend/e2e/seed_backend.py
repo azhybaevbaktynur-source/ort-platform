@@ -36,6 +36,8 @@ STUDENTS = [
     "staff-seed",
     # S11a: phone walk of the palette sheet (after staff-seed, so the seeded names above keep their numbers)
     "flow-phone-ru",
+    # BLUEBOOK_PLAYER: review page and split screen walks
+    "bb-review-ru", "bb-split-ru", "bb-screens-ru",
 ]
 
 
@@ -240,7 +242,7 @@ def seed_modules(api: Api, log: Path, admin_tok: str, ort_course_id: str) -> dic
 
 # --- Phase 8b S3 begin --- (scrolling display mode, frontend/e2e/scrolling-player.spec.ts; written after every ORT,
 # quiz-editor and modules row, so those rows and screens are exactly as before)
-SCROLL_STUDENTS = ["walk", "phone", "forward", "page", "base", "shots"]
+SCROLL_STUDENTS = ["walk", "phone", "forward", "page", "base", "shots", "bb-scroll", "bb-timer", "bb-keys", "bb-screens"]
 
 
 def seed_scrolling(api: Api, log: Path, admin_tok: str) -> dict:

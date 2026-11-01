@@ -1388,7 +1388,7 @@
     "false": "False",
     "finishSection": "Finish section",
     "finishTest": "Finish test",
-    "flag": "Flag",
+    "flag": "Mark for review",
     "imageAlt": "Question illustration",
     "instructions": "Section instructions",
     "loading": "Loading the test...",
@@ -1402,16 +1402,14 @@
     "palette": {
       "answered": "Answered",
       "current": "Current",
-      "flagged": "Flagged",
+      "flagged": "For review",
       "title": "Questions",
       "unanswered": "Unanswered",
-      "open": "Questions {n}/{total}",
       "openLabel": "Question list: question {n} of {total}"
     },
-    "prev": "Previous",
+    "prev": "Back",
     "previewBanner": "Preview mode: this attempt is not counted for students.",
     "progress": "{answered} of {total} answered",
-    "progressBar": "Answering progress",
     "question": "Question",
     "questionOf": "Question {n} of {total}",
     "rejected": "The server rejected the answers to questions: {list}. Please answer them again.",
@@ -1455,10 +1453,14 @@
       "oneMinute": "One minute left",
       "unlimited": "No time limit",
       "sectionLeft": "Left in section",
-      "left": "Time left"
+      "left": "Time left",
+      "hide": "Hide",
+      "show": "Show",
+      "hideLabel": "Hide the timer",
+      "showLabel": "Show the timer"
     },
     "true": "True",
-    "unflag": "Remove flag",
+    "unflag": "Marked for review",
     "unsaved": {
       "deadline": "Answers not saved because time ran out: {n}",
       "already_submitted": "Answers not saved because the attempt had already been submitted: {n}",
@@ -1475,7 +1477,8 @@
       "text": "Text",
       "show": "Show text",
       "hide": "Hide text",
-      "textTitle": "Text: {title}"
+      "textTitle": "Text: {title}",
+      "resize": "Resize the text and question panels"
     },
     "scrolling": {
       "showNext": "Show the next {n}",
@@ -1492,6 +1495,13 @@
       "moveUp": "Move up: {item}",
       "moveDown": "Move down: {item}",
       "keepOrder": "Keep this order"
+    },
+    "directions": "Directions",
+    "more": "More",
+    "review": {
+      "title": "Review your answers",
+      "open": "Go to review page",
+      "hint": "Select a question to go back to it."
     }
   },
   "grading": {

@@ -1,13 +1,17 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { AlarmClock, Clock } from "lucide-react";
+import { AlarmClock, Clock, Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
+import { cn, focusRing } from "@/components/ui";
 import { formatClock } from "./playerUtils";
 
 /**
  * Countdown to an absolute deadline. The remaining time is recomputed from the (server-corrected) clock on
  * every tick, never decremented, so background-tab throttling and sleeping laptops cannot drift it.
+ *
+ * `hidden` only hides the digits: this component keeps ticking, warns and expires as usual, and in the last five
+ * minutes the digits come back on their own and the Hide / Show button goes (BLUEBOOK_PLAYER).
  */
 export function DeadlineTimer({
   deadlineMs,
@@ -15,12 +19,16 @@ export function DeadlineTimer({
   onExpire,
   onTick,
   label,
+  hidden = false,
+  onToggleHidden,
 }: {
   deadlineMs: number | null;
   getNowMs: () => number;
   onExpire: () => void;
   onTick?: (remainingMs: number) => void;
   label?: string;
+  hidden?: boolean;
+  onToggleHidden?: () => void;
 }) {
   const { t } = useTranslation();
   const [left, setLeft] = useState<number | null>(null);
@@ -64,16 +72,29 @@ export function DeadlineTimer({
   // Under five minutes the icon changes too and the digits turn bold: colour is never the only signal (S7b, P4).
   const Icon = warn ? AlarmClock : Clock;
   return (
-    <div className="flex items-center gap-2">
-      {label ? <span className="hidden text-xs text-slate-600 sm:inline">{label}</span> : null}
-      <span
-        role="timer"
-        aria-label={t("player.timer.label")}
-        className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 font-mono text-sm tabular-nums ${warn ? "font-extrabold" : "font-semibold"} ${tone}`}
-      >
-        <Icon className="h-4 w-4" aria-hidden="true" />
-        {formatClock(secs)}
-      </span>
+    <div className="flex items-center gap-1">
+      {hidden && !warn ? null : (
+        <span
+          role="timer"
+          aria-label={t("player.timer.label")}
+          title={label}
+          className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 font-mono text-sm tabular-nums sm:px-3 ${warn ? "font-extrabold" : "font-semibold"} ${tone}`}
+        >
+          <Icon className="h-4 w-4" aria-hidden="true" />
+          {formatClock(secs)}
+        </span>
+      )}
+      {onToggleHidden && !warn ? (
+        <button
+          type="button"
+          onClick={onToggleHidden}
+          aria-label={hidden ? t("player.timer.showLabel") : t("player.timer.hideLabel")}
+          className={cn("inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl px-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 sm:min-h-9 sm:min-w-0", focusRing)}
+        >
+          {hidden ? <Eye className="h-4 w-4" aria-hidden="true" /> : <EyeOff className="h-4 w-4" aria-hidden="true" />}
+          <span className={hidden ? undefined : "hidden sm:inline"}>{hidden ? t("player.timer.show") : t("player.timer.hide")}</span>
+        </button>
+      ) : null}
       {/* Announce only at the two thresholds, not every second. */}
       <span className="sr-only" role="status" aria-live="polite">
         {secs <= 60 && secs > 55 ? t("player.timer.oneMinute") : secs <= 300 && secs > 295 ? t("player.timer.fiveMinutes") : ""}

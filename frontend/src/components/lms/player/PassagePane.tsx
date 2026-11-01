@@ -9,23 +9,32 @@ import type { StudentPassage } from "@/lib/lms/attemptTypes";
 import type { PassageDisplay } from "@/lib/lms/blocks";
 
 /**
- * The reading text. Side by side with the question from `xl`; below that it sits above the question and can be
- * folded away with the sticky `PassageToggle` (S7b, P6), open by default. The text itself (line numbers) is the
- * unchanged `TemplatePassage`.
+ * The reading text. Inside `SplitPassage` (`fill`) it is the left pane from `lg`; below that it sits above the question
+ * and can be folded away with the sticky `PassageToggle` (S7b, P6), open by default. The text itself (line numbers) is
+ * the unchanged `TemplatePassage`.
  */
 export const PassagePane = React.forwardRef<HTMLElement, {
   passage: StudentPassage; open?: boolean; id?: string; scrollMarginTop?: number;
   /** Phase 8b S3: renderer from the attempt state (`passage_display`); absent = course template. */
   display?: PassageDisplay | null;
+  /** The left pane of the split screen: fills its column and scrolls on its own from `lg`. */
+  fill?: boolean;
 }>(
-  function PassagePane({ passage, open = true, id, scrollMarginTop, display }, ref) {
+  function PassagePane({ passage, open = true, id, scrollMarginTop, display, fill }, ref) {
+    const { t } = useTranslation();
     return (
       <section
         ref={ref}
         id={id}
         style={scrollMarginTop ? { scrollMarginTop } : undefined}
+        // the pane scrolls by itself, so the keyboard must be able to reach it
+        tabIndex={fill ? 0 : undefined}
+        aria-label={fill ? t("player.passage.text") : undefined}
         className={cn(
-          "rounded-2xl border border-slate-200 bg-white p-3 sm:p-5 shadow-xs xl:block lg:max-h-[calc(100vh-11rem)] lg:overflow-y-auto",
+          "rounded-2xl border border-slate-200 bg-white p-3 shadow-xs sm:p-5",
+          fill
+            ? `lg:block lg:overflow-y-auto lg:rounded-none lg:border-0 lg:p-6 lg:shadow-none ${focusRing} focus-visible:ring-inset focus-visible:ring-offset-0`
+            : "lg:max-h-[calc(100vh-11rem)] lg:overflow-y-auto",
           !open && "hidden",
         )}
       >
@@ -57,7 +66,7 @@ export function PassageToggle({ passage, open, controls, top, onToggle }: {
       aria-controls={controls}
       style={{ top }}
       className={cn(
-        "sticky z-[5] flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white/95 px-4 py-2 text-left text-sm shadow-sm backdrop-blur xl:hidden",
+        "sticky z-[5] flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white/95 px-4 py-2 text-left text-sm shadow-sm backdrop-blur lg:hidden",
         focusRing,
       )}
     >
