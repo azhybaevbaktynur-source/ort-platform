@@ -2,7 +2,7 @@ import type { Lang } from "@/lib/lms/types";
 import type {
   ChoiceData, ComparisonChoice, Difficulty, EssayData, ImageOut, MultipleAnswersData, NumericAnswer, NumericData,
   QuestionContentIn, QuestionMetaIn, QuestionStaffOut, QuestionType, ShortTextData, SingleChoiceData, TrueFalseData,
-  ComparisonData, VersionOut,
+  ComparisonData, FillBlankData, MatchingData, OrderingData, VersionOut,
 } from "@/lib/lms/contentTypes";
 import type { CardPayload } from "@/lib/lms/quizEditorTypes"; // Phase 7c S3
 
@@ -37,6 +37,12 @@ export interface QuestionForm {
   caseSensitive: boolean;
   wordLimit: string;
   rubric: string;
+  // Phase 10 S1: structured types
+  matchPairs: { left: string; right: string }[];
+  matchDistractors: string[];
+  blankText: string;
+  blankAnswers: string[]; // one "a|alt" string per blank
+  orderItems: string[];
 }
 
 export const CHOICE_LETTERS = "ABCDEFGHIJ".split("");
@@ -53,6 +59,8 @@ export function emptyForm(type: QuestionType, language: Lang): QuestionForm {
     choices: blankChoices(), correctSingle: "A", correctMulti: [], shuffle: false, scoring: "all_or_nothing",
     tf: true, columnA: "", columnB: "", compCorrect: "A",
     numeric: [blankNumeric()], shortAnswers: "", caseSensitive: false, wordLimit: "", rubric: "",
+    matchPairs: [{ left: "", right: "" }, { left: "", right: "" }], matchDistractors: [],
+    blankText: "", blankAnswers: [""], orderItems: ["", "", ""],
   };
 }
 
@@ -104,6 +112,17 @@ export function formFromStaff(q: QuestionStaffOut): QuestionForm {
       f.wordLimit = d.word_limit ? String(d.word_limit) : ""; f.rubric = d.rubric_note || "";
       break;
     }
+    case "matching": {
+      const d = v.data as MatchingData;
+      f.matchPairs = d.pairs.map((p) => ({ left: p.left, right: p.right })); f.matchDistractors = [...(d.distractors || [])];
+      break;
+    }
+    case "fill_blank": {
+      const d = v.data as FillBlankData;
+      f.blankText = d.text; f.blankAnswers = d.blanks.map((b) => b.answers.join("|")); f.caseSensitive = !!d.case_sensitive;
+      break;
+    }
+    case "ordering": f.orderItems = (v.data as OrderingData).items.map((i) => i.text); break;
   }
   return f;
 }
@@ -132,6 +151,13 @@ export function contentFromForm(f: QuestionForm): QuestionContentIn {
       const wl = parseInt(f.wordLimit, 10);
       return { ...base, data: { word_limit: Number.isFinite(wl) && wl > 0 ? wl : null, rubric_note: f.rubric.trim() ? f.rubric : null } };
     }
+    case "matching":
+      return { ...base, data: { pairs: f.matchPairs.map((p) => ({ left: p.left.trim(), right: p.right.trim() })),
+        distractors: f.matchDistractors.map((s) => s.trim()).filter(Boolean) } };
+    case "fill_blank":
+      return { ...base, data: { text: f.blankText, blanks: f.blankAnswers.map((a) => ({ answers: a.split("|").map((s) => s.trim()).filter(Boolean) })),
+        case_sensitive: f.caseSensitive } };
+    case "ordering": return { ...base, data: { items: f.orderItems.map((s) => ({ text: s.trim() })) } };
   }
 }
 
@@ -165,6 +191,16 @@ export function validateForm(f: QuestionForm): string | null {
     }
   }
   if (f.type === "short_text" && f.shortAnswers.split("\n").every((s) => !s.trim())) return "bank.editor.errAnswers";
+  if (f.type === "matching") {
+    if (f.matchPairs.length < 2 || f.matchPairs.some((p) => !p.left.trim() || !p.right.trim())) return "bank.editor.structured.errPairs";
+  }
+  if (f.type === "fill_blank") {
+    const n = f.blankAnswers.length;
+    const tokens = (f.blankText.match(/\{\{\d+\}\}/g) || []).map((t) => Number(t.slice(2, -2)));
+    if (n < 1 || tokens.length !== n || tokens.some((t, i) => t !== i + 1)) return "bank.editor.structured.errTokens";
+    if (f.blankAnswers.some((a) => a.split("|").every((s) => !s.trim()))) return "bank.editor.errAnswers";
+  }
+  if (f.type === "ordering" && (f.orderItems.length < 3 || f.orderItems.some((s) => !s.trim()))) return "bank.editor.structured.errItems";
   return null;
 }
 
@@ -239,6 +275,24 @@ export function formFromPayload(p: CardPayload, imageOf: (assetId: string) => Im
       f.wordLimit = typeof d.word_limit === "number" && d.word_limit > 0 ? String(d.word_limit) : "";
       f.rubric = str(d.rubric_note);
       break;
+    case "matching": {
+      const pairs = arr(d.pairs).map((x) => { const o = (x || {}) as Record<string, unknown>; return { left: str(o.left), right: str(o.right) }; });
+      if (pairs.length) f.matchPairs = pairs;
+      f.matchDistractors = arr(d.distractors).map(str);
+      break;
+    }
+    case "fill_blank": {
+      f.blankText = str(d.text);
+      const blanks = arr(d.blanks).map((x) => arr(((x || {}) as Record<string, unknown>).answers).map(str).join("|"));
+      if (blanks.length) f.blankAnswers = blanks;
+      f.caseSensitive = !!d.case_sensitive;
+      break;
+    }
+    case "ordering": {
+      const items = arr(d.items).map((x) => str(((x || {}) as Record<string, unknown>).text));
+      if (items.length) f.orderItems = items;
+      break;
+    }
   }
   return f;
 }

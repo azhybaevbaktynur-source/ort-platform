@@ -5,6 +5,7 @@ from app.lms.core.errors import ValidationFailed
 
 from .base import ImageRef, QuestionType, ScoreResult, media_url, set_media_url
 from .choices import Comparison, MultipleAnswers, SingleChoice, TrueFalse
+from .structured import FillBlank, Matching, Ordering
 from .texts import Essay, Numeric, ShortText
 
 REGISTRY: dict[str, QuestionType] = {
@@ -12,6 +13,7 @@ REGISTRY: dict[str, QuestionType] = {
     for t in (
         SingleChoice(), MultipleAnswers(), TrueFalse(), Comparison(),
         Numeric(), ShortText(), Essay(),
+        Matching(), FillBlank(), Ordering(),
     )
 }
 

@@ -7,6 +7,7 @@ import { useTranslation } from "@/lib/i18n/context";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import type { StudentQuestion } from "@/lib/lms/attemptTypes";
 import { letter, orderedChoices, type ResponseObj } from "./playerUtils";
+import { FillBlankAnswer, MatchingAnswer, OrderingAnswer } from "./StructuredAnswers"; // Phase 10 S1
 
 // S7b: one type family (sans) for stem, choices and comparison labels (P7); every option is at least 44 px tall.
 const OPTION_BASE = `flex min-h-11 w-full items-center gap-3 rounded-xl border px-4 py-3 text-left text-base transition-all ${focusRing}`;
@@ -25,7 +26,7 @@ function Badge({ on, children, square }: { on: boolean; children: React.ReactNod
   );
 }
 
-/** One question with its answer input. Dispatches on the question type (all 7 types). */
+/** One question with its answer input. Dispatches on the question type (all 10 types). */
 export function ItemView({
   question,
   choiceOrder,
@@ -37,9 +38,12 @@ export function ItemView({
   onChange,
   onToggleFlag,
   headingId,
+  hideFlag,
 }: {
   /** Phase 8b S3: id of the "Question n of N" heading (scrolling list: `item-<pos>-h`); default `q-<question id>-h`. */
   headingId?: string;
+  /** Phase 10 S1: no flag button (practice). */
+  hideFlag?: boolean;
   question: StudentQuestion;
   choiceOrder: string[] | null;
   number: number;
@@ -60,7 +64,7 @@ export function ItemView({
         <h2 id={hId} className="rounded-lg bg-brand-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-brand-700">
           {t("player.questionOf", { n: number, total })}
         </h2>
-        <button
+        {!hideFlag && <button
           type="button"
           onClick={onToggleFlag}
           aria-pressed={flagged}
@@ -72,7 +76,7 @@ export function ItemView({
         >
           <Bookmark className={`h-4 w-4 sm:h-3.5 sm:w-3.5 ${flagged ? "fill-amber-600 text-amber-600" : ""}`} aria-hidden="true" />
           {flagged ? t("player.unflag") : t("player.flag")}
-        </button>
+        </button>}
       </header>
 
       {question.stem ? (
@@ -220,6 +224,10 @@ export function ItemView({
           />
         </label>
       ) : null}
+
+      {question.type === "matching" ? <MatchingAnswer question={question} response={response} disabled={disabled} onChange={onChange} /> : null}
+      {question.type === "fill_blank" ? <FillBlankAnswer question={question} response={response} disabled={disabled} onChange={onChange} /> : null}
+      {question.type === "ordering" ? <OrderingAnswer question={question} response={response} disabled={disabled} onChange={onChange} /> : null}
 
       {question.type === "essay" ? <EssayInput question={question} value={typeof r.text === "string" ? r.text : ""} disabled={disabled} onChange={(text) => onChange({ text })} /> : null}
     </article>

@@ -166,6 +166,7 @@ class _RowCtx:
     profile: Optional[TemplateProfile]
     image_for: Callable[[str, int], Optional[ParsedImage]]
     seen_external: dict[str, int] = field(default_factory=dict)
+    refused_types: tuple = ()
 
     def error(self, code: str, message: str, row: Optional[int] = None, column: Optional[str] = None,
               **params) -> None:
@@ -221,6 +222,9 @@ def _parse_row(c: _RowCtx, raw: dict, n: int) -> tuple[Optional[GeneralItem], Op
     if psec is not None and tname not in psec.allowed_types:
         c.error(E_TYPE_NOT_ALLOWED, f"Type '{tname}' is not allowed in section '{section}'.", n, "type",
                 type=tname, section=section, allowed=list(psec.allowed_types))
+        return None, None, None, None
+    if tname in c.refused_types:  # Phase 10 S1: the course template refuses this type
+        c.error("type_not_allowed", f"Type '{tname}' is not available in this course.", n, "type", type=tname)
         return None, None, None, None
     qt = REGISTRY[tname]
 
@@ -303,9 +307,10 @@ def _parse_row(c: _RowCtx, raw: dict, n: int) -> tuple[Optional[GeneralItem], Op
 
 def parse_rows(header: list[str], records: list[list[str]], bundle: ParsedBundle, issues: Issues,
                profile: Optional[TemplateProfile], image_for: Callable[[str, int], Optional[ParsedImage]],
-               *, broot: Optional[str] = None) -> None:
+               *, broot: Optional[str] = None, refused_types: tuple = ()) -> None:
     """Fill `bundle.items` / `bundle.passages` from header-driven records (comment rows skipped)."""
     c = _RowCtx(issues, bundle.questions_path, broot, bundle.language, profile, image_for)
+    c.refused_types = tuple(refused_types)
     # Security review 7b (H1): a wide header made every row O(header width); refuse it before any per-column work.
     if len(header) > MAX_COLUMNS:
         c.error(E_TOO_MANY_COLUMNS, f"The header has {len(header)} columns; the limit is {MAX_COLUMNS}.",
@@ -463,7 +468,7 @@ def _parse_csv(raw: bytes, filename: str, opts: ImportOptions, profile: Optional
                          params={"image": value[:200]})
         return None
 
-    parse_rows(header, records, bundle, issues, profile, image_for)
+    parse_rows(header, records, bundle, issues, profile, image_for, refused_types=tuple(opts.refused_types))
     return [bundle]
 
 
@@ -595,7 +600,8 @@ def _parse_general_zip(zf: SafeZip, manifests: list[tuple[str, dict]], opts: Imp
                 _b.images[p] = img
             return img
 
-        parse_rows(header, records, b, issues, profile, image_for, broot=broot)
+        parse_rows(header, records, b, issues, profile, image_for, broot=broot,
+                   refused_types=tuple(opts.refused_types))
         data_rows = sum(1 for r in records if not _is_comment(r))
         qc = m.get("question_count")
         if qc is not None and qc != data_rows:

@@ -16,6 +16,10 @@ export function isAnswered(type: StudentQuestion["type"] | undefined, response: 
     case "numeric": return typeof response.value === "string" && response.value.trim() !== "";
     case "short_text":
     case "essay": return typeof response.text === "string" && response.text.trim() !== "";
+    case "matching": return !!response.pairs && typeof response.pairs === "object" && Object.keys(response.pairs as object).length > 0;
+    case "fill_blank": return !!response.blanks && typeof response.blanks === "object"
+      && Object.values(response.blanks as Record<string, unknown>).some((v) => typeof v === "string" && v.trim() !== "");
+    case "ordering": return Array.isArray(response.order) && response.order.length > 0;
     default: return false;
   }
 }

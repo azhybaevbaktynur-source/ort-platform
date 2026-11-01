@@ -8,6 +8,7 @@ Format (language-neutral; the client renders math and translates the true/false 
 - comparison: the letter A-D;
 - numeric: each accepted answer as "7", "7 ± 0.5" or "1 – 3";
 - short_text: the accepted answers;
+- matching: "left = right" per pair; fill_blank: the accepted answers per blank; ordering: the items in order;
 - essay and unknown types: None."""
 from __future__ import annotations
 
@@ -59,6 +60,14 @@ def correct_summary(qtype: str, data: Optional[dict]) -> Optional[str]:
         parts = [_numeric(a) for a in data.get("answers") or [] if isinstance(a, dict)]
     elif qtype == "short_text":
         parts = [_text(a) for a in data.get("answers") or []]
+    elif qtype == "matching":
+        parts = [f"{_text(p.get('left'))} = {_text(p.get('right'))}" for p in data.get("pairs") or []
+                 if isinstance(p, dict)]
+    elif qtype == "fill_blank":
+        parts = [" / ".join(_text(a) for a in b.get("answers") or []) for b in data.get("blanks") or []
+                 if isinstance(b, dict)]
+    elif qtype == "ordering":
+        parts = [_text(i.get("text")) for i in data.get("items") or [] if isinstance(i, dict)]
     else:
         return None
     s = SEP.join(p for p in parts if p)

@@ -10,6 +10,7 @@ import type { Lang } from "@/lib/lms/types";
 import { ImagePicker } from "./ImagePicker";
 import { RichTextField } from "./RichTextField";
 import { ChoiceFields } from "./types/ChoiceFields";
+import { FillBlankFields, MatchingFields, OrderingFields } from "./types/StructuredFields"; // Phase 10 S1
 import { ComparisonFields, EssayFields, NumericFields, ShortTextFields, TrueFalseFields } from "./types/SimpleFields";
 import type { QuestionForm } from "./types/formModel";
 import { cardCls, inputCls, labelCls } from "./ui";
@@ -79,6 +80,9 @@ export function QuestionCardForm({
       {form.type === "numeric" && <NumericFields {...fieldProps} />}
       {form.type === "short_text" && <ShortTextFields {...fieldProps} />}
       {form.type === "essay" && <EssayFields {...fieldProps} />}
+      {form.type === "matching" && <MatchingFields {...fieldProps} />}
+      {form.type === "fill_blank" && <FillBlankFields {...fieldProps} />}
+      {form.type === "ordering" && <OrderingFields {...fieldProps} />}
     </>
   );
   return (

@@ -43,6 +43,13 @@ def assert_import_profile_allowed(course, exam_type: Optional[str]) -> None:
                                details=[{"loc": ["exam_type"], "msg": "not available in this course"}])
 
 
+def assert_question_type_allowed(course, qtype: str) -> None:
+    """Phase 10 S1: 422 `type_not_allowed` when the course's template refuses the question type."""
+    if qtype in _template(course).refused_question_types:
+        raise ValidationFailed("This question type is not available in this course", code="type_not_allowed",
+                               details=[{"loc": ["type"], "msg": "not available in this course"}])
+
+
 def is_locked(course, field: str, *, preset: Optional[str] = None, actor_id: Optional[str] = None) -> bool:
     if not getattr(course, "template_locked", False):
         return False

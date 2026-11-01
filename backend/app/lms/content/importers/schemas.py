@@ -23,6 +23,7 @@ class ImportOptions(BaseModel):
     assessment_id: Optional[str] = None             # validate against this assessment's template version
     attach_to_assessment_id: Optional[str] = None   # commit only: add the imported questions to its sections
     # --- Phase 7b S3 end ---
+    refused_types: list[str] = []  # Phase 10 S1: set by preview/commit from the course template (not a request field)
 
     @property
     def ort(self) -> bool:

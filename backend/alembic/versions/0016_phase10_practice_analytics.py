@@ -27,7 +27,20 @@ def _final_index(name: str, cols: list[str]) -> None:
     op.create_index(name, "attempts", cols, postgresql_where=_FINAL_PG, sqlite_where=_FINAL_SQLITE)
 
 
+_OLD_TYPES = "('single_choice','multiple_answers','true_false','comparison','numeric','short_text','essay')"
+_NEW_TYPES = "('single_choice','multiple_answers','true_false','comparison','numeric','short_text','essay','matching','fill_blank','ordering')"
+
+
+def _swap_type_checks(types: str) -> None:
+    """S1: the question type CHECKs list the three structured types (the constraint names are unchanged)."""
+    for table in ("bank_questions", "question_versions"):
+        with op.batch_alter_table(table) as b:
+            b.drop_constraint(op.f(f"ck_{table}_type_valid"), type_="check")
+            b.create_check_constraint(op.f(f"ck_{table}_type_valid"), f"type IN {types}")
+
+
 def upgrade() -> None:
+    _swap_type_checks(_NEW_TYPES)
     with op.batch_alter_table("assessments") as b:
         b.add_column(sa.Column("is_practice", sa.Boolean(), server_default=sa.false(), nullable=False))
         b.create_check_constraint("ck_assessments_practice_preset_none", "NOT is_practice OR preset = 'none'")
@@ -88,6 +101,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    _swap_type_checks(_OLD_TYPES)
     op.drop_table("assessment_item_stats")
     op.drop_table("assessment_version_stats")
     op.drop_table("course_goals")

@@ -10,6 +10,9 @@ from httpx import ASGITransport, AsyncClient
 
 from app.lms.content.importers import ImportOptions, parse_upload
 from app.lms.content.types import REGISTRY, TYPE_NAMES
+
+# Phase 10 S1: the structured types are not part of these fixtures (their format is tested in test_structured_types)
+LEGACY_TYPES = tuple(t for t in TYPE_NAMES if t not in ("matching", "fill_blank", "ordering"))
 from app.lms.core.errors import register_error_handlers
 from app.lms.exam_templates.import_format import (
     EXAMPLE_VALUES, csv_for, format_for, profile_from_format, safe_cell,
@@ -67,7 +70,7 @@ def test_format_for_union_and_sections(db):
     fmt = format_for(db, v)
     assert fmt.format == "lms-bundle" and fmt.format_version == 1 and fmt.version_no == 1
     assert fmt.header[:3] == ["section", "type", "stem"] and fmt.header[-2:] == ["passage_text", "passage_ref"]
-    every = {c for t in TYPE_NAMES for c in REGISTRY[t].import_columns}
+    every = {c for t in LEGACY_TYPES for c in REGISTRY[t].import_columns}
     assert every <= set(fmt.header) and len(fmt.header) == len(set(fmt.header))
     choice, cmp_, open_ = fmt.sections
     assert choice.allowed_types == ["single_choice", "multiple_answers", "true_false"] and not choice.allow_passages
@@ -114,7 +117,7 @@ def test_csv_rows_header_and_titles(db):
     assert rows[0] == fmt.header and len(rows) == 1 + len(fmt.sections)
     assert [r[0] for r in rows[1:]] == ["#Выбор", "#Comparison", "#Open"]   # title in the language, else another
     assert [r[0] for r in rows_of(csv_for(fmt, "ky"))[1:]] == ["#Choice", "#Comparison", "#Ачык"]
-    assert set(EXAMPLE_VALUES) == set(TYPE_NAMES)
+    assert set(EXAMPLE_VALUES) == set(LEGACY_TYPES)
     # every example value is plain ASCII
     assert all(v.isascii() for d in EXAMPLE_VALUES.values() for v in d.values())
 

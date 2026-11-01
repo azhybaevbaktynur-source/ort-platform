@@ -718,6 +718,18 @@
       "essay": {
         "name": "Essay",
         "hint": "Free-form answer that a teacher reviews manually."
+      },
+      "matching": {
+        "name": "Matching",
+        "hint": "Match each item on the left with its pair on the right."
+      },
+      "fill_blank": {
+        "name": "Fill in the blanks",
+        "hint": "The student types the missing words into blanks in a text."
+      },
+      "ordering": {
+        "name": "Ordering",
+        "hint": "The student puts the items in the correct order."
       }
     },
     "editor": {
@@ -783,7 +795,30 @@
       "errChoiceEmpty": "Every choice needs text or an image.",
       "errCorrect": "Mark at least one correct choice.",
       "errColumns": "Fill in both columns.",
-      "errAnswers": "Add at least one accepted answer."
+      "errAnswers": "Add at least one accepted answer.",
+      "structured": {
+        "pairs": "Pairs",
+        "left": "Left",
+        "right": "Right",
+        "addPair": "Add pair",
+        "distractors": "Extra answers (optional)",
+        "distractor": "Extra answer",
+        "addDistractor": "Add extra answer",
+        "blankText": "Text with blanks",
+        "blankHint": "Mark each blank as {{1}}, {{2}} in order. Separate accepted answers with |.",
+        "blankN": "Blank {n}: accepted answers",
+        "addBlank": "Add blank",
+        "caseSensitive": "Case sensitive",
+        "orderItems": "Items in the correct order",
+        "itemN": "Item {n}",
+        "addItem": "Add item",
+        "up": "Move up",
+        "down": "Move down",
+        "remove": "Remove",
+        "errPairs": "Add at least two pairs and fill both sides.",
+        "errTokens": "The text needs {{1}}, {{2}}... once each, in order, one per blank.",
+        "errItems": "Add at least three items and fill each one."
+      }
     },
     "rich": {
       "math": "Formula $...$",
@@ -1449,6 +1484,14 @@
       "previousSection": "Previous section",
       "windowOf": "Questions {from}–{to} of {total}",
       "back": "Back"
+    },
+    "structured": {
+      "choose": "Choose...",
+      "matchWith": "Match: {item}",
+      "blankN": "Blank {n}",
+      "moveUp": "Move up: {item}",
+      "moveDown": "Move down: {item}",
+      "keepOrder": "Keep this order"
     }
   },
   "grading": {
@@ -1840,6 +1883,9 @@
       "onlyMistakes": "Only mistakes and unanswered",
       "noMistakes": "No mistakes: every answer is correct.",
       "sectionSummary": "{correct} of {total} correct"
+    },
+    "structured": {
+      "blankN": "Blank {n}"
     }
   },
   "schemes": {

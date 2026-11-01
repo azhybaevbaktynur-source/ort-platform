@@ -38,6 +38,12 @@ def build(name, s):
         return {"answers": [s], "case_sensitive": True}
     if name == "essay":
         return {"word_limit": 321, "rubric_note": s}
+    if name == "matching":
+        return {"pairs": [{"left": "L1", "right": "R1"}, {"left": "L2", "right": "R2"}], "distractors": ["D1"]}
+    if name == "fill_blank":
+        return {"text": "A {{1}}", "blanks": [{"answers": [s]}], "case_sensitive": True}
+    if name == "ordering":
+        return {"items": [{"text": "i1"}, {"text": "i2"}, {"text": "i3"}]}
     raise AssertionError(name)
 
 
@@ -49,6 +55,9 @@ EXPECTED_KEYS = {
     "numeric": set(),
     "short_text": set(),
     "essay": {"word_limit"},
+    "matching": {"lefts", "rights"},
+    "fill_blank": {"text", "blank_count"},
+    "ordering": {"items"},
 }
 
 FORBIDDEN_TOKENS = ["77777.123", "0.4242", "31337", "41414", "range", "exact", "margin",

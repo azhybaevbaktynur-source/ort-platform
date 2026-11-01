@@ -5,7 +5,7 @@ import { Check } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import type {
-  ComparisonData, EssayData, MultipleAnswersData, NumericData, ShortTextData, SingleChoiceData, TrueFalseData, VersionOut,
+  ComparisonData, EssayData, FillBlankData, MatchingData, OrderingData, MultipleAnswersData, NumericData, ShortTextData, SingleChoiceData, TrueFalseData, VersionOut,
 } from "@/lib/lms/contentTypes";
 
 /** Staff view of one question version (with the key marked). Used for history comparison. */
@@ -64,6 +64,24 @@ export function VersionView({ v }: { v: VersionOut }) {
       )}
       {v.type === "short_text" && (
         <ul className="list-inside list-disc">{(v.data as ShortTextData).answers.map((a, i) => <li key={i}>{a}</li>)}</ul>
+      )}
+      {v.type === "matching" && (
+        <ul className="space-y-1">
+          {(v.data as MatchingData).pairs.map((p) => <li key={p.left_id} className="rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5">{p.left} = {p.right}</li>)}
+          {(v.data as MatchingData).distractors.map((d) => <li key={d} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-slate-600">{d}</li>)}
+        </ul>
+      )}
+      {v.type === "fill_blank" && (() => {
+        const d = v.data as FillBlankData;
+        return (
+          <div className="space-y-1">
+            <p className="whitespace-pre-wrap">{d.text}</p>
+            <ol className="list-inside list-decimal">{d.blanks.map((b, i) => <li key={i}>{b.answers.join(" / ")}</li>)}</ol>
+          </div>
+        );
+      })()}
+      {v.type === "ordering" && (
+        <ol className="list-inside list-decimal">{(v.data as OrderingData).items.map((i) => <li key={i.id}>{i.text}</li>)}</ol>
       )}
       {v.type === "essay" && (v.data as EssayData).word_limit ? <p>{t("bank.preview.wordLimit", { n: (v.data as EssayData).word_limit as number })}</p> : null}
       {v.explanation && (
