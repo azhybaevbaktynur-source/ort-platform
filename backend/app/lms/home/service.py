@@ -117,7 +117,8 @@ def _listable(user_id: str, now: datetime, used):
     caller already open (that one is under `in_progress`) or (text/file) a published live assignment the caller has
     not handed in yet."""
     open_ = exists().where(Attempt.assessment_id == Assessment.id, Attempt.user_id == user_id,
-                           Attempt.status == "in_progress", Attempt.is_preview.is_(False))
+                           Attempt.status == "in_progress", Attempt.is_preview.is_(False),
+                           Attempt.is_practice.is_(False))
     allowed = _eff_allowed()
     quiz = and_(
         Assignment.kind == "quiz", Assessment.deleted_at.is_(None), Assessment.status == "published",
@@ -139,7 +140,8 @@ def _listable(user_id: str, now: datetime, used):
 
 def _courses(db: Session, uid: str) -> tuple[list, int]:
     in_progress = exists().where(Attempt.enrollment_id == Enrollment.id, Attempt.user_id == uid,
-                                 Attempt.status == "in_progress", Attempt.is_preview.is_(False))
+                                 Attempt.status == "in_progress", Attempt.is_preview.is_(False),
+                                 Attempt.is_practice.is_(False))
     rows = db.execute(
         select(Course.id, Course.title, Course.organization_id, User.display_name,
                in_progress.label("in_progress"), func.count().over().label("total"))
@@ -171,6 +173,7 @@ def _in_progress(db: Session, uid: str) -> list[sch.HomeInProgressOut]:
         .join(Course, Course.id == Enrollment.course_id)
         .join(Assessment, Assessment.id == Attempt.assessment_id)
         .where(_mine(uid), Attempt.user_id == uid, Attempt.status == "in_progress", Attempt.is_preview.is_(False),
+               Attempt.is_practice.is_(False),
                Assessment.deleted_at.is_(None))
         .order_by(Attempt.started_at.desc(), Attempt.id.desc()).limit(sch.IN_PROGRESS_MAX)
     ).all()
@@ -221,6 +224,7 @@ def _todo(db: Session, uid: str, now: datetime, listable: list) -> list[sch.Home
         .outerjoin(Assignment, Assignment.assessment_id == Assessment.id)
         .outerjoin(O, and_(O.assignment_id == Assignment.id, O.enrollment_id == Enrollment.id))
         .where(_mine(uid), Attempt.user_id == uid, Attempt.status == "in_progress", Attempt.is_preview.is_(False),
+               Attempt.is_practice.is_(False),
                Assessment.deleted_at.is_(None))
         .order_by(due.is_(None), due, Attempt.started_at.desc(), Attempt.id.desc()).limit(sch.TODO_MAX)
     ).all()
@@ -249,7 +253,7 @@ def _latest_results(db: Session, uid: str, now: datetime) -> list[sch.HomeResult
     # results policy lets students see results now (`after_close`: window plus grace over, nothing in progress).
     # Manual grades (none/text/file): graded + released on a published assignment.
     open_any = exists().where(Attempt.assessment_id == Assessment.id, Attempt.status == "in_progress",
-                              Attempt.is_preview.is_(False))
+                              Attempt.is_preview.is_(False), Attempt.is_practice.is_(False))
     closed_before = now - timedelta(seconds=settings.ATTEMPT_GRACE_S)
     visible = or_(Assessment.results_policy == "after_submit",
                   and_(Assessment.results_policy == "after_close", Assessment.available_until.isnot(None),

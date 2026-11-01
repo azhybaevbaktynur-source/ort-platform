@@ -29,6 +29,7 @@ from app.lms.assessments.snapshot import _default_points, _load_group_members
 from app.lms.attempts.models import Attempt
 from app.lms.content import repository as content_repo
 from app.lms.content.models import BankQuestion, Passage, PassageVersion, QuestionBank, QuestionVersion
+from app.lms.content.types import TYPE_NAMES
 from app.lms.core import clock
 from app.lms.core.errors import Conflict, NotFound, ValidationFailed
 from app.lms.courses.models import Course
@@ -47,6 +48,19 @@ from app.lms.exam_templates import locks as _locks
 # --- Phase 7b S2 end ---
 
 _ZERO = Decimal("0")
+
+# --- Phase 10 S2 begin --- (PHASE_10_DESIGN 3: forced at creation; 409 `practice_fixed` on AssessmentUpdateIn)
+PRACTICE_FIXED_FIELDS = frozenset({
+    "allowed_attempts", "time_limit_s", "results_policy", "show_correct_answers", "score_policy", "shuffle_items",
+    "navigation", "display_mode", "result_view", "grading_scheme_version_id", "grade_category_id", "due_at",
+    "access_code",
+})
+
+
+def practice_rules() -> dict:
+    """Section rules of a practice set: every question type except essays, which need a teacher."""
+    return {"allowed_types": [t for t in TYPE_NAMES if t != "essay"]}
+# --- Phase 10 S2 end ---
 
 
 def utc(dt: Optional[datetime]) -> Optional[datetime]:
@@ -67,7 +81,10 @@ def _commit(db: Session, a: Assessment) -> None:
 
 # =========================================================================== assessments
 
-def create_assessment(db: Session, ctx: AuthzContext, course: Course, data: sch.AssessmentCreateIn) -> Assessment:
+def create_assessment(db: Session, ctx: AuthzContext, course: Course, data: sch.AssessmentCreateIn,
+                      *, practice: bool = False) -> Assessment:
+    """`practice=True` (Phase 10 S2): the forced settings, one section, no quiz assignment; flushes only, the caller
+    (`practice.service`) adds the blocks, publishes and commits."""
     require_course(ctx, A.CONTENT_MANAGE, course)
     assert_not_sandbox(course)  # Phase 8b fix L1: the sample quiz is never published; no other assessments
     # --- Phase 7b S2 begin --- (PHASE_7B_DESIGN 5.3 / 9.1: the template branch; `preset` and a template never mix.
@@ -102,6 +119,16 @@ def create_assessment(db: Session, ctx: AuthzContext, course: Course, data: sch.
         show_correct_answers=ort, allowed_attempts=1, score_policy="highest",
         grading_scheme_version_id=PRESET_SCHEME_VERSIONS.get(data.preset),
     )
+    # --- Phase 10 S2 begin --- (PHASE_10_DESIGN 3: no assignments row, so grades and lists never see the set)
+    if practice:
+        a.is_practice, a.allowed_attempts, a.score_policy, a.show_correct_answers = True, -1, "latest", True
+        a.shuffle_items, a.display_mode, a.result_view = True, "one_per_page", "general"
+        db.add(a)
+        db.flush()
+        db.add(AssessmentSection(assessment_id=a.id, position=1, key=None, rules=practice_rules()))
+        db.flush()
+        return a
+    # --- Phase 10 S2 end ---
     db.add(a)
     db.flush()
     if data.preset == "ort_main":
@@ -126,6 +153,10 @@ def update_assessment(db: Session, ctx: AuthzContext, course: Course, aid: uuid.
         raise Conflict("The assessment was changed by someone else", code="draft_conflict",
                        details={"draft_rev": a.draft_rev})
     fields = data.model_fields_set - {"draft_rev"}
+    # --- Phase 10 S2 --- (PHASE_10_DESIGN 3)
+    if a.is_practice and fields & PRACTICE_FIXED_FIELDS:
+        raise Conflict("Fixed for a practice set", code="practice_fixed",
+                       details={"fields": sorted(fields & PRACTICE_FIXED_FIELDS)})
     # --- Phase 7a S4 begin --- (PHASE_7A_DESIGN 2.7, 3.8: access code -> bcrypt hash; editable under the ORT lock)
     if "access_code" in fields:
         from app.lms.accommodations.service import hash_access_code
@@ -176,7 +207,8 @@ def update_assessment(db: Session, ctx: AuthzContext, course: Course, aid: uuid.
         setattr(a, f, value)
     if (a.grading_scheme_version_id, a.score_policy, utc(a.due_at)) != before:
         a.grading_changed_at = clock.now()  # drives the gradebook's stale_count (P4-12, P4-15)
-    assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
+    if not a.is_practice:  # Phase 10 S2: mirroring would create the assignments row a practice set must not have
+        assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
     _commit(db, a)
     return a
 
@@ -197,10 +229,13 @@ def soft_delete_assessment(db: Session, ctx: AuthzContext, course: Course, aid: 
     from app.lms.courses.service import assert_not_sandbox  # Phase 8b S1: the sample quiz stays (design 5.1)
 
     assert_not_sandbox(course)
-    if repo.has_open_attempts(db, a.id):
+    # Phase 10 S2: a practice attempt has no deadline, so an abandoned one would block the delete for ever; it closes
+    # lazily with the deleted set (`engine._env_closed`) and no grade depends on it
+    if not a.is_practice and repo.has_open_attempts(db, a.id):
         raise Conflict("Students are taking this assessment", code="attempts_in_progress")
     a.soft_delete(ctx.user.id)
-    assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
+    if not a.is_practice:  # Phase 10 S2
+        assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
     # --- Phase 7c S2 begin --- (PHASE_7C_DESIGN 5.1: the quiz bank follows its quiz; drafts stay for a restore)
     from app.lms.quiz_editor import quiz_banks as _qb
 
@@ -216,7 +251,8 @@ def restore_assessment(db: Session, ctx: AuthzContext, course: Course, aid: uuid
     if a.deleted_at is None:
         raise Conflict("Assessment is not deleted", code="not_deleted")
     a.restore()
-    assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
+    if not a.is_practice:  # Phase 10 S2
+        assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
     # --- Phase 7c S2 begin --- (PHASE_7C_DESIGN 5.1: the quiz bank follows its quiz)
     from app.lms.quiz_editor import quiz_banks as _qb
 
@@ -237,6 +273,8 @@ def _renumber(rows: list, attr: str = "position") -> None:
 def _section_rules(a: Assessment, key: Optional[str], given: Optional[sch.SectionRulesIn],
                    current: Optional[dict] = None) -> dict:
     rules = normalize_rules(given.model_dump(exclude_none=True) if given is not None else None)
+    if a.is_practice:  # Phase 10 S2: the builder cannot let essays into a practice set
+        return {**rules, **practice_rules()}
     lock = locked_rules(a.preset, key)
     if lock is not None:
         if "allowed_types" in rules and rules["allowed_types"] != lock["allowed_types"]:
@@ -972,6 +1010,7 @@ def list_staff(db: Session, course: Course, *, cursor: Optional[str], limit: Opt
     from app.lms.courses.service import paginate_rows
 
     stmt = select(Assessment).where(Assessment.course_id == course.id,
+                                    Assessment.is_practice.is_(False),  # Phase 10 S2
                                     Assessment.deleted_at.is_not(None) if deleted else Assessment.deleted_at.is_(None))
     rows, nxt = paginate_rows(db, stmt, sort_col=Assessment.position, id_col=Assessment.id,
                               entity_of=lambda r: r[0], cursor=cursor, limit=limit, descending=False)
@@ -1047,6 +1086,7 @@ def list_student(db: Session, ctx: AuthzContext, course: Course, *, cursor: Opti
     stmt = (select(Assessment, AssessmentVersion.snapshot, AssessmentVersion.item_count)
             .join(AssessmentVersion, AssessmentVersion.id == Assessment.published_version_id)
             .where(Assessment.course_id == course.id, Assessment.deleted_at.is_(None),
+                   Assessment.is_practice.is_(False),  # Phase 10 S2
                    (Assessment.status == "published") | own))
     rows, nxt = paginate_rows(db, stmt, sort_col=Assessment.position, id_col=Assessment.id,
                               entity_of=lambda r: r[0], cursor=cursor, limit=limit, descending=False)

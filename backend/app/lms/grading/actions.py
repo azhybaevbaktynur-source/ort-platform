@@ -334,7 +334,7 @@ def void_attempt(db: Session, ctx: AuthzContext, course: Course, attempt_id, rea
         raise Conflict("Attempt is in progress", code="attempt_in_progress")
     old_status = attempt.status
     db.execute(update(Attempt.__table__).where(Attempt.__table__.c.id == attempt.id).values(status="void"))
-    if not attempt.is_preview:
+    if not attempt.is_preview and not attempt.is_practice:  # Phase 10 S2: practice has no submission
         srow = subs.load_context(db, attempt.assessment_id, attempt.enrollment_id)
         sub = subs.lock_or_create_submission(
             db, course_id=attempt.course_id, assessment_id=attempt.assessment_id,

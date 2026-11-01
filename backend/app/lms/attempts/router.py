@@ -10,9 +10,10 @@ from sqlalchemy.orm import Session
 
 from app.core.authz import A, AuthzContext, get_authz
 from app.db.session import get_db
-from app.lms.attempts import autosave, engine, results, serializers as ser, sweep
+from app.lms.attempts import autosave, engine, practice, results, serializers as ser, sweep
 from app.lms.attempts.schemas import (
-    AnswersIn, AttemptStateOut, MyAttemptOut, SaveOut, StartIn, SubmitIn, SubmitOut,
+    AnswersIn, AttemptStateOut, MyAttemptOut, PracticeFeedbackListOut, PracticeFeedbackOut, SaveOut, StartIn, SubmitIn,
+    SubmitOut,
 )
 from app.lms.core import clock
 from app.lms.core.deps import client_ip_hash, get_lms_user
@@ -166,3 +167,15 @@ def get_review(attempt_id: str, user: User = Depends(get_lms_user), db: Session 
     items = results.load_items(db, attempt.id)
     with_keys = results.keys_allowed(env.assessment) or bool(attempt.is_preview)
     return results.review_out(attempt, items, plan, None, with_keys=with_keys)
+
+
+# ------------------------------------------------------------------ practice (Phase 10 S2)
+
+@router.post("/attempts/{attempt_id}/items/{position}/check", response_model=PracticeFeedbackOut)
+def check_item(attempt_id: str, position: int, user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
+    return practice.check_item(db, user, attempt_id, position, now=clock.now())
+
+
+@router.get("/attempts/{attempt_id}/practice-feedback", response_model=PracticeFeedbackListOut)
+def practice_feedback(attempt_id: str, user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
+    return practice.list_feedback(db, user, attempt_id)

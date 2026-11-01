@@ -66,6 +66,7 @@ class AttemptStateOut(BaseModel):
     status: AttemptStatus
     language: Lang
     is_preview: bool
+    is_practice: bool = False  # Phase 10 S2
     server_now: datetime
     grace_s: int
     started_at: datetime
@@ -122,6 +123,21 @@ class MyAttemptOut(BaseModel):
     submitted_at: Optional[datetime] = None
     results_available: bool
     result: Optional[Any] = None
+
+
+# --- Phase 10 S2 begin --- (PHASE_10_DESIGN 3: item check of a practice attempt)
+class PracticeFeedbackOut(BaseModel):
+    position: int
+    correctness: str
+    score: str
+    points: str
+    key: dict[str, Any]
+    explanation: Optional[str] = None
+
+
+class PracticeFeedbackListOut(BaseModel):
+    items: list[PracticeFeedbackOut]
+# --- Phase 10 S2 end ---
 
 
 class SweepOut(BaseModel):

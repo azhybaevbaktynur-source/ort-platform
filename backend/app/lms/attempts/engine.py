@@ -376,7 +376,8 @@ def build_state(db: Session, attempt, assessment, sections, items, plan, now: da
             flagged=bool(r.flagged)))
     return AttemptStateOut(
         id=str(attempt.id), assessment_id=str(attempt.assessment_id), version_id=str(attempt.assessment_version_id),
-        status=attempt.status, language=attempt.language, is_preview=bool(attempt.is_preview), server_now=now,
+        status=attempt.status, language=attempt.language, is_preview=bool(attempt.is_preview),
+        is_practice=bool(getattr(attempt, "is_practice", False)), server_now=now,  # Phase 10 S2
         grace_s=settings.ATTEMPT_GRACE_S, started_at=timing.as_utc(attempt.started_at),
         deadline_at=timing.as_utc(attempt.deadline_at), current_section_pos=attempt.current_section_pos,
         navigation=_navigation(plan),
@@ -750,6 +751,7 @@ def start_attempt(db: Session, ctx: AuthzContext, course: Course, aid, data: Sta
     attempt_row = dict(
         id=attempt_id, assessment_id=assessment_id, assessment_version_id=version_id, course_id=course.id,
         enrollment_id=enr.id, user_id=user.id, attempt_no=next_no, language=lang, is_preview=staff,
+        is_practice=bool(snapshot.get("is_practice")),  # Phase 10 S2
         status="in_progress", started_at=now, deadline_at=ad, extra_time_s=extra_s, current_section_pos=1,  # S4
         item_count=len(entries), points_possible=points, created_at=now, updated_at=now)
     item_rows = [dict(attempt_id=attempt_id, position=e["position"], section_pos=e["section_pos"], slot=e["slot"],
@@ -775,8 +777,8 @@ def start_attempt(db: Session, ctx: AuthzContext, course: Course, aid, data: Sta
 
     view = SimpleNamespace(
         id=attempt_id, assessment_id=assessment_id, assessment_version_id=version_id, language=lang,
-        is_preview=staff, status="in_progress", started_at=now, deadline_at=ad, current_section_pos=1,
-        submitted_at=None)
+        is_preview=staff, is_practice=bool(snapshot.get("is_practice")),  # Phase 10 S2
+        status="in_progress", started_at=now, deadline_at=ad, current_section_pos=1, submitted_at=None)
     items = [SimpleNamespace(position=e["position"], section_pos=e["section_pos"], slot=e["slot"],
                              question_version_id=e["qv"], choice_order=e["choice_order"], response=None,
                              flagged=False) for e in entries]

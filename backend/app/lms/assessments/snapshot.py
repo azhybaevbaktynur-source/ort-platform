@@ -292,6 +292,9 @@ def build_snapshot(db: Session, assessment: Assessment, *, now: Optional[datetim
     # player cache read only the keys they know, so attempts behave exactly as before)
     snapshot.update(template_snapshot_keys(assessment))
     # --- Phase 7b S1 end ---
+    # --- Phase 10 S2 --- (PHASE_10_DESIGN 0.1: the key exists only on practice sets, so other hashes stay equal)
+    if getattr(assessment, "is_practice", False):
+        snapshot["is_practice"] = True
     return snapshot, issues
 
 

@@ -13,5 +13,7 @@ ATTEMPT_POLICIES: dict[tuple[str, str], str] = {
     ("POST", f"{_T}/submit"): "attempt_owner",
     ("GET", f"{_T}/result"): "attempt_owner",
     ("GET", f"{_T}/review"): "attempt_owner",
+    ("POST", f"{_T}/items/{{position}}/check"): "attempt_owner",  # Phase 10 S2
+    ("GET", f"{_T}/practice-feedback"): "attempt_owner",  # Phase 10 S2
     ("POST", "/api/v1/internal/attempts/sweep"): "internal_token",
 }
