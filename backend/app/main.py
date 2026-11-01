@@ -125,6 +125,13 @@ async def lifespan(app: FastAPI):
     yield
 
 
+from app.core.logging import configure_logging  # noqa: E402
+from app.core.request_log import RequestLogMiddleware  # noqa: E402
+from app.core.sentry import init_sentry  # noqa: E402
+
+configure_logging()
+init_sentry()  # Phase 11 S6: no-op without SENTRY_DSN
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="Backend API for Kyrgyz National Scholarship Test (ОРТ / ЖРТ) Test-Prep Platform",
@@ -148,6 +155,7 @@ app.include_router(_invitations_router, prefix=settings.API_V1_STR)
 app.add_middleware(BodyCapMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(SecurityHeadersMiddleware)  # Phase 11 S4: just inside CORS, so every route's answer carries the headers
+app.add_middleware(RequestLogMiddleware)  # Phase 11 S6: outside the app, inside CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
