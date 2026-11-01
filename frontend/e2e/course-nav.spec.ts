@@ -267,7 +267,18 @@ test.describe("course navigation (ru)", () => {
 
   // ---------------------------------------------------------------- 5. Student view
   /** The test student's token this tab holds (per-tab `sessionStorage`). */
-  const tabSession = (tp: Page) => tp.evaluate(() => JSON.parse(window.sessionStorage.getItem("studentView") || "null"));
+  // reset and leave reload the page: read after the navigation, and retry if one starts mid-read
+  const tabSession = async (tp: Page) => {
+    for (let i = 0; ; i++) {
+      try {
+        await tp.waitForLoadState("load");
+        return await tp.evaluate(() => JSON.parse(window.sessionStorage.getItem("studentView") || "null"));
+      } catch (e) {
+        if (i >= 4) throw e;
+        await tp.waitForTimeout(300);
+      }
+    }
+  };
   const SV_NAME = () => t("studentView.testStudentName");
 
   test("Student view: banner, student sidebar, a hand-in stays out of the staff lists, staff routes refused, leave", async ({ browser }) => {
