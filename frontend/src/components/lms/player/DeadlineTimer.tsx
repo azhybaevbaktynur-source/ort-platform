@@ -61,7 +61,8 @@ export function DeadlineTimer({
     return (
       <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm text-slate-500">
         <Clock className="h-4 w-4" aria-hidden="true" />
-        {t("player.timer.unlimited")}
+        {/* UX: on phones the text would squeeze the section title; the icon stays, screen readers keep the words */}
+        <span className="sr-only sm:not-sr-only">{t("player.timer.unlimited")}</span>
       </span>
     );
   }
