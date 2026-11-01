@@ -82,6 +82,8 @@ const LINKS = {
   bank: "bank.tab",
   settings: "courses.settings.tab",
   files: "courseFiles.title",
+  practice: "practice.nav", // Phase 10
+  analytics: "analytics.nav", // Phase 10
 } as const;
 
 async function createTextAssignment(title: string, published = true): Promise<string> {
@@ -183,7 +185,7 @@ test.describe("course navigation (ru)", () => {
     await sp.goto(base());
     // before: Course, Assignments, Grades, Teachers (people) only
     await expect(link(sp, LINKS.course)).toHaveAttribute("aria-current", "page");
-    expect(await linkNames(sp)).toEqual([t(LINKS.course), t(LINKS.assignments), t(LINKS.grades), t("courses.people.tabStudent")]);
+    expect(await linkNames(sp)).toEqual([t(LINKS.course), t(LINKS.assignments), t(LINKS.grades), t("courses.people.tabStudent"), t("progress.nav")]);
     // opening a hidden area by URL: the "not available" page, no list
     for (const area of ["announcements", "files"]) {
       await sp.goto(`${base()}/${area}`);
@@ -265,7 +267,18 @@ test.describe("course navigation (ru)", () => {
 
   // ---------------------------------------------------------------- 5. Student view
   /** The test student's token this tab holds (per-tab `sessionStorage`). */
-  const tabSession = (tp: Page) => tp.evaluate(() => JSON.parse(window.sessionStorage.getItem("studentView") || "null"));
+  // reset and leave reload the page: read after the navigation, and retry if one starts mid-read
+  const tabSession = async (tp: Page) => {
+    for (let i = 0; ; i++) {
+      try {
+        await tp.waitForLoadState("load");
+        return await tp.evaluate(() => JSON.parse(window.sessionStorage.getItem("studentView") || "null"));
+      } catch (e) {
+        if (i >= 4) throw e;
+        await tp.waitForTimeout(300);
+      }
+    }
+  };
   const SV_NAME = () => t("studentView.testStudentName");
 
   test("Student view: banner, student sidebar, a hand-in stays out of the staff lists, staff routes refused, leave", async ({ browser }) => {

@@ -8,6 +8,7 @@ from typing import get_args
 from app.lms.assessments.rules import ORT_MAIN_SECTIONS, ORT_SUBJECT_KEYS
 from app.lms.assessments.schemas import Preset
 from app.lms.content.importers.schemas import EXAM_TYPES
+from app.lms.content.types.structured import STRUCTURED_TYPES
 from app.lms.grading.seeds import PRESET_SCHEME_VERSIONS
 from app.lms.templates.base import ALL_LOCK_FIELDS, CourseTemplate
 
@@ -36,4 +37,5 @@ ORT = CourseTemplate(
     default_home_kind="assignments",
     default_structure=None,
     # --- Phase 8a S1 end ---
+    refused_question_types=STRUCTURED_TYPES,  # Phase 10 S1
 )

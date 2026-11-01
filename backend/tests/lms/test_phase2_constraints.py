@@ -109,7 +109,7 @@ def test_translation_group_language_unique_among_live(db, ctx):
 
 
 @pytest.mark.parametrize("overrides", [
-    {"type": "matching"}, {"language": "de"}, {"difficulty": "extreme"},
+    {"type": "drag_drop"}, {"language": "de"}, {"difficulty": "extreme"},
 ])
 def test_question_checks(db, ctx, overrides):
     teacher, _, bank = ctx
@@ -133,7 +133,7 @@ def test_version_checks_and_unique(db, ctx):
     with pytest.raises(IntegrityError):
         db.commit()
     db.rollback()
-    for bad in ({"origin": "magic"}, {"type": "matching"}, {"default_points": -1}, {"default_points": 1001}):
+    for bad in ({"origin": "magic"}, {"type": "drag_drop"}, {"default_points": -1}, {"default_points": 1001}):
         db.add(version(**bad))
         with pytest.raises(IntegrityError):
             db.commit()

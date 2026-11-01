@@ -51,9 +51,11 @@ def _content_in(payload: CardPayloadIn, default_points) -> QuestionContentIn:
         raise _invalid(str(e.get("msg")), ["payload", *[str(x) for x in e.get("loc", ())]]) from None
 
 
-def _prepared(db: Session, ctx: AuthzContext, payload: CardPayloadIn, default_points, carried: set) -> dict:
+def _prepared(db: Session, ctx: AuthzContext, course, payload: CardPayloadIn, default_points, carried: set) -> dict:
     """Request content -> normalized content (ImageRefs resolved); 422 before any write."""
     get_type(payload.type)  # 422 unsupported_type
+    from app.lms.templates.service import assert_question_type_allowed  # Phase 10 S1
+    assert_question_type_allowed(course, payload.type)
     content = content_svc.prepare_content(db, ctx.user, _content_in(payload, default_points), carried)
     return content_svc.normalize_question_content(payload.language, content)
 
@@ -126,7 +128,7 @@ def create_question_in_quiz(db: Session, ctx: AuthzContext, course, a: Assessmen
             if cand is not None and cand.section_id == section.id and cand.parent_item_id is None:
                 after = cand
     b._caps(db, a, section, 1)
-    n = _prepared(db, ctx, payload, payload.points, set())
+    n = _prepared(db, ctx, course, payload, payload.points, set())
     meta = _clean_meta(payload)
     bank = quiz_banks.ensure_quiz_bank(db, ctx, course, a)
     quiz_banks.assert_bank_usable(bank, a)
@@ -212,7 +214,7 @@ def commit_draft(db: Session, ctx: AuthzContext, course, aid: uuid.UUID, draft_i
     current = db.get(QuestionVersion, q.current_version_id)
     in_quiz_bank = bank.assessment_id == a.id
     version_points = payload.points if in_quiz_bank else current.default_points
-    n = _prepared(db, ctx, payload, version_points, content_svc._carried(current))
+    n = _prepared(db, ctx, course, payload, version_points, content_svc._carried(current))
     meta = _clean_meta(payload)
     # M1: an existing card never moves between passages here; `meta.passage_id` is ignored (always present in the
     # payload, so passing it on would detach a passage child when it is null)
@@ -252,7 +254,7 @@ def commit_draft(db: Session, ctx: AuthzContext, course, aid: uuid.UUID, draft_i
             raise Conflict("A passage question cannot be copied into this quiz only", code=ids.E_PASSAGE_CHILD_SCOPE)
         _check_type(section, a, n["type"], q.language)
         if not in_quiz_bank:  # the new quiz-bank question's default points are the card's points
-            n = _prepared(db, ctx, payload, payload.points, content_svc._carried(current))
+            n = _prepared(db, ctx, course, payload, payload.points, content_svc._carried(current))
         own = quiz_banks.ensure_quiz_bank(db, ctx, course, a)
         q2 = BankQuestion(bank_id=own.id, passage_id=None, type=n["type"], language=q.language,
                           position=content_svc._next_position(db, own.id), search_text="", **meta)

@@ -110,6 +110,15 @@ ROUTE_POLICIES.update(PAGE_POLICIES)
 ROUTE_POLICIES.update(COURSE_FILE_POLICIES)
 ROUTE_POLICIES.update(ANNOUNCEMENT_POLICIES)
 # --- Phase 8a S1 end ---
+# --- Phase 10 S0 begin --- (empty dicts; S1..S6 fill them)
+from app.lms.analytics.policies import ANALYTICS_POLICIES  # noqa: E402
+from app.lms.practice.policies import PRACTICE_POLICIES  # noqa: E402
+from app.lms.progress.policies import PROGRESS_POLICIES  # noqa: E402
+from app.lms.statistics.policies import STATISTICS_POLICIES  # noqa: E402
+
+for _d in (PRACTICE_POLICIES, PROGRESS_POLICIES, STATISTICS_POLICIES, ANALYTICS_POLICIES):
+    ROUTE_POLICIES.update(_d)
+# --- Phase 10 S0 end ---
 # --- Phase 8b S1 begin --- (PHASE_8B_DESIGN 6.1: no new route in S1; the preview policy name is registered here and
 # S2 moves `exam_templates.policies.PLANNED_POLICIES` into EXAM_TEMPLATE_POLICIES when it mounts the routes)
 from app.lms.exam_templates.ids import POLICY_NAMES as _EXAM_TEMPLATE_POLICY_NAMES_8B  # noqa: E402

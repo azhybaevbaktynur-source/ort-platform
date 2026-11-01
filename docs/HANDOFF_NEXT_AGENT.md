@@ -29,13 +29,13 @@ A teacher-owned, Canvas-style LMS where ORT/ЖРТ test prep is one course kind:
 | Owner checkpoint after 8b | Closed 2026-10-31: owner asked for a navigation redesign first (8c) | `CHECKPOINT_8B.md`, `PHASE_8C_NAVIGATION_PROPOSAL.md` |
 | 8c teacher navigation | **Deployed 2026-10-31** (`main` ff508a8, no migration) | `PHASE_8C.md`, `PHASE_8C_DESIGN.md` |
 | 9 organizations completion, enrollment forms, invitations | **Deployed 2026-11-01** (`main` 636d14a, migration 0014) | `PHASE_9.md`, `PHASE_9_DESIGN.md` |
-| UX rework (UR-1…8) | **In progress** on branch `ux-rework`; Phase 10 follows without a wait | `UX_REWORK_DESIGN.md`, `PRODUCT_DECISIONS.md` |
+| UX rework (UR-1…8) | **Deployed 2026-11-01** (`main` ace2476, migration 0015) | `UX_REWORK.md`, `UX_REWORK_DESIGN.md` |
 | **10** | Directly after the UX rework (UR-7b): practice, analytics, quiz statistics, new question types (matching, fill-in-the-blank, ordering) | `IMPLEMENTATION_PLAN.md` |
 | Next | 8a modules, pages, files, announcements, gating → 8b exam templates II (visual constructor, scrolling display mode; **checkpoint after 8b**) → 9 → 10 → 11 | `IMPLEMENTATION_PLAN.md` |
 
-Production: Vercel https://ort-platform-nu.vercel.app + Render https://ort-platform-w77q.onrender.com (`/health` shows `commit`; Render deploys only when backend files change) + Neon project `noisy-sound-20763725` (production branch `br-cool-firefly-b227gbuy`, Alembic head `0014_phase9_organizations_forms`) + Cloudflare R2. Production data is small: 6 users, 3 courses (2 ORT + the owner's draft), 299 question versions, ~4 attempts, 1 submission; one organization "Platform".
+Production: Vercel https://ort-platform-nu.vercel.app + Render https://ort-platform-w77q.onrender.com (`/health` shows `commit`; Render deploys only when backend files change) + Neon project `noisy-sound-20763725` (production branch `br-cool-firefly-b227gbuy`, Alembic head `0015_test_student`) + Cloudflare R2. Production data is small: 6 users, 3 courses (2 ORT + the owner's draft), 299 question versions, ~4 attempts, 1 submission; one organization "Platform".
 
-Neon backups (free plan: **max 10 branches, 1 manual snapshot**): `backup-2026-10-25-before-phase6a`, `backup-2026-10-26-before-phase7a`, `backup-2026-10-26-before-phase7b`, `backup-2026-10-28-before-phase7c`, `backup-2026-10-28-before-phase8a`, `backup-2026-10-28-before-phase8b`, `backup-2026-11-01-before-phase9` (**8/10 branches used** after deleting before-phase5 on 2026-11-01 with the owner's OK), snapshot `before-phase6a-deploy-2026-10-25`. Before each `main` merge with a migration create `backup-<date>-before-<phase>`; when full, ask the owner which old backup to delete (owner OK'd deleting obsolete ones on 2026-10-26; deleting Neon data always needs the owner's OK).
+Neon backups (free plan: **max 10 branches, 1 manual snapshot**): `backup-2026-10-25-before-phase6a`, `backup-2026-10-26-before-phase7a`, `backup-2026-10-26-before-phase7b`, `backup-2026-10-28-before-phase7c`, `backup-2026-10-28-before-phase8a`, `backup-2026-10-28-before-phase8b`, `backup-2026-11-01-before-phase9`, `backup-2026-11-01-before-ux-rework` (**9/10 branches used**; ask the owner before deleting any), snapshot `before-phase6a-deploy-2026-10-25`. Before each `main` merge with a migration create `backup-<date>-before-<phase>`; when full, ask the owner which old backup to delete (owner OK'd deleting obsolete ones on 2026-10-26; deleting Neon data always needs the owner's OK).
 
 ## 3b. Waiting for the owner
 
@@ -62,10 +62,11 @@ Neon backups (free plan: **max 10 branches, 1 manual snapshot**): `backup-2026-1
 
 ## 5. What to do next
 
-1. Finish the UX rework (`docs/phases/UX_REWORK_DESIGN.md`), then continue directly with Phase 10 (owner, UR-7b; give the short review list, no wait). Neon: 8/10 branches; ask before deleting any other backup.
+1. UX rework done. Neon 9/10 branches: the next migration deploy can create one more backup; ask before deleting any. QA accounts on production: `UX_REWORK.md`; disable them after the Phase 10 production check.
 2. Phase 10 with Sonnet implementers (Opus only after a failure; UR-7b): (practice, analytics, quiz statistics, new question types matching / fill-in-the-blank / ordering; `IMPLEMENTATION_PLAN.md`), architect design first, inside the 8c shell; new question types also extend the 7c type dropdown and the 7b general import format. Stop for review after Phase 10, then Phase 11, and stop again before launch.
 3. Open owner questions keep their defaults: `CHECKPOINT_8B.md` §3, 8c design §17, 9-Q1…Q8 in `PRODUCT_DECISIONS.md`. Optional 8c teacher test.
-4. Fix the flaky PG test `tests/lms/test_enrollments_api.py::test_ip_failure_limit_counts_failures_only`.
+4. Fix the flaky PG test `tests/lms/test_enrollments_api.py::test_ip_failure_limit_counts_failures_only`; an unidentified intermittent `backend-sqlite` CI failure was seen once (55e3348).
+5. Phase 11 hardening list: sweep retired test students' hand-in files.
 
 ## 6. Models and token usage (Claude Max subscription)
 

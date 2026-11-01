@@ -18,6 +18,8 @@ from app.lms.core.types import JSONType
 
 _OPEN_PG = text("status = 'in_progress' AND NOT is_preview")
 _OPEN_SQLITE = text("status = 'in_progress' AND is_preview = 0")
+_FINAL_PG = text("status IN ('graded','needs_review') AND NOT is_preview")
+_FINAL_SQLITE = text("status IN ('graded','needs_review') AND is_preview = 0")
 _PREVIEW_PG = text("status = 'in_progress' AND is_preview")
 _PREVIEW_SQLITE = text("status = 'in_progress' AND is_preview = 1")
 
@@ -41,6 +43,8 @@ class Attempt(UUIDPKMixin, TimestampMixin, Base):
     attempt_no: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     language: Mapped[str] = mapped_column(String(2), nullable=False)
     is_preview: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    # Phase 10 S0: copied from the snapshot at start, like is_preview
+    is_practice: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="in_progress",
                                         server_default="in_progress")
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -69,6 +73,13 @@ class Attempt(UUIDPKMixin, TimestampMixin, Base):
         Index("ix_attempts_assessment_id_is_preview_status_submitted_at",
               "assessment_id", "is_preview", "status", "submitted_at"),
         Index("ix_attempts_user_id_created_at", "user_id", "created_at"),
+        # Phase 10 S0: final, non-preview attempts (analytics.scope.final_attempt)
+        Index("ix_attempts_version_final", "assessment_version_id", "user_id", "attempt_no",
+              postgresql_where=_FINAL_PG, sqlite_where=_FINAL_SQLITE),
+        Index("ix_attempts_user_course_final", "user_id", "course_id", "submitted_at",
+              postgresql_where=_FINAL_PG, sqlite_where=_FINAL_SQLITE),
+        Index("ix_attempts_course_final", "course_id", "assessment_id",
+              postgresql_where=_FINAL_PG, sqlite_where=_FINAL_SQLITE),
         Index("ix_attempts_open_deadline", "deadline_at",
               postgresql_where=text("status = 'in_progress'"), sqlite_where=text("status = 'in_progress'")),
     )

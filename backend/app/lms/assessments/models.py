@@ -91,8 +91,11 @@ class Assessment(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
     structure_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False,
                                                    server_default=text("false"))
     # --- Phase 7b S1 end ---
+    # --- Phase 10 S0 --- (PHASE_10_DESIGN 1: practice quizzes write no grades; never an ORT preset)
+    is_practice: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
 
     __table_args__ = (
+        CheckConstraint("NOT is_practice OR preset = 'none'", name="practice_preset_none"),
         CheckConstraint("preset IN ('none','ort_main','ort_subject')", name="preset_valid"),
         CheckConstraint("grade_release IN ('auto','manual')", name="grade_release_valid"),
         CheckConstraint("status IN ('draft','published')", name="status_valid"),

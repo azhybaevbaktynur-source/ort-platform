@@ -427,7 +427,7 @@ def clear_attempt_grades(db: Session, attempt_ids: list, now: datetime) -> None:
 def on_attempt_scored(db: Session, attempt: Attempt) -> None:
     """Registered in ATTEMPT_SCORED_HOOKS (via `app.lms.grading.on_attempt_scored`). Runs inside the Phase 3
     finalize / manual-score transaction, after the attempt row is written. Never raises LMSError."""
-    if attempt.is_preview or attempt.status not in COUNTED:
+    if attempt.is_preview or attempt.is_practice or attempt.status not in COUNTED:  # Phase 10 S2: practice
         return
     now = clock.now()
     ctx = load_context(db, attempt.assessment_id, attempt.enrollment_id)  # 1 (Phase 7a S3: override-aware due)

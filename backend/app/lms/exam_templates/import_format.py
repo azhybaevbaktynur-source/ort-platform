@@ -124,6 +124,11 @@ EXAMPLE_VALUES: dict[str, dict[str, str]] = {
     "numeric": {"stem": "Question text", "answer": "42", "tolerance": "0"},
     "short_text": {"stem": "Question text", "answers": "answer|other answer", "case_sensitive": "false"},
     "essay": {"stem": "Question text", "rubric": "Rubric note", "max_points": "5"},
+    # Phase 10: new question types
+    "matching": {"stem": "Match the pairs", "match_pairs": "Paris=>France|Rome=>Italy", "match_distractors": "Spain"},
+    "fill_blank": {"stem": "Fill in the blanks", "blank_text": "{{1}} is the capital of {{2}}",
+                   "blank_answers": "Paris||France|La France", "case_sensitive": "false"},
+    "ordering": {"stem": "Put in order", "order_items": "first|second|third"},
 }
 _FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
 

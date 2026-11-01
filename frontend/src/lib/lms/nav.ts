@@ -15,13 +15,14 @@
 
 export type CourseNavRole = "teacher" | "assistant" | "student" | "observer";
 export type CourseNavKey =
-  | "course" | "announcements" | "assignments" | "grades" | "people" | "bank" | "settings" | "files";
+  | "course" | "announcements" | "assignments" | "grades" | "people" | "bank" | "settings" | "files"
+  | "practice" | "progress" | "analytics";
 
 export interface CourseNavCourse {
   id: string;
   home_kind?: string | null;
   home_page_id?: string | null;
-  features?: { modules: boolean; files: boolean; announcements: boolean } | null;
+  features?: { modules: boolean; files: boolean; announcements: boolean; practice?: boolean } | null;
   my_enrollment: { role: string; read_only?: boolean };
 }
 
@@ -59,7 +60,7 @@ export function courseNavItems(course: CourseNavCourse, role: CourseNavRole, pat
   const lang = (pathname.match(LANG_RE) || [])[1] || "ru";
   const base = `/${lang}/courses/${course.id}`;
   const staff = role === "teacher" || role === "assistant";
-  const f = course.features ?? { modules: false, files: false, announcements: false };
+  const f = course.features ?? { modules: false, files: false, announcements: false, practice: false };
   const item = (key: CourseNavKey, href: string, label: string, active: boolean, shown: boolean, flag = true) =>
     shown ? [{ key, href, label, active, hiddenFromStudents: staff && !flag }] : [];
   // Course: the course page; modules and pages are reached from it (staff /modules redirects here; students keep it)
@@ -78,6 +79,10 @@ export function courseNavItems(course: CourseNavCourse, role: CourseNavRole, pat
     ...item("bank", `${base}/bank`, t("bank.tab"), under(pathname, `${base}/bank`), staff || (role === "observer" && !!opts.staffShape)),
     ...item("settings", `${base}/settings`, t("courses.settings.tab"), under(pathname, `${base}/settings`), role === "teacher"),
     ...item("files", `${base}/files`, t("courseFiles.title"), under(pathname, `${base}/files`), staff || f.files, f.files),
+    // Phase 10: practice (staff always, students once a practice quiz is published), progress (students), analytics (staff and observers)
+    ...item("practice", `${base}/practice`, t("practice.nav"), under(pathname, `${base}/practice`), staff || (role === "student" && !!f.practice), !!f.practice),
+    ...item("progress", `${base}/progress`, t("progress.nav"), under(pathname, `${base}/progress`), role === "student"),
+    ...item("analytics", `${base}/analytics`, t("analytics.nav"), under(pathname, `${base}/analytics`), staff || role === "observer"),
   ];
 }
 

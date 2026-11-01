@@ -95,6 +95,15 @@ api_router.include_router(_pages_router, prefix="/courses", tags=["Pages"])
 api_router.include_router(_course_files_router, prefix="/courses", tags=["Course Files"])
 api_router.include_router(_announcements_router, prefix="/courses", tags=["Announcements"])
 # --- Phase 8a S3 end ---
+# --- Phase 10 S0 begin --- (empty routers; the slices add routes)
+from app.lms.analytics.router import router as _analytics_router  # noqa: E402
+from app.lms.practice.router import router as _practice_router  # noqa: E402
+from app.lms.progress.router import router as _progress_router  # noqa: E402
+from app.lms.statistics.router import router as _statistics_router  # noqa: E402
+
+for _r in (_practice_router, _progress_router, _statistics_router, _analytics_router):
+    api_router.include_router(_r)
+# --- Phase 10 S0 end ---
 # --- Phase 9 S4 begin --- (enrollment forms, applications, /me/applications; PHASE_9_DESIGN 5)
 from app.lms.enrollment_forms.router import router as _enrollment_forms_router  # noqa: E402
 

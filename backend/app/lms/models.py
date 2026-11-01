@@ -48,3 +48,7 @@ from app.lms.enrollment_forms.models import (  # noqa: F401,E402
     EnrollmentApplication, EnrollmentForm, EnrollmentFormField,
 )
 # --- Phase 9 S1 end ---
+# --- Phase 10 S0 begin ---
+from app.lms.progress.models import CourseGoal  # noqa: F401,E402
+from app.lms.statistics.models import AssessmentItemStat, AssessmentVersionStats  # noqa: F401,E402
+# --- Phase 10 S0 end ---

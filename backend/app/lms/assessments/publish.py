@@ -115,7 +115,8 @@ def publish(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID, *, c
         a.published_draft_rev = a.draft_rev
         if a.published_at is None:
             a.published_at = clock.now()
-        assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
+        if not a.is_practice:  # Phase 10: a practice set never has an assignments row
+            assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
         db.commit()
         return PublishResult(a, cur, True)
     if cur is not None and not confirm:
@@ -134,7 +135,8 @@ def publish(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID, *, c
     a.status = "published"
     a.published_draft_rev = a.draft_rev
     a.published_at = clock.now()
-    assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
+    if not a.is_practice:  # Phase 10: a practice set never has an assignments row
+        assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
     db.commit()
     return PublishResult(a, v, False)
 
@@ -146,7 +148,8 @@ def unpublish(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID) ->
     if a.status != "published":
         raise Conflict("Assessment is not published", code="not_published")
     a.status = "draft"
-    assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
+    if not a.is_practice:  # Phase 10: a practice set never has an assignments row
+        assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
     db.commit()
     return a
 

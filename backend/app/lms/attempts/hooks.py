@@ -14,7 +14,7 @@ ATTEMPT_SCORED_HOOKS: list[Callable[[Session, Attempt], None]] = []
 
 
 def run_scored_hooks(db: Session, attempt: Attempt) -> None:
-    if attempt.is_preview:
+    if attempt.is_preview or attempt.is_practice:  # Phase 10 S2: practice writes no grades
         return
     for hook in list(ATTEMPT_SCORED_HOOKS):
         hook(db, attempt)

@@ -165,6 +165,7 @@ class ModuleProgress(Base):
         PrimaryKeyConstraint("enrollment_id", "module_id", name="pk_module_progress"),
         CheckConstraint(_in("state", MODULE_STATES), name="state_valid"),
         Index("ix_module_progress_enrollment_id", "enrollment_id"),
+        Index("ix_module_progress_module_id_state", "module_id", "state"),  # Phase 10 S0
     )
 
 

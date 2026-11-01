@@ -37,7 +37,7 @@ async def test_validation_errors(db, api):
     bad = await api.call(w.O, "POST", url, json=qbody(data={"choices": [{"id": "A", "text": "x"}], "correct": "A"}))
     assert bad.status_code == 422 and bad.json()["error"]["code"] == "invalid_question_data"
     assert bad.json()["error"]["details"]
-    bad = await api.call(w.O, "POST", url, json=qbody(type="matching"))
+    bad = await api.call(w.O, "POST", url, json=qbody(type="drag_drop"))
     assert bad.status_code == 422 and bad.json()["error"]["code"] == "unsupported_type"
     bad = await api.call(w.O, "POST", url, json=qbody(language="ky"))
     assert bad.status_code == 422 and bad.json()["error"]["code"] == "language_not_in_course"

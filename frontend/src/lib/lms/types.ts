@@ -302,6 +302,8 @@ export interface CourseFeaturesOut {
   modules: boolean;
   files: boolean;
   announcements: boolean;
+  /** Phase 10: a live, published practice quiz exists (optional: older backend). */
+  practice?: boolean;
 }
 
 export interface CourseStudentOut {

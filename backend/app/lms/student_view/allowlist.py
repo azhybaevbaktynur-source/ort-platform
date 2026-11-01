@@ -25,6 +25,12 @@ _I = f"{_C}/modules/{{module_id}}/items/{{item_id}}"
 _T = f"{_V}/attempts/{{attempt_id}}"  # an attempt route: `attempt_owner`, so only the test student's own attempts
 
 TEST_STUDENT_ROUTES: frozenset[tuple[str, str]] = frozenset({
+    # --- Phase 10 S4 begin --- (progress, mistakes notebook, goal: the test student sees their own)
+    ("GET", f"{_C}/my/progress"),
+    ("GET", f"{_C}/my/mistakes"),
+    ("PUT", f"{_C}/my/goal"),
+    ("DELETE", f"{_C}/my/goal"),
+    # --- Phase 10 S4 end ---
     # the app frame and the student home
     ("GET", f"{_V}/auth/me"),
     ("GET", f"{_V}/me/lms"),
@@ -49,6 +55,7 @@ TEST_STUDENT_ROUTES: frozenset[tuple[str, str]] = frozenset({
     ("GET", f"{_C}/assignments"),
     ("GET", _G),
     ("GET", f"{_G}/mine"),
+    ("GET", f"{_C}/practice"),  # Phase 10 S2
     ("GET", f"{_C}/submissions/{{submission_id}}/files/{{asset_id}}"),
     # own course: what a student does
     ("POST", f"{_A}/attempts"),
@@ -64,6 +71,8 @@ TEST_STUDENT_ROUTES: frozenset[tuple[str, str]] = frozenset({
     ("PUT", f"{_T}/answers"),
     ("POST", f"{_T}/sections/{{pos}}/close"),
     ("POST", f"{_T}/submit"),
+    ("POST", f"{_T}/items/{{position}}/check"),  # Phase 10 S2
+    ("GET", f"{_T}/practice-feedback"),  # Phase 10 S2
     # images and files in course content (`/media/{name}` is public and has no user at all)
     ("GET", f"{_V}/assets/{{asset_id}}/content"),
 })

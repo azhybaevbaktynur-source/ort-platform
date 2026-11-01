@@ -563,11 +563,17 @@ def _run(db: Session, actor_id: str, course: Any, raw: Any, filename: str, opts:
         return rep
 
 
+def _with_refused(course: Any, opts: ImportOptions) -> ImportOptions:
+    from app.lms.templates.service import _template
+    return opts.model_copy(update={"refused_types": list(_template(course).refused_question_types)})
+
+
 def preview(db: Session, ctx: Any, course: Any, raw: Any, filename: str, opts: ImportOptions) -> ImportReport:
     """Parse + validate + read-only plan: no locks, no encoding, nothing written."""
     # --- Phase 6 S2b begin --- (course template importer profiles, PHASE_6_DESIGN 5.2)
     from app.lms.templates.service import assert_import_profile_allowed
     assert_import_profile_allowed(course, opts.exam_type)
+    opts = _with_refused(course, opts)  # Phase 10 S1
     # --- Phase 6 S2b end ---
     # --- Phase 7b S3 begin --- (exam template validation / attach target, PHASE_7B_DESIGN 8)
     from app.lms.exam_templates.import_format import resolve_import_target
@@ -583,6 +589,7 @@ def commit(db: Session, ctx: Any, course: Any, raw: Any, filename: str, opts: Im
     # --- Phase 6 S2b begin --- (course template importer profiles, PHASE_6_DESIGN 5.2)
     from app.lms.templates.service import assert_import_profile_allowed
     assert_import_profile_allowed(course, opts.exam_type)
+    opts = _with_refused(course, opts)  # Phase 10 S1
     # --- Phase 6 S2b end ---
     # --- Phase 7b S3 begin --- (exam template validation / attach target, PHASE_7B_DESIGN 8)
     from app.lms.exam_templates.import_format import resolve_import_target

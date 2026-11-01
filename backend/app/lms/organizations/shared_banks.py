@@ -168,6 +168,14 @@ def copy_bank(db: Session, ctx: AuthzContext, course, source_bank_id: uuid.UUID,
     if len(q_ids) > ids.BANK_COPY_MAX_QUESTIONS:
         raise ValidationFailed("The bank is too large to copy", code=ids.E_BANK_TOO_LARGE,
                                details={"max_questions": ids.BANK_COPY_MAX_QUESTIONS})
+    # Phase 10 S1: a template that refuses question types refuses a bank holding one
+    from app.lms.templates.service import _template
+    refused = _template(course).refused_question_types
+    if refused and db.execute(select(BankQuestion.id).where(
+            BankQuestion.bank_id == src.id, BankQuestion.deleted_at.is_(None),
+            BankQuestion.type.in_(refused)).limit(1)).first() is not None:
+        raise ValidationFailed("This question type is not available in this course", code="type_not_allowed",
+                               details=[{"loc": ["bank"], "msg": "not available in this course"}])
     languages = set(db.execute(select(BankQuestion.language).where(
         BankQuestion.bank_id == src.id, BankQuestion.deleted_at.is_(None)).distinct()).scalars())
     languages |= set(db.execute(select(Passage.language).where(

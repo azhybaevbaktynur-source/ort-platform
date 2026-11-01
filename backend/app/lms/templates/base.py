@@ -56,6 +56,8 @@ class CourseTemplate:
     # Optional seeding of modules on course creation (`(db, course) -> None`); None for both templates in 8a.
     default_structure: Optional[Callable[..., None]] = None
     # --- Phase 8a S1 end ---
+    # --- Phase 10 S1 --- (PHASE_10_DESIGN 2: question types this template refuses; ORT refuses the structured ones)
+    refused_question_types: tuple[str, ...] = ()
 
     def locks(self, field_name: str) -> bool:
         return field_name in self.lock_scope

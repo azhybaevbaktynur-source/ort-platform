@@ -13,7 +13,7 @@ function ok(cond: boolean, msg: string) {
 const t = (k: string) => k;
 const cid = "c1";
 const base = `/en/courses/${cid}`;
-const course = (role: string, features = { modules: true, files: false, announcements: false }, extra = {}): CourseNavCourse =>
+const course = (role: string, features = { modules: true, files: false, announcements: false, practice: false }, extra = {}): CourseNavCourse =>
   ({ id: cid, features, my_enrollment: { role }, ...extra });
 
 // every route of app/[lang]/courses/[courseId]/** -> the active link
@@ -26,11 +26,12 @@ const ROUTES: [string, string][] = [
   ["/attempts/t1", "assignments"], ["/grades", "grades"], ["/people", "people"], ["/bank", "bank"],
   ["/bank/questions/q1", "bank"], ["/bank/passages/p1", "bank"], ["/bank/import", "bank"], ["/settings", "settings"],
   ["/files", "files"],
+  ["/practice", "practice"], ["/practice/p1", "practice"], ["/progress", "progress"], ["/analytics", "analytics"],
 ];
 
 const ROLES: CourseNavRole[] = ["teacher", "assistant", "student", "observer"];
 for (const role of ROLES) {
-  const all = { modules: true, files: true, announcements: true };
+  const all = { modules: true, files: true, announcements: true, practice: true };
   for (const [suffix, key] of ROUTES) {
     const items = courseNavItems(course(role, all), role, base + suffix, t);
     const active = items.filter((i) => i.active).map((i) => i.key);
@@ -40,18 +41,18 @@ for (const role of ROLES) {
   }
 }
 
-const keys = (role: CourseNavRole, f = { modules: true, files: false, announcements: false }) =>
+const keys = (role: CourseNavRole, f = { modules: true, files: false, announcements: false, practice: false }) =>
   courseNavItems(course(role, f), role, base, t).map((i) => i.key).join(",");
-ok(keys("teacher") === "course,announcements,assignments,grades,people,bank,settings,files", "teacher: all eight links");
-ok(keys("assistant") === "course,announcements,assignments,grades,people,bank,files", "assistant: no settings");
-ok(keys("student") === "course,assignments,grades,people", "student: announcements and files auto-hidden");
-ok(keys("student", { modules: true, files: true, announcements: true }) === "course,announcements,assignments,grades,people,files",
+ok(keys("teacher") === "course,announcements,assignments,grades,people,bank,settings,files,practice,analytics", "teacher: all links");
+ok(keys("assistant") === "course,announcements,assignments,grades,people,bank,files,practice,analytics", "assistant: no settings");
+ok(keys("student") === "course,assignments,grades,people,progress", "student: announcements, files, practice auto-hidden");
+ok(keys("student", { modules: true, files: true, announcements: true, practice: true }) === "course,announcements,assignments,grades,people,files,practice,progress",
   "student: shown with published content");
-ok(keys("observer") === "course,assignments,grades,people", "observer without the staff shape: no banks, no settings");
+ok(keys("observer") === "course,assignments,grades,people,analytics", "observer without the staff shape: no banks, no settings");
 ok(courseNavItems(course("observer"), "observer", base, t, { staffShape: true }).map((i) => i.key).join(",")
-  === "course,assignments,grades,people,bank", "org admin (staff shape): question banks, no settings");
+  === "course,assignments,grades,people,bank,analytics", "org admin (staff shape): question banks, no settings");
 const marks = courseNavItems(course("teacher"), "teacher", base, t).filter((i) => i.hiddenFromStudents).map((i) => i.key);
-ok(marks.join(",") === "announcements,files", "staff: hidden-from-students marks");
+ok(marks.join(",") === "announcements,files,practice", "staff: hidden-from-students marks");
 ok(courseNavItems(course("student"), "student", base, t).every((i) => !i.hiddenFromStudents), "students: no marks");
 ok(courseNavItems(course("student"), "student", base, t).find((i) => i.key === "people")?.label === "courses.people.tabStudent",
   "students: people link is 'Teachers'");
@@ -63,7 +64,7 @@ ok(courseNavRole(course("assistant")) === "assistant" && courseNavRole(course("t
 ok(hiddenAreaFor(course("student"), "student", `${base}/announcements`) === "announcements", "student: hidden announcements");
 ok(hiddenAreaFor(course("student"), "student", `${base}/files`) === "files", "student: hidden files");
 ok(hiddenAreaFor(course("teacher"), "teacher", `${base}/files`) === null, "staff: never hidden");
-ok(hiddenAreaFor(course("student", { modules: true, files: true, announcements: true }), "student", `${base}/files`) === null, "published: open");
+ok(hiddenAreaFor(course("student", { modules: true, files: true, announcements: true, practice: false }), "student", `${base}/files`) === null, "published: open");
 ok(hiddenAreaFor({ id: cid, my_enrollment: { role: "student" } }, "student", `${base}/files`) === null, "no flags: open");
 
 // safeFrom

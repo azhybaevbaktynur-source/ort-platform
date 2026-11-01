@@ -13,7 +13,7 @@ export const PASSAGE_DISPLAYS = ["plain", "numbered"] as const;
 export const DISPLAY_MODES = ["one_per_page", "scrolling"] as const;
 export const NAVIGATIONS = ["free", "section_forward_only"] as const;
 export const IMPORTER_PROFILES = ["general", "ort"] as const;
-export const QUESTION_TYPES = ["single_choice", "multiple_answers", "true_false", "comparison", "numeric", "short_text", "essay"] as const;
+export const QUESTION_TYPES = ["single_choice", "multiple_answers", "true_false", "comparison", "numeric", "short_text", "essay", "matching", "fill_blank", "ordering"] as const;
 
 export type ResultView = (typeof RESULT_VIEWS)[number];
 export type PassageDisplay = (typeof PASSAGE_DISPLAYS)[number];

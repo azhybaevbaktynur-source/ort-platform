@@ -100,6 +100,12 @@ def reset_lms_state() -> None:
         conn.execute(delete(QuestionDraft.__table__))
         conn.execute(update(QuestionBank.__table__).values(assessment_id=None))
         # --- Phase 7c S1 end ---
+        # --- Phase 10: statistics cache and goals reference versions, questions, courses and enrollments ---
+        from app.lms.progress.models import CourseGoal
+        from app.lms.statistics.models import AssessmentItemStat, AssessmentVersionStats
+
+        for model in (AssessmentItemStat, AssessmentVersionStats, CourseGoal):
+            conn.execute(delete(model.__table__))
         conn.execute(update(Assessment.__table__).values(published_version_id=None))
         conn.execute(delete(AssessmentItem.__table__).where(AssessmentItem.parent_item_id.isnot(None)))
         for model in (AssessmentItem, AssessmentVersion, AssessmentSection, Assessment):
