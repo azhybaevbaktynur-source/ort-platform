@@ -1,0 +1,302 @@
+{
+ "label": "after",
+ "limits": {
+  "ms": 200,
+  "seq_pct": 1.0
+ },
+ "counts": {
+  "users": 6254,
+  "courses": 202,
+  "enrollments": 21457,
+  "assessments": 425,
+  "attempts": 56031,
+  "attempt_items": 1404650,
+  "attempt_sections": 80155,
+  "submissions": 99768,
+  "grade_events": 200000,
+  "module_progress": 127350,
+  "practice_attempts": 50000,
+  "test_enrollments": 230,
+  "database_size": "448 MB"
+ },
+ "rows": {
+  "submissions": 99768,
+  "attempt_items": 1404650,
+  "attempts": 56031,
+  "enrollments": 21457
+ },
+ "load_average": [
+  4.4,
+  9.9,
+  11.3
+ ],
+ "setting": null,
+ "cases": [
+  {
+   "case": "statistics.summary_fresh",
+   "statements": 5,
+   "explained": 5,
+   "service_ms": 6.6,
+   "sql_ms": 1.9,
+   "worst_statement_ms": 1.0,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "statistics.item_page",
+   "statements": 5,
+   "explained": 5,
+   "service_ms": 5.0,
+   "sql_ms": 1.1,
+   "worst_statement_ms": 0.92,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "statistics.refresh_compute_4000",
+   "statements": 4,
+   "explained": 4,
+   "service_ms": 2368.1,
+   "sql_ms": 2726.1,
+   "worst_statement_ms": 1079.15,
+   "verdict": "accepted",
+   "failures": [
+    "1079 ms > 200 ms",
+    "906 ms > 200 ms",
+    "736 ms > 200 ms"
+   ]
+  },
+  {
+   "case": "statistics.refresh_compute_500",
+   "statements": 4,
+   "explained": 4,
+   "service_ms": 316.9,
+   "sql_ms": 344.8,
+   "worst_statement_ms": 124.89,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "analytics.overview_6000",
+   "statements": 7,
+   "explained": 7,
+   "service_ms": 48.2,
+   "sql_ms": 52.4,
+   "worst_statement_ms": 26.54,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "analytics.overview_small",
+   "statements": 7,
+   "explained": 7,
+   "service_ms": 8.1,
+   "sql_ms": 2.2,
+   "worst_statement_ms": 0.91,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "analytics.modules_page",
+   "statements": 4,
+   "explained": 4,
+   "service_ms": 12.5,
+   "sql_ms": 13.1,
+   "worst_statement_ms": 11.77,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "analytics.assignments_page",
+   "statements": 4,
+   "explained": 4,
+   "service_ms": 9.3,
+   "sql_ms": 7.2,
+   "worst_statement_ms": 6.12,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "analytics.quizzes_page",
+   "statements": 3,
+   "explained": 3,
+   "service_ms": 7.8,
+   "sql_ms": 5.6,
+   "worst_statement_ms": 5.58,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "analytics.practice_page",
+   "statements": 3,
+   "explained": 3,
+   "service_ms": 57.3,
+   "sql_ms": 61.1,
+   "worst_statement_ms": 61.08,
+   "verdict": "accepted",
+   "failures": [
+    "Seq Scan attempts: 56031 rows read, 100.0 %"
+   ]
+  },
+  {
+   "case": "org.overview",
+   "statements": 6,
+   "explained": 6,
+   "service_ms": 182.4,
+   "sql_ms": 218.4,
+   "worst_statement_ms": 140.31,
+   "verdict": "accepted",
+   "failures": [
+    "Seq Scan enrollments: 21457 rows read, 100.0 %",
+    "Seq Scan submissions: 99768 rows read, 100.0 %",
+    "Seq Scan enrollments: 21457 rows read, 100.0 %",
+    "Seq Scan submissions: 99768 rows read, 100.0 %",
+    "Seq Scan enrollments: 42914 rows read, 200.0 %",
+    "Seq Scan enrollments: 21457 rows read, 100.0 %"
+   ]
+  },
+  {
+   "case": "org.courses_page",
+   "statements": 5,
+   "explained": 5,
+   "service_ms": 62.2,
+   "sql_ms": 62.3,
+   "worst_statement_ms": 21.13,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "org.courses_page_department",
+   "statements": 6,
+   "explained": 6,
+   "service_ms": 42.9,
+   "sql_ms": 43.4,
+   "worst_statement_ms": 14.69,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "org.quizzes_page",
+   "statements": 3,
+   "explained": 3,
+   "service_ms": 7.3,
+   "sql_ms": 5.5,
+   "worst_statement_ms": 5.12,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "progress.mistakes_open_heavy",
+   "statements": 5,
+   "explained": 4,
+   "service_ms": 11.8,
+   "sql_ms": 5.5,
+   "worst_statement_ms": 5.26,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "progress.mistakes_fixed_heavy",
+   "statements": 5,
+   "explained": 4,
+   "service_ms": 10.7,
+   "sql_ms": 5.7,
+   "worst_statement_ms": 5.49,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "progress.mistakes_page2_heavy",
+   "statements": 10,
+   "explained": 7,
+   "service_ms": 21.3,
+   "sql_ms": 12.8,
+   "worst_statement_ms": 6.43,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "progress.mistakes_open_typical",
+   "statements": 6,
+   "explained": 5,
+   "service_ms": 7.3,
+   "sql_ms": 0.7,
+   "worst_statement_ms": 0.49,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "progress.progress_heavy",
+   "statements": 8,
+   "explained": 7,
+   "service_ms": 12.0,
+   "sql_ms": 6.3,
+   "worst_statement_ms": 2.96,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "progress.progress_typical",
+   "statements": 8,
+   "explained": 7,
+   "service_ms": 5.9,
+   "sql_ms": 0.7,
+   "worst_statement_ms": 0.29,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "progress.mistakes_open_busiest",
+   "statements": 5,
+   "explained": 4,
+   "service_ms": 11.9,
+   "sql_ms": 5.8,
+   "worst_statement_ms": 5.57,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "progress.progress_busiest",
+   "statements": 8,
+   "explained": 7,
+   "service_ms": 11.6,
+   "sql_ms": 6.3,
+   "worst_statement_ms": 2.96,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "home.home_heavy",
+   "statements": 12,
+   "explained": 12,
+   "service_ms": 22.2,
+   "sql_ms": 1.8,
+   "worst_statement_ms": 0.52,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "home.home_typical",
+   "statements": 13,
+   "explained": 13,
+   "service_ms": 22.0,
+   "sql_ms": 1.1,
+   "worst_statement_ms": 0.29,
+   "verdict": "ok",
+   "failures": []
+  },
+  {
+   "case": "retention.dry_run",
+   "statements": 2,
+   "explained": 2,
+   "service_ms": 27.1,
+   "sql_ms": 42.4,
+   "worst_statement_ms": 42.27,
+   "verdict": "accepted",
+   "failures": [
+    "Seq Scan attempts: 56030 rows read, 100.0 %",
+    "Seq Scan attempts: 56032 rows read, 100.0 %"
+   ]
+  }
+ ]
+}

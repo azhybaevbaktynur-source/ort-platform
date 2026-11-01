@@ -5,6 +5,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.config import settings
+from app.lms.core import ratelimit
 from app.lms.core.models import utcnow
 from app.lms.courses.models import Course
 from app.lms.enrollments.models import Enrollment, EnrollmentEvent
@@ -69,6 +70,9 @@ async def test_user_rate_limit_429(db, api):
 
 async def test_ip_failure_limit_counts_failures_only(db, api, monkeypatch):
     monkeypatch.setattr(settings, "RATE_LIMIT_IP_ENFORCE", True, raising=False)
+    # A frozen clock: 122 calls may otherwise straddle a 10-minute window and start counting from zero again.
+    fixed = ratelimit._now()
+    monkeypatch.setattr(ratelimit, "_now", lambda: fixed)
     t = teacher(db)
     c = make_course(db, t, status="published")
     ip = "5.5.5.5"

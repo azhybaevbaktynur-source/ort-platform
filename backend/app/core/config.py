@@ -1,5 +1,6 @@
 import json
-from typing import Annotated, List, Union
+from datetime import datetime
+from typing import Annotated, List, Optional, Union
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
@@ -43,11 +44,12 @@ class Settings(BaseSettings):
     # JWT Authentication
     SECRET_KEY: str = "ort_secret_jwt_key_2026_super_secure_academic_prep"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 3  # 3 days, rolling: POST /auth/refresh (PHASE_11_DESIGN 5.2)
 
-    # Number of trusted proxies appending to X-Forwarded-For (Vercel rewrite -> Render = 2); 0 = ignore the header
+    # Number of trusted proxies appending to X-Forwarded-For; 0 = ignore the header. Not verified yet: the browser calls
+    # Render directly, so 2 is probably wrong. docs/runbooks/IP_CHAIN.md finds the real value.
     RATE_LIMIT_PROXY_HOPS: int = 2
-    # IP-keyed rate-limit rules count and log but never deny until the proxy chain is verified.
+    # IP-keyed rate-limit rules count and log but never deny until the proxy chain is verified (IP_CHAIN.md; kill switch).
     RATE_LIMIT_IP_ENFORCE: bool = False
 
     # --- Phase 2: files and content library (docs/phases/PHASE_2_DESIGN.md) ---
@@ -201,6 +203,17 @@ class Settings(BaseSettings):
     # --- Phase 8b S1 begin --- (exam template preview, docs/phases/PHASE_8B_DESIGN.md 5.1, P8B-2)
     SANDBOX_PREVIEW_KEEP: int = 20  # finished preview attempts kept per author on a template's sample quiz
     # --- Phase 8b S1 end ---
+    # --- Phase 11 S1 begin --- (docs/phases/PHASE_11_DESIGN.md 2; defaults of the owner questions in 9)
+    PRIVACY_UNDER14_GATE: bool = True  # restrict an under-14 account until a parent consents
+    PRIVACY_LEGACY_DEADLINE: Optional[datetime] = None  # legacy accounts past this are gated; None: never
+    PRIVACY_LEGACY_GRACE_DAYS: int = 30  # days before the gate closes on an existing account that turns out under 14
+    DATA_REQUEST_DUE_DAYS: int = 30
+    GUARDIAN_PAIRING_TTL_HOURS: int = 24
+    PRACTICE_RETENTION_DAYS: int = 0  # 0 = off
+    SECRET_KEY_PREVIOUS: str = ""
+    SENTRY_DSN: str = ""
+    LOG_SAMPLE_2XX: float = 0.1
+    # --- Phase 11 S1 end ---
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -212,3 +225,10 @@ DEFAULT_SECRET_KEY = "ort_secret_jwt_key_2026_super_secure_academic_prep"
 
 def is_production() -> bool:
     return settings.ENVIRONMENT.strip().lower() == "production"
+
+
+def refuse_unsafe_secret_keys() -> None:
+    """Phase 11 S4 (PHASE_11_DESIGN 5.2): production never starts on the public default key, as the current key or as
+    the previous one: anyone could forge login tokens with it."""
+    if is_production() and DEFAULT_SECRET_KEY in (settings.SECRET_KEY, settings.SECRET_KEY_PREVIOUS):
+        raise RuntimeError("SECRET_KEY or SECRET_KEY_PREVIOUS is the public default from the repository. Set SECRET_KEY.")

@@ -35,12 +35,20 @@ class User(Base):
     # UX rework S1: the per-course test student of Student view (app/lms/student_view); never signs in, limited by a
     # deny-by-default route allow-list and excluded from every staff list, count and lock
     is_test_student = Column(Boolean, default=False, nullable=False, server_default=sa.false())
+    # Phase 11 S1 (PHASE_11_DESIGN 2): `legacy` = existing account, nothing restricted; see app/lms/privacy/gate.py
+    consent_state = Column(String(20), default="legacy", nullable=False, server_default="legacy")
+    consent_due_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)  # the row stays as a tombstone (privacy/anonymize.py)
+    token_version = Column(Integer, default=0, nullable=False, server_default="0")
 
     __table_args__ = (
         CheckConstraint("teacher_status IN ('none','pending','approved','revoked')", name="teacher_status_valid"),
         CheckConstraint("locale IS NULL OR locale IN ('en','ru','ky')", name="locale_valid"),
         CheckConstraint(
             "age_band IS NULL OR age_band IN ('under_14','14_17','18_plus')", name="age_band_valid"
+        ),
+        CheckConstraint(
+            "consent_state IN ('legacy','ok','pending_guardian','exempt')", name="consent_state_valid"
         ),
         Index("ix_users_teacher_status", "teacher_status"),
     )

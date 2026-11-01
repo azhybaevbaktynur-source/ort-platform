@@ -7,6 +7,7 @@ import { AuthHeader } from "@/components/auth/AuthHeader";
 import { Button, Input, buttonClasses } from "@/components/ui";
 import { useBackendWarmup } from "@/lib/useBackendWarmup";
 import { Mail, ArrowRight, AlertCircle, CheckCircle2 } from "lucide-react";
+import { API_BASE_URL } from "@/lib/apiBase";
 
 function ForgotPasswordForm() {
   const { lang, t } = useTranslation();
@@ -24,7 +25,7 @@ function ForgotPasswordForm() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/v1/auth/forgot-password", {
+      const res = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim(), lang }),
@@ -32,12 +33,12 @@ function ForgotPasswordForm() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || t("auth.forgotFailed"));
+        throw new Error(res.status === 429 ? t("auth.errors.rate_limited") : err.detail || t("auth.forgotFailed"));
       }
 
       setSuccess(true);
     } catch (err: any) {
-      setError(err?.message || t("auth.forgotFailed"));
+      setError(err instanceof TypeError ? t("auth.errors.network") : err?.message || t("auth.forgotFailed"));
     } finally {
       setLoading(false);
     }

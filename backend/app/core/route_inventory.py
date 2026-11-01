@@ -155,6 +155,16 @@ from app.lms.student_view.policies import STUDENT_VIEW_POLICIES  # noqa: E402
 
 ROUTE_POLICIES.update(STUDENT_VIEW_POLICIES)
 # --- UX rework S1 end ---
+# --- Phase 11 S1 begin --- (privacy; the other dicts are empty until S2, S4 and S5 fill them)
+from app.lms.core.security_policies import SECURITY_POLICIES  # noqa: E402
+from app.lms.guardian.policies import GUARDIAN_POLICIES  # noqa: E402
+from app.lms.practice.retention_router import RETENTION_POLICIES  # noqa: E402
+from app.lms.privacy.route_policies import PRIVACY_POLICIES  # noqa: E402
+from app.lms.student_view.sweep_router import SWEEP_POLICIES  # noqa: E402
+
+for _d in (PRIVACY_POLICIES, GUARDIAN_POLICIES, RETENTION_POLICIES, SWEEP_POLICIES, SECURITY_POLICIES):
+    ROUTE_POLICIES.update(_d)
+# --- Phase 11 S1 end ---
 
 
 def iter_routes(app):

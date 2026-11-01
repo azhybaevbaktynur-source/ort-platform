@@ -1,0 +1,5 @@
+{
+  "privacy": {"version": 1, "status": "draft_legal_review", "requires_reconsent": false},
+  "terms": {"version": 1, "status": "draft_legal_review", "requires_reconsent": false},
+  "guardian_consent": {"version": 1, "status": "draft_legal_review", "requires_reconsent": false}
+}

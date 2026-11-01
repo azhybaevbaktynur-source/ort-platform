@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { getStudentView, leaveStudentView } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/apiBase";
 
 /** Minimal signed-in user (the app authenticates with its own backend JWT, not Firebase). */
 export interface AuthUser {
@@ -22,6 +23,14 @@ export interface AuthUserProfile {
   locale?: string;
   /** Student view: this tab is the course's test student (UX rework S1). */
   is_test_student?: boolean;
+  /** Phase 11: has an active link to a student; shows the Parent area. */
+  is_guardian?: boolean;
+}
+
+/** Phase 11 S3: the age step of the sign-up form (PHASE_11_DESIGN 3.2). */
+export interface SignUpConsent {
+  ageBand: string;
+  policyVersionIds: string[];
 }
 
 export interface RegisterResult {
@@ -52,7 +61,7 @@ interface AuthContextType {
   userProfile: AuthUserProfile | null;
   loading: boolean;
   signIn: (email: string, pass: string) => Promise<void>;
-  signUp: (email: string, pass: string, displayName: string, phone?: string) => Promise<RegisterResult>;
+  signUp: (email: string, pass: string, displayName: string, phone: string | undefined, consent: SignUpConsent) => Promise<RegisterResult>;
   verifyEmail: (email: string, pass: string, code: string) => Promise<void>;
   resendCode: (email: string) => Promise<{ resendAfterSeconds: number }>;
   signOut: () => Promise<void>;
@@ -81,6 +90,7 @@ function toProfile(u: any): AuthUserProfile {
     teacher_status: u.teacher_status || "none",
     locale: u.locale || undefined,
     is_test_student: Boolean(u.is_test_student),
+    is_guardian: Boolean(u.is_guardian),
   };
 }
 
@@ -93,8 +103,10 @@ function toAuthUser(profile: AuthUserProfile, token: string): AuthUser {
   };
 }
 
+// Phase 11 S4: directly to the API, like every other call. Through the Vercel rewrite all students would share a few
+// Vercel addresses, and one school's failed logins would count against everyone (docs/runbooks/IP_CHAIN.md).
 async function postJson(path: string, body: unknown): Promise<any> {
-  const res = await fetch(path, {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -199,7 +211,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (res.ok) {
           const data = await res.json();
           const profile = toProfile(data);
-          startSession(storedToken, profile);
+          // Phase 11 S4: TokenRefresh may have swapped the token while this was on its way
+          startSession(localStorage.getItem("ort_token") ?? storedToken, profile);
         }
       } catch (e) {
         // Network problem: keep the cached session; the backend still checks the token on every call.
@@ -216,27 +229,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signIn = async (email: string, pass: string): Promise<void> => {
-    const data = await postJson("/api/v1/auth/login", { email: email.trim(), password: pass, lang });
+    const data = await postJson("/auth/login", { email: email.trim(), password: pass, lang });
     finishLogin(data);
   };
 
-  const signUp = async (email: string, pass: string, displayName: string, phone?: string): Promise<RegisterResult> => {
-    return postJson("/api/v1/auth/register", {
+  const signUp = async (email: string, pass: string, displayName: string, phone: string | undefined, consent: SignUpConsent): Promise<RegisterResult> => {
+    return postJson("/auth/register", {
       email: email.trim(),
       password: pass,
       displayName: displayName.trim(),
       phone: phone?.trim() || undefined,
       lang,
+      ageBand: consent.ageBand,
+      policyVersionIds: consent.policyVersionIds,
     });
   };
 
   const verifyEmail = async (email: string, pass: string, code: string): Promise<void> => {
-    const data = await postJson("/api/v1/auth/verify-email", { email: email.trim(), password: pass, code: code.trim() });
+    const data = await postJson("/auth/verify-email", { email: email.trim(), password: pass, code: code.trim() });
     finishLogin(data);
   };
 
   const resendCode = async (email: string): Promise<{ resendAfterSeconds: number }> => {
-    return postJson("/api/v1/auth/resend-code", { email: email.trim(), lang });
+    return postJson("/auth/resend-code", { email: email.trim(), lang });
   };
 
   const signOut = async () => {

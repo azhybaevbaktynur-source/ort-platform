@@ -92,7 +92,8 @@
       "too_many_attempts": "Too many incorrect attempts. Request a new code.",
       "resend_cooldown": "Please wait {retryAfterSeconds} s before resending.",
       "email_send_failed": "Could not send the email. Please try again a bit later.",
-      "network": "The server is not responding. It may be waking up, so try again in a few seconds."
+      "network": "The server is not responding. It may be waking up, so try again in a few seconds.",
+      "rate_limited": "Too many attempts. Please wait a bit and try again."
     },
     "wakingServer": "The server is waking up after being idle, so the first login may take up to a minute...",
     "resetInvalidToken": "Invalid link or token not found",
@@ -5359,6 +5360,219 @@
       "course": "Course",
       "department": "Department",
       "submittedCount": "Submitted"
+    }
+  },
+  "privacy": {
+    "nav": {
+      "parent": "Parent"
+    },
+    "title": "Privacy",
+    "confirm": "Confirm",
+    "draftBadge": "Draft: awaiting legal review",
+    "parentLink": "I'm a parent",
+    "parentOpen": "Enter a code",
+    "age": {
+      "question": "How old are you?",
+      "label": "Age",
+      "change": "Change",
+      "under_14": "Under 14",
+      "14_17": "14–17",
+      "18_plus": "18 or older"
+    },
+    "accept": {
+      "label": "I accept the {privacy} and {terms}",
+      "privacy": "privacy policy",
+      "terms": "terms of use"
+    },
+    "policies": {
+      "privacy": "Privacy policy",
+      "terms": "Terms of use",
+      "guardian_consent": "Parent consent",
+      "notFound": "Document not found"
+    },
+    "banner": {
+      "age": "Confirm your age",
+      "accept": "Accept the updated documents",
+      "parent": "Parent consent needed by {date}"
+    },
+    "code": {
+      "title": "Give this code to a parent",
+      "get": "Get code",
+      "new": "New code",
+      "valid": "Valid until {date}",
+      "due": "Needed by {date}",
+      "check": "Check again"
+    },
+    "documents": {
+      "title": "Documents",
+      "accepted": "Accepted",
+      "missing": "Not accepted",
+      "accept": "Accept"
+    },
+    "parents": {
+      "title": "Parents",
+      "none": "No parents linked",
+      "remove": "Remove",
+      "removeTitle": "Remove this parent?",
+      "removeEffect": "They will no longer see your grades.",
+      "holdsConsent": "Gave consent"
+    },
+    "data": {
+      "title": "Your data",
+      "download": "Download my data",
+      "delete": "Delete account",
+      "deleteTitle": "Delete your account?",
+      "deleteEffect": "An admin carries this out. Your name, email, phone and hand-ins are erased; grades stay without your name."
+    },
+    "requests": {
+      "title": "Requests",
+      "cancel": "Cancel",
+      "kind": {
+        "export": "Data download",
+        "delete": "Account deletion"
+      },
+      "status": {
+        "pending": "Pending",
+        "completed": "Done",
+        "rejected": "Rejected",
+        "cancelled": "Cancelled"
+      }
+    },
+    "admin": {
+      "title": "Data requests",
+      "filter": "Filter requests",
+      "filters": {
+        "pending": "Pending",
+        "all": "All"
+      },
+      "empty": "No requests",
+      "person": "Person",
+      "kind": "Kind",
+      "due": "Due",
+      "status": "Status",
+      "actions": "Actions",
+      "overdue": "Overdue",
+      "run": "Run",
+      "reject": "Reject",
+      "runTitle": "Delete this account?",
+      "runEffect": "Name, email, phone and hand-ins are erased. This cannot be undone.",
+      "rejectTitle": "Reject this request?",
+      "rejectEffect": "The person sees the reason.",
+      "rejectReason": "Reason",
+      "rejectCodes": {
+        "identity_unverified": "Identity not confirmed",
+        "legal_obligation": "Must be kept by law",
+        "duplicate": "Duplicate request"
+      },
+      "ranToast": "Account deleted",
+      "rejectedToast": "Request rejected"
+    },
+    "errors": {
+      "consent_required": "A parent must confirm first",
+      "age_band_required": "Choose your age",
+      "age_band_set": "Your age is already set",
+      "policy_not_accepted": "Accept the documents",
+      "policy_not_current": "Documents changed. Reload the page",
+      "guardian_consent_required": "A parent consents for this account",
+      "password_required": "Enter your password",
+      "password_incorrect": "Wrong password",
+      "request_open": "This request is already open",
+      "request_not_pending": "This request is closed",
+      "request_not_export": "Only a data download can be saved",
+      "request_not_executable": "A download completes by itself",
+      "data_request_not_found": "Request not found",
+      "reject_code_invalid": "Choose a reason",
+      "user_deleted": "This account was deleted",
+      "delete_blocked_platform_admin": "Remove admin rights first",
+      "delete_blocked_owns_courses": "Transfer their courses first",
+      "delete_blocked_open_attempts": "An attempt is still open",
+      "delete_blocked_test_student": "Test student",
+      "guardian_holds_consent": "This parent is the only one who gave consent",
+      "guardian_limit": "Too many parents linked"
+    }
+  },
+  "guardian": {
+    "title": "Parent",
+    "back": "Parent",
+    "students": "Linked students",
+    "noStudents": "No linked students yet.",
+    "needsConsent": "Needs consent",
+    "code": {
+      "label": "Student's code",
+      "hint": "The student gets it under My data.",
+      "submit": "Link"
+    },
+    "adultOnly": {
+      "title": "For adult accounts",
+      "body": "Confirm your age to continue.",
+      "action": "My data"
+    },
+    "tabs": {
+      "label": "Student information",
+      "grades": "Grades",
+      "due": "Due",
+      "announcements": "Announcements"
+    },
+    "course": "Course",
+    "noCourses": "No courses yet.",
+    "dueOn": "Due {date}",
+    "noDate": "No due date",
+    "grades": {
+      "empty": "No grades yet.",
+      "total": "Course total: {percent}%",
+      "points": "{points} / {possible}"
+    },
+    "due": {
+      "empty": "Nothing due."
+    },
+    "announcements": {
+      "empty": "No announcements."
+    },
+    "state": {
+      "graded": "Graded",
+      "pending": "Waiting",
+      "submitted": "Handed in",
+      "missing": "Missing",
+      "excused": "Excused",
+      "hidden": "Not shown",
+      "not_started": "Not started"
+    },
+    "consent": {
+      "title": "Consent",
+      "body": "{name} is under 14. The account stays closed until a parent consents.",
+      "read": "Read the consent text",
+      "draft": "Draft: awaiting legal review",
+      "confirm": "I consent",
+      "held": "You gave consent."
+    },
+    "withdraw": {
+      "action": "Withdraw consent",
+      "title": "Withdraw consent?",
+      "effect": "If no other parent holds consent, this account closes at once."
+    },
+    "remove": {
+      "action": "Remove link",
+      "title": "Remove this link?",
+      "effect": "You stop seeing this student, and your consent ends. If no other parent holds consent, a student under 14 loses access at once."
+    },
+    "delete": {
+      "action": "Ask to delete account",
+      "title": "Ask to delete this account?",
+      "effect": "An administrator reviews the request. Deleting an account cannot be undone.",
+      "sent": "Request sent. It will be handled by {date}."
+    },
+    "errors": {
+      "invalid_code": "This code does not work. Ask the student for a new one.",
+      "already_linked": "This student is already linked.",
+      "guardian_limit": "Too many links for this student or this account.",
+      "guardian_must_be_adult": "Only an adult account can be a parent.",
+      "guardian_link_not_found": "This link no longer exists.",
+      "consent_required": "A parent's consent is needed first.",
+      "consent_not_needed": "This student does not need a parent's consent.",
+      "policy_not_current": "The consent text has changed. Reload the page.",
+      "guardian_not_holder": "Only the parent who gave consent can ask for this.",
+      "request_open": "A request is already open.",
+      "pairing_busy": "Try again."
     }
   }
 }

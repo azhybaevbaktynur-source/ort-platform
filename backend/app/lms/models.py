@@ -52,3 +52,7 @@ from app.lms.enrollment_forms.models import (  # noqa: F401,E402
 from app.lms.progress.models import CourseGoal  # noqa: F401,E402
 from app.lms.statistics.models import AssessmentItemStat, AssessmentVersionStats  # noqa: F401,E402
 # --- Phase 10 S0 end ---
+# --- Phase 11 S1 begin ---
+from app.lms.privacy.models import ConsentRecord, DataRequest, PolicyVersion  # noqa: F401,E402
+from app.lms.guardian.models import GuardianLink, GuardianPairingCode  # noqa: F401,E402
+# --- Phase 11 S1 end ---

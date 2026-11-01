@@ -2,6 +2,7 @@ import React from "react";
 import { LanguageProvider, Language } from "@/lib/i18n/context";
 import { AuthProvider } from "@/lib/auth-context";
 import { ToastProvider } from "@/components/ui/Toast";
+import { TokenRefresh } from "@/lib/tokenRefresh";
 import type { Metadata } from "next";
 import enDict from "@/lib/i18n/en.json";
 import kyDict from "@/lib/i18n/ky.json";
@@ -35,6 +36,7 @@ export default async function LangLayout({
   return (
     <LanguageProvider initialLang={currentLang}>
       <AuthProvider>
+        <TokenRefresh />
         <ToastProvider>
           {children}
         </ToastProvider>

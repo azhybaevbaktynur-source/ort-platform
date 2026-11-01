@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.lms.core.errors import Conflict, LMSError, NotFound, ValidationFailed
+from app.lms.core.models import utcnow
 from app.lms.core.pagination import Page, paginate
 from app.lms.files import scopes, usage
 from app.lms.files.images import EncodedImage, encode_image
@@ -119,6 +120,12 @@ def check_import_caps(db: Session, owner_id: str, new_blobs: dict[str, int], new
                           details={"stored_bytes": total, "limit_bytes": settings.ASSET_DB_MAX_TOTAL_BYTES})
 
 
+def _referenced_keys(db: Session, keys: list[str]) -> set[str]:
+    """Keys of `keys` a live asset row points at. An erased asset no longer counts; a soft-deleted one does (a hand-in
+    stays readable after its owner deleted the asset)."""
+    return set(db.scalars(select(Asset.storage_key).where(Asset.storage_key.in_(keys), Asset.erased_at.is_(None))))
+
+
 def delete_unreferenced_blobs(db: Session, keys: Iterable[str]) -> int:
     """Best effort: delete blobs (written by a failed import) that no asset row references. Never raises."""
     keys = list(dict.fromkeys(keys))
@@ -127,7 +134,7 @@ def delete_unreferenced_blobs(db: Session, keys: Iterable[str]) -> int:
         storage = get_blob_storage()
         for i in range(0, len(keys), 500):
             chunk = keys[i:i + 500]
-            used = set(db.scalars(select(Asset.storage_key).where(Asset.storage_key.in_(chunk))))
+            used = _referenced_keys(db, chunk)
             for k in chunk:
                 if k not in used:
                     n = storage.delete(k)
@@ -138,6 +145,45 @@ def delete_unreferenced_blobs(db: Session, keys: Iterable[str]) -> int:
         log.exception("could not clean up blobs of a failed import")
     try:
         usage.record_removed(freed, deleted)  # only what the driver really deleted (never on r2)
+    except Exception:
+        log.exception("could not update the storage counter")
+    return removed
+
+
+def erase_asset(db: Session, asset: Asset) -> tuple[str, int]:
+    """Phase 11 S1 (PHASE_11_DESIGN 3.4): personal-data erasure of one asset, in the caller's transaction. Marks the row
+    and returns (storage key, bytes) for `remove_erased_blobs`, which the caller runs AFTER its commit: removing a blob
+    cannot be rolled back. Shared by account deletion and the test-student sweep. Does not commit."""
+    asset.erased_at = utcnow()
+    asset.original_filename = "erased"
+    return asset.storage_key, int(asset.bytes)
+
+
+def remove_erased_blobs(db: Session, blobs: dict[str, int]) -> int:
+    """Remove the blobs of erased assets (key -> bytes) that no other live asset references. Blobs are
+    content-addressed, so another owner's identical file keeps the blob. Here, unlike orphan cleanup, the R2 object goes
+    too: the database has just proved nothing points at it. Updates the usage ledger. Best effort, never raises: a
+    failure leaves an unreferenced blob (the orphan sweep takes it on db/local; logged for r2)."""
+    removed = freed = 0
+    try:
+        storage = get_blob_storage()
+        keys = list(blobs)
+        for i in range(0, len(keys), 500):
+            chunk = keys[i:i + 500]
+            used = _referenced_keys(db, chunk)
+            for k in chunk:
+                if k in used:
+                    continue
+                n = storage.delete(k)
+                if not n and hasattr(storage, "delete_object_unsafe"):
+                    storage.delete_object_unsafe(k)  # r2: delete() is a no-op
+                    n = blobs[k]
+                if n:
+                    removed, freed = removed + 1, freed + n
+    except Exception:
+        log.exception("could not remove the blobs of erased assets")
+    try:
+        usage.record_removed(freed, removed)
     except Exception:
         log.exception("could not update the storage counter")
     return removed
@@ -158,7 +204,7 @@ def sweep_orphan_blobs(db: Session, *, min_age_seconds: Optional[int] = None) ->
     try:
         for i in range(0, len(keys), 500):
             chunk = keys[i:i + 500]
-            used = set(db.scalars(select(Asset.storage_key).where(Asset.storage_key.in_(chunk))))
+            used = _referenced_keys(db, chunk)
             for k in chunk:
                 if k not in used:
                     n = storage.delete(k)
@@ -341,7 +387,8 @@ def list_my_assets(db: Session, actor: User, cursor: Optional[str], limit: Optio
 
 def load_my_asset(db: Session, actor: User, asset_id: uuid.UUID) -> Asset:
     a = db.execute(
-        select(Asset).where(Asset.id == asset_id, Asset.owner_id == actor.id, Asset.deleted_at.is_(None))
+        select(Asset).where(Asset.id == asset_id, Asset.owner_id == actor.id, Asset.deleted_at.is_(None),
+                            Asset.erased_at.is_(None))
     ).scalar_one_or_none()
     if a is None:
         raise NotFound("Asset not found", code="asset_not_found")

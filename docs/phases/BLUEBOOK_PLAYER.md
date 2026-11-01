@@ -21,3 +21,8 @@ Decisions: "Hide" is view-only and per attempt tab; a hidden timer shows itself 
 
 ## Proof
 Backend untouched: ORT parity job, golden and scoring tests stay green with no change. `frontend/e2e/ort.spec.ts` keeps every behaviour assertion (section order and counts, timer, flag and answer state, comparison columns, line numbers, forward-only, result); `ort-exam.ts` helpers follow the new controls. New approved baselines for the player screens only (lobby, result, answer review and teacher screens must not change); add `review-page`.
+
+## Report
+Deployed 2026-11-02 (`main` 10c0855, frontend only, no backend file changed). 52 browser tests passed, ORT DOM walk green, zero pixel differences against the new baselines; CI six jobs green, including ORT parity. Only one `ort.spec` assertion changed, on phones: "Finish" pinned in the sheet became "Go to review" pinned, and focus returns to Finish. New approved baselines: comparison, flagged palette, passage, section end, submit, review page, and the general one-per-page and scrolling screens, viewed by the orchestrator. Lobby, result, answer review and teacher screens unchanged.
+Production (QA student, practice set, ru, 375 / 1440 / 1920): top bar, question popup, review page, no sideways scroll, no page errors. Timed ORT sections, the passage split and forward-only flow were verified locally only (the QA student isn't enrolled in ORT).
+Choices: questions capped at `max-w-4xl` with bars full width; Directions closed by default; the Student view banner also shows inside the player.

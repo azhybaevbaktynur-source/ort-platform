@@ -43,6 +43,12 @@ class LengthRequired(LMSError):
     code = "length_required"
 
 
+class AssetErased(LMSError):
+    """Phase 11 S1: the hand-in row stays (immutable grades point at it), its file was erased with the account."""
+    status_code = 410
+    code = "asset_erased"
+
+
 def submission_not_found() -> NotFound:
     return NotFound("Submission not found", code="submission_not_found")
 
@@ -182,6 +188,8 @@ def load_download(ctx: AuthzContext, course_id: uuid.UUID, submission_id: uuid.U
     asset = db.get(Asset, asset_id)
     if asset is None:
         raise NotFound("File not found", code="asset_not_found")
+    if asset.erased_at is not None:
+        raise AssetErased("This file was erased")
     return asset  # a hand-in stays readable even if its owner later deleted the asset (hand-ins are append-only)
 
 

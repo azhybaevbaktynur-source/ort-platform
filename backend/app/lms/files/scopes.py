@@ -13,7 +13,7 @@ def _like_escape(q: str) -> str:
 
 
 def my_assets(user_id: str, q: Optional[str] = None) -> Select:
-    stmt = select(Asset).where(Asset.owner_id == user_id, Asset.deleted_at.is_(None))
+    stmt = select(Asset).where(Asset.owner_id == user_id, Asset.deleted_at.is_(None), Asset.erased_at.is_(None))
     if q:
         stmt = stmt.where(Asset.original_filename.ilike(f"%{_like_escape(q.strip())}%", escape="\\"))
     return stmt

@@ -1,0 +1,159 @@
+{
+ "label": "n3000b",
+ "autosave_students": 3000,
+ "readers": 60,
+ "steady_s": 180,
+ "ramp_s": 120,
+ "procs": 4,
+ "server_env": {
+  "workers": "2",
+  "pool": "10+10",
+  "tokens": "20"
+ },
+ "counters": {
+  "started_ok": 3000,
+  "gen_cpu_s": 117.60000000000001
+ },
+ "endpoints": {
+  "analytics_modules": {
+   "n": 147,
+   "rps": 0.9,
+   "p50_ms": 30.39,
+   "p95_ms": 198.52,
+   "p99_ms": 479.89,
+   "max_ms": 680.21,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "analytics_overview": {
+   "n": 148,
+   "rps": 0.9,
+   "p50_ms": 75.29,
+   "p95_ms": 227.57,
+   "p99_ms": 314.44,
+   "max_ms": 369.96,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "analytics_quizzes": {
+   "n": 144,
+   "rps": 0.9,
+   "p50_ms": 23.24,
+   "p95_ms": 217.52,
+   "p99_ms": 353.41,
+   "max_ms": 392.38,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "autosave": {
+   "n": 26879,
+   "rps": 149.3,
+   "p50_ms": 17.15,
+   "p95_ms": 248.58,
+   "p99_ms": 1181.09,
+   "max_ms": 6228.8,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "content": {
+   "n": 21,
+   "rps": 21.0,
+   "p50_ms": 565.9,
+   "p95_ms": 626.57,
+   "p99_ms": 652.95,
+   "max_ms": 652.95,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "home": {
+   "n": 617,
+   "rps": 3.4,
+   "p50_ms": 42.22,
+   "p95_ms": 501.27,
+   "p99_ms": 1281.02,
+   "max_ms": 5646.26,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "notebook": {
+   "n": 605,
+   "rps": 3.4,
+   "p50_ms": 31.22,
+   "p95_ms": 294.6,
+   "p99_ms": 1044.11,
+   "max_ms": 2231.8,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "org_courses": {
+   "n": 146,
+   "rps": 0.8,
+   "p50_ms": 100.71,
+   "p95_ms": 344.47,
+   "p99_ms": 638.17,
+   "max_ms": 686.3,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "org_overview": {
+   "n": 150,
+   "rps": 0.8,
+   "p50_ms": 254.41,
+   "p95_ms": 903.74,
+   "p99_ms": 1812.06,
+   "max_ms": 3474.01,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "org_quizzes": {
+   "n": 142,
+   "rps": 0.8,
+   "p50_ms": 21.25,
+   "p95_ms": 93.91,
+   "p99_ms": 172.25,
+   "max_ms": 309.5,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "progress": {
+   "n": 592,
+   "rps": 3.4,
+   "p50_ms": 26.1,
+   "p95_ms": 164.78,
+   "p99_ms": 357.07,
+   "max_ms": 931.76,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "statistics": {
+   "n": 154,
+   "rps": 0.9,
+   "p50_ms": 25.8,
+   "p95_ms": 1196.94,
+   "p99_ms": 4145.47,
+   "max_ms": 5484.45,
+   "err_pct": 0.0,
+   "codes": {}
+  },
+  "statistics_items": {
+   "n": 151,
+   "rps": 0.9,
+   "p50_ms": 26.59,
+   "p95_ms": 488.6,
+   "p99_ms": 1287.19,
+   "max_ms": 1635.48,
+   "err_pct": 0.0,
+   "codes": {}
+  }
+ },
+ "requests_steady": 29896,
+ "server_cpu_cores": 0.88,
+ "postgres_cpu_cores": 0.13,
+ "server_rss_mb_max": 159,
+ "machine_load1_max": 8.52,
+ "machine_load1_mean": 6.2,
+ "verify": {
+  "acks": 62512,
+  "lost": 0
+ }
+}
