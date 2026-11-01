@@ -127,7 +127,7 @@ export default function PrivacyPage() {
   const title = t("privacy.title");
   if (!state) {
     return (
-      <div className="mx-auto max-w-2xl">
+      <div className="max-w-3xl">
         <PageHeader title={title} />
         {error ? <ErrorState message={privacyErrorText(t, error)} onRetry={() => void load()} /> : <LoadingState label={t("lms.common.loading")} />}
       </div>
@@ -136,7 +136,7 @@ export default function PrivacyPage() {
 
   if (state.consent_state === "pending_guardian") {
     return (
-      <div className="mx-auto max-w-2xl">
+      <div className="max-w-3xl">
         <PageHeader title={title} />
         <PrivacyError error={error} className="mb-3" />
         <NeedsParent state={state} onCheck={load} />
@@ -145,7 +145,7 @@ export default function PrivacyPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="max-w-3xl">
       <PageHeader title={title} />
       <div className="space-y-4">
         {state.age_band === null ? <ChooseAge onDone={setState} /> : (
