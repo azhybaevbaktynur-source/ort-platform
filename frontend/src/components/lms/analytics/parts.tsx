@@ -50,7 +50,7 @@ export function ScoreAndSubmissions({ score, submissions, extra }: {
       <section className="mt-6" aria-labelledby="an-dist">
         <h2 id="an-dist" className="text-base font-semibold text-slate-900">{t("analytics.distribution")}</h2>
         {score.count > 0
-          ? <div className="mt-2"><Histogram distribution={score.distribution} label={t("analytics.distribution")} /></div>
+          ? <div className="mt-2"><Histogram buckets={score.distribution} /></div>
           : <p className="mt-2 text-sm text-slate-600">{t("analytics.noScores")}</p>}
       </section>
     </>
