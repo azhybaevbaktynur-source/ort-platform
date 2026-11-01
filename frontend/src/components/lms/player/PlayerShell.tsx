@@ -34,6 +34,7 @@ import { ClosedDialog, SectionEndDialog, SubmitDialog, TimeUpDialog } from "./Pl
 import { isAnswered, isTypingTarget, itemPassage, itemQuestion, mergeContent, type ResponseObj } from "./playerUtils";
 import { ScrollingItems, type ScrollRequest } from "./ScrollingItems"; // Phase 8b S3
 import { useReturnPath, withReturn } from "./returnPath"; // Phase 8b S3
+import { PracticeCheck, usePracticeFeedback } from "@/components/lms/practice/PracticeCheck"; // Phase 10 S3
 
 type LocalAnswer = { response: ResponseObj; flagged: boolean };
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -49,6 +50,7 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
 
   const [state, setState] = useState<AttemptState | null>(null);
   const [content, setContent] = useState<AttemptContent | null>(null);
+  const practice = usePracticeFeedback(attemptId, !!state?.is_practice); // Phase 10 S3: inert unless a practice attempt
   const [loadError, setLoadError] = useState<unknown>(null);
   const [answers, setAnswers] = useState<Record<number, LocalAnswer>>({});
   const answersRef = useRef<Record<number, LocalAnswer>>({});
@@ -357,9 +359,10 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
 
   // ---- actions ----
   const onAnswer = useCallback((position: number, response: ResponseObj) => {
+    if (practice.lockedRef.current[position]) return; // Phase 10 S3: a checked practice item is locked
     setAnswers((prev) => ({ ...prev, [position]: { response, flagged: prev[position]?.flagged ?? false } }));
     queueRef.current?.set(position, { response });
-  }, []);
+  }, [practice.lockedRef]);
 
   const onToggleFlag = useCallback((position: number) => {
     const cur = answersRef.current[position] ?? { response: null, flagged: false };
@@ -753,9 +756,22 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
                   total={visibleItems.length}
                   response={answers[curItem.position]?.response ?? null}
                   flagged={!!answers[curItem.position]?.flagged}
+                  disabled={state.is_practice ? !!practice.fb[curItem.position] : undefined}
                   onChange={(r) => onAnswer(curItem.position, r)}
                   onToggleFlag={() => onToggleFlag(curItem.position)}
                 />
+                {state.is_practice && q ? (
+                  <PracticeCheck
+                    key={`practice-${curItem.position}`}
+                    attemptId={attemptId}
+                    position={curItem.position}
+                    question={q}
+                    feedback={practice.fb[curItem.position]}
+                    answered={isAnswered(q.type, answers[curItem.position]?.response)}
+                    flush={async () => queueRef.current?.flushNow()}
+                    onChecked={practice.add}
+                  />
+                ) : null}
               </div>
             </>
           ) : (

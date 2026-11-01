@@ -72,6 +72,8 @@ export interface AttemptState {
   status: AttemptStatus;
   language: Lang;
   is_preview: boolean;
+  /** Phase 10: a practice attempt (per-item check, no grades). */
+  is_practice?: boolean;
   /** ISO UTC; also used to compute the client clock offset */
   server_now: string;
   grace_s: number;
@@ -227,4 +229,14 @@ export interface ReviewOut {
   /** Phase 8b: effective result view and passage display. */
   result_view?: ResultView;
   passage_display?: PassageDisplay;
+}
+
+/** Phase 10 S3: feedback of one checked practice item (`POST /attempts/{id}/items/{position}/check`). */
+export interface PracticeFeedback {
+  position: number;
+  correctness: Correctness;
+  score: string;
+  points: string;
+  key: Record<string, unknown>;
+  explanation: string | null;
 }

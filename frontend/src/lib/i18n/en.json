@@ -5190,7 +5190,49 @@
     }
   },
   "practice": {
-    "nav": "Practice"
+    "nav": "Practice",
+    "title": "Practice",
+    "empty": "No practice sets yet.",
+    "emptyStaff": "No practice sets yet. Create one from a question bank.",
+    "new": "New set",
+    "questions": "{n} questions",
+    "best": "Best {percent}%",
+    "attempts": "{n} attempts",
+    "start": "Start",
+    "continue": "Continue",
+    "actions": "Actions",
+    "rename": "Rename",
+    "refresh": "Refresh questions",
+    "delete": "Delete",
+    "refreshed": "Questions refreshed",
+    "deleteTitle": "Delete this practice set?",
+    "deleteEffect": "Students can no longer start it. Past attempts are kept.",
+    "check": "Check",
+    "answerFirst": "Answer the question first.",
+    "saveFailed": "The answer was not saved. Try again.",
+    "difficulty": {
+      "easy": "Easy",
+      "medium": "Medium",
+      "hard": "Hard"
+    },
+    "dialog": {
+      "createTitle": "New practice set",
+      "editTitle": "Edit practice set",
+      "name": "Name",
+      "block": "Block {n}",
+      "bank": "Question bank",
+      "chooseBank": "Choose a bank",
+      "section": "Section",
+      "topic": "Topic",
+      "difficulty": "Difficulty",
+      "any": "Any",
+      "count": "Questions",
+      "addBlock": "Add block",
+      "removeBlock": "Remove block",
+      "create": "Create",
+      "save": "Save",
+      "poolTooSmall": "The bank has too few questions for this block. Lower the count or change the filters."
+    }
   },
   "progress": {
     "nav": "My progress",
