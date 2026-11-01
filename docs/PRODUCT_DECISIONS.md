@@ -541,3 +541,6 @@ Implementation decisions (agent):
 | PBB-1 | Agent: a hidden timer shows itself again in the last 5 minutes (safety; time-up is unchanged). Answer elimination isn't built; listed in `ORT_PLAYER_IDEAS.md`. |
 | 10-N | Neon: `backup-2026-10-25-before-phase6a` and `backup-2026-10-26-before-phase7a` deleted with the owner's OK (2026-11-01) after a row-ID comparison with production. QA data stays while testing needs it. |
 
+## Phase 11 decisions (agent, 2026-11-02; design `phases/PHASE_11_DESIGN.md`)
+Parents are a separate `guardian_links` table, not an enrollment role `observer` as the plan worded it: a parent links to a student, has no course access, and stays out of every roster and count. Owner questions 11-Q1…Q10 run on the safe defaults in the design's §9 and appear in `LAUNCH_CHECKLIST.md`. Policy text ships as a draft awaiting legal review.
+

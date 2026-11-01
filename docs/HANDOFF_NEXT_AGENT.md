@@ -31,8 +31,8 @@ A teacher-owned, Canvas-style LMS where ORT/ЖРТ test prep is one course kind:
 | 9 organizations completion, enrollment forms, invitations | **Deployed 2026-11-01** (`main` 636d14a, migration 0014) | `PHASE_9.md`, `PHASE_9_DESIGN.md` |
 | UX rework (UR-1…8) | **Deployed 2026-11-01** (`main` ace2476, migration 0015) | `UX_REWORK.md`, `UX_REWORK_DESIGN.md` |
 | 10 practice, notebook, progress, statistics, analytics, new question types | **Deployed 2026-11-01** (migration 0016); **waiting for the owner's review** | `PHASE_10.md`, `PHASE_10_DESIGN.md` |
-| Bluebook player (BB-1) | **In progress**, before Phase 11 | `BLUEBOOK_PLAYER.md` |
-| **11** | Next (owner OK 2026-11-01): observer/parent with consent, hardening, launch; stop before launch | `IMPLEMENTATION_PLAN.md` |
+| Bluebook player (BB-1) | **Deployed 2026-11-02** (`main` 10c0855, frontend only) | `BLUEBOOK_PLAYER.md` |
+| **11** | **In progress** on branch `phase-11` (owner OK 2026-11-01), `PHASE_11_DESIGN.md`: observer/parent with consent, hardening, launch; stop before launch | `IMPLEMENTATION_PLAN.md` |
 | Next | 8a modules, pages, files, announcements, gating → 8b exam templates II (visual constructor, scrolling display mode; **checkpoint after 8b**) → 9 → 10 → 11 | `IMPLEMENTATION_PLAN.md` |
 
 Production: Vercel https://ort-platform-nu.vercel.app + Render https://ort-platform-w77q.onrender.com (`/health` shows `commit`; Render deploys only when backend files change) + Neon project `noisy-sound-20763725` (production branch `br-cool-firefly-b227gbuy`, Alembic head `0016_phase10_practice_analytics`) + Cloudflare R2. Production data is small: 6 users, 3 courses (2 ORT + the owner's draft), 299 question versions, ~4 attempts, 1 submission; one organization "Platform".
@@ -64,7 +64,7 @@ Neon backups (free plan: **max 10 branches, 1 manual snapshot**): `backup-2026-1
 
 ## 5. What to do next
 
-1. Bluebook player first (`docs/phases/BLUEBOOK_PLAYER.md`), then Phase 11; stop before launch. Neon 8/10 branches. QA accounts disabled; re-enable by SQL for production checks, remove after the final check.
+1. Phase 11 per `docs/phases/PHASE_11_DESIGN.md`; stop before launch with `LAUNCH_CHECKLIST.md`. Neon 8/10 branches. QA accounts disabled; re-enable by SQL for production checks, remove after the final check.
 2. Phase 11 after the owner's OK. Back to the normal model rule (UR-6); Sonnet for Phase 10 only. Include: load test at scale, practice retention, sweep of retired test students' files.
 3. Open owner questions keep their defaults: `CHECKPOINT_8B.md` §3, 8c design §17, 9-Q1…Q8 in `PRODUCT_DECISIONS.md`. Optional 8c teacher test.
 4. Fix the flaky PG test `tests/lms/test_enrollments_api.py::test_ip_failure_limit_counts_failures_only`; an unidentified intermittent `backend-sqlite` CI failure was seen once (55e3348).
