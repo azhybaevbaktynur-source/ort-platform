@@ -273,11 +273,11 @@ Dependencies: 6b needs 6a; 7a needs 6a (organizations, course templates) and use
 
 ## UX rework (owner, 2026-11-01; before Phase 10)
 
-Width, student course home, student dashboard, simpler teacher and admin pages, Student view rebuilt on a test student (`PRODUCT_DECISIONS.md` UR-1…8, `phases/UX_REWORK_DESIGN.md`). Verified on production at 375 / 1440 / 1920 px; screens in `phases/UX_REWORK_screens/`. **Owner checkpoint: Phase 10 starts only after the owner's OK.**
+Width, student course home, student dashboard, simpler teacher and admin pages, Student view rebuilt on a test student (`PRODUCT_DECISIONS.md` UR-1…8, `phases/UX_REWORK_DESIGN.md`). Verified on production at 375 / 1440 / 1920 px; screens in `phases/UX_REWORK_screens/`. Phase 10 follows directly after production verification (UR-7b).
 
 ## Phase 10 — Practice, analytics, quiz statistics, student tools (M)
 
-**Owner stops: review after Phase 10, and again before launch (after Phase 11 is ready).** Test students are excluded from every aggregate here (UR-5).
+**Owner stops: review after Phase 10, and again before launch (after Phase 11 is ready).** Phase 10 implementers on Sonnet, Opus only after a failure (UR-7b). Test students are excluded from every aggregate here (UR-5).
 
 - **Practice mode**: self-paced practice assessments (unlimited attempts, immediate feedback) built from a bank by topic/difficulty with `pick` items; ORT practice uses the ORT template's banks without changing the exam.
 - **Mistakes notebook** and **progress** pages on `attempt_items` (SQL aggregates); per-course goal (D18).

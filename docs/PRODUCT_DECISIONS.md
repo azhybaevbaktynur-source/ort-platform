@@ -506,6 +506,7 @@ The owner tested production as teacher and student and found it hard to use. Ref
 | UR-5 | **Student view rebuilt the Canvas way**: a test-student enrollment in the course, a banner with "Reset test student" and "Leave student view", test-student attempts excluded from grades and analytics. If it could not work properly it would be removed and noted in the plan. |
 | UR-6 | **Token rules (replaces D21 and the ux-reviewer step)**: the `ux-reviewer` agent is no longer used and the per-language and full screenshot sets are gone. The orchestrator checks the changed screens itself at 375 / 1440 / 1920 px in one language (ru) and fixes what is wrong. Fable only for hard design and security reviews; implementers on Opus, Sonnet for simple work; short briefs and outputs. The trilingual rule for strings and the ORT review stay. |
 | UR-7 | **Order**: the rework ships first, then the owner reviews. Phase 10 starts only after the owner's OK; stop after Phase 10 and again before launch. |
+| UR-7b | **Owner, 2026-11-01 (later the same day; replaces the wait in UR-7)**: Phase 10 starts right after the rework is deployed and verified, with no wait for the owner's OK. The stop after Phase 10 and the stop before launch stay. **Phase 10 only**: implementers on Sonnet when Sonnet can build it (escalate to Opus only after a failure); optimize token usage. |
 | UR-8 | **Neon**: `backup-2026-10-23-before-phase5` deleted with the owner's OK (2026-11-01). Ask before deleting anything else. |
 
 Implementation decisions (agent):
