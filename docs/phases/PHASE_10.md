@@ -33,3 +33,12 @@ Exam behaviour, import and scoring unchanged: `ort.spec`, `ort-visual` with zero
 
 ## Production QA data
 `agent-qa-teacher@example.com`, `agent-qa-student@example.com`, their test student and the private QA course (63e9565c-f609-48ce-bf56-897764d0e373, with a question bank and practice set) are disabled (`disabled_at`), not deleted. The two accounts were created by SQL for this verification (`UX_REWORK.md`). Deleting needs the owner's OK.
+
+Owner, 2026-11-01: keep the QA data while further production testing needs it, then remove it. Kept (disabled) for the Phase 11 check; remove after the final check.
+
+## Neon backup check (2026-11-01, read-only; waiting for the owner's OK to delete)
+Compared row IDs (users, courses, enrollments, question, passage and assessment versions, attempts, assets) with production rows created up to each backup's timestamp.
+- `backup-2026-10-25-before-phase6a` (br-steep-bird-b2hvz5lr): all 8 identical; every table still in production; also covered by snapshot `before-phase6a-deploy-2026-10-25`.
+- `backup-2026-10-26-before-phase7a` (br-ancient-term-b2svt6xz): all 8 identical. A read-only compute (ep-spring-frost-b2wb01mb) was added for the check; it goes with the branch.
+Not compared: later edits to the same rows (old values live only in the backup) and the newer backups, which have no compute and aren't candidates.
+
