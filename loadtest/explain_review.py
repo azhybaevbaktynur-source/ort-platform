@@ -137,10 +137,15 @@ def review(raw_conn, statements, rows_of):
     """EXPLAIN each captured SELECT. Returns [{sql, ms, failures, plan}]."""
     out = []
     seen = set()
+    applied = []
     with raw_conn.cursor() as cur:
         for sql, params, wall_ms in statements:
+            if sql.startswith("SET LOCAL"):  # the service's own planner setting holds for the rest of the case
+                cur.execute(sql.replace("SET LOCAL", "SET", 1), params)
+                applied.append(sql.split()[2])
+                continue
             head = sql.lstrip()[:6].upper()
-            if head not in ("SELECT", "WITH r", "WITH \"") and not head.startswith("WITH"):
+            if head != "SELECT" and not head.startswith("WITH"):
                 continue
             key = (sql, repr(params))
             if key in seen:
@@ -168,6 +173,8 @@ def review(raw_conn, statements, rows_of):
             out.append(dict(sql=sql, ms=round(ms, 2), planning_ms=round(planning, 2), wall_ms=round(wall_ms, 2),
                             hit_blocks=shared[0], read_blocks=shared[1], failures=failures,
                             jit_ms=round(doc.get("JIT", {}).get("Timing", {}).get("Total", 0), 1), plan=doc))
+        for name in applied:
+            cur.execute(f"RESET {name}")
     return out
 
 

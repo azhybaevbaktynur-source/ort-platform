@@ -7,7 +7,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Float, and_, case, cast, func, or_, select
+from sqlalchemy import Float, and_, case, cast, func, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.lms.analytics.scope import final_attempt
@@ -70,6 +70,15 @@ def visible_assessments(db: Session, course_id: uuid.UUID, user_id: str, now: da
     return {a.id: a for a in rows if results.assessment_results_visible(db, a, now)}
 
 
+# ------------------------------------------------------------------ plans
+
+def _prefer_item_index(db: Session) -> None:
+    """For this transaction only. With the default random_page_cost (4) a student with about 300 attempts tips the
+    planner into a Seq Scan of all of `attempt_items`: 200-460 ms instead of 7 ms (docs/phases/PHASE_11_EXPLAIN.md)."""
+    if db.get_bind().dialect.name == "postgresql":
+        db.execute(text("SET LOCAL random_page_cost = 1.1"))
+
+
 # ------------------------------------------------------------------ mistakes
 
 def _final_attempts(user_id: str, course_id: uuid.UUID, visible: list[uuid.UUID]):
@@ -115,6 +124,7 @@ def mistakes(db: Session, course: Course, user_id: str, *, status: str, cursor: 
     assessments = visible_assessments(db, course.id, user_id, now)
     if not assessments:
         return PageOut[MistakeOut](items=[], next_cursor=None)
+    _prefer_item_index(db)
     r = _latest_rows(user_id, course.id, list(assessments)).cte("r")
     stmt = select(r, AttemptItem).join(
         AttemptItem, and_(AttemptItem.attempt_id == r.c.attempt_id, AttemptItem.position == r.c.position)
@@ -176,6 +186,7 @@ def progress(db: Session, course: Course, user_id: str, enrollment_id: uuid.UUID
     if not assessments:
         return out
     visible = list(assessments)
+    _prefer_item_index(db)
     ratio = cast(Attempt.raw_score, Float) / func.nullif(cast(Attempt.points_possible, Float), 0.0)
     base = [Attempt.user_id == user_id, Attempt.course_id == course.id, final_attempt(_A),
             Attempt.assessment_id.in_(visible), Attempt.raw_score.is_not(None)]
