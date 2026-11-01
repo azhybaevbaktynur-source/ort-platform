@@ -85,7 +85,7 @@ export function UserOrganizationsSection({ user, readOnly }: { user: { id: strin
       <MoreError list={list} />
 
       {!readOnly && (
-        <Card className="mt-3" headingLevel={3} title={t("organizations.adminUser.addToOrg")} description={t("organizations.adminUser.addToOrgHint")}>
+        <Card className="mt-3" headingLevel={3} title={t("organizations.adminUser.addToOrg")}>
           {orgsError ? <OrgError error={orgsError} onRetry={loadOrgs} /> : orgs === null ? <LoadingState label={t("lms.common.loading")} rows={1} /> : (
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
               <Select containerClassName="min-w-0 flex-1" label={t("organizations.fields.organization")} value={orgId} onChange={(e) => setOrgId(e.target.value)}

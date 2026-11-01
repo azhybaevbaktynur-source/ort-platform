@@ -11,7 +11,7 @@ import {
   THRESHOLD_REQUIREMENTS, requirementTypesFor, type CompletionMode, type ItemKind, type ItemStaffOut, type ModuleStaffOut,
   type RequirementIn, type RequirementType,
 } from "@/lib/lms/modulesTypes";
-import { Button, Checkbox, Dialog, Input, Select, Switch } from "@/components/ui";
+import { Button, Checkbox, Dialog, Input, Select } from "@/components/ui";
 import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
 import { fromLocalInput, toLocalInput } from "@/components/lms/assessments/format";
 import { fmtThreshold } from "./moduleUi";
@@ -47,13 +47,11 @@ export interface ModuleSettingsValue {
   unlock_at: string | null;
   sequential: boolean;
   completion_mode: CompletionMode;
-  published: boolean;
 }
 
 export function ModuleSettingsDialog({ open, module, langs, busy, error, onSave, onClose }: {
   open: boolean;
-  /** null: create a new module */
-  module: ModuleStaffOut | null;
+  module: ModuleStaffOut;
   langs: CourseLangs;
   busy: boolean;
   error: string | null;
@@ -62,11 +60,10 @@ export function ModuleSettingsDialog({ open, module, langs, busy, error, onSave,
 }) {
   const { t } = useTranslation();
   const formId = useId();
-  const [title, setTitle] = useState<LocalizedText>(module?.title ?? {});
-  const [unlock, setUnlock] = useState(toLocalInput(module?.unlock_at));
-  const [sequential, setSequential] = useState(module?.sequential ?? false);
-  const [mode, setMode] = useState<CompletionMode>(module?.completion_mode ?? "all");
-  const [published, setPublished] = useState(module?.published ?? false);
+  const [title, setTitle] = useState<LocalizedText>(module.title);
+  const [unlock, setUnlock] = useState(toLocalInput(module.unlock_at));
+  const [sequential, setSequential] = useState(module.sequential);
+  const [mode, setMode] = useState<CompletionMode>(module.completion_mode);
   const [touched, setTouched] = useState(false);
   const cleaned = cleanLocalized(title, langs.languages);
   const titleOk = Object.keys(cleaned).length > 0;
@@ -75,16 +72,16 @@ export function ModuleSettingsDialog({ open, module, langs, busy, error, onSave,
     ev.preventDefault();
     setTouched(true);
     if (!titleOk) return;
-    onSave({ title: cleaned, unlock_at: fromLocalInput(unlock), sequential, completion_mode: mode, published });
+    onSave({ title: cleaned, unlock_at: fromLocalInput(unlock), sequential, completion_mode: mode });
   };
 
   return (
     <Dialog open={open} onClose={onClose} busy={busy} size="lg"
-      title={module ? t("modules.settings.editTitle") : t("modules.settings.createTitle")}
+      title={t("modules.settings.editTitle")}
       footer={(
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>{t("lms.common.cancel")}</Button>
-          <Button type="submit" form={formId} loading={busy}>{module ? t("lms.common.save") : t("modules.settings.create")}</Button>
+          <Button type="submit" form={formId} loading={busy}>{t("lms.common.save")}</Button>
         </>
       )}>
       <form id={formId} onSubmit={submit} noValidate className="space-y-5">
@@ -100,9 +97,6 @@ export function ModuleSettingsDialog({ open, module, langs, busy, error, onSave,
           <RadioRow name={`${formId}-mode`} checked={mode === "all"} onChange={() => setMode("all")} label={t("modules.settings.modeAll")} disabled={busy} />
           <RadioRow name={`${formId}-mode`} checked={mode === "any"} onChange={() => setMode("any")} label={t("modules.settings.modeAny")} disabled={busy} />
         </fieldset>
-        {!module && (
-          <Switch label={t("modules.settings.publish")} hint={t("modules.settings.publishHint")} checked={published} disabled={busy} onChange={setPublished} />
-        )}
         <ErrorLine text={error} />
       </form>
     </Dialog>

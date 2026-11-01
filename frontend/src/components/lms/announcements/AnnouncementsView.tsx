@@ -90,7 +90,7 @@ export function AnnouncementsView() {
     <div>
       <PageHeader
         title={t("announcements.title")}
-        description={t(canEdit ? "announcements.descriptionStaff" : "announcements.descriptionStudent")}
+        description={canEdit ? undefined : t("announcements.descriptionStudent")}
         primaryAction={canEdit ? <LinkButton href={`${base}/new`} leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}>{t("announcements.new")}</LinkButton> : undefined}
       />
       <ContentError error={actionError} className="mb-4" />

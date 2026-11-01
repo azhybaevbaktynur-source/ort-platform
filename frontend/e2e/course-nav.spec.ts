@@ -10,9 +10,9 @@ import { seed, settle, signIn, tr, VIEWPORTS, type SeedUser } from "./helpers";
  *  4. redirects of the old URLs (section 4.2), query strings kept
  *  5. Student view: banner, student sidebar, a write is refused (403 `student_view_read_only`), "Start" in view mode
  *     starts a preview attempt, hand-ins are off
- *  6. To do panel -> assignment page on the Submissions tab with `filter=to_grade`
- *  7. "Unsorted" group and "Move to module"
- *  8. grouped "+ Add -> Quiz": lands in the 7c editor, Back returns to the module (`from=...#m-{id}`)
+ *  6. "To grade" list -> assignment page on the Submissions tab with `filter=to_grade`
+ *  7. "Not in modules" row and "Move to module"
+ *  8. grouped "+ -> Quiz": inline title, the row links to the 7c editor, Back returns to the module (`from=...#m-{id}`)
  *
  * Parts 1-3 and the S1 half of 4 and 5 run against the S1 shell. The rest is written against the design's roles and
  * i18n keys (`todo.*`, `coursePage.*`, `assignments.page.*`) and waits for S2 (Course page) and S3 (one-page objects).
@@ -39,6 +39,7 @@ const LOOSE_TASK = "Задание вне модуля";
 const QUIZ_VIEW = "Квиз из карточки";
 const MOD_A = "Модуль навигации А";
 const MOD_B = "Модуль навигации Б";
+const MOD_C = "Модуль навигации В";
 const PDF = Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n");
 
 const nav = () => seed().course_nav;
@@ -120,12 +121,11 @@ test.describe("course navigation (ru)", () => {
     // eight links in the design order; staff see them all (2.2)
     expect(await linkNames(tp)).toEqual(Object.values(LINKS).map((k) => t(k)));
     await expect(link(tp, LINKS.course)).toHaveAttribute("aria-current", "page");
-    // Announcements and Files have nothing published: marked "hidden from students" (2.3) with a help line
+    // Announcements and Files have nothing published: marked "hidden from students" (2.3); the mark carries its own tooltip
     for (const k of [LINKS.announcements, LINKS.files]) {
       await expect(mark(link(tp, k))).toHaveAttribute("aria-label", t("courseNav.hiddenFromStudents"));
     }
     await expect(mark(link(tp, LINKS.assignments))).toHaveCount(0);
-    await expect(tp.getByText(t("courseNav.hiddenHelp"))).toBeVisible();
     // the Teaching sub-menu (Courses / Create / Grading schemes / Exam templates) is gone inside a course (2.5)
     await expect(tp.getByRole("link", { name: t("lms.nav.gradingSchemes"), exact: true })).toHaveCount(0);
     // Student view button in the course bar (2.4)
@@ -184,7 +184,6 @@ test.describe("course navigation (ru)", () => {
     // before: Course, Assignments, Grades, Teachers (people) only
     await expect(link(sp, LINKS.course)).toHaveAttribute("aria-current", "page");
     expect(await linkNames(sp)).toEqual([t(LINKS.course), t(LINKS.assignments), t(LINKS.grades), t("courses.people.tabStudent")]);
-    await expect(sp.getByText(t("courseNav.hiddenHelp"))).toHaveCount(0);
     // opening a hidden area by URL: the "not available" page, no list
     for (const area of ["announcements", "files"]) {
       await sp.goto(`${base()}/${area}`);
@@ -365,13 +364,13 @@ test.describe("course navigation (ru)", () => {
   });
 
 // ---------------------------------------------------------------- 6. To do deep link (S2 + S3)
-  test("To do: 'to grade' links to the assignment's Submissions tab, filter to_grade", async ({ browser }) => {
+  test("To grade: the list links to the assignment's Submissions tab, filter to_grade", async ({ browser }) => {
     const cid = nav().course_id;
     const id = await createTextAssignment(HAND_IN);
     await api(nav().students.handin, "POST", `/courses/${cid}/assignments/${id}/submissions`, { body_text: "Мой ответ." }, [200, 201]);
     const tp = await open(browser, nav().teacher);
     await tp.goto(base());
-    await expect(tp.getByRole("heading", { name: t("todo.title") })).toBeVisible();
+    await expect(tp.getByRole("heading", { name: t("todo.toGrade") })).toBeVisible();
     const toGrade = tp.locator(`a[href*="/assignments/${id}?tab=submissions"]`).first();
     await expect(toGrade).toContainText(HAND_IN);
     await toGrade.click();
@@ -385,18 +384,20 @@ test.describe("course navigation (ru)", () => {
   });
 
   // ---------------------------------------------------------------- 7. Unsorted (S2)
-  test("Unsorted group lists loose targets and moves one into a module", async ({ browser }) => {
+  test("'Not in modules' lists loose targets and moves one into a module", async ({ browser }) => {
     const cid = nav().course_id;
     const mod = await api(nav().teacher, "POST", `/courses/${cid}/modules`, { title: { ru: MOD_A }, published: true });
     await createTextAssignment(LOOSE_TASK);
     const pg = await api(nav().teacher, "POST", `/courses/${cid}/pages`, { title: PAGE_TITLE, language: "ru", body_md: "Текст.", published: true });
     const tp = await open(browser, nav().teacher);
     await tp.goto(base());
-    const unsorted = tp.locator("section, details").filter({ has: tp.getByRole("heading", { name: t("coursePage.unsorted.title") }) }).first();
-    await expect(unsorted).toBeVisible();
+    // one collapsed row at the end of the outline; expanded, a flat list
+    const unsorted = tp.locator("#unsorted");
+    const toggle = unsorted.getByRole("button", { name: new RegExp(`^${t("coursePage.unsorted.row", { n: 0 }).replace(/\d+$/, "")}\\d+$`) });
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(unsorted.getByText(PAGE_TITLE, { exact: true })).toBeHidden();
+    await toggle.click();
     for (const title of [LOOSE_TASK, PAGE_TITLE, FILE_TITLE]) await expect(unsorted.getByText(title, { exact: true })).toBeVisible();
-    await expect(unsorted.getByRole("link", { name: t("coursePage.unsorted.allPages") })).toHaveAttribute("href", new RegExp(`/courses/${cid}/pages`));
-    await expect(unsorted.getByRole("link", { name: t("coursePage.unsorted.allFiles") })).toHaveAttribute("href", new RegExp(`/courses/${cid}/files`));
     // move the page into the module
     const row = unsorted.locator("li").filter({ hasText: PAGE_TITLE });
     await row.getByRole("button", { name: t("modules.editor.actions") }).click();
@@ -414,7 +415,7 @@ test.describe("course navigation (ru)", () => {
   });
 
   // ---------------------------------------------------------------- 8. grouped "+ Add -> Quiz" (S2 + S3)
-  test("'+ Add -> Quiz' opens the 7c editor and Back returns to the module", async ({ browser }) => {
+  test("'+ -> Quiz' creates it inline, its row opens the 7c editor and Back returns to the module", async ({ browser }) => {
     const cid = nav().course_id;
     const mod = await api(nav().teacher, "POST", `/courses/${cid}/modules`, { title: { ru: MOD_B }, published: false });
     const tp = await open(browser, nav().teacher);
@@ -422,22 +423,20 @@ test.describe("course navigation (ru)", () => {
     const card = tp.locator(`#m-${mod.id}`);
     await expect(card).toBeVisible();
     // the menu groups: Content (page, file, link, header) and Assessment (quiz, assignment)
-    await card.getByRole("button", { name: t("modules.editor.addItem") }).first().click();
+    await card.getByRole("button", { name: t("coursePage.add", { title: MOD_B }) }).first().click();
     const menu = tp.getByRole("menu");
     await expect(menu.getByText(t("coursePage.addGroups.content"))).toBeVisible();
     await expect(menu.getByText(t("coursePage.addGroups.assessment"))).toBeVisible();
     for (const k of ["page", "file", "link", "header", "quiz", "assignment"]) {
       await expect(menu.getByRole("menuitem", { name: t(`coursePage.addItems.${k}`) })).toBeVisible();
     }
+    await expect(menu.getByRole("menuitem", { name: t("coursePage.addExisting") })).toBeVisible();
     await menu.getByRole("menuitem", { name: t("coursePage.addItems.quiz") }).click();
-    const dlg = tp.getByRole("dialog", { name: t("modules.add.title") });
-    await dlg.getByRole("textbox", { name: t("modules.add.quizTitle") }).fill(QUIZ_VIEW);
-    for (const other of ["ky", "en"]) {
-      const box = dlg.getByRole("checkbox", { name: t(`courses.languages.${other}`) });
-      if (await box.isChecked()) await box.uncheck();
-    }
-    await dlg.getByRole("button", { name: t("modules.add.createQuiz") }).click();
-    // the 7c editor, with the way back to the module in `from`
+    const input = card.getByRole("textbox", { name: t("coursePage.inlineTitle", { kind: t("coursePage.addItems.quiz") }) });
+    await input.fill(QUIZ_VIEW);
+    await input.press("Enter");
+    // the quiz stays in the list; its row is the 7c editor, with the way back to the module in `from`
+    await card.getByRole("link", { name: QUIZ_VIEW, exact: true }).click();
     await tp.waitForURL(/\/assessments\/[0-9a-f-]{36}\/edit/);
     const from = new URL(tp.url()).searchParams.get("from");
     expect(from).toBe(`${base()}#m-${mod.id}`);
@@ -454,6 +453,72 @@ test.describe("course navigation (ru)", () => {
     await expect(tp.getByText(t("quizEditor.section.emptyQuizTitle"))).toBeVisible();
     await expect(tp.locator('a[href^="https://evil.example"]')).toHaveCount(0);
     await settle(tp);
+    await tp.context().close();
+  });
+
+  // ---------------------------------------------------------------- 9. inline forms (UX rework D)
+  test("inline: rename a module and an item (Esc cancels), add a page, an assignment and a header", async ({ browser }) => {
+    const cid = nav().course_id;
+    const mod = await api(nav().teacher, "POST", `/courses/${cid}/modules`, { title: { ru: MOD_C }, published: false });
+    const renamed = `${MOD_C} (новое)`;
+    const tp = await open(browser, nav().teacher);
+    await tp.goto(base());
+    const card = tp.locator(`#m-${mod.id}`);
+    await expect(card).toBeVisible();
+
+    const renameModule = async () => {
+      await card.getByRole("button", { name: t("modules.editor.actions") }).first().click();
+      await tp.getByRole("menuitem", { name: t("coursePage.rename") }).click();
+      return card.getByRole("textbox", { name: t("coursePage.rename") });
+    };
+    let input = await renameModule();
+    await input.fill("Не сохранять");
+    await input.press("Escape");
+    await expect(input).toHaveCount(0);
+    await expect(card.getByRole("heading", { name: MOD_C, exact: true })).toBeVisible();
+    input = await renameModule();
+    await input.fill(renamed);
+    await input.press("Enter");
+    await expect(card.getByRole("heading", { name: renamed, exact: true })).toBeVisible();
+
+    const add = async (kind: "page" | "assignment" | "header", title: string, assignmentKind?: string) => {
+      await card.getByRole("button", { name: t("coursePage.add", { title: renamed }) }).first().click();
+      await tp.getByRole("menuitem", { name: t(`coursePage.addItems.${kind}`) }).click();
+      const field = card.getByRole("textbox", { name: t("coursePage.inlineTitle", { kind: t(`coursePage.addItems.${kind}`) }) });
+      await field.fill(title);
+      if (assignmentKind) await card.getByRole("combobox", { name: t("assignments.create.kind") }).selectOption(assignmentKind);
+      await field.press("Enter");
+      await expect(card.locator("li").filter({ hasText: title })).toBeVisible();
+    };
+    await add("page", "Новая страница");
+    await add("assignment", "Новая сдача файла", "file");
+    await add("header", "Новый заголовок");
+    // page and assignment stay in the list with a link to edit
+    await expect(card.getByRole("link", { name: "Новая страница", exact: true })).toHaveAttribute("href", /\/pages\/[0-9a-f-]{36}/);
+    await expect(card.getByRole("link", { name: "Новая сдача файла", exact: true })).toHaveAttribute("href", /\/assignments\/[0-9a-f-]{36}/);
+
+    // by id: while it is renamed, the row's title is an input value, not text
+    const row = tp.locator(`#${await card.locator("li").filter({ hasText: "Новый заголовок" }).getAttribute("id")}`);
+    await row.getByRole("button", { name: t("modules.editor.actions") }).click();
+    await tp.getByRole("menuitem", { name: t("coursePage.rename") }).click();
+    input = row.getByRole("textbox", { name: t("coursePage.rename") });
+    await input.fill("Другой заголовок");
+    await input.press("Enter");
+    await expect(card.locator("li").filter({ hasText: "Другой заголовок" })).toBeVisible();
+
+    const outline = await api(nav().teacher, "GET", `/courses/${cid}/modules`);
+    const m = outline.modules.find((x: { id: string }) => x.id === mod.id);
+    expect(m.title.ru).toBe(renamed);
+    expect(m.items.map((i: { kind: string }) => i.kind)).toEqual(["page", "assignment", "header"]);
+    expect(m.items[1].target.assignment_kind).toBe("file");
+    expect(m.items[2].title_override.ru).toBe("Другой заголовок");
+
+    // the join code moved to People, with the copy button and the way to the enrollment settings
+    await tp.goto(`${base()}/people`);
+    const code = tp.locator("section", { has: tp.getByRole("heading", { name: t("courses.settings.joinCode") }) });
+    await expect(code.locator("code")).toBeVisible();
+    await expect(code.getByRole("button", { name: t("lms.common.copy") })).toBeVisible();
+    await expect(code.getByRole("link", { name: t("teaching.manageEnrollment") })).toHaveAttribute("href", new RegExp(`/courses/${cid}/settings`));
     await tp.context().close();
   });
 });

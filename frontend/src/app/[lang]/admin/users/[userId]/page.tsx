@@ -14,6 +14,7 @@ import { Badge, Button, Card, DescriptionList, LoadingState, PageHeader, ReasonD
 import { UserStatusBadge } from "@/components/lms/admin/UserStatusBadge";
 import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
 import { LoadError, OrgError, SystemAccountBadge } from "@/components/lms/org/OrgUi";
+import { OutlineMenu } from "@/components/lms/modules/OutlineMenu";
 import { UserOrganizationsSection } from "@/components/lms/org/admin/UserOrganizationsSection"; // Phase 6 S4b
 
 type Action = "disable" | "revoke" | "grant";
@@ -100,11 +101,16 @@ export default function AdminUserDetailPage() {
       ) : (
         <Button variant="secondary" onClick={() => { setDialogError(null); setAction("grant"); }}>{t("platformAdmin.users.grantTeacher")}</Button>
       )}
-      {canDisable && (user.disabled_at ? (
-        <Button variant="secondary" loading={enabling} onClick={() => void enable()}>{t("platformAdmin.users.enable")}</Button>
-      ) : (
-        <Button variant="dangerOutline" onClick={() => { setDialogError(null); setAction("disable"); }}>{t("platformAdmin.users.disable")}</Button>
-      ))}
+      {canDisable && (
+        <OutlineMenu label={t("coursePage.moreActions")} disabled={enabling}
+          groups={[{ id: "account", items: [user.disabled_at
+            ? { id: "enable", label: t("platformAdmin.users.enable") }
+            : { id: "disable", label: t("platformAdmin.users.disable"), danger: true }] }]}
+          onSelect={(id) => {
+            if (id === "enable") void enable();
+            else { setDialogError(null); setAction("disable"); }
+          }} />
+      )}
     </>
   ) : undefined;
 

@@ -76,12 +76,13 @@ const tCard = (page: Page, title: string) =>
 const sidebar = (page: Page) => page.getByRole("navigation", { name: t("courses.home.tabsLabel") });
 
 async function createModule(page: Page, title: string) {
+  // UX rework D: the title input opens in place; Enter creates
   await page.getByRole("button", { name: t("modules.editor.newModule") }).first().click();
-  const dlg = page.getByRole("dialog", { name: t("modules.settings.createTitle") });
-  await dlg.getByRole("textbox", { name: t("modules.settings.titleLabel") }).fill(title);
-  await dlg.getByRole("button", { name: t("modules.settings.create") }).click();
-  await expect(dlg).toBeHidden();
+  const input = page.getByRole("textbox", { name: t("modules.settings.titleLabel") });
+  await input.fill(title);
+  await input.press("Enter");
   await expect(tCard(page, title)).toBeVisible();
+  await expect(input).toHaveCount(0);
 }
 
 async function moduleMenu(page: Page, title: string, item: string) {
@@ -90,15 +91,37 @@ async function moduleMenu(page: Page, title: string, item: string) {
   await page.getByRole("menuitem", { name: item }).click();
 }
 
-/** "+ Add" in a module header, then the item from the grouped menu (Content: page, file, link, header; Assessment: quiz, assignment). */
-async function addItem(page: Page, module: string, kind: "page" | "file" | "link" | "header" | "quiz" | "assignment", pick?: string, req?: string, threshold?: string) {
-  await tCard(page, module).getByRole("button", { name: t("modules.editor.addItem") }).first().click();
-  await page.getByRole("menuitem", { name: t(`coursePage.addItems.${kind}`) }).click();
+/** The module's "+" menu (accessible name "Add to «…»"; an empty module's small button has the same name). */
+const openAddMenu = (page: Page, module: string) => tCard(page, module).getByRole("button", { name: t("coursePage.add", { title: module }) }).first().click();
+
+/** "+ -> File": the picker dialog. */
+async function addFile(page: Page, module: string, pick: string) {
+  await openAddMenu(page, module);
+  await page.getByRole("menuitem", { name: t("coursePage.addItems.file") }).click();
   const dlg = page.getByRole("dialog", { name: t("modules.add.title") });
-  if (pick) await dlg.getByRole("radio", { name: new RegExp(pick) }).check();
-  if (req) await dlg.getByRole("radio", { name: req, exact: true }).check();
-  if (threshold) await dlg.getByRole("spinbutton").fill(threshold);
+  await dlg.getByRole("radio", { name: new RegExp(pick) }).check();
   return dlg;
+}
+
+/** "+ -> Add existing": the dialog with the page, file and assignment pickers. */
+async function addExisting(page: Page, module: string, kind: "page" | "file" | "assignment", pick: string, req?: string) {
+  await openAddMenu(page, module);
+  await page.getByRole("menuitem", { name: t("coursePage.addExisting") }).click();
+  const dlg = page.getByRole("dialog", { name: t("modules.add.title") });
+  await dlg.getByRole("radio", { name: t(`modules.kinds.${kind}`), exact: true }).check();
+  await dlg.getByRole("radio", { name: new RegExp(pick) }).check();
+  if (req) await dlg.getByRole("radio", { name: req, exact: true }).check();
+  return dlg;
+}
+
+/** "+ -> kind": the title input (a link also takes its web address) opens at the end of the module; Enter creates. */
+async function addInline(page: Page, module: string, kind: "page" | "link" | "header" | "quiz", title: string, url?: string) {
+  await openAddMenu(page, module);
+  await page.getByRole("menuitem", { name: t(`coursePage.addItems.${kind}`) }).click();
+  const input = tCard(page, module).getByRole("textbox", { name: t("coursePage.inlineTitle", { kind: t(`coursePage.addItems.${kind}`) }) });
+  await input.fill(title);
+  if (url) await tCard(page, module).getByRole("textbox", { name: t("modules.add.url") }).fill(url);
+  await input.press("Enter");
 }
 
 async function studentModules(page: Page, cid: string) {
@@ -151,26 +174,21 @@ test.describe("modules walk (ru)", () => {
     await createModule(tp, M3);
 
     // M1: the page ("view" requirement) and the PDF
-    let dlg = await addItem(tp, M1, "page", PAGE_TITLE, t("modules.reqPicker.types.view"));
+    let dlg = await addExisting(tp, M1, "page", PAGE_TITLE, t("modules.reqPicker.types.view"));
     await dlg.getByRole("button", { name: t("modules.add.submit") }).click();
     await expect(dlg).toBeHidden();
-    dlg = await addItem(tp, M1, "file", FILE_TITLE);
+    dlg = await addFile(tp, M1, FILE_TITLE);
     await dlg.getByRole("button", { name: t("modules.add.submit") }).click();
     await expect(dlg).toBeHidden();
     await expect(tCard(tp, M1).getByText(FILE_TITLE, { exact: true })).toBeVisible();
 
-    // M2: "+ Add -> Quiz" creates the quiz assignment and its item, then opens the 7c editor
-    dlg = await addItem(tp, M2, "quiz");
-    await dlg.getByRole("textbox", { name: t("modules.add.quizTitle") }).fill(QUIZ);
-    for (const other of ["ky", "en"]) {
-      const box = dlg.getByRole("checkbox", { name: t(`courses.languages.${other}`) });
-      if (await box.isChecked()) await box.uncheck();
-    }
+    // M2: "+ -> Quiz" creates the quiz assignment and its item inline; its row links to the 7c editor
     const quizResp = tp.waitForResponse((r) => r.request().method() === "POST" && /\/modules\/[0-9a-f-]{36}\/quiz$/.test(r.url()));
-    await dlg.getByRole("button", { name: t("modules.add.createQuiz") }).click();
+    await addInline(tp, M2, "quiz", QUIZ);
     const quizOut = await (await quizResp).json();
     const assignmentId: string = quizOut.assignment.id;
     const aid: string = quizOut.assessment_id;
+    await tCard(tp, M2).getByRole("link", { name: QUIZ, exact: true }).click();
     await tp.waitForURL(new RegExp(`/assessments/${aid}/edit`));
     await expect(tp.getByText(t("quizEditor.section.emptyQuizTitle"))).toBeVisible();
     // three single-choice questions worth 1, 2 and 7 points; "B" is always right (70 % = only Q3, 90 % = Q2 + Q3)
@@ -218,11 +236,14 @@ test.describe("modules walk (ru)", () => {
     await pre.getByRole("button", { name: t("lms.common.save") }).click();
     await expect(pre).toBeHidden();
     await expect(tCard(tp, M3)).toContainText(t("modules.editor.after", { titles: M2 }));
-    dlg = await addItem(tp, M3, "link", undefined, t("modules.reqPicker.types.mark_done"));
-    await dlg.getByRole("textbox", { name: t("modules.add.url") }).fill("https://example.com/fractions");
-    await dlg.getByRole("textbox", { name: t("modules.add.titleOverride") }).fill(LINK_TITLE);
-    await dlg.getByRole("button", { name: t("modules.add.submit") }).click();
-    await expect(dlg).toBeHidden();
+    await addInline(tp, M3, "link", LINK_TITLE, "https://example.com/fractions");
+    const linkRow = tCard(tp, M3).locator("li").filter({ hasText: LINK_TITLE });
+    await linkRow.getByRole("button", { name: t("modules.editor.actions") }).click();
+    await tp.getByRole("menuitem", { name: t("modules.editor.setRequirement") }).click();
+    const linkReq = tp.getByRole("dialog", { name: t("modules.reqPicker.title") });
+    await linkReq.getByRole("radio", { name: t("modules.reqPicker.types.mark_done"), exact: true }).check();
+    await linkReq.getByRole("button", { name: t("lms.common.save") }).click();
+    await expect(linkReq).toBeHidden();
 
     // M2 opens tomorrow (the 423 check below); then publish all three
     const tomorrow = new Date(Date.now() + 24 * 3600_000);
@@ -618,8 +639,8 @@ test.describe("modules walk (ru)", () => {
         await card(M2).locator("li").filter({ hasText: QUIZ }).getByRole("button", { name: tl("modules.editor.actions") }).click();
         await tp.getByRole("menuitem", { name: tl("modules.editor.setRequirement") }).click();
         await dialogShot("teacher-requirement");
-        await card(M1).getByRole("button", { name: tl("modules.editor.addItem") }).first().click();
-        await tp.getByRole("menuitem", { name: tl("coursePage.addItems.page") }).click();
+        await card(M1).getByRole("button", { name: tl("coursePage.add", { title: M1 }) }).first().click();
+        await tp.getByRole("menuitem", { name: tl("coursePage.addExisting") }).click();
         await expect(tp.getByRole("dialog").getByRole("radio").first()).toBeVisible(); // the page list loaded
         await dialogShot("teacher-add-item");
         await tp.getByRole("button", { name: tl("modules.progress.open") }).click();

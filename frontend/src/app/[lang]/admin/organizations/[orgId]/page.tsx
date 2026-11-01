@@ -13,8 +13,10 @@ import {
 import { fmtApiDateTimeShort } from "@/lib/format";
 import { formatBytes } from "@/lib/lms/storage"; // Phase 6b S11b (UX 10): the localized formatter
 import {
-  Button, Card, Checkbox, DescriptionList, Dialog, EmptyState, Input, LoadingState, PageHeader, ReasonDialog, StatTile, TabPanel, Tabs, toast,
+  Button, Checkbox, DescriptionList, Dialog, EmptyState, Input, LoadingState, PageHeader, ReasonDialog, StatTile, TabPanel, Tabs, toast,
 } from "@/components/ui";
+import { Disclosure } from "@/components/lms/admin/Disclosure";
+import { OutlineMenu } from "@/components/lms/modules/OutlineMenu";
 import { AuditTable } from "@/components/lms/admin/AuditTable";
 import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
 import { useCursorList } from "@/components/lms/admin/useCursorList";
@@ -25,7 +27,7 @@ import { OrgTemplatesTab } from "@/components/lms/org/admin/OrgTemplatesTab";
 import { LoadError, OrgBadge, OrgError } from "@/components/lms/org/OrgUi";
 import { DepartmentTree, type DepartmentAction } from "@/components/lms/org/DepartmentTree"; // Phase 9 S2
 
-const TABS = ["summary", "admins", "teachers", "courses", "departments", "usage", "templates", "log"] as const; // Phase 9 S2: departments
+const TABS = ["summary", "admins", "teachers", "courses", "departments", "templates", "log"] as const; // Phase 9 S2: departments; UX rework E: usage is on Summary
 type Tab = (typeof TABS)[number];
 
 export default function AdminOrganizationDetailPage() {
@@ -101,9 +103,12 @@ export default function AdminOrganizationDetailPage() {
         secondaryActions={
           <>
             <Button variant="secondary" onClick={() => setEditing(true)}>{t("organizations.admin.edit")}</Button>
-            <Button variant={suspended ? "secondary" : "dangerOutline"} onClick={() => { setDialogError(null); setStatusDialog(true); }}>
-              {t(suspended ? "organizations.admin.resume" : "organizations.admin.suspend")}
-            </Button>
+            <OutlineMenu label={t("coursePage.moreActions")} onSelect={() => { setDialogError(null); setStatusDialog(true); }}
+              groups={[{
+                id: "status", items: [suspended
+                  ? { id: "resume", label: t("organizations.admin.resume") }
+                  : { id: "suspend", label: t("organizations.admin.suspend"), danger: true }],
+              }]} />
           </>
         }
       />
@@ -118,37 +123,32 @@ export default function AdminOrganizationDetailPage() {
         items={TABS.map((k) => ({ id: k, label: t(`organizations.admin.tabs.${k}`) }))} />
       <TabPanel tabsId={tabsId} value={tab}>
         {tab === "summary" && (
-          <Card>
-            <DescriptionList twoColumns items={[
-              { key: "admins", term: t("organizations.counts.orgAdmins"), description: dash(org.org_admins) },
-              { key: "teachers", term: t("organizations.counts.teachers"), description: dash(org.teachers) },
-              { key: "courses", term: t("organizations.counts.courses"), description: dash(org.courses) },
-              { key: "storage", term: t("organizations.usage.storage"), description: usage ? bytes(usage.storage_bytes) : "—" },
-              { key: "created", term: t("organizations.admin.created"), description: fmtApiDateTimeShort(org.created_at, lang) },
-              { key: "canCreate", term: t("organizations.fields.teachersCanCreate"), description: org.settings?.teachers_can_create_courses ? t("platformAdmin.yes") : t("platformAdmin.no") },
-              ...settingsRows(org, t),
-            ]} />
-          </Card>
+          <div className="space-y-4">
+            {usageError ? <LoadError error={usageError} onRetry={loadUsage} /> : null}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <StatTile label={t("organizations.counts.orgAdmins")} value={dash(org.org_admins)} />
+              <StatTile label={t("organizations.counts.teachers")} value={usage ? usage.teachers : dash(org.teachers)} />
+              <StatTile label={t("organizations.counts.courses")} value={usage ? usage.courses : dash(org.courses)} />
+              <StatTile label={t("organizations.counts.students")} value={usage ? usage.students : "—"} />
+              <StatTile label={t("organizations.usage.banks")} value={usage ? usage.banks : "—"} />
+              <StatTile label={t("organizations.usage.questions")} value={usage ? usage.questions : "—"} />
+              <div title={t("organizations.usage.storageNote")}>
+                <StatTile className="h-full" label={t("organizations.usage.storage")} value={usage ? bytes(usage.storage_bytes) : "—"} />
+              </div>
+              <StatTile label={t("organizations.admin.created")} value={<span className="text-base font-semibold leading-8">{fmtApiDateTimeShort(org.created_at, lang)}</span>} />
+            </div>
+            <Disclosure title={t("orgSettings.nav")}>
+              <DescriptionList twoColumns items={[
+                { key: "canCreate", term: t("organizations.fields.teachersCanCreate"), description: org.settings?.teachers_can_create_courses ? t("platformAdmin.yes") : t("platformAdmin.no") },
+                ...settingsRows(org, t),
+              ]} />
+            </Disclosure>
+          </div>
         )}
         {tab === "admins" && <OrgMembersTab org={org} role="org_admin" onChanged={() => void load()} />}
         {tab === "teachers" && <OrgMembersTab org={org} role="teacher" onChanged={() => void load()} />}
         {tab === "courses" && <OrgCoursesTab org={org} />}
         {tab === "departments" && <OrgDepartmentsTab org={org} />}
-        {tab === "usage" && (
-          usageError ? <LoadError error={usageError} onRetry={loadUsage} /> : !usage ? <LoadingState label={t("lms.common.loading")} /> : (
-            <div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <StatTile label={t("organizations.counts.teachers")} value={usage.teachers} />
-                <StatTile label={t("organizations.counts.courses")} value={usage.courses} />
-                <StatTile label={t("organizations.counts.students")} value={usage.students} />
-                <StatTile label={t("organizations.usage.banks")} value={usage.banks} />
-                <StatTile label={t("organizations.usage.questions")} value={usage.questions} />
-                <StatTile label={t("organizations.usage.storage")} value={bytes(usage.storage_bytes)} />
-              </div>
-              <p className="mt-3 text-sm text-slate-600">{t("organizations.usage.storageNote")}</p>
-            </div>
-          )
-        )}
         {tab === "templates" && <OrgTemplatesTab org={org} />}
         {tab === "log" && <OrgLogTab org={org} />}
       </TabPanel>
@@ -232,7 +232,6 @@ function OrgDepartmentsTab({ org }: { org: OrganizationOut }) {
   const suspend = target?.action === "suspend";
   return (
     <div className="space-y-3">
-      <p className="text-sm text-slate-700">{t("departments.platformHint")}</p>
       <DepartmentTree rows={rows} mode="platform" onAction={onAction} />
       {rows.length <= 1 && <EmptyState variant="plain" className="py-4" title={t("departments.noneUsage")} />}
       <ReasonDialog
@@ -271,10 +270,7 @@ function OrgLogTab({ org }: { org: OrganizationOut }) {
   const state = useTableState(list);
   return (
     <div className="space-y-3">
-      <p className="text-sm text-slate-700">
-        {t("organizations.admin.logIntro")}{" "}
-        <Link href={`/${lang}/admin/audit-log`} className="font-medium text-brand-700 hover:underline">{t("organizations.admin.logAll")}</Link>
-      </p>
+      <Link href={`/${lang}/admin/audit-log`} className="inline-flex min-h-11 items-center text-sm font-medium text-brand-700 hover:underline sm:min-h-0">{t("organizations.admin.logAll")}</Link>
       <AuditTable entries={list.items} {...state} empty={<EmptyState title={t("platformAdmin.audit.empty")} />} />
       <MoreError list={list} />
     </div>

@@ -112,7 +112,7 @@ export function PageList() {
 
   return (
     <div>
-      <PageHeader title={t("pages.title")} description={t("pages.description")} primaryAction={newButton} />
+      <PageHeader title={t("pages.title")} primaryAction={newButton} />
       {/* 8a UX (minor 10): a filter, not an action: a checkbox under the header instead of a second button */}
       <Checkbox label={t("pages.showTrash")} checked={trash} onChange={(e) => setTrash(e.target.checked)} containerClassName="mb-2" />
       <ContentError error={actionError} className="mb-4" />

@@ -76,7 +76,6 @@ export function OrgTemplatesTab({ org }: { org: OrganizationOut }) {
   ];
   return (
     <div className="space-y-3">
-      <p className="text-sm text-slate-700">{t("organizations.templates.intro")}</p>
       <Table
         caption={t("organizations.admin.tabs.templates")}
         columns={columns}

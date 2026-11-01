@@ -6,7 +6,7 @@ import { GraduationCap, UserPlus, Users, UsersRound } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { listOrgInvitations, type InvitationOut } from "@/lib/lms/invitations";
 import { fmtApiDate } from "@/lib/format";
-import { Button, Card, EmptyState, LoadingState, PageHeader, StatTile } from "@/components/ui";
+import { Button, Card, LoadingState, PageHeader, StatTile } from "@/components/ui";
 import { useOrg } from "@/components/lms/org/OrgShell";
 import { InviteDialog, toastInvitationSent } from "@/components/lms/org/InviteDialog";
 import { OrgBadge, OrgError } from "@/components/lms/org/OrgUi";
@@ -36,7 +36,6 @@ export default function OrgOverviewPage() {
     <div>
       <PageHeader
         title={org.name}
-        description={t("organizations.org.area")}
         badge={<OrgBadge tone={org.status} labelKey={`organizations.status.${org.status}`} />}
         primaryAction={
           <Button disabled={readOnly} leftIcon={<UserPlus aria-hidden="true" className="h-4 w-4" />} onClick={() => setInviting(true)}>
@@ -57,7 +56,7 @@ export default function OrgOverviewPage() {
         padding={pending && pending.length > 0 ? "none" : "md"}
       >
         {error ? <OrgError error={error} onRetry={load} /> : pending === null ? <LoadingState label={t("lms.common.loading")} rows={1} /> : pending.length === 0 ? (
-          <EmptyState variant="plain" className="py-4" title={t("invitations.pendingEmpty")} />
+          <p className="text-sm text-slate-600">{t("invitations.pendingEmpty")}</p>
         ) : (
           <ul className="divide-y divide-slate-100 border-t border-slate-100">
             {pending.map((i) => (

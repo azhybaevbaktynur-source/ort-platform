@@ -345,7 +345,6 @@
       "saved": "Saved",
       "enrollment": "Enrollment",
       "joinCode": "Join code",
-      "joinCodeHint": "Share this code with your students. It works only while the course is published and enrollment is by code.",
       "joinCodeInactiveUnpublished": "The code is not active right now: publish the course and set enrollment to a join code.",
       "regenerate": "Generate a new code",
       "regenerateTitle": "Generate a new code?",
@@ -376,7 +375,6 @@
       "delete": "Delete course",
       "deleteTitle": "Delete this course?",
       "deleteBody": "The course disappears for everyone. You can restore it from deleted courses.",
-      "deleteHint": "Only the owner can delete or restore a course.",
       "joinCodeInactiveMode": "The code is off because students join by application form. Choose “{code}” to use it.",
       "joinCodeInactiveOpen": "The code is off because students join from the catalog without it. Choose “{code}” to use it.",
       "joinCodeInactiveClosed": "The code is off because enrollment is closed. Choose “{code}” to use it."
@@ -411,7 +409,6 @@
     },
     "homeKind": {
       "title": "Course home",
-      "hint": "What students see first when they open the course.",
       "label": "Students see first",
       "kinds": {
         "modules": "Modules",
@@ -474,12 +471,7 @@
     },
     "overview": {
       "title": "Platform administration",
-      "pendingRequests": "Teacher requests waiting for review",
-      "usersHint": "Search accounts, change teacher status, disable accounts.",
-      "coursesHint": "Moderate courses: unlist, delete, restore, transfer.",
-      "auditHint": "Every administrator action is recorded here.",
-      "orgsHint": "Schools and centers: admins, teachers, templates, suspend or resume.",
-      "sections": "Sections"
+      "pendingRequests": "Teacher requests waiting for review"
     },
     "reasonRequired": "Reason (required)",
     "reasonOptional": "Reason (optional)",
@@ -2156,7 +2148,6 @@
   "storage": {
     "nav": "Storage",
     "title": "File storage",
-    "intro": "Cloudflare R2 must stay in the free tier (10 GB stored, 1 million Class A and 10 million Class B operations per month). The platform counts every file it writes and refuses new uploads before the limit.",
     "r2devWarning": "Public images are served from an r2.dev address. r2.dev is rate-limited and not meant for production: switch to a custom domain before the first large exam.",
     "units": {
       "b": "B",
@@ -2341,11 +2332,9 @@
         "teachers": "Teachers",
         "courses": "Courses",
         "departments": "Departments",
-        "usage": "Usage",
         "templates": "Templates",
         "log": "Log"
       },
-      "logIntro": "Actions on this organization (suspend, resume, template grants).",
       "logAll": "Open the full audit log",
       "systemAccount": "System account",
       "systemAccountHint": "The platform needs this account (for example the ORT system teacher). It cannot be edited, blocked or given other rights."
@@ -2366,7 +2355,6 @@
       "orgsTitle": "Organizations and roles",
       "orgsEmpty": "Not a member of any organization yet.",
       "addToOrg": "Add to organization",
-      "addToOrgHint": "The person gets the chosen role in the organization at once.",
       "role": "Role",
       "addTitle": "Add to the organization?",
       "addBody": "{name} becomes «{role}» in {org}. This is recorded in the audit log.",
@@ -2392,25 +2380,23 @@
       "removeAdminBody": "{name} stops being an admin of «{org}» and can no longer manage its teachers and courses.",
       "removed": "{name} was removed from the organization.",
       "assignAdmin": "Assign admin",
-      "assignAdminHint": "Find an existing account by name or email. To invite someone without an account, use an invitation.",
       "assignAdminTitle": "Make {name} an admin?",
       "assignAdminBody": "{name} will manage the teachers and courses of «{org}».",
       "adminAdded": "{name} is now an admin.",
       "addTeacher": "Add teacher",
-      "addTeacherHint": "Find an existing account by name or email.",
       "addTeacherTitle": "Add {name} as a teacher?",
       "addTeacherBody": "{name} becomes a teacher of «{org}» and is listed among its teachers.",
       "teacherAdded": "{name} was added as a teacher.",
       "person": "Person",
       "noAdmins": "No admins yet. Assign one so the organization can be managed.",
       "noTeachers": "No teachers yet.",
-      "sinceColumn": "Member since"
+      "sinceColumn": "Member since",
+      "actionsFor": "Actions: {name}"
     },
     "courses": {
       "title": "Courses",
       "create": "Create course",
       "createTitle": "New course",
-      "createHint": "The course belongs to «{org}». Choose who owns and teaches it.",
       "back": "Back to courses",
       "searchPlaceholder": "Course title",
       "empty": "No courses yet. Create the first course and assign a teacher.",
@@ -2449,7 +2435,6 @@
       "storageNote": "Storage is an estimate: the files uploaded by the organization's active members."
     },
     "templates": {
-      "intro": "A course template gives courses a fixed exam structure. Granted organizations can create courses with it.",
       "grantOnly": "Visible only to granted organizations.",
       "grantedOn": "granted {date}",
       "stateGranted": "Granted",
@@ -3197,7 +3182,6 @@
     },
     "list": {
       "title": "Assignments",
-      "subtitle": "Everything students hand in or get a grade for, in one list.",
       "ortHint": "The ORT exam is listed here as an assignment. Its questions and settings stay in the exam builder.",
       "assistantNote": "Assistants can edit and grade assignments. Exceptions for students are set by the teacher.",
       "caption": "Assignments of the course",
@@ -3507,7 +3491,6 @@
     },
     "section": {
       "title": "Accommodations",
-      "subtitle": "Extra time or attempts for a student in every quiz of the course. Only teachers can change them.",
       "colAccommodations": "Accommodations",
       "none": "None",
       "open": "Accommodations",
@@ -3676,11 +3659,6 @@
     },
     "list": {
       "pageTitle": "Exam templates",
-      "intro": {
-        "teacher": "Your own templates. Use them when you create an exam in a course.",
-        "org": "Templates of this organization and of its teachers.",
-        "platform": "All exam templates on the platform."
-      },
       "new": "New template",
       "title": "Template",
       "scope": "Visible to",
@@ -4318,7 +4296,6 @@
   },
   "pages": {
     "title": "Pages",
-    "description": "Text pages for your course: lessons, instructions and notes. Students open them from modules or the course home.",
     "new": "New page",
     "empty": "No pages yet",
     "emptyHint": "Create a page to share a lesson, instructions or notes.",
@@ -4439,7 +4416,6 @@
   },
   "courseFiles": {
     "title": "Files",
-    "descriptionStaff": "PDF files for your students. Put them in folders and publish them when they are ready.",
     "descriptionStudent": "Course files from your teacher.",
     "upload": "Upload a file",
     "quota": "Course storage",
@@ -4499,7 +4475,6 @@
   },
   "announcements": {
     "title": "Announcements",
-    "descriptionStaff": "Post news for the whole course. Pinned announcements stay on top.",
     "descriptionStudent": "News from your teacher.",
     "new": "New announcement",
     "empty": "No announcements yet",
@@ -4577,10 +4552,8 @@
     "celebrate": "Module “{title}” completed. Well done!",
     "editor": {
       "title": "Modules",
-      "description": "Students see published modules in this order.",
       "newModule": "New module",
       "emptyTitle": "No modules yet",
-      "emptyBody": "Modules group pages, files, assignments and links into steps. Students see published modules in order.",
       "published": "Published",
       "draft": "Draft",
       "hidden": "Hidden",
@@ -4606,7 +4579,6 @@
       "moveItemUp": "Move “{title}” up",
       "moveItemDown": "Move “{title}” down",
       "after": "After: {titles}",
-      "noItems": "No items yet. Add a page, file, assignment, link or header.",
       "addItem": "Add",
       "editItem": "Item settings",
       "setRequirement": "Completion requirement",
@@ -4633,7 +4605,6 @@
       "toastUnpublished": "Draft (unpublished): {title}"
     },
     "settings": {
-      "createTitle": "New module",
       "editTitle": "Module settings",
       "titleLabel": "Module title",
       "titleRequired": "Enter a title.",
@@ -4644,8 +4615,6 @@
       "completionMode": "The module is complete when",
       "modeAll": "all requirements are met",
       "modeAny": "any one requirement is met",
-      "publish": "Publish now",
-      "publishHint": "Students see only published modules.",
       "create": "Create module",
       "localTime": "Your local time"
     },
@@ -4676,7 +4645,6 @@
     "add": {
       "title": "Add item",
       "kindLabel": "What to add",
-      "newQuiz": "New quiz",
       "pickPage": "Choose a page",
       "pickFile": "Choose a file",
       "pickAssignment": "Choose an assignment",
@@ -4702,9 +4670,6 @@
         "2": "Level 2",
         "3": "Level 3"
       },
-      "quizTitle": "Quiz title",
-      "quizNext": "The quiz editor opens next. The quiz stays a draft until you publish it.",
-      "createQuiz": "Create quiz",
       "submit": "Add"
     },
     "itemEdit": {
@@ -4752,7 +4717,6 @@
   "courseNav": {
     "menu": "Course menu",
     "hiddenFromStudents": "Hidden from students: nothing published yet",
-    "hiddenHelp": "Links with a crossed-out eye are hidden from students until something is published there.",
     "unavailable": {
       "title": "Not available yet",
       "body": "Your teacher has not published anything here.",
@@ -4790,21 +4754,10 @@
     "toggleModule": "Show or hide the items of “{title}”",
     "itemCount": "Items: {n}",
     "structure": "Course structure",
-    "structureHint": "Modules: pages, files and links in steps for students.",
     "unsorted": {
-      "title": "Not in a module",
-      "empty": "Everything is in a module.",
       "hint": "These assignments, pages and files are in no module. Students find them only in Assignments, Files or through a link.",
-      "totals": "Assignments: {assignments} · Pages: {pages} · Files: {files}",
-      "groups": {
-        "assignments": "Assignments ({n})",
-        "pages": "Pages ({n})",
-        "files": "Files ({n})"
-      },
       "more": "Show more",
       "moveTo": "Move to module…",
-      "allPages": "All pages",
-      "allFiles": "All files",
       "placeTitle": "Move to a module",
       "noModules": "There are no modules yet. Create a module first.",
       "position": "Position in the module",
@@ -4813,26 +4766,23 @@
       "after": "After “{title}”",
       "placed": "Added to the module.",
       "deleteTitle": "Delete this item?",
-      "deleteBody": "It goes to the trash of its list (Assignments, Pages or Files) and can be restored there. Students stop seeing it."
-    }
+      "deleteBody": "It goes to the trash of its list (Assignments, Pages or Files) and can be restored there. Students stop seeing it.",
+      "row": "Not in modules · {n}",
+      "edit": "Edit"
+    },
+    "rename": "Rename",
+    "inlineTitle": "{kind}: title"
   },
   "todo": {
-    "title": "To do",
     "toGrade": "To grade",
-    "toGradeLine": "To grade: {toGrade} · Drafts: {drafts}",
     "waiting": "Waiting: {n}",
-    "drafts": "Drafts",
-    "unpublishedModules": "Unpublished modules: {n}",
-    "studentsTitle": "Students",
-    "students": "Active students: {n}",
-    "nothing": "Nothing to do",
     "more": "{n} more",
-    "joinCodeOff": "The code is off. Turn on joining by code in Enrollment settings."
+    "joinCodeOff": "The code is off. Turn on joining by code in Enrollment settings.",
+    "toGradeCount": "To grade: {n}"
   },
   "orgSettings": {
     "nav": "Settings",
     "title": "Organization settings",
-    "intro": "These settings apply to the whole organization and every department in it.",
     "readOnly": "Settings are shared by the whole organization {root}. Its administrators change them.",
     "coursesTitle": "Courses",
     "teachersCanCreate": "Teachers can create courses",
@@ -4845,7 +4795,6 @@
     "studentInvitations": "Teachers can invite students by email",
     "studentInvitationsHint": "Students still accept the invitation themselves.",
     "defaultsTitle": "Defaults for new courses",
-    "defaultsHint": "New courses start with these values. ORT courses keep their own.",
     "visibility": "In the catalog",
     "visibilityOptions": {
       "private": "Private (by code or link)",
@@ -4868,7 +4817,6 @@
   "departments": {
     "nav": "Departments",
     "title": "Departments",
-    "intro": "Group teachers and courses into departments. Admins of the organization manage every department in it.",
     "create": "New department",
     "createTitle": "Create a department",
     "name": "Name",
@@ -4894,7 +4842,6 @@
     "usageTitle": "By department",
     "usageDepartment": "Department",
     "noneUsage": "No departments yet.",
-    "platformHint": "A suspended department suspends everything inside it: its courses and sub-departments become read-only.",
     "save": "Save",
     "cancel": "Cancel",
     "suspendTitle": "Suspend this department?",
@@ -4904,7 +4851,6 @@
     "suspendedToast": "{name} is suspended.",
     "resumedToast": "{name} is active again.",
     "courseDepartment": "Department",
-    "courseDepartmentHint": "Move the course to another department. Its students, staff and question banks stay with it.",
     "moveCourse": "Move course",
     "courseMoved": "The course is now in {name}",
     "courseCount": "{count} courses",
@@ -4922,7 +4868,6 @@
   "sharedBanks": {
     "nav": "Shared banks",
     "title": "Shared question banks",
-    "intro": "Question banks that teachers shared with the whole organization. Teachers copy them into their courses on the course's Question banks page.",
     "search": "Search by title",
     "empty": "No shared banks yet",
     "emptyHint": "A teacher shares a bank from its page, with More actions, once sharing is turned on in Settings.",

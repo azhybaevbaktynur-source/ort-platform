@@ -73,8 +73,8 @@ export default function OrgNewCoursePage() {
   const disabled = busy || readOnly;
   const coursesHref = `/${lang}/org/${org.id}/courses`;
   return (
-    <div className="max-w-2xl">
-      <PageHeader title={t("organizations.courses.createTitle")} description={t("organizations.courses.createHint", { org: org.name })}
+    <div className="max-w-3xl">
+      <PageHeader title={t("organizations.courses.createTitle")}
         breadcrumbs={crumbs({ label: t("organizations.org.nav.courses"), href: coursesHref }, { label: t("organizations.courses.createTitle") })} />
     <Card>
     <form onSubmit={submit} noValidate className="space-y-6">

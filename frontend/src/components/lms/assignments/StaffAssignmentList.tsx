@@ -274,7 +274,7 @@ export function StaffAssignmentList() {
   return (
     <div className="space-y-4">
       <PageHeader title={t("assignments.list.title")} className="mb-2"
-        description={ui.key === "ort" ? t("assignments.list.ortHint") : t("assignments.list.subtitle")}
+        description={ui.key === "ort" ? t("assignments.list.ortHint") : undefined}
         secondaryActions={canEdit ? <Button variant="secondary" onClick={() => { setTrash((s) => !s); setCursor(null); }}>
           {trash ? t("assignments.list.hideTrash") : t("assignments.list.showTrash")}</Button> : undefined}
         primaryAction={create} />

@@ -16,6 +16,8 @@ import {
 } from "@/components/ui";
 import { platformUserSearch, type PickedUser } from "@/components/lms/UserPicker";
 import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
+import { Disclosure } from "@/components/lms/admin/Disclosure";
+import { OutlineMenu } from "@/components/lms/modules/OutlineMenu";
 import { CourseStatusBadge, LoadError, OrgError, SystemAccountBadge } from "@/components/lms/org/OrgUi";
 
 type Action = "delete" | "restore" | "unlist" | "relist" | "transfer";
@@ -126,12 +128,13 @@ export default function AdminCourseDetailPage() {
   const actions = isDeleted ? (
     <Button variant="secondary" onClick={() => open("restore")}>{labels.restore}</Button>
   ) : (
-    <>
-      {course.unlisted_by_admin_at
-        ? <Button variant="secondary" onClick={() => open("relist")}>{labels.relist}</Button>
-        : <Button variant="secondary" onClick={() => open("unlist")}>{labels.unlist}</Button>}
-      <Button variant="dangerOutline" onClick={() => open("delete")}>{labels.delete}</Button>
-    </>
+    <OutlineMenu label={t("coursePage.moreActions")} onSelect={(id) => open(id as Action)}
+      groups={[{
+        id: "course", items: [
+          course.unlisted_by_admin_at ? { id: "relist", label: labels.relist } : { id: "unlist", label: labels.unlist },
+          { id: "delete", label: labels.delete, danger: true },
+        ],
+      }]} />
   );
   const badges = (
     <span className="flex flex-wrap items-center gap-2">
@@ -173,7 +176,7 @@ export default function AdminCourseDetailPage() {
       </Card>
 
       {!isDeleted && (
-        <Card className="mb-6" title={t("platformAdmin.courses.transferHeading")} description={t("platformAdmin.courses.transferHint")}>
+        <Disclosure className="mb-6" title={t("platformAdmin.courses.transferHeading")}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="w-full sm:max-w-md">
               <UserPicker id="new-owner" label={t("platformAdmin.courses.newOwnerId")} value={newOwner} onChange={setNewOwner}
@@ -181,7 +184,8 @@ export default function AdminCourseDetailPage() {
             </div>
             <Button variant="secondary" disabled={!newOwner} onClick={() => open("transfer")}>{labels.transfer}</Button>
           </div>
-        </Card>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{t("platformAdmin.courses.transferHint")}</p>
+        </Disclosure>
       )}
 
       <Card title={t("platformAdmin.courses.roster")} description={people === null ? t("platformAdmin.courses.rosterAudited") : undefined}>
