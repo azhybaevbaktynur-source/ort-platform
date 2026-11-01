@@ -532,3 +532,12 @@ Implementation decisions (agent):
 | 10-Q5 | Retention of old practice attempts | Keep all; Phase 11 reviews growth, any Neon cost goes to the owner first. |
 | 10-Q6 | Students build their own practice; statistics across versions | No: teachers build sets; statistics per version with a selector. |
 
+## Owner decisions 2026-11-01: exam player in Bluebook style (`phases/BLUEBOOK_PLAYER.md`)
+
+| # | Decision |
+|---|---|
+| BB-1 | The exam player, ORT and general, takes a Bluebook-style layout: full width, no always-visible palette, top bar (section + Directions, timer with Hide, Saved + More), bottom bar (Back, "Question n of m" popup, Next), Mark for review, review page per section, split screen for passages with a draggable divider. **This overrides the earlier "no layout change" rule for the ORT player. Exam rules, timing, forward-only sections, scoring, autosave and imports stay exactly the same.** Proof: ORT e2e and scoring parity green, new approved baselines. |
+| BB-2 | Done before Phase 11. |
+| PBB-1 | Agent: a hidden timer shows itself again in the last 5 minutes (safety; time-up is unchanged). Answer elimination isn't built; listed in `ORT_PLAYER_IDEAS.md`. |
+| 10-N | Neon: `backup-2026-10-25-before-phase6a` and `backup-2026-10-26-before-phase7a` deleted with the owner's OK (2026-11-01) after a row-ID comparison with production. QA data stays while testing needs it. |
+
