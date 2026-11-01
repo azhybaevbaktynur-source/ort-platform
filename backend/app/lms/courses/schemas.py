@@ -28,6 +28,7 @@ class CourseFeaturesOut(BaseModel):
     modules: bool = False
     files: bool = False
     announcements: bool = False
+    practice: bool = False  # Phase 10 S0: a live, published practice quiz exists
 # --- Phase 8a S1 end ---
 
 

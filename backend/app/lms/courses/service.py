@@ -373,6 +373,7 @@ def course_features(db: Session, course: Course):
     from sqlalchemy import exists
 
     from app.lms.announcements.models import Announcement
+    from app.lms.assessments.models import Assessment
     from app.lms.course_files.models import CourseFile
     from app.lms.courses.schemas import CourseFeaturesOut
     from app.lms.modules.models import CourseModule
@@ -385,8 +386,11 @@ def course_features(db: Session, course: Course):
                        CourseFile.published.is_(True)),
         exists().where(Announcement.course_id == course.id, Announcement.deleted_at.is_(None),
                        Announcement.published_at.isnot(None), Announcement.published_at <= now),
+        exists().where(Assessment.course_id == course.id, Assessment.deleted_at.is_(None),
+                       Assessment.status == "published", Assessment.is_practice.is_(True)),
     )).one()
-    return CourseFeaturesOut(modules=bool(row[0]), files=bool(row[1]), announcements=bool(row[2]))
+    return CourseFeaturesOut(modules=bool(row[0]), files=bool(row[1]), announcements=bool(row[2]),
+                             practice=bool(row[3]))
 # --- Phase 8a S3 end ---
 
 

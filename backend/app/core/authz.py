@@ -41,6 +41,8 @@ class A:
     # --- Phase 8a S1 begin --- (PHASE_8A_DESIGN 7: module view / mark-done facts; students only, published course)
     PROGRESS_RECORD = "progress.record"
     # --- Phase 8a S1 end ---
+    # --- Phase 10 S0 --- (staff and org admins read aggregates; students never; item statistics need CONTENT_READ_ADMIN)
+    ANALYTICS_READ = "analytics.read"
 
 
 ALL_ACTIONS = frozenset(v for k, v in vars(A).items() if not k.startswith("_"))
@@ -65,7 +67,7 @@ ROLE_GRANTS["student"] = ROLE_GRANTS["student"] | {A.PROGRESS_RECORD}
 
 READ_ONLY_ACTIONS = frozenset({
     A.COURSE_READ, A.ROSTER_READ, A.CONTENT_READ, A.CONTENT_READ_ADMIN,
-    A.ATTEMPT_READ_OWN, A.ATTEMPT_READ_ALL, A.GRADES_READ_OWN,
+    A.ATTEMPT_READ_OWN, A.ATTEMPT_READ_ALL, A.GRADES_READ_OWN, A.ANALYTICS_READ,
 })
 
 PLATFORM_ADMIN_ACTIONS = frozenset({A.COURSE_READ, A.ROSTER_READ, A.COURSE_DELETE})
@@ -76,7 +78,8 @@ CONCLUDED_ACTIONS = READ_ONLY_ACTIONS | {A.COURSE_PUBLISH, A.COURSE_DELETE, A.CO
 # --- Phase 6 S1 begin --- (PHASE_6_DESIGN 2.2, owner decision A13): an org admin of course.organization_id reads
 # the course and its content (student-facing views only: no answer keys, attempts or grades), manages the roster
 # and reassigns the owner. Full teacher powers only through a teacher enrollment (join-as-teacher).
-ORG_ADMIN_ACTIONS = frozenset({A.COURSE_READ, A.ROSTER_READ, A.ROSTER_MANAGE, A.COURSE_TRANSFER, A.CONTENT_READ})
+ORG_ADMIN_ACTIONS = frozenset({A.COURSE_READ, A.ROSTER_READ, A.ROSTER_MANAGE, A.COURSE_TRANSFER, A.CONTENT_READ,
+                              A.ANALYTICS_READ})
 # --- Phase 6 S1 end ---
 
 

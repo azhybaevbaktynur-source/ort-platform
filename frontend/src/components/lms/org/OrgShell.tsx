@@ -68,6 +68,7 @@ export function OrgShell({ children }: { children: React.ReactNode }) {
     { href: `${base}/shared-banks`, label: t("sharedBanks.nav"), active: pathname.startsWith(`${base}/shared-banks`) },
     { href: `${base}/roster-import`, label: t("organizations.org.rosterImport"), active: pathname.startsWith(`${base}/roster-import`) },
     // --- Phase 9 S2 end ---
+    { href: `${base}/analytics`, label: t("analytics.nav"), active: pathname.startsWith(`${base}/analytics`) },
     // --- Phase 7b S4 ---
     { href: `${base}/exam-templates`, label: t("examTemplates.nav.title"), active: pathname.startsWith(`${base}/exam-templates`) },
     // --- Phase 9 S2 ---

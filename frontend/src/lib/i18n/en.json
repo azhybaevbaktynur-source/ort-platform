@@ -5142,5 +5142,15 @@
       "rejected": "Application of {name} rejected",
       "concluded": "The course is concluded: you can reject, but not approve."
     }
+  },
+  "practice": {
+    "nav": "Practice"
+  },
+  "progress": {
+    "nav": "My progress"
+  },
+  "quizStats": {},
+  "analytics": {
+    "nav": "Analytics"
   }
 }

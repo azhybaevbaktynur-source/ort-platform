@@ -146,7 +146,7 @@ async def test_features_follow_published_rows(api, db):
         assert res.status_code == 200, res.text
         return res.json()["features"]
 
-    none = {"modules": False, "files": False, "announcements": False}
+    none = {"modules": False, "files": False, "announcements": False, "practice": False}
     assert await features(w.S) == none
     make_module(db, w.course, w.O, published=False)
     make_course_file(db, w.course, w.O, published=False)
@@ -157,9 +157,9 @@ async def test_features_follow_published_rows(api, db):
     db.commit()
     assert await features(w.S) == none
     make_module(db, w.course, w.O)
-    assert await features(w.S) == {"modules": True, "files": False, "announcements": False}
+    assert await features(w.S) == {"modules": True, "files": False, "announcements": False, "practice": False}
     make_course_file(db, w.course, w.O)
     make_announcement(db, w.course, w.O)
-    full = {"modules": True, "files": True, "announcements": True}
+    full = {"modules": True, "files": True, "announcements": True, "practice": False}
     assert await features(w.S) == full
     assert await features(w.O) == full  # staff shape carries the same flags

@@ -7,7 +7,8 @@
 import React from "react";
 import { usePathname } from "next/navigation";
 import {
-  BookOpen, ClipboardList, EyeOff, FolderOpen, GraduationCap, Library, Megaphone, Settings, Users,
+  BarChart3, BookOpen, ClipboardList, Dumbbell, EyeOff, FolderOpen, GraduationCap, Library, Megaphone, Settings,
+  TrendingUp, Users,
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { courseNavItems, courseNavRole, type CourseNavKey } from "@/lib/lms/nav";
@@ -23,6 +24,9 @@ const ICONS: Record<CourseNavKey, React.ReactNode> = {
   bank: <Library />,
   settings: <Settings />,
   files: <FolderOpen />,
+  practice: <Dumbbell />,
+  progress: <TrendingUp />,
+  analytics: <BarChart3 />,
 };
 
 export function CourseSidebar({ course, children }: { course: CourseOut; children: React.ReactNode }) {

@@ -10,6 +10,7 @@ ALL = frozenset({
     "attempt.read_all", "grades.read_own", "grades.manage", "course.transfer", "course.leave",
     "assignment.submit", "accommodations.manage",  # Phase 7a
     "progress.record",  # Phase 8a: module view / mark-done facts, students only
+    "analytics.read",  # Phase 10: aggregates for staff and org admins, never students
 })
 TEACHER = ALL - {"assignment.submit", "progress.record"}  # Phase 7a/8a: staff never hand in nor record progress
 ASSISTANT_PUBLISHED = TEACHER - {"course.delete", "course.publish", "roster.manage", "course.transfer",
@@ -20,7 +21,7 @@ STUDENT_PUBLISHED = frozenset({
 })
 READ_ONLY = frozenset({
     "course.read", "roster.read", "content.read", "content.read_admin", "attempt.read_own", "attempt.read_all",
-    "grades.read_own",
+    "grades.read_own", "analytics.read",
 })
 
 # Explicit expectation table, written independently of decide().
