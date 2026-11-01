@@ -7,6 +7,7 @@ import { useTranslation } from "@/lib/i18n/context";
 import { AuthHeader } from "@/components/auth/AuthHeader";
 import { Button, Input, buttonClasses } from "@/components/ui";
 import { Lock, ArrowRight, AlertCircle, CheckCircle2 } from "lucide-react";
+import { API_BASE_URL } from "@/lib/apiBase";
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -49,7 +50,7 @@ function ResetPasswordForm() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/v1/auth/reset-password", {
+      const res = await fetch(`${API_BASE_URL}/auth/reset-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -60,12 +61,12 @@ function ResetPasswordForm() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || t("auth.resetFailed"));
+        throw new Error(res.status === 429 ? t("auth.errors.rate_limited") : err.detail || t("auth.resetFailed"));
       }
 
       setSuccess(true);
     } catch (err: any) {
-      setError(err?.message || t("auth.resetFailed"));
+      setError(err instanceof TypeError ? t("auth.errors.network") : err?.message || t("auth.resetFailed"));
     } finally {
       setLoading(false);
     }

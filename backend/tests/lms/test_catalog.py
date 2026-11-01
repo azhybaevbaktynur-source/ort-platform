@@ -322,6 +322,9 @@ async def test_open_join_is_rate_limited_with_the_join_limits(db, api):
 async def test_open_join_failures_count_against_the_ip(db, api, monkeypatch):
     from app.core.config import settings
     monkeypatch.setattr(settings, "RATE_LIMIT_IP_ENFORCE", True, raising=False)
+    from app.lms.core import ratelimit
+    fixed = ratelimit._now()  # a frozen clock: these calls can otherwise straddle the 10-minute window
+    monkeypatch.setattr(ratelimit, "_now", lambda: fixed)
     t = teacher(db)
     c = catalog_course(db, t)
     ip = "4.4.4.4"

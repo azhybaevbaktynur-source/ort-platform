@@ -10,9 +10,12 @@ RULE = Limit("t", 3, 60)
 
 
 @pytest.fixture(autouse=True)
-def clean():
+def clean(monkeypatch):
     with engine.begin() as c:
         c.execute(RateLimitBucket.__table__.delete())
+    # A frozen clock (Phase 11 S4): a few calls can straddle these 60-second windows. Tests that move time set their own.
+    fixed = ratelimit._now()
+    monkeypatch.setattr(ratelimit, "_now", lambda: fixed)
     yield
 
 

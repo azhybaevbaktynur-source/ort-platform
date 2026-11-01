@@ -67,6 +67,8 @@ async def test_the_allowed_routes_get_past_the_gate(db):
     for method, path in sorted(set(iter_routes(app))):
         if not path.startswith("/api/v1") or not _allowed(method, path):
             continue
+        if path == "/api/v1/auth/logout-all":  # would end this test's token; test_security_11 covers it for a gated account
+            continue
         res = await call(user, method, _fill(path), json={})
         assert not (res.status_code == 403 and code(res) == "consent_required"), (method, path)
     assert (await call(user, "GET", "/api/v1/auth/me")).status_code == 200

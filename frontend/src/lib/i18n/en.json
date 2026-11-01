@@ -92,7 +92,8 @@
       "too_many_attempts": "Too many incorrect attempts. Request a new code.",
       "resend_cooldown": "Please wait {retryAfterSeconds} s before resending.",
       "email_send_failed": "Could not send the email. Please try again a bit later.",
-      "network": "The server is not responding. It may be waking up, so try again in a few seconds."
+      "network": "The server is not responding. It may be waking up, so try again in a few seconds.",
+      "rate_limited": "Too many attempts. Please wait a bit and try again."
     },
     "wakingServer": "The server is waking up after being idle, so the first login may take up to a minute...",
     "resetInvalidToken": "Invalid link or token not found",

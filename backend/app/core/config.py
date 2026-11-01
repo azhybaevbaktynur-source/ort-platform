@@ -44,11 +44,12 @@ class Settings(BaseSettings):
     # JWT Authentication
     SECRET_KEY: str = "ort_secret_jwt_key_2026_super_secure_academic_prep"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 3  # 3 days, rolling: POST /auth/refresh (PHASE_11_DESIGN 5.2)
 
-    # Number of trusted proxies appending to X-Forwarded-For (Vercel rewrite -> Render = 2); 0 = ignore the header
+    # Number of trusted proxies appending to X-Forwarded-For; 0 = ignore the header. Not verified yet: the browser calls
+    # Render directly, so 2 is probably wrong. docs/runbooks/IP_CHAIN.md finds the real value.
     RATE_LIMIT_PROXY_HOPS: int = 2
-    # IP-keyed rate-limit rules count and log but never deny until the proxy chain is verified.
+    # IP-keyed rate-limit rules count and log but never deny until the proxy chain is verified (IP_CHAIN.md; kill switch).
     RATE_LIMIT_IP_ENFORCE: bool = False
 
     # --- Phase 2: files and content library (docs/phases/PHASE_2_DESIGN.md) ---
@@ -224,3 +225,10 @@ DEFAULT_SECRET_KEY = "ort_secret_jwt_key_2026_super_secure_academic_prep"
 
 def is_production() -> bool:
     return settings.ENVIRONMENT.strip().lower() == "production"
+
+
+def refuse_unsafe_secret_keys() -> None:
+    """Phase 11 S4 (PHASE_11_DESIGN 5.2): production never starts on the public default key, as the current key or as
+    the previous one: anyone could forge login tokens with it."""
+    if is_production() and DEFAULT_SECRET_KEY in (settings.SECRET_KEY, settings.SECRET_KEY_PREVIOUS):
+        raise RuntimeError("SECRET_KEY or SECRET_KEY_PREVIOUS is the public default from the repository. Set SECRET_KEY.")
