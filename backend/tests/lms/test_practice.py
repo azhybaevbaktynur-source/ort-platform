@@ -598,3 +598,17 @@ async def test_ort_course_practice_leaves_the_exam_alone(db, api):
     assert [x["id"] for x in res.json()["items"]] == [str(exam.id)]
     res = await api.call(student, "POST", f"/courses/{cid}/assessments/{exam.id}/attempts", json={})
     assert res.status_code == 201 and res.json()["is_practice"] is False
+
+
+async def test_generic_publish_routes_never_create_an_assignment(db, api):
+    """The generic publish routes also reach a practice set: they must not mirror it onto an assignment."""
+    w = world(db)
+    bank, _ = bank_of(db, w.course, w.O, 4)
+    pset = await mk_set(api, w, bank, 2)
+    base = f"/courses/{w.cid}/assessments/{pset['id']}"
+    republish = await api.call(w.O, "POST", f"{base}/publish", json={})
+    unpublish = await api.call(w.O, "POST", f"{base}/unpublish", json={})
+    assert republish.status_code < 500 and unpublish.status_code < 500
+    assert unpublish.status_code == 200  # the mirror line is reached
+    db.expire_all()
+    assert db.query(Assignment).filter(Assignment.assessment_id == uuid.UUID(pset["id"])).count() == 0
