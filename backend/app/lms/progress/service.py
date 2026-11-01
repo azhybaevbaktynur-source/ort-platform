@@ -72,21 +72,29 @@ def visible_assessments(db: Session, course_id: uuid.UUID, user_id: str, now: da
 
 # ------------------------------------------------------------------ mistakes
 
+def _final_attempts(user_id: str, course_id: uuid.UUID, visible: list[uuid.UUID]):
+    """The student's final attempts on the visible assessments, read first through `ix_attempts_user_course_final`.
+    Materialized so one student's page never turns into a parallel scan of `attempts` (PHASE_11_EXPLAIN.md)."""
+    return (select(_A.c.id, _A.c.submitted_at, _A.c.assessment_id, _A.c.assessment_version_id, _A.c.language)
+            .where(_A.c.user_id == user_id, _A.c.course_id == course_id, final_attempt(_A),
+                   _A.c.assessment_id.in_(visible))
+            .cte("final_attempts").prefix_with("MATERIALIZED", dialect="postgresql"))
+
+
 def _latest_rows(user_id: str, course_id: uuid.UUID, visible: list[uuid.UUID]):
     """One row per bank question: the student's latest answer (window functions: PG and SQLite)."""
-    a, i, qv, bq = Attempt, AttemptItem, QuestionVersion, BankQuestion
+    a, i, qv, bq = _final_attempts(user_id, course_id, visible), AttemptItem, QuestionVersion, BankQuestion
     wrong = case((i.correctness.in_(_WRONG), 1), else_=0)
     return select(
         i.attempt_id.label("attempt_id"), i.position.label("position"), i.correctness.label("correctness"),
-        a.submitted_at.label("submitted_at"), a.assessment_id.label("assessment_id"),
-        a.assessment_version_id.label("version_id"), a.language.label("language"),
+        a.c.submitted_at.label("submitted_at"), a.c.assessment_id.label("assessment_id"),
+        a.c.assessment_version_id.label("version_id"), a.c.language.label("language"),
         bq.topic.label("topic"), bq.section.label("section"),
         func.row_number().over(partition_by=qv.question_id,
-                               order_by=(a.submitted_at.desc(), i.attempt_id.desc(), i.position.desc())).label("rn"),
+                               order_by=(a.c.submitted_at.desc(), i.attempt_id.desc(), i.position.desc())).label("rn"),
         func.max(wrong).over(partition_by=qv.question_id).label("ever_wrong"),
-    ).select_from(a).join(i, i.attempt_id == a.id).join(qv, qv.id == i.question_version_id) \
-        .join(bq, bq.id == qv.question_id).where(
-        a.user_id == user_id, a.course_id == course_id, final_attempt(_A), a.assessment_id.in_(visible))
+    ).select_from(a).join(i, i.attempt_id == a.c.id).join(qv, qv.id == i.question_version_id) \
+        .join(bq, bq.id == qv.question_id)
 
 
 def _kind_filter(r, status: str):
@@ -188,12 +196,12 @@ def progress(db: Session, course: Course, user_id: str, enrollment_id: uuid.UUID
     # accuracy by section and topic: `pending` items are not counted, `unanswered` are
     i, qv, bq = AttemptItem, QuestionVersion, BankQuestion
     weight = case((i.correctness == "correct", 1.0), (i.correctness == "partial", 0.5), else_=0.0)
+    mine = _final_attempts(user_id, course.id, visible)
     rows = db.execute(
         select(bq.section, bq.topic, func.sum(weight), func.count())
-        .select_from(Attempt).join(i, i.attempt_id == Attempt.id).join(qv, qv.id == i.question_version_id)
+        .select_from(mine).join(i, i.attempt_id == mine.c.id).join(qv, qv.id == i.question_version_id)
         .join(bq, bq.id == qv.question_id)
-        .where(Attempt.user_id == user_id, Attempt.course_id == course.id, final_attempt(_A),
-               Attempt.assessment_id.in_(visible), i.correctness.is_not(None), i.correctness != "pending")
+        .where(i.correctness.is_not(None), i.correctness != "pending")
         .group_by(bq.section, bq.topic)).all()
     sections: dict[str, list[float]] = {}
     topics: list[TopicStat] = []
