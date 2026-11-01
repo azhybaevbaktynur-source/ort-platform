@@ -3,11 +3,12 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { listSharedBanks } from "@/lib/lms/quizEditor"; // Phase 7c S3
-import { DIFFICULTIES, QUESTION_TYPES, type BankOut, type Difficulty, type QuestionType } from "@/lib/lms/contentTypes";
+import { DIFFICULTIES, type BankOut, type Difficulty, type QuestionType } from "@/lib/lms/contentTypes";
 import { useTemplateUi } from "@/lib/lms/templates";
 import type { PickFilter } from "@/lib/lms/assessmentTypes";
 import { inputCls, labelCls } from "@/components/lms/content/ui";
 import { ContentError } from "@/components/lms/content/ContentError";
+import { useQuestionTypes } from "@/components/lms/content/useQuestionTypes"; // Phase 10
 
 /**
  * Loads the course banks once (first 100) for pickers. Phase 7c S3 (PHASE_7C_DESIGN 16): shared banks only; a quiz
@@ -43,6 +44,7 @@ export interface PickValue { bank_id: string; count: number; filter: PickFilter 
 /** Pick N random questions from a bank by filter. Pool size (per language) is shown by the item after it is saved. */
 export function PickFields({ courseId, value, onChange, lockBank = false }: { courseId: string; value: PickValue; onChange: (v: PickValue) => void; lockBank?: boolean }) {
   const { t } = useTranslation();
+  const questionTypes = useQuestionTypes();
   const ui = useTemplateUi();
   const { banks, error } = useBanks(courseId);
   const setF = (p: Partial<PickFilter>) => {
@@ -64,7 +66,7 @@ export function PickFields({ courseId, value, onChange, lockBank = false }: { co
           <label className={labelCls} htmlFor="pick-type">{t("bank.filters.type")}</label>
           <select id="pick-type" className={inputCls} value={value.filter.type ?? ""} onChange={(e) => setF({ type: (e.target.value || undefined) as QuestionType | undefined })}>
             <option value="">{t("bank.filters.all")}</option>
-            {QUESTION_TYPES.map((q) => <option key={q} value={q}>{t(`bank.types.${q}.name`)}</option>)}
+            {questionTypes.map((q) => <option key={q} value={q}>{t(`bank.types.${q}.name`)}</option>)}
           </select>
         </div>
         <div>

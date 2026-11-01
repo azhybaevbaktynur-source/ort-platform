@@ -3,11 +3,12 @@
 import React from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
-import { QUESTION_TYPES, type QuestionType } from "@/lib/lms/contentTypes";
+import type { QuestionType } from "@/lib/lms/contentTypes";
 import { useCourse } from "@/components/lms/CourseContext";
 import { QuestionEditor } from "@/components/lms/content/QuestionEditor";
 import { PageHeader } from "@/components/ui";
 import { useTabCrumbs } from "@/components/lms/course/StaffCourseUi";
+import { useQuestionTypes } from "@/components/lms/content/useQuestionTypes"; // Phase 10
 
 export default function NewQuestionPage() {
   const { lang, t } = useTranslation();
@@ -15,8 +16,9 @@ export default function NewQuestionPage() {
   const { bankId } = useParams<{ bankId: string }>();
   const search = useSearchParams();
   const { course } = useCourse();
+  const questionTypes = useQuestionTypes();
   const raw = search.get("type") as QuestionType | null;
-  const type: QuestionType = raw && QUESTION_TYPES.includes(raw) ? raw : "single_choice";
+  const type: QuestionType = raw && questionTypes.includes(raw) ? raw : "single_choice";
   const base = `/${lang}/courses/${course.id}/bank`;
   const crumbs = useTabCrumbs("bank", [{ label: t("bank.backToQuestions"), href: `${base}/${bankId}` }, { label: t("bank.questions.newTitle") }], course.id);
   if (course.status === "concluded") return <p className="text-sm text-slate-600">{t("bank.concluded")}</p>;

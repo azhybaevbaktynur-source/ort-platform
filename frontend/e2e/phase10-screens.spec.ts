@@ -50,6 +50,7 @@ test.describe("phase 10 screens", () => {
     ids.c = c.id;
     await api(T, "POST", `/courses/${c.id}/publish`, {});
     const bank = await api(T, "POST", `/courses/${c.id}/banks`, { title: "Банк", default_language: "ru" });
+    ids.bank = bank.id;
     const q = (type: string, stem: string, data: unknown) => api(T, "POST", `/courses/${c.id}/banks/${bank.id}/questions`, { type, language: "ru", stem, explanation: "Потому что так.", data });
     await q("matching", "Соедините столицы и страны", { pairs: [{ left: "Бишкек", right: "Кыргызстан" }, { left: "Астана", right: "Казахстан" }, { left: "Ташкент", right: "Узбекистан" }], distractors: ["Таджикистан"] });
     await q("fill_blank", "Заполните пропуски", { text: "Небо {{1}}, трава {{2}}.", blanks: [{ answers: ["синее"] }, { answers: ["зелёная"] }] });
@@ -85,6 +86,29 @@ test.describe("phase 10 screens", () => {
     }
     await api(S, "POST", `/attempts/${ids.attempt}/submit`, {}).catch(() => null);
     await walk(browser, S, [["student-practice", `${b}/practice`], ["student-progress", `${b}/progress`]]);
+  });
+
+  test("org analytics and question editor", async ({ browser }) => {
+    test.setTimeout(240_000);
+    const o = seed().org_admin;
+    await walk(browser, o.org_admin, [["org-analytics", `/ru/org/${o.organization_id}/analytics`]]);
+    const T = seed().quiz_editor.teacher;
+    const b = `/ru/courses/${ids.c}`;
+    for (const [type, opt] of [["matching", "matching"], ["fill_blank", "fill_blank"], ["ordering", "ordering"]] as const) {
+      for (const [w, h] of SIZES) {
+        const ctx = await browser.newContext({ viewport: { width: w, height: h }, locale: "ru-RU", timezoneId: "UTC" });
+        const page = await ctx.newPage();
+        await signIn(page, T);
+        await page.goto(`${b}/bank/${ids.bank}/new?type=${type}`);
+        await settle(page);
+        await expect(page.locator(`option[value="${opt}"]:checked`).first()).toHaveCount(1);
+        await page.waitForTimeout(400);
+        const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        expect(over, `editor ${type} at ${w}px scrolls sideways`).toBeLessThanOrEqual(0);
+        await page.screenshot({ path: path.join(OUT!, `editor-${type}-${w}.jpg`), type: "jpeg", quality: 70, fullPage: true, animations: "disabled" });
+        await ctx.close();
+      }
+    }
   });
 
   test("teacher", async ({ browser }) => {

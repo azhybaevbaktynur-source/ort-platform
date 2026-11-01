@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
-import { QUESTION_TYPES, type QuestionType } from "@/lib/lms/contentTypes";
+import { type QuestionType } from "@/lib/lms/contentTypes";
 import { templateLockedFields, type AssessmentStaffOut, type SectionIn, type SectionOut } from "@/lib/lms/assessmentTypes";
 import { isAssessmentLocked, isPresetRuleLocked, useTemplateUi } from "@/lib/lms/templates";
 import { cleanLocalized } from "@/lib/lms/localized";
@@ -13,6 +13,7 @@ import { btnPrimary, btnSecondary } from "@/components/lms/course/staffUi"; // P
 import { AssessmentError } from "./AssessmentError";
 import { Modal } from "./Modal";
 import { minToSec, secToMin } from "./format";
+import { useQuestionTypes } from "@/components/lms/content/useQuestionTypes"; // Phase 10
 
 const orNull = (v: LocalizedText): LocalizedText | null => (Object.keys(v).length ? v : null);
 
@@ -31,6 +32,7 @@ export function SectionDialog({
   onCancel: () => void;
 }) {
   const { t } = useTranslation();
+  const questionTypes = useQuestionTypes();
   const [key, setKey] = useState("");
   const [title, setTitle] = useState<LocalizedText>({});
   const [instructions, setInstructions] = useState<LocalizedText>({});
@@ -100,7 +102,7 @@ export function SectionDialog({
         <fieldset disabled={locked}>
           <legend className={labelCls}>{t("assessments.section.allowedTypes")}</legend>
           <div className="flex flex-wrap gap-2">
-            {QUESTION_TYPES.map((q) => (
+            {questionTypes.map((q) => (
               <label key={q} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1 text-xs">
                 <input type="checkbox" checked={types.includes(q)} onChange={() => toggleType(q)} />{t(`bank.types.${q}.name`)}
               </label>

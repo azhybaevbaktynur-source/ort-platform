@@ -277,6 +277,8 @@ Width, student course home, student dashboard, simpler teacher and admin pages, 
 
 ## Phase 10 — Practice, analytics, quiz statistics, student tools (M)
 
+**Deployed 2026-11-01**: `phases/PHASE_10.md`.
+
 **Owner stops: review after Phase 10, and again before launch (after Phase 11 is ready).** Phase 10 implementers on Sonnet, Opus only after a failure (UR-7b). Test students are excluded from every aggregate here (UR-5).
 
 - **Practice mode**: self-paced practice assessments (unlimited attempts, immediate feedback) built from a bank by topic/difficulty with `pick` items; ORT practice uses the ORT template's banks without changing the exam.
