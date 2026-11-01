@@ -1,0 +1,17 @@
+# Phase 11 S4 (docs/SECURITY_AUDIT.md). Never auto-merged: every PR runs the full CI, ORT parity included.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

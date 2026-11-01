@@ -543,4 +543,4 @@ Implementation decisions (agent):
 
 ## Phase 11 decisions (agent, 2026-11-02; design `phases/PHASE_11_DESIGN.md`)
 Parents are a separate `guardian_links` table, not an enrollment role `observer` as the plan worded it: a parent links to a student, has no course access, and stays out of every roster and count. Owner questions 11-Q1…Q10 run on the safe defaults in the design's §9 and appear in `LAUNCH_CHECKLIST.md`. Policy text ships as a draft awaiting legal review.
-
+Sessions stay on Bearer tokens, not HttpOnly cookies: `*.vercel.app` to `*.onrender.com` makes a cookie third-party (Safari blocks it), Student view needs a per-tab token, and a session migration risks lost answers before launch. Compensation: 3-day rolling tokens, revocation, CSP, the server sanitizer. Revisit with a custom domain. Auth calls moved from the Vercel rewrite to the API directly, so login failures count per student address rather than per Vercel address (`runbooks/IP_CHAIN.md`).

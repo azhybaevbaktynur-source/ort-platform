@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { getStudentView, leaveStudentView } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/apiBase";
 
 /** Minimal signed-in user (the app authenticates with its own backend JWT, not Firebase). */
 export interface AuthUser {
@@ -93,8 +94,10 @@ function toAuthUser(profile: AuthUserProfile, token: string): AuthUser {
   };
 }
 
+// Phase 11 S4: directly to the API, like every other call. Through the Vercel rewrite all students would share a few
+// Vercel addresses, and one school's failed logins would count against everyone (docs/runbooks/IP_CHAIN.md).
 async function postJson(path: string, body: unknown): Promise<any> {
-  const res = await fetch(path, {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -199,7 +202,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (res.ok) {
           const data = await res.json();
           const profile = toProfile(data);
-          startSession(storedToken, profile);
+          // Phase 11 S4: TokenRefresh may have swapped the token while this was on its way
+          startSession(localStorage.getItem("ort_token") ?? storedToken, profile);
         }
       } catch (e) {
         // Network problem: keep the cached session; the backend still checks the token on every call.
@@ -216,12 +220,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signIn = async (email: string, pass: string): Promise<void> => {
-    const data = await postJson("/api/v1/auth/login", { email: email.trim(), password: pass, lang });
+    const data = await postJson("/auth/login", { email: email.trim(), password: pass, lang });
     finishLogin(data);
   };
 
   const signUp = async (email: string, pass: string, displayName: string, phone?: string): Promise<RegisterResult> => {
-    return postJson("/api/v1/auth/register", {
+    return postJson("/auth/register", {
       email: email.trim(),
       password: pass,
       displayName: displayName.trim(),
@@ -231,12 +235,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const verifyEmail = async (email: string, pass: string, code: string): Promise<void> => {
-    const data = await postJson("/api/v1/auth/verify-email", { email: email.trim(), password: pass, code: code.trim() });
+    const data = await postJson("/auth/verify-email", { email: email.trim(), password: pass, code: code.trim() });
     finishLogin(data);
   };
 
   const resendCode = async (email: string): Promise<{ resendAfterSeconds: number }> => {
-    return postJson("/api/v1/auth/resend-code", { email: email.trim(), lang });
+    return postJson("/auth/resend-code", { email: email.trim(), lang });
   };
 
   const signOut = async () => {

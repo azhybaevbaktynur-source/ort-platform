@@ -117,7 +117,19 @@ export function tr(lang: Lang | "en", key: string, vars: Record<string, string |
 // ----------------------------------------------------------------------------- session
 
 /** Sign in without the login form: the token and cached profile the app's AuthProvider restores. */
+const cspWatched = new WeakSet<Page>();
+
+/** Phase 11 S4 (PHASE_11_DESIGN 5.5): any CSP violation on a page fails the test, and the test goes on to show the rest. */
+export function watchCsp(page: Page): void {
+  if (cspWatched.has(page)) return;
+  cspWatched.add(page);
+  page.on("console", (msg) => {
+    if (/Content Security Policy/i.test(msg.text())) expect.soft(msg.text(), "CSP violation on " + page.url()).toBe("");
+  });
+}
+
 export async function signIn(page: Page, user: SeedUser): Promise<void> {
+  watchCsp(page);
   const p = user.profile;
   const cachedProfile = {
     uid: p.id, email: p.email, displayName: p.displayName || user.name, phone: p.phone || undefined,
@@ -135,6 +147,7 @@ export async function signIn(page: Page, user: SeedUser): Promise<void> {
 
 /** Network quiet, web fonts loaded, KaTeX laid out, no "loading" placeholder, pointer parked off any hover target. */
 export async function settle(page: Page, network = true): Promise<void> {
+  watchCsp(page);
   if (network) await page.waitForLoadState("networkidle");
   await page.evaluate(async () => {
     await document.fonts.ready;
@@ -189,6 +202,7 @@ export interface ShotOptions {
  * output and in $E2E_DIR/diffs/ (uploaded by CI).
  */
 export async function expectScreen(page: Page, info: TestInfo, name: string, opts: ShotOptions = {}): Promise<void> {
+  watchCsp(page);
   await settle(page, opts.waitNetwork !== false);
   const shotOpts = { animations: "disabled" as const, caret: "hide" as const, mask: opts.mask ?? [], maskColor: MASK_COLOR };
   const buf = opts.element ? await opts.element.screenshot(shotOpts) : await page.screenshot({ ...shotOpts, fullPage: !!opts.fullPage });

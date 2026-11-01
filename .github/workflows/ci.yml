@@ -137,6 +137,24 @@ jobs:
           NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
         run: npx next build
 
+  # Phase 11 S4: findings are fixed or accepted with a reason in docs/SECURITY_AUDIT.md
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: pip install pip-audit
+      - name: Python dependencies
+        run: pip-audit -r backend/requirements.txt
+      - name: Frontend dependencies (production only)
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
+
   i18n:
     runs-on: ubuntu-latest
     steps:

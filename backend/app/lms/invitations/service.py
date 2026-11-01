@@ -41,7 +41,7 @@ STAFF_ROLES = ("teacher", "assistant")
 
 # Rate limits (IP rules count and log unless settings.RATE_LIMIT_IP_ENFORCE, like every IP rule).
 INVITE_SEND_1H = Limit("invite_send_1h", 50, 3600)              # create + resend, per actor (each sends an email)
-INVITE_LOOKUP_IP_10M = Limit("invite_lookup_ip_10m", 60, 600, is_ip_rule=True)
+INVITE_LOOKUP_IP_10M = Limit("invite_lookup_ip_10m", 600, 600, is_ip_rule=True)  # counts successes: one school, one IP
 INVITE_LOOKUP_USER_10M = Limit("invite_lookup_user_10m", 30, 600)
 INVITE_ACCEPT_USER_10M = Limit("invite_accept_user_10m", 10, 600)
 INVITE_ACCEPT_IP_FAIL_10M = Limit("invite_accept_ip_fail_10m", 30, 600, is_ip_rule=True)

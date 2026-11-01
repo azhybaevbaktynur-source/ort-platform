@@ -37,6 +37,7 @@ def disable_user(db: Session, admin: User, user_id: str, reason: str, request: R
     if target.is_platform_admin:
         raise Conflict("Cannot disable a platform admin", code="cannot_disable_admin")
     target.disabled_at = utcnow()
+    target.token_version = (target.token_version or 0) + 1  # Phase 11 S4: enabling again does not revive old tokens
     target.disabled_by_id = admin.id
     target.disabled_reason = reason
     audit.record(db, actor=admin, action="user.disable", target_type="user", target_id=target.id,

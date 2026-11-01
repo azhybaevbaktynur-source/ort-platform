@@ -5,10 +5,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
-from app.core.config import settings, is_production, DEFAULT_SECRET_KEY
+from app.core.config import settings, refuse_unsafe_secret_keys
 from app.db.init_db import init_db
 from app.db.migrate import run_migrations
 from app.api.v1.router import api_router
+from app.core.security_headers import SecurityHeadersMiddleware
 from app.lms.core import admission
 from app.lms.core.errors import register_error_handlers
 import app.lms.grading  # noqa: F401,E402  (registers the Phase 4 attempt-scored hook, P4-1)
@@ -104,6 +105,7 @@ def _seed_ort_courses() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """FastAPI modern lifespan handler (replaces deprecated on_event)."""
+    refuse_unsafe_secret_keys()  # Phase 11 S4: before anything touches the database
     try:
         run_migrations()
     except Exception:
@@ -118,9 +120,6 @@ async def lifespan(app: FastAPI):
     _ensure_assignments()  # Phase 7a S1: after the organizations, before the ORT courses
     _seed_ort_courses()
     _ensure_policies()  # Phase 11 S1
-    if is_production():
-        if settings.SECRET_KEY == DEFAULT_SECRET_KEY:
-            logger.critical("SECRET_KEY is the public default from the repository: anyone can forge login tokens. Set SECRET_KEY.")
     await _configure_thread_limiter()
     admission.logger.info("admission gate configured", extra=admission.describe())
     yield
@@ -148,6 +147,7 @@ app.include_router(_invitations_router, prefix=settings.API_V1_STR)
 # --- Phase 6 S3 end ---
 app.add_middleware(BodyCapMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1024)
+app.add_middleware(SecurityHeadersMiddleware)  # Phase 11 S4: just inside CORS, so every route's answer carries the headers
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,

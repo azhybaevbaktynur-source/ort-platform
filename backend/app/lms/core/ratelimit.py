@@ -13,7 +13,7 @@ import threading
 import time
 from dataclasses import dataclass
 
-from sqlalchemy import BigInteger, Index, Integer, String, create_engine, delete, select, text
+from sqlalchemy import BigInteger, Index, Integer, String, and_, create_engine, delete, or_, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Mapped, mapped_column
@@ -80,7 +80,7 @@ def access_code_day_limit() -> Limit:
 
 def access_code_ip_limit() -> Limit:
     """Quiz access code tries, per client IP and assessment (enforced only with RATE_LIMIT_IP_ENFORCE)."""
-    return Limit("access_code_ip_10m", 100, 600, is_ip_rule=True)
+    return Limit("access_code_ip_10m", 2000, 600, is_ip_rule=True)  # counts successes: one school shares an IP (F3)
 # --- Phase 7a S4 end ---
 
 
@@ -130,6 +130,21 @@ def sandbox_open_limit() -> Limit:
     from app.lms.exam_templates.ids import SANDBOX_OPEN_RATE_PER_HOUR
 
     return Limit("sandbox_open_1h", SANDBOX_OPEN_RATE_PER_HOUR, 3600)
+
+# --- Phase 11 S4 begin --- (PHASE_11_DESIGN 5.1)
+LOGIN_EMAIL_FAIL_10M = Limit("login_email_fail_10m", 10, 600)
+LOGIN_EMAIL_FAIL_24H = Limit("login_email_fail_24h", 50, 86400)
+LOGIN_IP_FAIL_10M = Limit("login_ip_fail_10m", 300, 600, is_ip_rule=True)
+REGISTER_IP_1H = Limit("register_ip_1h", 120, 3600, is_ip_rule=True)
+VERIFY_IP_FAIL_10M = Limit("verify_ip_fail_10m", 60, 600, is_ip_rule=True)
+FORGOT_EMAIL_1H = Limit("forgot_email_1h", 5, 3600)
+FORGOT_IP_1H = Limit("forgot_ip_1h", 60, 3600, is_ip_rule=True)
+RESET_IP_FAIL_10M = Limit("reset_ip_fail_10m", 30, 600, is_ip_rule=True)
+PAIR_CREATE_USER_1H = Limit("pair_create_user_1h", 5, 3600)
+PAIR_REDEEM_USER_10M = Limit("pair_redeem_user_10m", 10, 600)
+PAIR_REDEEM_USER_24H = Limit("pair_redeem_user_24h", 30, 86400)
+PAIR_REDEEM_IP_FAIL_10M = Limit("pair_redeem_ip_fail_10m", 60, 600, is_ip_rule=True)
+# --- Phase 11 S4 end ---
 
 _CLEANUP_PROBABILITY = 1 / 200
 _CLEANUP_BATCH = 1000
@@ -236,3 +251,51 @@ def enforce(key: str, rule: Limit) -> None:
     allowed, retry = hit(key, rule)
     if not allowed:
         raise RateLimited("Too many requests", details={"retry_after_seconds": retry})
+
+
+# --- Phase 11 S4 begin --- (PHASE_11_DESIGN 5.1) Auth routes: never a 500 and never a closed door because of the limiter.
+def peek_all(rules: list[tuple[str, Limit]]) -> tuple[bool, int]:
+    """One read for all rules of a failures-only check, so a successful login costs one query and no write. Same answer
+    as `peek` per rule; the longest wait wins. An unreachable limiter lets the request through."""
+    keyed = [(key, rule) for key, rule in rules if not rule.is_ip_rule or settings.RATE_LIMIT_IP_ENFORCE]
+    if not keyed:
+        return True, 0
+    try:
+        now = _now()
+        t = RateLimitBucket.__table__
+        wanted = {(_bucket_key(key, rule), _window(now, rule)): rule for key, rule in keyed}
+        with _engine().connect() as conn:
+            rows = conn.execute(select(t.c.key, t.c.window_start, t.c.count).where(
+                or_(*(and_(t.c.key == k, t.c.window_start == ws) for k, ws in wanted)))).all()
+    except Exception:
+        logger.warning("rate limit check failed, request allowed", exc_info=True)
+        return True, 0
+    retry = 0
+    for key, window_start, count in rows:
+        rule = wanted[(key, window_start)]
+        if count >= rule.limit:
+            retry = max(retry, max(1, window_start + rule.window_seconds - now))
+    return retry == 0, retry
+
+
+def record_failures(rules: list[tuple[str, Limit]]) -> None:
+    """Count one failure on every rule. Best effort: the caller's answer is already decided."""
+    for key, rule in rules:
+        try:
+            hit(key, rule)
+        except Exception:
+            logger.warning("rate limit count failed rule=%s", rule.name, exc_info=True)
+
+
+def hit_all(rules: list[tuple[str, Limit]]) -> tuple[bool, int]:
+    """Count one event on the rules in order, stopping at the first refusal. An unreachable limiter lets it through."""
+    for key, rule in rules:
+        try:
+            allowed, retry = hit(key, rule)
+        except Exception:
+            logger.warning("rate limit count failed rule=%s, request allowed", rule.name, exc_info=True)
+            continue
+        if not allowed:
+            return False, retry
+    return True, 0
+# --- Phase 11 S4 end ---

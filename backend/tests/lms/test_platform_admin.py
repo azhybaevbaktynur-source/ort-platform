@@ -86,7 +86,10 @@ async def test_disable_enable_flow_and_audit(client, db):
 
     r = await client.post(f"{P}/users/{target.id}/enable", headers=auth(admin))
     assert r.status_code == 200 and r.json()["disabled_at"] is None
-    assert (await client.get("/api/v1/me/lms", headers=headers)).status_code == 200
+    # Phase 11 S4: disabling revoked the old token for good; signing in again works
+    assert (await client.get("/api/v1/me/lms", headers=headers)).status_code == 401
+    fresh = {"Authorization": "Bearer " + create_access_token({"sub": target.id, "tv": 1})}
+    assert (await client.get("/api/v1/me/lms", headers=fresh)).status_code == 200
 
     rows = db.query(AdminAuditLog).filter(AdminAuditLog.target_id == target.id).all()
     assert sorted(x.action for x in rows) == ["user.disable", "user.enable"]
