@@ -49,6 +49,7 @@ TEST_STUDENT_ROUTES: frozenset[tuple[str, str]] = frozenset({
     ("GET", f"{_C}/assignments"),
     ("GET", _G),
     ("GET", f"{_G}/mine"),
+    ("GET", f"{_C}/practice"),  # Phase 10 S2
     ("GET", f"{_C}/submissions/{{submission_id}}/files/{{asset_id}}"),
     # own course: what a student does
     ("POST", f"{_A}/attempts"),
@@ -64,6 +65,8 @@ TEST_STUDENT_ROUTES: frozenset[tuple[str, str]] = frozenset({
     ("PUT", f"{_T}/answers"),
     ("POST", f"{_T}/sections/{{pos}}/close"),
     ("POST", f"{_T}/submit"),
+    ("POST", f"{_T}/items/{{position}}/check"),  # Phase 10 S2
+    ("GET", f"{_T}/practice-feedback"),  # Phase 10 S2
     # images and files in course content (`/media/{name}` is public and has no user at all)
     ("GET", f"{_V}/assets/{{asset_id}}/content"),
 })

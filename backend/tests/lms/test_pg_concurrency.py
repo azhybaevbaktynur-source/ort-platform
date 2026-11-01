@@ -100,7 +100,9 @@ from app.lms.courses.models import Course  # noqa: E402
 from app.lms.courses.schemas import CourseUpdateIn  # noqa: E402
 from app.lms.enrollments import service as enr_svc  # noqa: E402
 from app.lms.enrollments.models import Enrollment, EnrollmentEvent  # noqa: E402
+from app.lms.grading.models import Submission  # noqa: E402
 from app.models.user import User  # noqa: E402
+from sqlalchemy import func, select  # noqa: E402
 
 
 def _mk_user(s: Session, n: int, teacher=False) -> str:
@@ -341,3 +343,99 @@ def test_parallel_storage_reservations_never_pass_the_hard_limit(pg, monkeypatch
                 assert usage.month_row(s)["objects_written"] == 1
     finally:
         storage.reset_blob_storage()
+
+
+# ---------------------------------------------------------------- Phase 10 S2: practice item check
+
+def _practice_attempt(pg_engine, n_items: int):
+    """A published practice set, a student and an open attempt with every item answered: wrong on odd positions."""
+    import uuid
+
+    from app.core.authz import AuthzContext, enrollment_role_resolver
+    from app.lms.attempts import autosave, engine as att_engine
+    from app.lms.attempts.schemas import AnswerIn, StartIn
+    from app.lms.content.models import QuestionVersion
+    from app.lms.core import clock
+    from app.lms.practice import schemas as practice_sch
+    from app.lms.practice import service as practice_svc
+    from tests.lms.factories import make_bank, make_question
+
+    cid, _code, owner = _mk_course(pg_engine, None)
+    with Session(pg_engine) as s:
+        course = s.get(Course, cid)
+        bank = make_bank(s, course, s.get(User, owner))
+        for i in range(n_items):
+            make_question(s, bank, s.get(User, owner), stem=f"q{i}")
+        bank_id = bank.id
+        out = practice_svc.create_set(s, _ctx(s, owner), s.get(Course, cid), practice_sch.PracticeCreateIn(
+            title={"en": "Drill"}, languages=["en"], blocks=[{"bank_id": bank_id, "count": n_items}]))
+        student = _mk_user(s, 1)
+        s.add(Enrollment(course_id=cid, user_id=student, role="student", state="active", source="join_code"))
+        s.commit()
+        ctx = AuthzContext(s.get(User, student), s, enrollment_role_resolver(s, student))
+        state, created = att_engine.start_attempt(s, ctx, s.get(Course, cid), out.id, StartIn(), now=clock.now())
+        assert created and state.is_practice
+        entries = []
+        for item in state.items:
+            data = s.get(QuestionVersion, uuid.UUID(item.qv)).data
+            good = item.position % 2 == 0
+            choice = data["correct"] if good else next(c["id"] for c in data["choices"] if c["id"] != data["correct"])
+            entries.append(AnswerIn(position=item.position, response={"choice_id": choice}, client_ts=1000))
+        autosave.save_answers(s, s.get(User, student), state.id, entries, now=clock.now())
+        return state.id, student
+
+
+def test_practice_check_racing_submit_no_deadlock_and_same_scores(pg):
+    """Every order of checks and one submit: no deadlock, every answer of a check equals the final row, and the
+    attempt's score is the sum of its rows."""
+    import uuid as _u
+    from decimal import Decimal
+
+    from app.lms.attempts import engine as att_engine
+    from app.lms.attempts import practice
+    from app.lms.attempts.models import Attempt, AttemptItem
+    from app.lms.attempts.schemas import SubmitIn
+    from app.lms.core import clock
+
+    n_items = 6
+    for _round in range(8):
+        attempt_id, student = _practice_attempt(pg, n_items)
+
+        def check_job(position):
+            return lambda s: practice.check_item(s, s.get(User, student), attempt_id, position, now=clock.now())
+
+        def submit_job(s):
+            return att_engine.submit(s, s.get(User, student), attempt_id, SubmitIn(), now=clock.now())
+
+        jobs = [check_job(p) for p in range(1, n_items + 1) for _twice in range(2)]
+        jobs.insert(len(jobs) // 2 + _round % 3, submit_job)
+        results = _run_parallel(pg, jobs)
+        assert [r for r in results if r[0] != "ok"] == []  # a check after finalize still answers: everything is scored
+
+        with Session(pg) as s:
+            attempt = s.get(Attempt, _u.UUID(attempt_id))
+            rows = s.execute(select(AttemptItem).where(AttemptItem.attempt_id == attempt.id)
+                             .order_by(AttemptItem.position)).scalars().all()
+            assert attempt.status == "graded" and len(rows) == n_items
+            assert attempt.raw_score == sum((r.score for r in rows), Decimal("0")) == Decimal(n_items // 2)
+            by_pos = {r.position: r for r in rows}
+            for r in by_pos.values():
+                assert r.correctness == ("correct" if r.position % 2 == 0 else "incorrect")
+                assert r.graded_at is None
+            for kind, out in results:
+                if hasattr(out, "correctness"):
+                    assert out.correctness == by_pos[out.position].correctness
+                    assert Decimal(out.score) == by_pos[out.position].score
+            assert s.scalar(select(func.count()).select_from(Submission)) == 0
+
+
+def test_practice_parallel_checks_of_one_item_write_once(pg):
+    from app.lms.attempts import practice
+    from app.lms.core import clock
+
+    attempt_id, student = _practice_attempt(pg, 2)
+    results = _run_parallel(pg, [
+        lambda s: practice.check_item(s, s.get(User, student), attempt_id, 2, now=clock.now()) for _ in range(6)])
+    assert [r[0] for r in results] == ["ok"] * 6
+    assert {(r[1].correctness, r[1].score) for r in results} == {("correct", "1.00")}
+
