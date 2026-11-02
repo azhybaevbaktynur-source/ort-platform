@@ -206,7 +206,7 @@ async def test_me_organizations(db, api):
     a = make_org(db, "A")
     add_member(db, a, u, "teacher")
     items = (await api.call(u, "GET", "/me/organizations")).json()["items"]
-    assert items == [{"id": str(a.id), "slug": a.slug, "name": "A", "status": "active", "role": "teacher",
+    assert items == [{"id": str(a.id), "slug": a.slug, "name": "A", "kind": "school", "status": "active", "role": "teacher",
                       "can_create_courses": False}]
     me = (await api.call(u, "GET", "/me/lms")).json()
     assert me["can_create_courses"] is False
@@ -298,7 +298,10 @@ def test_banks_follow_course_or_owner(db):
 async def test_approval_creates_personal_org_and_revoke_suspends(db, api):
     admin = make_user(db, platform_admin=True)
     user = make_user(db, display_name="Nurlan")
-    r = await api.call(user, "POST", "/me/teacher-requests", json={"message": "hi"})
+    user.age_band = "18_plus"
+    db.commit()
+    r = await api.call(user, "POST", "/me/teacher-requests", json={
+        "applicant_name": "Nurlan", "school": "Private", "subject": "Math", "phone": "+996700123456", "message": "hi"})
     rid = r.json()["id"]
     assert db.get(Organization, personal_org_id(user.id)) is None
     r = await api.call(admin, "POST", f"/platform/teacher-requests/{rid}/approve", json={})

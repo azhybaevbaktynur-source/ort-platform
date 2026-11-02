@@ -2,7 +2,8 @@
 is stored, so no R2 use.
 
 Own profile, enrollments, released grades (an unreleased grade or feedback is not the student's to see yet), own answers,
-hand-in text and hand-in file names (the files stay downloadable through the existing route), consents and requests. Each
+hand-in text and hand-in file names (the files stay downloadable through the existing route), consents, requests and
+teacher applications. Each
 batch has its own short session, so a slow download holds no pooled connection. The request completes when the last byte
 has been produced: a broken download leaves it pending, to be tried again."""
 from __future__ import annotations
@@ -25,6 +26,7 @@ from app.lms.files.models import Asset
 from app.lms.grading.models import CourseGrade, Submission
 from app.lms.privacy.models import ConsentRecord, DataRequest
 from app.lms.privacy.registry import exported_columns
+from app.lms.teachers.models import TeacherRequest
 from app.models.user import User
 
 MEDIA_TYPE = "application/vnd.ort.data-export+json"  # streams past the buffering of UTCDatetimeJSONMiddleware
@@ -69,6 +71,8 @@ def sections() -> list[Section]:
                 lambda uid: ConsentRecord.user_id == uid, ConsentRecord.id),
         Section("requests", _cols(DataRequest, "id", "kind", "status", "requested_at", "due_at", "completed_at"),
                 lambda uid: DataRequest.user_id == uid, DataRequest.id),
+        Section("teacher_requests", _cols(TeacherRequest, "id", "status", "created_at", "decided_at"),
+                lambda uid: TeacherRequest.user_id == uid, TeacherRequest.id),
     ]
 
 

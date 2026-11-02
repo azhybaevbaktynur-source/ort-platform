@@ -127,6 +127,18 @@ class HomeApplicationOut(BaseModel):
 # --- Phase 9 S4 end ---
 
 
+# --- Accounts begin --- (docs/phases/ACCOUNTS.md B)
+TEACHER_DECISION_SHOWN_DAYS = 14
+
+
+class HomeTeacherApplicationOut(BaseModel):
+    status: str  # pending, approved, rejected, revoked
+    decided_at: Optional[datetime] = None
+    reason: Optional[str] = None
+    reapply_available_at: Optional[datetime] = None
+# --- Accounts end ---
+
+
 class HomeOut(BaseModel):
     in_progress: list[HomeInProgressOut]
     next_up: list[HomeNextUpOut]
@@ -140,6 +152,7 @@ class HomeOut(BaseModel):
     # --- Phase 8a S3 end ---
     pending_applications: list[HomeApplicationOut] = []  # Phase 9 S4: newest three, never answers
     todo: list[HomeTodoOut] = []  # UX rework: at most TODO_MAX rows, in-progress attempts first
+    teacher_application: Optional[HomeTeacherApplicationOut] = None  # Accounts: null unless there is something to say
 
 
 HOME_KEYS = frozenset(HomeOut.model_fields)
@@ -148,6 +161,7 @@ MODULES_NEXT_KEYS = frozenset(HomeModuleNextOut.model_fields)
 ANNOUNCEMENT_KEYS = frozenset(AnnouncementHomeOut.model_fields)
 # --- Phase 8a S3 end ---
 PENDING_APPLICATION_KEYS = frozenset(HomeApplicationOut.model_fields)  # Phase 9 S4
+TEACHER_APPLICATION_KEYS = frozenset(HomeTeacherApplicationOut.model_fields)  # Accounts
 IN_PROGRESS_KEYS = frozenset(HomeInProgressOut.model_fields)
 NEXT_UP_KEYS = frozenset(HomeNextUpOut.model_fields)
 TODO_KEYS = frozenset(HomeTodoOut.model_fields)

@@ -5,7 +5,7 @@ from typing import Optional
 
 from fastapi import Request
 from sqlalchemy import func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.lms.audit import service as audit
 from app.lms.audit.models import AdminAuditLog
@@ -14,8 +14,12 @@ from app.lms.core.models import utcnow
 from app.lms.courses.models import Course
 from app.lms.courses.scopes import regular_courses  # Phase 8b S1
 from app.lms.enrollments.models import Enrollment
+from app.lms.organizations.ids import personal_org_id
+from app.lms.organizations.models import Organization, OrganizationMember
+from app.lms.organizations.tree import within_clause
 from app.lms.platform_admin.schemas import (
-    AdminUserDetailOut, AdminUserOut, AuditEntryOut, OwnedCourseBrief, TeacherRequestAdminOut, UserBrief,
+    AdminUserDetailOut, AdminUserOut, AuditEntryOut, OwnedCourseBrief, RevokeImpactOut, TeacherRequestAdminOut,
+    UserBrief,
 )
 from app.lms.teachers.models import TeacherRequest
 from app.models.user import User
@@ -119,14 +123,62 @@ def user_out(user: User) -> AdminUserOut:
     )
 
 
-def request_out(db: Session, req: TeacherRequest) -> TeacherRequestAdminOut:
+TEACHES_AT_MAX = 5
+
+
+def teaches_at(db: Session, user_ids: list[str]) -> dict[str, list[str]]:
+    """Per applicant, the active schools (or the platform) they belong to, directly or through a department; at most
+    `TEACHES_AT_MAX` each, whatever the page size (one query)."""
+    if not user_ids:
+        return {}
+    root, own = aliased(Organization), aliased(Organization)
+    pairs = (
+        select(OrganizationMember.user_id.label("user_id"), root.name.label("name"))
+        .join(own, own.id == OrganizationMember.organization_id)
+        .join(root, within_clause(own.path, root.path))
+        .where(OrganizationMember.user_id.in_(user_ids), OrganizationMember.state == "active",
+               own.deleted_at.is_(None), root.deleted_at.is_(None), root.parent_id.is_(None),
+               root.status == "active", root.kind.in_(("school", "platform")))
+        .distinct().subquery()
+    )
+    rank = func.row_number().over(partition_by=pairs.c.user_id, order_by=pairs.c.name).label("rank")
+    ranked = select(pairs.c.user_id, pairs.c.name, rank).subquery()
+    out: dict[str, list[str]] = {}
+    for uid, name in db.execute(select(ranked.c.user_id, ranked.c.name).where(ranked.c.rank <= TEACHES_AT_MAX)
+                                .order_by(ranked.c.user_id, ranked.c.rank)):
+        out.setdefault(uid, []).append(name)
+    return out
+
+
+def requests_out(db: Session, reqs: list[TeacherRequest]) -> list[TeacherRequestAdminOut]:
+    schools = teaches_at(db, list({r.user_id for r in reqs}))
+    return [request_out(db, r, schools.get(r.user_id, [])) for r in reqs]
+
+
+def request_out(db: Session, req: TeacherRequest, schools: Optional[list[str]] = None) -> TeacherRequestAdminOut:
     user = db.get(User, req.user_id)
     decider = db.get(User, req.decided_by_id) if req.decided_by_id else None
+    if schools is None:
+        schools = teaches_at(db, [req.user_id]).get(req.user_id, [])
     return TeacherRequestAdminOut(
         id=req.id, user=brief(user), user_teacher_status=user.teacher_status, message=req.message,
         status=req.status, reason=req.reason, created_at=req.created_at, decided_at=req.decided_at,
-        decided_by=brief(decider),
+        decided_by=brief(decider), applicant_name=req.applicant_name, school=req.school, subject=req.subject,
+        phone=req.phone, teaches_at=schools,
     )
+
+
+def revoke_impact(db: Session, user: User) -> RevokeImpactOut:
+    """What a revoke freezes: the personal organization's courses and their students, never test students or the hidden
+    preview courses of exam templates."""
+    in_org = (Course.organization_id == personal_org_id(user.id), Course.deleted_at.is_(None), regular_courses())
+    courses = db.execute(select(func.count()).select_from(Course).where(*in_org)).scalar_one()
+    students = db.execute(
+        select(func.count(Enrollment.user_id.distinct())).join(Course, Course.id == Enrollment.course_id)
+        .where(*in_org, Enrollment.role == "student", Enrollment.state == "active",
+               Enrollment.is_test_student.is_(False))
+    ).scalar_one()
+    return RevokeImpactOut(students=students, courses=courses)
 
 
 def user_detail(db: Session, user: User) -> AdminUserDetailOut:
@@ -148,7 +200,8 @@ def user_detail(db: Session, user: User) -> AdminUserDetailOut:
         owned_courses=[OwnedCourseBrief(id=c.id, title=c.title, status=c.status, deleted_at=c.deleted_at)
                        for c in courses],
         active_enrollment_count=active,
-        teacher_requests=[request_out(db, r) for r in reqs],
+        teacher_requests=requests_out(db, list(reqs)),
+        revoke_impact=revoke_impact(db, user),
     )
 
 

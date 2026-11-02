@@ -41,6 +41,7 @@ class MyOrganizationOut(BaseModel):
     id: uuid.UUID
     slug: str
     name: str
+    kind: str  # Accounts: pickers label a personal organization, the /org picker leaves it out
     status: str
     role: str
     can_create_courses: bool

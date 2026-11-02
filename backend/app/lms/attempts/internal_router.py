@@ -27,13 +27,17 @@ def sweep_attempts(x_sweep_token: Optional[str] = Header(None)) -> SweepOut:
 # has no cron, so the purge also runs opportunistically and bounded from the staff inbox and from submit)
 from app.lms.enrollment_forms.purge import run_purge  # noqa: E402
 from app.lms.enrollment_forms.schemas import PurgeOut  # noqa: E402
+from app.lms.teachers.purge import run_task as run_phone_purge_task  # noqa: E402
 
 
 @router.post("/purge-applications", response_model=PurgeOut)
 def purge_applications(x_sweep_token: Optional[str] = Header(None)) -> PurgeOut:
-    """Same token and the same 404 as the attempt sweep (one cron entry for both)."""
+    """Same token and the same 404 as the attempt sweep (one cron entry for both). Also runs the teacher applicants'
+    phone purge (no route of its own); the response counts application answers, as before."""
     token = settings.ATTEMPT_SWEEP_TOKEN
     if not token or not x_sweep_token or not hmac.compare_digest(token.encode(), x_sweep_token.encode()):
         raise NotFound("Not found")
-    return run_purge()
+    out = run_purge()
+    run_phone_purge_task()
+    return out
 # --- Phase 9 S4 end ---

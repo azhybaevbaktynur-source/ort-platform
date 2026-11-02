@@ -23,6 +23,11 @@ class TeacherRequestAdminOut(BaseModel):
     created_at: datetime
     decided_at: Optional[datetime] = None
     decided_by: Optional[UserBrief] = None
+    applicant_name: Optional[str] = None
+    school: Optional[str] = None
+    subject: Optional[str] = None
+    phone: Optional[str] = None
+    teaches_at: list[str] = []  # active schools or the platform where the applicant is a member, at most 5
 
 
 class AdminUserOut(BaseModel):
@@ -44,10 +49,16 @@ class OwnedCourseBrief(BaseModel):
     deleted_at: Optional[datetime] = None
 
 
+class RevokeImpactOut(BaseModel):
+    students: int
+    courses: int
+
+
 class AdminUserDetailOut(AdminUserOut):
     owned_courses: list[OwnedCourseBrief]
     active_enrollment_count: int
     teacher_requests: list[TeacherRequestAdminOut]
+    revoke_impact: RevokeImpactOut  # Accounts: who a revoke freezes (the user's personal organization)
 
 
 class AuditEntryOut(BaseModel):

@@ -2,7 +2,7 @@
 import uuid
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -15,6 +15,7 @@ from app.lms.platform_admin.schemas import (
     AdminUserDetailOut, AdminUserOut, ApproveIn, AuditEntryOut, DisableIn, RejectIn, SummaryOut,
     TeacherRequestAdminOut, TeacherStatusIn,
 )
+from app.lms.teachers import purge as teacher_purge
 from app.lms.teachers import service as teacher_service
 from app.lms.teachers.models import TeacherRequest
 from app.models.user import User
@@ -30,13 +31,15 @@ def summary(admin: User = Depends(require_platform_admin), db: Session = Depends
 
 @router.get("/teacher-requests", response_model=PageOut[TeacherRequestAdminOut])
 def list_teacher_requests(
+    background: BackgroundTasks,
     status: Literal["pending", "approved", "rejected", "cancelled", "all"] = "pending",
     cursor: Optional[str] = None, limit: Optional[int] = Query(None),
     admin: User = Depends(require_platform_admin), db: Session = Depends(get_db),
 ):
     page = paginate(us.teacher_requests_stmt(status), db, sort_col=TeacherRequest.created_at,
                     id_col=TeacherRequest.id, cursor=cursor, limit=limit)
-    return PageOut(items=[us.request_out(db, r) for r in page.items], next_cursor=page.next_cursor)
+    teacher_purge.queue(background)
+    return PageOut(items=us.requests_out(db, list(page.items)), next_cursor=page.next_cursor)
 
 
 @router.post("/teacher-requests/{request_id}/approve", response_model=TeacherRequestAdminOut)

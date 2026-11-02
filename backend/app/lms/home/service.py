@@ -11,7 +11,8 @@ Server-limited, no N+1: a fixed number of statements whatever the number of cour
 5. latest released results (max 3; quiz: the results-policy gate is in SQL, same rule as `/grades/mine`; manual
    grades: released);
 6. the caller's counted attempts on those quiz results (personal best; skipped without quiz results);
-7. pending invitations count.
+7. pending invitations count;
+8. the caller's latest teacher request (`ix_teacher_requests_user_id`; skipped for a revoked teacher).
 
 Next up / next due list assignments: published, not deleted, course published, organization active, the caller's
 effective window not closed (a LEFT JOIN on `assignment_overrides` of the caller's enrollment), and either a quiz that
@@ -504,6 +505,7 @@ def home(db: Session, user: User) -> sch.HomeOut:
         modules_next=_modules_next(db, uid), announcements=_announcements(db, uid),
         # --- Phase 8a S3 end ---
         pending_applications=_pending_applications(db, uid),  # Phase 9 S4
+        teacher_application=_teacher_application(db, user, now),  # Accounts
     )
 
 
@@ -530,3 +532,29 @@ def _pending_applications(db: Session, uid: str) -> list:
     return [sch.HomeApplicationOut(application_id=a, course_id=c, course_title=t, submitted_at=at)
             for a, c, t, at in rows]
 # --- Phase 9 S4 end ---
+
+
+# --- Accounts begin --- (docs/phases/ACCOUNTS.md B: the dashboard's one line; what the person already sees elsewhere)
+def _teacher_application(db: Session, user: User, now: datetime) -> Optional[sch.HomeTeacherApplicationOut]:
+    from app.lms.teachers.models import TeacherRequest
+    from app.lms.teachers.service import reapply_available_at
+
+    if user.teacher_status == "revoked":  # no stored date; the admin's reason isn't shown to the person today
+        return sch.HomeTeacherApplicationOut(status="revoked")
+    req = db.execute(
+        select(TeacherRequest).where(TeacherRequest.user_id == user.id)
+        .order_by(TeacherRequest.created_at.desc(), TeacherRequest.id.desc()).limit(1)
+    ).scalar_one_or_none()
+    if req is None:
+        return None
+    if req.status == "pending":
+        return sch.HomeTeacherApplicationOut(status="pending")
+    # A rejection the admin later overrode by a direct grant says nothing true any more.
+    decided = (req.status == "approved" and user.teacher_status == "approved") or (
+        req.status == "rejected" and user.teacher_status != "approved")
+    shown_from = now - timedelta(days=sch.TEACHER_DECISION_SHOWN_DAYS)
+    if not decided or req.decided_at is None or _utc(req.decided_at) < shown_from:
+        return None
+    return sch.HomeTeacherApplicationOut(status=req.status, decided_at=req.decided_at, reason=req.reason,
+                                         reapply_available_at=reapply_available_at(req))
+# --- Accounts end ---

@@ -52,7 +52,8 @@ S = "PII-SENTINEL"
 PASSWORD = "secret-pass-123"
 # CHECKs limit these two: asserted NULL below instead of holding the sentinel
 UNFILLABLE = {("users", "locale"), ("users", "age_band"), ("consent_records", "locale"),
-              ("data_requests", "reject_code"), ("course_goals", "target_percent")}
+              ("data_requests", "reject_code"), ("course_goals", "target_percent"),
+              ("teacher_requests", "phone_purge_after")}  # a date: `scan` reads text and JSON columns
 
 
 def _is_text(col) -> bool:
@@ -122,7 +123,8 @@ def fill(db):
     db.add(Invitation(token_hash=uuid.uuid4().hex, email=u.email, organization_id=w.course.organization_id, role="student",
                       course_id=w.course.id, message=S, language="en", invited_by_id=teacher,
                       expires_at=utcnow() + timedelta(days=1)))
-    db.add(TeacherRequest(user_id=u.id, message=S, reason=S))
+    db.add(TeacherRequest(user_id=u.id, message=S, reason=S, applicant_name=S, school=S, subject=S, phone=S[:32],
+                          phone_purge_after=utcnow()))
     db.add(AdminAuditLog(actor_id=teacher, action="x", target_type="user", target_id=u.id, reason=S,
                          details={"email": S, "display_name": S, "keep": 1}, ip_hash=S[:32]))
     db.add(AdminAuditLog(actor_id=teacher, action="invitation.created", target_type="course", target_id=str(w.course.id),
@@ -198,6 +200,7 @@ def test_side_tables_after_anonymizing(db):
     assert inv.email == "deleted@deleted.invalid" and inv.message is None and inv.revoked_at is not None
     tr = db.scalars(select(TeacherRequest).where(TeacherRequest.user_id == u.id)).one()
     assert tr.message is None and tr.reason is None
+    assert (tr.applicant_name, tr.school, tr.subject, tr.phone, tr.phone_purge_after) == (None,) * 5
     rows = db.scalars(select(AdminAuditLog).where(AdminAuditLog.action.in_(("x", "invitation.created")))).all()
     assert len(rows) == 2 and all("email" not in r.details and "display_name" not in r.details for r in rows)
     assert all(r.ip_hash is None for r in rows)
