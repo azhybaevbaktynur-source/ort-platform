@@ -22,6 +22,10 @@ Reproduced locally by delaying the API: `Учёба / Преподавание /
 ## Item 11: course card
 `components/lms/course/CourseCard.tsx` is the only card (dashboard, catalog, teaching list, trash). `GET /me/home/courses` pages the dashboard's "show all". `useGradeListText` + `grade_max` for grades in lists. Decisions: `PRODUCT_DECISIONS.md` UR2-*.
 
-## Results
-See the end of this file after deployment.
+## Results (deployed 2026-11-03, `main` 06c7d4e; no migration)
+- Local: SQLite 4033 passed, 49 skipped; PG 4120 passed, 25 skipped; alembic check clean; CI green on f3be409 (7 jobs). ORT walks and pixel comparison pass with no baseline change.
+- Production, signed in with the QA accounts (re-enabled for the check, then disabled again): landing at 375, 1440, 1920 (images load, no sideways scroll, no CSP errors, one login and one sign-up in the header); dashboard at the same widths; `/me/lms`, `/me/home`, `/me/home/courses`; the same menu on six pages and while moving between areas; 404 page.
+- Not seen on production: the admin overview (needs the owner's login; covered locally with the API slowed down and failing). Reproduced on the old code only with a slow API; a persistent failure would now show a retry and the error instead of "—".
+- Local browser run after the last spec fixes covered the changed and ORT specs; the full suite ran in CI.
+- Kyrgyz text is agent-written and not reviewed by a native speaker. Contacts page and platform name are placeholders (`LAUNCH_CHECKLIST.md`).
 
