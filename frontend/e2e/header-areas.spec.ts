@@ -63,6 +63,13 @@ test("a student's menu has no extra areas on any page", async ({ page }) => {
   await expect(page.getByRole("navigation", { name: t("shell.areas.label") })).toHaveCount(0);
 });
 
+test("an independent teacher has no Organization area", async ({ page }) => {
+  await page.setViewportSize(VIEWPORTS.desktop);
+  await signIn(page, seed().teacher_signup.independent);
+  await page.goto("/ru/courses");
+  await expect.poll(() => areas(page)).toEqual([t("shell.areas.learning"), t("shell.areas.teaching")]);
+});
+
 test("admin overview: numbers, then a retry when the summary fails", async ({ page }) => {
   await page.setViewportSize(VIEWPORTS.desktop);
   await signIn(page, seed().admin);

@@ -14,6 +14,7 @@ import { Badge, Button, EmptyState, ErrorState, LinkButton, Pagination, Skeleton
 import { CourseCard } from "@/components/lms/course/CourseCard";
 import { useGradeListText } from "@/components/lms/results/GradeBadge";
 import { PendingApplicationsLine } from "@/components/lms/catalog/ApplicationStatus"; // Phase 9 S4
+import { TeacherApplicationNotice } from "./TeacherApplicationNotice"; // Accounts
 import { fmtDayMonthTime } from "./format";
 import { SideRow, SideSection, TodoRows } from "./TodoList";
 import { useErrorText } from "./useErrorText";
@@ -75,7 +76,12 @@ function Dashboard({ data }: { data: HomeOut }) {
   const todo = data.todo ?? [];
   const grades = data.latest_results.slice(0, 3);
   const news = (data.announcements ?? []).slice(0, 3);
-  const pendingApps = <PendingApplicationsLine items={data.pending_applications ?? []} />;
+  const pendingApps = (
+    <>
+      {data.teacher_application && <TeacherApplicationNotice application={data.teacher_application} />}
+      <PendingApplicationsLine items={data.pending_applications ?? []} />
+    </>
+  );
 
   if (data.courses_total === 0 && todo.length === 0) {
     return (

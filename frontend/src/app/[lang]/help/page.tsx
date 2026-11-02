@@ -16,6 +16,8 @@ export default function HelpPage() {
     { key: "forgot", text: t("landing.help.forgot.a", { link: t("auth.forgotPassword") }),
       link: { href: `/${lang}/forgot-password`, label: t("landing.help.forgot.link") } },
     { key: "language", text: t("landing.help.language.a") },
+    { key: "becomeTeacher", text: t("landing.help.becomeTeacher.a"),
+      link: { href: `/${lang}/for-teachers/apply`, label: t("landing.help.becomeTeacher.link") } },
   ];
   return (
     <PublicShell>

@@ -14,12 +14,11 @@ export default function GradingSchemesPage() {
   if (me && !me.can_create_courses && !me.is_platform_admin) {
     return (
       <div role="alert" className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
-        <h1 className="text-xl font-bold text-slate-900">{t("teacherAccess.schemesNoAccess.title")}</h1>
-        <p className="mt-2 text-base leading-6 text-slate-600 sm:text-sm">{t("teacherAccess.schemesNoAccess.body")}</p>
+        <h1 className="text-xl font-bold text-slate-900">{t("teacherOnly.title")}</h1>
+        <p className="mt-2 text-base leading-6 text-slate-600 sm:text-sm">{t("teacherOnly.schemesBody")}</p>
         {/* Phase 6b S11b (UX 5): design-system link buttons. */}
         <div className="mt-6 flex flex-col-reverse justify-center gap-3 sm:flex-row">
-          <LinkButton variant="secondary" href={`/${lang}/teacher-access`}>{t("teacherAccess.navLink")}</LinkButton>
-          <LinkButton href={`/${lang}/courses`}>{t("teacherAccess.schemesNoAccess.back")}</LinkButton>
+          <LinkButton href={`/${lang}/courses`}>{t("teacherOnly.back")}</LinkButton>
         </div>
       </div>
     );

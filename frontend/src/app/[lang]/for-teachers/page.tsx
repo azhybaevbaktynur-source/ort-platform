@@ -7,14 +7,15 @@ import { useAuth } from "@/lib/auth-context";
 import { LinkButton, cn, focusRing } from "@/components/ui";
 import { PublicPageHeading, PublicShell } from "@/components/landing/PublicShell";
 import { LANDING_INNER } from "@/components/landing/roles";
+import { loginBackHref } from "@/components/teacherApply/paths";
 
 const STEPS = ["step1", "step2", "step3"] as const;
 
-/** How teachers join today (public): register, send a request, the platform admin approves; or an organization invites. */
+/** How teachers join (public): the application page, the platform admin approves; or an organization invites. */
 export default function ForTeachersPage() {
   const { lang, t } = useTranslation();
   const { user } = useAuth();
-  const requestHref = `/${lang}/teacher-access`;
+  const applyHref = `/${lang}/for-teachers/apply`;
   return (
     <PublicShell>
       <PublicPageHeading title={t("landing.forTeachers.title")} intro={t("landing.forTeachers.intro")} pose="working" />
@@ -28,22 +29,18 @@ export default function ForTeachersPage() {
                 <div className="min-w-0">
                   <h3 className="text-base font-semibold leading-6 text-slate-900">{t(`landing.forTeachers.${step}Title`)}</h3>
                   <p className="mt-1 text-base leading-7 text-slate-600">
-                    {t(`landing.forTeachers.${step}Text`, { page: t("teacherAccess.navLink") })}
+                    {t(`landing.forTeachers.${step}Text`)}
                   </p>
                 </div>
               </li>
             ))}
           </ol>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-5">
-            {user ? (
-              <LinkButton size="lg" href={requestHref} className="w-full sm:w-auto">{t("landing.forTeachers.request")}</LinkButton>
-            ) : (
-              <>
-                <LinkButton size="lg" href={`/${lang}/register`} className="w-full sm:w-auto">{t("landing.forTeachers.register")}</LinkButton>
-                <Link href={requestHref} className={cn("inline-flex min-h-11 items-center justify-center rounded-md text-base font-semibold text-brand-700 underline-offset-4 hover:underline", focusRing)}>
-                  {t("landing.forTeachers.haveAccount")}
-                </Link>
-              </>
+            <LinkButton size="lg" href={applyHref} className="w-full sm:w-auto">{t("landing.forTeachers.apply")}</LinkButton>
+            {!user && (
+              <Link href={loginBackHref(lang)} className={cn("inline-flex min-h-11 items-center justify-center rounded-md text-base font-semibold text-brand-700 underline-offset-4 hover:underline", focusRing)}>
+                {t("landing.forTeachers.haveAccount")}
+              </Link>
             )}
           </div>
         </section>

@@ -14,7 +14,7 @@ import { Pager } from "@/components/lms/Pager";
 import { RosterTable } from "@/components/lms/RosterTable";
 // --- Phase 6b S5c: staff people tab on the design system ---
 import { useListCount } from "@/components/lms/course/StaffCourseUi";
-import { Button, ConfirmDialog, EmptyState, Input, LoadingState, PageHeader, SearchInput, Select } from "@/components/ui";
+import { Button, ConfirmDialog, EmptyState, Input, LinkButton, LoadingState, PageHeader, SearchInput, Select } from "@/components/ui";
 // --- Phase 6b S5c end ---
 // --- Phase 6 S4b: invite staff without an account ---
 import { createCourseStaffInvitation } from "@/lib/lms/invitations";
@@ -23,7 +23,7 @@ import { OrgError } from "@/components/lms/org/OrgUi";
 // --- Phase 6 S4b end ---
 import { AccommodationsSection } from "@/components/lms/accommodations/AccommodationsSection"; // Phase 7a S5
 // --- Phase 9 S3: People tabs (Roster · Invitations · Applications), invite students by email ---
-import { UserPlus } from "lucide-react";
+import { FileUp, UserPlus } from "lucide-react";
 import { pickLocalized } from "@/lib/lms/localized";
 import { PeopleTabs, type PeopleTab } from "@/components/lms/people/PeopleTabs";
 import { InviteStudentsDialog } from "@/components/lms/people/InviteStudentsDialog";
@@ -281,7 +281,12 @@ export default function PeoplePage() {
       {/* Phase 6b S5c: PageHeader, add-staff card with design-system fields, roster Table with phone cards (UX T2). */}
       {/* Phase 9 S3: "Invite students" is the page's primary action; the content sits in tabs. */}
       <PageHeader title={t("courses.people.tab")} className="mb-2"
-        primaryAction={canManage && course.status !== "concluded" ? inviteButton : undefined} />
+        primaryAction={canManage && course.status !== "concluded" ? inviteButton : undefined}
+        secondaryActions={course.can_import_roster ? (
+          <LinkButton variant="secondary" href={`/${lang}/courses/${course.id}/people/roster-import`} leftIcon={<FileUp aria-hidden="true" className="h-4 w-4" />}>
+            {t("rosterImport.title")}
+          </LinkButton>
+        ) : undefined} />
       {/* UX rework D: the join code (it was in the Course page's To do panel). Teachers and assistants; settings for teachers. */}
       {(isTeacher || myRole === "assistant") && !course.my_enrollment.read_only && course.join_code && (
         <section aria-labelledby="people-join-code" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-slate-200 bg-white px-4 py-3">

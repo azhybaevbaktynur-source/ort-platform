@@ -6,7 +6,7 @@ import { useTranslation } from "@/lib/i18n/context";
 import { approveTeacherRequest, listTeacherRequests, rejectTeacherRequest, setTeacherStatus } from "@/lib/lms/admin";
 import type { TeacherRequestAdminOut, TeacherRequestStatus } from "@/lib/lms/types";
 import { fmtApiDateTimeShort } from "@/lib/format";
-import { Badge, Button, Card, EmptyState, LoadingState, PageHeader, Pagination, ReasonDialog, TabPanel, Tabs, toast } from "@/components/ui";
+import { Badge, Button, Card, DescriptionList, EmptyState, LoadingState, PageHeader, Pagination, ReasonDialog, TabPanel, Tabs, toast } from "@/components/ui";
 import { UserStatusBadge } from "@/components/lms/admin/UserStatusBadge";
 import { useAdminCrumbs, useAdminSummary } from "@/components/lms/admin/AdminShell";
 import { useCursorList } from "@/components/lms/admin/useCursorList";
@@ -18,6 +18,27 @@ type Filter = TeacherRequestStatus | "all";
 const IMPLIED_TEACHER_STATUS: Record<string, string> = { pending: "pending", approved: "approved", rejected: "none", cancelled: "none" };
 const FILTERS: Filter[] = ["pending", "approved", "rejected", "all"];
 const REQUEST_TONE: Record<string, "warning" | "success" | "danger" | "neutral"> = { pending: "warning", approved: "success", rejected: "danger", cancelled: "neutral" };
+
+/** What the applicant sent. A request from before the form has only its optional message. */
+function RequestFields({ request: r }: { request: TeacherRequestAdminOut }) {
+  const { t } = useTranslation();
+  const hasForm = !!(r.school || r.subject || r.phone);
+  if (!hasForm && !r.message) return <p className="mt-3 text-base leading-6 text-slate-600 sm:text-sm">{t("platformAdmin.requests.noMessage")}</p>;
+  const items = [
+    { key: "school", term: t("platformAdmin.requests.school"), description: r.school },
+    { key: "subject", term: t("platformAdmin.requests.subject"), description: r.subject },
+    { key: "phone", term: t("platformAdmin.requests.phone"), description: r.phone && (
+      <a href={`tel:${r.phone.replace(/[^0-9+]/g, "")}`} className="inline-flex min-h-11 items-center font-medium text-brand-700 hover:underline sm:min-h-0">{r.phone}</a>
+    ) },
+    { key: "teachesAt", term: t("platformAdmin.requests.teachesAt"), description: (r.teaches_at?.length ?? 0) > 0 ? r.teaches_at.join(", ") : null },
+  ].filter((item) => item.description);
+  return (
+    <div className="mt-3 space-y-3 border-t border-slate-100 pt-3">
+      {items.length > 0 && <DescriptionList twoColumns items={items} />}
+      {r.message && <DescriptionList items={[{ key: "message", term: t("platformAdmin.requests.message"), description: <span className="whitespace-pre-wrap">{r.message}</span> }]} />}
+    </div>
+  );
+}
 
 export default function TeacherRequestsPage() {
   const { lang, t } = useTranslation();
@@ -90,7 +111,7 @@ export default function TeacherRequestsPage() {
                 <Card as="li" key={r.id}>
                   <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
                     <div className="min-w-0">
-                      <Link href={`/${lang}/admin/users/${r.user.id}`} className="break-words text-base font-semibold text-brand-700 hover:underline">{nameOf(r)}</Link>
+                      <Link href={`/${lang}/admin/users/${r.user.id}`} className="inline-flex min-h-11 items-center break-words text-base font-semibold text-brand-700 hover:underline sm:min-h-0">{r.applicant_name || nameOf(r)}</Link>
                       <p className="break-all text-sm text-slate-600">{r.user.email}</p>
                     </div>
                     {/* Phase 6 S4 (admin M7): request status; teacher status only when it differs, prefixed "Now:" */}
@@ -104,7 +125,7 @@ export default function TeacherRequestsPage() {
                     </div>
                   </div>
                   <p className="mt-1 text-sm text-slate-600">{fmtApiDateTimeShort(r.created_at, lang)}</p>
-                  <p className="mt-3 whitespace-pre-wrap break-words text-base leading-6 text-slate-800 sm:text-sm">{r.message || t("platformAdmin.requests.noMessage")}</p>
+                  <RequestFields request={r} />
                   {r.reason && <p className="mt-2 break-words text-sm text-slate-800"><strong>{t("teacherRequest.reason")}:</strong> {r.reason}</p>}
                   {r.decided_by && r.decided_at && (
                     <p className="mt-1 text-sm text-slate-600">{t("platformAdmin.requests.decidedBy", { name: r.decided_by.display_name || r.decided_by.email, date: fmtApiDateTimeShort(r.decided_at, lang) })}</p>

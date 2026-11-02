@@ -98,6 +98,15 @@ export interface HomeOut {
   pending_applications?: HomePendingApplicationOut[];
   /** UX rework: at most 20 rows, in-progress attempts first, then soonest due (absent on an older backend) */
   todo?: HomeTodoOut[];
+  /** Accounts: null unless there is something to say about the person's teacher application. */
+  teacher_application?: HomeTeacherApplicationOut | null;
+}
+
+export interface HomeTeacherApplicationOut {
+  status: "pending" | "approved" | "rejected" | "revoked";
+  decided_at: string | null;
+  reason: string | null;
+  reapply_available_at: string | null;
 }
 
 /** Phase 9 S4: one "Pending applications" row on the student home. */

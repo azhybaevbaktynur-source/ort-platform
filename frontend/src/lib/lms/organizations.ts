@@ -101,6 +101,7 @@ export interface MyOrganizationOut {
   id: string;
   name: string;
   slug: string;
+  kind: OrgKind;
   role: OrgRole;
   status: OrgStatus;
   can_create_courses: boolean;
@@ -293,6 +294,11 @@ export const listMyOrganizations = (p: ListParams = {}) =>
   page(lmsFetch<PageOut<MyOrganizationOut>>("/me/organizations", { params: { limit: 100, ...p } })).then((x) => x.items);
 
 // --- Helpers ---
+
+/** What a picker calls an organization: a person's own personal organization is "My courses", never their name. */
+export function orgPickerLabel(o: { kind: string; name: string }, t: (key: string) => string): string {
+  return o.kind === "personal" ? t("organizations.fields.personal") : o.name;
+}
 
 /** System accounts (admin M5): the ORT demo teacher and any `@platform.invalid` address. Not editable. */
 export const SYSTEM_USER_IDS = ["usr_ort_demo_teacher"];

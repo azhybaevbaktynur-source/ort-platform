@@ -77,6 +77,29 @@ export interface Seed {
     invite_student: SeedUser;
     independent: SeedUser;
   };
+  /** Accounts: one person per test of teacher-signup.spec.ts. */
+  teacher_signup: {
+    registered: SeedUser & { password: string };
+    student: SeedUser;
+    no_links: SeedUser;
+    legacy: SeedUser;
+    minor: SeedUser;
+    pending: SeedUser;
+    approve: SeedUser;
+    rejected: SeedUser;
+    waited: SeedUser;
+    school_teacher: SeedUser;
+    invitee: SeedUser;
+    school_name: string;
+    independent: SeedUser;
+    independent_course_id: string;
+    personal_org_id: string;
+    personal_template_id: string;
+    personal_template_name: string;
+    both: SeedUser;
+    revoked: SeedUser;
+    revoke_target: SeedUser;
+  };
   /** Phase 8b S3: the scrolling-player course (its published quizzes serve the Student view "Start" check). */
   scrolling: {
     course_id: string;

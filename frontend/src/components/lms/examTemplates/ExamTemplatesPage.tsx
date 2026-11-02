@@ -12,7 +12,7 @@ import {
   EXAM_TEMPLATE_STATUSES, type BlocksOut, type ExamTemplateOut, type ExamTemplateScope, type ExamTemplateSpec, type ExamTemplateStatus,
 } from "@/lib/lms/examTemplateTypes";
 import type { DisplayMode } from "@/lib/lms/blocks";
-import { listMyOrganizations, type MyOrganizationOut } from "@/lib/lms/organizations";
+import { listMyOrganizations, orgPickerLabel, type MyOrganizationOut } from "@/lib/lms/organizations";
 import { cleanLocalized, pickLocalized } from "@/lib/lms/localized";
 import { LMS_LANGS, type LocalizedText } from "@/lib/lms/types";
 import { fmtDateTime } from "@/components/lms/assessments/format";
@@ -51,6 +51,7 @@ export function ExamTemplatesPage({ area, breadcrumbs }: { area: TemplateArea; b
   const [status, setStatus] = useState<"" | ExamTemplateStatus>("");
   const [scope, setScope] = useState<"" | ExamTemplateScope>("");
   const [creating, setCreating] = useState(false);
+  const [personalCount, setPersonalCount] = useState(0); // Accounts: the section below the list
   const readOnly = area.kind === "org" && !!area.readOnly;
 
   const fetchPage = useCallback((cursor: string | null) => listExamTemplates({
@@ -107,14 +108,63 @@ export function ExamTemplatesPage({ area, breadcrumbs }: { area: TemplateArea; b
             )}
           </FilterBar>
         }
-        empty={
+        empty={personalCount > 0 ? <p className="py-2 text-base leading-6 text-slate-600 sm:text-sm">{t(filtered ? "examTemplates.list.emptyFiltered" : "examTemplates.list.empty")}</p> : (
           <EmptyState mascot={filtered ? "thinking" : "working"} icon={<LayoutTemplate />} title={t(filtered ? "examTemplates.list.emptyFiltered" : "examTemplates.list.empty")}
             description={filtered ? undefined : t(`examTemplates.list.emptyHint.${area.kind}`)} />
-        }
+        )}
       />
       <MoreError list={list} />
+      {area.kind === "teacher" && <PersonalOrgTemplates status={status} onCount={setPersonalCount} />}
       <NewTemplateDialog open={creating} area={area} onClose={() => setCreating(false)} />
     </div>
+  );
+}
+
+/**
+ * Accounts (docs/phases/ACCOUNTS.md D): organization-scope templates of the person's own personal organization. Its
+ * organization area is hidden, so they live here, with the same editor as the person's own templates.
+ */
+function PersonalOrgTemplates({ status, onCount }: { status: "" | ExamTemplateStatus; onCount: (n: number) => void }) {
+  const [orgId, setOrgId] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    listMyOrganizations()
+      .then((rows) => { if (alive) setOrgId(rows.find((o) => o.kind === "personal" && o.role === "org_admin")?.id ?? null); })
+      .catch(() => { if (alive) setOrgId(null); });
+    return () => { alive = false; };
+  }, []);
+  if (!orgId) return null;
+  return <PersonalOrgTemplateList key={orgId} orgId={orgId} status={status} onCount={onCount} />;
+}
+
+function PersonalOrgTemplateList({ orgId, status, onCount }: { orgId: string; status: "" | ExamTemplateStatus; onCount: (n: number) => void }) {
+  const { lang, t } = useTranslation();
+  const title = t("examTemplates.list.personalTitle");
+  const fetchPage = useCallback((cursor: string | null) => listExamTemplates({ organization_id: orgId, scope: "organization", ...(status ? { status } : {}), cursor, limit: 50 }), [orgId, status]);
+  const list = useCursorList(fetchPage);
+  const state = useTableState(list);
+  const count = list.items.length;
+  useEffect(() => { onCount(count); }, [count, onCount]);
+  if (count === 0) return null;
+  const columns: TableColumn<ExamTemplateOut>[] = [
+    {
+      key: "title", header: t("examTemplates.list.title"), primary: true,
+      cell: (x) => (
+        <Link href={templateHref(lang, { kind: "teacher" }, x.id)} className="break-words font-semibold text-brand-700 hover:underline">
+          {pickLocalized(x.title, lang) || t("examTemplates.untitled")}
+        </Link>
+      ),
+    },
+    { key: "status", header: t("examTemplates.list.status"), cell: (x) => <TemplateStatusBadge status={x.status} /> },
+    { key: "version", header: t("examTemplates.list.version"), hideInCard: (x) => x.current_version_no == null, cell: (x) => x.current_version_no != null ? t("examTemplates.versionShort", { n: x.current_version_no }) : <span className="text-slate-500">—</span> },
+    { key: "updated", header: t("examTemplates.list.updated"), hideOnMobile: true, nowrap: true, cell: (x) => fmtDateTime(x.updated_at) },
+  ];
+  return (
+    <section aria-labelledby="personal-org-templates" className="mt-8">
+      <h2 id="personal-org-templates" className="mb-3 text-lg font-semibold leading-7 text-slate-900">{title}</h2>
+      <Table caption={title} columns={columns} rows={list.items} rowKey={(x) => x.id} {...state} />
+      <MoreError list={list} />
+    </section>
   );
 }
 
@@ -197,7 +247,7 @@ function NewTemplateDialog({ open, area, onClose }: { open: boolean; area: Templ
         )}
         {area.kind === "teacher" && orgs && orgs.length > 1 && (
           <Select label={t("examTemplates.create.organization")} hint={t("examTemplates.create.organizationHint")} value={orgId}
-            onChange={(e) => setOrgId(e.target.value)} options={orgs.map((o) => ({ value: o.id, label: o.name }))} />
+            onChange={(e) => setOrgId(e.target.value)} options={orgs.map((o) => ({ value: o.id, label: orgPickerLabel(o, t) }))} />
         )}
         {area.kind === "teacher" && orgs && orgs.length === 0 && !error && (
           <p className="text-sm text-danger-700">{t("examTemplates.saveAs.noOrg")}</p>

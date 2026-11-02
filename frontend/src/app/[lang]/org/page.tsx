@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Building2, ChevronRight } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { listMyOrganizations, type MyOrganizationOut } from "@/lib/lms/organizations";
+import { useLmsMe } from "@/lib/lms/useLmsMe";
 import { EmptyState, LinkButton, LoadingState, PageHeader, cn, focusRing } from "@/components/ui";
 import { LoadError, OrgBadge } from "@/components/lms/org/OrgUi";
 
@@ -13,19 +14,22 @@ import { LoadError, OrgBadge } from "@/components/lms/org/OrgUi";
 export default function OrgPickerPage() {
   const { lang, t } = useTranslation();
   const router = useRouter();
+  const { me } = useLmsMe();
+  const isPlatformAdmin = me?.is_platform_admin;
   const [orgs, setOrgs] = useState<MyOrganizationOut[] | null>(null);
   const [error, setError] = useState<unknown>(null);
 
   const load = useCallback(async () => {
+    if (isPlatformAdmin === undefined) return; // the personal organization rule needs the profile
     setError(null);
     try {
-      const rows = (await listMyOrganizations()).filter((o) => o.role === "org_admin");
+      const rows = (await listMyOrganizations()).filter((o) => o.role === "org_admin" && (isPlatformAdmin || o.kind !== "personal"));
       setOrgs(rows);
       if (rows.length === 1) router.replace(`/${lang}/org/${rows[0].id}`);
     } catch (e) {
       setError(e);
     }
-  }, [lang, router]);
+  }, [lang, router, isPlatformAdmin]);
   useEffect(() => { void load(); }, [load]);
 
   return (
