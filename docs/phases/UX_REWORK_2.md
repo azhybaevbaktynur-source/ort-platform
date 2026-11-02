@@ -12,3 +12,16 @@ Reproduced locally by delaying the API: `Учёба / Преподавание /
 
 ## Item 9: mascot
 `scripts/mascot_crop.py` cuts `docs/mascot/mascot_sheet.png` into `frontend/public/mascot/<pose>.webp|png`. `components/ui/Mascot.tsx`: `pose`, `size`, lazy, empty alt. Dropping `public/mascot/<pose>.svg` replaces a pose at the next build with no code change (`next.config.ts`). `EmptyState` has a `mascot` prop.
+
+## Item 8: landing
+`app/[lang]/page.tsx`, `components/landing/*`, new public pages `for-teachers`, `about`, `help`, `contacts`. Screenshots in `public/landing/<name>-<lang>.webp` come from real screens: `RECORD_LANDING=1 ... npx playwright test e2e/landing-screens.spec.ts` (`seed_landing`: fictional school). Re-record when the dashboard, player or teacher course page changes visibly.
+
+## Item 10: name
+`common.appName` in `en.json`, `ky.json`, `ru.json`: one line per language. Everything uses it.
+
+## Item 11: course card
+`components/lms/course/CourseCard.tsx` is the only card (dashboard, catalog, teaching list, trash). `GET /me/home/courses` pages the dashboard's "show all". `useGradeListText` + `grade_max` for grades in lists. Decisions: `PRODUCT_DECISIONS.md` UR2-*.
+
+## Results
+See the end of this file after deployment.
+
