@@ -383,8 +383,9 @@ test("the course picker says My courses, not the person's name", async ({ browse
   const d = data();
   const page = await as(browser, d.both);
   await page.goto("/ru/courses/new");
+  // the list loads after the page: wait for it (a slow CI machine got here first)
+  await expect.poll(() => page.locator("#new-org option").allInnerTexts()).toContain(t("organizations.fields.personal"));
   const options = await page.locator("#new-org option").allInnerTexts();
-  expect(options).toContain(t("organizations.fields.personal"));
   expect(options).toContain(d.school_name);
   expect(options).not.toContain(d.both.name);
   await page.context().close();
