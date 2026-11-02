@@ -41,7 +41,7 @@ export function Mascot({ pose, size = 96, eager = false, className }: MascotProp
   } as const;
   if (SVG_POSES.includes(pose)) return <img src={`/mascot/${pose}.svg`} {...img} />;
   return (
-    <picture className="contents">
+    <picture className="contents [&>source]:hidden">
       <source srcSet={`/mascot/${pose}.webp`} type="image/webp" />
       <img src={`/mascot/${pose}.png`} {...img} />
     </picture>
