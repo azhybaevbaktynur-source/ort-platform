@@ -308,7 +308,7 @@ export function StaffAssignmentList() {
         )}
         error={error ? <AssignmentError error={error} onRetry={() => void load()} /> : undefined}
         empty={(
-          <EmptyState icon={<ClipboardList />}
+          <EmptyState mascot={filtered ? "thinking" : "working"} icon={<ClipboardList />}
             title={filtered ? t("assignments.list.emptyFiltered") : trash ? t("assignments.list.emptyTrash") : t("assignments.list.empty")}
             description={filtered || trash ? undefined : t("assignments.list.emptyHint")}
             action={filtered || trash ? undefined : create} />

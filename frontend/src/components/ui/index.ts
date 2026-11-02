@@ -29,6 +29,7 @@ export type { EmptyStateProps } from "./EmptyState";
 export { ErrorState } from "./ErrorState";
 export type { ErrorStateProps } from "./ErrorState";
 export { Skeleton, SkeletonText, LoadingState } from "./Skeleton";
+export { Mascot, type MascotPose } from "./Mascot";
 export { ToastProvider, useToast, toast } from "./Toast";
 export type { ToastType, ToastMessage } from "./Toast";
 export { Dialog } from "./Dialog";

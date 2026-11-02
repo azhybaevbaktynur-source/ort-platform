@@ -1,7 +1,7 @@
 // Student home: `GET /me/home` (PHASE_6_DESIGN 8.4; backend app/lms/home/schemas.py). Server-limited lists:
 // in_progress, next_up and latest_results hold at most 3 rows, courses at most 10 (courses_total counts all).
-import type { Num, SchemeType } from "./gradingTypes";
-import type { LocalizedText } from "./types";
+import type { Num, SchemeLabelValue, SchemeType } from "./gradingTypes";
+import type { Lang, LocalizedText } from "./types";
 
 export interface HomeInProgressOut {
   attempt_id: string;
@@ -41,7 +41,10 @@ export interface HomeResultOut {
   title: LocalizedText;
   display_value: Num | null;
   label: string | null;
+  labels: Record<string, SchemeLabelValue>;
   scheme_type: SchemeType | null;
+  /** what `display_value` reads against ("7 / 10", "132 / 245"); null for percent and label schemes */
+  max_value: Num | null;
   released_at: string;
   kept_attempt_id: string | null;
   /** the kept attempt beats every other attempt on this assessment (more than one attempt) */
@@ -51,10 +54,17 @@ export interface HomeResultOut {
 export interface HomeCourseOut {
   id: string;
   title: LocalizedText;
+  description: LocalizedText | null;
+  languages: Lang[];
+  default_language: Lang;
   owner_display_name: string;
+  /** root organization; null for a personal one */
+  organization_display_name: string | null;
   is_platform_course: boolean;
   next_due_at: string | null;
   in_progress: boolean;
+  /** requirements done / total, as the student's Modules page counts them; null: nothing to finish, no bar */
+  progress: { done: number; total: number } | null;
 }
 
 /** UX rework: one "To do" row of the dashboard. `attempt_id`: an attempt in progress. Dates are the caller's own. */

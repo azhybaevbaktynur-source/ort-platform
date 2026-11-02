@@ -13,6 +13,7 @@ We tested on a laptop, not on the real servers (`docs/phases/PHASE_11_LOADTEST.m
 - [ ] Change the secret key (`SECRET_KEY`) and any other keys you hold. Everyone gets logged out once.
 - [ ] Pay for a bigger Render plan and more Neon power **if** one exam will have thousands of students. Prices: `docs/COSTS.md` (many are unknown).
 - [ ] Run the full 6,000-student test on those paid servers. Without it, do not promise 6,000.
+- [ ] Give the platform its name (the site now says "Платформа") and a public contact address for the Contacts page (it now says details will come). Each is one line for the agent to change.
 - [ ] Sign this checklist.
 
 ## B. Does not block launch

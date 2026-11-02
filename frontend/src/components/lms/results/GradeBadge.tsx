@@ -25,6 +25,32 @@ export function useGradeText() {
   };
 }
 
+/**
+ * A grade in a list, always with its context: points and scaled schemes read against their maximum ("7 / 10",
+ * "132 / 245 · label"), percent gets its sign ("85%"), label schemes show the label. A zero stays "0 / 10". Values come
+ * from the server, nothing is computed here; a grade without a scheme has only points, so they are its value. The
+ * result card keeps `useGradeText`.
+ */
+export function useGradeListText() {
+  const label = useSchemeLabel();
+  return (g: {
+    display_value?: Num | null;
+    effective_points?: Num | null;
+    max_value?: Num | null;
+    label?: string | null;
+    labels?: Record<string, SchemeLabelValue> | null;
+    scheme_type?: string | null;
+  }): string => {
+    const value = fmtNum(g.display_value ?? (g.scheme_type ? null : g.effective_points));
+    const max = fmtNum(g.max_value);
+    const l = g.label ? label(g.label, g.labels ?? undefined) : "";
+    if (g.scheme_type === "percent") return value ? `${value}%` : l;
+    if (g.scheme_type === "bands" || g.scheme_type === "pass_fail") return l || (value ? `${value}%` : "");
+    const score = value && max ? `${value} / ${max}` : value;
+    return score && l ? `${score} · ${l}` : score || l;
+  };
+}
+
 /** Big grade value, label, percentile, threshold flags and kept/not-released markers. */
 export function GradeBadge({ grade, showKept = true }: { grade: AttemptGradeOut; showKept?: boolean }) {
   const { t } = useTranslation();

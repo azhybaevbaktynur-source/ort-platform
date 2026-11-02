@@ -12,7 +12,7 @@ import { fmtNum, fmtPercentile } from "@/components/lms/grading/schemes/params";
 import { useSchemeLabel } from "@/components/lms/grading/schemes/labels";
 import { fmtPoints } from "@/components/lms/assessments/format";
 import { fmtShortDateTime } from "@/components/lms/home/format"; // Phase 7a UX: no seconds
-import { useGradeText } from "./GradeBadge";
+import { useGradeListText, useGradeText } from "./GradeBadge";
 import { KindIcon, LateBadge } from "@/components/lms/assignments/assignmentUi"; // Phase 7a S5
 
 const STATE_STYLE: Record<string, string> = {
@@ -27,11 +27,13 @@ const STATE_STYLE: Record<string, string> = {
 function Row({ item, courseId }: { item: MyGradeOut; courseId: string }) {
   const { lang, t } = useTranslation();
   const label = useSchemeLabel();
-  const text = useGradeText();
+  const text = useGradeListText();
   const flags = Object.entries(item.thresholds ?? {}).filter(([, on]) => on).map(([k]) => k);
   const pct = fmtPercentile(item.percentile);
   const graded = item.state === "graded";
-  const main = graded ? text(item, item.scheme_type ?? undefined) : "";
+  const main = graded ? text(item) : "";
+  // points or no scheme: the main value already is "7 / 10"
+  const showRaw = !!item.scheme_type && item.scheme_type !== "points";
   return (
     <li className="rounded-2xl border border-slate-200 bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -46,7 +48,7 @@ function Row({ item, courseId }: { item: MyGradeOut; courseId: string }) {
       {graded && (
         <div className="mt-2 space-y-1 text-sm">
           {main && <p className="text-2xl font-bold text-slate-900">{main}</p>}
-          {item.effective_points !== null && item.effective_points !== undefined && item.points_possible !== null && item.points_possible !== undefined && (
+          {showRaw && item.effective_points !== null && item.effective_points !== undefined && item.points_possible !== null && item.points_possible !== undefined && (
             <p className="text-slate-600">{t("results.scoreOf", { score: fmtPoints(item.effective_points), max: fmtPoints(item.points_possible), count: fmtPoints(item.points_possible) })}</p>
           )}
           {item.late_deduction !== null && item.late_deduction !== undefined && Number(item.late_deduction) > 0 && (

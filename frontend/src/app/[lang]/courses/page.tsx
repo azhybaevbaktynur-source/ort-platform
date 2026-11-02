@@ -12,7 +12,7 @@ import { useAuth } from "@/lib/auth-context";
 import { listMyCourses } from "@/lib/lms/courses";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
 import type { CourseCard as CourseCardDto } from "@/lib/lms/types";
-import { CourseCard } from "@/components/lms/CourseCard";
+import { COURSE_GRID, CourseCard, StatusBadge } from "@/components/lms/course/CourseCard";
 import { StudentHome } from "@/components/lms/home/StudentHome";
 import { useErrorText } from "@/components/lms/home/useErrorText";
 import {
@@ -75,12 +75,22 @@ function TeachingList() {
       {error && items.length > 0 ? <ErrorState variant="inline" message={errorText(error)} onRetry={() => void load(cursor)} /> : null}
       {loading && items.length === 0 && !error && <LoadingState rows={3} />}
       {!loading && !error && items.length === 0 && (
-        <EmptyState title={t("courses.list.emptyTeaching")}
+        <EmptyState mascot="working" title={t("courses.list.emptyTeaching")}
           action={me?.can_create_courses ? <LinkButton href={`/${lang}/courses/new`}>{t("courses.list.create")}</LinkButton> : undefined} />
       )}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 min-[1700px]:grid-cols-4">
-        {items.map((c) => <CourseCard key={c.id} course={c} />)}
-      </div>
+      {items.length > 0 && (
+        <ul className={COURSE_GRID}>
+          {items.map((c) => (
+            <CourseCard key={c.id} course={c} href={`/${lang}/courses/${c.id}`}
+              badges={(
+                <>
+                  <StatusBadge status={c.status} />
+                  {c.my_role && <span className="text-xs font-medium text-slate-600">{t(`courses.roles.${c.my_role}`)}</span>}
+                </>
+              )} />
+          ))}
+        </ul>
+      )}
       <Pagination nextCursor={cursor} loading={loading} onLoadMore={() => void load(cursor)} />
       {/* --- Phase 6b S5c (UX T13): course creators reach the catalog after their own list, not above it --- */}
       {me?.can_create_courses && (

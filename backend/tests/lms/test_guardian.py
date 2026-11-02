@@ -364,7 +364,8 @@ async def test_no_course_access_for_a_parent(api, db):
 
 # ------------------------------------------------------------------ allow-list
 
-GRADE_KEYS = {"title", "due_at", "state", "points", "possible", "percent", "label"}
+GRADE_KEYS = {"title", "due_at", "state", "points", "possible", "percent", "label", "display_value", "max_value",
+              "scheme_type", "labels"}
 TOTAL_KEYS = {"percent", "label"}
 
 

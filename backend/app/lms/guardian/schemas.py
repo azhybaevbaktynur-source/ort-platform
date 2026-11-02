@@ -64,6 +64,10 @@ class GuardianGradeOut(BaseModel):
     possible: Optional[Decimal] = None
     percent: Optional[Decimal] = None
     label: Optional[str] = None
+    display_value: Optional[Decimal] = None  # the scheme's value, formatted by `scheme_type` against `max_value`
+    max_value: Optional[Decimal] = None
+    scheme_type: Optional[str] = None
+    labels: Optional[dict] = None
 
 
 class GuardianTotalOut(BaseModel):

@@ -82,7 +82,7 @@ export function PracticeList() {
       <PageHeader title={t("practice.title")} primaryAction={newButton} />
       <ErrorMessage error={actionError} className="mb-4" />
       {loading ? <LoadingState /> : error ? <ErrorMessage error={error} onRetry={() => void load()} /> : items.length === 0 ? (
-        <EmptyState title={t(canEdit ? "practice.emptyStaff" : "practice.empty")} icon={<Dumbbell className="h-6 w-6" aria-hidden="true" />} action={newButton} />
+        <EmptyState mascot={canEdit ? "working" : "reading"} title={t(canEdit ? "practice.emptyStaff" : "practice.empty")} icon={<Dumbbell className="h-6 w-6" aria-hidden="true" />} action={newButton} />
       ) : (
         <ul className="space-y-3">
           {items.map((s) => (

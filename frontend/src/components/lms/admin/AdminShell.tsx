@@ -6,10 +6,20 @@ import { ShieldAlert } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
 import { getPlatformSummary } from "@/lib/lms/admin";
+import type { LmsApiError } from "@/lib/lms/client";
+import type { StorageLevel } from "@/lib/lms/storage";
 import { AreaShell } from "@/components/ui/AreaShell";
 import { EmptyState, LinkButton, LoadingState, type Breadcrumb } from "@/components/ui";
 
-const SummaryContext = createContext<{ pending: number | null; refresh: () => void }>({ pending: null, refresh: () => {} });
+interface AdminSummary {
+  pending: number | null;
+  storageLevel: StorageLevel | null;
+  /** The summary could not be loaded, even after a retry. */
+  error: LmsApiError | null;
+  refresh: () => void;
+}
+const SummaryContext = createContext<AdminSummary>({ pending: null, storageLevel: null, error: null, refresh: () => {} });
+const RETRY_MS = 1500;
 export const useAdminSummary = () => useContext(SummaryContext);
 
 /** Breadcrumbs of an admin page: Admin → section (→ page). */
@@ -24,10 +34,27 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const { me, loading } = useLmsMe();
   const pathname = usePathname();
   const [pending, setPending] = useState<number | null>(null);
+  const [storageLevel, setStorageLevel] = useState<StorageLevel | null>(null);
+  const [error, setError] = useState<LmsApiError | null>(null);
   const isAdmin = !!me?.is_platform_admin;
 
+  // UX rework 2: one retry, for a slow or restarting server; after that the page says so instead of showing nothing.
   const refresh = useCallback(() => {
-    getPlatformSummary().then((s) => setPending(s.pending_teacher_requests)).catch(() => setPending(null));
+    setError(null);
+    const load = async (retry: boolean) => {
+      try {
+        const s = await getPlatformSummary();
+        setPending(s.pending_teacher_requests);
+        setStorageLevel(s.storage_level);
+      } catch (e) {
+        if (retry) {
+          await new Promise((done) => setTimeout(done, RETRY_MS));
+          return load(false);
+        }
+        setError(e as LmsApiError);
+      }
+    };
+    void load(true);
   }, []);
   useEffect(() => { if (isAdmin) refresh(); }, [isAdmin, refresh]);
 
@@ -60,7 +87,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     active: i.exact ? pathname === i.href : pathname === i.href || pathname.startsWith(`${i.href}/`),
   }));
   return (
-    <SummaryContext.Provider value={{ pending, refresh }}>
+    <SummaryContext.Provider value={{ pending, storageLevel, error, refresh }}>
       <AreaShell
         label={t("platformAdmin.nav.label")}
         items={items}

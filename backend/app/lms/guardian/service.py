@@ -417,7 +417,8 @@ def grades(db: Session, guardian: User, link_id: uuid.UUID, course_id: uuid.UUID
     return sch.GuardianGradesOut(total=total, items=[
         sch.GuardianGradeOut(title=i.title, due_at=home_svc._utc(i.due_at), state=i.state, points=i.effective_points,
                              possible=i.points_possible, percent=_percent(i.effective_points, i.points_possible),
-                             label=i.label)
+                             label=i.label, display_value=i.display_value, max_value=i.max_value,
+                             scheme_type=i.scheme_type, labels=i.labels)
         for i in mine.items])
 
 

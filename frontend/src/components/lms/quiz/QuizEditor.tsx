@@ -342,7 +342,7 @@ export function QuizEditor({ initial, mode = "course" }: {
       <div className="space-y-4">
         <QuizError error={actionError} />
         {a.sections.length === 0 ? (
-          <EmptyState icon={<ListChecks />} title={t("quizEditor.section.emptyQuizTitle")} description={t("quizEditor.section.emptyQuizBody")}
+          <EmptyState mascot="working" icon={<ListChecks />} title={t("quizEditor.section.emptyQuizTitle")} description={t("quizEditor.section.emptyQuizBody")}
             action={canEdit ? <AddAtEnd ops={ops} section={null} primary /> : undefined} />
         ) : a.sections.map((s, i) => (
           <section key={s.id} aria-label={secName(s)} className={showHeaders ? "space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3" : "space-y-3"}>
@@ -390,7 +390,7 @@ export function QuizEditor({ initial, mode = "course" }: {
         <QuizError error={actionError} />
         {canEdit && structureLocked && showHeaders && <p role="note" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{lockedNote}</p>}
         {a.sections.length === 0 ? (
-          <EmptyState icon={<ListChecks />} title={t("quizEditor.section.emptyQuizTitle")} description={t("quizEditor.section.emptyQuizBody")}
+          <EmptyState mascot="working" icon={<ListChecks />} title={t("quizEditor.section.emptyQuizTitle")} description={t("quizEditor.section.emptyQuizBody")}
             action={canEdit ? <AddAtEnd ops={ops} section={null} primary /> : undefined} />
         ) : (
           <div className="space-y-4">

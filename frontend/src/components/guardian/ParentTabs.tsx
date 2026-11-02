@@ -9,6 +9,8 @@ import { fmtApiDate } from "@/lib/format";
 import type { Num } from "@/lib/lms/gradingTypes";
 import { pickLocalized } from "@/lib/lms/localized";
 import type { Lang } from "@/lib/lms/types";
+import { useGradeListText } from "@/components/lms/results/GradeBadge";
+import { useSchemeLabel } from "@/components/lms/grading/schemes/labels";
 import { GuardianError } from "./GuardianError";
 import {
   getDue, getGrades, listAnnouncements, listCourses, type GuardianAnnouncement, type GuardianCourse, type GuardianDue,
@@ -36,7 +38,9 @@ function useReadError(onConsentNeeded: () => void) {
 }
 
 function GradesPanel({ linkId, courseId, onConsentNeeded }: { linkId: string; courseId: string; onConsentNeeded: () => void }) {
+  const schemeLabel = useSchemeLabel();
   const { lang, t } = useTranslation();
+  const gradeText = useGradeListText();
   const [data, setData] = useState<GuardianGrades | null>(null);
   const [error, setError] = useState<unknown>(null);
   const failed = useReadError(onConsentNeeded);
@@ -51,13 +55,13 @@ function GradesPanel({ linkId, courseId, onConsentNeeded }: { linkId: string; co
 
   if (error) return <GuardianError error={error} onRetry={load} />;
   if (!data) return <LoadingState rows={3} />;
-  if (data.items.length === 0) return <EmptyState title={t("guardian.grades.empty")} />;
+  if (data.items.length === 0) return <EmptyState mascot="reading" title={t("guardian.grades.empty")} />;
   return (
     <>
       {data.total && data.total.percent !== null && (
         <p className="mb-3 text-base font-semibold text-slate-900">
           {t("guardian.grades.total", { percent: num(data.total.percent, lang) })}
-          {data.total.label && <span className="ml-2 font-medium text-slate-700">{data.total.label}</span>}
+          {data.total.label && <span className="ml-2 font-medium text-slate-700">{schemeLabel(data.total.label)}</span>}
         </p>
       )}
       <ul className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
@@ -70,13 +74,13 @@ function GradesPanel({ linkId, courseId, onConsentNeeded }: { linkId: string; co
             <p className="mt-1 text-sm text-slate-600">
               {item.due_at ? t("guardian.dueOn", { date: fmtApiDate(item.due_at, lang) }) : t("guardian.noDate")}
             </p>
-            {item.state === "graded" && item.points !== null && (
+            {item.state === "graded" && (
               <p className="mt-1 text-sm font-semibold text-slate-900">
-                {item.possible !== null
-                  ? t("guardian.grades.points", { points: num(item.points, lang), possible: num(item.possible, lang) })
-                  : num(item.points, lang)}
-                {item.percent !== null && <span className="ml-2 font-medium text-slate-700">{num(item.percent, lang)}%</span>}
-                {item.label && <span className="ml-2 font-medium text-slate-700">{item.label}</span>}
+                {gradeText({ ...item, effective_points: item.points })}
+                {/* a scheme's value reads differently from the points: both, as the student's Grades page shows them */}
+                {item.scheme_type && item.scheme_type !== "points" && item.points !== null && item.possible !== null && (
+                  <span className="ml-2 font-medium text-slate-700">{t("guardian.grades.points", { points: num(item.points, lang), possible: num(item.possible, lang) })}</span>
+                )}
               </p>
             )}
           </li>
@@ -102,7 +106,7 @@ function DuePanel({ linkId, onConsentNeeded }: { linkId: string; onConsentNeeded
 
   if (error) return <GuardianError error={error} onRetry={load} />;
   if (!rows) return <LoadingState rows={3} />;
-  if (rows.length === 0) return <EmptyState title={t("guardian.due.empty")} />;
+  if (rows.length === 0) return <EmptyState mascot="reading" title={t("guardian.due.empty")} />;
   return (
     <ul className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
       {rows.map((row, i) => (
@@ -152,7 +156,7 @@ function AnnouncementsPanel({ linkId, courseId, onConsentNeeded }: { linkId: str
 
   if (error) return <GuardianError error={error} onRetry={load} />;
   if (!rows) return <LoadingState rows={2} />;
-  if (rows.length === 0) return <EmptyState title={t("guardian.announcements.empty")} />;
+  if (rows.length === 0) return <EmptyState mascot="reading" title={t("guardian.announcements.empty")} />;
   return (
     <>
       <ul className="space-y-3">
@@ -220,7 +224,7 @@ export function ParentTabs({ linkId, onConsentNeeded }: { linkId: string; onCons
         ) : courses === null ? (
           <LoadingState rows={3} />
         ) : noCourse ? (
-          <EmptyState title={t("guardian.noCourses")} />
+          <EmptyState mascot="reading" title={t("guardian.noCourses")} />
         ) : (
           <>
             {coursePicker}

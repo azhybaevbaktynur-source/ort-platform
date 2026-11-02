@@ -2,8 +2,9 @@
 read assignments).
 
 Server-limited, no N+1: a fixed number of statements whatever the number of courses, assignments or attempts:
-1. courses page (max 10) + total (window count) + per-course `in_progress` (correlated EXISTS);
+1. courses page (max 10) + total (window count) + per-course `in_progress` (correlated EXISTS) + root organization;
 2. per-course `next_due_at` for that page (one grouped query; skipped without courses);
+2b. per-course module progress for that page (one grouped query over the stored caches; skipped without courses);
 3. in-progress attempts (max 3);
 4. listable assignments (max `TODO_MAX`; attempts left as a correlated count): `todo` and, its first 3 rows, next up;
 4b. in-progress attempts with their effective dates (max `TODO_MAX`): the head of `todo`;
@@ -37,9 +38,15 @@ from app.lms.assessments.models import Assessment
 from app.lms.assignments.models import Assignment, AssignmentOverride, AssignmentSubmission
 from app.lms.attempts.models import Attempt
 from app.lms.core import clock
+from app.lms.core.pagination import PageOut
+from app.lms.courses import scopes as course_scopes
 from app.lms.courses.models import Course
+from app.lms.courses.schemas import card_organization_name
+from app.lms.courses.service import paginate_rows
 from app.lms.enrollments.models import Enrollment
 from app.lms.grading.models import GradingSchemeVersion, Submission
+from app.lms.grading.schemes import label_subset, version_data_from_row
+from app.lms.grading.serializers import grade_max
 from app.lms.home import schemas as sch
 from app.lms.invitations import service as invitation_svc
 from app.lms.organizations.ids import platform_org_id
@@ -138,19 +145,98 @@ def _listable(user_id: str, now: datetime, used):
     )
 
 
-def _courses(db: Session, uid: str) -> tuple[list, int]:
+def _course_rows(uid: str):
+    """The caller's student courses with everything a course card shows in one statement: rows of (Course, owner,
+    in_progress, org_name, org_kind)."""
     in_progress = exists().where(Attempt.enrollment_id == Enrollment.id, Attempt.user_id == uid,
                                  Attempt.status == "in_progress", Attempt.is_preview.is_(False),
                                  Attempt.is_practice.is_(False))
-    rows = db.execute(
-        select(Course.id, Course.title, Course.organization_id, User.display_name,
-               in_progress.label("in_progress"), func.count().over().label("total"))
+    return course_scopes.with_card_org(
+        select(Course, User.display_name.label("owner"), in_progress.label("in_progress"))
         .select_from(Enrollment).join(Course, Course.id == Enrollment.course_id)
         .join(User, User.id == Course.owner_id)
-        .where(_mine(uid))
+        .where(_mine(uid)))
+
+
+def _courses(db: Session, uid: str) -> tuple[list, int]:
+    rows = db.execute(
+        _course_rows(uid).add_columns(func.count().over().label("total"))
         .order_by(Course.created_at.desc(), Course.id.desc()).limit(sch.COURSES_MAX)
     ).all()
     return rows, (rows[0].total if rows else 0)
+
+
+def _item_target_visible():
+    """A module item's target published and live (invariant 1); the item must LEFT JOIN `Page`, `CourseFile` and
+    `Assignment` on its own target."""
+    from app.lms.course_files.models import CourseFile
+    from app.lms.modules.models import ModuleItem
+    from app.lms.pages.models import Page
+
+    return or_(
+        ModuleItem.kind == "url",
+        and_(ModuleItem.kind == "page", Page.published.is_(True), Page.deleted_at.is_(None)),
+        and_(ModuleItem.kind == "file", CourseFile.published.is_(True), CourseFile.deleted_at.is_(None)),
+        and_(ModuleItem.kind == "assignment", Assignment.published.is_(True), Assignment.deleted_at.is_(None)),
+    )
+
+
+def _progress(db: Session, uid: str, course_ids: list) -> dict:
+    """course id -> (done, total) for one page of cards, one grouped statement over the stored caches; never evaluates
+    (PHASE_8A_DESIGN 6.7). `total`: requirements of the visible items of published live modules, the rows the student's
+    Modules page counts; `done`: those with a `met` status row of the caller. A course without such an item is absent."""
+    if not course_ids:
+        return {}
+    from app.lms.course_files.models import CourseFile
+    from app.lms.modules.models import CourseModule, ItemCompletionRequirement, ItemRequirementStatus, ModuleItem
+    from app.lms.pages.models import Page
+
+    met = and_(ItemRequirementStatus.item_id == ModuleItem.id, ItemRequirementStatus.enrollment_id == Enrollment.id,
+               ItemRequirementStatus.met.is_(True))
+    rows = db.execute(
+        select(Course.id, func.count(ItemRequirementStatus.item_id), func.count(ModuleItem.id))
+        .select_from(Enrollment).join(Course, Course.id == Enrollment.course_id)
+        .join(CourseModule, CourseModule.course_id == Course.id)
+        .join(ModuleItem, ModuleItem.module_id == CourseModule.id)
+        .join(ItemCompletionRequirement, ItemCompletionRequirement.item_id == ModuleItem.id)
+        .outerjoin(ItemRequirementStatus, met)
+        .outerjoin(Page, Page.id == ModuleItem.page_id)
+        .outerjoin(CourseFile, CourseFile.id == ModuleItem.file_id)
+        .outerjoin(Assignment, Assignment.id == ModuleItem.assignment_id)
+        .where(_mine(uid), Course.id.in_(course_ids), CourseModule.deleted_at.is_(None),
+               CourseModule.published.is_(True), ModuleItem.deleted_at.is_(None), ModuleItem.published.is_(True),
+               ModuleItem.kind != "header", _item_target_visible())
+        .group_by(Course.id)
+    ).all()
+    return {cid: (int(done), int(total)) for cid, done, total in rows}
+
+
+def _course_cards(db: Session, uid: str, rows: list, now: datetime) -> list[sch.HomeCourseOut]:
+    """One page of cards: the page's own statement plus one grouped statement each for next due and progress."""
+    ids = [r[0].id for r in rows]
+    due = _next_due(db, uid, ids, now)
+    progress = _progress(db, uid, ids)
+    platform = platform_org_id()
+    out = []
+    for r in rows:
+        c = r[0]
+        done_total = progress.get(c.id)
+        out.append(sch.HomeCourseOut(
+            id=c.id, title=c.title, description=c.description, languages=list(c.languages),
+            default_language=c.default_language, owner_display_name=r.owner or "—",
+            organization_display_name=card_organization_name(r.org_kind, r.org_name),
+            is_platform_course=c.organization_id == platform, next_due_at=due.get(c.id),
+            in_progress=bool(r.in_progress),
+            progress=sch.HomeProgressOut(done=done_total[0], total=done_total[1]) if done_total else None))
+    return out
+
+
+def courses_page(db: Session, user: User, *, cursor: Optional[str] = None, limit: Optional[int] = None
+                 ) -> PageOut[sch.HomeCourseOut]:
+    """`GET /me/home/courses`: every student course of the caller, same order and same cards as `/me/home`."""
+    rows, nxt = paginate_rows(db, _course_rows(user.id), sort_col=Course.created_at, id_col=Course.id,
+                              entity_of=lambda r: r[0], cursor=cursor, limit=limit)
+    return PageOut[sch.HomeCourseOut](items=_course_cards(db, user.id, rows, clock.now()), next_cursor=nxt)
 
 
 def _next_due(db: Session, uid: str, course_ids: list, now: datetime) -> dict:
@@ -264,7 +350,8 @@ def _latest_results(db: Session, uid: str, now: datetime) -> list[sch.HomeResult
     rows = db.execute(
         select(Submission.assignment_id, Assignment.kind, Assignment.assessment_id, Submission.course_id,
                Course.title, Assignment.title, Submission.display_value, Submission.label, GradingSchemeVersion.type,
-               Submission.released_at, Submission.kept_attempt_id, Submission.enrollment_id)
+               Submission.released_at, Submission.kept_attempt_id, Submission.enrollment_id, GradingSchemeVersion,
+               Submission.points_possible, Submission.effective_points)
         .select_from(Submission).join(Enrollment, Enrollment.id == Submission.enrollment_id)
         .join(Course, Course.id == Enrollment.course_id)
         .join(Assignment, Assignment.id == Submission.assignment_id)
@@ -294,10 +381,16 @@ def _latest_results(db: Session, uid: str, now: datetime) -> list[sch.HomeResult
             return False
         return all(mine[kept] > v for k, v in mine.items() if k != kept)
 
-    return [sch.HomeResultOut(assignment_id=r[0], kind=r[1], assessment_id=r[2], course_id=r[3], course_title=r[4],
-                              title=r[5], display_value=r[6], label=r[7], scheme_type=r[8], released_at=_utc(r[9]),
-                              kept_attempt_id=r[10], is_personal_best=best(r[2], r[10]))
-            for r in rows]
+    def result(r) -> sch.HomeResultOut:
+        version = version_data_from_row(r[12]) if r[12] is not None else None
+        # a grade without a scheme has points only: they are its value, so a zero still reads "0 / 10"
+        value = r[6] if r[6] is not None or version is not None else r[14]
+        return sch.HomeResultOut(assignment_id=r[0], kind=r[1], assessment_id=r[2], course_id=r[3], course_title=r[4],
+                                 title=r[5], display_value=value, label=r[7], labels=label_subset(version, r[7]),
+                                 scheme_type=r[8], max_value=grade_max(r[8], r[13], version.scale_max if version else None),
+                                 released_at=_utc(r[9]), kept_attempt_id=r[10], is_personal_best=best(r[2], r[10]))
+
+    return [result(r) for r in rows]
 
 
 def _pending_invitations(db: Session, user: User, now: datetime) -> int:
@@ -345,12 +438,7 @@ def _modules_next(db: Session, uid: str) -> list[sch.HomeModuleNextOut]:
     ).all()
     if not mods:
         return []
-    target_ok = or_(
-        ModuleItem.kind == "url",
-        and_(ModuleItem.kind == "page", Page.published.is_(True), Page.deleted_at.is_(None)),
-        and_(ModuleItem.kind == "file", CourseFile.published.is_(True), CourseFile.deleted_at.is_(None)),
-        and_(ModuleItem.kind == "assignment", Assignment.published.is_(True), Assignment.deleted_at.is_(None)),
-    )
+    target_ok = _item_target_visible()
     met = and_(ItemRequirementStatus.item_id == ModuleItem.id,
                ItemRequirementStatus.enrollment_id.in_({m.enrollment_id for m in mods}),
                ItemRequirementStatus.met.is_(True))
@@ -406,12 +494,7 @@ def home(db: Session, user: User) -> sch.HomeOut:
     now = clock.now()
     uid = user.id
     course_rows, total = _courses(db, uid)
-    due = _next_due(db, uid, [r[0] for r in course_rows], now)
-    platform = platform_org_id()
-    courses = [sch.HomeCourseOut(id=cid, title=title, owner_display_name=owner or "—",
-                                 is_platform_course=org_id == platform, next_due_at=due.get(cid),
-                                 in_progress=bool(in_prog))
-               for cid, title, org_id, owner, in_prog, _total in course_rows]
+    courses = _course_cards(db, uid, course_rows, now)
     listable = _listable_rows(db, uid, now)
     return sch.HomeOut(
         in_progress=_in_progress(db, uid), next_up=_next_up(listable), todo=_todo(db, uid, now, listable),

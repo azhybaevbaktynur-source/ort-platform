@@ -32,7 +32,7 @@ export default function OrgPickerPage() {
     <div>
       <PageHeader title={t("organizations.org.pickTitle")} />
       {error ? <LoadError error={error} onRetry={load} /> : !orgs ? <LoadingState label={t("lms.common.loading")} /> : orgs.length === 0 ? (
-        <EmptyState icon={<Building2 />} title={t("organizations.org.pickEmpty")}
+        <EmptyState mascot="working" icon={<Building2 />} title={t("organizations.org.pickEmpty")}
           action={<LinkButton variant="secondary" href={`/${lang}/courses`}>{t("organizations.noAccess.back")}</LinkButton>} />
       ) : (
         <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

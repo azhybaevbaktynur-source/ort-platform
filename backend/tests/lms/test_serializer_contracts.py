@@ -18,7 +18,8 @@ def walk_keys(obj):
 
 
 def test_declared_key_sets():
-    assert set(CourseCard.model_fields) == {"id", "title", "languages", "default_language", "status", "my_role",
+    assert set(CourseCard.model_fields) == {"id", "title", "description", "organization_display_name", "languages",
+                                            "default_language", "status", "my_role",
                                             "owner_display_name", "starts_at", "ends_at", "deleted_at"}
     assert set(CourseStudentOut.model_fields) == {"id", "title", "description", "languages", "default_language",
                                                   "status", "starts_at", "ends_at", "owner_display_name",

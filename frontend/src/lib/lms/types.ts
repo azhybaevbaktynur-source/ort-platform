@@ -1,3 +1,4 @@
+import type { StorageLevel } from "./storage";
 // TypeScript mirrors of the Phase 1 API schemas (docs/phases/PHASE_1_DESIGN.md section 5).
 // Single source of truth for S4 and S5.
 
@@ -30,6 +31,9 @@ export interface MeOut {
   can_create_courses: boolean;
   /** Phase 6 S8: teaches somewhere (approved, org teacher/admin, or course staff); shows the Teaching area. */
   is_teacher: boolean;
+  /** UX rework 2: the header's areas come from this one answer. */
+  admin_organizations: { id: string; name: string }[];
+  is_guardian: boolean;
 }
 export interface MePatchIn {
   locale: Lang;
@@ -56,6 +60,9 @@ export interface UserBrief {
 export interface CourseCard {
   id: string;
   title: LocalizedText;
+  description?: LocalizedText | null;
+  /** root organization; null for a personal one */
+  organization_display_name?: string | null;
   languages: Lang[];
   default_language: Lang;
   status: CourseStatus;
@@ -226,6 +233,7 @@ export interface AuditEntryOut {
 }
 export interface PlatformSummaryOut {
   pending_teacher_requests: number;
+  storage_level: StorageLevel;
 }
 
 // Error codes (5.4); frontend keys are lms.errors.<code>

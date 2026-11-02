@@ -263,7 +263,7 @@ export function FormBuilder({ course }: { course: CourseStaffOut }) {
   if (!form) {
     return (
       <div className="max-w-4xl">{header}
-        <EmptyState title={t("enrollmentForm.empty.title")} description={t("enrollmentForm.empty.body")}
+        <EmptyState mascot="working" title={t("enrollmentForm.empty.title")} description={t("enrollmentForm.empty.body")}
           action={isTeacher ? <Button loading={busy === "create"} leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />} onClick={() => void create()}>{t("enrollmentForm.empty.create")}</Button> : undefined} />
         {error ? <ErrorState variant="inline" message={errorText(error)} className="mt-3" /> : null}
       </div>

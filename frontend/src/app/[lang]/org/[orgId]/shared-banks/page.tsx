@@ -34,7 +34,7 @@ export default function OrgSharedBanksPage() {
           {list.error ? <LoadError error={list.error} onRetry={list.reload} /> : (
             <>
               {!list.loading && list.items.length === 0 && (
-                <EmptyState icon={<Library />} title={q ? t("sharedBanks.emptySearch") : t("sharedBanks.empty")}
+                <EmptyState mascot={q ? "thinking" : "working"} icon={<Library />} title={q ? t("sharedBanks.emptySearch") : t("sharedBanks.empty")}
                   description={q ? undefined : t("sharedBanks.emptyHint")} />
               )}
               <SharedBankList items={list.items} loading={list.loading} hasMore={!!list.cursor} onMore={list.loadMore}

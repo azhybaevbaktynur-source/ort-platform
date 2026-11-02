@@ -8,7 +8,7 @@ import { useTranslation } from "@/lib/i18n/context";
 import type { AssessmentStudentSummaryOut } from "@/lib/lms/assessmentTypes";
 import { Badge, LinkButton, cn, focusRing, type BadgeTone } from "@/components/ui";
 import { fmtPoints } from "@/components/lms/assessments/format";
-import { useGradeText } from "@/components/lms/results/GradeBadge";
+import { useGradeListText } from "@/components/lms/results/GradeBadge";
 import type { StudentAssessmentStatus, StudentAssessmentView } from "./assessmentStatus";
 import { fmtDuration, fmtShortDateTime, isDueSoon } from "./format";
 
@@ -53,14 +53,14 @@ export function StudentAssessmentCard({ a, v, href, primary, title, as = "li" }:
   as?: "li" | "div";
 }) {
   const { lang, t } = useTranslation();
-  const gradeText = useGradeText();
+  const gradeText = useGradeListText();
   const Tag = as;
   const lobby = `${href}/assessments/${a.id}`;
   const duration = fmtDuration(a.time_limit_s, t);
   const variant = primary ? "primary" : "secondary";
 
   let result = "";
-  if (v.grade && v.grade.state === "graded") result = gradeText(v.grade, v.grade.scheme_type ?? undefined, v.grade.labels);
+  if (v.grade && v.grade.state === "graded") result = gradeText(v.grade);
   if (!result && a.last_result) result = t("home.scoreOf", { score: fmtPoints(a.last_result.raw_score), total: fmtPoints(a.last_result.points_possible) });
 
   const actions: React.ReactNode[] = [];

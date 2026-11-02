@@ -69,7 +69,7 @@ export function ProgressOverview({ courseId, onOpenMistakes }: { courseId: strin
       </div>
       <GoalInput courseId={courseId} value={data.goal_percent} onChange={(v) => setData({ ...data, goal_percent: v })} />
       {data.attempts_total === 0 ? (
-        <EmptyState title={t("progress.empty")} />
+        <EmptyState mascot="reading" title={t("progress.empty")} />
       ) : (
         <>
           <Trend data={data} />

@@ -136,7 +136,7 @@ export function InvitationList({
             ]} />
         }
         empty={
-          <EmptyState title={state ? t("studentInvite.list.emptyFilter") : t("studentInvite.list.empty")}
+          <EmptyState mascot={state ? "thinking" : "working"} title={state ? t("studentInvite.list.emptyFilter") : t("studentInvite.list.empty")}
             description={state ? undefined : t("studentInvite.list.emptyHint")}
             action={!state && canManage && onInvite ? (
               <Button variant="secondary" leftIcon={<UserPlus aria-hidden="true" className="h-4 w-4" />} onClick={onInvite}>{t("studentInvite.invite")}</Button>

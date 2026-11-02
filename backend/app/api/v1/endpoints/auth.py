@@ -22,7 +22,7 @@ from app.db.session import get_db
 from app.lms.core import ratelimit
 from app.lms.core.deps import client_ip_hash
 from app.lms.core.errors import ValidationFailed
-from app.lms.guardian.models import GuardianLink
+from app.lms.guardian.links import has_active_link
 from app.lms.privacy import service as privacy
 from app.models.user import User
 from app.schemas.user import (
@@ -131,13 +131,6 @@ def _issue_email_code(user: User, db: Session, lang: str) -> bool:
     return sent
 
 
-def _is_guardian(user: User) -> bool:
-    """Phase 11: from the database on every call, like every other permission."""
-    db = object_session(user)
-    return db is not None and db.execute(select(GuardianLink.id).where(
-        GuardianLink.guardian_user_id == user.id, GuardianLink.revoked_at.is_(None)).limit(1)).first() is not None
-
-
 def _profile(user: User) -> UserProfile:
     return UserProfile(
         id=user.id,
@@ -149,7 +142,7 @@ def _profile(user: User) -> UserProfile:
         teacher_status=user.teacher_status or "none",
         locale=user.locale,
         is_test_student=bool(user.is_test_student),
-        is_guardian=_is_guardian(user),
+        is_guardian=has_active_link(user),
     )
 
 

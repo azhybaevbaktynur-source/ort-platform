@@ -429,8 +429,9 @@ async def test_statement_count_is_fixed(db, api):
         counts[name] = len(c.statements)
         # user, courses (+total, in_progress), next_due, in_progress, next_up, results, attempts, invitations;
         # Phase 8a S3: modules strip (+ its current items when any module is open), announcements;
-        # UX rework: todo's in-progress attempts (its other rows are the next_up statement's)
-        assert counts[name] <= 12, "\n".join(st[:120] for st in c.statements)
+        # UX rework: todo's in-progress attempts (its other rows are the next_up statement's);
+        # one course card: module progress of the page's courses, one grouped statement
+        assert counts[name] <= 13, "\n".join(st[:120] for st in c.statements)
     assert counts["small"] == counts["big"], counts
 
 

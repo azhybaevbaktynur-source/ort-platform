@@ -149,7 +149,7 @@ export function CourseLanding({ courseId }: { courseId: string }) {
   return (
     <div className="w-full max-w-3xl space-y-6">
       <PageHeader title={title} breadcrumbs={crumbs(title)} badge={<CatalogModeBadge mode={course.enrollment_mode} />}
-        description={course.organization_name || undefined} />
+        description={course.organization_display_name || undefined} />
 
       {/* The student's application (pending, or decided with the teacher's note). Phase 9 S5: an approved
           applicant (now a member) still sees the teacher's note, as the inbox promises ("shown to the student"). */}

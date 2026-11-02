@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const rawBackend = (process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
@@ -43,7 +45,17 @@ const SECURITY_HEADERS = [
 ];
 // --- Phase 11 S4 end ---
 
+// Final mascot art: an SVG dropped into public/mascot replaces that pose's WebP and PNG at the next build, with no code change.
+function mascotSvgPoses(): string {
+  try {
+    return fs.readdirSync(path.join(process.cwd(), "public", "mascot")).filter((f) => f.endsWith(".svg")).map((f) => f.slice(0, -4)).join(",");
+  } catch {
+    return "";
+  }
+}
+
 const nextConfig: NextConfig = {
+  env: { NEXT_PUBLIC_MASCOT_SVG: mascotSvgPoses() },
   async headers() {
     // Not on the /api rewrite: the API sets its own (a download's CSP must not be replaced by a page's).
     return [{ source: "/((?!api/).*)", headers: SECURITY_HEADERS }];

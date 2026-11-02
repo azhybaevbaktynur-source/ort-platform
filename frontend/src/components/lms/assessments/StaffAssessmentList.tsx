@@ -127,7 +127,7 @@ export function StaffAssessmentList({ embedded = false }: { embedded?: boolean }
       <IssueList issues={flow.issues} kind="error" />
       {loading && items.length === 0 && !error && <LoadingState rows={3} />}
       {!loading && !error && items.length === 0 && (
-        <EmptyState title={trash ? t("assessments.list.emptyTrash") : t("assessments.list.empty")}
+        <EmptyState mascot="working" title={trash ? t("assessments.list.emptyTrash") : t("assessments.list.empty")}
           description={trash ? undefined : t("teaching.assessmentsEmptyHint")} action={create} />
       )}
       <ul className="space-y-3">

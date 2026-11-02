@@ -35,6 +35,7 @@ TEST_STUDENT_ROUTES: frozenset[tuple[str, str]] = frozenset({
     ("GET", f"{_V}/auth/me"),
     ("GET", f"{_V}/me/lms"),
     ("GET", f"{_V}/me/home"),
+    ("GET", f"{_V}/me/home/courses"),
     ("GET", f"{_V}/courses"),
     # own course: reads of the student screens
     ("GET", _C),

@@ -18,7 +18,7 @@ import { pickLocalized } from "@/lib/lms/localized";
 import { parseApiDate } from "@/lib/format";
 import { useCourse } from "@/components/lms/CourseContext";
 import { Card, DescriptionList, ErrorState, LinkButton, LoadingState } from "@/components/ui";
-import { useGradeText } from "@/components/lms/results/GradeBadge";
+import { useGradeListText } from "@/components/lms/results/GradeBadge";
 import { fmtShortDateTime } from "./format";
 import { LeaveCourseLink } from "./LeaveCourseLink";
 import { useErrorText } from "./useErrorText";
@@ -27,7 +27,7 @@ export function StudentCourseHome() {
   const { lang, t } = useTranslation();
   const { course } = useCourse();
   const errorText = useErrorText();
-  const gradeText = useGradeText();
+  const gradeText = useGradeListText();
   const base = `/${lang}/courses/${course.id}`;
   const [items, setItems] = useState<AssignmentStudentOut[] | null>(null); // Phase 7a S5: assignments
   const [grades, setGrades] = useState<MyGradeOut[]>([]);
@@ -102,7 +102,7 @@ export function StudentCourseHome() {
       {latest && (
         <Card title={t("home.course.latestTitle")} headingLevel={2}>
           <p className="break-words text-base font-semibold leading-6 text-slate-900">{pickLocalized(latest.title, lang, course.default_language) || t("assessments.untitled")}</p>
-          <p className="mt-1 text-2xl font-bold leading-8 text-slate-900">{gradeText(latest, latest.scheme_type ?? undefined, latest.labels) || "—"}</p>
+          <p className="mt-1 text-2xl font-bold leading-8 text-slate-900">{gradeText(latest) || "—"}</p>
           {latest.released_at && <p className="text-sm leading-6 text-slate-600">{fmtShortDateTime(latest.released_at, lang)}</p>}
           <div className="mt-3 flex flex-col gap-2 sm:flex-row [&>*]:w-full sm:[&>*]:w-auto">
             {latest.kept_attempt_id && <LinkButton variant="secondary" href={`${base}/attempts/${latest.kept_attempt_id}/result`}>{t("home.action.result")}</LinkButton>}

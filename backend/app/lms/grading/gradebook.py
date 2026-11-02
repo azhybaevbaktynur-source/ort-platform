@@ -472,6 +472,7 @@ def my_grades(db: Session, ctx: AuthzContext, course: Course, *, now: datetime) 
         labels = label_subset(v, sub.label) if v is not None and sub.label else None
         _n, latest = hand_ins.get((enr.id, a.id), (0, None))
         items.append(ser.my_grade_out(a, states[a.id], sub, labels=labels, scheme_type=v.type if v else None,
+                                      scale_max=v.scale_max if v else None,
                                       hand_in=latest, rubric_scores=rubrics.get(sub.id) if sub is not None else None))
     out = ser.MyGradesOut(total=ser.my_total_out(rel_t.current_percent, map_total(course_v, rel_t.current_percent)),
                           scheme=scheme_ref, items=items)

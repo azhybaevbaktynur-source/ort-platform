@@ -70,7 +70,8 @@ def list_my_courses(as_: Literal["teaching", "learning", "all"] = Query("all", a
         ctx.db, scopes.my_courses(ctx.user.id, as_=as_), sort_col=Course.created_at, id_col=Course.id,
         entity_of=lambda r: r[0], cursor=cursor, limit=limit,
     )
-    return PageOut[CourseCard](items=[course_card(r[0], r[1], r[2]) for r in rows], next_cursor=nxt)
+    return PageOut[CourseCard](items=[course_card(r[0], r[1], r[2], org_kind=r.org_kind, org_name=r.org_name)
+                                         for r in rows], next_cursor=nxt)
 
 
 @router.get("/trash", response_model=PageOut[CourseCard])
@@ -79,7 +80,8 @@ def list_trash(cursor: Optional[str] = None, limit: int = 25, ctx: AuthzContext 
         ctx.db, scopes.my_deleted_courses(ctx.user.id), sort_col=Course.deleted_at, id_col=Course.id,
         entity_of=lambda r: r[0], cursor=cursor, limit=limit,
     )
-    return PageOut[CourseCard](items=[course_card(r[0], "teacher", r[1]) for r in rows], next_cursor=nxt)
+    return PageOut[CourseCard](items=[course_card(r[0], "teacher", r[1], org_kind=r.org_kind, org_name=r.org_name)
+                                         for r in rows], next_cursor=nxt)
 
 
 @router.post("", status_code=201, response_model=CourseStaffOut)

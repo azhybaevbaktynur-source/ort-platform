@@ -7,6 +7,11 @@ from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class MeAdminOrganizationOut(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
 class MeOut(BaseModel):
     id: str
     email: str
@@ -16,6 +21,9 @@ class MeOut(BaseModel):
     teacher_status: str
     can_create_courses: bool
     is_teacher: bool  # Phase 6 S8: approved, org teacher/admin, or course staff (UI area, not a permission)
+    # UX rework 2: the header's areas come from this one answer, so the menu is the same on every page (UI, not permissions)
+    admin_organizations: list[MeAdminOrganizationOut] = []
+    is_guardian: bool = False
 
 
 class MePatchIn(BaseModel):

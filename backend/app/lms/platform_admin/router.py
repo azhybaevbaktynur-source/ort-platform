@@ -9,6 +9,7 @@ from app.db.session import get_db
 from app.lms.audit.models import AdminAuditLog
 from app.lms.core.deps import require_platform_admin
 from app.lms.core.pagination import PageOut, paginate
+from app.lms.files import usage
 from app.lms.platform_admin import users_service as us
 from app.lms.platform_admin.schemas import (
     AdminUserDetailOut, AdminUserOut, ApproveIn, AuditEntryOut, DisableIn, RejectIn, SummaryOut,
@@ -23,7 +24,8 @@ router = APIRouter()
 
 @router.get("/summary", response_model=SummaryOut)
 def summary(admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
-    return SummaryOut(pending_teacher_requests=us.pending_request_count(db))
+    return SummaryOut(pending_teacher_requests=us.pending_request_count(db),
+                      storage_level=usage.level(usage.stored_totals(db)[0]))
 
 
 @router.get("/teacher-requests", response_model=PageOut[TeacherRequestAdminOut])

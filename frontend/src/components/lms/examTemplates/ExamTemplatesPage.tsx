@@ -108,7 +108,7 @@ export function ExamTemplatesPage({ area, breadcrumbs }: { area: TemplateArea; b
           </FilterBar>
         }
         empty={
-          <EmptyState icon={<LayoutTemplate />} title={t(filtered ? "examTemplates.list.emptyFiltered" : "examTemplates.list.empty")}
+          <EmptyState mascot={filtered ? "thinking" : "working"} icon={<LayoutTemplate />} title={t(filtered ? "examTemplates.list.emptyFiltered" : "examTemplates.list.empty")}
             description={filtered ? undefined : t(`examTemplates.list.emptyHint.${area.kind}`)} />
         }
       />

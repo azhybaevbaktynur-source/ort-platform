@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronRight, Users } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
+import { useLmsMe } from "@/lib/lms/useLmsMe";
 import { Badge, Button, Card, EmptyState, Input, LinkButton, LoadingState } from "@/components/ui";
 import { GuardianError } from "./GuardianError";
 import { listLinks, redeemCode, type GuardianLink } from "./api";
@@ -13,6 +14,7 @@ import { listLinks, redeemCode, type GuardianLink } from "./api";
 export function ParentHome() {
   const { lang, t } = useTranslation();
   const router = useRouter();
+  const { reload: reloadMe } = useLmsMe();
   const [links, setLinks] = useState<GuardianLink[] | null>(null);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [code, setCode] = useState("");
@@ -37,6 +39,7 @@ export function ParentHome() {
     setError(null);
     try {
       const link = await redeemCode(code);
+      void reloadMe(); // UX rework 2: the header's Parent area comes from MeOut
       router.push(`/${lang}/parent/${link.id}`);
     } catch (e) {
       setError(e);
@@ -74,7 +77,7 @@ export function ParentHome() {
       ) : links === null ? (
         <LoadingState rows={2} />
       ) : links.length === 0 ? (
-        <EmptyState icon={<Users />} title={t("guardian.noStudents")} />
+        <EmptyState mascot="reading" icon={<Users />} title={t("guardian.noStudents")} />
       ) : (
         <ul className="space-y-2">
           {links.map((link) => (

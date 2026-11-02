@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.lms.core.deps import get_lms_user
+from app.lms.guardian.links import has_active_link
 from app.lms.teachers import service
 from app.lms.teachers.schemas import MeOut, MePatchIn, MyTeacherRequestOut, TeacherRequestIn
 from app.models.user import User
@@ -15,6 +16,7 @@ def _me(user: User) -> MeOut:
         id=user.id, email=user.email, display_name=user.display_name, locale=user.locale,
         is_platform_admin=bool(user.is_platform_admin), teacher_status=user.teacher_status,
         can_create_courses=service.can_create_courses(user), is_teacher=service.is_teacher(user),
+        admin_organizations=service.admin_organizations(user), is_guardian=has_active_link(user),
     )
 
 

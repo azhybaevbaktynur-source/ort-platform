@@ -64,19 +64,32 @@ class HomeResultOut(BaseModel):
     title: dict
     display_value: Optional[Decimal] = None
     label: Optional[str] = None
+    labels: dict = {}  # `{label: text}` when the scheme version defines a text for `label`
     scheme_type: Optional[str] = None
+    max_value: Optional[Decimal] = None  # what `display_value` reads against ("7 / 10", "132 / 245")
     released_at: datetime
     kept_attempt_id: Optional[uuid.UUID] = None
     is_personal_best: bool = False
 
 
+class HomeProgressOut(BaseModel):
+    """Requirements of visible module items, as the student's Modules page counts them; from the stored caches."""
+    done: int
+    total: int
+
+
 class HomeCourseOut(BaseModel):
     id: uuid.UUID
     title: dict
+    description: Optional[dict] = None
+    languages: list[str]
+    default_language: str
     owner_display_name: str
+    organization_display_name: Optional[str] = None  # root organization; null for a personal one
     is_platform_course: bool
     next_due_at: Optional[datetime] = None
     in_progress: bool
+    progress: Optional[HomeProgressOut] = None  # null: no module item with a requirement, so no bar
 
 
 # --- Phase 8a S3 begin --- (PHASE_8A_DESIGN 5.4, 6.7, 8.1: "continue in course" strip and announcements)
@@ -140,3 +153,4 @@ NEXT_UP_KEYS = frozenset(HomeNextUpOut.model_fields)
 TODO_KEYS = frozenset(HomeTodoOut.model_fields)
 RESULT_KEYS = frozenset(HomeResultOut.model_fields)
 COURSE_KEYS = frozenset(HomeCourseOut.model_fields)
+PROGRESS_KEYS = frozenset(HomeProgressOut.model_fields)

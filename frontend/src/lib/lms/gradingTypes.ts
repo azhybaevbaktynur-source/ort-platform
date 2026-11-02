@@ -535,6 +535,8 @@ export interface MyGradeOut {
   thresholds?: Record<string, boolean> | null;
   effective_points?: Num | null;
   points_possible?: Num | null;
+  /** graded rows: what `display_value` reads against in a list; null for percent and label schemes */
+  max_value?: Num | null;
   late_deduction?: Num | null;
   released_at?: string | null;
   kept_attempt_id?: string | null;

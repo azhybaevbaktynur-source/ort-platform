@@ -86,7 +86,7 @@ export function ApplicationsInbox({
           </div>
         }
         empty={
-          <EmptyState icon={<Inbox />}
+          <EmptyState mascot="working" icon={<Inbox />}
             title={filtered ? t("applications.inbox.emptyFilter") : t("applications.inbox.empty")}
             description={filtered ? undefined : t("applications.inbox.emptyHint")}
             action={status === "pending" && !query ? (
