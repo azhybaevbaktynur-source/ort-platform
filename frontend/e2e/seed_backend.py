@@ -533,6 +533,102 @@ def seed_privacy(api: Api, log: Path, ort_course_id: str, exam_id: str) -> dict:
 # --- Phase 11 S3 end ---
 
 
+# --- Landing screens begin --- (frontend/e2e/landing-screens.spec.ts; written after every other row)
+def tri(ru: str, ky: str, en: str) -> dict:
+    return {"ru": ru, "ky": ky, "en": en}
+
+
+def seed_landing(api: Api, log: Path, admin_tok: str, ort_course_id: str) -> dict:
+    """A school that reads like a real one for the landing page screenshots: a teacher with two courses (modules, pages,
+    assignments, quizzes), three students, one handed-in assignment to check, one quiz result. Fictional people, private
+    courses (not in the catalog), no "E2E" in anything visible."""
+    from datetime import datetime, timedelta, timezone
+
+    def due(days: int) -> str:
+        return (datetime.now(timezone.utc) + timedelta(days=days)).replace(hour=17, minute=59, second=0, microsecond=0).isoformat()  # 23:59 in Bishkek
+
+    def person(email: str, name: str) -> dict:
+        p = register(api, log, email, name)
+        p["profile"] = profile(api, p["token"])
+        return p
+
+    teacher = person("e2e-landing-teacher@example.com", "Гулзат Мамбетова")
+    api.call("POST", f"/platform/users/{teacher['profile']['id']}/teacher-status", admin_tok, {"status": "approved"})
+    teacher["profile"] = profile(api, teacher["token"])
+    tok = teacher["token"]
+    student = person("e2e-landing-student@example.com", "Айбек Осмонов")
+    classmates = [person("e2e-landing-classmate-1@example.com", "Элина Жумабаева"),
+                  person("e2e-landing-classmate-2@example.com", "Темирлан Султанов")]
+
+    def new_course(title: dict) -> dict:
+        c = api.call("POST", "/courses", tok, {"title": title, "languages": ["ru", "ky", "en"], "default_language": "ru"})
+        api.call("POST", f"/courses/{c['id']}/publish", tok, {})
+        for s in [student, *classmates]:
+            api.call("POST", "/courses/join", s["token"], {"code": c["join_code"]})
+        return c
+
+    def task(cid: str, kind: str, title: dict, days: int, points: int) -> dict:
+        a = api.call("POST", f"/courses/{cid}/assignments", tok, {"kind": kind, "title": title, "points_possible": points})
+        return api.call("PATCH", f"/courses/{cid}/assignments/{a['id']}", tok, {"published": True, "due_at": due(days)})
+
+    def quiz(cid: str, bank_id: str, title: dict, days: int, questions: list[dict]) -> tuple[str, dict]:
+        ids = [api.call("POST", f"/courses/{cid}/banks/{bank_id}/questions", tok, q)["id"] for q in questions]
+        a = api.call("POST", f"/courses/{cid}/assessments", tok, {"title": title, "preset": "none", "languages": ["ru"]})
+        base = f"/courses/{cid}/assessments/{a['id']}"
+        sec = api.call("POST", f"{base}/sections", tok, {"title": tri("Часть 1", "1-бөлүк", "Part 1")})
+        api.call("POST", f"{base}/sections/{sec['id']}/items/bulk", tok, {"question_ids": ids})
+        api.call("POST", f"{base}/publish", tok, {})
+        listed = api.call("GET", f"/courses/{cid}/assignments?limit=100", tok)["items"]
+        row = next(r for r in listed if r.get("assessment_id") == a["id"])
+        api.call("PATCH", f"/courses/{cid}/assignments/{row['id']}", tok, {"due_at": due(days)})
+        return a["id"], row
+
+    def module(cid: str, title: dict, items: list[dict]) -> None:
+        m = api.call("POST", f"/courses/{cid}/modules", tok, {"title": title, "published": True})
+        for item in items:
+            api.call("POST", f"/courses/{cid}/modules/{m['id']}/items", tok, {**item, "published": True})
+
+    def page(cid: str, title: dict, body: str) -> dict:
+        p = api.call("POST", f"/courses/{cid}/pages", tok, {"title": title["ru"], "language": "ru", "body_md": body, "published": True})
+        return {"kind": "page", "page_id": p["id"], "title_override": title}
+
+    def assignment(row: dict) -> dict:
+        return {"kind": "assignment", "assignment_id": row["id"]}
+
+    maths = new_course(tri("Математика, 11 класс", "Математика, 11-класс", "Mathematics, grade 11"))
+    mid = maths["id"]
+    bank = api.call("POST", f"/courses/{mid}/banks", tok, {"title": "Математика", "default_language": "ru"})["id"]
+    percent = task(mid, "text", tri("Задачи на проценты", "Пайызга маселелер", "Percentage problems"), 3, 10)
+    written = task(mid, "file", tri("Контрольная работа", "Текшерүү иши", "Written test"), 9, 20)
+    quiz_id, quiz_row = quiz(mid, bank, tri("Тест: дроби", "Тест: бөлчөктөр", "Quiz: fractions"), 1, [
+        sc("Сколько будет 1/2 + 1/4?", "3/4", "2/6"), sc("Сколько процентов составляет 1/4?", "25 %", "40 %")])
+    _, quiz_two = quiz(mid, bank, tri("Тест: уравнения", "Тест: теңдемелер", "Quiz: equations"), 6, [
+        sc("Решите: x + 3 = 7", "4", "10"), sc("Решите: 2x = 10", "5", "8")])
+    module(mid, tri("Дроби и проценты", "Бөлчөктөр жана пайыздар", "Fractions and percentages"), [
+        page(mid, tri("Обыкновенные дроби", "Жөнөкөй бөлчөктөр", "Common fractions"), "Дробь показывает часть целого."),
+        assignment(quiz_row), assignment(percent)])
+    module(mid, tri("Уравнения", "Теңдемелер", "Equations"), [
+        page(mid, tri("Линейные уравнения", "Сызыктуу теңдемелер", "Linear equations"), "Уравнение вида ax + b = 0."),
+        assignment(quiz_two), assignment(written)])
+    module(mid, tri("Геометрия", "Геометрия", "Geometry"), [
+        page(mid, tri("Площади фигур", "Фигуралардын аянты", "Areas of shapes"), "Площадь прямоугольника равна a · b.")])
+
+    # a classmate's hand-in (teacher: work to check); the student's quiz result (the correct choice "B" of `sc`)
+    api.call("POST", f"/courses/{mid}/assignments/{percent['id']}/submissions", classmates[0]["token"], {"body_text": "Ответ: 25 %."})
+    st = api.call("POST", f"/courses/{mid}/assessments/{quiz_id}/attempts", student["token"], {"language": "ru"})
+    answers = [{"position": it["position"], "response": {"choice_id": "B"}, "client_ts": 1000 + it["position"]} for it in st["items"]]
+    api.call("PUT", f"/attempts/{st['id']}/answers", student["token"], {"answers": answers})
+    api.call("POST", f"/attempts/{st['id']}/submit", student["token"], {})
+
+    language = new_course(tri("Кыргыз тили, 11 класс", "Кыргыз тили, 11-класс", "Kyrgyz language, grade 11"))
+    essay = task(language["id"], "text", tri("Сочинение о родном крае", "Туулган жер жөнүндө дилбаян", "An essay about your home region"), 5, 10)
+    module(language["id"], tri("Письменная речь", "Жазуу речи", "Writing"), [assignment(essay)])
+
+    api.call("POST", f"/courses/{ort_course_id}/join", student["token"], {})
+    return {"course_id": mid, "teacher": teacher, "student": student}
+# --- Landing screens end ---
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--api", required=True)
@@ -609,6 +705,7 @@ def main() -> int:
     catalog_apply = seed_catalog_apply(api, log, tok)  # Phase 9 S4 (after every other row)
     org_admin = seed_org_admin(api, log, tok)  # Phase 9 S5 (after every other row)
     privacy = seed_privacy(api, log, cid, exam["id"])  # Phase 11 S3 (after every other row)
+    landing = seed_landing(api, log, tok, cid)  # landing page screenshots (after every other row)
 
     seed = {
         "quiz_editor": quiz_editor,
@@ -619,6 +716,7 @@ def main() -> int:
         "catalog_apply": catalog_apply,
         "org_admin": org_admin,
         "privacy": privacy,
+        "landing": landing,
         "api": args.api, "course_id": cid, "bank_id": bank_id, "exam": exam, "staff_exam": staff_exam,
         "picks": picks, "keys": keys, "comparison_question_id": comparison_qid, "passage_id": passage_id,
         "staff_attempt_id": staff_attempt, "admin": admin, "students": students,

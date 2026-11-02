@@ -2115,19 +2115,126 @@
   },
   "landing": {
     "badge": "A learning platform for teachers and students",
-    "title": "Learn and teach with courses, tests and clear grades",
-    "subtitle": "Join a course with a code or browse the catalog, take assessments, and follow your progress in one place.",
-    "start": "Get started",
-    "signIn": "Sign in",
-    "toCourses": "Go to my courses",
-    "f1Title": "Courses",
-    "f1Text": "Join with a code or find a course in the catalog.",
-    "f2Title": "Assessments",
-    "f2Text": "Timed tests with autosave and instant feedback.",
-    "f3Title": "Grades",
-    "f3Text": "Transparent gradebook and detailed result reviews.",
-    "f4Title": "Three languages",
-    "f4Text": "English, Kyrgyz and Russian everywhere."
+    "myCourses": "My courses",
+    "hero": {
+      "title": "One place to learn and to teach",
+      "subtitle": "Courses with clear modules, timed tests and understandable grades. Practice exams in the ORT format and tools for teachers.",
+      "rolesLabel": "Choose where to start",
+      "roles": {
+        "student": "I'm a student",
+        "teacher": "I'm a teacher"
+      },
+      "continue": "Continue"
+    },
+    "why": {
+      "title": "Why it works",
+      "structure": {
+        "title": "Structured courses",
+        "text": "Modules lead from one topic to the next, with materials, assignments and tests in order. You always see what comes next."
+      },
+      "practice": {
+        "title": "Real exam practice",
+        "text": "Timed tests with autosave. Practice exams in the ORT format keep its section order and give a scaled score."
+      },
+      "teachers": {
+        "title": "Tools for teachers",
+        "text": "Question banks, a gradebook and analytics. Check work in one place and see which topics need more time."
+      }
+    },
+    "students": {
+      "title": "Students and learners",
+      "body": "Join a course with a code from your teacher or pick one from the catalog. Your courses, tasks and results are on one page.",
+      "p1": "See what is due and what to do next",
+      "p2": "Practice questions at your own pace",
+      "p3": "Grades and result reviews",
+      "button": "Students, start here"
+    },
+    "exam": {
+      "title": "Exam practice in the ORT format",
+      "body": "A practice exam runs section by section with a timer. Flag questions, check your answers on the review page, and get a scaled score with results for each section."
+    },
+    "teachers": {
+      "title": "Teachers",
+      "body": "Build a course from modules, pages, assignments and tests. Invite students with a code and keep their work in one gradebook.",
+      "p1": "Question banks and exam templates",
+      "p2": "Grading and a gradebook",
+      "p3": "Analytics and question statistics",
+      "button": "Teachers, start here"
+    },
+    "final": {
+      "title": "Ready to start?",
+      "body": "Create an account and join your first course.",
+      "button": "Create an account",
+      "titleSignedIn": "Welcome back",
+      "bodySignedIn": "Your courses are one click away."
+    },
+    "shots": {
+      "studentDashboard": "A student's home page with courses, upcoming tasks and results.",
+      "examPlayer": "A practice exam in the ORT format: a question, a timer and the question list.",
+      "teacherCourse": "A teacher's course page with modules and the work to check."
+    },
+    "footer": {
+      "platform": "Platform",
+      "about": "About",
+      "forTeachers": "For teachers",
+      "support": "Support",
+      "help": "Help",
+      "contacts": "Contacts",
+      "privacy": "Privacy",
+      "languages": {
+        "en": "English",
+        "ky": "Кыргызча",
+        "ru": "Русский"
+      }
+    },
+    "forTeachers": {
+      "title": "How to become a teacher",
+      "intro": "A teacher account is approved before you can create courses. There are two ways in: apply yourself, or get an invitation from your organization.",
+      "applyTitle": "Apply yourself",
+      "step1Title": "Create an account",
+      "step1Text": "Sign up and confirm your email.",
+      "step2Title": "Send a teacher request",
+      "step2Text": "Log in, open the \"{page}\" page and send the request.",
+      "step3Title": "Wait for approval",
+      "step3Text": "The platform administrator reviews the request. Once it is approved, you can create courses.",
+      "inviteTitle": "Your school or center invites you",
+      "inviteText": "An organization administrator sends an invitation by email. Open the link in it to join; you do not need to apply.",
+      "register": "Create an account",
+      "haveAccount": "I have an account: send a request",
+      "request": "Send a teacher request"
+    },
+    "about": {
+      "title": "About the platform",
+      "intro": "A learning platform where teachers run their courses and students learn, hand in work and see their grades.",
+      "p1": "Teachers work inside an organization: a school, a center or their own. A course is built from modules, pages, files, assignments and tests, and students join it with a code or from the catalog.",
+      "p2": "The platform also prepares students for the ORT: practice exams follow its format and give a scaled score. This is one of the things it does, not the only one.",
+      "p3": "Everything is available in Kyrgyz, Russian and English."
+    },
+    "help": {
+      "title": "Help",
+      "intro": "Answers to the most common questions.",
+      "joinCode": {
+        "q": "How do I join a course with a code?",
+        "a": "Ask your teacher for the code. Log in, open \"{courses}\", choose \"{join}\" and enter it."
+      },
+      "catalog": {
+        "q": "Where can I find a course?",
+        "a": "After you log in, open \"{catalog}\". It lists the courses open to every student. Some let you join at once, others ask you to apply."
+      },
+      "forgot": {
+        "q": "Forgot your password?",
+        "a": "On the login page choose \"{link}\" and enter your email. We send a reset link; check your Spam folder too.",
+        "link": "Reset my password"
+      },
+      "language": {
+        "q": "How do I change the language?",
+        "a": "Choose the language at the top of the page: Kyrgyz, Russian or English. Your choice is remembered on this device."
+      }
+    },
+    "contacts": {
+      "title": "Contacts",
+      "body": "Contact details will be added to this page soon."
+    }
   },
   "catalog": {
     "title": "Course catalog",
