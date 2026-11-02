@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { seed, settle, signIn, tr, VIEWPORTS } from "./helpers";
+import { sectionCounts, seed, settle, signIn, tr, VIEWPORTS } from "./helpers";
 import { OrtExam } from "./ort-exam";
 
 /**
@@ -72,7 +72,7 @@ test("result page: encouraging on a low score, celebrating on a high one, outsid
       await exam.openLobby();
       await exam.start();
       for (const pos of [1, 2, 3, 4]) await exam.skipSection(pos);
-      await exam.openSubmit({ unanswered: seed().exam.items === 19 ? 2 : 0, flagged: 0 });
+      await exam.openSubmit({ unanswered: sectionCounts()[4], flagged: 0 });
       await exam.confirmSubmit();
       resultUrl = page.url();
     } else {
