@@ -56,7 +56,7 @@ export function StudentAssignmentList() {
       {error && items.length > 0 ? <ErrorState variant="inline" message={errorText(error)} onRetry={() => void load(cursor)} /> : null}
       {loading && items.length === 0 && !error && <LoadingState rows={3} />}
       {!loading && !error && items.length === 0 && (
-        <EmptyState icon={<ClipboardList />} title={t("assignments.student.empty")} description={t("assignments.student.emptyHint")} />
+        <EmptyState mascot="reading" icon={<ClipboardList />} title={t("assignments.student.empty")} description={t("assignments.student.emptyHint")} />
       )}
       {rows.length > 0 && (
         <ul className="space-y-3">

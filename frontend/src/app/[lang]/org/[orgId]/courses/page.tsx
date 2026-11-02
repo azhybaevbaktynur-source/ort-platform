@@ -40,7 +40,7 @@ export default function OrgCoursesPage() {
         {...state}
         search={<SearchInput value={input} onChange={setInput} label={t("lms.common.search")} placeholder={t("organizations.courses.searchPlaceholder")} containerClassName="sm:max-w-sm" />}
         empty={
-          <EmptyState
+          <EmptyState mascot={q ? "thinking" : "working"}
             title={q ? t("organizations.courses.emptySearch") : t("organizations.courses.empty")}
             action={!q && !readOnly ? create("secondary") : undefined}
           />

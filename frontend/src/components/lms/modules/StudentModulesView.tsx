@@ -307,7 +307,7 @@ export function StudentModulesView({ fallback }: { fallback?: React.ReactNode })
   else if (!data) content = <LoadingState rows={3} />;
   else if (data.modules.length === 0) {
     if (fallback !== undefined) return <>{fallback}</>;
-    content = <EmptyState title={t("modules.emptyStudentTitle")} description={t("modules.emptyStudentBody")} />;
+    content = <EmptyState mascot="reading" title={t("modules.emptyStudentTitle")} description={t("modules.emptyStudentBody")} />;
   } else {
     content = (
       <ModuleList data={data} mode={readOnly ? "readonly" : "student"} onChange={(next, completedTitle, reload) => {

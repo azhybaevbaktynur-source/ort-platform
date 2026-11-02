@@ -44,7 +44,7 @@ export function MistakesList({ courseId }: { courseId: string }) {
       {error ? <ErrorState message={errorText(error)} onRetry={() => void load(items ? cursor : undefined)} retrying={loading} /> : null}
       {!error && items === null && <div className="space-y-3"><Skeleton className="h-40 w-full" /><Skeleton className="h-40 w-full" /></div>}
       {!error && items !== null && items.length === 0 && (
-        <EmptyState title={t(status === "open" ? "progress.mistakes.emptyOpen" : "progress.mistakes.emptyFixed")} />
+        <EmptyState mascot="reading" title={t(status === "open" ? "progress.mistakes.emptyOpen" : "progress.mistakes.emptyFixed")} />
       )}
       {items !== null && items.length > 0 && (
         <ul className="space-y-4">

@@ -228,7 +228,7 @@ export default function PeoplePage() {
 
       {error ? <ErrorMessage error={error} onRetry={() => load()} /> : null}
       {loading && items.length === 0 && !error && <LoadingState rows={3} />}
-      {!loading && !error && items.length === 0 && <EmptyState title={t("courses.people.empty")} />}
+      {!loading && !error && items.length === 0 && <EmptyState mascot="working" title={t("courses.people.empty")} />}
       {items.length > 0 && (
         <RosterTable
           entries={items}

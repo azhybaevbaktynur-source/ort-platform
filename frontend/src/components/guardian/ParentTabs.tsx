@@ -53,7 +53,7 @@ function GradesPanel({ linkId, courseId, onConsentNeeded }: { linkId: string; co
 
   if (error) return <GuardianError error={error} onRetry={load} />;
   if (!data) return <LoadingState rows={3} />;
-  if (data.items.length === 0) return <EmptyState title={t("guardian.grades.empty")} />;
+  if (data.items.length === 0) return <EmptyState mascot="reading" title={t("guardian.grades.empty")} />;
   return (
     <>
       {data.total && data.total.percent !== null && (
@@ -104,7 +104,7 @@ function DuePanel({ linkId, onConsentNeeded }: { linkId: string; onConsentNeeded
 
   if (error) return <GuardianError error={error} onRetry={load} />;
   if (!rows) return <LoadingState rows={3} />;
-  if (rows.length === 0) return <EmptyState title={t("guardian.due.empty")} />;
+  if (rows.length === 0) return <EmptyState mascot="reading" title={t("guardian.due.empty")} />;
   return (
     <ul className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
       {rows.map((row, i) => (
@@ -154,7 +154,7 @@ function AnnouncementsPanel({ linkId, courseId, onConsentNeeded }: { linkId: str
 
   if (error) return <GuardianError error={error} onRetry={load} />;
   if (!rows) return <LoadingState rows={2} />;
-  if (rows.length === 0) return <EmptyState title={t("guardian.announcements.empty")} />;
+  if (rows.length === 0) return <EmptyState mascot="reading" title={t("guardian.announcements.empty")} />;
   return (
     <>
       <ul className="space-y-3">
@@ -222,7 +222,7 @@ export function ParentTabs({ linkId, onConsentNeeded }: { linkId: string; onCons
         ) : courses === null ? (
           <LoadingState rows={3} />
         ) : noCourse ? (
-          <EmptyState title={t("guardian.noCourses")} />
+          <EmptyState mascot="reading" title={t("guardian.noCourses")} />
         ) : (
           <>
             {coursePicker}

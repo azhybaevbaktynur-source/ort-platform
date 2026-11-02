@@ -96,7 +96,7 @@ export function CourseFilesView() {
         <ContentError error={actionError} className="mb-4" />
       )}
       {loading ? <LoadingState /> : error ? <ContentError error={error} onRetry={() => void load()} /> : items.length === 0 ? (
-        <EmptyState
+        <EmptyState mascot={isStaff ? "working" : "reading"}
           title={t("courseFiles.empty")}
           description={isStaff ? t("courseFiles.emptyHintStaff") : t("courseFiles.emptyHintStudent")}
           icon={<FileText className="h-6 w-6" aria-hidden="true" />}

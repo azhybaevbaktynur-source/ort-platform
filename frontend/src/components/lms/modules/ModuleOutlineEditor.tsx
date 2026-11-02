@@ -551,7 +551,7 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
   else if (!data) body = <LoadingState rows={3} />;
   else if (live.length === 0 && deleted.length === 0) {
     body = newModuleForm || (
-      <EmptyState title={t("modules.editor.emptyTitle")} action={canEdit ? newModuleButton : undefined} />
+      <EmptyState mascot="working" title={t("modules.editor.emptyTitle")} action={canEdit ? newModuleButton : undefined} />
     );
   } else {
     body = (

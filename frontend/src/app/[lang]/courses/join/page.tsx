@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LayoutGrid } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
+import { rememberAccepted } from "@/lib/lms/invitations";
+import { pickLocalized } from "@/lib/lms/localized";
 import { JoinCodeForm } from "@/components/lms/JoinCodeForm";
 import { Card, PageHeader, cn, focusRing } from "@/components/ui";
 
@@ -19,7 +21,11 @@ function JoinInner() {
       <PageHeader title={t("courses.join.title")}
         breadcrumbs={[{ label: t("lms.nav.myCourses"), href: `/${lang}/courses` }, { label: t("courses.join.title") }]} />
       <Card>
-        <JoinCodeForm initialCode={params.get("code") || ""} onJoined={(r) => router.push(`/${lang}/courses/${r.course.id}`)} />
+        <JoinCodeForm initialCode={params.get("code") || ""} onJoined={(r) => {
+          const dest = `/${lang}/courses/${r.course.id}`;
+          if (!r.already_enrolled) rememberAccepted(dest, { role: "student", organization_name: "", course_id: r.course.id }, pickLocalized(r.course.title, lang));
+          router.push(dest);
+        }} />
       </Card>
       <p className="mt-4 text-base leading-6 text-slate-600 sm:text-sm">
         {t("courses.join.noCode")}{" "}
