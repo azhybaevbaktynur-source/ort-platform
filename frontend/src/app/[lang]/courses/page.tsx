@@ -75,7 +75,7 @@ function TeachingList() {
       {error && items.length > 0 ? <ErrorState variant="inline" message={errorText(error)} onRetry={() => void load(cursor)} /> : null}
       {loading && items.length === 0 && !error && <LoadingState rows={3} />}
       {!loading && !error && items.length === 0 && (
-        <EmptyState title={t("courses.list.emptyTeaching")}
+        <EmptyState mascot="working" title={t("courses.list.emptyTeaching")}
           action={me?.can_create_courses ? <LinkButton href={`/${lang}/courses/new`}>{t("courses.list.create")}</LinkButton> : undefined} />
       )}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 min-[1700px]:grid-cols-4">

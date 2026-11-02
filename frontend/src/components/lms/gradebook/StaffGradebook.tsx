@@ -249,9 +249,9 @@ export function StaffGradebook() {
       {loading && rows.length === 0 && !error ? (
         <LoadingState rows={2} />
       ) : !error && columns.length === 0 ? (
-        <EmptyState title={t("assignments.gradebook.noAssignments")} description={t("assignments.gradebook.noAssignmentsHint")} />
+        <EmptyState mascot="working" title={t("assignments.gradebook.noAssignments")} description={t("assignments.gradebook.noAssignmentsHint")} />
       ) : !error && rows.length === 0 ? (
-        <EmptyState title={t("gradebook.noStudents")} />
+        <EmptyState mascot="working" title={t("gradebook.noStudents")} />
       ) : rows.length > 0 ? (
         <>
           <GradebookLegend />

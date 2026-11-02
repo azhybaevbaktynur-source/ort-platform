@@ -5574,5 +5574,22 @@
       "request_open": "A request is already open.",
       "pairing_busy": "Try again."
     }
+  },
+  "mascot": {
+    "notFound": {
+      "title": "We could not find this page",
+      "body": "The link may be old or mistyped.",
+      "home": "Go to the home page"
+    },
+    "error": {
+      "title": "Something went wrong",
+      "body": "Please try again. If it keeps happening, come back a little later.",
+      "retry": "Try again",
+      "home": "Go to the home page"
+    },
+    "result": {
+      "proud": "Great result, well done!",
+      "encourage": "Keep going. Every try helps you learn."
+    }
   }
 }

@@ -64,7 +64,7 @@ export function PageList() {
       <div>
         <PageHeader title={t("pages.title")} />
         {loading ? <LoadingState /> : error ? <ContentError error={error} onRetry={() => void load()} /> : items.length === 0 ? (
-          <EmptyState title={t("pages.studentEmpty")} icon={<FileText className="h-6 w-6" aria-hidden="true" />} />
+          <EmptyState mascot="reading" title={t("pages.studentEmpty")} icon={<FileText className="h-6 w-6" aria-hidden="true" />} />
         ) : (
           <ul className="space-y-2">
             {items.map((p) => (

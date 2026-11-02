@@ -95,7 +95,7 @@ export function AnnouncementsView() {
       />
       <ContentError error={actionError} className="mb-4" />
       {loading ? <LoadingState /> : error ? <ContentError error={error} onRetry={() => void load()} /> : items.length === 0 ? (
-        <EmptyState title={t("announcements.empty")} description={t(canEdit ? "announcements.emptyHintStaff" : "announcements.emptyHintStudent")}
+        <EmptyState mascot={canEdit ? "working" : "reading"} title={t("announcements.empty")} description={t(canEdit ? "announcements.emptyHintStaff" : "announcements.emptyHintStudent")}
           icon={<Megaphone className="h-6 w-6" aria-hidden="true" />}
           action={canEdit ? <LinkButton href={`${base}/new`}>{t("announcements.new")}</LinkButton> : undefined} />
       ) : (

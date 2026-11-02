@@ -8,7 +8,7 @@ import type { AttemptResultOut, AttemptState, Correctness, ReviewItemOut, Review
 import { LmsApiError } from "@/lib/lms/client";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { ChevronDown } from "lucide-react";
-import { LinkButton, LoadingState, cn, focusRing } from "@/components/ui";
+import { LinkButton, LoadingState, Mascot, cn, focusRing } from "@/components/ui";
 import { ResultSummary, useResultSectionName } from "./ResultSummary";
 import { ReviewItemCard } from "./ReviewItemCard";
 import { useReturnPath, withReturn } from "@/components/lms/player/returnPath";
@@ -114,12 +114,32 @@ export function StudentResult({ courseId, attemptId }: { courseId: string; attem
         {state.is_preview && <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">{t("results.preview")}</span>}
       </div>
       <ErrorMessage error={error} onRetry={() => void load()} />
+      {result && !state.is_preview && !state.is_practice && <ResultMascot result={result} />}
       {result && <ResultSummary result={result} />}
       {reviewError ? <ErrorMessage error={reviewError} onRetry={() => void load()} /> : null}
       {review && review.items.length > 0 && (
         <ReviewList items={review.items} sections={result?.sections ?? []} passageDisplay={review.passage_display ?? result?.passage_display ?? null} />
       )}
       {review && review.items.length === 0 && <p className="text-sm text-slate-500">{t("results.noReview")}</p>}
+    </div>
+  );
+}
+
+/**
+ * The cub next to the result, never inside the result card (the ORT pixel baseline compares that element only):
+ * celebrating from 80 %, encouraging under 50 %, nothing in between. Small, in a row with its line, also on phones.
+ */
+function ResultMascot({ result }: { result: AttemptResultOut }) {
+  const { t } = useTranslation();
+  const max = Number(result.points_possible);
+  const ratio = max > 0 ? Number(result.raw_score) / max : NaN;
+  if (!Number.isFinite(ratio)) return null;
+  const high = ratio >= 0.8;
+  if (!high && ratio >= 0.5) return null;
+  return (
+    <div className="flex h-16 items-center gap-3" data-testid="result-mascot">
+      <Mascot pose={high ? "celebrating" : "encouraging"} size={64} className="h-16 w-auto" />
+      <p className="text-sm font-medium text-slate-700">{t(high ? "mascot.result.proud" : "mascot.result.encourage")}</p>
     </div>
   );
 }

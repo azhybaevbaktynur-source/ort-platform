@@ -160,7 +160,7 @@ export default function OrgTeachersPage() {
           {...membersState}
           search={<SearchInput value={input} onChange={setInput} label={t("lms.common.search")} placeholder={t("organizations.members.searchPlaceholder")} containerClassName="sm:max-w-sm" />}
           empty={
-            <EmptyState
+            <EmptyState mascot={q ? "thinking" : "working"}
               title={q ? t("organizations.members.emptySearch") : t("organizations.members.empty")}
               action={!q && !readOnly ? inviteButton("secondary") : undefined}
             />

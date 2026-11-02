@@ -77,7 +77,7 @@ export function ParentHome() {
       ) : links === null ? (
         <LoadingState rows={2} />
       ) : links.length === 0 ? (
-        <EmptyState icon={<Users />} title={t("guardian.noStudents")} />
+        <EmptyState mascot="reading" icon={<Users />} title={t("guardian.noStudents")} />
       ) : (
         <ul className="space-y-2">
           {links.map((link) => (

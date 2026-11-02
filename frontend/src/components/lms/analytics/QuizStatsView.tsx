@@ -74,7 +74,7 @@ export function QuizStatsView({ assessmentId }: { assessmentId: string }) {
             />
           )}
           {stats.state === "empty" || !hasData ? (
-            stats.state === "computing" ? <LoadingState label={t("quizStats.computing")} rows={3} /> : <EmptyState title={t("quizStats.empty")} />
+            stats.state === "computing" ? <LoadingState label={t("quizStats.computing")} rows={3} /> : <EmptyState mascot="working" title={t("quizStats.empty")} />
           ) : (
             <>
               {stats.state === "stale" && stats.computed_at && (

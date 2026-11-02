@@ -68,7 +68,7 @@ export default function OrgDepartmentsPage() {
         <>
           <DepartmentTree rows={rows} readOnly={readOnly || personal} onAction={onAction} />
           {rows.length <= 1 && (
-            <EmptyState className="mt-4" title={t("departments.empty")} description={t("departments.emptyHint")}
+            <EmptyState mascot="working" className="mt-4" title={t("departments.empty")} description={t("departments.emptyHint")}
               action={canCreate ? createButton("secondary") : undefined} />
           )}
         </>

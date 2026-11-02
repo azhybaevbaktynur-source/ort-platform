@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { CheckCircle2, X } from "lucide-react";
+import { X } from "lucide-react";
+import { Mascot } from "@/components/ui";
 import { useTranslation } from "@/lib/i18n/context";
 import { takeAccepted, type AcceptedNoticeData } from "@/lib/lms/invitations";
 
@@ -23,8 +24,8 @@ export function InvitationAcceptedNotice() {
       : data.role === "assistant" ? "invitationAccepted.courseAssistant" : "invitationAccepted.courseTeacher", { course: data.course })
     : t(data.role === "org_admin" ? "invitationAccepted.orgAdmin" : "invitationAccepted.orgTeacher", { org: data.org });
   return (
-    <div role="status" className="mb-6 flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-      <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0" aria-hidden="true" />
+    <div role="status" className="mb-6 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+      <Mascot pose="hello" size={48} />
       <p className="min-w-0 flex-1 break-words font-medium">{text}</p>
       <button type="button" onClick={() => setData(null)} aria-label={t("invitationAccepted.dismiss")}
         className="-my-2 -mr-2 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl text-emerald-800 hover:bg-emerald-100">
