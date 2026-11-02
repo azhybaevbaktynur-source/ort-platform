@@ -39,6 +39,8 @@ STUDENTS = [
     "flow-phone-ru",
     # BLUEBOOK_PLAYER: review page and split screen walks
     "bb-review-ru", "bb-split-ru", "bb-screens-ru",
+    # UX rework 2: mascot spec (no mascot in the player; on the result page)
+    "mascot-player-ru", "mascot-result-ru",
 ]
 
 
