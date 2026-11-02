@@ -69,7 +69,7 @@ test("admin overview: numbers, then a retry when the summary fails", async ({ pa
   await page.goto("/ru/admin");
   const pending = page.getByRole("link", { name: new RegExp(t("platformAdmin.overview.pendingRequests")) });
   await expect(pending).toContainText(/\d+/);
-  const level = page.getByRole("link", { name: new RegExp(t("storage.totals.level")) });
+  const level = page.getByRole("link", { name: new RegExp(t("storage.nav")) });
   await expect(level).toContainText(t("storage.level.ok"));
   await expect(page.locator("main")).not.toContainText("—");
 

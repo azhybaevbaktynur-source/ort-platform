@@ -25,7 +25,7 @@ export default function AdminOverviewPage() {
         : (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <StatTile href={`${base}/teacher-requests`} icon={<UserCheck />} label={t("platformAdmin.overview.pendingRequests")} value={pending ?? waiting} />
-            <StatTile href={`${base}/storage`} icon={<HardDrive />} label={t("storage.totals.level")}
+            <StatTile href={`${base}/storage`} icon={<HardDrive />} label={t("storage.nav")}
               value={storageLevel ? t(`storage.level.${storageLevel}`) : waiting} />
           </div>
         )}
