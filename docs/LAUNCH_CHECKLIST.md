@@ -9,6 +9,7 @@ We tested on a laptop, not on the real servers (`docs/phases/PHASE_11_LOADTEST.m
 - So the size is **not proven**. It needs a full test on paid servers near Frankfurt. The script is ready.
 
 ## A. Must be done before launch (blocks)
+- [ ] Lawyer also reads: teacher applications now store a phone number, school and subject (`docs/phases/ACCOUNTS.md`), and independent teachers must be 18 or older by their own statement.
 - [ ] Lawyer reads the policy wording, the age limit, the days to answer a data request, and what counts as "anonymous enough". Also the basis for storing data abroad (Neon, Render, Vercel, R2, Sentry). Policy text says "Draft: awaiting legal review" until then.
 - [ ] Change the secret key (`SECRET_KEY`) and any other keys you hold. Everyone gets logged out once.
 - [ ] Pay for a bigger Render plan and more Neon power **if** one exam will have thousands of students. Prices: `docs/COSTS.md` (many are unknown).

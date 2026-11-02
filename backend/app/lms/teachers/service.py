@@ -21,6 +21,7 @@ from app.models.user import User
 
 
 ME_ORGANIZATIONS_MAX = 100
+MINOR_AGE_BANDS = ("under_14", "14_17")  # owner decision Q2: independent teachers are 18 or older
 REAPPLY_WAIT_DAYS = 7  # after a rejection (owner Q7)
 PHONE_RETENTION_DAYS = 90  # after a rejection or a revoke (owner Q3); an approved teacher's phone stays
 
@@ -118,7 +119,7 @@ def _locked_applicant(db: Session, user: User) -> User:
         if available_at is not None and clock.now() < available_at:
             raise Conflict("Wait before applying again", code="reapply_wait",
                            details={"available_at": available_at.isoformat().replace("+00:00", "Z")})
-    if locked.age_band in ("under_14", "14_17"):
+    if locked.age_band in MINOR_AGE_BANDS:
         raise Forbidden("Independent teachers must be 18 or older", code="teacher_age_required")
     return locked
 
@@ -199,9 +200,21 @@ def _set_phone_purge(db: Session, user_id: str, value: Optional[datetime]) -> No
         latest.phone_purge_after = value
 
 
+def _ensure_may_become_teacher(user: User) -> None:
+    """Every approval, not only applying: an older request, or an age band corrected after applying, must not get through
+    (owner decision Q2). A disabled account would otherwise become a teacher the moment it is enabled again."""
+    if user.disabled_at is not None:
+        raise Conflict("This account is disabled", code="teacher_account_disabled")
+    if user.is_test_student:
+        raise Conflict("Invalid transition", code="invalid_transition")
+    if user.age_band in MINOR_AGE_BANDS:
+        raise Conflict("Independent teachers must be 18 or older", code="teacher_age_required")
+
+
 def approve(db: Session, admin: User, request_id: uuid.UUID, note: Optional[str], request: Request) -> TeacherRequest:
     req = _locked_request(db, request_id)
     user = db.get(User, req.user_id)
+    _ensure_may_become_teacher(user)
     before = user.teacher_status
     req.status = "approved"
     req.decided_by_id = admin.id
@@ -257,6 +270,7 @@ def set_teacher_status(
     if status == "approved":
         if before == "approved":
             raise Conflict("Invalid transition", code="invalid_transition")
+        _ensure_may_become_teacher(user)
         pending = db.execute(
             select(TeacherRequest).where(TeacherRequest.user_id == user.id, TeacherRequest.status == "pending")
             .with_for_update()

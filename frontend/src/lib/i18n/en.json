@@ -260,7 +260,8 @@
       "reapply_wait": "You can apply again from {date}.",
       "teacher_age_required": "Independent teachers must be 18 or older.",
       "age_confirmation_required": "Confirm that you are 18 or older and accept the policies.",
-      "personal_org_no_members": "Other teachers can't be invited to your own courses as an organization. Invite the person from the course's People page."
+      "personal_org_no_members": "Other teachers can't be invited to your own courses as an organization. Invite the person from the course's People page.",
+      "teacher_account_disabled": "This account is disabled. Enable it first, then approve."
     }
   },
   "courses": {
@@ -5693,6 +5694,7 @@
   "teacherApply": {
     "title": "Apply as a teacher",
     "intro": "Create an account, confirm your email and tell us where you teach. The platform administrator reviews every application and answers by email.",
+    "introSignedIn": "Tell us where you teach. The platform administrator reviews every application and answers by email.",
     "age": "I am 18 or older",
     "steps": {
       "label": "Steps of the application",

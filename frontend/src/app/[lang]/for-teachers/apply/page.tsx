@@ -36,7 +36,7 @@ export default function TeacherApplyPage() {
             <h1 className="min-w-0 text-2xl font-extrabold leading-tight tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">{t("teacherApply.title")}</h1>
             <Mascot pose="working" size={200} eager className="h-14 w-auto sm:h-20 lg:mt-6 lg:h-44" />
           </div>
-          <p className="mt-1 hidden text-base leading-7 text-slate-600 sm:block lg:mt-4">{t("teacherApply.intro")}</p>
+          <p className="mt-1 hidden text-base leading-7 text-slate-600 sm:block lg:mt-4">{t(user ? "teacherApply.introSignedIn" : "teacherApply.intro")}</p>
           {showSteps && <ApplySteps current={step} className="mt-2 sm:mt-4 lg:mt-8" />}
         </div>
         <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:mt-6 sm:p-6 lg:mt-0 lg:self-start">

@@ -1020,3 +1020,43 @@ async def test_revoke_impact_counts_real_students_only(db, api, admin):
 async def test_revoke_impact_of_someone_without_a_personal_organization(db, api, admin):
     body = (await api.call(admin, "GET", f"/platform/users/{make_user(db).id}")).json()
     assert body["revoke_impact"] == {"students": 0, "courses": 0}
+
+
+# ------------------------------------------------------------------- every approval checks the person (security review)
+
+@pytest.mark.parametrize("band", ["under_14", "14_17"])
+async def test_a_minor_is_refused_at_approval_too(db, api, admin, outbox, band):
+    user = adult(db)
+    rid = (await apply_ok(api, user))["id"]
+    user.age_band = band  # the admin corrected the band after the application, or the request is older than the rule
+    db.commit()
+    res = await api.call(admin, "POST", f"/platform/teacher-requests/{rid}/approve", json={})
+    assert res.status_code == 409 and code(res) == "teacher_age_required"
+    res = await api.call(admin, "POST", f"/platform/users/{user.id}/teacher-status", json={"status": "approved"})
+    assert res.status_code == 409 and code(res) == "teacher_age_required"
+    db.expire_all()
+    assert db.get(User, user.id).teacher_status == "pending" and db.get(TeacherRequest, uuid.UUID(rid)).status == "pending"
+    assert outbox == []
+
+
+async def test_a_disabled_account_is_refused_at_approval_and_can_still_be_rejected(db, api, admin, outbox):
+    user = adult(db)
+    rid = (await apply_ok(api, user))["id"]
+    user.disabled_at = utcnow()
+    db.commit()
+    res = await api.call(admin, "POST", f"/platform/teacher-requests/{rid}/approve", json={})
+    assert res.status_code == 409 and code(res) == "teacher_account_disabled"
+    res = await api.call(admin, "POST", f"/platform/users/{user.id}/teacher-status", json={"status": "approved"})
+    assert res.status_code == 409 and code(res) == "teacher_account_disabled"
+    res = await api.call(admin, "POST", f"/platform/teacher-requests/{rid}/reject", json={"reason": "spam"})
+    assert res.status_code == 200
+    assert outbox == []  # never a decision email to a disabled account
+
+
+async def test_no_age_band_can_still_be_granted_directly(db, api, admin, outbox):
+    user = adult(db)
+    user.age_band = None  # older accounts: the owner may still grant them directly
+    db.commit()
+    res = await api.call(admin, "POST", f"/platform/users/{user.id}/teacher-status", json={"status": "approved"})
+    assert res.status_code == 200
+

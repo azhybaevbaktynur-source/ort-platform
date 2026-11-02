@@ -64,3 +64,17 @@ Revoke itself keeps today's behaviour (freeze). Step 3 proposes the second actio
 Backend: `/me/lms` per person in the discussion's table; apply matrix (fields, each age band, NULL band with and without confirmation, policies, rate limit, duplicate, reject wait with date, after revoke, school teacher applying, test student refused, consent gate); emails (all decisions, not to disabled, failure doesn't break the decision); refused personal invitations and still-acceptable old one; purge; privacy; `revoke_impact` excludes test students; `can_import_roster` matrix; authorization of org routes unchanged; home key sets.
 
 Browser, `frontend/e2e/teacher-signup.spec.ts`: new person through all three steps; existing student; email already registered; pending and rejected states; approve and the header change; no teacher link anywhere for a student; invitation accept from `/invitations`; roster import from People; independent teacher: no Organization tab, `/org/{id}` redirects; personal templates listed. Update `header-areas.spec.ts`, `security.spec.ts`, `landing.spec.ts` and any spec using the old pages. ORT specs and pixel baselines stay unchanged.
+
+## F. As built (differences from the above, and what the security review added)
+- Consent records use source `prompt`: `consent_records.source` has a CHECK with no `teacher_application`, and this change adds no other table.
+- Roster import in People is a page, `/courses/[id]/people/roster-import`, not a dialog.
+- **Every approval checks the person**, not only applying: a minor (`teacher_age_required`), a disabled account (`teacher_account_disabled`) and a test student are refused by `approve` and the direct grant. Rejecting a disabled account still works, without an email.
+- Every revoke confirmation states who it freezes and needs a reason, also in the requests queue.
+- Purge runs from the admin queue and submit (hourly per process) and from the `/internal/purge-applications` sweep.
+- Decision emails use `send_email(private=True)`: no address, body or provider error in logs. Sentry doesn't send stack frame variables.
+
+Known limits, on purpose:
+- 18+ is the person's own statement; the platform admin's review is the real check. Re-registering an unverified account can change its band (as on `/register`), which a minor could also do with another email. The code still goes to the real mailbox.
+- Someone who turns 18 needs the platform admin to change their band.
+- An approved teacher whose band is later corrected to a minor isn't revoked automatically (raised in the Step 3 review).
+
