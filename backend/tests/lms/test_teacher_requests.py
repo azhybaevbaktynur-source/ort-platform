@@ -36,7 +36,7 @@ async def test_me_and_locale(client, db):
     assert r.status_code == 200
     body = r.json()
     assert set(body) == {"id", "email", "display_name", "locale", "is_platform_admin", "teacher_status",
-                         "can_create_courses", "is_teacher"}
+                         "can_create_courses", "is_teacher", "admin_organizations", "is_guardian"}
     assert body["can_create_courses"] is False and body["is_teacher"] is False
     r = await client.patch(f"{P}/me/lms", json={"locale": "ky"}, headers=auth(u))
     assert r.status_code == 200 and r.json()["locale"] == "ky"
@@ -196,6 +196,7 @@ async def test_queue_pagination_and_summary(client, db):
         assert (await _submit(client, u)).status_code == 201
     s = (await client.get(f"{P}/platform/summary", headers=auth(admin))).json()
     assert s["pending_teacher_requests"] >= 3
+    assert s["storage_level"] == "ok"  # UX rework 2: the admin overview's cards come from this one answer
     seen, cursor = [], None
     while True:
         url = f"{P}/platform/teacher-requests?status=pending&limit=2" + (f"&cursor={cursor}" if cursor else "")

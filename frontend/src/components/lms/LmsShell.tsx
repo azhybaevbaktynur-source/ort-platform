@@ -7,8 +7,7 @@ import { useTranslation, type Language } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
 import { gateOpenPath } from "@/lib/api"; // Phase 11 S3
 import { LmsMeProvider, useLmsMeLoader } from "@/lib/lms/useLmsMe";
-import { listMyOrganizations, type MyOrganizationOut } from "@/lib/lms/organizations";
-import { AppHeader, Brand, type AppHeaderArea, type AreaKey } from "@/components/ui/AppHeader";
+import { AppHeader, AreaPillsSkeleton, Brand, type AppHeaderArea, type AreaKey } from "@/components/ui/AppHeader";
 import { ErrorState, LoadingState, SHELL_WIDTH, Skeleton, cn } from "@/components/ui";
 import { EXAM_COLUMN_INNER, EXAM_COLUMN_OUTER } from "@/components/ui/shellWidth";
 import { lmsErrorKey } from "./ErrorMessage";
@@ -87,9 +86,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const [view, setView] = useState<string | null>(null);
   const [declaredArea, setDeclared] = useState<DeclaredArea | null>(null);
   const declared = declaredArea?.area ?? null;
-  const [orgs, setOrgs] = useState<MyOrganizationOut[]>([]);
   const testStudent = !!userProfile?.is_test_student; // UX rework S1: Student view
-  const isGuardian = !!userProfile?.is_guardian; // Phase 11
   const consentBlocked = meState.error?.code === "consent_required"; // Phase 11 S3: the gate refuses the profile too
 
   useEffect(() => {
@@ -106,16 +103,6 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
     }
   }, [unauthorized, signOut]);
 
-  // Organizations the person administers (Organization area). Navigation only: fails silently.
-  useEffect(() => {
-    if (!me || testStudent) return;
-    let alive = true;
-    listMyOrganizations()
-      .then((rows) => { if (alive) setOrgs((Array.isArray(rows) ? rows : []).filter((o) => o.role === "org_admin")); })
-      .catch(() => { if (alive) setOrgs([]); });
-    return () => { alive = false; };
-  }, [me, testStudent]);
-
   const switchLang = (l: Language) => {
     setLang(l);
     const rest = pathname.replace(/^\/(en|ky|ru)(?=\/|$)/, "");
@@ -129,7 +116,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
     router.replace(`/${lang}/login`);
   };
 
-  // Role flags: MeOut is authoritative; until it loads, the cached /auth/me profile avoids a flash.
+  // Role flags: MeOut is authoritative. The cached /auth/me profile is only the fallback when MeOut fails.
   const isAdmin = me ? me.is_platform_admin : !!userProfile?.is_platform_admin;
   const teacherStatus = me ? me.teacher_status : userProfile?.teacher_status;
   const canCreate = me ? me.can_create_courses : teacherStatus === "approved";
@@ -137,6 +124,11 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const isTeacher = me ? me.is_teacher : teacherStatus === "approved";
   const hasTeaching = isTeacher || canCreate;
   const canRequestTeacher = !isAdmin && !isTeacher && !testStudent;
+
+  // UX rework 2: the areas come from one answer, kept across pages (`useLmsMeLoader`), so the menu is the same everywhere.
+  const orgs = me?.admin_organizations ?? [];
+  const isGuardian = me ? !!me.is_guardian : !!userProfile?.is_guardian; // Phase 11
+  const areasLoading = !me && !meState.error;
 
   const rest = pathname.replace(/^\/(en|ky|ru)(?=\/|$)/, "") || "/";
   // Same default as the /courses page: its Teaching tab opens first for teachers and course creators.
@@ -167,10 +159,10 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
         choices: orgs.map((o) => ({ href: `${base}/org/${o.id}`, label: o.name, active: rest === `/org/${o.id}` || rest.startsWith(`/org/${o.id}/`) })),
       });
     }
-    if (isGuardian || urlArea === "parent") list.push({ key: "parent", label: t("privacy.nav.parent"), href: `${base}/parent`, icon: <Users /> }); // Phase 11
+    if (isGuardian) list.push({ key: "parent", label: t("privacy.nav.parent"), href: `${base}/parent`, icon: <Users /> }); // Phase 11
     if (isAdmin) list.push({ key: "platform", label: t("shell.areas.platform"), href: `${base}/admin`, icon: <ShieldCheck /> });
     return hideSections ? list.map((a) => ({ ...a, sections: undefined })) : list;
-  }, [lang, t, hasTeaching, isAdmin, canCreate, isGuardian, orgs, rest, urlArea, hideSections]);
+  }, [lang, t, hasTeaching, isAdmin, canCreate, isGuardian, me, rest, urlArea, hideSections]); // `orgs` comes from `me`
 
   if (authLoading || !user || unauthorized) {
     // Student finding S16: the frame (header + skeleton content) shows at once, never a blank screen.
@@ -179,6 +171,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
         <header className="border-b border-slate-200 bg-white">
           <div className={cn("flex h-14 items-center gap-3 sm:h-16", SHELL_WIDTH)}>
             <Brand href={`/${lang}/courses`} />
+            <AreaPillsSkeleton />
             <Skeleton className="ml-auto h-9 w-9 rounded-full" />
           </div>
         </header>
@@ -224,6 +217,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
           <AppHeader
             brandHref={`/${lang}/courses`}
             areas={areas}
+            areasLoading={areasLoading}
             activeArea={activeArea}
             user={{ name, email }}
             accountLinks={accountLinks}

@@ -63,6 +63,7 @@ class AuditEntryOut(BaseModel):
 
 class SummaryOut(BaseModel):
     pending_teacher_requests: int
+    storage_level: str  # UX rework 2: the overview's two cards come from one answer
 
 
 class ApproveIn(BaseModel):

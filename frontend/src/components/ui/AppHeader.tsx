@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Check, ChevronDown, GraduationCap, LogOut } from "lucide-react";
 import { useTranslation, type Language } from "@/lib/i18n/context";
 import { SHELL_WIDTH } from "./shellWidth";
+import { Skeleton } from "./Skeleton";
 import { cn, focusRing } from "./utils";
 
 /*
@@ -37,6 +38,8 @@ export interface AppHeaderArea {
 export interface AppHeaderProps {
   brandHref: string;
   areas: AppHeaderArea[];
+  /** The account is not known yet: placeholders instead of a partial menu. */
+  areasLoading?: boolean;
   activeArea: AreaKey | null;
   user: { name: string; email: string };
   /** Extra links in the account menu (for example "I am a teacher"). */
@@ -246,16 +249,27 @@ function AccountMenu({ user, links, onLanguageChange, onLogout, routeKey, nameFr
   );
 }
 
+/** Desktop placeholders while the account loads: a menu is never shown with areas missing. */
+export function AreaPillsSkeleton() {
+  return (
+    <div aria-hidden="true" data-testid="areas-loading" className="ml-2 hidden items-center gap-3 lg:flex">
+      <Skeleton className="h-6 w-20" />
+      <Skeleton className="h-6 w-28" />
+    </div>
+  );
+}
+
 /** The one header of the signed-in app. Areas with a single entry (only Learning) hide the switcher. */
-export function AppHeader({ brandHref, areas, activeArea, user, accountLinks = [], onLanguageChange, onLogout, routeKey }: AppHeaderProps) {
+export function AppHeader({ brandHref, areas, areasLoading = false, activeArea, user, accountLinks = [], onLanguageChange, onLogout, routeKey }: AppHeaderProps) {
   const { t } = useTranslation();
-  const multi = areas.length > 1;
+  const multi = !areasLoading && areas.length > 1;
   const active = areas.find((a) => a.key === activeArea);
   const sections = multi && active?.sections && active.sections.length > 0 ? active.sections : null;
   return (
     <header className="border-b border-slate-200 bg-white">
       <div className={cn("relative flex h-14 items-center gap-2 sm:h-16 sm:gap-3", SHELL_WIDTH)}>
         <Brand href={brandHref} hideNameOnPhone={multi} />
+        {areasLoading && <AreaPillsSkeleton />}
         {multi && (
           <>
             <AreaMenu areas={areas} activeArea={activeArea} routeKey={routeKey} className="lg:hidden" />

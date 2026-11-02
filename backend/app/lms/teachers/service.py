@@ -17,6 +17,29 @@ from app.lms.teachers.models import TeacherRequest
 from app.models.user import User
 
 
+ME_ORGANIZATIONS_MAX = 100
+
+
+def admin_organizations(user: User) -> list[dict]:
+    """UX rework 2: organizations the person administers directly, for the header's Organization area."""
+    from sqlalchemy.orm import object_session
+
+    from app.lms.organizations.models import Organization, OrganizationMember
+
+    db = object_session(user)
+    if db is None:
+        return []
+    rows = db.execute(
+        select(Organization.id, Organization.name)
+        .join(OrganizationMember, OrganizationMember.organization_id == Organization.id)
+        .where(OrganizationMember.user_id == user.id, OrganizationMember.state == "active",
+               OrganizationMember.role == "org_admin", Organization.deleted_at.is_(None))
+        .order_by(OrganizationMember.created_at, OrganizationMember.id)
+        .limit(ME_ORGANIZATIONS_MAX)
+    ).all()
+    return [{"id": oid, "name": name} for oid, name in rows]
+
+
 def can_create_courses(user: User) -> bool:
     """Phase 6 S1 (PHASE_6_DESIGN 2.2): from organization memberships, not from teacher_status."""
     from sqlalchemy.orm import object_session
