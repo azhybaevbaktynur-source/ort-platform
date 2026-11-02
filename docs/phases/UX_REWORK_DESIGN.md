@@ -24,8 +24,8 @@ Frontend `StudentHome.tsx`, rewritten:
 - Title "Панель" (`home.dashboard`) in a row with two secondary actions: enter code, catalog.
 - Banners only when needed: pending invitations, pending applications.
 - `lg:grid-cols-[minmax(0,1fr)_340px]`. Left: course cards, `sm:grid-cols-2 xl:grid-cols-3 min-[1700px]:grid-cols-4`. Right: "К выполнению" list, then "Недавние оценки" (max 3) and announcements (max 3), each only when non-empty.
-- Phone: to-do first when non-empty, then cards.
-- Course card (`components/lms/home/DashboardCourseCard.tsx`): a colored band (about 96 px) from a fixed palette keyed on a hash of the course id (`lib/lms/courseColor.ts`, 8 colors, white text passes AA), course name, teacher name, small "next due" line when set. The whole card is the link. All courses reachable (use the existing paging when `courses_total > courses.length`).
+- Phone: cards first, then to-do, grades, announcements (owner, 2026-11-03; replaces "to-do first when non-empty").
+- Course card (`components/lms/course/CourseCard.tsx`, one component for dashboard, catalog, Teaching list and trash): a colored band (about 96 px) from a fixed palette keyed on a hash of the course id (`lib/lms/courseColor.ts`, 8 colors, white text passes AA), course name, teacher, organization (none for a personal one; a platform course shows the platform organization instead of a teacher), language, two-line description, joined courses also progress and next due. The whole card is the link. All courses reachable (`GET /me/home/courses`, same cards, when `courses_total > courses.length`).
 - To-do row: kind icon, title, course name, date ("до 12 нояб., 23:59"; "Просрочено" for overdue; "Идёт попытка" for in progress). Empty: one friendly line.
 - No greeting hero, no "Что дальше", no "Продолжить в курсе" strip.
 - New student with no courses: an inviting empty state with enter code + catalog as primary actions.

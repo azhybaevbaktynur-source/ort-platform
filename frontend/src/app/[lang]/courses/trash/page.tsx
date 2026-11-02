@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/context";
 import { listTrash, restoreCourse } from "@/lib/lms/courses";
 import type { CourseCard as CourseCardDto } from "@/lib/lms/types";
-import { CourseCard } from "@/components/lms/CourseCard";
+import { COURSE_GRID, CourseCard, StatusBadge } from "@/components/lms/course/CourseCard";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { Pager } from "@/components/lms/Pager";
 
@@ -55,16 +55,18 @@ export default function TrashPage() {
       {!loading && !error && items.length === 0 && (
         <p className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">{t("courses.trash.empty")}</p>
       )}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {items.map((c) => (
-          <CourseCard key={c.id} course={c} action={
-            <button type="button" disabled={busyId === c.id} onClick={() => restore(c.id)}
-              className="rounded-xl bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
-              {t("courses.trash.restore")}
-            </button>
-          } />
-        ))}
-      </div>
+      {items.length > 0 && (
+        <ul className={COURSE_GRID}>
+          {items.map((c) => (
+            <CourseCard key={c.id} course={c} href={null} badges={<StatusBadge status={c.status} />} action={
+              <button type="button" disabled={busyId === c.id} onClick={() => restore(c.id)}
+                className="rounded-xl bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
+                {t("courses.trash.restore")}
+              </button>
+            } />
+          ))}
+        </ul>
+      )}
       <Pager nextCursor={cursor} loading={loading} onMore={() => load(cursor)} />
     </div>
   );

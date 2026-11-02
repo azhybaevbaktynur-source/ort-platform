@@ -273,8 +273,7 @@
       "requestPending": "Teacher request under review",
       "emptyTeaching": "You are not teaching any courses yet.",
       "emptyLearning": "You have not joined any courses yet. Use a code from your teacher.",
-      "untitled": "Untitled course",
-      "owner": "Teacher: {name}"
+      "untitled": "Untitled course"
     },
     "create": {
       "title": "Create a course",
@@ -3062,7 +3061,6 @@
       "body": "Have a code from your teacher? Join with it."
     },
     "personalBest": "Personal best",
-    "platformCourse": "Platform course",
     "due": "Due {date}",
     "dueSoon": "Due soon: {date}",
     "until": "Open until {date}",

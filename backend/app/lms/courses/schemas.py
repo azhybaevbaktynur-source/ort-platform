@@ -114,6 +114,8 @@ class AdminTransferIn(BaseModel):
 class CourseCard(BaseModel):
     id: uuid.UUID
     title: dict
+    description: Optional[dict] = None
+    organization_display_name: Optional[str] = None  # root organization; null for a personal one
     languages: list[str]
     default_language: str
     status: str
@@ -206,9 +208,16 @@ def _course_template_out(course):
 # --- Phase 6 S2b end ---
 
 
-def course_card(course, my_role: Optional[str], owner_display_name: Optional[str]) -> CourseCard:
+def card_organization_name(kind: Optional[str], name: Optional[str]) -> Optional[str]:
+    """What a course card shows for the root organization: a personal organization's name means nothing to students."""
+    return None if kind == "personal" or not name else name
+
+
+def course_card(course, my_role: Optional[str], owner_display_name: Optional[str], *, org_kind: Optional[str] = None,
+                org_name: Optional[str] = None) -> CourseCard:
     return CourseCard(
-        id=course.id, title=course.title, languages=list(course.languages),
+        id=course.id, title=course.title, description=course.description,
+        organization_display_name=card_organization_name(org_kind, org_name), languages=list(course.languages),
         default_language=course.default_language, status=course.status, my_role=my_role,
         owner_display_name=owner_display_name or "—", starts_at=course.starts_at, ends_at=course.ends_at,
         deleted_at=course.deleted_at,

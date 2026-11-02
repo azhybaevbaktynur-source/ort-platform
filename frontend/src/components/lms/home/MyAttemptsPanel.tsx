@@ -8,7 +8,7 @@ import { listMyAttempts } from "@/lib/lms/attempts";
 import type { MyAttemptOut } from "@/lib/lms/attemptTypes";
 import { Badge, ErrorState, LinkButton, Skeleton, type BadgeTone } from "@/components/ui";
 import { fmtPoints } from "@/components/lms/assessments/format";
-import { useGradeText } from "@/components/lms/results/GradeBadge";
+import { useGradeListText } from "@/components/lms/results/GradeBadge";
 import { parseApiDate } from "@/lib/format";
 import { fmtShortDateTime } from "./format";
 import { useErrorText } from "./useErrorText";
@@ -18,7 +18,7 @@ const TONE: Record<string, BadgeTone> = { in_progress: "info", submitted: "info"
 export function MyAttemptsPanel({ courseId, assessmentId, exhausted }: { courseId: string; assessmentId: string; exhausted: boolean }) {
   const { lang, t } = useTranslation();
   const errorText = useErrorText();
-  const gradeText = useGradeText();
+  const gradeText = useGradeListText();
   const [items, setItems] = useState<MyAttemptOut[] | null>(null);
   const [error, setError] = useState<unknown>(null);
 
@@ -51,7 +51,7 @@ export function MyAttemptsPanel({ courseId, assessmentId, exhausted }: { courseI
         <ul className="mt-3 divide-y divide-slate-100">
           {done.map((a, i) => {
             const r = a.result;
-            const value = r?.grade ? gradeText(r.grade, r.grade.scheme_type) : r ? t("home.scoreOf", { score: fmtPoints(r.raw_score), total: fmtPoints(r.points_possible) }) : "";
+            const value = r?.grade ? gradeText({ ...r.grade, max_value: r.grade.scale_max ?? r.points_possible }) : r ? t("home.scoreOf", { score: fmtPoints(r.raw_score), total: fmtPoints(r.points_possible) }) : "";
             return (
               <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
                 <div className="min-w-0 flex-1 basis-48">

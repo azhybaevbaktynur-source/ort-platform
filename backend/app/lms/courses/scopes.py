@@ -29,8 +29,20 @@ def _visible_predicate(user_id: str):
     )
 
 
+def with_card_org(stmt: Select) -> Select:
+    """The course card's organization: adds `org_name` and `org_kind` of the root of the course's tree (a root's path
+    is its own id, 32 hex chars). Outer joins in the same statement, so a card list loses no course and gains no query."""
+    from app.lms.organizations.models import Organization
+
+    org = aliased(Organization, name="card_org")
+    root = aliased(Organization, name="card_root")
+    return (stmt.outerjoin(org, org.id == Course.organization_id)
+            .outerjoin(root, root.path == func.substr(org.path, 1, 32))
+            .add_columns(root.name.label("org_name"), root.kind.label("org_kind")))
+
+
 def my_courses(user_id: str, *, as_: Literal["teaching", "learning", "all"] = "all") -> Select:
-    """Rows of (Course, my_role, owner_display_name[, owner_email only when as_ == "teaching"])."""
+    """Rows of (Course, my_role, owner_display_name[, owner_email only when as_ == "teaching"], org_name, org_kind)."""
     cols = [Course, Enrollment.role.label("my_role"), User.display_name.label("owner_display_name")]
     if as_ == "teaching":
         cols.append(User.email.label("owner_email"))
@@ -44,7 +56,7 @@ def my_courses(user_id: str, *, as_: Literal["teaching", "learning", "all"] = "a
         stmt = stmt.where(Enrollment.role.in_(("teacher", "assistant")))
     elif as_ == "learning":
         stmt = stmt.where(Enrollment.role == "student")
-    return stmt
+    return with_card_org(stmt)
 
 
 def courses_visible_to(user_id: str) -> Select:
@@ -56,7 +68,7 @@ def courses_visible_to(user_id: str) -> Select:
 
 
 def my_deleted_courses(user_id: str) -> Select:
-    return (
+    return with_card_org(
         select(Course, User.display_name.label("owner_display_name"), User.email.label("owner_email"))
         .join(User, User.id == Course.owner_id)
         .where(Course.owner_id == user_id, Course.deleted_at.is_not(None),
@@ -104,7 +116,8 @@ CATALOG_Q_MAX = 80
 
 def catalog_cards(user_id: str, *, q: Optional[str] = None, language: Optional[str] = None,
                   mode: Optional[str] = None, organization_id=None) -> Select:
-    """Rows of (Course, my_role, my_state, root_id, root_name, has_active_form, my_app_id, my_app_status).
+    """Rows of (Course, my_role, my_state, root_id, root_name, has_active_form, my_app_id, my_app_status, root_kind,
+    owner_display_name).
 
     `q` matches `courses.catalog_search` (lowercased titles and descriptions in every language) with a plain
     `LIKE` (design 7: acceptable at catalog size); `language` is one of the course's languages; `mode` is the
@@ -122,7 +135,8 @@ def catalog_cards(user_id: str, *, q: Optional[str] = None, language: Optional[s
         root.id.label("root_id"), root.name.label("root_name"), has_form.label("has_active_form"),
         latest.with_only_columns(EnrollmentApplication.id).scalar_subquery().label("my_app_id"),
         latest.with_only_columns(EnrollmentApplication.status).scalar_subquery().label("my_app_status"),
-    )
+        root.kind.label("root_kind"), User.display_name.label("owner_display_name"),
+    ).outerjoin(User, User.id == Course.owner_id)
     if q and q.strip():
         needle = like_escape(q.strip().lower()[:CATALOG_Q_MAX])
         stmt = stmt.where(Course.catalog_search.like("%" + needle + "%", escape="\\"))

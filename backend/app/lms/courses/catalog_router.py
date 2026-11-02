@@ -16,7 +16,7 @@ from app.lms.core.errors import NotFound
 from app.lms.core.pagination import PageOut
 from app.lms.courses import scopes
 from app.lms.courses.models import Course
-from app.lms.courses.schemas import CatalogCourseOut, catalog_course_out
+from app.lms.courses.schemas import CatalogCourseOut, card_organization_name, catalog_course_out
 from app.lms.courses.service import paginate_rows
 
 router = APIRouter()
@@ -31,6 +31,9 @@ class CatalogMyApplication(BaseModel):
 class CatalogCardOut(CatalogCourseOut):
     organization_id: uuid.UUID            # the root of the course's organization tree
     organization_name: str
+    organization_display_name: Optional[str] = None  # what the card shows: null for a personal organization
+    owner_display_name: str               # public display name, never an email
+    is_platform_course: bool              # the card shows the platform organization instead of a teacher
     has_active_form: bool
     my_application: Optional[CatalogMyApplication] = None
 
@@ -48,10 +51,12 @@ class CourseLandingOut(CatalogCardOut):
 
 
 def _card(row, count: int) -> CatalogCardOut:
-    c, role, state, root_id, root_name, has_form, app_id, app_status = row
+    c, role, state, root_id, root_name, has_form, app_id, app_status, root_kind, owner_name = row
     base = catalog_course_out(c, role, state, count)
     return CatalogCardOut(
         **base.model_dump(), organization_id=root_id, organization_name=root_name or "",
+        organization_display_name=card_organization_name(root_kind, root_name),
+        owner_display_name=owner_name or "—", is_platform_course=root_kind == "platform",
         has_active_form=bool(has_form),
         my_application=CatalogMyApplication(id=app_id, status=app_status) if app_id is not None else None,
     )

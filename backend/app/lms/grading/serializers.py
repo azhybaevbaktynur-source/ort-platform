@@ -236,6 +236,17 @@ class SubmissionStaffOut(CellOut):
 
 # ------------------------------------------------------------------ my grades (student)
 
+SCALED_SCHEME_TYPES = ("piecewise_curve", "lookup_table")
+
+
+def grade_max(scheme_type: Optional[str], points_possible, scale_max):
+    """The maximum a listed grade reads against ("7 / 10", "132 / 245"): the top of a scaled scheme, the points
+    possible of a points scheme or of a grade without a scheme, nothing for percent and label schemes."""
+    if scheme_type in SCALED_SCHEME_TYPES:
+        return scale_max
+    return points_possible if scheme_type in ("points", None) else None
+
+
 class MyGradeOut(BaseModel):
     """Optional fields are only SET for `graded` rows; routes serialize with `exclude_unset`, so other states
     carry exactly {assignment_id, kind, assessment_id, title, state, due_at} (text/file items also `submitted_at`
@@ -252,6 +263,7 @@ class MyGradeOut(BaseModel):
     thresholds: Optional[dict[str, bool]] = None
     effective_points: Optional[Decimal] = None
     points_possible: Optional[Decimal] = None
+    max_value: Optional[Decimal] = None  # graded rows: `grade_max`, what `display_value` reads against in a list
     late_deduction: Optional[Decimal] = None
     released_at: Optional[datetime] = None
     kept_attempt_id: Optional[uuid.UUID] = None
@@ -286,7 +298,7 @@ HAND_IN_KINDS = ("text", "file")
 
 
 def my_grade_out(a: Any, state: str, sub: Any = None, *, labels: Optional[dict] = None,
-                 scheme_type: Optional[str] = None, hand_in: Any = None,
+                 scheme_type: Optional[str] = None, scale_max: Optional[Decimal] = None, hand_in: Any = None,
                  rubric_scores: Optional[list[RubricScoreOut]] = None) -> MyGradeOut:
     """`a`: assignment row (id, kind, assessment_id, title, due_at). Numbers only for `graded`; `labels` =
     `{label: text}` of the grade's scheme version (set only on graded rows whose label has a text); `hand_in`: the
@@ -311,6 +323,7 @@ def my_grade_out(a: Any, state: str, sub: Any = None, *, labels: Optional[dict] 
     return MyGradeOut(**base, **extra,
         display_value=sub.display_value, label=sub.label, percentile=sub.percentile, passed=sub.passed,
         thresholds=sub.thresholds, effective_points=sub.effective_points, points_possible=sub.points_possible,
+        max_value=grade_max(scheme_type, sub.points_possible, scale_max),
         late_deduction=sub.late_deduction, released_at=sub.released_at, kept_attempt_id=sub.kept_attempt_id,
     )
 

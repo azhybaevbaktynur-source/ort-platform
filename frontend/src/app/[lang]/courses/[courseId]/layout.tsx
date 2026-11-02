@@ -9,7 +9,7 @@ import { pickLocalized } from "@/lib/lms/localized";
 import { courseNavRole, hiddenAreaFor } from "@/lib/lms/nav";
 import { isStaffCourse, type CourseOut } from "@/lib/lms/types";
 import { CourseContext } from "@/components/lms/CourseContext";
-import { StatusBadge } from "@/components/lms/CourseCard";
+import { StatusBadge } from "@/components/lms/course/CourseCard";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { StaffCourseBar } from "@/components/lms/course/StaffCourseUi"; // Phase 6b S5c
 import { useDeclareArea } from "@/components/lms/LmsShell"; // Phase 6b integration

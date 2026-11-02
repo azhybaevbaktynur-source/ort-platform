@@ -78,6 +78,7 @@ ROUTE_POLICIES.update(INVITATION_POLICIES)
 # --- Phase 6 S6a begin --- (student home, PHASE_6_DESIGN 2.3 / 8.4)
 ROUTE_POLICIES.update({
     ("GET", "/api/v1/me/home"): "authenticated",  # the caller's own enrollments, attempts, grades, invitations
+    ("GET", "/api/v1/me/home/courses"): "authenticated",  # the caller's own student courses: pages of the same cards
 })
 # --- Phase 6 S6a end ---
 # --- Phase 7a S1 begin --- (assignments, hand-ins, grades: S2/S3 fill ASSIGNMENT_POLICIES; accommodations: S4)

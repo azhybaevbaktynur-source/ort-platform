@@ -9,6 +9,7 @@ import { fmtApiDate } from "@/lib/format";
 import type { Num } from "@/lib/lms/gradingTypes";
 import { pickLocalized } from "@/lib/lms/localized";
 import type { Lang } from "@/lib/lms/types";
+import { useGradeListText } from "@/components/lms/results/GradeBadge";
 import { GuardianError } from "./GuardianError";
 import {
   getDue, getGrades, listAnnouncements, listCourses, type GuardianAnnouncement, type GuardianCourse, type GuardianDue,
@@ -37,6 +38,7 @@ function useReadError(onConsentNeeded: () => void) {
 
 function GradesPanel({ linkId, courseId, onConsentNeeded }: { linkId: string; courseId: string; onConsentNeeded: () => void }) {
   const { lang, t } = useTranslation();
+  const gradeText = useGradeListText();
   const [data, setData] = useState<GuardianGrades | null>(null);
   const [error, setError] = useState<unknown>(null);
   const failed = useReadError(onConsentNeeded);
@@ -70,13 +72,13 @@ function GradesPanel({ linkId, courseId, onConsentNeeded }: { linkId: string; co
             <p className="mt-1 text-sm text-slate-600">
               {item.due_at ? t("guardian.dueOn", { date: fmtApiDate(item.due_at, lang) }) : t("guardian.noDate")}
             </p>
-            {item.state === "graded" && item.points !== null && (
+            {item.state === "graded" && (
               <p className="mt-1 text-sm font-semibold text-slate-900">
-                {item.possible !== null
-                  ? t("guardian.grades.points", { points: num(item.points, lang), possible: num(item.possible, lang) })
-                  : num(item.points, lang)}
-                {item.percent !== null && <span className="ml-2 font-medium text-slate-700">{num(item.percent, lang)}%</span>}
-                {item.label && <span className="ml-2 font-medium text-slate-700">{item.label}</span>}
+                {gradeText({ ...item, effective_points: item.points })}
+                {/* a scheme's value reads differently from the points: both, as the student's Grades page shows them */}
+                {item.scheme_type && item.scheme_type !== "points" && item.points !== null && item.possible !== null && (
+                  <span className="ml-2 font-medium text-slate-700">{t("guardian.grades.points", { points: num(item.points, lang), possible: num(item.possible, lang) })}</span>
+                )}
               </p>
             )}
           </li>

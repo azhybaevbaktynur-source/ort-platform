@@ -5,13 +5,12 @@
 // Phase 9 S4: search and filters, the organization and a mode badge on each card, the title opens the course landing,
 // form-mode courses offer "Apply" (or show the student's application status).
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { KeyRound, LayoutGrid, SearchX, Users } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { isActiveMember, isFormMode, joinOpenCourse, listCatalog, type CatalogCourseOut, type CatalogFilters as Filters } from "@/lib/lms/catalog";
-import { pickLocalized } from "@/lib/lms/localized";
-import { Button, EmptyState, ErrorState, LinkButton, PageHeader, Pagination, Skeleton, focusRing } from "@/components/ui";
+import { Button, EmptyState, ErrorState, LinkButton, PageHeader, Pagination, Skeleton } from "@/components/ui";
+import { COURSE_GRID, CourseCard } from "@/components/lms/course/CourseCard";
 import { CatalogFilters } from "@/components/lms/catalog/CatalogFilters";
 import { CatalogModeBadge } from "@/components/lms/catalog/CatalogModeBadge";
 import { ApplicationStatusBadge } from "@/components/lms/catalog/ApplicationStatus";
@@ -24,13 +23,15 @@ function CatalogSkeleton() {
   return (
     <div role="status" aria-live="polite">
       <span className="sr-only">{t("ui.loading")}</span>
-      <div aria-hidden="true" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div aria-hidden="true" className={COURSE_GRID}>
         {Array.from({ length: 3 }, (_, i) => (
-          <div key={i} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-            <Skeleton className="mb-3 h-5 w-2/3" />
-            <Skeleton className="mb-2 h-4 w-full" />
-            <Skeleton className="mb-4 h-4 w-1/2" />
-            <Skeleton className="h-11 w-full rounded-xl" />
+          <div key={i} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <Skeleton className="h-24 w-full rounded-none" />
+            <div className="p-4">
+              <Skeleton className="mb-2 h-4 w-2/3" />
+              <Skeleton className="mb-4 h-4 w-1/2" />
+              <Skeleton className="h-11 w-full rounded-xl" />
+            </div>
           </div>
         ))}
       </div>
@@ -68,7 +69,8 @@ export function CatalogView() {
         const m = new Map(prev);
         let changed = false;
         for (const c of page.items) {
-          if (c.organization_id && c.organization_name && !m.has(c.organization_id)) { m.set(c.organization_id, c.organization_name); changed = true; }
+          // a personal organization's name means nothing to students: not a filter either
+          if (c.organization_id && c.organization_display_name && !m.has(c.organization_id)) { m.set(c.organization_id, c.organization_display_name); changed = true; }
         }
         return changed ? m : prev;
       });
@@ -150,32 +152,23 @@ export function CatalogView() {
           action={<LinkButton href={`/${lang}/courses/join`}>{t("home.primary.join")}</LinkButton>} />
       ))}
       {items.length > 0 && (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 min-[1700px]:grid-cols-4" aria-busy={loading || undefined}>
-          {items.map((c) => {
-            const title = pickLocalized(c.title, lang, c.default_language) || t("courses.list.untitled");
-            const description = pickLocalized(c.description, lang, c.default_language);
-            return (
-              <li key={c.id} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-                <div className="mb-2 flex flex-wrap gap-2"><CatalogModeBadge mode={c.enrollment_mode} /></div>
-                <h2 className="break-words text-lg font-semibold leading-7 text-slate-900">
-                  <Link href={landing(c)} className={`rounded hover:underline ${focusRing}`}>{title}</Link>
-                </h2>
-                {c.organization_name && <p className="text-sm leading-6 text-slate-600">{c.organization_name}</p>}
-                {description && <p className="mt-1 line-clamp-3 text-base leading-6 text-slate-600 sm:text-sm">{description}</p>}
-                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm leading-6 text-slate-600">
-                  <span>{c.languages.map((l) => t(`courses.languages.${l}`)).join(", ")}</span>
-                  {c.student_count >= SHOW_COUNT_FROM && (
-                    <span className="inline-flex items-center gap-1">
-                      <Users className="h-4 w-4" aria-hidden="true" />
-                      {t("catalog.students", { count: c.student_count })}
-                    </span>
-                  )}
-                </div>
-                <div className="mt-auto pt-4">{action(c)}</div>
-                {joinError?.id === c.id && <ErrorState variant="inline" message={errorText(joinError.error)} className="mt-3" />}
-              </li>
-            );
-          })}
+        <ul className={COURSE_GRID} aria-busy={loading || undefined}>
+          {items.map((c) => (
+            <CourseCard key={c.id} course={c} href={landing(c)} headingLevel={2}
+              badges={<CatalogModeBadge mode={c.enrollment_mode} />}
+              meta={c.student_count >= SHOW_COUNT_FROM ? (
+                <span className="inline-flex items-center gap-1">
+                  <Users className="h-4 w-4" aria-hidden="true" />
+                  {t("catalog.students", { count: c.student_count })}
+                </span>
+              ) : undefined}
+              action={(
+                <>
+                  {action(c)}
+                  {joinError?.id === c.id && <ErrorState variant="inline" message={errorText(joinError.error)} className="mt-3" />}
+                </>
+              )} />
+          ))}
         </ul>
       )}
       <Pagination nextCursor={cursor} loading={loading} onLoadMore={() => void load(cursor)} />

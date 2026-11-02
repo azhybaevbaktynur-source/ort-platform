@@ -60,6 +60,9 @@ export interface UserBrief {
 export interface CourseCard {
   id: string;
   title: LocalizedText;
+  description?: LocalizedText | null;
+  /** root organization; null for a personal one */
+  organization_display_name?: string | null;
   languages: Lang[];
   default_language: Lang;
   status: CourseStatus;

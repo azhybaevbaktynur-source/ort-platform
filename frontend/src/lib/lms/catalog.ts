@@ -23,6 +23,10 @@ export interface CatalogCourseOut {
   /** Root organization of the course's tree. */
   organization_id: string;
   organization_name: string;
+  /** what a card shows: null for a personal organization, whose name means nothing to students */
+  organization_display_name: string | null;
+  owner_display_name: string;
+  is_platform_course: boolean;
   has_active_form: boolean;
   my_application: { id: string; status: ApplicationStatus } | null;
 }

@@ -1,6 +1,6 @@
 // Phase 11 S2 (PHASE_11_DESIGN 4): the parent routes. Backend: app/lms/guardian/.
 import { lmsFetch } from "@/lib/lms/client";
-import type { Num } from "@/lib/lms/gradingTypes";
+import type { Num, SchemeLabelValue, SchemeType } from "@/lib/lms/gradingTypes";
 import type { LocalizedText, PageOut } from "@/lib/lms/types";
 
 const e = encodeURIComponent;
@@ -33,6 +33,11 @@ export interface GuardianGrade {
   possible: Num | null;
   percent: Num | null;
   label: string | null;
+  /** the scheme's value; null without a scheme, then `points` is the value */
+  display_value: Num | null;
+  max_value: Num | null;
+  scheme_type: SchemeType | null;
+  labels: Record<string, SchemeLabelValue> | null;
 }
 
 export interface GuardianGrades {
