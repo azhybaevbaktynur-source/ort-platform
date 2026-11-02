@@ -78,3 +78,11 @@ Known limits, on purpose:
 - Someone who turns 18 needs the platform admin to change their band.
 - An approved teacher whose band is later corrected to a minor isn't revoked automatically (raised in the Step 3 review).
 
+## G. Results (deployed 2026-11-03, `main` 061bf6a, Neon `0019_teacher_applications`)
+- Backup branch `backup-2026-11-03-before-accounts` (`br-late-pond-b2s3xwy3`, branch-only role `rehearsal_accounts`). Neon is now 10/10 branches: the next migration needs the owner's OK to delete an old backup first.
+- Rehearsal on a copy of production: an untouched restore and the migrated copy hash identical for attempts, attempt items, grade events, courses, enrollments, organizations, members, assessments, submissions, question versions, guardian links; users' key columns and the old request's fields too. The active teacher keeps 2 courses (their other 2 are internal template sandboxes), `admin_organizations` empty, still creates courses. Local copy deleted.
+- Local: SQLite 4150+ passed, PG 4237+ passed; the two remaining failures were old tests expecting approval of a disabled account, since updated. Browser suite 115 passed, 35 skipped (screenshot recorders); ORT pixels unchanged. CI green on 2277999 (7 jobs), after one timing fix in a new spec.
+- Security review: one medium (approval didn't re-check age or disabled accounts), fixed; low findings fixed or listed in section F.
+- Production, QA accounts re-enabled for the check, then disabled: 28 checks at 375, 1440, 1920 px, including no teacher link for students, the same menu without Организация for an independent teacher, old links redirecting, personal-organization invitations refused, no application created.
+- Not exercised on production: a real application and decision email, which would put a test row in the owner's queue and mail a dead address. The owner's first real application tests them. Local e2e covers the walk with console email.
+
