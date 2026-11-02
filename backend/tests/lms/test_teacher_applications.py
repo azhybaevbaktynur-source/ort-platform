@@ -415,17 +415,19 @@ async def test_no_email_to_a_disabled_account(db, api, admin, outbox):
     db.expire_all()
     db.get(User, user.id).disabled_at = utcnow()
     db.commit()
-    await approve(api, admin, rid)
+    res = await api.call(admin, "POST", f"/platform/teacher-requests/{rid}/reject", json={"reason": "no"})  # approval is refused
+    assert res.status_code == 200
     assert outbox == []
     db.expire_all()
-    assert db.get(User, user.id).teacher_status == "approved"
+    assert db.get(User, user.id).teacher_status == "none"
 
 
 async def test_no_email_to_a_test_student(db, api, admin, outbox):
     user = adult(db)
     user.is_test_student = True
+    user.teacher_status = "approved"  # approval itself is refused for a test student; revoke is the decision left to check
     db.commit()
-    await set_status(api, admin, user, "approved")
+    await set_status(api, admin, user, "revoked")
     assert outbox == []
 
 
