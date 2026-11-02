@@ -124,7 +124,7 @@ export function ApplicationStep({ onSubmitted }: { onSubmitted: () => void }) {
     return (
       <Panel icon={<CircleAlert />} tone="danger" title={t("teacherApply.rejected.title")}>
         {latest?.reason && <p className="break-words"><strong>{t("teacherRequest.reason")}:</strong> {latest.reason}</p>}
-        <p>{t("teacherApply.rejected.wait", { date: fmtApiDate(reapplyAt, lang) })}</p>
+        <p>{t("teacherApply.rejected.wait", { date: fmtApiDateTimeShort(reapplyAt, lang) })}</p>
         <LinkButton href={home} variant="secondary" className="w-full sm:w-auto">{t("teacherOnly.back")}</LinkButton>
       </Panel>
     );
@@ -268,6 +268,6 @@ function ApplicationForm({ needsAge, initialName, revoked, canAlreadyCreate, rej
 
 function errorText(t: T, error: unknown, lang: string): string {
   const e = error as { code?: string; details?: Record<string, unknown> };
-  if (e.code === "reapply_wait") return t("lms.errors.reapply_wait", { date: fmtApiDate(String(e.details?.available_at ?? ""), lang) });
+  if (e.code === "reapply_wait") return t("lms.errors.reapply_wait", { date: fmtApiDateTimeShort(String(e.details?.available_at ?? ""), lang) });
   return apiErrorText(t, error);
 }

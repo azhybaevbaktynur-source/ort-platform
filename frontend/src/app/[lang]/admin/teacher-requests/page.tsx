@@ -3,7 +3,7 @@
 import React, { useCallback, useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/context";
-import { approveTeacherRequest, listTeacherRequests, rejectTeacherRequest, setTeacherStatus } from "@/lib/lms/admin";
+import { approveTeacherRequest, getUser, listTeacherRequests, rejectTeacherRequest, setTeacherStatus } from "@/lib/lms/admin";
 import type { TeacherRequestAdminOut, TeacherRequestStatus } from "@/lib/lms/types";
 import { fmtApiDateTimeShort } from "@/lib/format";
 import { Badge, Button, Card, DescriptionList, EmptyState, LoadingState, PageHeader, Pagination, ReasonDialog, TabPanel, Tabs, toast } from "@/components/ui";
@@ -50,6 +50,7 @@ export default function TeacherRequestsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<unknown>(null);
   const [dialog, setDialog] = useState<{ kind: "reject" | "revoke"; req: TeacherRequestAdminOut } | null>(null);
+  const [revokeImpact, setRevokeImpact] = useState<{ students: number; courses: number } | null>(null);
   const [dialogError, setDialogError] = useState<unknown>(null);
 
   const replace = (u: TeacherRequestAdminOut) => list.setItems((prev) => prev.map((r) => (r.id === u.id ? u : r)));
@@ -68,6 +69,19 @@ export default function TeacherRequestsPage() {
     } finally {
       setBusyId(null);
     }
+  };
+
+  // Q6 (docs/DISCUSSION_ACCOUNTS.md): a revoke says who it freezes. If the numbers can't load, the general wording still warns.
+  const openRevoke = async (req: TeacherRequestAdminOut) => {
+    setDialogError(null);
+    setBusyId(req.id);
+    let impact: { students: number; courses: number } | null = null;
+    try {
+      impact = (await getUser(req.user.id)).revoke_impact ?? null;
+    } catch { /* the dialog falls back to the general wording */ }
+    setRevokeImpact(impact);
+    setBusyId(null);
+    setDialog({ kind: "revoke", req });
   };
 
   const confirm = async (reason: string) => {
@@ -133,7 +147,7 @@ export default function TeacherRequestsPage() {
                   {(r.status === "pending" || r.user_teacher_status === "approved") && (
                     <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap">
                       {r.user_teacher_status === "approved" && (
-                        <Button variant="secondary" disabled={busyId === r.id} onClick={() => { setDialogError(null); setDialog({ kind: "revoke", req: r }); }}>
+                        <Button variant="secondary" disabled={busyId === r.id} onClick={() => void openRevoke(r)}>
                           {t("platformAdmin.requests.revoke")}
                         </Button>
                       )}
@@ -160,9 +174,10 @@ export default function TeacherRequestsPage() {
         open={!!dialog}
         title={dialog?.kind === "reject" ? t("platformAdmin.requests.rejectTitle") : t("platformAdmin.requests.revokeTitle")}
         object={dialog ? (dialog.req.user.display_name ? `${dialog.req.user.display_name} · ${dialog.req.user.email}` : dialog.req.user.email) : undefined}
-        effect={dialog?.kind === "reject" ? t("platformAdmin.requests.rejectBody") : t("platformAdmin.requests.revokeBody")}
+        effect={dialog?.kind === "reject" ? t("platformAdmin.requests.rejectBody")
+          : revokeImpact ? t("platformAdmin.users.revokeImpact", revokeImpact) : t("platformAdmin.requests.revokeBody")}
         confirmLabel={dialog?.kind === "reject" ? t("platformAdmin.requests.reject") : t("platformAdmin.requests.revoke")}
-        tone="danger" optional={dialog?.kind === "revoke"} busy={!!busyId}
+        tone="danger" busy={!!busyId}
         error={dialogError ? <OrgError error={dialogError} /> : undefined}
         onConfirm={(r) => void confirm(r)} onCancel={() => setDialog(null)}
       />

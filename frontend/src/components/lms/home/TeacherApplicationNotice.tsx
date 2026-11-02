@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { CircleAlert, CircleCheck, Clock } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
-import { fmtApiDate, parseApiDate } from "@/lib/format";
+import { fmtApiDateTimeShort, parseApiDate } from "@/lib/format";
 import type { HomeTeacherApplicationOut } from "@/lib/lms/homeTypes";
 import { cn, focusRing } from "@/components/ui";
 
@@ -34,7 +34,7 @@ export function TeacherApplicationNotice({ application }: { application: Pick<Ho
       <div className="min-w-0 flex-1 basis-56">
         <p className="font-medium">{t(`home.teacherApplication.${status}`)}</p>
         {status === "rejected" && reason && <p className="break-words"><strong>{t("teacherRequest.reason")}:</strong> {reason}</p>}
-        {waiting && <p>{t("home.teacherApplication.rejectedWait", { date: fmtApiDate(reapplyAt, lang) })}</p>}
+        {waiting && <p>{t("home.teacherApplication.rejectedWait", { date: fmtApiDateTimeShort(reapplyAt, lang) })}</p>}
       </div>
       {link && (
         <Link href={link.href} className={cn("inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 font-semibold text-brand-700 hover:bg-slate-50 sm:w-auto", focusRing)}>
