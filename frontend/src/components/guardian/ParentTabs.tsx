@@ -10,6 +10,7 @@ import type { Num } from "@/lib/lms/gradingTypes";
 import { pickLocalized } from "@/lib/lms/localized";
 import type { Lang } from "@/lib/lms/types";
 import { useGradeListText } from "@/components/lms/results/GradeBadge";
+import { useSchemeLabel } from "@/components/lms/grading/schemes/labels";
 import { GuardianError } from "./GuardianError";
 import {
   getDue, getGrades, listAnnouncements, listCourses, type GuardianAnnouncement, type GuardianCourse, type GuardianDue,
@@ -37,6 +38,7 @@ function useReadError(onConsentNeeded: () => void) {
 }
 
 function GradesPanel({ linkId, courseId, onConsentNeeded }: { linkId: string; courseId: string; onConsentNeeded: () => void }) {
+  const schemeLabel = useSchemeLabel();
   const { lang, t } = useTranslation();
   const gradeText = useGradeListText();
   const [data, setData] = useState<GuardianGrades | null>(null);
@@ -59,7 +61,7 @@ function GradesPanel({ linkId, courseId, onConsentNeeded }: { linkId: string; co
       {data.total && data.total.percent !== null && (
         <p className="mb-3 text-base font-semibold text-slate-900">
           {t("guardian.grades.total", { percent: num(data.total.percent, lang) })}
-          {data.total.label && <span className="ml-2 font-medium text-slate-700">{data.total.label}</span>}
+          {data.total.label && <span className="ml-2 font-medium text-slate-700">{schemeLabel(data.total.label)}</span>}
         </p>
       )}
       <ul className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
