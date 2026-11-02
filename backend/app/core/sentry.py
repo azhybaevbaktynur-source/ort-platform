@@ -30,6 +30,7 @@ def init_sentry() -> bool:
         dsn=settings.SENTRY_DSN,
         environment=settings.ENVIRONMENT,
         send_default_pii=False,
+        include_local_variables=False,  # stack frames can hold an address, a phone or a reason
         traces_sample_rate=0.0,
         before_send=_scrub_event,
     )

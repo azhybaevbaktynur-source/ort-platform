@@ -6,7 +6,7 @@ import { useTranslation } from "@/lib/i18n/context";
 import { Checkbox } from "@/components/ui";
 
 /** "I accept the privacy policy and terms of use": the words link to the policy text, in a new tab so a form stays. */
-export function PolicyAccept({ checked, onChange, required = false }: { checked: boolean; onChange: (v: boolean) => void; required?: boolean }) {
+export function PolicyAccept({ checked, onChange, required = false, error, id }: { checked: boolean; onChange: (v: boolean) => void; required?: boolean; error?: React.ReactNode; id?: string }) {
   const { lang, t } = useTranslation();
   const parts = t("privacy.accept.label").split(/(\{privacy\}|\{terms\})/);
   const label = parts.map((part, i) => {
@@ -18,5 +18,5 @@ export function PolicyAccept({ checked, onChange, required = false }: { checked:
       </Link>
     );
   });
-  return <Checkbox label={<>{label}</>} checked={checked} required={required} onChange={(e) => onChange(e.target.checked)} />;
+  return <Checkbox id={id} label={<>{label}</>} checked={checked} required={required} error={error} onChange={(e) => onChange(e.target.checked)} />;
 }

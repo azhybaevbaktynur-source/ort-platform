@@ -21,6 +21,13 @@ class TeacherRequest(UUIDPKMixin, TimestampMixin, Base):
     )
     decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     reason: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    # Accounts (docs/phases/ACCOUNTS.md A): required by the application form, NULL on older rows; personal data, in the
+    # registry and the export. Only the applicant and the platform admin read them; never in the audit log or logs.
+    applicant_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    school: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    subject: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    phone_purge_after: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint("status IN ('pending','approved','rejected','cancelled')", name="status_valid"),

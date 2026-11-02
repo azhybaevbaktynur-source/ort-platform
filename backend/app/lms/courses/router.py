@@ -40,8 +40,17 @@ def _out(ctx: AuthzContext, course: Course):
     if (enrollment is not None and enrollment.role in STAFF_ROLES) or (
             enrollment is None and ctx.org_admin_for(course.organization_id)):
         return course_staff_out(course, enrollment, owner, svc.active_student_count(db, course.id), ctx.user.id,
-                                org_name)
+                                org_name, can_import_roster=_can_import_roster(ctx, course))
     return course_student_out(course, enrollment, owner, org_name)
+
+
+def _can_import_roster(ctx: AuthzContext, course: Course) -> bool:
+    """Accounts (ACCOUNTS.md B): the caller administers the course's organization (tree rule); never a sandbox or a locked
+    template (ORT) course. A suspended organization refuses the import (`roster._ensure_writable`), so it isn't offered."""
+    if course.is_sandbox or course.template_locked:
+        return False
+    org_id = course.organization_id
+    return ctx.org_admin_for(org_id) and not ctx.org_suspended(org_id)
 
 
 # --- Phase 6 S1 begin ---

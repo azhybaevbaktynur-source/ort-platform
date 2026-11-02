@@ -29,8 +29,13 @@ Erased data stays in the database provider's history until its restore window pa
 | `submission_rubric_scores` | `comment` | about the person | Emptied | No |
 | `submissions` | `feedback_text` | about the person | Emptied | Yes |
 | `submissions` | `override_reason` | about the person | Emptied | No |
-| `teacher_requests` | `message` | own text | Emptied | No |
-| `teacher_requests` | `reason` | about the person | Emptied | No |
+| `teacher_requests` | `applicant_name` | identity | Emptied | Yes |
+| `teacher_requests` | `message` | own text | Emptied | Yes |
+| `teacher_requests` | `phone` | contact | Emptied | Yes |
+| `teacher_requests` | `phone_purge_after` | retention date of the phone | Emptied | No |
+| `teacher_requests` | `reason` | about the person | Emptied | Yes |
+| `teacher_requests` | `school` | own text | Emptied | Yes |
+| `teacher_requests` | `subject` | own text | Emptied | Yes |
 | `users` | `age_band` | age | Emptied | Yes |
 | `users` | `disabled_reason` | account state | Replaced | No |
 | `users` | `display_name` | identity | Emptied | Yes |

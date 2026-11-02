@@ -95,7 +95,8 @@ async def test_empty_home(db, api):
     assert body == {"in_progress": [], "next_up": [], "latest_results": [], "courses": [], "courses_total": 0,
                     "pending_invitations": 0, "modules_next": [], "announcements": [],  # + Phase 8a S3
                     "pending_applications": [],  # + Phase 9 S4
-                    "todo": []}  # + UX rework
+                    "todo": [],  # + UX rework
+                    "teacher_application": None}  # + Accounts
 
 
 async def test_full_shape_and_no_private_fields(db, api):
@@ -430,8 +431,9 @@ async def test_statement_count_is_fixed(db, api):
         # user, courses (+total, in_progress), next_due, in_progress, next_up, results, attempts, invitations;
         # Phase 8a S3: modules strip (+ its current items when any module is open), announcements;
         # UX rework: todo's in-progress attempts (its other rows are the next_up statement's);
-        # one course card: module progress of the page's courses, one grouped statement
-        assert counts[name] <= 13, "\n".join(st[:120] for st in c.statements)
+        # one course card: module progress of the page's courses, one grouped statement;
+        # Accounts: the caller's latest teacher request, one indexed statement
+        assert counts[name] <= 14, "\n".join(st[:120] for st in c.statements)
     assert counts["small"] == counts["big"], counts
 
 

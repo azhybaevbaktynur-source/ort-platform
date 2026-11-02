@@ -174,9 +174,9 @@ export default function AdminUserDetailPage() {
         open={!!action}
         title={action === "disable" ? t("platformAdmin.users.disableTitle") : action === "revoke" ? t("platformAdmin.users.revokeTitle") : t("platformAdmin.users.grantTitle")}
         object={user.display_name ? `${user.display_name} · ${user.email}` : user.email}
-        effect={action === "disable" ? t("platformAdmin.users.disableBody") : action === "revoke" ? t("platformAdmin.requests.revokeBody") : t("organizations.adminUser.grantBody")}
+        effect={action === "disable" ? t("platformAdmin.users.disableBody") : action === "revoke" ? t("platformAdmin.users.revokeImpact", { students: user.revoke_impact.students, courses: user.revoke_impact.courses }) : t("organizations.adminUser.grantBody")}
         confirmLabel={action === "disable" ? t("platformAdmin.users.disable") : action === "revoke" ? t("platformAdmin.requests.revoke") : t("platformAdmin.users.grantTeacher")}
-        tone={action === "grant" ? "primary" : "danger"} optional={action !== "disable"} busy={busy}
+        tone={action === "grant" ? "primary" : "danger"} optional={action === "grant"} busy={busy}
         error={dialogError ? <OrgError error={dialogError} /> : undefined}
         onConfirm={(r) => void run(r)} onCancel={() => setAction(null)}
       />

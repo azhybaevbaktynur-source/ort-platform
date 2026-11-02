@@ -14,6 +14,7 @@ import { useLmsMe } from "@/lib/lms/useLmsMe";
 import type { CourseCard as CourseCardDto } from "@/lib/lms/types";
 import { COURSE_GRID, CourseCard, StatusBadge } from "@/components/lms/course/CourseCard";
 import { StudentHome } from "@/components/lms/home/StudentHome";
+import { TeacherApplicationNotice } from "@/components/lms/home/TeacherApplicationNotice";
 import { useErrorText } from "@/components/lms/home/useErrorText";
 import {
   Badge, EmptyState, ErrorState, LinkButton, LoadingState, PageHeader, Pagination, TabPanel, Tabs, cn, focusRing,
@@ -71,6 +72,8 @@ function TeachingList() {
 
   return (
     <div className="space-y-4">
+      {/* Accounts: a revoked teacher keeps this list, read-only */}
+      {me?.teacher_status === "revoked" && <TeacherApplicationNotice application={{ status: "revoked" }} />}
       {error && items.length === 0 ? <ErrorState message={errorText(error)} onRetry={() => void load()} retrying={loading} /> : null}
       {error && items.length > 0 ? <ErrorState variant="inline" message={errorText(error)} onRetry={() => void load(cursor)} /> : null}
       {loading && items.length === 0 && !error && <LoadingState rows={3} />}

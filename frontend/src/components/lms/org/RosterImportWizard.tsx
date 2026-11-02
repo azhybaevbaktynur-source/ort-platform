@@ -88,17 +88,19 @@ function Counts({ counts, applied }: { counts: RosterImportCounts; applied: bool
 }
 
 export function RosterImportWizard({
-  orgId, readOnly = false, departments,
+  orgId, readOnly = false, departments, course,
 }: {
   orgId: string;
   readOnly?: boolean;
   /** Organizations of the tree a teacher import may target (S2's department list); default: this organization. */
   departments?: { id: string; name: string }[];
+  /** Accounts: opened from a course's People page, so this course and the student kind are fixed. */
+  course?: { id: string; title: string };
 }) {
   const { lang, t } = useTranslation();
   const [step, setStep] = useState<Step>("upload");
   const [kind, setKind] = useState<RosterKind>("student");
-  const [courseId, setCourseId] = useState("");
+  const [courseId, setCourseId] = useState(course?.id ?? "");
   const [departmentId, setDepartmentId] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [touched, setTouched] = useState(false);
@@ -122,13 +124,15 @@ export function RosterImportWizard({
       setCoursesError(e);
     }
   }, [orgId]);
-  useEffect(() => { void loadCourses(); }, [loadCourses]);
+  const fixedCourse = !!course;
+  useEffect(() => { if (!fixedCourse) void loadCourses(); }, [loadCourses, fixedCourse]);
   useEffect(() => { headingRef.current?.focus(); }, [step]);
 
   const courseName = useMemo(() => {
+    if (course) return course.title;
     const c = courses?.find((x) => x.id === (checked?.course_id ?? courseId));
     return c ? pickLocalized(c.title, lang as Lang) : "";
-  }, [courses, checked, courseId, lang]);
+  }, [course, courses, checked, courseId, lang]);
 
   const reset = () => {
     setStep("upload"); setFile(null); setChecked(null); setApplied(null); setError(null); setTouched(false);
@@ -258,12 +262,14 @@ export function RosterImportWizard({
     <Card as="section" aria-labelledby="roster-step-title">
       {stepper}
       <h2 id="roster-step-title" ref={headingRef} tabIndex={-1} className="mb-1 text-lg font-semibold text-slate-900 focus:outline-none">{t("rosterImport.title")}</h2>
-      <p className="mb-4 text-sm text-slate-600">{t("rosterImport.intro")}</p>
+      <p className="mb-4 text-sm text-slate-600">{course ? t("rosterImport.courseIntro", { course: course.title }) : t("rosterImport.intro")}</p>
       <form onSubmit={check} noValidate className="space-y-4">
-        <Select id="roster-kind" label={t("rosterImport.kind.label")} value={kind} disabled={busy}
-          onChange={(e) => { setKind(e.target.value as RosterKind); setError(null); }}
-          options={[{ value: "student", label: t("rosterImport.kind.student") }, { value: "teacher", label: t("rosterImport.kind.teacher") }]} />
-        {kind === "student" ? (
+        {!course && (
+          <Select id="roster-kind" label={t("rosterImport.kind.label")} value={kind} disabled={busy}
+            onChange={(e) => { setKind(e.target.value as RosterKind); setError(null); }}
+            options={[{ value: "student", label: t("rosterImport.kind.student") }, { value: "teacher", label: t("rosterImport.kind.teacher") }]} />
+        )}
+        {course ? null : kind === "student" ? (
           coursesError ? <OrgError error={coursesError} onRetry={() => void loadCourses()} />
           : courses && courses.length === 0 ? <EmptyState title={t("rosterImport.course.none")} />
           : (

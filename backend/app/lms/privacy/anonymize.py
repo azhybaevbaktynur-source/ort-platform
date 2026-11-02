@@ -189,7 +189,9 @@ def anonymize_user(db: Session, user_id: str, *, actor_id: str) -> dict[str, int
                .values(revoked_at=now, revoked_by_id=actor_id).execution_options(synchronize_session=False))
     db.execute(update(Invitation).where(Invitation.email == email)
                .values(email=DELETED_INVITATION_EMAIL, message=None).execution_options(synchronize_session=False))
-    db.execute(update(TeacherRequest).where(TeacherRequest.user_id == user_id).values(message=None, reason=None)
+    db.execute(update(TeacherRequest).where(TeacherRequest.user_id == user_id)
+               .values(message=None, reason=None, applicant_name=None, school=None, subject=None, phone=None,
+                       phone_purge_after=None)
                .execution_options(synchronize_session=False))
     db.execute(update(Organization).where(Organization.id == personal_org_id(user_id), Organization.kind == "personal")
                .values(name=Organization.slug).execution_options(synchronize_session=False))

@@ -42,7 +42,7 @@ export interface AppHeaderProps {
   areasLoading?: boolean;
   activeArea: AreaKey | null;
   user: { name: string; email: string };
-  /** Extra links in the account menu (for example "I am a teacher"). */
+  /** Extra links in the account menu (for example the privacy page). */
   accountLinks?: (AppHeaderLink & { icon?: React.ReactNode })[];
   onLanguageChange: (lang: Language) => void;
   onLogout: () => void;

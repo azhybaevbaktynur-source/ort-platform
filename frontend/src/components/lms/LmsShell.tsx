@@ -2,7 +2,7 @@
 
 import React, { createContext, Suspense, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { BookOpen, Building2, Lock, Presentation, ShieldCheck, UserPlus, Users } from "lucide-react";
+import { BookOpen, Building2, Lock, Presentation, ShieldCheck, Users } from "lucide-react";
 import { useTranslation, type Language } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
 import { gateOpenPath } from "@/lib/api"; // Phase 11 S3
@@ -17,7 +17,7 @@ import { StudentViewBanner } from "./course/StudentViewBanner"; // UX rework S1
 import { PrivacyBanner } from "@/components/privacy/PrivacyBanner"; // Phase 11 S3
 
 /*
- * Phase 6b S5b: the frame of every signed-in page (courses/*, admin/*, org/*, grading-schemes, teacher-access).
+ * Phase 6b S5b: the frame of every signed-in page (courses/*, admin/*, org/*, grading-schemes, invitations).
  * `AppHeader` with the area switcher replaces the old link rows. Area URLs: Learning `/courses` (or
  * `/courses?view=learning` for people who also teach), Teaching `/courses?view=teaching`, Organization
  * `/org/{id}` (or the picker `/org`), Platform `/admin`.
@@ -120,10 +120,8 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const isAdmin = me ? me.is_platform_admin : !!userProfile?.is_platform_admin;
   const teacherStatus = me ? me.teacher_status : userProfile?.teacher_status;
   const canCreate = me ? me.can_create_courses : teacherStatus === "approved";
-  // Phase 6 S8 (UX S1): "I am a teacher" only for people who teach nowhere yet.
   const isTeacher = me ? me.is_teacher : teacherStatus === "approved";
   const hasTeaching = isTeacher || canCreate;
-  const canRequestTeacher = !isAdmin && !isTeacher && !testStudent;
 
   // UX rework 2: the areas come from one answer, kept across pages (`useLmsMeLoader`), so the menu is the same everywhere.
   const orgs = me?.admin_organizations ?? [];
@@ -185,10 +183,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
 
   const name = testStudent ? t("studentView.testStudentName") : me?.display_name || userProfile?.displayName || user.email || "";
   const email = testStudent ? name : me?.email || user.email || ""; // the header hides an email equal to the name
-  const accountLinks = canRequestTeacher
-    ? [{ href: `/${lang}/teacher-access`, label: t("teacherAccess.navLink"), icon: <UserPlus />, active: rest === "/teacher-access" }]
-    : [];
-  if (!testStudent) accountLinks.push({ href: `/${lang}/privacy`, label: t("privacy.title"), icon: <Lock />, active: rest === "/privacy" }); // Phase 11 S3
+  const accountLinks = testStudent ? [] : [{ href: `/${lang}/privacy`, label: t("privacy.title"), icon: <Lock />, active: rest === "/privacy" }]; // Phase 11 S3
 
   const meError = meState.error && !me && !consentBlocked ? meState.error : null;
   const content = (

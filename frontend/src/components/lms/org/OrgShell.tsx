@@ -1,10 +1,11 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { useParams, usePathname } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import { Building2, TriangleAlert } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { getOrg, type OrgSummaryOut } from "@/lib/lms/organizations";
+import { useLmsMe } from "@/lib/lms/useLmsMe";
 import { AreaShell } from "@/components/ui/AreaShell";
 import { EmptyState, LinkButton, LoadingState, type Breadcrumb } from "@/components/ui";
 import { LoadError, OrgBadge } from "./OrgUi";
@@ -31,6 +32,8 @@ export function OrgShell({ children }: { children: React.ReactNode }) {
   const { lang, t } = useTranslation();
   const { orgId } = useParams<{ orgId: string }>();
   const pathname = usePathname();
+  const router = useRouter();
+  const { me } = useLmsMe();
   const [org, setOrg] = useState<OrgSummaryOut | null>(null);
   const [error, setError] = useState<unknown>(null);
 
@@ -43,6 +46,11 @@ export function OrgShell({ children }: { children: React.ReactNode }) {
     }
   }, [orgId]);
   useEffect(() => { setOrg(null); void reload(); }, [reload]);
+  // Accounts: a personal organization has no area of its own; only the platform admin opens it here.
+  const personal = org?.kind === "personal" && !me?.is_platform_admin;
+  useEffect(() => {
+    if (personal && me) router.replace(`/${lang}/courses?view=teaching`);
+  }, [personal, me, lang, router]);
 
   const status = (error as { status?: number } | null)?.status;
   if (!org && (status === 403 || status === 404)) {
@@ -56,7 +64,7 @@ export function OrgShell({ children }: { children: React.ReactNode }) {
     );
   }
   if (!org && error) return <LoadError error={error} onRetry={reload} />;
-  if (!org) return <LoadingState label={t("lms.common.loading")} />;
+  if (!org || personal) return <LoadingState label={t("lms.common.loading")} />;
 
   const base = `/${lang}/org/${org.id}`;
   const items = [

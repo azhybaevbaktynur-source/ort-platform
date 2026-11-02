@@ -168,6 +168,7 @@ class CourseStaffOut(CourseStudentOut):
     # --- Phase 8b S5 --- (staff only: the course is an exam template's hidden sandbox; the course frame then shows
     # no course bar or tabs, since every course-level write answers 409 `sandbox_course`)
     sandbox_for_template_id: Optional[uuid.UUID] = None
+    can_import_roster: bool = False  # Accounts: the course's People page offers the organization's roster import
 
 
 class JoinOut(BaseModel):
@@ -254,7 +255,7 @@ def _course_features(course) -> CourseFeaturesOut:
 
 
 def course_staff_out(course, enrollment, owner, active_student_count: int, viewer_id: str,
-                     organization_name: str = "") -> CourseStaffOut:
+                     organization_name: str = "", can_import_roster: bool = False) -> CourseStaffOut:
     base = course_student_out(course, enrollment, owner, organization_name).model_dump()
     base["owner_display_name"] = staff_display_name(owner)
     return CourseStaffOut(
@@ -265,6 +266,7 @@ def course_staff_out(course, enrollment, owner, active_student_count: int, viewe
         is_owner=(course.owner_id == viewer_id), created_at=course.created_at, updated_at=course.updated_at,
         published_at=course.published_at, concluded_at=course.concluded_at,
         sandbox_for_template_id=getattr(course, "sandbox_for_template_id", None),  # Phase 8b S5
+        can_import_roster=can_import_roster,
     )
 
 

@@ -102,13 +102,16 @@ def _policy_ids(api: Api) -> list[str]:
     return [p["id"] for p in api.call("GET", "/privacy/policies/current") if p["kind"] in ("privacy", "terms")]
 
 
-def register(api: Api, log: Path, email: str, name: str, lang: str = "ru") -> dict:
+def register(api: Api, log: Path, email: str, name: str, lang: str = "ru", *, keep_password: bool = False) -> dict:
     password = secrets.token_urlsafe(18)
     api.call("POST", "/auth/register", body={"email": email, "password": password, "displayName": name, "lang": lang,
                                              "ageBand": "18_plus", "policyVersionIds": _policy_ids(api)})
     code = code_from_log(log, email)
     out = api.call("POST", "/auth/verify-email", body={"email": email, "password": password, "code": code})
-    return {"email": email, "name": name, "token": out["access_token"]}
+    user = {"email": email, "name": name, "token": out["access_token"]}
+    if keep_password:  # random per run, in the scratch seed.json only
+        user["password"] = password
+    return user
 
 
 def profile(api: Api, token: str) -> dict:
@@ -535,6 +538,96 @@ def seed_privacy(api: Api, log: Path, ort_course_id: str, exam_id: str) -> dict:
 # --- Phase 11 S3 end ---
 
 
+# --- Accounts begin --- (frontend/e2e/teacher-signup.spec.ts; written after every other row. One person per test, so
+# no test depends on another.)
+APPLICATION = {"school": "Лицей 7", "subject": "Математика", "phone": "+996 700 111 222"}
+
+
+def seed_teacher_signup(api: Api, log: Path, admin_tok: str, school_id: str, school_admin: dict) -> dict:
+    def person(key: str, name: str, **kw) -> dict:
+        u = register(api, log, f"e2e-signup-{key}@example.com", name, **kw)
+        u["profile"] = profile(api, u["token"])
+        return u
+
+    def applied(key: str, name: str, **fields) -> dict:
+        u = person(key, name)
+        u["request_id"] = api.call("POST", "/me/teacher-requests", u["token"],
+                                   {"applicant_name": name, **APPLICATION, **fields})["id"]
+        return u
+
+    def teacher(key: str, name: str) -> dict:
+        u = person(key, name)
+        api.call("POST", f"/platform/users/{u['profile']['id']}/teacher-status", admin_tok, {"status": "approved"})
+        u["profile"] = profile(api, u["token"])
+        return u
+
+    def course(owner: dict, title: str) -> dict:
+        c = api.call("POST", "/courses", owner["token"], {"title": {"ru": title, "ky": title, "en": title},
+                                                          "languages": ["ru", "ky", "en"], "default_language": "ru"})
+        api.call("POST", f"/courses/{c['id']}/publish", owner["token"], {})
+        return c
+
+    registered = person("registered", "Уже Зарегистрирован", keep_password=True)
+    student = person("student", "Ученик Без Заявки")
+    no_links = person("no-links", "Ученик Без Ссылок")
+    legacy = person("legacy", "Старый Аккаунт")
+    scratch_sql("DELETE FROM consent_records WHERE user_id = ?", legacy["profile"]["id"])
+    scratch_sql("UPDATE users SET age_band = NULL, consent_state = 'legacy' WHERE id = ?", legacy["profile"]["id"])
+    minor = person("minor", "Ученик Шестнадцати Лет")
+    scratch_sql("UPDATE users SET age_band = '14_17' WHERE id = ?", minor["profile"]["id"])
+
+    pending = applied("pending", "Айгуль На Рассмотрении", message="Веду олимпиадную группу.")
+    approve = applied("approve", "Бакыт Одобряемый", message="Преподаю пять лет.")
+    rejected = applied("rejected", "Отклонённая Заявка")
+    api.call("POST", f"/platform/teacher-requests/{rejected['request_id']}/reject", admin_tok, {"reason": "Нет данных о школе"})
+    waited = applied("waited", "Подождавший Неделю")
+    api.call("POST", f"/platform/teacher-requests/{waited['request_id']}/reject", admin_tok, {"reason": "Нет данных о школе"})
+    scratch_sql("UPDATE teacher_requests SET decided_at = '2020-01-01 00:00:00.000000' WHERE id = ?",
+                waited["request_id"].replace("-", ""))
+    # a teacher of the school who also applies: the queue says where they teach
+    school_teacher = applied("school-teacher", "Учитель Из Школы")
+    api.call("POST", f"/platform/organizations/{school_id}/members", admin_tok,
+             {"user_id": school_teacher["profile"]["id"], "role": "teacher"})
+
+    invitee = person("invitee", "Приглашённый Учитель")
+    api.call("POST", f"/org/{school_id}/invitations", school_admin["token"],
+             {"email": invitee["email"], "role": "teacher", "language": "ru"})
+
+    independent = teacher("independent", "Независимый С Курсом")
+    independent_course = course(independent, "Мой курс E2E")
+    orgs = api.call("GET", "/me/organizations", independent["token"])["items"]
+    personal_id = next(o["id"] for o in orgs if o["kind"] == "personal")
+    name = "Шаблон моей организации E2E"
+    template = api.call("POST", "/exam-templates", independent["token"], {
+        "owner_scope": "organization", "organization_id": personal_id, "title": {"ru": name, "ky": name, "en": name},
+        "draft_spec": {"schema": 1, "parameters": [], "lock_scope": [],
+                       "sections": [{"key": None, "title": {"ru": "Часть 1"}, "allowed_types": ["single_choice"]}]}})
+
+    # a person with their own courses and a school: the course picker must not show their name
+    both = teacher("both", "Учитель С Двумя Местами")
+    api.call("POST", f"/platform/organizations/{school_id}/members", admin_tok,
+             {"user_id": both["profile"]["id"], "role": "teacher"})
+
+    revoked = teacher("revoked", "Отозванный Учитель")
+    course(revoked, "Замороженный курс E2E")
+    api.call("POST", f"/platform/users/{revoked['profile']['id']}/teacher-status", admin_tok,
+             {"status": "revoked", "reason": "Жалоба"})
+    revoked["profile"] = profile(api, revoked["token"])
+
+    revoke_target = teacher("revoke-target", "Учитель Под Отзывом")
+    target_course = course(revoke_target, "Курс под отзывом E2E")
+    target_student = person("revoke-student", "Ученик Учителя Под Отзывом")
+    api.call("POST", "/courses/join", target_student["token"], {"code": target_course["join_code"]})
+
+    return {"registered": registered, "student": student, "no_links": no_links, "legacy": legacy, "minor": minor,
+            "pending": pending, "approve": approve, "rejected": rejected, "waited": waited,
+            "school_teacher": school_teacher, "invitee": invitee, "school_name": "Лицей 61 E2E",
+            "independent": independent, "independent_course_id": independent_course["id"],
+            "personal_org_id": personal_id, "personal_template_id": template["id"], "personal_template_name": name,
+            "both": both, "revoked": revoked, "revoke_target": revoke_target}
+# --- Accounts end ---
+
+
 # --- Landing screens begin --- (frontend/e2e/landing-screens.spec.ts; written after every other row)
 def tri(ru: str, ky: str, en: str) -> dict:
     return {"ru": ru, "ky": ky, "en": en}
@@ -708,6 +801,7 @@ def main() -> int:
     org_admin = seed_org_admin(api, log, tok)  # Phase 9 S5 (after every other row)
     privacy = seed_privacy(api, log, cid, exam["id"])  # Phase 11 S3 (after every other row)
     landing = seed_landing(api, log, tok, cid)  # landing page screenshots (after every other row)
+    teacher_signup = seed_teacher_signup(api, log, tok, org_admin["organization_id"], org_admin["org_admin"])  # Accounts
 
     seed = {
         "quiz_editor": quiz_editor,
@@ -719,6 +813,7 @@ def main() -> int:
         "org_admin": org_admin,
         "privacy": privacy,
         "landing": landing,
+        "teacher_signup": teacher_signup,
         "api": args.api, "course_id": cid, "bank_id": bank_id, "exam": exam, "staff_exam": staff_exam,
         "picks": picks, "keys": keys, "comparison_question_id": comparison_qid, "passage_id": passage_id,
         "staff_attempt_id": staff_attempt, "admin": admin, "students": students,

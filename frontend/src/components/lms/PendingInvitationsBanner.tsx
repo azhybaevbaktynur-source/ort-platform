@@ -9,7 +9,7 @@ import { INVITATIONS_CHANGED_EVENT, listMyInvitations } from "@/lib/lms/invitati
 
 /**
  * Phase 6 S4b: "Invitations for you: N" after login (GET /me/invitations), linking to the list with
- * Accept buttons on /teacher-access. Navigation only: fails silently, hidden on that page itself.
+ * Accept buttons on /invitations. Navigation only: fails silently, hidden on that page itself.
  */
 export function PendingInvitationsBanner({ enabled }: { enabled: boolean }) {
   const { lang, t } = useTranslation();
@@ -26,7 +26,7 @@ export function PendingInvitationsBanner({ enabled }: { enabled: boolean }) {
     return () => window.removeEventListener(INVITATIONS_CHANGED_EVENT, load);
   }, [enabled, load]);
 
-  const href = `/${lang}/teacher-access`;
+  const href = `/${lang}/invitations`;
   if (count === 0 || pathname === href) return null;
   return (
     <div role="status" className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">

@@ -108,7 +108,7 @@ def my_organizations(cursor: Optional[str] = None, limit: int = 25, user: User =
     creator_ids = set(svc.creator_organizations(db, user.id))  # Phase 9 S2: root settings and status (one SQL)
     for org, m in rows:
         creates = org.id in creator_ids
-        items.append(MyOrganizationOut(id=org.id, slug=org.slug, name=org.name, status=org.status, role=m.role,
+        items.append(MyOrganizationOut(id=org.id, slug=org.slug, name=org.name, kind=org.kind, status=org.status, role=m.role,
                                        can_create_courses=creates))
     return PageOut[MyOrganizationOut](items=items, next_cursor=nxt)
 

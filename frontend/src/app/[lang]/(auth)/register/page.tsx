@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, Suspense } from "react";
+import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
@@ -10,11 +10,11 @@ import { useAuth, RegisterResult } from "@/lib/auth-context";
 import { safeRedirect } from "@/lib/safeRedirect";
 import { useBackendWarmup, useSlowHint } from "@/lib/useBackendWarmup";
 import { VerifyEmailStep, authErrorMessage } from "@/components/auth/VerifyEmailStep";
+import { PolicyAcceptField, SignUpEmailInput, SignUpNameInput, SignUpPasswordInput, useOwnPolicies } from "@/components/auth/SignUpFields";
 import { AgeButtons } from "@/components/privacy/AgeButtons";
-import { PolicyAccept } from "@/components/privacy/PolicyAccept";
-import { getPolicies, ownPolicyIds, type AgeBand, type PolicyOut } from "@/components/privacy/privacyApi";
-import { PrivacyError, ownPrivacyErrorText } from "@/components/privacy/privacyErrors";
-import { Mail, Lock, User, Phone, ArrowRight, AlertCircle } from "lucide-react";
+import { ownPolicyIds, type AgeBand } from "@/components/privacy/privacyApi";
+import { ownPrivacyErrorText } from "@/components/privacy/privacyErrors";
+import { Phone, ArrowRight, AlertCircle } from "lucide-react";
 
 function RegisterForm() {
   const router = useRouter();
@@ -38,17 +38,9 @@ function RegisterForm() {
   const [band, setBand] = useState<AgeBand | null>(null);
   const [asParent, setAsParent] = useState(false);
   const [accepted, setAccepted] = useState(false);
-  const [policies, setPolicies] = useState<PolicyOut[] | null>(null);
-  const [policiesError, setPoliciesError] = useState<unknown>(null);
   const needsPolicies = !!band && band !== "under_14";
-
-  const loadPolicies = () => {
-    setPoliciesError(null);
-    getPolicies(lang).then(setPolicies).catch(setPoliciesError);
-  };
-  useEffect(() => {
-    if (needsPolicies && !policies) loadPolicies();
-  }, [needsPolicies]); // eslint-disable-line react-hooks/exhaustive-deps
+  const policyState = useOwnPolicies(needsPolicies);
+  const { policies } = policyState;
 
   useBackendWarmup();
   const slow = useSlowHint(loading);
@@ -135,21 +127,15 @@ function RegisterForm() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Input label={t("auth.displayName")} leading={<User className="h-4 w-4" />} type="text" required value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={t("auth.displayNamePlaceholder")} />
+            <SignUpNameInput value={displayName} onChange={setDisplayName} />
 
             <Input label={t("auth.phone")} leading={<Phone className="h-4 w-4" />} type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={t("auth.phonePlaceholder")} />
 
-            <Input label={t("auth.email")} leading={<Mail className="h-4 w-4" />} type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("auth.emailPlaceholder")} />
+            <SignUpEmailInput value={email} onChange={setEmail} />
 
-            <Input label={t("auth.password")} leading={<Lock className="h-4 w-4" />} type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.passwordPlaceholder")} />
+            <SignUpPasswordInput value={password} onChange={setPassword} />
 
-            {needsPolicies && <PolicyAccept checked={accepted} onChange={setAccepted} required />}
-            {needsPolicies && policiesError ? (
-              <div className="space-y-2">
-                <PrivacyError error={policiesError} />
-                <Button type="button" variant="secondary" size="sm" onClick={loadPolicies}>{t("lms.common.retry")}</Button>
-              </div>
-            ) : null}
+            {needsPolicies && <PolicyAcceptField state={policyState} checked={accepted} onChange={setAccepted} />}
 
             <Button type="submit" size="lg" fullWidth disabled={loading || (needsPolicies && !policies)} loading={loading} rightIcon={<ArrowRight aria-hidden="true" className="h-4 w-4" />}>
               {loading ? t("auth.signingUp") : t("auth.signUpButton")}

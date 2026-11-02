@@ -38,7 +38,10 @@ async def test_phase1_flow(db, api):
     # 2. teacher request -> approval
     r = await api.call(teacher, "POST", "/courses", json={"title": {"en": "X"}, "languages": ["en"], "default_language": "en"})
     assert r.status_code == 403
-    r = await api.call(teacher, "POST", "/me/teacher-requests", json={"message": "I teach"})
+    teacher.age_band = "18_plus"
+    db.commit()
+    r = await api.call(teacher, "POST", "/me/teacher-requests", json={
+        "applicant_name": "T", "school": "S", "subject": "Math", "phone": "+996700123456", "message": "I teach"})
     assert r.status_code == 201
     rid = r.json()["id"]
     r = await api.call(admin, "POST", f"/platform/teacher-requests/{rid}/approve", json={})

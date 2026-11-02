@@ -111,7 +111,6 @@
       "myCourses": "My courses",
       "join": "Join a course",
       "create": "Create course",
-      "becomeTeacher": "Become a teacher",
       "platformAdmin": "Platform admin",
       "gradingSchemes": "Grading schemes",
       "catalog": "Catalog",
@@ -257,7 +256,12 @@
       "nothing_to_preview": "There is nothing to preview yet: the template has no sections.",
       "language_not_in_assessment": "The sample questions are not available in this language.",
       "sandbox_course": "This course holds a template's sample questions and cannot be changed here.",
-      "test_student_forbidden": "Not available in student view."
+      "test_student_forbidden": "Not available in student view.",
+      "reapply_wait": "You can apply again from {date}.",
+      "teacher_age_required": "Independent teachers must be 18 or older.",
+      "age_confirmation_required": "Confirm that you are 18 or older and accept the policies.",
+      "personal_org_no_members": "Other teachers can't be invited to your own courses as an organization. Invite the person from the course's People page.",
+      "teacher_account_disabled": "This account is disabled. Enable it first, then approve."
     }
   },
   "courses": {
@@ -425,26 +429,7 @@
     }
   },
   "teacherRequest": {
-    "back": "Back to my courses",
-    "title": "Become a teacher",
-    "intro": "Teachers can create courses and invite students. Send a request and a platform administrator will review it.",
-    "currentStatus": "Your teacher status",
-    "status": {
-      "none": "Not a teacher",
-      "pending": "Request pending",
-      "approved": "Approved teacher",
-      "revoked": "Access revoked"
-    },
-    "approvedBody": "You are an approved teacher and can create courses.",
-    "createCourse": "Create a course",
-    "pendingBody": "Your request is waiting for review. You will see the result here.",
-    "revokedBody": "Your teacher access was revoked. Your existing courses stay available. You may send a new request.",
-    "rejectedBody": "Your last request was rejected. You may send a new one.",
     "reason": "Reason",
-    "messageLabel": "Tell us about yourself (optional)",
-    "messagePlaceholder": "Where you teach, which subjects, why you need courses.",
-    "submit": "Send request",
-    "history": "Your requests",
     "noHistory": "No requests yet.",
     "requestStatus": {
       "pending": "Pending",
@@ -502,9 +487,14 @@
       "reject": "Reject",
       "revoke": "Revoke teacher access",
       "rejectTitle": "Reject this request?",
-      "rejectBody": "The user will see your reason and can apply again later.",
+      "rejectBody": "The person gets an email with your reason and can apply again in 7 days.",
       "revokeTitle": "Revoke teacher access?",
-      "revokeBody": "The person can no longer create courses or become a teacher in other courses. Existing courses stay unchanged."
+      "revokeBody": "The person can no longer create courses. Their courses become read-only: students can't start tests or hand in work.",
+      "school": "School",
+      "subject": "Subject",
+      "phone": "Phone",
+      "teachesAt": "Already teaches at",
+      "message": "Message"
     },
     "users": {
       "title": "Users",
@@ -530,7 +520,8 @@
       "revokeTitle": "Revoke teacher access?",
       "ownedCourses": "Owned courses",
       "noCourses": "No courses.",
-      "requestHistory": "Teacher requests"
+      "requestHistory": "Teacher requests",
+      "revokeImpact": "Students frozen: {students}. Courses frozen: {courses}. They can't start tests or hand in work. The person can no longer create courses."
     },
     "courses": {
       "title": "Courses",
@@ -2193,15 +2184,14 @@
       "applyTitle": "Apply yourself",
       "step1Title": "Create an account",
       "step1Text": "Sign up and confirm your email.",
-      "step2Title": "Send a teacher request",
-      "step2Text": "Log in, open the \"{page}\" page and send the request.",
+      "step2Title": "Send your application",
+      "step2Text": "Tell us your school, subject and phone number.",
       "step3Title": "Wait for approval",
-      "step3Text": "The platform administrator reviews the request. Once it is approved, you can create courses.",
+      "step3Text": "The platform administrator reviews the application and answers by email. Once it is approved, you can create courses.",
       "inviteTitle": "Your school or center invites you",
       "inviteText": "An organization administrator sends an invitation by email. Open the link in it to join; you do not need to apply.",
-      "register": "Create an account",
-      "haveAccount": "I have an account: send a request",
-      "request": "Send a teacher request"
+      "haveAccount": "I have an account: log in and apply",
+      "apply": "Apply"
     },
     "about": {
       "title": "About the platform",
@@ -2229,6 +2219,11 @@
       "language": {
         "q": "How do I change the language?",
         "a": "Choose the language at the top of the page: Kyrgyz, Russian or English. Your choice is remembered on this device."
+      },
+      "becomeTeacher": {
+        "q": "How do I become a teacher?",
+        "a": "Fill in the application on the page for teachers: an account, the code from the email, your school and subject. The platform administrator answers by email. If a school or center invites you, you do not need to apply: open the link in the email.",
+        "link": "Apply"
       }
     },
     "contacts": {
@@ -2405,7 +2400,8 @@
       "teachersCanCreateHint": "When off, only organization admins create courses and assign their owners.",
       "organization": "Organization",
       "organizationPick": "Choose an organization",
-      "organizationHint": "You teach in several organizations. The course belongs to the one you choose."
+      "organizationHint": "You teach in several organizations. The course belongs to the one you choose.",
+      "personal": "My courses"
     },
     "picker": {
       "placeholder": "Name or email",
@@ -2691,7 +2687,18 @@
       "banner": "Invitations for you: {n}",
       "view": "View invitations",
       "accept": "Accept",
-      "accepted": "Invitation accepted."
+      "accepted": "Invitation accepted.",
+      "title": "Invitations",
+      "empty": "No invitations",
+      "emptyBody": "When a school or a teacher invites you, the invitation appears here.",
+      "validUntil": "Valid until {date}. Accept here or with the link in the email.",
+      "item": {
+        "org_admin": "«{org}» invites you as an organization admin.",
+        "teacher": "«{org}» invites you as a teacher.",
+        "assistant": "«{org}» invites you as an assistant in «{course}».",
+        "teacherCourse": "«{org}» invites you as a teacher in «{course}».",
+        "student": "«{org}» invites you as a student in «{course}»."
+      }
     },
     "staff": {
       "noAccount": "There is no account with {email} yet. Send an invitation: the person joins the course after signing up with this email.",
@@ -2865,7 +2872,9 @@
       "roster_target_invalid": "This course or organization is not part of this organization.",
       "student_invitations_disabled": "Student invitations are turned off in this organization.",
       "roster_import_not_found": "This import no longer exists. Start again."
-    }
+    },
+    "courseIntro": "Add students to «{course}» from a CSV file. First the file is checked; nothing is sent until you confirm.",
+    "notAvailable": "Roster import is not available for this course."
   },
   "templates": {
     "field": "Course template",
@@ -2876,32 +2885,6 @@
     "names": {
       "ort": "ORT",
       "general": "General course"
-    }
-  },
-  "teacherAccess": {
-    "navLink": "I am a teacher",
-    "title": "I am a teacher",
-    "intro": "Teachers work inside an organization: a school, a center or their own.",
-    "canCreate": "You can already create courses.",
-    "schoolTitle": "At a school or center?",
-    "schoolBody": "Ask your administrator for an invitation. It arrives by email; open the link in it to join.",
-    "pendingTitle": "Invitations for you: {n}",
-    "pendingItem": {
-      "org_admin": "«{org}» invites you as an organization admin.",
-      "teacher": "«{org}» invites you as a teacher.",
-      "assistant": "«{org}» invites you as an assistant in «{course}».",
-      "teacherCourse": "«{org}» invites you as a teacher in «{course}»."
-    },
-    "pendingHint": "Open the link in the invitation email to accept (valid until {date}).",
-    "independentTitle": "Independent teacher? Apply",
-    "schemesNoAccess": {
-      "title": "For teachers only",
-      "body": "Grading schemes are available to teachers who can create courses.",
-      "back": "Back to my courses"
-    },
-    "pendingHintAccept": "Valid until {date}. Accept here or with the link in the email.",
-    "statusLine": {
-      "none": "You do not have teacher access yet. You can send a new request."
     }
   },
   "invitationAccepted": {
@@ -3236,6 +3219,15 @@
       "due": "Due {date}",
       "overdue": "Overdue",
       "inProgress": "Attempt in progress"
+    },
+    "teacherApplication": {
+      "pending": "Your teacher application is under review. We will answer by email.",
+      "approved": "Your application was approved: you can create courses.",
+      "approvedLink": "Go to Teaching",
+      "rejected": "Your teacher application was rejected.",
+      "rejectedWait": "You can apply again from {date}.",
+      "revoked": "Your teacher access was revoked. Your courses are read-only: students can't start tests or hand in work. You can apply again.",
+      "applyLink": "Apply"
     }
   },
   "shell": {
@@ -3733,7 +3725,8 @@
     "scopeHint": {
       "platform": "Visible in every course on the platform.",
       "organization": "Visible in every course of this organization.",
-      "teacher": "Only you can use it, in the courses you teach."
+      "teacher": "Only you can use it, in the courses you teach.",
+      "personal": "Visible in all your courses."
     },
     "status": {
       "draft": "Draft",
@@ -3836,7 +3829,8 @@
         "teacher": "Create one here, or open an exam in a course and choose \"Save as template\".",
         "org": "Create a template for the whole organization, or promote a teacher's template.",
         "platform": "Create a template that every course on the platform can use."
-      }
+      },
+      "personalTitle": "Templates for all my courses"
     },
     "create": {
       "title": "New exam template",
@@ -5696,5 +5690,73 @@
       "proud": "Great result, well done!",
       "encourage": "Keep going. Every try helps you learn."
     }
+  },
+  "teacherApply": {
+    "title": "Apply as a teacher",
+    "intro": "Create an account, confirm your email and tell us where you teach. The platform administrator reviews every application and answers by email.",
+    "introSignedIn": "Tell us where you teach. The platform administrator reviews every application and answers by email.",
+    "age": "I am 18 or older",
+    "steps": {
+      "label": "Steps of the application",
+      "account": "Account",
+      "email": "Email code",
+      "application": "Application"
+    },
+    "account": {
+      "title": "Create your account",
+      "submit": "Continue",
+      "emailTaken": "This email is registered: log in to continue.",
+      "emailTakenLink": "Log in and continue"
+    },
+    "form": {
+      "title": "Tell us about yourself",
+      "intro": "The platform administrator reviews your application and answers by email.",
+      "submit": "Send application",
+      "revoked": "Your teacher access was revoked. You can apply again.",
+      "canCreate": "You can already create courses in your organization. Apply only if you also want to run your own courses.",
+      "rejected": "Your previous application was rejected. You can send a new one."
+    },
+    "field": {
+      "name": "Full name",
+      "school": "School or organization",
+      "schoolHint": "If you teach privately, write \"Private teacher\".",
+      "subject": "Subject",
+      "phone": "Phone",
+      "phoneHint": "Only the platform administrator sees it.",
+      "message": "Comment"
+    },
+    "error": {
+      "required": "Fill in this field.",
+      "phone": "Enter a phone number: digits, spaces and + - ( ), at least 5 digits.",
+      "age": "Confirm that you are 18 or older.",
+      "policies": "Accept the privacy policy and terms of use."
+    },
+    "approved": {
+      "title": "You are a teacher",
+      "body": "You can create courses and invite students.",
+      "link": "Go to Teaching"
+    },
+    "pending": {
+      "title": "Application under review",
+      "body": "The platform administrator will review it and answer by email. Until then you can use the platform as usual.",
+      "sent": "Sent"
+    },
+    "rejected": {
+      "title": "Application rejected",
+      "wait": "You can apply again from {date}."
+    },
+    "minor": {
+      "title": "Applications start at 18",
+      "body": "Independent teachers must be 18 or older. If a school or center invites you, you do not need to apply: open the link in the email."
+    },
+    "refused": {
+      "title": "Application not available"
+    }
+  },
+  "teacherOnly": {
+    "title": "For teachers only",
+    "schemesBody": "Grading schemes are available to teachers who can create courses.",
+    "courseBody": "Courses are created by teachers.",
+    "back": "Back to my courses"
   }
 }

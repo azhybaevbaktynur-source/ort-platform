@@ -32,6 +32,8 @@ interface VerifyEmailStepProps {
   reason: "registered" | "notVerified";
   onVerified: () => void;
   onChangeEmail: () => void;
+  /** A page with its own h1 shows this step's title as an h2. */
+  headingLevel?: 1 | 2;
 }
 
 export const VerifyEmailStep: React.FC<VerifyEmailStepProps> = ({
@@ -42,7 +44,9 @@ export const VerifyEmailStep: React.FC<VerifyEmailStepProps> = ({
   reason,
   onVerified,
   onChangeEmail,
+  headingLevel = 1,
 }) => {
+  const Heading = headingLevel === 2 ? "h2" : "h1";
   const { t } = useTranslation();
   const { verifyEmail, resendCode } = useAuth();
   const [code, setCode] = useState("");
@@ -98,7 +102,7 @@ export const VerifyEmailStep: React.FC<VerifyEmailStepProps> = ({
         <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center">
           <KeyRound className="w-6 h-6" />
         </div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("auth.verify.title")}</h1>
+        <Heading className="text-2xl font-bold tracking-tight text-slate-900">{t("auth.verify.title")}</Heading>
         <p className="mt-1 text-sm text-slate-600">
           {reason === "registered" ? t("auth.verify.subtitle", { email }) : t("auth.verify.notVerifiedNotice", { email })}
         </p>

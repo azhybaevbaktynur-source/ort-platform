@@ -11,7 +11,8 @@ import type { Lang, LocalizedText } from "@/lib/lms/types";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { LanguagePicker } from "@/components/lms/LanguagePicker";
 import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
-import { listMyOrganizations, type MyOrganizationOut } from "@/lib/lms/organizations"; // Phase 6 S4b
+import { listMyOrganizations, orgPickerLabel, type MyOrganizationOut } from "@/lib/lms/organizations"; // Phase 6 S4b
+import { LinkButton } from "@/components/ui";
 
 export default function NewCoursePage() {
   const { lang, t } = useTranslation();
@@ -44,9 +45,12 @@ export default function NewCoursePage() {
   if (loading) return <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p>;
   if (me && !me.can_create_courses) {
     return (
-      <div className="max-w-xl rounded-2xl border border-slate-200 bg-white p-6">
-        <p className="text-sm text-slate-700">{t("lms.errors.teacher_not_approved")}</p>
-        <Link href={`/${lang}/courses/become-teacher`} className="mt-3 inline-block text-sm font-semibold text-brand-700 underline">{t("lms.nav.becomeTeacher")}</Link>
+      <div role="alert" className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
+        <h1 className="text-xl font-bold text-slate-900">{t("teacherOnly.title")}</h1>
+        <p className="mt-2 text-base leading-6 text-slate-600 sm:text-sm">{t("teacherOnly.courseBody")}</p>
+        <div className="mt-6 flex flex-col-reverse justify-center gap-3 sm:flex-row">
+          <LinkButton href={`/${lang}/courses`}>{t("teacherOnly.back")}</LinkButton>
+        </div>
       </div>
     );
   }
@@ -92,7 +96,7 @@ export default function NewCoursePage() {
           <select id="new-org" value={orgId} disabled={busy} aria-invalid={orgMissing} onChange={(e) => setOrgId(e.target.value)}
             className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm">
             <option value="">{t("organizations.fields.organizationPick")}</option>
-            {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+            {orgs.map((o) => <option key={o.id} value={o.id}>{orgPickerLabel(o, t)}</option>)}
           </select>
           <p className={`mt-1 text-xs ${orgMissing ? "text-red-700" : "text-slate-500"}`} role={orgMissing ? "alert" : undefined}>
             {orgMissing ? t("organizations.errors.organization_required") : t("organizations.fields.organizationHint")}

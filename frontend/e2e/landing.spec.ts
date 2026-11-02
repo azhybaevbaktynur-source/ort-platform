@@ -44,8 +44,8 @@ test.describe("landing page", () => {
     await roleLink(page, "teacher").click();
     await expect(page).toHaveURL(new RegExp(`/${L}/for-teachers$`));
     await expect(page.getByRole("heading", { level: 1, name: t("landing.forTeachers.title") })).toBeVisible();
-    await expect(page.getByRole("main").getByRole("link", { name: t("landing.forTeachers.register") })).toHaveAttribute("href", `/${L}/register`);
-    await expect(page.getByRole("main").getByRole("link", { name: t("landing.forTeachers.haveAccount") })).toHaveAttribute("href", `/${L}/teacher-access`);
+    await expect(page.getByRole("main").getByRole("link", { name: t("landing.forTeachers.apply"), exact: true })).toHaveAttribute("href", `/${L}/for-teachers/apply`);
+    await expect(page.getByRole("main").getByRole("link", { name: t("landing.forTeachers.haveAccount") })).toHaveAttribute("href", `/${L}/login?redirect=${encodeURIComponent(`/${L}/for-teachers/apply`)}`);
     await page.goto(`/${L}`);
     await roleLink(page, "student").click();
     await expect(page).toHaveURL(new RegExp(`/${L}/register$`));

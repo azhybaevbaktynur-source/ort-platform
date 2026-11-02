@@ -134,19 +134,24 @@ def _send_smtp(to_email: str, subject: str, text: str, html: str, from_name: Opt
 
 
 def send_email(to_email: str, subject: str, text: str, html: str, *, from_name: Optional[str] = None,
-               reply_to: Optional[str] = None) -> bool:
-    """from_name / reply_to default to None: the configured sender name and no Reply-To (as before)."""
+               reply_to: Optional[str] = None, private: bool = False) -> bool:
+    """from_name / reply_to default to None: the configured sender name and no Reply-To (as before). `private`: nothing
+    about the recipient or the body reaches the logs, including a provider's error text, which may repeat the address."""
     if is_reserved_address(to_email):  # UX rework S1: Student view test students never get mail; nothing to deliver
         return True
     reply_to = _clean_reply_to(reply_to)
     provider = active_provider()
+    who = "(recipient hidden)" if private else to_email
     if provider == "console":
         if not is_production():
-            # Dev-only console delivery: the code must be visible to the developer.
-            logger.warning("[EMAIL console] To: %s Subject: %s From: %s Reply-To: %s\n%s", to_email, subject,
-                           _from_header(from_name), reply_to or "-", text)
+            if private:
+                logger.warning("[EMAIL console] Subject: %s (recipient and body not shown)", subject)
+            else:
+                # Dev-only console delivery: the code must be visible to the developer.
+                logger.warning("[EMAIL console] To: %s Subject: %s From: %s Reply-To: %s\n%s", to_email, subject,
+                               _from_header(from_name), reply_to or "-", text)
         if is_production():
-            logger.error("No email provider configured (set RESEND_API_KEY or BREVO_API_KEY); email to %s NOT sent", to_email)
+            logger.error("No email provider configured (set RESEND_API_KEY or BREVO_API_KEY); email to %s NOT sent", who)
             return False
         return True
 
@@ -161,13 +166,13 @@ def send_email(to_email: str, subject: str, text: str, html: str, *, from_name: 
         return False
     try:
         sender(to_email, subject, text, html, from_name=from_name, reply_to=reply_to)
-        logger.info("Email '%s' sent to %s via %s", subject, to_email, provider)
+        logger.info("Email '%s' sent to %s via %s", subject, who, provider)
         return True
     except httpx.HTTPStatusError as e:
-        logger.error("Email provider %s rejected message to %s: %s %s", provider, to_email,
-                     e.response.status_code, e.response.text[:300])
+        logger.error("Email provider %s rejected message to %s: %s %s", provider, who,
+                     e.response.status_code, "" if private else e.response.text[:300])
     except Exception as e:
-        logger.error("Failed to send email to %s via %s: %s", to_email, provider, e)
+        logger.error("Failed to send email to %s via %s: %s", who, provider, type(e).__name__ if private else e)
     return False
 
 

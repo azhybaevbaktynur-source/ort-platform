@@ -558,3 +558,7 @@ Agent decisions, for the owner's review:
 - UR2-7 Phone dashboard: cards first, then to-do, grades, announcements (replaces PUR-5's "to-do first").
 - UR2-8 Grades in lists: "7 / 10", "85%", "132 / 245 · label", or the label alone. The big grade on the result card and on the assignment page stay as they are.
 
+## Owner decisions 2026-11-03: accounts and teacher sign-up (`DISCUSSION_ACCOUNTS.md`, built per `phases/ACCOUNTS.md`)
+The owner accepted the recommendation and every default ("defaults"): Q1 personal organizations stay internal and are hidden by kind, three-step teacher sign-up, no account types; Q2 independent teachers 18+ (checked at applying and at every approval); Q3 phone kept 90 days after a rejection, while they remain a teacher if approved; Q4 name, school, subject and phone required; Q5 an applicant uses the platform as a student while waiting; Q6 two teacher actions ("stop new courses", "freeze") proposed for Step 3, until then revoke stays a freeze and its confirmation states who is affected; Q7 7 days before a rejected person can reapply.
+Agent decision: the open invitation from a personal organization on production (expires 2026-11-15) was left alone: it wasn't among Q1–Q7, and if accepted the person only sees Teaching.
+

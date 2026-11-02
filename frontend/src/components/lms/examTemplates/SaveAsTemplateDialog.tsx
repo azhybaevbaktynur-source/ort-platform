@@ -42,6 +42,7 @@ export function SaveAsTemplateDialog({ open, assessment, courseId, onClose }: {
   const a = assessment;
   const orgId = course.organization_id ?? null;
   const [orgAdmin, setOrgAdmin] = useState(false);
+  const [personalOrg, setPersonalOrg] = useState(false); // Accounts: the course is in the person's own personal organization
   const [scope, setScope] = useState<ExamTemplateScope>("teacher");
   const [title, setTitle] = useState<LocalizedText>({});
   const [counts, setCounts] = useState<Counts>({});
@@ -57,7 +58,11 @@ export function SaveAsTemplateDialog({ open, assessment, courseId, onClose }: {
     let alive = true;
     if (orgId) {
       listMyOrganizations()
-        .then((rows) => { if (alive) setOrgAdmin(rows.some((o) => o.id === orgId && o.role === "org_admin" && o.status === "active")); })
+        .then((rows) => {
+          if (!alive) return;
+          setOrgAdmin(rows.some((o) => o.id === orgId && o.role === "org_admin" && o.status === "active"));
+          setPersonalOrg(rows.some((o) => o.id === orgId && o.kind === "personal"));
+        })
         .catch(() => { if (alive) setOrgAdmin(false); });
     }
     return () => { alive = false; };
@@ -110,7 +115,7 @@ export function SaveAsTemplateDialog({ open, assessment, courseId, onClose }: {
 
   const pageHref = (tpl: ExamTemplateOut) => tpl.owner_scope === "platform"
     ? `/${lang}/admin/exam-templates/${tpl.id}`
-    : tpl.owner_scope === "organization" && tpl.organization_id
+    : tpl.owner_scope === "organization" && tpl.organization_id && !personalOrg
       ? `/${lang}/org/${tpl.organization_id}/exam-templates/${tpl.id}`
       : `/${lang}/exam-templates/${tpl.id}`;
 
@@ -151,8 +156,8 @@ export function SaveAsTemplateDialog({ open, assessment, courseId, onClose }: {
                   scope === s ? "border-brand-500 bg-brand-50" : "border-slate-200 hover:bg-slate-50", "focus-within:ring-2 focus-within:ring-brand-600")}>
                   <input type="radio" name={`${uid}-scope`} className="mt-1 h-4 w-4 accent-brand-600" checked={scope === s} onChange={() => setScope(s)} />
                   <span className="min-w-0">
-                    <span className="block font-medium text-slate-900">{t(`examTemplates.scope.${s}`)}</span>
-                    <span className="block text-sm leading-5 text-slate-600">{t(`examTemplates.scopeHint.${s}`)}</span>
+                    <span className="block font-medium text-slate-900">{s === "organization" && personalOrg ? t("organizations.fields.personal") : t(`examTemplates.scope.${s}`)}</span>
+                    <span className="block text-sm leading-5 text-slate-600">{s === "organization" && personalOrg ? t("examTemplates.scopeHint.personal") : t(`examTemplates.scopeHint.${s}`)}</span>
                   </span>
                 </label>
               ))}

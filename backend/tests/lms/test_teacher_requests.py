@@ -1,7 +1,9 @@
 import uuid
+from datetime import timedelta
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy.orm import object_session
 
 from app.db.session import SessionLocal
 from app.lms.audit.models import AdminAuditLog
@@ -26,8 +28,15 @@ async def client():
         yield c
 
 
+FORM = {"applicant_name": "Aida Test", "school": "Lyceum 61", "subject": "Math", "phone": "+996 700 123-456"}
+
+
 async def _submit(client, user, message="please"):
-    return await client.post(f"{P}/me/teacher-requests", json={"message": message}, headers=auth(user))
+    """An account with a known adult age band: the form's fields; the age rules are in test_teacher_applications.py."""
+    if user.age_band != "18_plus":
+        user.age_band = "18_plus"
+        object_session(user).commit()
+    return await client.post(f"{P}/me/teacher-requests", json={**FORM, "message": message}, headers=auth(user))
 
 
 async def test_me_and_locale(client, db):
@@ -108,7 +117,10 @@ async def test_reject_flow(client, db):
     assert db.get(User, user.id).teacher_status == "none"
     mine = (await client.get(f"{P}/me/teacher-requests", headers=auth(user))).json()
     assert mine[0]["status"] == "rejected" and mine[0]["reason"] == "need more info"
-    # may ask again
+    # may ask again once the wait is over (test_teacher_applications.py: the wait itself)
+    req = db.get(TeacherRequest, uuid.UUID(rid))
+    req.decided_at = req.decided_at - timedelta(days=8)
+    db.commit()
     assert (await _submit(client, user)).status_code == 201
     a = db.query(AdminAuditLog).filter_by(action="teacher_request.reject", target_id=rid).all()
     assert len(a) == 1 and a[0].reason == "need more info"
@@ -136,6 +148,10 @@ async def test_rate_limit_three_per_24h(client, db):
         assert r.status_code == 201
         await client.post(f"{P}/platform/teacher-requests/{r.json()['id']}/reject", json={"reason": "no"},
                           headers=auth(admin))
+        req = db.get(TeacherRequest, uuid.UUID(r.json()["id"]))
+        db.refresh(req)
+        req.decided_at = req.decided_at - timedelta(days=8)  # past the wait: this test is about the rate limit
+        db.commit()
     r = await _submit(client, user)
     assert r.status_code == 429
     err = r.json()["error"]

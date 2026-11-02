@@ -52,8 +52,9 @@ def test_immutable_tables_are_only_ever_kept():
 def test_every_exported_table_reaches_the_export():
     exported_tables = {e.table for e in ENTRIES if e.exported}
     assert exported_tables == {"users", "assignment_submissions", "assets", "submissions", "attempt_items",
-                               "consent_records", "data_requests"}
-    assert {s.name for s in sections()} >= {"enrollments", "grades", "course_grades", "hand_ins", "consents", "requests"}
+                               "consent_records", "data_requests", "teacher_requests"}
+    assert {s.name for s in sections()} >= {"enrollments", "grades", "course_grades", "hand_ins", "consents", "requests",
+                                            "teacher_requests"}
     assert exported_columns("assets") == ["original_filename"]
 
 

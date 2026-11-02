@@ -153,6 +153,13 @@ def item_out(inv: Invitation, course_title: Optional[dict], inviter: Optional[Us
     )
 
 
+def _refuse_personal_org(org: Organization) -> None:
+    """Accounts (ACCOUNTS.md B): a personal organization has one member. Invitations already open stay acceptable, and
+    course staff invitations are untouched: they are how a course is shared."""
+    if org.kind == "personal":
+        raise Conflict("A personal organization has no other members", code="personal_org_no_members")
+
+
 def _ensure_active_org(org: Organization) -> None:
     """Phase 9 fix 2 (M1): the organization or any ancestor on its path suspended -> 403 (read from the org's own
     session, so every caller gets the inherited check)."""
@@ -248,6 +255,7 @@ def create_org_invitation(db: Session, actor: User, org: Organization, *, email:
                           request: Optional[Request] = None) -> InvitationCreatedOut:
     """POST /org/{id}/invitations (org admin or platform admin; `org_admin` invitations included)."""
     ratelimit.enforce(f"invite_send:{actor.id}", INVITE_SEND_1H)
+    _refuse_personal_org(org)
     _ensure_active_org(org)
     email = normalize_email(email)
     _check_not_member(db, org, email, None)
@@ -395,6 +403,8 @@ def resend(db: Session, user: User, organization_id: uuid.UUID, invitation_id: u
         raise Forbidden("Only the owner can do this", code="owner_only")  # same rule as create
     if inv.accepted_at is not None or inv.revoked_at is not None:
         raise Conflict("Invitation is not pending", code="invitation_not_pending")
+    if inv.course_id is None:
+        _refuse_personal_org(org)  # a resend is a new invitation
     db.rollback()  # nothing written yet; the rate-limit counter needs a session without open writes
     ratelimit.enforce(f"invite_send:{user.id}", INVITE_SEND_1H)
     inv = _load_in_org(db, org.id, invitation_id)

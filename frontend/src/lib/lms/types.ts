@@ -38,8 +38,16 @@ export interface MeOut {
 export interface MePatchIn {
   locale: Lang;
 }
+/** The application form (docs/phases/ACCOUNTS.md B). */
 export interface TeacherRequestIn {
+  applicant_name: string;
+  school: string;
+  subject: string;
+  phone: string;
   message?: string;
+  /** Only an account with no age band sends these two. */
+  age_confirmed?: boolean;
+  policy_version_ids?: string[];
 }
 export interface MyTeacherRequestOut {
   id: string;
@@ -48,6 +56,12 @@ export interface MyTeacherRequestOut {
   reason: string | null;
   created_at: string;
   decided_at: string | null;
+  applicant_name: string | null;
+  school: string | null;
+  subject: string | null;
+  phone: string | null;
+  /** Rejected rows only: when the person may apply again. */
+  reapply_available_at: string | null;
 }
 
 // 5.2 Courses
@@ -111,6 +125,8 @@ export interface CourseStaffOut extends CourseStudentOut {
   concluded_at: string | null;
   /** Phase 8b S5: set when the course is an exam template's hidden sandbox (sample quiz + previews). */
   sandbox_for_template_id?: string | null;
+  /** Accounts: the People page offers the organization's roster import for this course (decided by the server). */
+  can_import_roster?: boolean;
 }
 
 /** Either serializer; discriminate with `isStaffCourse`. */
@@ -191,6 +207,12 @@ export interface TeacherRequestAdminOut {
   created_at: string;
   decided_at: string | null;
   decided_by: UserBrief | null;
+  applicant_name: string | null;
+  school: string | null;
+  subject: string | null;
+  phone: string | null;
+  /** Active schools (or the platform) where the applicant is a member, at most 5. */
+  teaches_at: string[];
 }
 export interface AdminUserOut {
   id: string;
@@ -207,6 +229,8 @@ export interface AdminUserDetailOut extends AdminUserOut {
   owned_courses: CourseCard[];
   active_enrollment_count: number;
   teacher_requests: TeacherRequestAdminOut[];
+  /** Who a revoke freezes: the user's personal organization. */
+  revoke_impact: { students: number; courses: number };
 }
 export interface AdminCourseOut {
   id: string;
@@ -267,6 +291,8 @@ export const LMS_ERROR_CODES = [
   "course_files_quota", "page_conflict", "already_published",
   // Phase 8c S1: a write sent in the read-only Student view
   "test_student_forbidden",
+  // Accounts: the teacher application and personal organizations
+  "reapply_wait", "teacher_age_required", "age_confirmation_required", "personal_org_no_members",
 ] as const;
 export type LmsErrorCode = (typeof LMS_ERROR_CODES)[number];
 

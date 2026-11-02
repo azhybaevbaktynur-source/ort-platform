@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.lms.core.deps import get_lms_user
 from app.lms.guardian.links import has_active_link
-from app.lms.teachers import service
+from app.lms.teachers import purge, service
 from app.lms.teachers.schemas import MeOut, MePatchIn, MyTeacherRequestOut, TeacherRequestIn
 from app.models.user import User
 
@@ -31,11 +31,13 @@ def patch_me(body: MePatchIn, user: User = Depends(get_lms_user), db: Session = 
 
 
 @router.post("/teacher-requests", response_model=MyTeacherRequestOut, status_code=201)
-def create_teacher_request(body: TeacherRequestIn, user: User = Depends(get_lms_user),
+def create_teacher_request(body: TeacherRequestIn, background: BackgroundTasks, user: User = Depends(get_lms_user),
                            db: Session = Depends(get_db)):
-    return service.submit_request(db, user, body.message)
+    req = service.submit_request(db, user, body)
+    purge.queue(background)
+    return service.my_request_out(req)
 
 
 @router.get("/teacher-requests", response_model=list[MyTeacherRequestOut])
 def list_my_teacher_requests(user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
-    return service.my_requests(db, user, limit=10)
+    return [service.my_request_out(r) for r in service.my_requests(db, user, limit=10)]
