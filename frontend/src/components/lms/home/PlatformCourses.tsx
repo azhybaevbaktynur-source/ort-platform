@@ -11,7 +11,10 @@ import { Button, ErrorState } from "@/components/ui";
 import { CourseCard } from "@/components/lms/course/CourseCard";
 import { useErrorText } from "./useErrorText";
 
-export function PlatformCourses({ courses, grid }: { courses: HomePlatformCourseOut[]; grid: string }) {
+/** `joinVariant`: secondary where another card holds the page's primary button (Student UI U3 exam-prep home). */
+export function PlatformCourses({ courses, grid, joinVariant = "primary" }: {
+  courses: HomePlatformCourseOut[]; grid: string; joinVariant?: "primary" | "secondary";
+}) {
   const { lang, t } = useTranslation();
   const router = useRouter();
   const errorText = useErrorText();
@@ -40,7 +43,7 @@ export function PlatformCourses({ courses, grid }: { courses: HomePlatformCourse
           <CourseCard key={c.id} course={c} href={`/${lang}/courses/catalog/${c.id}`}
             action={(
               <>
-                <Button fullWidth loading={joining === c.id} disabled={joining !== null && joining !== c.id}
+                <Button fullWidth variant={joinVariant} loading={joining === c.id} disabled={joining !== null && joining !== c.id}
                   onClick={() => void join(c.id)}>
                   {t("catalog.join")}
                 </Button>

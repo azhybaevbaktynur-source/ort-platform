@@ -3344,6 +3344,39 @@
       "title": "From the platform",
       "subtitle": "Exam prep courses. Join with one tap.",
       "haveCode": "Have a code from your teacher?"
+    },
+    "greeting": {
+      "morning": "Good morning, {name}",
+      "afternoon": "Good afternoon, {name}",
+      "evening": "Good evening, {name}",
+      "morningPlain": "Good morning!",
+      "afternoonPlain": "Good afternoon!",
+      "eveningPlain": "Good evening!"
+    },
+    "prep": {
+      "noDate": "The exam date is not set yet. The countdown appears here once it is known.",
+      "streak": {
+        "title": "Study streak",
+        "days": "{count} days in a row",
+        "days_one": "{count} day in a row",
+        "days_few": "{count} days in a row",
+        "days_many": "{count} days in a row",
+        "days_other": "{count} days in a row",
+        "none": "Answer at least one question today to start a streak.",
+        "best": "Best: {count}",
+        "week": "Last 7 days",
+        "dayActive": "{day}: studied",
+        "dayIdle": "{day}: no study"
+      },
+      "score": {
+        "title": "Scores",
+        "current": "Current score"
+      },
+      "unlock": {
+        "title": "Unlock all exams",
+        "body": "The free tests are already yours. A pass opens the other exams and practice."
+      },
+      "addCourse": "Find a course in the catalog"
     }
   },
   "shell": {

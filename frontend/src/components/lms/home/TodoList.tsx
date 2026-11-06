@@ -15,7 +15,7 @@ export function SideSection({ id, title, children }: { id: string; title: React.
   return (
     <section aria-labelledby={id}>
       <h2 id={id} className="mb-2 text-lg font-semibold leading-7 text-slate-900">{title}</h2>
-      <div className="rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">{children}</div>
+      <div className="rounded-card border border-slate-200 bg-white p-1">{children}</div>
     </section>
   );
 }
