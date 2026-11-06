@@ -12,8 +12,9 @@ from tests.lms.modules_support import (
 from tests.lms.s3_support import api, clean_rate_limits, db  # noqa: F401
 
 MODULE_KEYS = {"id", "title", "state", "unlock_at", "sequential", "completion_mode", "current_position",
-               "lock_reasons", "items"}
-ITEM_KEYS = {"id", "kind", "title", "indent", "locked", "requirement", "link", "due_at", "video"}
+               "lock_reasons", "items", "access_tier", "access_locked", "done", "total", "duration_s"}  # + F5a
+ITEM_KEYS = {"id", "kind", "title", "indent", "locked", "requirement", "link", "due_at", "video",
+             "duration_s", "done", "locked_reason"}  # + F5a
 REQ_KEYS = {"type", "threshold", "met", "best_score_percent"}
 LINK_KEYS = {"page_id", "file_id", "assignment_id", "assessment_id", "assignment_kind", "url"}
 FORBIDDEN = ("rules_version", "warnings", "created_by_id", "deleted_at", "body_md", "evaluated_rules_version",
@@ -56,7 +57,8 @@ async def test_student_payload_is_an_allow_list(db, api):
     r = await api.call(w.S, "GET", f"{C(w)}/modules")
     assert r.status_code == 200
     body = r.json()
-    assert set(body) == {"modules", "up_next"}
+    assert set(body) == {"modules", "up_next", "progress"}  # + F5a
+    assert set(body["progress"]) == {"done", "total", "duration_s"}
     assert [m["title"] for m in body["modules"]] == [{"en": "Visible"}]
     mod = body["modules"][0]
     assert set(mod) == MODULE_KEYS
@@ -111,7 +113,7 @@ async def test_locked_details_name_only_published_modules(db, api):
 async def test_staff_shape(db, api):
     w = _world(db)
     out = (await api.call(w.O, "GET", f"{C(w)}/modules")).json()
-    assert set(out) == {"modules"}
+    assert set(out) == {"modules", "is_platform_course"}  # F5c: the editor's Pro switch
     assert [m["title"]["en"] for m in out["modules"]] == ["Visible", "HIDDEN-MODULE"]
     mod = out["modules"][0]
     assert {"rules_version", "prerequisites", "warnings", "published", "position", "items", "deleted_at"} <= set(mod)

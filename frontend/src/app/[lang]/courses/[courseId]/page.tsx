@@ -11,6 +11,7 @@ import { ConfirmDialog } from "@/components/lms/ConfirmDialog";
 import { TeacherCoursePage } from "@/components/lms/course/TeacherCoursePage"; // Phase 8c S2
 import { StudentCourseHome } from "@/components/lms/home/StudentCourseHome"; // Phase 6 S6b
 import { StudentModulesView } from "@/components/lms/modules/StudentModulesView"; // Phase 8a S4a
+import { StudentSyllabus } from "@/components/lms/modules/StudentSyllabus"; // F5b
 import { PageView } from "@/components/lms/pages/PageView"; // Phase 8a S4a (home_kind = page)
 import { CourseLoadingSkeleton } from "@/components/lms/home/StudentCourseFrame";
 import { templateUi } from "@/lib/lms/templates";
@@ -59,7 +60,8 @@ export default function CourseHomePage() {
         </div>
       );
     }
-    if (course.features?.modules) return <StudentModulesView fallback={<StudentCourseHome />} />;
+    // F5b (COURSE_LESSONS_DESIGN L1): a course with lessons opens on the course overview
+    if (course.features?.modules) return <StudentSyllabus />;
     return <StudentCourseHome />;
   }
   // --- Phase 8a S4a end ---

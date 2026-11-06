@@ -24,7 +24,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.session import Base
 from app.lms.core.models import SoftDeleteMixin, TimestampMixin, UUIDPKMixin, utcnow
 from app.lms.core.types import JSONType
-from app.lms.modules.ids import COMPLETION_MODES, ITEM_KINDS, MODULE_STATES, PROGRESS_EVENTS, REQUIREMENT_TYPES
+from app.lms.modules.ids import (
+    COMPLETION_MODES, DURATION_S_MAX, DURATION_S_MIN, ITEM_KINDS, MODULE_STATES, MODULE_TIERS, PROGRESS_EVENTS,
+    REQUIREMENT_TYPES,
+)
 
 
 def _in(col: str, values) -> str:
@@ -64,9 +67,12 @@ class CourseModule(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
     rules_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     created_by_id: Mapped[Optional[str]] = _user()
     deleted_by_id: Mapped[Optional[str]] = _user()
+    # F5a (0024): `paid` = Pro module; effective only where the S3 access Gate is (platform course, no pass)
+    access_tier: Mapped[str] = mapped_column(String(8), nullable=False, default="free", server_default="free")
 
     __table_args__ = (
         CheckConstraint(_in("completion_mode", COMPLETION_MODES), name="completion_mode_valid"),
+        CheckConstraint(_in("access_tier", MODULE_TIERS), name="access_tier_valid"),
         Index("ix_course_modules_course_id_position", "course_id", "position"),
     )
 
@@ -98,9 +104,12 @@ class ModuleItem(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
     assignment_id: Mapped[Optional[uuid.UUID]] = _fk("assignments.id", nullable=True)
     url: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
     deleted_by_id: Mapped[Optional[str]] = _user()
+    duration_s: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # F5a (0024): lesson length
 
     __table_args__ = (
         CheckConstraint(_in("kind", ITEM_KINDS), name="kind_valid"),
+        CheckConstraint(f"duration_s IS NULL OR (duration_s >= {DURATION_S_MIN} AND duration_s <= {DURATION_S_MAX})",
+                        name="duration_s_range"),
         CheckConstraint("indent >= 0 AND indent <= 3", name="indent_valid"),
         CheckConstraint(ITEM_TARGET_CHECK, name="item_target_matches_kind"),
         Index("ix_module_items_module_id_position", "module_id", "position"),

@@ -147,6 +147,18 @@ def _listable(user_id: str, now: datetime, used):
     )
 
 
+def _pro_locked(user_id: str, now: datetime):
+    """F5a (COURSE_LESSONS_DESIGN 5): an assignment that only Pro modules hold, in a platform course, for a caller
+    without an active pass who is not a test student (the S3 Gate); preset (ORT) exams of a template-locked course keep
+    their own tier. Over `_assignments_of_mine` rows."""
+    from app.lms.access.service import active_pass_clause, platform_path_clause
+    from app.lms.modules.service import pro_only_assignment
+
+    preset_exempt = and_(Course.template_locked.is_(True), func.coalesce(Assessment.preset, "none") != "none")
+    return and_(platform_path_clause(Organization.path), Enrollment.is_test_student.is_(False),
+                ~active_pass_clause(user_id, now), ~preset_exempt, pro_only_assignment(Assignment.id))
+
+
 def _course_rows(uid: str):
     """The caller's student courses with everything a course card shows in one statement: rows of (Course, owner,
     in_progress, org_name, org_kind)."""
@@ -218,10 +230,9 @@ def _exam_features(db: Session, course_ids: list) -> dict:
     EXISTS, the same rows `course_features` reads); none when the page has no exam-prep course."""
     if not course_ids:
         return {}
-    from app.lms.modules.models import CourseModule
+    from app.lms.modules.service import lesson_exists
 
-    modules = exists().where(CourseModule.course_id == Course.id, CourseModule.deleted_at.is_(None),
-                             CourseModule.published.is_(True))
+    modules = lesson_exists(Course.id)  # F5a: at least one lesson (COURSE_LESSONS_DESIGN 3)
     practice = exists().where(Assessment.course_id == Course.id, Assessment.deleted_at.is_(None),
                               Assessment.status == "published", Assessment.is_practice.is_(True))
     rows = db.execute(select(Course.id, modules, practice).where(Course.id.in_(course_ids))).all()
@@ -299,7 +310,7 @@ def _listable_rows(db: Session, uid: str, now: datetime) -> list:
             select(Assignment.id, Assignment.kind, Assignment.assessment_id, Assignment.course_id, Course.title,
                    Assignment.title, due.label("due"), until.label("until"), allowed.label("allowed"),
                    used.label("used")))
-        .where(_mine(uid), _listable(uid, now, used))
+        .where(_mine(uid), _listable(uid, now, used), ~_pro_locked(uid, now))
         .order_by(due.is_(None), due, until.is_(None), until, Assignment.id)
         .limit(sch.TODO_MAX)
     ).all()
@@ -435,53 +446,81 @@ MODULES_SCAN_MAX = 100
 
 def _modules_next(db: Session, uid: str) -> list[sch.HomeModuleNextOut]:
     """Caches only, never evaluates (design 6.7). 1) the published live modules of the caller's published student
-    courses whose STORED state is `unlocked` or `started`; 2) their visible items (item, target published and live,
-    invariant 1) with a requirement that has no `met` status row of the caller. Per course: the first such item of
-    the first module that has one; courses with a started module first, then the most recently evaluated."""
+    courses whose STORED state is open (`unlocked`, `started` or, F5a, `completed`: a module without requirements is
+    completed once open and may still hold unviewed lessons), minus Pro modules the caller has no pass for (F5a,
+    COURSE_LESSONS_DESIGN 4-5); 2) their visible items (item, target published and live, invariant 1) that are not done
+    (F5a, the outline's `up_next` rule): a requirement without a `met` status row of the caller, a lesson without a
+    requirement and without a `viewed` fact, a test without a requirement and without a submitted submission. Per
+    course: the first such item of the first module that has one; courses with a started module first, then the most
+    recently evaluated."""
+    from app.lms.access.service import has_active_pass, is_platform_path
     from app.lms.course_files.models import CourseFile
+    from app.lms.modules import ids as mids
     from app.lms.modules.models import (
-        CourseModule, ItemCompletionRequirement, ItemRequirementStatus, ModuleItem, ModuleProgress,
+        CourseModule, ItemCompletionRequirement, ItemProgress, ItemRequirementStatus, ModuleItem, ModuleProgress,
     )
     from app.lms.modules.schemas import ItemLinkOut
     from app.lms.pages.models import Page
 
+    org_path = select(Organization.path).where(Organization.id == Course.organization_id).scalar_subquery()
     mods = db.execute(
         select(Course.id.label("course_id"), Course.title.label("course_title"), Course.default_language.label("lang"),
                Enrollment.id.label("enrollment_id"), CourseModule.id.label("module_id"),
                CourseModule.title.label("module_title"), ModuleProgress.state.label("state"),
-               ModuleProgress.evaluated_at.label("evaluated_at"))
+               ModuleProgress.evaluated_at.label("evaluated_at"), CourseModule.access_tier.label("tier"),
+               Enrollment.is_test_student.label("is_test"), org_path.label("org_path"))
         .select_from(Enrollment).join(Course, Course.id == Enrollment.course_id)
         .join(ModuleProgress, ModuleProgress.enrollment_id == Enrollment.id)
         .join(CourseModule, CourseModule.id == ModuleProgress.module_id)
         .where(_mine(uid), _open_course(), CourseModule.course_id == Course.id,
                CourseModule.deleted_at.is_(None), CourseModule.published.is_(True),
-               ModuleProgress.state.in_(("unlocked", "started")))
+               ModuleProgress.state.in_(("unlocked", "started", "completed")))
         .order_by(Course.id, CourseModule.position, CourseModule.id).limit(MODULES_SCAN_MAX)
     ).all()
+    # F5a: Pro modules of platform courses need a pass (S3 Gate; test students never locked); one statement, only
+    # when such a module is among the rows
+    tiered = [m for m in mods if m.tier == "paid" and not m.is_test and is_platform_path(m.org_path)]
+    if tiered and not has_active_pass(db, uid):
+        drop = {m.module_id for m in tiered}
+        mods = [m for m in mods if m.module_id not in drop]
     if not mods:
         return []
     target_ok = _item_target_visible()
+    enrollments = {m.enrollment_id for m in mods}
     met = and_(ItemRequirementStatus.item_id == ModuleItem.id,
-               ItemRequirementStatus.enrollment_id.in_({m.enrollment_id for m in mods}),
+               ItemRequirementStatus.enrollment_id.in_(enrollments),
                ItemRequirementStatus.met.is_(True))
+    viewed = exists().where(ItemProgress.item_id == ModuleItem.id, ItemProgress.enrollment_id.in_(enrollments),
+                            ItemProgress.event == "viewed")
+    submitted = exists().where(Submission.assignment_id == ModuleItem.assignment_id,
+                               Submission.enrollment_id.in_(enrollments),
+                               Submission.state.in_(mids.SUBMIT_MET_STATES))
+    not_done = or_(
+        and_(ItemCompletionRequirement.item_id.isnot(None), ItemRequirementStatus.item_id.is_(None)),
+        and_(ItemCompletionRequirement.item_id.is_(None), ModuleItem.kind.in_(mids.LESSON_KINDS), ~viewed),
+        and_(ItemCompletionRequirement.item_id.is_(None), ModuleItem.kind == "assignment", ~submitted),
+    )
     first: dict = {}
-    for it in db.execute(
+    # F5a review: only the first not-done item per module leaves the database (row_number per module), so the rows
+    # read are bounded by the module scan (<= MODULES_SCAN_MAX), not by the items of those modules
+    rank = func.row_number().over(partition_by=ModuleItem.module_id,
+                                  order_by=(ModuleItem.position, ModuleItem.id)).label("rn")
+    ranked = (
         select(ModuleItem.module_id, ModuleItem.position, ModuleItem.id, ModuleItem.kind, ModuleItem.title_override,
                ModuleItem.page_id, ModuleItem.file_id, ModuleItem.assignment_id, ModuleItem.url,
                Page.title.label("page_title"), Page.language.label("page_lang"),
                CourseFile.title.label("file_title"), Assignment.title.label("assignment_title"),
-               Assignment.kind.label("assignment_kind"), Assignment.assessment_id)
+               Assignment.kind.label("assignment_kind"), Assignment.assessment_id, rank)
         .select_from(ModuleItem)
-        .join(ItemCompletionRequirement, ItemCompletionRequirement.item_id == ModuleItem.id)
+        .outerjoin(ItemCompletionRequirement, ItemCompletionRequirement.item_id == ModuleItem.id)
         .outerjoin(ItemRequirementStatus, met)
         .outerjoin(Page, Page.id == ModuleItem.page_id)
         .outerjoin(CourseFile, CourseFile.id == ModuleItem.file_id)
         .outerjoin(Assignment, Assignment.id == ModuleItem.assignment_id)
         .where(ModuleItem.module_id.in_({m.module_id for m in mods}), ModuleItem.deleted_at.is_(None),
-               ModuleItem.published.is_(True), ModuleItem.kind != "header", target_ok,
-               ItemRequirementStatus.item_id.is_(None))
-        .order_by(ModuleItem.module_id, ModuleItem.position, ModuleItem.id)
-    ).all():
+               ModuleItem.published.is_(True), ModuleItem.kind != "header", target_ok, not_done)
+    ).subquery()
+    for it in db.execute(select(ranked).where(ranked.c.rn == 1).order_by(ranked.c.module_id)).all():
         first.setdefault(it.module_id, it)
     chosen: dict = {}
     for m in mods:  # course, then module position order

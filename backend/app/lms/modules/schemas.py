@@ -13,7 +13,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal, Optional, Union
+from typing import Annotated, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -31,6 +31,9 @@ WarningCode = Literal[
     "requirement_on_unpublished_target", "unlock_in_past_with_locked_students",
 ]
 LockReasonKind = Literal["unlock_at", "prerequisite", "sequential"]
+AccessTier = Literal["free", "paid"]                      # F5a: Pro module
+ItemLockedReason = Literal["module", "access_required"]   # F5a
+DurationS = Optional[Annotated[int, Field(ge=ids.DURATION_S_MIN, le=ids.DURATION_S_MAX)]]  # F5a: seconds
 
 _TARGET_FIELDS = {"page": "page_id", "file": "file_id", "assignment": "assignment_id", "url": "url"}
 
@@ -48,6 +51,7 @@ class ModuleIn(_In):
     unlock_at: Optional[datetime] = None
     sequential: bool = False
     completion_mode: CompletionMode = "all"
+    access_tier: AccessTier = "free"  # F5a: `paid` only in platform courses (service, 422)
 
 
 class ModuleUpdateIn(_In):
@@ -57,10 +61,11 @@ class ModuleUpdateIn(_In):
     unlock_at: Optional[datetime] = None
     sequential: Optional[bool] = None
     completion_mode: Optional[CompletionMode] = None
+    access_tier: Optional[AccessTier] = None  # F5a: never null; `paid` only in platform courses (service, 422)
 
     @model_validator(mode="after")
     def _not_null(self):
-        for f in ("title", "published", "sequential", "completion_mode"):
+        for f in ("title", "published", "sequential", "completion_mode", "access_tier"):
             if f in self.model_fields_set and getattr(self, f) is None:
                 raise ValueError(f"{f} cannot be null")
         return self
@@ -108,6 +113,7 @@ class ItemIn(_In):
     published: bool = False
     position: Optional[int] = Field(default=None, ge=1)  # None = append at the end
     requirement: Optional[RequirementIn] = None
+    duration_s: DurationS = None  # F5a: page / file / url only (service, 422 `loc=["duration_s"]`)
 
     @model_validator(mode="after")
     def _target(self):
@@ -130,6 +136,7 @@ class ItemUpdateIn(_In):
     indent: Optional[int] = Field(default=None, ge=0, le=ids.INDENT_MAX)
     published: Optional[bool] = None
     url: Optional[str] = Field(default=None, min_length=1, max_length=ids.URL_MAX)
+    duration_s: DurationS = None  # F5a: `null` clears; page / file / url only (service)
 
     @model_validator(mode="after")
     def _not_null(self):
@@ -208,6 +215,7 @@ class ItemStaffOut(BaseModel):
     requirement: Optional[RequirementStaffOut] = None
     target: Optional[ItemTargetOut] = None    # None for url and header
     warnings: list[WarningOut] = []
+    duration_s: Optional[int] = None          # F5a
 
 
 class ModuleStaffOut(BaseModel):
@@ -223,11 +231,16 @@ class ModuleStaffOut(BaseModel):
     items: list[ItemStaffOut] = []
     warnings: list[WarningOut] = []
     deleted_at: Optional[datetime] = None
+    access_tier: AccessTier = "free"          # F5a
+    duration_s: int = 0                       # F5a: sum over the published (visible) items
+    lessons_count: int = 0                    # F5a: published (visible) page / file / url items
 
 
 class ModulesStaffOut(BaseModel):
     """`GET _C/modules` for teachers and assistants (no evaluation; `?deleted` may include deleted modules)."""
     modules: list[ModuleStaffOut] = []
+    # F5c: the editor shows the Pro switch only where the server accepts `access_tier = paid` (platform courses)
+    is_platform_course: bool = False
 
 
 class QuizItemOut(BaseModel):
@@ -277,6 +290,9 @@ class ItemStudentOut(BaseModel):
     link: Optional[ItemLinkOut] = None
     due_at: Optional[datetime] = None  # UX rework: assignment rows, the student's effective date (never on a locked row)
     video: Optional[VideoOut] = None  # U7: url items only, never on a locked row
+    duration_s: Optional[int] = None  # F5a
+    done: bool = False                # F5a: decided on the server (design 4); also on a locked row
+    locked_reason: Optional[ItemLockedReason] = None  # F5a: why `locked` (a module rule wins over the Pro tier)
 
 
 class ModuleStudentOut(BaseModel):
@@ -291,10 +307,23 @@ class ModuleStudentOut(BaseModel):
     current_position: Optional[int] = None
     lock_reasons: list[LockReasonOut] = []
     items: list[ItemStudentOut] = []
+    access_tier: AccessTier = "free"  # F5a
+    access_locked: bool = False       # F5a: the Pro tier locks this module for the caller
+    done: int = 0                     # F5a: done rows of `items` (headers excluded)
+    total: int = 0                    # F5a: non-header rows of `items`
+    duration_s: int = 0               # F5a: sum of the rows' `duration_s`
+
+
+class ProgressOut(BaseModel):
+    """F5a: the course bar, the same rows as the modules' `done/total` (tests inside modules included)."""
+    done: int = 0
+    total: int = 0
+    duration_s: int = 0
 
 
 class ItemRefOut(BaseModel):
-    """"Up next": the first unlocked item with an unmet requirement (one primary action)."""
+    """"Up next" (F5a, design 4): the first visible non-header item in course order that is neither locked (module
+    rule or Pro tier) nor done."""
     module_id: uuid.UUID
     module_title: dict
     item_id: uuid.UUID
@@ -308,6 +337,7 @@ class ModulesStudentOut(BaseModel):
     the facts routes return one `ModuleStudentOut`."""
     modules: list[ModuleStudentOut] = []
     up_next: Optional[ItemRefOut] = None
+    progress: ProgressOut = Field(default_factory=ProgressOut)  # F5a
 
 
 # --- Phase 8c S1 begin --- (PHASE_8C_DESIGN 7: the "Unsorted" group of the teacher Course page)

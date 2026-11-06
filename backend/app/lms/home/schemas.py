@@ -110,9 +110,10 @@ MODULES_NEXT_MAX = 3
 
 
 class HomeModuleNextOut(BaseModel):
-    """"Continue in *course*: *item*": per course, the first visible item with an unmet requirement in the first
-    open (`unlocked`/`started`) published module that has one. Read from the stored caches only (`module_progress`,
-    `item_requirement_status`; never evaluates, design 6.7). Titles are `{lang: text}`."""
+    """"Continue in *course*: *item*": per course, the first visible item that is not done (F5a: unmet requirement,
+    unviewed lesson, unsubmitted test) in the first open (`unlocked`/`started`/`completed`) published module that has
+    one, Pro modules only with a pass. Read from the stored caches and facts only (`module_progress`,
+    `item_requirement_status`, `item_progress`, `submissions`; never evaluates, design 6.7). Titles are `{lang: text}`."""
     course_id: uuid.UUID
     course_title: dict
     module_id: uuid.UUID

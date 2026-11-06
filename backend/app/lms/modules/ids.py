@@ -25,6 +25,11 @@ PROGRESS_EVENTS = ("viewed", "marked_done", "unmarked_done")
 MODULE_STATES = ("locked", "unlocked", "started", "completed")
 COMPLETION_MODES = ("all", "any")
 HOME_KINDS = ("modules", "page", "assignments")
+MODULE_TIERS = ("free", "paid")    # F5a: course_modules.access_tier (CHECK in models.py / 0024)
+DURATION_S_MIN = 60                # F5a: module_items.duration_s, seconds (1..600 minutes in the editor)
+DURATION_S_MAX = 36000
+LESSON_KINDS = ("page", "file", "url")  # F5a L2: a lesson; `assignment` items are tests (steps, not lessons)
+DURATION_KINDS = LESSON_KINDS           # items that take a duration (422 on header / assignment)
 DEFAULT_HOME_KIND = "assignments"  # server default of courses.home_kind: today's layout
 
 # Submission states that satisfy `submit` / `min_*` (6.2 step 4)
@@ -35,6 +40,9 @@ REASON_UNLOCK_AT = "unlock_at"
 REASON_PREREQUISITE = "prerequisite"
 REASON_SEQUENTIAL = "sequential"
 LOCK_REASON_KINDS = (REASON_UNLOCK_AT, REASON_PREREQUISITE, REASON_SEQUENTIAL)
+# F5a: `ItemStudentOut.locked_reason` (a module rule vs a Pro module without a pass)
+REASON_MODULE = "module"
+REASON_ACCESS = "access_required"
 
 # ------------------------------------------------------------------ staff outline warnings (5.2; computed)
 W_TARGET_UNPUBLISHED = "target_unpublished"
