@@ -19,3 +19,11 @@
 - Rules from the design and the security review: a timed attempt finishes after a pass ends, an untimed one waits (answers kept); test students and staff never locked; per-user row lock on redeem/grant; Bishkek end of day; no-benefit codes refused; buyer note erased on revoke and 90 days after redemption; redeem network limit always on; revoke shifts later passes; `python -m app.lms.access.rekey` after a key rotation.
 - Owner to fill: `access.howToPay` (how to pay, e.g. QR transfer and contact), now a placeholder.
 - Tests at deploy: SQLite 4239, PG 4329, migration/concurrency 49, CI green.
+
+## S4 person page: deployed 2026-11-06 (`main` e48715d, migration `0023_person`)
+- Admin users list: search by any part of email or name; filters: email not confirmed, blocked, platform admins, exam access; last login column.
+- Person page: last login (set on sign-in, email-code verify and the two-step step, not on refresh), email confirmed, age band, consent, parent links, exam access (S3), attempt lookup (course, test, status, times, saved answers; never answers or scores, decision A4).
+- Actions with a reason, audited: password reset email, age-band correction, email change, cancel a pending change. Email change (A9): link to the new address (24 h, single use, keyed hash), notice to the old one (also when an admin starts it), sessions end on confirm; self-service on `/privacy` with the password (admins also give the two-step code); refused for platform admins by others and for disabled accounts; a pending admin-started change dies if the person becomes an admin.
+- Security review (Fable) findings fixed before deploy; trigram index for user search deferred (tiny table; comment in `users_service.py`).
+- CI: the Postgres suite now reports failing tests as annotations (an intermittent failure was seen twice and passed on rerun).
+- Tests at deploy: SQLite 4281, PG 4371, CI green.

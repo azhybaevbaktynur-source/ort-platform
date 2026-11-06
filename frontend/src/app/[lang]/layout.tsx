@@ -3,6 +3,7 @@ import { LanguageProvider, Language } from "@/lib/i18n/context";
 import { AuthProvider } from "@/lib/auth-context";
 import { ToastProvider } from "@/components/ui/Toast";
 import { TokenRefresh } from "@/lib/tokenRefresh";
+import { PwaProvider } from "@/components/pwa/PwaProvider";
 import type { Metadata } from "next";
 import enDict from "@/lib/i18n/en.json";
 import kyDict from "@/lib/i18n/ky.json";
@@ -38,7 +39,7 @@ export default async function LangLayout({
       <AuthProvider>
         <TokenRefresh />
         <ToastProvider>
-          {children}
+          <PwaProvider>{children}</PwaProvider>
         </ToastProvider>
       </AuthProvider>
     </LanguageProvider>

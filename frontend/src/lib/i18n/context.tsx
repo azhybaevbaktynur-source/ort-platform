@@ -1,11 +1,10 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
-import kyDict from "./ky.json";
-import ruDict from "./ru.json";
-import enDict from "./en.json";
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 
 export type Language = "en" | "ky" | "ru";
+type Dictionary = Record<string, any>;
 
 interface LanguageContextType {
   lang: Language;
@@ -13,10 +12,49 @@ interface LanguageContextType {
   t: (keyPath: string, params?: Record<string, string | number>) => string;
 }
 
-const dictionaries: Record<Language, any> = {
-  ky: kyDict,
-  ru: ruDict,
-  en: enDict,
+/*
+ * S5 performance (low-end phones): the three dictionaries are about 1 MB together (230 kB compressed, more than half
+ * of every page's JavaScript). Each is now its own chunk: a page loads only its language, another language is
+ * loaded the first time it is chosen. `?lazy` (lazy-json.d.ts) keeps these imports apart from the small static
+ * reads of the same files (mascot/staticText.ts), which webpack trims to the parts they use.
+ */
+const dictionaries: Partial<Record<Language, Dictionary>> = {};
+const loading: Partial<Record<Language, Promise<void>>> = {};
+const LOADERS: Record<Language, () => Promise<{ default: unknown }>> = {
+  en: () => import("./en.json?lazy"),
+  ky: () => import("./ky.json?lazy"),
+  ru: () => import("./ru.json?lazy"),
+};
+
+/** Called by dictionaries/<lang>.tsx when it renders. */
+export function registerDictionary(lang: Language, dictionary: unknown) {
+  dictionaries[lang] ??= dictionary as Dictionary;
+}
+
+/** A download that never rejects: when it fails (no network) it is tried again later; meanwhile the server's HTML stays. */
+function retrying<T>(load: () => Promise<T>): Promise<T> {
+  return new Promise<T>((resolve) => {
+    const attempt = (n: number) => {
+      load().then(resolve, () => { setTimeout(() => attempt(n + 1), Math.min(30_000, 1000 * 2 ** n)); });
+    };
+    attempt(0);
+  });
+}
+
+function loadDictionary(lang: Language): Promise<void> {
+  loading[lang] ??= retrying(LOADERS[lang]).then((m) => registerDictionary(lang, m.default));
+  return loading[lang];
+}
+
+/*
+ * The page's own language arrives with the page: rendered through next/dynamic, its chunk is named in the server's
+ * HTML, so the browser fetches it together with the other scripts, and hydration waits for it (the server's HTML stays
+ * on screen) instead of fetching it only after the app's code ran.
+ */
+const PAGE_DICTIONARY: Record<Language, React.ComponentType<{ children: React.ReactNode }>> = {
+  en: dynamic(() => retrying(() => import("./dictionaries/en"))),
+  ky: dynamic(() => retrying(() => import("./dictionaries/ky"))),
+  ru: dynamic(() => retrying(() => import("./dictionaries/ru"))),
 };
 
 /** Value at a dotted path, or undefined. */
@@ -29,7 +67,7 @@ function lookupPath(dict: any, keys: string[]): unknown {
   return current;
 }
 
-/** String at `keyPath` in `lang`; a path missing in `lang` falls back to Russian. */
+/** String at `keyPath` in `lang`; a path missing in `lang` falls back to Russian (when loaded). */
 function resolveKey(lang: Language, keyPath: string): string | undefined {
   const keys = keyPath.split(".");
   let value = lookupPath(dictionaries[lang], keys);
@@ -68,13 +106,23 @@ export function LanguageProvider({
   children: React.ReactNode;
   initialLang?: Language;
 }) {
+  const PageDictionary = PAGE_DICTIONARY[initialLang];
   const [lang, setLangState] = useState<Language>(initialLang);
+  const wanted = useRef<Language>(initialLang);
+
+  /** Shows `next` once its dictionary is here; a later choice wins over a slower earlier one. */
+  const switchTo = (next: Language) => {
+    wanted.current = next;
+    if (dictionaries[next]) { setLangState(next); return; }
+    loadDictionary(next).then(() => { if (wanted.current === next) setLangState(next); }).catch(() => undefined);
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem("ort_preferred_language") as Language;
     if (saved && (saved === "ky" || saved === "ru" || saved === "en")) {
-      setLangState(saved);
+      switchTo(saved);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Phase 6b: the document language follows the UI language (screen readers, hyphenation, api.ts messages).
@@ -83,7 +131,7 @@ export function LanguageProvider({
   }, [lang]);
 
   const setLang = (newLang: Language) => {
-    setLangState(newLang);
+    switchTo(newLang);
     localStorage.setItem("ort_preferred_language", newLang);
   };
 
@@ -107,7 +155,7 @@ export function LanguageProvider({
 
   return (
     <LanguageContext.Provider value={{ lang, setLang, t }}>
-      {children}
+      <PageDictionary>{children}</PageDictionary>
     </LanguageContext.Provider>
   );
 }
