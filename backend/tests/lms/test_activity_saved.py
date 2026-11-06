@@ -214,16 +214,24 @@ def test_saved_lists_only_flagged_items_of_submitted_attempts(db, client):
     assert first["section"] == "math" and first["topic"] == "geo"
 
 
-def test_saved_unreleased_result_has_no_key(db, client):
+def test_saved_hidden_results_never_listed(db, client):
     w = _world(db, results_policy="never", show_correct=True)
+    _flagged(db, w, 1, (1, 6))
+    r = _get(client, w.student, w, "saved")
+    assert r.status_code == 200 and r.json() == {"items": [], "next_cursor": None}
+    assert "stem" not in r.text and not any(t in r.text for t in KEY_TOKENS)
+
+
+def test_saved_after_close_listed_only_once_closed(db, client):
+    w = _world(db, results_policy="after_close", show_correct=True, available_until=clock.now() + timedelta(days=1))
     _flagged(db, w, 1, (1,))
     r = _get(client, w.student, w, "saved")
-    items = r.json()["items"]
-    assert len(items) == 1 and items[0]["released"] is False
-    it = items[0]["item"]
-    assert "key" not in it and "explanation" not in it
-    assert it["correctness"] is None and it["score"] is None
-    assert not any(t in r.text for t in KEY_TOKENS)
+    assert r.json()["items"] == [] and "stem" not in r.text
+    w.assessment.available_until = clock.now() - timedelta(days=1)
+    db.commit()
+    items = _get(client, w.student, w, "saved").json()["items"]
+    assert len(items) == 1 and items[0]["released"] is True and items[0]["position"] == 1
+    assert items[0]["item"]["question"]["stem"] == "stem sc" and "key" in items[0]["item"]
 
 
 def test_saved_keys_follow_show_correct_answers(db, client):

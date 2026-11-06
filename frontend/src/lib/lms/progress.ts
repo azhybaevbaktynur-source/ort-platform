@@ -55,7 +55,11 @@ export interface ActivityOut {
   sessions: ActivitySession[]; // last 7 days, newest first, at most 50
   heatmap: { date: string; answered: number }[]; // all time, at most 366 active days, oldest first
 }
-export interface SavedOut extends MistakeOut { released: boolean }
+export interface SavedOut extends Omit<MistakeOut, "item"> {
+  position: number;
+  item: ReviewItemOut | null; // null (metadata only) when the results are not visible
+  released: boolean;
+}
 export interface SavedPage { items: SavedOut[]; next_cursor: string | null }
 
 export const getActivity = (courseId: string, days: ActivityDays = 30, signal?: AbortSignal) =>

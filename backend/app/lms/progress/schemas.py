@@ -53,9 +53,16 @@ class MistakeOut(BaseModel):
     item: Union[ReviewItemKeyedOut, ReviewItemOut]
 
 
-class SavedOut(MistakeOut):
-    """A question the student flagged in a submitted attempt (STUDENT_UI_DESIGN 4.3). `released` is False while the
-    results policy hides the attempt: then the item has no key and no correctness, score or feedback."""
+class SavedOut(BaseModel):
+    """A question the student flagged in a submitted attempt (STUDENT_UI_DESIGN 4.3). `item` is None (metadata only)
+    and `released` False when the results are not visible; the list holds only visible assessments today."""
+    attempt_id: uuid.UUID
+    submitted_at: Optional[datetime] = None
+    assessment_title: Optional[Any] = None
+    topic: Optional[str] = None
+    section: Optional[str] = None
+    position: int
+    item: Optional[Union[ReviewItemKeyedOut, ReviewItemOut]] = None
     released: bool = True
 
 

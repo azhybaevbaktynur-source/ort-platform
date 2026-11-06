@@ -239,9 +239,13 @@ def progress(db: Session, course: Course, user_id: str, enrollment_id: uuid.UUID
 
 def saved(db: Session, course: Course, user_id: str, *, cursor: Optional[str], limit: int,
           now: datetime) -> PageOut[SavedOut]:
-    """Items the caller flagged in their own submitted (final, non-preview) attempts, newest first. One keyset query
-    for the page; keys only when the results are visible and `show_correct_answers`; while the results policy hides
-    the attempt the item carries no correctness, score or feedback either."""
+    """Items the caller flagged in their own submitted (final, non-preview) attempts, newest first, of the assessments
+    whose results the review page would show (`visible_assessments`, as the mistakes notebook). One keyset query for
+    the page; keys only with `show_correct_answers`. A row whose results are not visible never carries the question
+    (`item` None, metadata only): a student must not pass on questions of an exam others are still taking."""
+    assessments = visible_assessments(db, course.id, user_id, now)
+    if not assessments:
+        return PageOut[SavedOut](items=[], next_cursor=None)
     _prefer_item_index(db)
     a, i, qv, bq = _A, AttemptItem, QuestionVersion, BankQuestion
     stmt = (select(a.c.id.label("attempt_id"), a.c.submitted_at.label("submitted_at"),
@@ -249,7 +253,8 @@ def saved(db: Session, course: Course, user_id: str, *, cursor: Optional[str], l
                    a.c.language.label("language"), bq.topic.label("topic"), bq.section.label("section"), i)
             .select_from(a).join(i, i.attempt_id == a.c.id).join(qv, qv.id == i.question_version_id)
             .join(bq, bq.id == qv.question_id)
-            .where(a.c.user_id == user_id, a.c.course_id == course.id, final_attempt(a), i.flagged.is_(True)))
+            .where(a.c.user_id == user_id, a.c.course_id == course.id, final_attempt(a), i.flagged.is_(True),
+                   a.c.assessment_id.in_(list(assessments))))
     if cursor:
         c = decode_cursor(cursor)
         try:
@@ -270,27 +275,27 @@ def saved(db: Session, course: Course, user_id: str, *, cursor: Optional[str], l
     rows = rows[:limit]
     out: list[SavedOut] = []
     if rows:
-        asms = {x.id: x for x in db.execute(
-            select(Assessment).where(Assessment.id.in_({r.assessment_id for r in rows}))).scalars()}
-        released = {k: results.assessment_results_visible(db, v, now) for k, v in asms.items()}
-        items = [row[-1] for row in rows]
+        asms = assessments
+        shown_rows = [row for row in rows if row.assessment_id in asms]  # all of them; kept as a guard
+        items = [row[-1] for row in shown_rows]
         versions = content_repo.load_versions(db, [it.question_version_id for it in items])
-        plans = {vid: get_plan(db, vid) for vid in {row.version_id for row in rows}}
+        plans = {vid: get_plan(db, vid) for vid in {row.version_id for row in shown_rows}}
         pv_ids = {(row.attempt_id, row[-1].position): results._pv_for(
-            plans[row.version_id], row.language, int(row[-1].slot), row[-1].question_version_id) for row in rows}
+            plans[row.version_id], row.language, int(row[-1].slot), row[-1].question_version_id)
+            for row in shown_rows}
         passages = content_repo.load_passage_versions(db, [p for p in pv_ids.values() if p])
         for row in rows:
-            it, asm = row[-1], asms[row.assessment_id]
-            plan = plans[row.version_id]
-            slot = next(s for s in plan.slots[row.language] if int(s["slot"]) == int(it.slot))
-            pid = pv_ids[(row.attempt_id, it.position)]
-            shown = released[row.assessment_id]
-            item = ser.review_item(it, versions[it.question_version_id], passages.get(pid) if pid else None,
-                                   Decimal(str(slot["points"])), with_keys=shown and results.keys_allowed(asm))
-            if not shown:
-                item = item.model_copy(update={"correctness": None, "score": None, "feedback": None})
-            out.append(SavedOut(attempt_id=row.attempt_id, submitted_at=row.submitted_at, assessment_title=asm.title,
-                                topic=row.topic, section=row.section, item=item, released=shown))
+            it, asm = row[-1], asms.get(row.assessment_id)
+            item = None
+            if asm is not None:
+                plan = plans[row.version_id]
+                slot = next(s for s in plan.slots[row.language] if int(s["slot"]) == int(it.slot))
+                pid = pv_ids[(row.attempt_id, it.position)]
+                item = ser.review_item(it, versions[it.question_version_id], passages.get(pid) if pid else None,
+                                       Decimal(str(slot["points"])), with_keys=results.keys_allowed(asm))
+            out.append(SavedOut(attempt_id=row.attempt_id, submitted_at=row.submitted_at,
+                                assessment_title=asm.title if asm is not None else None, topic=row.topic,
+                                section=row.section, position=int(it.position), item=item, released=item is not None))
     nxt = None
     if more:
         last = rows[-1]
