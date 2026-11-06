@@ -8,6 +8,7 @@ import {
   LinkButton, LoadingState, PageHeader, ReasonDialog, Select, Skeleton, SkeletonText, StatTile, Switch, Table, TabPanel, Tabs,
   TabsNav, Textarea, UserPicker, useToast, type BadgeTone, type PickedUser, type TableColumn, type TableSort,
 } from "@/components/ui";
+import { StudentUiDemo } from "./StudentUiDemo"; // Student UI U1
 
 /* Demo data (names and emails are sample data, not UI strings). */
 type Status = "published" | "inProgress" | "late" | "notPassed" | "draft";
@@ -320,6 +321,10 @@ export function UiShowcase() {
             <LoadingState rows={2} />
           </Card>
         </div>
+      </Section>
+
+      <Section id="student" title={d("s.student")}>
+        <StudentUiDemo />
       </Section>
 
       <Section id="dialogs" title={d("s.dialogs")}>

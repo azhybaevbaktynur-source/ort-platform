@@ -10,7 +10,27 @@ import colors from "tailwindcss/colors";
  *   (contrast >= 4.5:1); filled buttons use the 600 shade with white text.
  * - gold: achievements only (for example the ORT golden certificate).
  * Spacing is the Tailwind default 4 px scale. One font family (`font-sans`).
+ *
+ * Student UI U1 (docs/phases/STUDENT_UI_DESIGN.md §1): navy, tag, acc, heat and chart colours, the `control` and
+ * `card` radii, and Inter for the student shell only (see `fontFamily`). The same values are CSS variables on
+ * `:root` in styles/globals.css.
  */
+
+/** The system font stack every frame used before Student UI U1 (the teacher, admin, lobby and attempt frames still do). */
+const SYSTEM_STACK = [
+  "system-ui",
+  "-apple-system",
+  "BlinkMacSystemFont",
+  '"Segoe UI"',
+  "Roboto",
+  "Oxygen",
+  "Ubuntu",
+  "Cantarell",
+  '"Open Sans"',
+  '"Helvetica Neue"',
+  "sans-serif",
+];
+
 const config: Config = {
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
@@ -52,21 +72,39 @@ const config: Config = {
           800: colors.amber[800],
           900: colors.amber[900],
         },
+        // --- Student UI U1 ---
+        // the student sidebar, the phone top bar's brand mark and the "More" sheet header
+        navy: { 800: "#1b2a4a", 900: "#13203a" },
+        // ORT section pills: `bg-tag-<key>` with `text-tag-<key>-fg`
+        tag: {
+          math1: { DEFAULT: "#e0f2fe", fg: "#075985" },
+          math2: { DEFAULT: "#e0e7ff", fg: "#3730a3" },
+          analogies: { DEFAULT: "#ede9fe", fg: "#5b21b6" },
+          reading: { DEFAULT: "#ccfbf1", fg: "#115e59" },
+          grammar: { DEFAULT: "#ffedd5", fg: "#9a3412" },
+        },
+        // accuracy bands (< 60 %, 60-84 %, >= 85 %): fill `bg-acc-<band>`, text `text-acc-<band>-text`
+        acc: {
+          low: { DEFAULT: "#f43f5e", text: "#be123c" },
+          mid: { DEFAULT: "#f59e0b", text: "#b45309" },
+          high: { DEFAULT: "#10b981", text: "#047857" },
+        },
+        // activity heatmap levels (0, 1-4, 5-14, 15-29, 30+ answers a day)
+        heat: { 0: "#eef2f7", 1: "#c7d7fb", 2: "#8fb0f6", 3: "#4f82ee", 4: "#1d4ed8" },
+        // chart series (correct = chart-2, wrong = acc-low)
+        chart: { 1: "#2563eb", 2: "#10b981", 3: "#f97316", 4: "#8b5cf6", 5: "#f59e0b" },
       },
+      // Student UI U1: the student shell defines `--font-inter` (next/font, lib/fonts.ts) and sets `font-sans` again;
+      // everywhere else the variable is unset and `font-sans` resolves to exactly the system stack used before.
+      // `font-system` is the system stack alone.
       fontFamily: {
-        sans: [
-          "system-ui",
-          "-apple-system",
-          "BlinkMacSystemFont",
-          '"Segoe UI"',
-          "Roboto",
-          "Oxygen",
-          "Ubuntu",
-          "Cantarell",
-          '"Open Sans"',
-          '"Helvetica Neue"',
-          "sans-serif",
-        ],
+        sans: ["var(--font-inter, system-ui)", ...SYSTEM_STACK.slice(1)],
+        system: SYSTEM_STACK,
+      },
+      // Student UI U1: controls (buttons, inputs, sidebar pills) and cards
+      borderRadius: {
+        control: "12px",
+        card: "16px",
       },
     },
   },

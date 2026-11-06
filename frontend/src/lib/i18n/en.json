@@ -3048,7 +3048,8 @@
         "states": "Empty, error and loading states",
         "dialogs": "Dialogs",
         "toasts": "Notifications",
-        "picker": "User picker"
+        "picker": "User picker",
+        "student": "Student area"
       },
       "b": {
         "save": "Save changes",
@@ -3189,7 +3190,36 @@
       "picker": {
         "label": "New owner",
         "hint": "Search by name or email (try “ai”)."
+      },
+      "student": {
+        "tags": "Section tags",
+        "meters": "Accuracy by topic",
+        "meterLabel": "Accuracy: {name}",
+        "topicA": "Equations",
+        "topicB": "Percentages",
+        "topicC": "Word analogies",
+        "heatmap": "My activity",
+        "heatmapSummary": "{n} answers in 3 months",
+        "countdown": "Until the exam",
+        "lockTitle": "Detailed analytics",
+        "lockBody": "Open all exams to see every topic.",
+        "sidebar": "Sidebar",
+        "tabBar": "Phone tab bar",
+        "sheet": "Bottom sheet",
+        "openSheet": "Open the sheet",
+        "sheetBody": "Sheets hold the phone menus: the exam switcher, More and the account."
       }
+    },
+    "heatmap": {
+      "less": "Less",
+      "more": "More",
+      "cell": "{date}: {n} answers"
+    },
+    "countdown": {
+      "days": "days",
+      "hours": "hrs",
+      "minutes": "min",
+      "today": "Today"
     }
   },
   "teaching": {
@@ -6298,6 +6328,38 @@
       "title": "No internet connection",
       "body": "Check your Wi-Fi or mobile data and try again.",
       "retry": "Try again"
+    }
+  },
+  "student": {
+    "nav": {
+      "label": "Student menu",
+      "home": "Home",
+      "analytics": "Analytics",
+      "saved": "Saved",
+      "lessonsGroup": "Lessons",
+      "lessons": "Video lessons",
+      "practiceGroup": "Practice",
+      "tests": "Tests",
+      "practice": "Practice",
+      "mistakes": "My mistakes",
+      "gettingStarted": "Getting started",
+      "otherAreas": "Other areas",
+      "catalog": "Catalog",
+      "more": "More",
+      "tabBar": "Main sections"
+    },
+    "switcher": {
+      "label": "My exams",
+      "title": "Choose an exam",
+      "add": "Add an exam",
+      "open": "Exam: {name}. Change"
+    },
+    "access": {
+      "until": "Access until {date}",
+      "open": "Access is open"
+    },
+    "account": {
+      "title": "Account"
     }
   }
 }
