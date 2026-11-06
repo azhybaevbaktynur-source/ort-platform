@@ -275,6 +275,14 @@ where touched, the ORT baseline run (`frontend/e2e` bluebook and exam-prep specs
 Order: U1 + U2 as one slice → (U3, U4, U5 in parallel) → (U6, U7 in parallel, U6 after U5) → U8 → U9. U5 and U7's backend part are
 the only backend work.
 
+### 5.1 Coherence pass (owner 2026-11-06: "it must look natural, not a combined made-up thing; we don't need every feature of the reference")
+After the palette (§1.1), a Fable review of all student screens together (one product, not pages side by side), then the
+fixes in U9. Already decided: (a) mistakes live in one place, "Сохранённые" with tabs Сохранённые · Ошибки (no separate
+"Мои ошибки" nav item, no mistakes tab on Аналитика); (b) unlock: sidebar pill always, home card only for students
+without results, lock pills only on paid tests; (c) analytics cards that need history (active hour, sessions, study time)
+appear only after enough activity; (d) one header pattern (title, course subtitle, at most one action); (e) one primary
+button per screen. Not built from the reference: daily questions, study planner, credits, question rush, vocab.
+
 ## 6. Free and locked (summary)
 Free: home, countdown, goal, Next, the free test(s) and their review, practice where `practice_free`, lessons (D9),
 saved and mistakes, analytics (D8). Locked: paid tests (lock pill, blurred score, "Открыть доступ"), the Next card
