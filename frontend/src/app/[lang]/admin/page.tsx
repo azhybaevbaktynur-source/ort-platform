@@ -42,7 +42,8 @@ export default function AdminOverviewPage() {
               value={storageLevel ? t(`storage.level.${storageLevel}`) : waiting} />
           </div>
         )}
-      {!error && <AccessAttention />}
+      {/* S3: only once the summary answered, so an admin who must set up two-step login sends no extra refused call */}
+      {!error && pending !== null && <AccessAttention />}
       {!error && <HealthCard />}
     </div>
   );
