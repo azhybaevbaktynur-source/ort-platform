@@ -40,7 +40,7 @@
 
 Production: Vercel https://ort-platform-nu.vercel.app + Render https://ort-platform-w77q.onrender.com (`/health` shows `commit`; Render deploys only when backend files change) + Neon project `noisy-sound-20763725` (production branch `br-cool-firefly-b227gbuy`, Alembic head `0018_phase11_indexes`) + Cloudflare R2. Production data is small: 6 users, 3 courses (2 ORT + the owner's draft), 299 question versions, ~4 attempts, 1 submission; one organization "Platform".
 
-Neon backups (free plan: **max 10 branches, 1 manual snapshot**): before-phase9, before-ux-rework, before-phase10, before-phase11, before-accounts, before-exam-prep-s2, before-admin-mfa-s1, before-access-s3 (**9/10 branches** incl. production; 6a, 7a, 7b, 7c, 8a, 8b deleted with the owner's OK, last on 2026-11-06). Before each `main` merge with a migration create `backup-<date>-before-<slice>`; when full, ask the owner which old backup to delete (deleting Neon data always needs the owner's OK).
+Neon backups (free plan: **max 10 branches, 1 manual snapshot**): before-ux-rework, before-phase10, before-phase11, before-accounts, before-exam-prep-s2, before-admin-mfa-s1, before-access-s3 (**8/10 branches** incl. production; 6a, 7a, 7b, 7c, 8a, 8b, 9 deleted with the owner's OK, last on 2026-11-06). Before each `main` merge with a migration create `backup-<date>-before-<slice>`; when full, ask the owner which old backup to delete (deleting Neon data always needs the owner's OK).
 
 ## 3b. Waiting for the owner
 
