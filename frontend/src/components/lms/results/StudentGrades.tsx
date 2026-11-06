@@ -17,11 +17,11 @@ import { KindIcon, LateBadge } from "@/components/lms/assignments/assignmentUi";
 
 const STATE_STYLE: Record<string, string> = {
   graded: "bg-emerald-100 text-emerald-800",
-  pending: "bg-indigo-100 text-indigo-800",
+  pending: "bg-brand-100 text-brand-800",
   missing: "bg-slate-200 text-slate-700",
   excused: "bg-sky-100 text-sky-800",
   hidden: "bg-slate-200 text-slate-700",
-  submitted: "bg-indigo-100 text-indigo-800", // Phase 7a S5
+  submitted: "bg-brand-100 text-brand-800", // Phase 7a S5
 };
 
 function Row({ item, courseId }: { item: MyGradeOut; courseId: string }) {

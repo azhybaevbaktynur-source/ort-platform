@@ -51,7 +51,7 @@ export function StreakCard({ activity, className }: { activity: ActivityOut; cla
       </div>
       {streak > 0 ? (
         <p className="mt-2 flex items-center gap-2">
-          <Flame aria-hidden="true" className="h-7 w-7 shrink-0 fill-chart-3/20 text-chart-3" />
+          <Flame aria-hidden="true" className="h-7 w-7 shrink-0 text-brand-600" />
           <span className="text-2xl font-bold leading-8 tabular-nums text-slate-900">{t("home.prep.streak.days", { count: streak })}</span>
         </p>
       ) : (

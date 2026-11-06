@@ -47,7 +47,7 @@ export function ResultSummary({ result, grade: gradeProp }: { result: AttemptRes
   const scaled = isScaledResult(result, grade, ui.resultView);
   const flags = Object.entries(grade?.thresholds ?? {}).filter(([, on]) => on).map(([k]) => k);
   const pending = result.pending_review > 0 ? (
-    <p role="status" className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
+    <p role="status" className="rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-900">
       {t("results.pendingReview", { n: result.pending_review })}
     </p>
   ) : null;

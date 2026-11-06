@@ -16,18 +16,18 @@ export const LANGUAGE_SECTIONS = new Set(["analogies", "reading", "grammar", "na
  */
 export const SECTION_ORDER = ["math_1", "math_2", "analogies", "reading", "grammar"] as const;
 export const SECTION_FILL: Record<string, string> = {
-  math_1: "#2563eb", // chart-1
-  math_2: "#f59e0b", // chart-5
-  analogies: "#8b5cf6", // chart-4
-  reading: "#10b981", // chart-2
-  grammar: "#f97316", // chart-3
+  math_1: "rgb(var(--brand-800))", // brand ramp (800 .. 200), darkest first; the legend names the sections
+  math_2: "rgb(var(--brand-600))",
+  analogies: "rgb(var(--brand-400))",
+  reading: "rgb(var(--brand-300))",
+  grammar: "rgb(var(--brand-200))",
 };
 export const OTHER_FILL = "#94a3b8"; // slate-400
 
-/** Correct answers (chart-2) and wrong ones (acc-low, hatched so colour is never the only difference). */
-export const CORRECT_FILL = "#10b981";
+/** Correct answers: brand blue; wrong ones: neutral grey, hatched so colour is never the only difference (4.1). */
+export const CORRECT_FILL = "rgb(var(--brand-600))";
 export const WRONG_STYLE: CSSProperties = {
-  backgroundImage: "repeating-linear-gradient(135deg, #f43f5e 0 3px, #fecdd3 3px 5px)",
+  backgroundImage: "repeating-linear-gradient(135deg, #64748b 0 3px, #cbd5e1 3px 5px)",
 };
 
 /** One bar of a time chart: a day, or a week (Monday first) for the one-year period. */

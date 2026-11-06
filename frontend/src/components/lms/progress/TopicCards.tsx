@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Meter, SectionTag, accuracyBand, cn, focusRing, type AccuracyBand } from "@/components/ui";
 import { useTranslation } from "@/lib/i18n/context";
-import { AnalyticsCard, BandLegend, CardEmpty } from "./AnalyticsCard";
+import { AnalyticsCard, BandLegend, CardEmpty, NotEnoughData } from "./AnalyticsCard";
 import { isGraded, toPercent, topicGroup, twoDigits, weakestTopics, type NamedTopic, type TopicGroup } from "./analyticsData";
 
 /*
@@ -32,10 +32,16 @@ function Ring({ percent }: { percent: number }) {
   );
 }
 
-export function WeakTopics({ topics, ready, practiceHref, locked = false }: { topics: NamedTopic[]; ready: boolean; practiceHref: string | null; locked?: boolean }) {
+export function WeakTopics({ topics, ready, practiceHref, testsHref, locked = false }: { topics: NamedTopic[]; ready: boolean; practiceHref: string | null; testsHref: string; locked?: boolean }) {
   const { t } = useTranslation();
   const weak = weakestTopics(topics, ready);
-  if (weak === null) return null;
+  if (weak === null) {
+    return (
+      <AnalyticsCard locked={locked} title={t("progress.analytics.weak.titleEmpty")}>
+        <NotEnoughData body={t("progress.analytics.notEnough.weakBody")} href={testsHref} />
+      </AnalyticsCard>
+    );
+  }
   return (
     <AnalyticsCard locked={locked}
       title={weak.length ? t("progress.analytics.weak.title", { count: weak.length }) : t("progress.analytics.weak.titleEmpty")}
@@ -113,10 +119,8 @@ function TopicRows({ topics }: { topics: NamedTopic[] }) {
   );
 }
 
-const GROUP_POSE = { math: "working", language: "reading", other: "thinking" } as const;
-
 /** Accuracy by topic: a math card and a language card on ORT-like courses, one card on general courses. */
-export function TopicAccuracy({ topics, split, locked = false }: { topics: NamedTopic[]; split: boolean; locked?: boolean }) {
+export function TopicAccuracy({ topics, split, testsHref, locked = false }: { topics: NamedTopic[]; split: boolean; testsHref: string; locked?: boolean }) {
   const { t } = useTranslation();
   const by: Record<TopicGroup, NamedTopic[]> = { math: [], language: [], other: [] };
   for (const tp of topics) by[topicGroup(tp.section)].push(tp);
@@ -130,8 +134,8 @@ export function TopicAccuracy({ topics, split, locked = false }: { topics: Named
         <AnalyticsCard key={g} locked={locked} className={g === "other" && groups.length === 3 ? "lg:col-span-2" : undefined}
           title={t(useSplit ? `progress.analytics.topics.${g}` : "progress.analytics.topics.all")}
           subtitle={t("progress.analytics.topics.subtitle")}>
-          {by[g].length === 0 ? (
-            <CardEmpty pose={GROUP_POSE[g]} compact hint={t(`progress.analytics.topics.empty.${g}`)} />
+          {by[g].length === 0 || !by[g].some(isGraded) ? (
+            <NotEnoughData compact body={t("progress.analytics.notEnough.topicsBody")} href={testsHref} />
           ) : (
             <>
               <TopicRows topics={by[g]} />

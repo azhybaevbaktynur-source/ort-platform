@@ -18,15 +18,10 @@ export interface StatTileProps {
   className?: string;
 }
 
-export type StatIconTone = "brand" | "blue" | "green" | "violet" | "orange";
-/** The student frame's pastel icon chips (§1.1: blue #dbeafe/#1d4ed8, green #dcfce7/#15803d, violet #ede9fe/#6d28d9,
- * orange #ffedd5/#c2410c). */
+export type StatIconTone = "brand";
+/** The student frame's one icon chip tone (STUDENT_UI_FIX_PLAN 4.1): brand-50 / brand-700. */
 export const STAT_ICON_TONE: Record<StatIconTone, string> = {
   brand: "bg-brand-50 text-brand-700",
-  blue: "bg-blue-100 text-blue-700",
-  green: "bg-green-100 text-green-700",
-  violet: "bg-violet-100 text-violet-700",
-  orange: "bg-orange-100 text-orange-700",
 };
 
 /** A number with its label; optionally a link to the list behind it. */

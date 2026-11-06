@@ -8,7 +8,6 @@ import React from "react";
 import Link from "next/link";
 import { CalendarClock } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
-import { courseColor } from "@/lib/lms/courseColor";
 import { pickLocalized } from "@/lib/lms/localized";
 import type { Lang, LocalizedText } from "@/lib/lms/types";
 import { cn } from "@/components/ui";
@@ -52,7 +51,7 @@ function Progress({ courseId, done, total }: { courseId: string; done: number; t
     <div>
       <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={total} aria-valuenow={done}
         className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-        <div className="h-full rounded-full" style={{ width: `${total > 0 ? Math.min(100, (done / total) * 100) : 0}%`, backgroundColor: courseColor(courseId) }} />
+        <div className="h-full rounded-full bg-brand-600" style={{ width: `${total > 0 ? Math.min(100, (done / total) * 100) : 0}%` }} />
       </div>
       <p aria-hidden="true" className="mt-1 text-xs leading-5 text-slate-600">{label}</p>
     </div>
@@ -84,7 +83,7 @@ export function CourseCard({ course, href, headingLevel = 3, badges, progress, n
   const Heading = headingLevel === 2 ? "h2" : "h3";
   return (
     <li className="group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
-      <div className="flex h-24 shrink-0 items-end px-4 py-3" style={{ backgroundColor: courseColor(course.id) }}>
+      <div className="flex h-24 shrink-0 items-end bg-gradient-to-br from-brand-700 to-brand-500 px-4 py-3">
         <Heading title={title} className="line-clamp-2 min-w-0 break-words text-base font-semibold leading-6 text-white">
           {href
             ? (

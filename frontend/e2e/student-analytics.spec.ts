@@ -119,7 +119,7 @@ test.describe("student analytics", () => {
     if (OUT) fs.mkdirSync(OUT, { recursive: true });
     await walk(browser, seed().students["analytics-empty-ru"], "analytics-empty", async (page) => {
       await expect(page.getByText(tr("ru", "progress.analytics.empty.pageTitle"))).toBeVisible();
-      await expect(page.getByText(tr("ru", "progress.analytics.empty.title")).first()).toBeVisible();
+      await expect(page.getByText(tr("ru", "progress.analytics.notEnough.title")).first()).toBeVisible();
     });
   });
 

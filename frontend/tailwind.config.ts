@@ -69,14 +69,6 @@ const config: Config = {
         // the student sidebar, the phone top bar's brand mark and the "More" sheet header
         // (Student UI colour: CSS variables like `brand`; `.student-theme` turns them into the owner's teal)
         navy: { 800: "rgb(var(--navy-800) / <alpha-value>)", 900: "rgb(var(--navy-900) / <alpha-value>)" },
-        // ORT section pills: `bg-tag-<key>` with `text-tag-<key>-fg`
-        tag: {
-          math1: { DEFAULT: "#e0f2fe", fg: "#075985" },
-          math2: { DEFAULT: "#e0e7ff", fg: "#3730a3" },
-          analogies: { DEFAULT: "#ede9fe", fg: "#5b21b6" },
-          reading: { DEFAULT: "#ccfbf1", fg: "#115e59" },
-          grammar: { DEFAULT: "#ffedd5", fg: "#9a3412" },
-        },
         // accuracy bands (< 60 %, 60-84 %, >= 85 %): fill `bg-acc-<band>`, text `text-acc-<band>-text`
         acc: {
           low: { DEFAULT: "#f43f5e", text: "#be123c" },
@@ -85,8 +77,6 @@ const config: Config = {
         },
         // activity heatmap levels (0, 1-4, 5-14, 15-29, 30+ answers a day)
         heat: { 0: "#eef2f7", 1: "#c7d7fb", 2: "#8fb0f6", 3: "#4f82ee", 4: "#1d4ed8" },
-        // chart series (correct = chart-2, wrong = acc-low)
-        chart: { 1: "#2563eb", 2: "#10b981", 3: "#f97316", 4: "#8b5cf6", 5: "#f59e0b" },
       },
       // Student UI U1: the student shell defines `--font-inter` (next/font, lib/fonts.ts) and sets `font-sans` again;
       // everywhere else the variable is unset and `font-sans` resolves to exactly the system stack used before.

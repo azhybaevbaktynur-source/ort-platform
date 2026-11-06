@@ -5734,7 +5734,13 @@
         "emptyOpenHint": "When you get a question wrong in a test, it will appear here so you can fix it.",
         "emptyFixedHint": "Questions you answer right after a mistake move here."
       },
-      "lowData": "Not enough data"
+      "lowData": "Not enough data",
+      "notEnough": {
+        "title": "Not enough data yet",
+        "weakBody": "Answer a few more questions and your weak topics will appear here.",
+        "topicsBody": "A topic needs at least 5 answers before it is rated.",
+        "action": "Take a test"
+      }
     }
   },
   "quizStats": {
@@ -6172,7 +6178,8 @@
       "title": "Sections",
       "subtitle": "From your latest result",
       "score": "{raw} of {possible}",
-      "empty": "Sections appear after your first released result."
+      "empty": "Sections appear after your first released result.",
+      "fewAnswers": "Too few answers to rate this section"
     },
     "next": {
       "title": "Next step",
