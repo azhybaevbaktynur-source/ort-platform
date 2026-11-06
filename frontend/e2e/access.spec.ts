@@ -187,9 +187,11 @@ test.describe("free and paid exams (ru)", () => {
       await expect(plansCard().getByText(t("access.plan.month_3"), { exact: true })).toBeVisible();
       await expect(plansCard().getByText(t("access.plan.season"), { exact: true })).toHaveCount(0);
       await expect(plansCard()).not.toContainText(t("access.pro.plans.price", { price: "@@" }).replace("@@", "").trim());
-      await expect(plansCard()).toContainText(t("access.pro.pay.chosen", { plan: t("access.plan.month_1") }));
+      await expect(plansCard().getByText(t("access.pro.plans.priceOnRequest"), { exact: true })).toHaveCount(2);
+      await expect(plansCard()).toContainText(t("access.pro.pay.chosenOnRequest", { plan: t("access.plan.month_1") }));
       await expect(plansCard()).toContainText(t("access.howToPay"));
       await proShots(student, "pro-free");
+      await student.screenshot({ path: path.join(PRO_SHOTS, "fix-pro-unset-1440-ru.png"), fullPage: true, animations: "disabled", caret: "hide" });
 
       // ---- admin settings: a season end in 60 days and one price; only what changed is sent
       await admin.goto(`/${L}/admin/access/settings`);
@@ -207,7 +209,7 @@ test.describe("free and paid exams (ru)", () => {
       await expect(plansCard().getByText(t("access.plan.season"), { exact: true })).toBeVisible();
       await expect(plansCard()).toContainText(t("access.pro.pay.chosenPrice", { plan: t("access.plan.month_1"), price: "990" }));
       await plansCard().getByText(t("access.plan.month_3"), { exact: true }).click();
-      await expect(plansCard()).toContainText(t("access.pro.pay.chosen", { plan: t("access.plan.month_3") }));
+      await expect(plansCard()).toContainText(t("access.pro.pay.chosenOnRequest", { plan: t("access.plan.month_3") }));
 
       // ---- admin: "Выдать Pro" with the person search, 1 month
       await admin.goto(`/${L}/admin/access`);
@@ -217,6 +219,8 @@ test.describe("free and paid exams (ru)", () => {
       await grant.getByRole("combobox", { name: t("access.admin.pro.person") }).fill("e2e-access-pro");
       await grant.getByRole("option", { name: new RegExp(name) }).click();
       await expect(grant).toContainText(t("access.admin.pro.preview", { date: "@@" }).split("@@")[0]);
+      await expect(grant).toContainText(t("access.admin.pro.grantBodyNew")); // no Pro yet: it starts now
+      await admin.screenshot({ path: path.join(PRO_SHOTS, "fix-grant-dialog-1440-ru.png"), animations: "disabled", caret: "hide" });
       await grant.getByLabel(t("ui.reason.required")).fill("E2E: оплата наличными");
       await grant.getByRole("button", { name: t("access.admin.pro.grant") }).click();
       await expect(grant).toBeHidden();
@@ -241,6 +245,8 @@ test.describe("free and paid exams (ru)", () => {
       await cancel.getByRole("button", { name: t("access.admin.pro.cancel") }).click();
       await expect(cancel).toBeHidden();
       await expect(admin.getByText(t("access.admin.pro.cancelled"))).toBeVisible();
+      await expect(admin.getByRole("link", { name: t("access.admin.pro.openPerson", { name }) }))
+        .toHaveAttribute("href", `/${L}/admin/users/${acc.pro_student.profile.id}`);
       await expect(admin.getByText(name, { exact: true }).locator("visible=true")).toHaveCount(0);
 
       await student.goto(`/${L}/pro`);

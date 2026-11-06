@@ -98,7 +98,7 @@ export function UserAccessSection({ userId, name, readOnly = false }: { userId: 
       </div>
       <GrantProDialog open={granting} person={{ id: userId, display_name: name, email: name }} currentEnd={data?.active ? data.ends_at : null}
         onClose={() => setGranting(false)} onGranted={(out) => { setData(out); setGranting(false); }} />
-      <CancelProDialog person={cancelling ? { id: userId, name } : null} onClose={() => setCancelling(false)}
+      <CancelProDialog person={cancelling ? { id: userId, name } : null} linkToPerson={false} onClose={() => setCancelling(false)}
         onCancelled={(out) => { setData(out); setCancelling(false); }} />
       <ReasonDialog open={!!revoking} title={t("access.admin.user.revokeTitle")} object={name}
         effect={t("access.admin.user.revokeBody")} confirmLabel={t("access.admin.user.revoke")} tone="danger" busy={busy}

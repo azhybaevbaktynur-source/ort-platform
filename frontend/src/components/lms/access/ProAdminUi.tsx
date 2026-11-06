@@ -21,16 +21,24 @@ const PLAN_DAYS: Record<"month_1" | "month_3", number> = { month_1: 30, month_3:
 export const planLabel = (plan: PlanId | null, t: T) => (plan ? t(`access.plan.${plan}`) : "—");
 export const sourceLabel = (source: PassSource | null, t: T) => (source ? t(`access.source.${source}`) : "—");
 
-/** The season end the admin set, when the season plan can still be granted (its Bishkek end of day is ahead). */
-export function useSeasonEnd(enabled: boolean): string | null {
+/** The season end the admin set, when the season plan can still be granted (its Bishkek end of day is ahead), and
+ *  whether the settings have been read (so a season preset is not dropped before they arrive). */
+export function useSeasonSetting(enabled: boolean): { seasonEnd: string | null; loaded: boolean } {
   const [seasonEnd, setSeasonEnd] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
   useEffect(() => {
     if (!enabled) return;
     let alive = true;
-    getProSettings().then((s) => { if (alive) setSeasonEnd(s.season_end); }).catch(() => { if (alive) setSeasonEnd(null); });
+    setLoaded(false);
+    getProSettings().then((s) => { if (alive) setSeasonEnd(s.season_end); }).catch(() => { if (alive) setSeasonEnd(null); })
+      .finally(() => { if (alive) setLoaded(true); });
     return () => { alive = false; };
   }, [enabled]);
-  return seasonEnd && bishkekDayEnd(seasonEnd).getTime() > Date.now() ? seasonEnd : null;
+  return { seasonEnd: seasonEnd && bishkekDayEnd(seasonEnd).getTime() > Date.now() ? seasonEnd : null, loaded };
+}
+
+export function useSeasonEnd(enabled: boolean): string | null {
+  return useSeasonSetting(enabled).seasonEnd;
 }
 
 export interface GrantProDialogProps {
@@ -49,7 +57,7 @@ export interface GrantProDialogProps {
 export function GrantProDialog({ open, person, currentEnd, preset, renew = false, onClose, onGranted }: GrantProDialogProps) {
   const { lang, t } = useTranslation();
   const errorText = useErrorText();
-  const seasonEnd = useSeasonEnd(open);
+  const { seasonEnd, loaded: seasonLoaded } = useSeasonSetting(open);
   const search = useMemo(() => platformUserSearch(), []);
   const [picked, setPicked] = useState<PickedUser | null>(null);
   const [pickedEnd, setPickedEnd] = useState<string | null>(null);
@@ -71,8 +79,10 @@ export function GrantProDialog({ open, person, currentEnd, preset, renew = false
     getUserAccess(picked.id).then((a) => { if (alive) setPickedEnd(a.active ? a.ends_at : null); }).catch(() => { if (alive) setPickedEnd(null); });
     return () => { alive = false; };
   }, [picked]);
-  // a season plan preset while no season end is set: fall back to a month
-  useEffect(() => { if (open && mode === "season" && !seasonEnd) setMode(preset === "month_3" ? "month_3" : "month_1"); }, [open, mode, seasonEnd, preset]);
+  // a season plan preset while no season end is set (known only once the settings are read): fall back to a month
+  useEffect(() => {
+    if (open && seasonLoaded && mode === "season" && !seasonEnd) setMode("month_1");
+  }, [open, seasonLoaded, mode, seasonEnd]);
 
   const who = person ?? picked;
   const endIso = person ? (currentEnd ?? null) : pickedEnd;
@@ -86,15 +96,18 @@ export function GrantProDialog({ open, person, currentEnd, preset, renew = false
   else newEnd = endsOn ? bishkekDayEnd(endsOn).getTime() : null;
   const noBenefit = newEnd !== null && newEnd <= base;
 
-  const modes: Mode[] = ["month_1", "month_3", ...(seasonEnd ? (["season"] as Mode[]) : []), "days", "date"];
+  // the season choice stays while the settings load, so a season row's "Продлить" keeps its plan
+  const showSeason = !!seasonEnd || (!seasonLoaded && mode === "season");
+  const modes: Mode[] = ["month_1", "month_3", ...(showSeason ? (["season"] as Mode[]) : []), "days", "date"];
   const modeLabel = (m: Mode) => m === "days" ? t("access.admin.batches.lengthDays")
     : m === "date" ? t("access.admin.batches.lengthDate")
-      : m === "season" ? t("access.admin.batches.planOption", { plan: t("access.plan.season"), length: fmtPlanDay(seasonEnd, lang) })
+      : m === "season" ? (seasonEnd ? t("access.admin.batches.planOption", { plan: t("access.plan.season"), length: fmtPlanDay(seasonEnd, lang) }) : t("access.plan.season"))
         : t("access.admin.batches.planOption", { plan: t(`access.plan.${m}`), length: t("access.admin.batches.lengthDaysValue", { count: PLAN_DAYS[m] }) });
 
   const submit = async () => {
     if (!who) { setError(t("access.admin.pro.pickPerson")); return; }
-    if (mode === "days" && !daysOk) { setError(t("lms.errors.grant_too_long")); return; }
+    if (mode === "days" && !daysOk) { setError(t(d >= 1 ? "lms.errors.grant_too_long" : "lms.errors.grant_length_required")); return; }
+    if (mode === "season" && !seasonEnd) { setError(t(seasonLoaded ? "lms.errors.season_not_set" : "lms.common.loading")); return; }
     if (mode === "date" && !endsOn) { setError(t("lms.errors.grant_length_required")); return; }
     if (!reason.trim()) { setError(t("ui.reason.missing")); return; }
     setBusy(true);
@@ -110,7 +123,8 @@ export function GrantProDialog({ open, person, currentEnd, preset, renew = false
   const radio = "inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border px-3 text-sm font-medium sm:min-h-9";
   return (
     <ConfirmDialog open={open} title={t(renew ? "access.admin.pro.renewTitle" : "access.admin.pro.grantTitle")}
-      object={person ? (person.display_name || person.email) : undefined} effect={t("access.admin.pro.grantBody")}
+      object={person ? (person.display_name || person.email) : undefined}
+      effect={t(who && !endIso ? "access.admin.pro.grantBodyNew" : "access.admin.pro.grantBody")}
       confirmLabel={t(renew ? "access.admin.pro.renew" : "access.admin.pro.grant")} busy={busy} error={error ?? undefined}
       onConfirm={() => void submit()} onCancel={onClose}>
       <div className="space-y-4">
@@ -150,13 +164,15 @@ export function GrantProDialog({ open, person, currentEnd, preset, renew = false
   );
 }
 
-export function CancelProDialog({ person, onClose, onCancelled }: {
+export function CancelProDialog({ person, onClose, onCancelled, linkToPerson = true }: {
   /** Open while set. */
   person: { id: string; name: string } | null;
+  /** The toast links to the person page (not on the person page itself). */
+  linkToPerson?: boolean;
   onClose: () => void;
   onCancelled: (out: UserAccessOut, userId: string) => void;
 }) {
-  const { t } = useTranslation();
+  const { lang, t } = useTranslation();
   const errorText = useErrorText();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -168,7 +184,8 @@ export function CancelProDialog({ person, onClose, onCancelled }: {
     setError(null);
     try {
       const out = await cancelPro(person.id, reason);
-      toast.success(t("access.admin.pro.cancelled"));
+      toast.success(t("access.admin.pro.cancelled"), undefined, linkToPerson
+        ? { href: `/${lang}/admin/users/${person.id}`, label: t("access.admin.pro.openPerson", { name: person.name }) } : undefined);
       onCancelled(out, person.id);
     } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   };

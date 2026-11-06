@@ -6596,7 +6596,9 @@
         "granted": "Pro given until {date}",
         "cancelTitle": "Cancel Pro?",
         "cancelBody": "Every open pass of this person ends now. Timed exams already started can still be finished. The platform does not refund money automatically.",
-        "cancelled": "Pro cancelled."
+        "cancelled": "Pro cancelled.",
+        "grantBodyNew": "Pro starts now. At most 400 days ahead.",
+        "openPerson": "Open the page of {name}"
       },
       "settings": {
         "title": "Pro settings",
@@ -6606,7 +6608,7 @@
         "seasonNone": "Not set: the plan \"Until the end of the season\" is hidden.",
         "seasonClear": "Clear the date",
         "pricesTitle": "Prices",
-        "pricesHint": "In som, a whole number. Empty: the Pro page shows no price.",
+        "pricesHint": "In som, a whole number. Empty: the Pro page shows \"ask us\" instead of a price.",
         "priceLabel": "{plan}, som",
         "payTitle": "How to pay",
         "payHint": "The text on the Pro page. An empty Kyrgyz or English text shows the Russian one. If all are empty, a standard text is shown.",
@@ -6663,12 +6665,13 @@
       "plans": {
         "title": "Choose a plan",
         "price": "{price} som",
-        "newEnd": "Pro until {date}"
+        "newEnd": "Pro until {date}",
+        "priceOnRequest": "ask us"
       },
       "pay": {
         "title": "How to pay",
-        "chosen": "Plan: {plan}",
-        "chosenPrice": "Plan: {plan}, {price} som"
+        "chosenPrice": "Plan: {plan}, {price} som",
+        "chosenOnRequest": "Plan: {plan}, ask us for the price"
       },
       "voucher": {
         "toggle": "Have a gift code?",
