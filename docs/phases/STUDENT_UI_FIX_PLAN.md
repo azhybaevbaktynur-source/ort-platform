@@ -120,6 +120,28 @@ assertion that the lobby keeps the old header → inverted; `STUDENT_UI_DESIGN.m
 section. Kept on purpose: `StudentHome.tsx` (students without an exam-prep course), `PlatformCourses.tsx` (rows in
 the exam sheet and the admin page), `MyAttemptsPanel` (the only list of previous attempts of one test).
 
+**F2a confirmed list (2026-11-07, `grep -rl` over `frontend/src`, `frontend/e2e`, docs; branch `fix-f2`)**
+- Already gone in F2a/F2b (replaced, nothing left for F2c): `ORT_FRAME`/`isOrtFrame` (now `isPlayerRoute` +
+  `PLAYER_FRAME` in `LmsShell.tsx`); the `lobby` exception and the exam-prep student `header` on `attemptsPage`
+  (`layout.tsx`: the exam-prep branch runs first and covers lobby, result and review); `useTabCrumbs` on the student
+  lobby (moved into `StaffOverview` in `assessments/[assessmentId]/page.tsx`); `ResultMascot` in `StudentResult.tsx`
+  (the cub is in `ExamResultHero`); `e2e/student-shell.spec.ts:40` inverted (lobby inside the student shell).
+- **Delete in F2c**: `components/lms/results/OrtResultView.tsx` (no importer left: `ResultSummary` uses
+  `SectionBreakdown`; the only other hit is a comment in `ResultSummary.tsx`). No i18n key becomes orphaned with it
+  (`results.grade.scaledShort/scaled/raw/overall/sectionsTitle` are read by `SectionBreakdown`, `results.grade.percentile`
+  by `GradeBadge`).
+- **Stale comments/docs to rewrite in F2c**: `StudentShell.tsx:33` ("never uses this frame on the ORT lobby and
+  attempt routes (§2.4)"), `lib/fonts.ts:5-10` (lobby/attempt frames keep the system font), `tailwind.config.ts:19`
+  (same), `styles/globals.css:68-69` (same), `STUDENT_UI_DESIGN.md` lines 25, 79 and §2.4 (line 128) → point to this
+  section (SF-1).
+- **Not removable as planned (keep, with reason)**: `EXAM_COLUMN_OUTER/INNER` (`ui/shellWidth.ts`, `LmsShell.tsx`):
+  still the column of result/review pages outside the student shell (staff previews, template sandbox, a teacher
+  awaiting the course's area) = "staff keep today's frames"; `StudentCourseHeader`'s `breadcrumbs` prop: exam-prep
+  course pages outside the own-title list in `layout.tsx` (e.g. `/grades`, `/pages/{id}`) still render it with
+  `breadcrumbs={false}`; dropping the prop needs those pages to get their own title first (F4b/F5 decision, not F2c);
+  `results.back`: general-course students keep "Назад к заданию" to the lobby (guarded by
+  `e2e/scrolling-player.spec.ts:273`); exam-prep students get `results.backToTests`.
+
 **Files**: `LmsShell.tsx`, `courses/[courseId]/layout.tsx`, `assessments/[assessmentId]/page.tsx`,
 `attempts/[attemptId]/result/page.tsx`, `results/StudentResult.tsx`, `ResultSummary.tsx`, `GradeBadge.tsx`,
 `ReviewItemCard.tsx` (id only), new `results/ExamResultHero.tsx`, `results/SectionBreakdown.tsx`,

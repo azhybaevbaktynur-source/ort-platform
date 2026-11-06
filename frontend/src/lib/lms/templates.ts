@@ -98,6 +98,11 @@ export function templateUi(course: Pick<CourseOut, "template"> | null | undefine
   return templateUiFrom(course.template);
 }
 
+/** SF-1: a student (test students included) of an exam-prep course: lobby and result live in the student shell. */
+export function isExamPrepStudent(course: Pick<CourseOut, "template" | "my_enrollment"> | null | undefined): boolean {
+  return !!course && course.my_enrollment.role === "student" && templateUi(course).studentLayout === "exam_prep";
+}
+
 /** `templateUi` of the course of the current course route (today's behaviour outside a course). */
 export function useTemplateUi(): TemplateUi {
   const ctx = useContext(CourseContext);

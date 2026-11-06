@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { getAssessment, listAssessmentVersions } from "@/lib/lms/assessments";
-import { isStaffAssessment, type AssessmentDetailOut, type VersionOut } from "@/lib/lms/assessmentTypes";
+import { isStaffAssessment, type AssessmentDetailOut, type AssessmentStaffOut, type VersionOut } from "@/lib/lms/assessmentTypes";
+import { isExamPrepStudent } from "@/lib/lms/templates"; // SF-1
+import { ChevronLeft } from "lucide-react";
 import { pickLocalized } from "@/lib/lms/localized";
 import { useCourse } from "@/components/lms/CourseContext";
 import { useCanEditContent } from "@/components/lms/content/StaffGate";
@@ -44,14 +46,16 @@ export default function AssessmentPage() {
     }
   }, [course.id, aid]);
   useEffect(() => { void load(); }, [load]);
-  const staffTitle = data && isStaffAssessment(data) ? pickLocalized(data.title, lang, course.default_language) || t("assessments.untitled") : "";
-  const crumbs = useTabCrumbs("assessments", [{ label: staffTitle || t("lms.common.loading") }], course.id);
+  // SF-1: an exam-prep student goes back to Тесты; other students to the course's list of assignments
+  const backLink = isExamPrepStudent(course)
+    ? <BackLink href={`/${lang}/courses/${course.id}/tests`}>{t("results.backToTests")}</BackLink>
+    : <BackLink href={base}>{t("assessments.backToList")}</BackLink>;
 
   // Phase 8a fix1 (M2): the lobby of a quiz in a locked module answers 423 `module_locked` for students
   if (error && !data && isModuleLocked(error)) {
     return (
       <div className="space-y-4">
-        <Link href={base} className="inline-flex min-h-11 items-center text-sm font-medium text-brand-700 hover:underline sm:min-h-0">{t("assessments.backToList")}</Link>
+        {backLink}
         <LockedState error={error} courseId={course.id} />
       </div>
     );
@@ -63,8 +67,8 @@ export default function AssessmentPage() {
     const exhausted = !data.can_start && data.reason === "attempts_exhausted";
     const attempts = <MyAttemptsPanel courseId={course.id} assessmentId={data.id} exhausted={exhausted} />;
     return (
-      <div className="mx-auto w-full max-w-[54rem] space-y-4">{/* UX rework (PUR-6): today's lobby column */}
-        <Link href={base} className="inline-flex min-h-11 items-center text-sm font-medium text-brand-700 hover:underline sm:min-h-0">{t("assessments.backToList")}</Link>
+      <div className="mx-auto w-full max-w-[54rem] space-y-4">{/* UX rework (PUR-6): the lobby column */}
+        {backLink}
         {exhausted && attempts}
         {data.locked && <UnlockCallout />}
         <LobbyView lobby={data} />
@@ -73,9 +77,24 @@ export default function AssessmentPage() {
     );
   }
   // --- Phase 6 S6b end ---
+  return <StaffOverview a={data} versions={versions} canEdit={canEdit} onChanged={load} />;
+}
 
-  const a = data;
-  const title = staffTitle;
+function BackLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link href={href} className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-brand-700 hover:underline sm:min-h-0">
+      <ChevronLeft className="h-4 w-4" aria-hidden="true" />{children}
+    </Link>
+  );
+}
+
+/** The staff overview of an assessment (SF-1: the staff breadcrumbs live only here, never on the student lobby). */
+function StaffOverview({ a, versions, canEdit, onChanged }: { a: AssessmentStaffOut; versions: VersionOut[]; canEdit: boolean; onChanged: () => void | Promise<void> }) {
+  const { lang, t } = useTranslation();
+  const { course } = useCourse();
+  const base = `/${lang}/courses/${course.id}/assessments`;
+  const title = pickLocalized(a.title, lang, course.default_language) || t("assessments.untitled");
+  const crumbs = useTabCrumbs("assessments", [{ label: title }], course.id);
   // Phase 6b S5c (UX T8): one primary per page: "Publish changes" (in the publish panel) when that is the next step, else "Edit".
   const editPrimary = canEdit && !publishIsPrimary(a);
   const editLink = canEdit ? <LinkButton variant={editPrimary ? "primary" : "secondary"} href={`${base}/${a.id}/edit`}>{t("assessments.list.edit")}</LinkButton> : undefined;
@@ -87,7 +106,7 @@ export default function AssessmentPage() {
           {!editPrimary && editLink}
         </>}
         primaryAction={editPrimary ? editLink : undefined} />
-      <PublishPanel assessment={a} courseId={course.id} canEdit={canEdit} onChanged={load} />
+      <PublishPanel assessment={a} courseId={course.id} canEdit={canEdit} onChanged={onChanged} />
       <Card padding="md">
         <DescriptionList twoColumns items={[
           { term: t("assessments.overview.items"), description: `${a.item_count} · ${t("assessments.overview.points", { n: fmtPoints(a.points_possible), count: Number(a.points_possible) })}` },

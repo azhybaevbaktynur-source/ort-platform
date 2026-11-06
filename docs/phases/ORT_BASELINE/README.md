@@ -110,3 +110,12 @@ owner. Never to make a failing run green without looking.
 
 - 2026-10-28: teacher-* re-recorded for Phase 8a staff course tabs (approved; before/after in docs/phases/PHASE_8A_screens/ort-review/)
 - 2026-10-31: lobby-* and teacher-* frame screens re-recorded for Phase 8c course sidebar (approved; before/after in docs/phases/PHASE_8C_screens/ort-before-after/)
+- 2026-11-07: every student image (37: nine screens × phone/desktop × ru/ky + `player-loading-phone-ru`) re-recorded
+  for SF-1 (STUDENT_UI_FIX_PLAN §2): lobby and result/review inside the student shell, the redesigned result card
+  (hero + section breakdown), the player chrome-less with the student tokens (sky blue, Inter). Look only: the DOM
+  walks (`ort.spec.ts`, `bluebook-player`, `scrolling-player`, `exam-prep`) and the backend ORT parity tests pass
+  unchanged; `teacher-*` match unchanged. Before/after pairs in `docs/phases/STUDENT_UI_FIX_screens/ort-review/`
+  (`<name>-before.png` / `<name>-after.png`); awaiting the orchestrator's review. The general-player baselines
+  `PHASE_8B_screens/general-player/{scrolling-top,one-per-page}-phone-ru.png` changed for the same reason (Inter is
+  narrower, the card header fits one line); pairs in `STUDENT_UI_FIX_screens/general-player-review/`. Known artifact:
+  the phone `result-*` element shots include the fixed student tab bar over the card's last rows.

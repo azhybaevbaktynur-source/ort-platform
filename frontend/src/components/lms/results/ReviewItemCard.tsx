@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Check, Circle, Clock, Minus, X } from "lucide-react";
-import { Badge, type BadgeTone } from "@/components/ui";
+import { Badge, cn, type BadgeTone } from "@/components/ui";
 import { useTranslation } from "@/lib/i18n/context";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import { TemplatePassage } from "@/components/lms/PlainPassage";
@@ -58,7 +58,10 @@ export function ReviewItemCard({
   children,
   viewer = "student",
   passageDisplay,
+  anchorId,
 }: {
+  /** SF-1 / problem 3: the result page's anchor (`item-{position}`), the target of `#item-n` links. */
+  anchorId?: string;
   item: ReviewItemOut;
   number: number;
   maxPoints?: number | string | null;
@@ -79,7 +82,7 @@ export function ReviewItemCard({
   const keyList = (name: string): Record<string, unknown>[] => (key && Array.isArray(key[name]) ? (key[name] as Record<string, unknown>[]) : []);
 
   return (
-    <article className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5" aria-label={t("results.questionN", { n: number })}>
+    <article id={anchorId} className={cn("space-y-4 rounded-2xl border border-slate-200 bg-white p-5", anchorId && "scroll-mt-20")} aria-label={t("results.questionN", { n: number })}>
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
         <h3 className="rounded-lg bg-brand-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-brand-700">{t("results.questionN", { n: number })}</h3>
         <div className="flex flex-wrap items-center gap-2 text-xs">

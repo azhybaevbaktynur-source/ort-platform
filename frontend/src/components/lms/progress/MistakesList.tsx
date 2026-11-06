@@ -59,7 +59,7 @@ export function MistakesList({ courseId }: { courseId: string }) {
                   {m.topic && <span className="min-w-0 break-words">· {m.topic}</span>}
                   {m.submitted_at && <span>· {fmtShortDateTime(m.submitted_at, lang)}</span>}
                 </p>
-                <Link href={`/${lang}/courses/${courseId}/attempts/${m.attempt_id}/result`} className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-700 hover:underline sm:min-h-0">
+                <Link href={`/${lang}/courses/${courseId}/attempts/${m.attempt_id}/result#item-${m.item.position}`}className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-700 hover:underline sm:min-h-0">
                   {t("progress.mistakes.viewAttempt")}
                 </Link>
               </div>

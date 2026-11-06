@@ -10,6 +10,7 @@ import { LmsMeProvider, useLmsMeLoader } from "@/lib/lms/useLmsMe";
 import { AppHeader, AreaPillsSkeleton, Brand, type AppHeaderArea, type AreaKey } from "@/components/ui/AppHeader";
 import { ErrorState, LoadingState, SHELL_WIDTH, Skeleton, cn } from "@/components/ui";
 import { EXAM_COLUMN_INNER, EXAM_COLUMN_OUTER } from "@/components/ui/shellWidth";
+import { inter } from "@/lib/fonts"; // SF-1: the player route's font
 import { lmsErrorKey } from "./ErrorMessage";
 import { PendingInvitationsBanner } from "./PendingInvitationsBanner"; // Phase 6 S4b
 import { InvitationAcceptedNotice } from "./InvitationAcceptedNotice"; // Phase 6 S8
@@ -74,10 +75,19 @@ export function useDeclareStudentCourse(course: CourseOut | null) {
   }, [course, declare]);
 }
 
-/** ORT frames that never change (§2.4): the assessment lobby and every attempt page keep the AppHeader frame. */
-const ORT_FRAME = [/^\/courses\/[^/]+\/assessments\/[^/]+$/, /^\/courses\/[^/]+\/attempts(\/|$)/];
-const isOrtFrame = (rest: string) => ORT_FRAME.some((re) => re.test(rest));
 // --- Student UI U2 end ---
+
+// --- SF-1 begin --- (STUDENT_UI_FIX_PLAN §2.1, replaces STUDENT_UI_DESIGN §2.4): the lobby, the result and the review
+// follow the area rule (students: the student shell); the player route (exact path) has no chrome at all, only the
+// student tokens and Inter. PlayerShell is a fixed overlay and is not changed; it inherits the CSS variables and font.
+const PLAYER_ROUTE = /^\/courses\/[^/]+\/attempts\/[^/]+$/;
+/** The attempt player, `/courses/{c}/attempts/{id}` (path without the language prefix). */
+export const isPlayerRoute = (rest: string) => PLAYER_ROUTE.test(rest);
+/** The player route's only frame: full viewport, Inter, `.student-theme`; no sidebar, tab bar, header or banners. */
+const PLAYER_FRAME = cn(inter.variable, "student-theme min-h-screen font-sans");
+/** Result and review pages outside the student shell (staff previews, sandbox) keep their wide column. */
+const ATTEMPT_PAGE = /^\/courses\/[^/]+\/attempts\//;
+// --- SF-1 end ---
 
 /**
  * Area of a URL. `/courses` follows `?view=`; without it, `coursesDefault` (the tab `/courses` opens with:
@@ -190,22 +200,26 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
     return hideSections ? list.map((a) => ({ ...a, sections: undefined })) : list;
   }, [lang, t, hasTeaching, isAdmin, canCreate, isGuardian, me, rest, urlArea, hideSections]); // `orgs` comes from `me`
 
-  // --- Student UI U2 begin --- (STUDENT_UI_DESIGN §2.1, §2.4): the Learning area gets the student shell, except the
-  // ORT lobby and attempt routes. A course page of someone who teaches waits for the course's own declaration (a
+  // --- Student UI U2 begin --- (STUDENT_UI_DESIGN §2.1; SF-1): the Learning area gets the student shell, except the
+  // player route (no chrome). A course page of someone who teaches waits for the course's own declaration (a
   // course they teach is Teaching); the frames share one tree, so switching never remounts the page.
   const pathCourseId = courseIdOfPath(rest);
-  const ortFrame = isOrtFrame(rest);
+  const playerRoute = isPlayerRoute(rest);
   const awaitingCourseArea = !!pathCourseId && !declared && (hasTeaching || isAdmin);
-  const studentFrame = signedIn && !unauthorized && activeArea === "learning" && !ortFrame && !awaitingCourseArea;
+  const studentFrame = signedIn && !unauthorized && activeArea === "learning" && !playerRoute && !awaitingCourseArea;
   const studentData = useStudentShellData({
     enabled: studentFrame, pathCourseId, declared: declaredCourse, onHome: rest === "/courses", pathKey: rest,
   });
   // --- Student UI U2 end ---
 
   if (authLoading || !user || unauthorized) {
+    // SF-1: the player route waits in its own chrome-less frame
+    if (playerRoute) {
+      return <div className={PLAYER_FRAME}><LoadingState label={t("lms.common.loading")} className="px-4 py-6" /></div>;
+    }
     // Student UI U2: a student path (the cached profile does not teach) gets the student frame's skeleton
     const teachesCached = userProfile?.teacher_status === "approved" || !!userProfile?.is_platform_admin;
-    if (!ortFrame && urlArea === "learning" && !teachesCached) {
+    if (urlArea === "learning" && !teachesCached) {
       return (
         <div className={cn("min-h-screen bg-slate-50", STUDENT_FRAME)}>
           <div aria-hidden="true" className={cn("fixed inset-y-0 left-0 hidden w-[264px] lg:block", STUDENT_SIDEBAR_BG)} />
@@ -246,6 +260,28 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   ];
 
   const meError = meState.error && !me && !consentBlocked ? meState.error : null;
+  const gated = meError ? (
+    <ErrorState message={t(lmsErrorKey(meError.code))} onRetry={() => void meState.reload()} />
+  ) : consentBlocked && !gateOpenPath(rest) ? (
+    <LoadingState label={t("lms.common.loading")} />
+  ) : children;
+  // SF-1 (§2.1): the player route renders with no chrome at all (no header, sidebar, tab bar or banners)
+  if (playerRoute) {
+    return (
+      <AreaDeclareContext.Provider value={setDeclared}>
+        <StudentCourseDeclareContext.Provider value={setDeclaredCourse}>
+          <LmsMeProvider value={meState}>
+            <StudentShellDataContext.Provider value={null}>
+              <Suspense fallback={null}><ViewParam onChange={setView} onTab={setTab} /></Suspense>
+              <div className={PLAYER_FRAME}>
+                <main id="main" tabIndex={-1} className="focus:outline-none">{gated}</main>
+              </div>
+            </StudentShellDataContext.Provider>
+          </LmsMeProvider>
+        </StudentCourseDeclareContext.Provider>
+      </AreaDeclareContext.Provider>
+    );
+  }
   const content = (
     <>
       {/* --- Phase 6 S4b / S8: invitation banner and notice stay under the header --- */}
@@ -253,11 +289,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
       <InvitationAcceptedNotice />
       {/* Phase 11 S3: the one small home-page line; never on the player's paths */}
       {rest === "/courses" && signedIn && !testStudent && !consentBlocked && <PrivacyBanner />}
-      {meError ? (
-        <ErrorState message={t(lmsErrorKey(meError.code))} onRetry={() => void meState.reload()} />
-      ) : consentBlocked && !gateOpenPath(rest) ? (
-        <LoadingState label={t("lms.common.loading")} />
-      ) : children}
+      {gated}
     </>
   );
   // Student UI U2: the same children in both frames (chrome slot, banner, main, tab bar slot), so React keeps <main>
@@ -291,8 +323,9 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
           )}
           <StudentViewBanner />
           <main id="main" tabIndex={-1} className={studentFrame ? cn(STUDENT_MAIN, "focus:outline-none") : cn("py-6 focus:outline-none sm:py-8", SHELL_WIDTH)}>
-            {/* UX rework (PUR-6): the attempt pages (result, review) keep their column; the player is its own overlay */}
-            {/^\/courses\/[^/]+\/attempts(\/|$)/.test(rest)
+            {/* UX rework (PUR-6): result and review outside the student shell (staff previews) keep their column; SF-1:
+                inside the student shell the course layout gives them the reading column */}
+            {!studentFrame && ATTEMPT_PAGE.test(rest)
               ? <div className={EXAM_COLUMN_OUTER}><div className={EXAM_COLUMN_INNER}>{content}</div></div>
               : content}
           </main>
