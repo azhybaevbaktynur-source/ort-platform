@@ -188,7 +188,6 @@ def mistakes(db: Session, course: Course, user_id: str, *, status: str, cursor: 
 TOPIC_MIN_GRADED = 5  # TopicStat.rated
 SECTION_MIN_GRADED = 10  # SectionStat.rated
 WEAK_MIN_TOPICS = 3  # ProgressOut.weak_topics_ready
-MAX_TOPICS = 100
 
 
 def _answer(i):
@@ -278,7 +277,7 @@ def progress(db: Session, course: Course, user_id: str, enrollment_id: uuid.UUID
     out.weak_topics_ready = sum(1 for t in topics if t.rated and t.topic is not None) >= WEAK_MIN_TOPICS
     # rated topics first (weakest first), then the rest (most answers first)
     out.by_topic = sorted(topics, key=lambda t: (not t.rated, t.accuracy if t.rated else 0.0, -t.total,
-                                                 t.topic or "", t.section or ""))[:MAX_TOPICS]
+                                                 t.topic or "", t.section or ""))  # never cut: the sums must hold
     out.open_mistakes = count_open(db, user_id, course.id, visible)
     return out
 

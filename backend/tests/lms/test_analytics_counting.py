@@ -146,3 +146,32 @@ def test_progress_days_outside_the_set_is_422(db, client, days):
     w = _world(db)
     r = client.get(f"/api/v1/courses/{w.course.id}/my/progress", headers=auth(w.student), params={"days": days})
     assert r.status_code == 422
+
+
+def test_invariant_holds_beyond_one_hundred_topics(db, client, at_now):
+    """No topic cap: with 101 topics every topic is listed and the sums still agree."""
+    from tests.lms.factories import make_question
+
+    w = _world(db)
+    w.assessment.allowed_attempts = 20
+    db.commit()
+    qvs = []
+    for k in range(101):
+        q = make_question(db, w.bank, w.teacher, type="single_choice", stem=f"extra {k}")
+        q.topic, q.section = f"t{k:03d}", "math"
+        qvs.append(q.current_version_id)
+    db.commit()
+    t = NOW - timedelta(days=2)
+    k = 0
+    for no in range(1, 16):  # 15 attempts x 7 answers = 105 items, each pointed at its own extra question
+        att = _attempt(db, w, CORRECT, _when(t + timedelta(hours=no), ALL), submit_at=t + timedelta(hours=no, minutes=10),
+                       no=no)
+        for pos in range(1, 8):
+            db.query(AttemptItem).filter(AttemptItem.attempt_id == att.id, AttemptItem.position == pos).update(
+                {"question_version_id": qvs[k % 101]}, synchronize_session=False)
+            k += 1
+        db.commit()
+    n, _ = _check_invariant(client, w, 7)
+    assert n == 105
+    p = _get(client, w.student, w, "progress", days=7)
+    assert len({x["topic"] for x in p["by_topic"]}) == 101

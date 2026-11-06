@@ -225,9 +225,10 @@ def assignments_page(db: Session, course: Course, cursor: Optional[str],
 
 
 def quiz_rollup(db: Session, assessment_ids: list) -> dict:
-    """Attempts and distinct students per assessment over counted attempts; the mean percent over the **first** counted
-    attempt per student (T1, STUDENT_UI_FIX_PLAN 4.4), as the quiz statistics (`statistics.compute.first_attempts`):
-    `COALESCE(raw_score, 0) / points_possible`, 0 % when nothing is possible. No item reads."""
+    """Attempts and distinct students per assessment over counted attempts (every version); the mean percent with the
+    quiz statistics rule (T1, STUDENT_UI_FIX_PLAN 4.4; `statistics.compute.first_attempts` on the default version):
+    the **first** counted attempt per student on the **published version**, `COALESCE(raw_score, 0) /
+    points_possible`, 0 % when nothing is possible. No item reads."""
     if not assessment_ids:
         return {}
     a = _A
@@ -238,6 +239,8 @@ def quiz_rollup(db: Session, assessment_ids: list) -> dict:
                      a.c.points_possible.label("poss"),
                      func.row_number().over(partition_by=(a.c.assessment_id, a.c.user_id),
                                             order_by=(a.c.attempt_no, a.c.id)).label("rn"))
+              .join(Assessment, and_(Assessment.id == a.c.assessment_id,
+                                     Assessment.published_version_id == a.c.assessment_version_id))
               .where(a.c.assessment_id.in_(assessment_ids), counted_attempt(a)).subquery())
     first = (select(ranked.c.aid, func.avg(case((ranked.c.poss > 0, _pct(ranked.c.raw, ranked.c.poss)), else_=0.0))
                     .label("mean")).where(ranked.c.rn == 1).group_by(ranked.c.aid).subquery())

@@ -144,6 +144,25 @@ async def test_quiz_mean_is_first_attempt_and_equals_statistics_mean(db, api):
     assert s.json()["mean_percent"] == r[0]["mean_percent"]
 
 
+async def test_quiz_mean_follows_the_published_version_as_statistics(db, api):
+    """T1 with two versions: the mean is the statistics page's default (published version, first attempt there)."""
+    from tests.lms.factories import make_assessment_version
+
+    w = build(db)
+    qa, q = _quiz(db, w)  # v1: student 0 at 50 %, student 1 at 100 %
+    v2 = make_assessment_version(db, q, w.owner)
+    make_attempt(db, q, v2, w.students[0], enrollment=w.enrs[0], status="graded", raw_score=Decimal(9),
+                 points_possible=Decimal("10"), attempt_no=2)
+    make_attempt(db, q, v2, w.students[2], enrollment=w.enrs[2], status="graded", raw_score=Decimal(4),
+                 points_possible=Decimal("10"), attempt_no=3)
+    r = (await api.call(w.owner, "GET", f"/courses/{w.course.id}/analytics/quizzes")).json()["items"]
+    # v2 only: (90 + 40) / 2 = 65 (one first attempt per student across versions would give 63.3)
+    assert (r[0]["attempts"], r[0]["students"], r[0]["mean_percent"]) == (4, 3, 65.0)
+    s = await api.call(w.owner, "GET", f"/courses/{w.course.id}/assessments/{q.id}/statistics")
+    assert s.status_code == 200, s.text
+    assert s.json()["mean_percent"] == r[0]["mean_percent"]
+
+
 async def test_missing_is_null_without_due_date(db, api):
     """T2: an assignment without a due date has no "missing" (null), not a confident 0."""
     w = build(db)
