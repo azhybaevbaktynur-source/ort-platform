@@ -1,0 +1,84 @@
+"use client";
+
+// S3 access, platform admin: the section tabs and the attention block (exams published in the last 14 days with
+// their tier, and the alert after more than 20 codes shown in an hour). Used by /admin/access and the overview.
+import React, { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { AlertTriangle } from "lucide-react";
+import { useTranslation } from "@/lib/i18n/context";
+import { pickLocalized } from "@/lib/lms/localized";
+import { fmtApiDate } from "@/lib/format";
+import { getAccessOverview, type AccessOverviewOut, type AccessTier, type BatchOut } from "@/lib/lms/access";
+import { Badge, Card, Skeleton, TabsNav, cn, focusRing } from "@/components/ui";
+
+export function AccessTabs({ className }: { className?: string }) {
+  const { lang, t } = useTranslation();
+  const pathname = usePathname();
+  const base = `/${lang}/admin/access`;
+  return (
+    <TabsNav label={t("access.admin.title")} className={cn("mb-6", className)} items={[
+      { href: base, label: t("access.admin.tabs.batches"), active: pathname === base || pathname.startsWith(`${base}/batches`) },
+      { href: `${base}/exams`, label: t("access.admin.tabs.exams"), active: pathname.startsWith(`${base}/exams`) },
+    ]} />
+  );
+}
+
+export function TierBadge({ tier }: { tier: AccessTier }) {
+  const { t } = useTranslation();
+  return <Badge tone={tier === "paid" ? "warning" : "neutral"}>{t(tier === "paid" ? "access.paid" : "access.free")}</Badge>;
+}
+
+export function useAccessOverview(enabled = true) {
+  const [data, setData] = useState<AccessOverviewOut | null>(null);
+  const load = useCallback(async () => {
+    try { setData(await getAccessOverview()); } catch { setData(null); }
+  }, []);
+  useEffect(() => { if (enabled) void load(); }, [enabled, load]);
+  return { data, reload: load };
+}
+
+export function RevealAlert({ count, className }: { count: number; className?: string }) {
+  const { lang, t } = useTranslation();
+  return (
+    <div role="alert" className={cn("flex items-start gap-3 rounded-2xl border border-danger-200 bg-danger-50 p-4 text-sm leading-5 text-danger-900", className)}>
+      <AlertTriangle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" />
+      <p>
+        {t("access.admin.revealAlert", { count })}{" "}
+        <Link href={`/${lang}/admin/audit-log`} className={cn("font-semibold underline", focusRing)}>{t("platformAdmin.nav.auditLog")}</Link>
+      </p>
+    </div>
+  );
+}
+
+/** Exams of platform courses published in the last 14 days, with their tier (design 7.7). */
+export function RecentExamsCard({ data, compact = false, className }: { data: AccessOverviewOut | null; compact?: boolean; className?: string }) {
+  const { lang, t } = useTranslation();
+  const manage = `/${lang}/admin/access/exams`;
+  return (
+    <Card className={className} title={t("access.admin.recent.title")} description={t("access.admin.recent.hint")}
+      actions={compact ? <Link href={manage} className={cn("inline-flex min-h-11 items-center text-sm font-medium text-brand-700 hover:underline sm:min-h-0", focusRing)}>{t("access.admin.recent.manage")}</Link> : undefined}>
+      {!data ? <Skeleton className="h-6 w-2/3" /> : data.recent_exams.length === 0 ? (
+        <p className="text-sm text-slate-600">{t("access.admin.recent.empty")}</p>
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {data.recent_exams.map((e) => (
+            <li key={e.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2.5">
+              <span className="min-w-0">
+                <span className="block break-words font-medium text-slate-900">{pickLocalized(e.title, lang) || t("assessments.untitled")}</span>
+                <span className="block text-sm text-slate-600">{pickLocalized(e.course_title, lang)} · {fmtApiDate(e.published_at, lang)}</span>
+              </span>
+              <TierBadge tier={e.access_tier} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+/** "30 days" or "until 31/05/2027" (the end date is the last day, Bishkek time). */
+export function batchLength(b: Pick<BatchOut, "duration_days" | "ends_on">, t: (k: string, v?: Record<string, string | number>) => string, lang: string): string {
+  if (b.duration_days) return t("access.admin.batches.lengthDaysValue", { count: b.duration_days });
+  return b.ends_on ? t("access.admin.batches.lengthUntil", { date: fmtApiDate(b.ends_on, lang) }) : "";
+}

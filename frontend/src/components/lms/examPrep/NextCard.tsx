@@ -26,10 +26,12 @@ export function NextCard({ next, courseId, className }: { next: ExamNextOut | nu
   const section = next.section ? t(`sections.${next.section}`) : "";
   const title = next.kind === "practice"
     ? t("examPrep.next.practiceTitle", { section })
-    : pickLocalized(next.title, lang) || t("assessments.untitled");
+    : next.kind === "unlock" ? t("examPrep.next.unlockTitle") // S3: only paid tests remain
+      : pickLocalized(next.title, lang) || t("assessments.untitled");
   const href = next.kind === "resume" && next.attempt_id ? `${base}/attempts/${next.attempt_id}`
     : next.kind === "practice" ? `${base}/practice`
-      : `${base}/assessments/${next.assessment_id}`;
+      : next.kind === "unlock" ? `/${lang}/unlock`
+        : `${base}/assessments/${next.assessment_id}`;
   return (
     <section aria-labelledby="exam-next"
       className={cn("flex flex-col gap-4 rounded-2xl border border-brand-200 bg-brand-50 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5", className)}>

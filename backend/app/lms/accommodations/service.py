@@ -62,7 +62,8 @@ def start_context(db: Session, course_id, user_id: str, assessment) -> tuple[Any
     """Attempt start (students): (active enrollment row `(id, content_language)` or None, effective values) in ONE
     statement, so the start keeps its Phase 3 statement budget."""
     row = db.execute(
-        select(Enrollment.id, Enrollment.content_language, EnrollmentAccommodation, AssignmentOverride)
+        select(Enrollment.id, Enrollment.content_language, EnrollmentAccommodation, AssignmentOverride,
+               Enrollment.is_test_student)  # S3 access: test students are never locked
         .select_from(Enrollment)
         .outerjoin(EnrollmentAccommodation, EnrollmentAccommodation.enrollment_id == Enrollment.id)
         .outerjoin(AssignmentOverride, and_(AssignmentOverride.enrollment_id == Enrollment.id,
@@ -71,7 +72,8 @@ def start_context(db: Session, course_id, user_id: str, assessment) -> tuple[Any
     ).first()
     if row is None:
         return None, eff_mod.resolve(None, assessment, None, None)
-    return SimpleNamespace(id=row[0], content_language=row[1]), eff_mod.resolve(None, assessment, row[2], row[3])
+    return (SimpleNamespace(id=row[0], content_language=row[1], is_test_student=bool(row[4])),
+            eff_mod.resolve(None, assessment, row[2], row[3]))
 
 
 def effective_for_assessment(db: Session, course_id, user_id: str, assessment) -> eff_mod.Effective:

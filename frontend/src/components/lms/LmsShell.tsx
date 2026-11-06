@@ -2,7 +2,7 @@
 
 import React, { createContext, Suspense, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { BookOpen, Building2, Lock, Presentation, ShieldCheck, Users } from "lucide-react";
+import { BookOpen, Building2, KeyRound, Lock, Presentation, ShieldCheck, Users } from "lucide-react";
 import { useTranslation, type Language } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
 import { gateOpenPath } from "@/lib/api"; // Phase 11 S3
@@ -183,7 +183,10 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
 
   const name = testStudent ? t("studentView.testStudentName") : me?.display_name || userProfile?.displayName || user.email || "";
   const email = testStudent ? name : me?.email || user.email || ""; // the header hides an email equal to the name
-  const accountLinks = testStudent ? [] : [{ href: `/${lang}/privacy`, label: t("privacy.title"), icon: <Lock />, active: rest === "/privacy" }]; // Phase 11 S3
+  const accountLinks = testStudent ? [] : [
+    { href: `/${lang}/unlock`, label: t("access.menu"), icon: <KeyRound />, active: rest === "/unlock" }, // S3 access
+    { href: `/${lang}/privacy`, label: t("privacy.title"), icon: <Lock />, active: rest === "/privacy" }, // Phase 11 S3
+  ];
 
   const meError = meState.error && !me && !consentBlocked ? meState.error : null;
   const content = (

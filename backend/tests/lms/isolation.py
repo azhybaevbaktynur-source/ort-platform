@@ -55,6 +55,11 @@ def reset_lms_state() -> None:
         from app.lms.mfa.models import MfaRecoveryCode
 
         conn.execute(delete(MfaRecoveryCode.__table__))
+        # --- S3 access --- passes reference codes and users; codes reference batches and users (RESTRICT)
+        from app.lms.access.models import AccessPass, ActivationCode, ActivationCodeBatch
+
+        for model in (AccessPass, ActivationCode, ActivationCodeBatch):
+            conn.execute(delete(model.__table__))
         # --- Phase 11 S1 end ---
         # --- Phase 7a S1 begin --- hand-ins, rubric scores, overrides, accommodations before the submissions
         from app.lms.accommodations.models import EnrollmentAccommodation

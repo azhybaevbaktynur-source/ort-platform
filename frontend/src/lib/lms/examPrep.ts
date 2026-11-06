@@ -8,7 +8,7 @@ export type Num = string | number;
 export interface ExamGoalOut { target_score: number | null; scale_min: Num | null; scale_max: Num | null }
 export interface ScorePoint { attempt_id: string; assessment_id: string; title: LocalizedText; at: string | null; value: Num | null }
 export interface SectionBar { key: string; raw: Num; possible: Num; correct: number }
-export type NextKind = "resume" | "start" | "practice" | "retake";
+export type NextKind = "resume" | "start" | "practice" | "retake" | "unlock";
 export interface ExamNextOut {
   kind: NextKind;
   assessment_id: string | null;
@@ -27,6 +27,8 @@ export interface ExamPrepOut {
   next: ExamNextOut | null;
   sources: ExamSourceOut[];
   library_total: number;
+  /** S3: some tests here need a pass the student does not have */
+  needs_pass: boolean;
 }
 export type LibraryStatus = "not_started" | "in_progress" | "done";
 export interface LibraryCardOut {
@@ -40,7 +42,8 @@ export interface LibraryCardOut {
   best_value: Num | null;
   best_percent: number | null;
   scale_max: Num | null;
-  /** Reserved for paid tests (S3); always false now. */
+  /** S3: a paid test the student needs a pass for (a timed open attempt stays resumable, so it is not locked). */
+  access_tier: "free" | "paid";
   locked: boolean;
 }
 

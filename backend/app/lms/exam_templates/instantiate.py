@@ -126,6 +126,9 @@ def instantiate(db: Session, ctx: AuthzContext, course: Course, version: ExamTem
         shuffle_items=d.shuffle_items, shuffle_choices=d.shuffle_choices,
         structure_locked=bool(t.locked), **structure_values(spec, version),
     )
+    from app.lms.assessments.builder import default_access_tier
+
+    a.access_tier = default_access_tier(db, course)  # S3 access: `paid` in a platform course
     db.add(a)
     db.flush()
     for vals in section_values(spec, keys):

@@ -4,10 +4,11 @@
 // inline, inside the exam's scale) and the latest released scaled score. Phones: two tiles per row, the latest score
 // on its own row; the target editor takes a full row while open.
 import React, { useState } from "react";
-import { Trophy } from "lucide-react";
+import Link from "next/link";
+import { Lock, Trophy } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { daysUntil, deleteExamGoal, putExamGoal, wholeNumber, type ExamGoalOut, type ExamPrepOut } from "@/lib/lms/examPrep";
-import { Badge, Button, Input, cn } from "@/components/ui";
+import { Badge, Button, Input, cn, focusRing } from "@/components/ui";
 import { useErrorText } from "@/components/lms/home/useErrorText";
 
 const tile = "flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm";
@@ -146,6 +147,15 @@ export function GoalStrip({ data, courseId, onGoal, className }: {
       {editing && (
         <GoalEditor courseId={courseId} goal={data.goal}
           onDone={(g) => { onGoal(g); setEditing(false); }} onCancel={() => setEditing(false)} />
+      )}
+      {data.needs_pass && ( // S3: a quiet line to the unlock page while some tests here need a pass
+        <p className={cn("col-span-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm leading-5 text-slate-600", showDays && "sm:col-span-3")}>
+          <Lock aria-hidden="true" className="h-4 w-4 shrink-0" />
+          <span>{t("access.needsPass")}</span>
+          <Link href={`/${lang}/unlock`} className={cn("inline-flex min-h-11 items-center font-medium text-brand-700 underline-offset-2 hover:underline sm:min-h-0", focusRing)}>
+            {t("access.needsPassLink")}
+          </Link>
+        </p>
       )}
     </section>
   );

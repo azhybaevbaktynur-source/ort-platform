@@ -33,6 +33,7 @@ from app.lms.files.models import Asset
 from app.lms.grading.models import Submission
 from app.lms.guardian.models import GuardianLink, GuardianPairingCode
 from app.lms.mfa.models import MfaRecoveryCode
+from app.lms.access.models import AccessPass, ActivationCode  # S3 access
 from app.lms.organizations.ids import personal_org_id
 from app.lms.organizations.models import Invitation, Organization
 from app.lms.privacy.service import holder_lost
@@ -204,5 +205,10 @@ def anonymize_user(db: Session, user_id: str, *, actor_id: str) -> dict[str, int
     _scrub_guardians(db, user_id, actor_id, now)
     _scrub_user(user, actor_id, now)
     db.execute(delete(MfaRecoveryCode).where(MfaRecoveryCode.user_id == user_id))  # S1 admin security
+    # S3 access (design 7.5): passes stay (revenue record) without the admin's reason; the buyer on a redeemed code goes
+    db.execute(update(AccessPass).where(AccessPass.user_id == user_id).values(reason=None)
+               .execution_options(synchronize_session=False))
+    db.execute(update(ActivationCode).where(ActivationCode.redeemed_by_id == user_id).values(given_note=None)
+               .execution_options(synchronize_session=False))
     db.flush()
     return blobs

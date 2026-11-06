@@ -62,6 +62,7 @@ class PracticeSetOut(BaseModel):
     my_best_percent: Optional[float] = None
     my_last_at: Optional[datetime] = None
     open_attempt_id: Optional[uuid.UUID] = None
+    locked: Optional[bool] = None  # S3 access (students only): a pass is needed to practise here
 
 
 class PracticeFacetsOut(BaseModel):

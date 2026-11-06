@@ -140,7 +140,10 @@ def ort_ru_course(api: Api, token: str) -> dict:
     raise SystemExit("seed: the ORT (Russian) course was not seeded")
 
 
-def build_exam(api: Api, token: str, cid: str, bank_id: str, title: str, picks: dict[str, list[str]]) -> dict:
+def build_exam(api: Api, token: str, cid: str, bank_id: str, title: str, picks: dict[str, list[str]],
+               tier: str = "free") -> dict:
+    """S3 access: new tests of a platform course start paid; the seeded ORT exams are free, as migration 0022 left
+    every existing exam on production (the platform admin's toggle, `token` is the admin's)."""
     a = api.call("POST", f"/courses/{cid}/assessments", token, {
         "title": {"ru": title, "ky": title, "en": title}, "preset": "ort_main", "languages": ["ru"]})
     assert [s["key"] for s in a["sections"]] == SECTIONS, a["sections"]
@@ -152,6 +155,7 @@ def build_exam(api: Api, token: str, cid: str, bank_id: str, title: str, picks: 
     v = api.call("POST", f"{base}/validate", token, {})
     assert not v["errors"], v
     pub = api.call("POST", f"{base}/publish", token, {})
+    api.call("PATCH", f"/platform/access/exams/{a['id']}", token, {"access_tier": tier})  # S3 access
     return {"id": a["id"], "version": pub["version"]["version_no"], "items": pub["version"]["item_count"]}
 
 
@@ -733,6 +737,51 @@ def seed_exam_prep(api: Api, log: Path) -> dict:
 # --- Exam prep S2 end ---
 
 
+# --- S3 access begin --- (frontend/e2e/access.spec.ts; written after every other row)
+PLATFORM_ORG_ID = str(uuid.uuid5(uuid.uuid5(uuid.NAMESPACE_URL, "https://ort-platform/lms/organizations"), "org:platform"))
+
+
+def free_platform_exams(api: Api, tok: str) -> int:
+    """Every test the other seeds created in platform courses becomes free, as on production after migration 0022."""
+    n = 0
+    while True:
+        page = api.call("GET", "/platform/access/exams?tier=paid&limit=50", tok)
+        if not page["items"]:
+            return n
+        for e in page["items"]:
+            api.call("PATCH", f"/platform/access/exams/{e['id']}", tok, {"access_tier": "free"})
+            n += 1
+
+
+def seed_access(api: Api, log: Path, tok: str, root: Path) -> dict:
+    """A private ORT-template course of the platform organization (so no other spec sees it), its own bank from the same
+    bundle, one free and one paid ORT exam, and a student who joined by code and has no pass."""
+    course = api.call("POST", "/courses", tok, {
+        "title": {"ru": "ОРТ S3 E2E"}, "languages": ["ru"],
+        "default_language": "ru", "organization_id": PLATFORM_ORG_ID, "template_key": "ort"})
+    cid = course["id"]
+    api.call("POST", f"/courses/{cid}/publish", tok, {})
+    body, ctype = multipart({"language": "ru", "exam_type": "full_main"}, "file", "tsoomo19.zip",
+                            (root / "backend/tests/fixtures/bundles/tsoomo19.zip").read_bytes())
+    bank_id = api.call("POST", f"/courses/{cid}/imports", tok, raw=body, content_type=ctype)["banks"][0]["bank_id"]
+    picks: dict[str, list[str]] = {}
+    for key in SECTIONS:
+        qs = pages(api, f"/courses/{cid}/banks/{bank_id}/questions", tok, section=key)
+        if key == "reading":
+            pid = next(q["passage_id"] for q in qs if q.get("passage_id"))
+            picks[key] = [q["id"] for q in qs if q.get("passage_id") == pid]
+        else:
+            picks[key] = [q["id"] for q in qs[:COUNTS[key]]]
+    free = build_exam(api, tok, cid, bank_id, "ОРТ S3 бесплатный", picks, tier="free")
+    paid = build_exam(api, tok, cid, bank_id, "ОРТ S3 платный", picks, tier="paid")
+    student = register(api, log, "e2e-access-student@example.com", "Access Student")
+    student["profile"] = profile(api, student["token"])
+    api.call("POST", "/courses/join", student["token"], {"code": course["join_code"]})
+    return {"course_id": cid, "free_exam": free, "paid_exam": paid, "student": student,
+            "counts": [len(picks[k]) for k in SECTIONS]}
+# --- S3 access end ---
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--api", required=True)
@@ -812,6 +861,8 @@ def main() -> int:
     landing = seed_landing(api, log, tok, cid)  # landing page screenshots (after every other row)
     teacher_signup = seed_teacher_signup(api, log, tok, org_admin["organization_id"], org_admin["org_admin"])  # Accounts
     exam_prep = seed_exam_prep(api, log)  # Exam prep S2 (after every other row)
+    freed = free_platform_exams(api, tok)  # S3 access: the other seeds' platform tests stay free, as on production
+    access = seed_access(api, log, tok, root)  # S3 access (after every other row)
     # S1 admin security: a second platform admin, with a password, for the two-step login walk (admin-mfa.spec.ts)
     mfa_admin = register(api, log, "e2e-mfa-admin@example.com", "MFA Admin", keep_password=True)
     subprocess.run([sys.executable, str(root / "backend" / "make_admin.py"), mfa_admin["email"]], check=True,
@@ -838,6 +889,7 @@ def main() -> int:
         "landing": landing,
         "teacher_signup": teacher_signup,
         "exam_prep": exam_prep,
+        "access": access,
         "mfa_admin": mfa_admin,
         "gate_admin": extra_admins["gate"], "shots_admin": extra_admins["shots"],
         "api": args.api, "course_id": cid, "bank_id": bank_id, "exam": exam, "staff_exam": staff_exam,
@@ -847,7 +899,7 @@ def main() -> int:
     tmp = out_path.with_suffix(".tmp")
     tmp.write_text(json.dumps(seed, ensure_ascii=False, indent=2), encoding="utf-8")
     tmp.replace(out_path)
-    print(f"seed: course {cid}, exam {exam}, staff exam {staff_exam}, {len(students)} students")
+    print(f"seed: course {cid}, exam {exam}, staff exam {staff_exam}, {len(students)} students, {freed} tests set free")
     return 0
 
 

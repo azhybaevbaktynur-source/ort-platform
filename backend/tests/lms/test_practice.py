@@ -559,6 +559,9 @@ async def test_ort_course_practice_leaves_the_exam_alone(db, api):
     enroll(db, course, teacher, "teacher", source="staff_add")
     student = make_user(db)
     enroll(db, course, student)
+    from tests.lms.access_support import give_pass
+
+    give_pass(db, student)  # S3: practice of a platform course needs a pass
     bank_id = next(iter({s["qv"] for s in before.snapshot["slots"]["ru"]}))
     qv = db.get(QuestionVersion, uuid.UUID(bank_id))
     from app.lms.content.models import BankQuestion

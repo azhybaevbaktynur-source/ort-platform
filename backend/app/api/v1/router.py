@@ -130,3 +130,9 @@ from app.lms.mfa.router import router as _mfa_router  # noqa: E402
 
 api_router.include_router(_mfa_router, prefix="/platform", tags=["Platform Admin"])
 # --- S1 admin security end ---
+# --- S3 access begin --- (free and paid exams: the caller's own pass, and the platform admin's codes and passes)
+from app.lms.access.router import admin_router as _access_admin_router, me_router as _access_me_router  # noqa: E402
+
+api_router.include_router(_access_me_router, prefix="/me", tags=["Me"])
+api_router.include_router(_access_admin_router, prefix="/platform", tags=["Platform Admin"])
+# --- S3 access end ---

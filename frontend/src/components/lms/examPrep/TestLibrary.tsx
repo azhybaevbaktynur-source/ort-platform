@@ -2,10 +2,11 @@
 
 // Exam prep S2: every published test as a card (status, best released score), filtered by source. The sources are
 // the course's published modules (teachers already group tests by source in modules); tests in no module are "Other".
-// Paginated ("Show more"). Each card keeps an empty slot beside its status for the lock of paid tests (S3).
+// Paginated ("Show more"). S3: a paid test the student has no pass for shows a lock and "Paid" and opens the unlock
+// page instead of the lobby.
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Clock, ListChecks } from "lucide-react";
+import { Clock, ListChecks, Lock } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
 import { SOURCE_OTHER, listExamLibrary, wholeNumber, type ExamSourceOut, type LibraryCardOut, type LibraryStatus } from "@/lib/lms/examPrep";
@@ -36,9 +37,15 @@ function TestCard({ card, href }: { card: LibraryCardOut; href: string }) {
   return (
     <li className="group relative flex min-w-0 flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
       <div className="flex items-start justify-between gap-2">
-        <Badge tone={STATUS_TONE[card.status]}>{t(`examPrep.library.status.${card.status}`)}</Badge>
-        {/* S3: the lock of a paid test goes here; empty now */}
-        <span aria-hidden="true" data-slot="lock" className="h-6 w-6 shrink-0" />
+        <span className="flex flex-wrap items-center gap-2">
+          <Badge tone={STATUS_TONE[card.status]}>{t(`examPrep.library.status.${card.status}`)}</Badge>
+          {card.locked && <Badge tone="warning">{t("access.paid")}</Badge>}
+        </span>
+        {card.locked
+          ? <span data-slot="lock" className="inline-flex h-6 w-6 shrink-0 items-center justify-center text-slate-600" title={t("access.lockedLabel")}>
+              <Lock aria-hidden="true" className="h-5 w-5" /><span className="sr-only">{t("access.lockedLabel")}</span>
+            </span>
+          : <span aria-hidden="true" data-slot="lock" className="h-6 w-6 shrink-0" />}
       </div>
       <h3 className="break-words text-base font-semibold leading-6 text-slate-900">
         <Link href={href}
@@ -102,7 +109,8 @@ export function TestLibrary({ courseId, sources, total, className }: {
   }, [courseId, source]);
   useEffect(() => { void load(); }, [load]);
 
-  const href = (c: LibraryCardOut) => `${base}/assessments/${c.id}`; // the lobby: start, continue or see the results
+  // the lobby: start, continue or see the results; S3: a locked test opens the unlock page
+  const href = (c: LibraryCardOut) => (c.locked ? `/${lang}/unlock` : `${base}/assessments/${c.id}`);
 
   return (
     <section aria-labelledby="exam-library" className={cn("min-w-0", className)}>
