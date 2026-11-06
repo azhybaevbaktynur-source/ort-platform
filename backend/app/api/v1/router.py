@@ -122,3 +122,8 @@ from app.lms.content.shared_banks_router import (  # noqa: E402
 api_router.include_router(_shared_banks_org_router, prefix="/org", tags=["Organizations"])
 api_router.include_router(_shared_banks_course_router, prefix="/courses", tags=["Question Bank (LMS)"])
 # --- Phase 9 S2 end ---
+# --- S1 admin security begin --- (the admin's own two-step login setup)
+from app.lms.mfa.router import router as _mfa_router  # noqa: E402
+
+api_router.include_router(_mfa_router, prefix="/platform", tags=["Platform Admin"])
+# --- S1 admin security end ---

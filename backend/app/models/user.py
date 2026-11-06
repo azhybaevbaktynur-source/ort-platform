@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 import sqlalchemy as sa
-from sqlalchemy import Column, String, Integer, DateTime, Boolean, ForeignKey, CheckConstraint, Index
+from sqlalchemy import BigInteger, Column, String, Integer, DateTime, Boolean, ForeignKey, CheckConstraint, Index
 from app.db.session import Base
 
 
@@ -40,6 +40,13 @@ class User(Base):
     consent_due_at = Column(DateTime(timezone=True), nullable=True)
     deleted_at = Column(DateTime(timezone=True), nullable=True)  # the row stays as a tombstone (privacy/anonymize.py)
     token_version = Column(Integer, default=0, nullable=False, server_default="0")
+    # S1 admin security (app/lms/mfa): two-step login. The TOTP secret is stored only encrypted (AES-GCM, key derived from
+    # SECRET_KEY); `mfa_pending_secret_enc` holds a secret shown during setup until a code confirms it. `mfa_last_step`
+    # is the last accepted 30-second time step: a code is never accepted twice.
+    mfa_secret_enc = Column(String(255), nullable=True)
+    mfa_pending_secret_enc = Column(String(255), nullable=True)
+    mfa_enabled_at = Column(DateTime(timezone=True), nullable=True)
+    mfa_last_step = Column(BigInteger, nullable=True)
 
     __table_args__ = (
         CheckConstraint("teacher_status IN ('none','pending','approved','revoked')", name="teacher_status_valid"),

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
@@ -33,6 +33,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const { lang, t } = useTranslation();
   const { me, loading } = useLmsMe();
   const pathname = usePathname();
+  const router = useRouter();
   const [pending, setPending] = useState<number | null>(null);
   const [storageLevel, setStorageLevel] = useState<StorageLevel | null>(null);
   const [error, setError] = useState<LmsApiError | null>(null);
@@ -47,6 +48,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         setPending(s.pending_teacher_requests);
         setStorageLevel(s.storage_level);
       } catch (e) {
+        if ((e as LmsApiError)?.code === "mfa_enrollment_required") { // S1: set up two-step login first
+          setError(e as LmsApiError);
+          return;
+        }
         if (retry) {
           await new Promise((done) => setTimeout(done, RETRY_MS));
           return load(false);
@@ -57,6 +62,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     void load(true);
   }, []);
   useEffect(() => { if (isAdmin) refresh(); }, [isAdmin, refresh]);
+  const securityPath = `/${lang}/admin/security`;
+  const mustEnroll = error?.code === "mfa_enrollment_required";
+  useEffect(() => {
+    if (mustEnroll && pathname !== securityPath) router.replace(securityPath);
+  }, [mustEnroll, pathname, securityPath, router]);
 
   if (loading && !me) return <LoadingState label={t("lms.common.loading")} />;
   if (!isAdmin) {
@@ -81,8 +91,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     { href: `${base}/audit-log`, label: t("platformAdmin.nav.auditLog") },
     { href: `${base}/storage`, label: t("storage.nav") },
     { href: `${base}/privacy`, label: t("privacy.admin.title") }, // Phase 11 S3
+    { href: `${base}/security`, label: t("adminSecurity.nav") }, // S1 admin security
   ];
-  const items = nav.map((i) => ({
+  const visible = mustEnroll ? nav.filter((i) => i.href === securityPath) : nav;
+  const items = visible.map((i) => ({
     href: i.href, label: i.label, count: i.count,
     active: i.exact ? pathname === i.href : pathname === i.href || pathname.startsWith(`${i.href}/`),
   }));
@@ -93,7 +105,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         items={items}
         heading={<p className="text-xs font-semibold uppercase tracking-wide text-slate-600">{t("shell.areas.platform")}</p>}
       >
-        {children}
+        {mustEnroll && pathname !== securityPath ? <LoadingState label={t("lms.common.loading")} /> : children}
       </AreaShell>
     </SummaryContext.Provider>
   );

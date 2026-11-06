@@ -148,6 +148,12 @@ PAIR_REDEEM_USER_10M = Limit("pair_redeem_user_10m", 10, 600)
 PAIR_REDEEM_USER_24H = Limit("pair_redeem_user_24h", 30, 86400)
 PAIR_REDEEM_IP_FAIL_10M = Limit("pair_redeem_ip_fail_10m", 60, 600, is_ip_rule=True)
 # --- Phase 11 S4 end ---
+# --- S1 admin security begin --- two-step login (app/lms/mfa): every try on one challenge counts; wrong codes count per
+# account across challenges, setup screens and code-confirmed admin actions
+MFA_CHALLENGE_TRY = Limit("mfa_challenge_try", 5, 900)
+MFA_USER_FAIL_1H = Limit("mfa_user_fail_1h", 10, 3600)
+MFA_SETUP_1H = Limit("mfa_setup_1h", 10, 3600)
+# --- S1 admin security end ---
 
 _CLEANUP_PROBABILITY = 1 / 200
 _CLEANUP_BATCH = 1000

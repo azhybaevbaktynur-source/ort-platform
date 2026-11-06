@@ -32,6 +32,7 @@ from app.lms.files import service as files_svc
 from app.lms.files.models import Asset
 from app.lms.grading.models import Submission
 from app.lms.guardian.models import GuardianLink, GuardianPairingCode
+from app.lms.mfa.models import MfaRecoveryCode
 from app.lms.organizations.ids import personal_org_id
 from app.lms.organizations.models import Invitation, Organization
 from app.lms.privacy.service import holder_lost
@@ -162,6 +163,7 @@ def _scrub_user(user: User, actor_id: str, now) -> None:
     user.teacher_status = "none"
     user.token_version = (user.token_version or 0) + 1
     user.consent_state, user.consent_due_at = "exempt", None
+    user.mfa_secret_enc = user.mfa_pending_secret_enc = user.mfa_enabled_at = user.mfa_last_step = None  # S1
 
 
 def anonymize_user(db: Session, user_id: str, *, actor_id: str) -> dict[str, int]:
@@ -198,5 +200,6 @@ def anonymize_user(db: Session, user_id: str, *, actor_id: str) -> dict[str, int
     _scrub_audit(db, user_id, email)
     _scrub_guardians(db, user_id, actor_id, now)
     _scrub_user(user, actor_id, now)
+    db.execute(delete(MfaRecoveryCode).where(MfaRecoveryCode.user_id == user_id))  # S1 admin security
     db.flush()
     return blobs

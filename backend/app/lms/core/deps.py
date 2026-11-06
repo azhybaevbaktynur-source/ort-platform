@@ -53,6 +53,8 @@ def get_lms_user(authorization: Optional[str] = Header(None), db: Session = Depe
     """P3-27: authenticate with the request's own session (one pool checkout per request). A test student (Student
     view) passes the deny-by-default route allow-list here, so no route can forget it; `request` is FastAPI's."""
     claims = _claims_from_authorization(authorization)
+    if claims.get("typ") is not None:  # S1: access tokens carry no `typ`; a two-step challenge is never a session
+        raise UnauthorizedException("Invalid or expired token")
     user_id = claims.get("sub")
     user = db.get(User, user_id) if user_id else None
     if user is None:
@@ -74,9 +76,17 @@ def get_lms_user(authorization: Optional[str] = Header(None), db: Session = Depe
     return user
 
 
-def require_platform_admin(user: User = Depends(get_lms_user)) -> User:
+def require_platform_admin_enrolling(user: User = Depends(get_lms_user)) -> User:
+    """S1: the two-step login setup routes, open to a platform admin who has not set it up yet."""
     if not user.is_platform_admin:
         raise Forbidden("Platform admin required", code="platform_admin_required")
+    return user
+
+
+def require_platform_admin(user: User = Depends(require_platform_admin_enrolling)) -> User:
+    """Every platform-admin route. S1: with ADMIN_MFA_REQUIRED, an admin without two-step login is sent to set it up."""
+    if settings.ADMIN_MFA_REQUIRED and user.mfa_enabled_at is None:
+        raise Forbidden("Set up two-step login first", code="mfa_enrollment_required")
     return user
 
 

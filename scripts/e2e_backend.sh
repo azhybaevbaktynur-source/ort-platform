@@ -53,6 +53,7 @@ run_env=(
   R2_ACCOUNT_ID= R2_ACCESS_KEY_ID= R2_SECRET_ACCESS_KEY=
   EMAIL_PROVIDER=console
   RATE_LIMIT_IP_ENFORCE=false
+  ADMIN_MFA_REQUIRED=false  # S1: the seeded admins have no two-step login; admin-mfa.spec.ts sets it up for its own
   SECRET_KEY="$SECRET_KEY"
   ORT_SEED_SAMPLES=false
   ALLOWED_ORIGINS="$WEB_ORIGIN"

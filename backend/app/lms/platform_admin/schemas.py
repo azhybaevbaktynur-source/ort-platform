@@ -40,6 +40,7 @@ class AdminUserOut(BaseModel):
     teacher_status: str
     disabled_at: Optional[datetime] = None
     disabled_reason: Optional[str] = None
+    mfa_enabled: bool = False  # S1: two-step login on
 
 
 class OwnedCourseBrief(BaseModel):
@@ -92,3 +93,16 @@ class TeacherStatusIn(BaseModel):
 
 class DisableIn(BaseModel):
     reason: str = Field(min_length=1, max_length=500)
+
+
+# --- S1 admin security begin ---
+class PlatformAdminIn(BaseModel):
+    """Make (`true`) or remove (`false`) a platform admin; the acting admin's current authenticator code confirms it."""
+    platform_admin: bool
+    reason: str = Field(min_length=1, max_length=500)
+    code: str = Field(min_length=1, max_length=40)
+
+
+class EndSessionsIn(BaseModel):
+    reason: str = Field(min_length=1, max_length=500)
+# --- S1 admin security end ---

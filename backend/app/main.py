@@ -202,11 +202,13 @@ register_error_handlers(app)
 
 @app.get("/health", tags=["Health"])
 async def health_check():
+    """Cheap on purpose: Render pings it and Neon must be allowed to sleep, so it never touches the database. It proves
+    the server answers. The real check (database, migrations, email, storage) is the admin-only GET /platform/health."""
     return {
         "status": "healthy",
         "service": settings.PROJECT_NAME,
         "environment": settings.ENVIRONMENT,
-        "database": "connected",
+        "database": "not_checked",
         # Deployed commit (Render sets RENDER_GIT_COMMIT), to confirm which code is live
         "commit": os.getenv("RENDER_GIT_COMMIT", "")[:7] or None,
     }

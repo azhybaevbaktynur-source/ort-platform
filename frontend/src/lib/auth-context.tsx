@@ -64,6 +64,8 @@ interface AuthContextType {
   signUp: (email: string, pass: string, displayName: string, phone: string | undefined, consent: SignUpConsent) => Promise<RegisterResult>;
   verifyEmail: (email: string, pass: string, code: string) => Promise<void>;
   resendCode: (email: string) => Promise<{ resendAfterSeconds: number }>;
+  /** S1: second sign-in step after an AuthError `mfa_required` (details.challenge): authenticator or recovery code. */
+  completeMfa: (challenge: string, code: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -75,6 +77,7 @@ const AuthContext = createContext<AuthContextType>({
   signUp: async () => ({ email: "", resendAfterSeconds: 60, codeTtlMinutes: 10 }),
   verifyEmail: async () => {},
   resendCode: async () => ({ resendAfterSeconds: 60 }),
+  completeMfa: async () => {},
   signOut: async () => {},
 });
 
@@ -254,6 +257,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return postJson("/auth/resend-code", { email: email.trim(), lang });
   };
 
+  const completeMfa = async (challenge: string, code: string): Promise<void> => {
+    const data = await postJson("/auth/mfa", { challenge, code: code.trim() });
+    finishLogin(data);
+  };
+
   const signOut = async () => {
     if (getStudentView()) { // UX rework S1: never the teacher's login from a Student view tab
       leaveStudentView();
@@ -272,6 +280,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signUp,
         verifyEmail,
         resendCode,
+        completeMfa,
         signOut,
       }}
     >

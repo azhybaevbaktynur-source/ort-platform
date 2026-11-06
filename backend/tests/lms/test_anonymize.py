@@ -80,6 +80,7 @@ def fill(db):
     u = make_user(db, email=f"{S}@example.com", display_name=S)
     u.password_hash = S
     u.phone, u.reset_token, u.email_code_hash, u.disabled_reason = S, S, S, S
+    u.mfa_secret_enc = u.mfa_pending_secret_enc = S  # S1 admin security
     u.locale, u.age_band = "ru", "18_plus"
     db.commit()
     enr = Enrollment(course_id=w.course.id, user_id=u.id, role="student", state="active", source="join_code",

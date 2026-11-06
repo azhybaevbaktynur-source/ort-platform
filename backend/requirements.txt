@@ -20,3 +20,4 @@ pytest-alembic>=0.11.0
 Markdown==3.11.1
 nh3==0.3.7
 sentry-sdk>=2.0.0,<3
+cryptography==50.0.1  # S1 admin security: AES-GCM for the two-step login secret, HKDF (app/lms/mfa/service.py)

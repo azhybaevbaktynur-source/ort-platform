@@ -802,6 +802,11 @@ def main() -> int:
     privacy = seed_privacy(api, log, cid, exam["id"])  # Phase 11 S3 (after every other row)
     landing = seed_landing(api, log, tok, cid)  # landing page screenshots (after every other row)
     teacher_signup = seed_teacher_signup(api, log, tok, org_admin["organization_id"], org_admin["org_admin"])  # Accounts
+    # S1 admin security: a second platform admin, with a password, for the two-step login walk (admin-mfa.spec.ts)
+    mfa_admin = register(api, log, "e2e-mfa-admin@example.com", "MFA Admin", keep_password=True)
+    subprocess.run([sys.executable, str(root / "backend" / "make_admin.py"), mfa_admin["email"]], check=True,
+                   env=os.environ.copy(), stdout=subprocess.DEVNULL)
+    mfa_admin["profile"] = profile(api, mfa_admin["token"])
 
     seed = {
         "quiz_editor": quiz_editor,
@@ -814,6 +819,7 @@ def main() -> int:
         "privacy": privacy,
         "landing": landing,
         "teacher_signup": teacher_signup,
+        "mfa_admin": mfa_admin,
         "api": args.api, "course_id": cid, "bank_id": bank_id, "exam": exam, "staff_exam": staff_exam,
         "picks": picks, "keys": keys, "comparison_question_id": comparison_qid, "passage_id": passage_id,
         "staff_attempt_id": staff_attempt, "admin": admin, "students": students,

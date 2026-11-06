@@ -224,6 +224,8 @@ export interface AdminUserOut {
   teacher_status: TeacherStatus;
   disabled_at: string | null;
   disabled_reason: string | null;
+  /** S1: two-step login is on. */
+  mfa_enabled?: boolean;
 }
 export interface AdminUserDetailOut extends AdminUserOut {
   owned_courses: CourseCard[];
@@ -293,6 +295,9 @@ export const LMS_ERROR_CODES = [
   "test_student_forbidden",
   // Accounts: the teacher application and personal organizations
   "reapply_wait", "teacher_age_required", "age_confirmation_required", "personal_org_no_members",
+  // S1 admin security: two-step login, platform admins
+  "mfa_enrollment_required", "mfa_invalid_code", "mfa_already_enabled", "mfa_setup_missing", "last_platform_admin",
+  "already_platform_admin", "not_platform_admin", "target_email_not_verified", "target_disabled",
 ] as const;
 export type LmsErrorCode = (typeof LMS_ERROR_CODES)[number];
 

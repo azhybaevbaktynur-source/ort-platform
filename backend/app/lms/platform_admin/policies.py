@@ -11,4 +11,8 @@ PLATFORM_POLICIES: dict[tuple[str, str], str] = {
     ("POST", f"{_P}/users/{{user_id}}/disable"): "platform_admin",
     ("POST", f"{_P}/users/{{user_id}}/enable"): "platform_admin",
     ("GET", f"{_P}/audit-log"): "platform_admin",
+    # --- S1 admin security ---
+    ("POST", f"{_P}/users/{{user_id}}/platform-admin"): "platform_admin",  # + acting admin's current code; audited
+    ("POST", f"{_P}/users/{{user_id}}/end-sessions"): "platform_admin",  # audited
+    ("GET", f"{_P}/health"): "platform_admin",  # database, migrations, email and storage configuration
 }
