@@ -38,3 +38,13 @@ Platform admin (all audited, reason required where marked, behind S1's two-step 
 
 ## 6. Tests to require
 Locked start refused; resume of an open attempt allowed after expiry; staff/preview/Student view unaffected; non-platform courses never locked even if the column says paid; practice rule; redemption: wrong, used, revoked, case/dash variants, concurrent double redeem (PG), rate limits, extension arithmetic, `ends_on` in Bishkek time; admin actions audited; isolation (a student never sees another's pass); ORT parity unchanged for a student with access and for free tests.
+
+## 7. Changes after the security review (2026-11-06, Fable; these override the sections above)
+1. **Resume after a pass ends** (was "resuming never checks"): an open attempt of a paid exam may be resumed after the pass ended **only if it is timed** (`deadline_at` set), so it closes by itself. An untimed open attempt (including practice sets) is refused with `access_required` until the student has a pass again; its answers are kept. Otherwise a 1-day pass could open every exam and keep them for months.
+2. **Per-user serialization:** redeem and admin grant lock the user's row (`SELECT … FOR UPDATE` on `users`) in the same transaction as the code `UPDATE` and the pass `INSERT`; the code is never burned in a separate commit. Concurrent redeem + grant can't overlap or lose days.
+3. **Test students** (`Enrollment.is_test_student`, Student view) are never locked: the check reads the enrollment row `accommodations.start_context` already loads.
+4. **No-benefit codes:** an `ends_on` code whose date is not later than the current pass end is refused with `code_no_benefit` before anything is written; a batch whose `ends_on` has passed refuses with `code_invalid`. Pass times are stored UTC-aware and compared through `timing.as_utc` (SQLite stores naive).
+5. **Privacy:** `given_note` (the buyer, possibly a third person) is set to null when the redeeming user is anonymized and is never in a student's export; `access_passes` rows stay as tombstones (revenue record).
+6. **Admin limits:** a grant needs a reason and is capped at 400 days; the CSV export is audited with batch id and count; revealing more than 20 codes in an hour puts an item on the admin attention list.
+7. **Unnoticed paid exams:** no ORT screen changes (rule 9). Instead the admin "Access" page and the overview list exams published in the last 14 days with their tier, so the owner sees what became paid.
+8. **Transfer and refund:** documented path = revoke the pass (reason) and grant to the other account (reason), both audited.
