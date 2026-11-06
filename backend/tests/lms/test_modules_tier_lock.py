@@ -294,9 +294,29 @@ async def test_pro_and_rules_locked_free_reference_stays_locked(db, api, frozen_
     assert r.status_code == 201, r.text
 
 
+def test_pro_only_assessment_correlates_with_the_callers_assessment():
+    """F5a review MUST: the quiz's assignment is matched inside the EXISTS, so `assessments` correlates with the
+    caller's query (a scalar subquery nested in the EXISTS did not: `FROM assignments, assessments`, a constant)."""
+    from sqlalchemy.dialects import postgresql, sqlite
+    from sqlalchemy.orm import aliased
+
+    from app.lms.assessments.models import Assessment
+    from app.lms.modules.service import pro_only_assessment
+
+    alias = aliased(Assessment)
+    for model in (Assessment, alias):
+        for dialect in (sqlite.dialect(), postgresql.dialect()):
+            sql = " ".join(str(select(model.id).where(pro_only_assessment(model)).compile(dialect=dialect)).split())
+            assert "FROM assignments, assessments" not in sql and "assessments, assignments" not in sql, sql
+            assert sql.count("FROM assessments") == 1, sql  # only the outer query names the table
+            assert sql.count("EXISTS") == 2, sql
+
+
 async def test_next_test_and_todo_skip_tests_only_pro_modules_hold(db, api, no_scored_hooks):
     """The exam-prep "next" step and the home to-do / next up skip a test that only Pro modules hold for a gated
-    student; an ORT preset exam in the same Pro module keeps its own (free) tier; a pass brings the test back."""
+    student; an ORT preset exam in the same Pro module keeps its own (free) tier; a pass brings the test back.
+    Deterministic for the F5a correlation bug: the Pro-only quiz comes FIRST (lowest position and row order) and the
+    free quiz outside modules after it, so a constant subquery would lock every test (`next` = unlock)."""
     from app.lms.assignments.models import Assignment
     from app.lms.core.models import utcnow
     from app.lms.grading.seeds import ORT_MAIN_V1_ID
@@ -317,24 +337,30 @@ async def test_next_test_and_todo_skip_tests_only_pro_modules_hold(db, api, no_s
                                   title={"ru": title}, allowed_attempts=-1)
         return a, db.execute(select(Assignment).where(Assignment.assessment_id == a.id)).scalar_one()
 
-    pro_a, pro_asg = quiz("Pro", "none")
-    ort_a, ort_asg = quiz("Ort", "ort_main")
-    _free_a, free_asg = quiz("Free", "none")
+    pro_a, pro_asg = quiz("Pro", "none")        # first: only in the Pro module
+    free_a, free_asg = quiz("Free", "none")     # after: in no module
+    assert pro_a.position < free_a.position
     pro = make_module(db, course, t, title={"ru": "Pro"}, access_tier="paid")
     make_item(db, pro, pro_asg)
-    make_item(db, pro, ort_asg)
 
     async def state():
         page = await api.call(s, "GET", f"/courses/{course.id}/exam-prep")
         assert page.status_code == 200, page.text
         home = await api.call(s, "GET", "/me/home")
         assert home.status_code == 200, home.text
-        return (page.json()["next"]["assessment_id"], {r["assignment_id"] for r in home.json()["todo"]},
+        nxt = page.json()["next"]
+        return (nxt.get("assessment_id") or nxt["kind"], {r["assignment_id"] for r in home.json()["todo"]},
                 {r["assignment_id"] for r in home.json()["next_up"]})
 
     nxt, todo, next_up = await state()
-    assert nxt == str(ort_a.id)  # the Pro-only test is skipped; the ORT preset exam is not
-    assert str(pro_asg.id) not in todo | next_up and {str(ort_asg.id), str(free_asg.id)} <= todo
+    assert nxt == str(free_a.id)  # the Pro-only test is skipped, the free one is next (not "unlock")
+    assert str(pro_asg.id) not in todo | next_up and str(free_asg.id) in todo
+    # an ORT preset exam in the same Pro module keeps its own (free) tier
+    ort_a, ort_asg = quiz("Ort", "ort_main")
+    make_item(db, pro, ort_asg)
+    nxt, todo, next_up = await state()
+    assert nxt == str(free_a.id) and {str(ort_asg.id), str(free_asg.id)} <= todo
+    assert str(pro_asg.id) not in todo | next_up
     give_pass(db, s)
     nxt, todo, next_up = await state()
     assert nxt == str(pro_a.id) and str(pro_asg.id) in todo

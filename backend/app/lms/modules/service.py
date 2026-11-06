@@ -244,11 +244,17 @@ def lesson_exists(course_id_expr):
             .exists())
 
 
-def _assignment_ref(assignment_id_expr, tier_cond):
-    return (select(ModuleItem.id).join(CourseModule, CourseModule.id == ModuleItem.module_id)
-            .where(ModuleItem.assignment_id == assignment_id_expr, ModuleItem.deleted_at.is_(None),
-                   ModuleItem.published.is_(True), CourseModule.deleted_at.is_(None),
-                   CourseModule.published.is_(True), tier_cond)
+def _assignment_ref(match, tier_cond, *, via_assessment: bool = False):
+    """EXISTS a live, published item of a live, published module (`tier_cond`) whose assignment matches `match`.
+    `via_assessment` joins the assignment so `match` can name the quiz (`Assignment.assessment_id`) in the same
+    EXISTS: the caller's assessment then correlates one level up (a nested scalar subquery would not correlate)."""
+    q = select(ModuleItem.id).join(CourseModule, CourseModule.id == ModuleItem.module_id)
+    if via_assessment:
+        from app.lms.assignments.models import Assignment
+
+        q = q.join(Assignment, Assignment.id == ModuleItem.assignment_id)
+    return (q.where(match, ModuleItem.deleted_at.is_(None), ModuleItem.published.is_(True),
+                    CourseModule.deleted_at.is_(None), CourseModule.published.is_(True), tier_cond)
             .exists())
 
 
@@ -256,16 +262,19 @@ def pro_only_assignment(assignment_id_expr):
     """SQL: the assignment is referenced by a live, published item of a live, published Pro (`paid`) module and by
     no such item of a free module (the `require_access` rule before the module evaluation). Correlates with the
     caller's `assignment_id_expr` (a column or a scalar subquery)."""
-    return and_(_assignment_ref(assignment_id_expr, CourseModule.access_tier == "paid"),
-                ~_assignment_ref(assignment_id_expr, CourseModule.access_tier != "paid"))
+    match = ModuleItem.assignment_id == assignment_id_expr
+    return and_(_assignment_ref(match, CourseModule.access_tier == "paid"),
+                ~_assignment_ref(match, CourseModule.access_tier != "paid"))
 
 
 def pro_only_assessment(model):
-    """`pro_only_assignment` for a quiz: through its mirrored assignment (`Assignment.assessment_id`)."""
+    """`pro_only_assignment` for a quiz (an Assessment entity or alias): through its mirrored assignment
+    (`Assignment.assessment_id`), joined inside each EXISTS so `model` correlates with the caller's query."""
     from app.lms.assignments.models import Assignment
 
-    return pro_only_assignment(select(Assignment.id).where(Assignment.assessment_id == model.id)
-                               .limit(1).scalar_subquery())
+    match = Assignment.assessment_id == model.id
+    return and_(_assignment_ref(match, CourseModule.access_tier == "paid", via_assessment=True),
+                ~_assignment_ref(match, CourseModule.access_tier != "paid", via_assessment=True))
 # --- F5a end ---
 
 
