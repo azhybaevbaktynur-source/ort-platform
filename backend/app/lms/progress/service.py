@@ -3,11 +3,13 @@ assessments whose results the review page would show; keys only when `results.ke
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Float, and_, case, cast, func, or_, select, text
+from sqlalchemy import (
+    Date, DateTime, Float, Integer, String, and_, case, cast, false, func, literal_column, not_, null, or_, select, text, union_all,
+)
 from sqlalchemy.orm import Session
 
 from app.lms.analytics.scope import final_attempt
@@ -17,14 +19,16 @@ from app.lms.attempts import results, serializers as ser
 from app.lms.attempts.models import Attempt, AttemptItem
 from app.lms.content import repository as content_repo
 from app.lms.content.models import BankQuestion, QuestionVersion
-from app.lms.core.errors import NotFound
+from app.lms.core.errors import NotFound, ValidationFailed
 from app.lms.core.pagination import PageOut, decode_cursor, encode_cursor
 from app.lms.courses.models import Course
 from app.lms.enrollments.models import Enrollment
 from app.lms.progress.models import CourseGoal
 from app.lms.progress.schemas import (
-    GoalOut, MistakeOut, ProgressOut, SectionStat, TopicStat, TrendPoint,
+    ActivityDay, ActivityOut, ActivitySession, ActivityTotals, GoalOut, HeatmapDay, MistakeOut, ProgressOut, SavedOut,
+    SectionStat, TopicStat, TrendPoint,
 )
+from app.lms.statistics.sql import seconds_between
 
 _A = Attempt.__table__
 _WRONG = ("incorrect", "partial")
@@ -228,4 +232,222 @@ def progress(db: Session, course: Course, user_id: str, enrollment_id: uuid.UUID
                       for k, v in sorted(sections.items())]
     out.by_topic = sorted(topics, key=lambda t: (t.accuracy, -t.total, t.topic, t.section or ""))[:30]
     out.open_mistakes = count_open(db, user_id, course.id, visible)
+    return out
+
+
+# ------------------------------------------------------------------ saved (STUDENT_UI_DESIGN 4.3)
+
+def saved(db: Session, course: Course, user_id: str, *, cursor: Optional[str], limit: int,
+          now: datetime) -> PageOut[SavedOut]:
+    """Items the caller flagged in their own submitted (final, non-preview) attempts, newest first, of the assessments
+    whose results the review page would show (`visible_assessments`, as the mistakes notebook). One keyset query for
+    the page; keys only with `show_correct_answers`. A row whose results are not visible never carries the question
+    (`item` None, metadata only): a student must not pass on questions of an exam others are still taking."""
+    assessments = visible_assessments(db, course.id, user_id, now)
+    if not assessments:
+        return PageOut[SavedOut](items=[], next_cursor=None)
+    _prefer_item_index(db)
+    a, i, qv, bq = _A, AttemptItem, QuestionVersion, BankQuestion
+    stmt = (select(a.c.id.label("attempt_id"), a.c.submitted_at.label("submitted_at"),
+                   a.c.assessment_id.label("assessment_id"), a.c.assessment_version_id.label("version_id"),
+                   a.c.language.label("language"), bq.topic.label("topic"), bq.section.label("section"), i)
+            .select_from(a).join(i, i.attempt_id == a.c.id).join(qv, qv.id == i.question_version_id)
+            .join(bq, bq.id == qv.question_id)
+            .where(a.c.user_id == user_id, a.c.course_id == course.id, final_attempt(a), i.flagged.is_(True),
+                   a.c.assessment_id.in_(list(assessments))))
+    if cursor:
+        c = decode_cursor(cursor)
+        try:
+            s = datetime.fromisoformat(c["s"]) if c.get("s") else None
+            aid, pos = uuid.UUID(c["a"]), int(c["p"])
+        except (KeyError, ValueError, TypeError):
+            raise ValidationFailed("Invalid cursor", code="invalid_cursor")
+        sub = a.c.submitted_at
+        if s is None:
+            stmt = stmt.where(or_(and_(sub.is_(None), a.c.id < aid),
+                                  and_(sub.is_(None), a.c.id == aid, i.position > pos)))
+        else:
+            stmt = stmt.where(or_(sub < s, sub.is_(None), and_(sub == s, a.c.id < aid),
+                                  and_(sub == s, a.c.id == aid, i.position > pos)))
+    stmt = stmt.order_by(a.c.submitted_at.desc().nulls_last(), a.c.id.desc(), i.position.asc()).limit(limit + 1)
+    rows = db.execute(stmt).all()
+    more = len(rows) > limit
+    rows = rows[:limit]
+    out: list[SavedOut] = []
+    if rows:
+        asms = assessments
+        shown_rows = [row for row in rows if row.assessment_id in asms]  # all of them; kept as a guard
+        items = [row[-1] for row in shown_rows]
+        versions = content_repo.load_versions(db, [it.question_version_id for it in items])
+        plans = {vid: get_plan(db, vid) for vid in {row.version_id for row in shown_rows}}
+        pv_ids = {(row.attempt_id, row[-1].position): results._pv_for(
+            plans[row.version_id], row.language, int(row[-1].slot), row[-1].question_version_id)
+            for row in shown_rows}
+        passages = content_repo.load_passage_versions(db, [p for p in pv_ids.values() if p])
+        for row in rows:
+            it, asm = row[-1], asms.get(row.assessment_id)
+            item = None
+            if asm is not None:
+                plan = plans[row.version_id]
+                slot = next(s for s in plan.slots[row.language] if int(s["slot"]) == int(it.slot))
+                pid = pv_ids[(row.attempt_id, it.position)]
+                item = ser.review_item(it, versions[it.question_version_id], passages.get(pid) if pid else None,
+                                       Decimal(str(slot["points"])), with_keys=results.keys_allowed(asm))
+            out.append(SavedOut(attempt_id=row.attempt_id, submitted_at=row.submitted_at,
+                                assessment_title=asm.title if asm is not None else None, topic=row.topic,
+                                section=row.section, position=int(it.position), item=item, released=item is not None))
+    nxt = None
+    if more:
+        last = rows[-1]
+        nxt = encode_cursor({"s": last.submitted_at.isoformat() if last.submitted_at else None,
+                             "a": last.attempt_id, "p": int(last[-1].position)})
+    return PageOut[SavedOut](items=out, next_cursor=nxt)
+
+
+# ------------------------------------------------------------------ activity (STUDENT_UI_DESIGN 4.2)
+
+BISHKEK = timezone(timedelta(hours=6), "Asia/Bishkek")  # no daylight saving since 2005 (as access.service)
+ACTIVITY_DAYS = (7, 30, 90, 365)
+GAP_CAP_S = 600  # one gap between two answers of an attempt counts at most 10 minutes
+SESSION_GAP_S = 1800  # a pause longer than 30 minutes starts a new session
+MAX_SESSIONS = 50
+HEATMAP_MAX = 366
+STREAK_SCAN_DAYS = 3660  # active days read for the streaks (about ten years)
+
+
+def _local(dialect: str, col):
+    """(Asia/Bishkek date, hour) of a UTC timestamp. Literal arguments render inline so that PostgreSQL sees the
+    GROUP BY expression as the selected one."""
+    if dialect == "postgresql":
+        lt = func.timezone(literal_column("'Asia/Bishkek'"), col)
+        return cast(lt, Date), cast(func.extract("hour", lt), Integer)
+    shift = literal_column("'+6 hours'")
+    return func.date(col, shift), cast(func.strftime(literal_column("'%H'"), col, shift), Integer)
+
+
+def _as_date(v) -> date:
+    if isinstance(v, datetime):
+        return v.date()
+    if isinstance(v, date):
+        return v
+    return date.fromisoformat(str(v)[:10])
+
+
+def _as_utc(v) -> datetime:
+    if not isinstance(v, datetime):
+        v = datetime.fromisoformat(str(v))
+    return v.replace(tzinfo=timezone.utc) if v.tzinfo is None else v.astimezone(timezone.utc)
+
+
+def _streaks(active_desc: list[date], today: date) -> tuple[int, int]:
+    """Current (ending today or yesterday) and longest run of consecutive active days."""
+    current = 0
+    if active_desc and active_desc[0] >= today - timedelta(days=1):
+        current = 1
+        for prev, d in zip(active_desc, active_desc[1:]):
+            if prev - d != timedelta(days=1):
+                break
+            current += 1
+    longest = run = 0
+    for k, d in enumerate(active_desc):
+        run = run + 1 if k and active_desc[k - 1] - d == timedelta(days=1) else 1
+        longest = max(longest, run)
+    return current, longest
+
+
+def activity(db: Session, course: Course, user_id: str, *, days: int, now: datetime) -> ActivityOut:
+    """The caller's answering activity in the course: all their non-preview attempts (in progress included), from
+    `attempt_items.answered_at`. Correct/wrong count only items of final attempts whose results the review page
+    would show. One statement (UNION ALL of the per-day, per-hour, session and all-time branches) after the
+    visible-assessments read; every branch is grouped in SQL and bounded."""
+    if days not in ACTIVITY_DAYS:
+        raise ValidationFailed("days must be one of 7, 30, 90, 365", code="invalid_days")
+    dialect = db.get_bind().dialect.name
+    today = now.astimezone(BISHKEK).date()
+    first = today - timedelta(days=days - 1)
+    start = datetime.combine(first, time(0), tzinfo=BISHKEK).astimezone(timezone.utc)
+    start7 = datetime.combine(today - timedelta(days=6), time(0), tzinfo=BISHKEK).astimezone(timezone.utc)
+    visible = list(visible_assessments(db, course.id, user_id, now))
+    _prefer_item_index(db)
+    a, i, qv, bq = _A, AttemptItem, QuestionVersion, BankQuestion
+    mine = [a.c.user_id == user_id, a.c.course_id == course.id, not_(a.c.is_preview), i.answered_at.is_not(None)]
+    shown = and_(a.c.status.in_(results.FINAL_STATUSES), a.c.assessment_id.in_(visible)) if visible else false()
+    # attempts still open at the window start: the gap of the first answer in the window uses the answer before it
+    src = (select(i.answered_at.label("at"), i.attempt_id.label("aid"), bq.section.label("section"),
+                  case((and_(shown, i.correctness == "correct"), 1), else_=0).label("is_c"),
+                  case((and_(shown, i.correctness.in_(_WRONG)), 1), else_=0).label("is_w"),
+                  func.lag(i.answered_at).over(partition_by=i.attempt_id,
+                                               order_by=(i.answered_at, i.position)).label("prev"))
+           .select_from(a).join(i, i.attempt_id == a.c.id).join(qv, qv.id == i.question_version_id)
+           .join(bq, bq.id == qv.question_id)
+           .where(*mine, or_(a.c.submitted_at.is_(None), a.c.submitted_at >= start))
+           .cte("act_src"))
+    secs = seconds_between(dialect, src.c.at, src.c.prev)
+    gap = case((src.c.prev.is_(None), 0.0), (secs > GAP_CAP_S, float(GAP_CAP_S)), else_=secs)
+    day, hour = _local(dialect, src.c.at)
+    per = (select(src.c.at, src.c.aid, src.c.section, src.c.is_c, src.c.is_w, gap.label("gap"),
+                  day.label("day"), hour.label("hour")).where(src.c.at >= start).cte("act_per"))
+    # typed NULLs: PostgreSQL resolves UNION column types branch by branch (NULL, NULL -> text)
+    n, nd, ns, nh, nt = (func.count(), cast(null(), Date), cast(null(), String), cast(null(), Integer),
+                         cast(null(), DateTime(timezone=True)))
+    by_day = (select(literal_column("'d'").label("k"), per.c.day, per.c.section, nh, n, func.sum(per.c.is_c),
+                     func.sum(per.c.is_w), func.sum(per.c.gap), nt, nt)
+              .group_by(per.c.day, per.c.section))
+    by_hour = (select(literal_column("'h'"), nd, ns, per.c.hour, n, func.sum(per.c.is_c), func.sum(per.c.is_w),
+                      func.sum(per.c.gap), nt, nt).group_by(per.c.hour))
+    s1 = (select(per.c.at, per.c.aid, per.c.is_c,
+                 func.lag(per.c.at).over(order_by=(per.c.at, per.c.aid)).label("p"))
+          .where(per.c.at >= start7).subquery("s1"))
+    new = case((or_(s1.c.p.is_(None), seconds_between(dialect, s1.c.at, s1.c.p) > SESSION_GAP_S), 1), else_=0)
+    s2 = select(s1.c.at, s1.c.is_c, func.sum(new).over(order_by=(s1.c.at, s1.c.aid), rows=(None, 0)).label("sid")
+                ).subquery("s2")
+    t0 = func.min(s2.c.at)
+    s3 = (select(t0.label("t0"), func.max(s2.c.at).label("t1"), func.count().label("n"),
+                 func.sum(s2.c.is_c).label("c"))
+          .group_by(s2.c.sid).order_by(t0.desc()).limit(MAX_SESSIONS).subquery("s3"))
+    zero = literal_column("0")
+    sessions = select(literal_column("'s'"), nd, ns, nh, s3.c.n, s3.c.c, zero, zero, s3.c.t0, s3.c.t1)
+    yday, _ = _local(dialect, i.answered_at)
+    y1 = (select(yday.label("day"), func.count().label("n")).select_from(a).join(i, i.attempt_id == a.c.id)
+          .where(*mine).group_by(yday).order_by(yday.desc()).limit(STREAK_SCAN_DAYS).subquery("y1"))
+    heat = select(literal_column("'y'"), y1.c.day, ns, nh, y1.c.n, zero, zero, zero, nt, nt)
+    rows = db.execute(union_all(by_day, by_hour, sessions, heat)).all()
+
+    out = ActivityOut(days_window=days)
+    by_date = {first + timedelta(days=k): ActivityDay(date=first + timedelta(days=k)) for k in range(days)}
+    seconds: dict[date, float] = {}
+    section_s: dict[date, dict[str, float]] = {}
+    active: list[tuple[date, int]] = []
+    for k, d, sec, h, cnt, c, w, s, t_0, t_1 in rows:
+        if k == "d":
+            dd = _as_date(d)
+            e = by_date.get(dd)
+            if e is None:
+                continue
+            e.answered += int(cnt)
+            e.correct += int(c or 0)
+            e.wrong += int(w or 0)
+            seconds[dd] = seconds.get(dd, 0.0) + float(s or 0)
+            if sec:
+                bucket = section_s.setdefault(dd, {})
+                bucket[sec] = bucket.get(sec, 0.0) + float(s or 0)
+        elif k == "h":
+            out.by_hour[int(h)] = int(cnt)
+        elif k == "s":
+            out.sessions.append(ActivitySession(started_at=_as_utc(t_0), ended_at=_as_utc(t_1), answered=int(cnt),
+                                                correct=int(c or 0)))
+        else:
+            active.append((_as_date(d), int(cnt)))
+    for dd, e in by_date.items():
+        e.study_seconds = int(round(seconds.get(dd, 0.0)))
+        e.by_section = {key: int(round(v)) for key, v in sorted(section_s.get(dd, {}).items())}
+    out.days = list(by_date.values())
+    answered = sum(e.answered for e in out.days)
+    correct = sum(e.correct for e in out.days)
+    wrong = sum(e.wrong for e in out.days)
+    out.totals = ActivityTotals(answered=answered, correct=correct, accuracy=_acc(correct, correct + wrong))
+    out.sessions.sort(key=lambda x: x.started_at, reverse=True)
+    active.sort(key=lambda x: x[0], reverse=True)
+    out.streak_current, out.streak_longest = _streaks([d for d, _ in active], today)
+    out.heatmap = [HeatmapDay(date=d, answered=c) for d, c in reversed(active[:HEATMAP_MAX])]
     return out

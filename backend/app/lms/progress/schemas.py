@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Optional, Union
 
 from pydantic import BaseModel, Field
@@ -51,6 +51,59 @@ class MistakeOut(BaseModel):
     topic: Optional[str] = None
     section: Optional[str] = None
     item: Union[ReviewItemKeyedOut, ReviewItemOut]
+
+
+class SavedOut(BaseModel):
+    """A question the student flagged in a submitted attempt (STUDENT_UI_DESIGN 4.3). `item` is None (metadata only)
+    and `released` False when the results are not visible; the list holds only visible assessments today."""
+    attempt_id: uuid.UUID
+    submitted_at: Optional[datetime] = None
+    assessment_title: Optional[Any] = None
+    topic: Optional[str] = None
+    section: Optional[str] = None
+    position: int
+    item: Optional[Union[ReviewItemKeyedOut, ReviewItemOut]] = None
+    released: bool = True
+
+
+# ------------------------------------------------------------------ activity (STUDENT_UI_DESIGN 4.2)
+
+class ActivityTotals(BaseModel):
+    answered: int = 0
+    correct: int = 0
+    accuracy: float = 0.0  # correct / (correct + wrong) over graded items whose results are visible
+
+
+class ActivityDay(BaseModel):
+    date: date  # Asia/Bishkek
+    answered: int = 0
+    correct: int = 0
+    wrong: int = 0
+    study_seconds: int = 0
+    by_section: dict[str, int] = {}  # bank section key -> seconds (items without a section are left out)
+
+
+class ActivitySession(BaseModel):
+    started_at: datetime
+    ended_at: datetime
+    answered: int
+    correct: int
+
+
+class HeatmapDay(BaseModel):
+    date: date
+    answered: int
+
+
+class ActivityOut(BaseModel):
+    days_window: int
+    streak_current: int = 0
+    streak_longest: int = 0
+    totals: ActivityTotals = ActivityTotals()
+    days: list[ActivityDay] = []
+    by_hour: list[int] = [0] * 24
+    sessions: list[ActivitySession] = []
+    heatmap: list[HeatmapDay] = []
 
 
 class GoalIn(BaseModel):
