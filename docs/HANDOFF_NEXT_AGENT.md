@@ -1,10 +1,10 @@
 # Handoff for the next agent
 
-**Rewritten 2026-10-26** (end of a long session; the owner starts a fresh chat to save tokens). This file + `AGENTS.md` + the memory notes are enough to continue. Treat this file as the source of truth for "where we are".
+**Rewritten 2026-10-26, updated 2026-11-06 (new direction)** (end of a long session; the owner starts a fresh chat to save tokens). This file + `AGENTS.md` + the memory notes are enough to continue. Treat this file as the source of truth for "where we are".
 
 ## 1. Mission (one paragraph)
 
-A teacher-owned, Canvas-style LMS where ORT/ЖРТ test prep is one course kind: organizations (schools, centers, personal orgs for independent teachers) with org admins; admin-approved or invited teachers create courses; students join by code or catalog; assignments (quiz, text, file, oral) with a general gradebook; exam templates; flexible grading; three languages (en/ky/ru); safe timed attempts; target ~6,000 concurrent students. ORT itself must not change (locked `ort` course template). The owner is a cost-sensitive founder; budget ~$30/month.
+**Direction changed 2026-11-06 (owner): an exam-prep platform for individual students in Kyrgyzstan.** ORT first, then olympiads and НЦТ tests (Национальный центр тестирования), on one exam-prep course layout. One platform ORT course per language. Some exams free; a payment (activation codes first) unlocks all exams. Tutors and schools come later, once there are enough students. The plan and its slices S1–S6 are in **`docs/ROADMAP_EXAM_PREP.md`**; it replaces `IMPLEMENTATION_PLAN.md` for what comes next. The LMS built in Phases 0–11 (organizations, teacher courses, exam templates, gradebook, parents) stays as the foundation. ORT itself must not change (locked `ort` course template): player, imports, scoring, result page. Strategy research lives outside the public repo in `docs/strategy/` (git-excluded, local only). The owner is a cost-sensitive founder; budget ~$30/month; target ~6,000 concurrent students.
 
 ## 2. First 15 minutes checklist
 
@@ -33,11 +33,14 @@ A teacher-owned, Canvas-style LMS where ORT/ЖРТ test prep is one course kind:
 | 10 practice, notebook, progress, statistics, analytics, new question types | **Deployed 2026-11-01** (migration 0016); **waiting for the owner's review** | `PHASE_10.md`, `PHASE_10_DESIGN.md` |
 | Bluebook player (BB-1) | **Deployed 2026-11-02** (`main` 10c0855, frontend only) | `BLUEBOOK_PLAYER.md` |
 | 11 parents, privacy, hardening, performance, operations | **Deployed 2026-11-02** (migrations 0017, 0018). **Launch waits for the owner** | `PHASE_11.md`, `LAUNCH_CHECKLIST.md` |
-| Next | 8a modules, pages, files, announcements, gating → 8b exam templates II (visual constructor, scrolling display mode; **checkpoint after 8b**) → 9 → 10 → 11 | `IMPLEMENTATION_PLAN.md` |
+| UX rework part 2 (items 7–12) | **Deployed 2026-11-03** (`main` 06c7d4e, no migration) | `UX_REWORK_2.md` |
+| Accounts and teacher sign-up | **Deployed 2026-11-03** (`main` 061bf6a, migration 0019) | `ACCOUNTS.md`, `DISCUSSION_ACCOUNTS.md` |
+| Admin control center review | Written 2026-11-03, revised 2026-11-06 for the new direction (A1–A11) | `DISCUSSION_ADMIN_CENTER.md` |
+| **Exam-prep roadmap** (owner 2026-11-06) | **In progress:** S1 admin protection and S2 exam-prep page being built; S3 design written | `ROADMAP_EXAM_PREP.md`, `phases/S3_ACCESS_DESIGN.md` |
 
 Production: Vercel https://ort-platform-nu.vercel.app + Render https://ort-platform-w77q.onrender.com (`/health` shows `commit`; Render deploys only when backend files change) + Neon project `noisy-sound-20763725` (production branch `br-cool-firefly-b227gbuy`, Alembic head `0018_phase11_indexes`) + Cloudflare R2. Production data is small: 6 users, 3 courses (2 ORT + the owner's draft), 299 question versions, ~4 attempts, 1 submission; one organization "Platform".
 
-Neon backups (free plan: **max 10 branches, 1 manual snapshot**): `backup-2026-10-26-before-phase7b`, `backup-2026-10-28-before-phase7c`, `backup-2026-10-28-before-phase8a`, `backup-2026-10-28-before-phase8b`, `backup-2026-11-01-before-phase9`, `backup-2026-11-01-before-ux-rework`, `backup-2026-11-01-before-phase10`, `backup-2026-11-02-before-phase11` (**9/10 branches used**; 6a and 7a deleted with the owner's OK; ask before deleting any other), snapshot `before-phase6a-deploy-2026-10-25`. Before each `main` merge with a migration create `backup-<date>-before-<phase>`; when full, ask the owner which old backup to delete (owner OK'd deleting obsolete ones on 2026-10-26; deleting Neon data always needs the owner's OK).
+Neon backups (free plan: **max 10 branches, 1 manual snapshot**): before-phase9, before-ux-rework, before-phase10, before-phase11, before-accounts (**6/10 branches** incl. production; 6a, 7a, 7b, 7c, 8a, 8b deleted with the owner's OK, last on 2026-11-06). Before each `main` merge with a migration create `backup-<date>-before-<slice>`; when full, ask the owner which old backup to delete (deleting Neon data always needs the owner's OK).
 
 ## 3b. Waiting for the owner
 
@@ -64,11 +67,11 @@ Neon backups (free plan: **max 10 branches, 1 manual snapshot**): `backup-2026-1
 
 ## 5. What to do next
 
-1. All phases deployed. **Stopped before launch**: the owner works through `docs/LAUNCH_CHECKLIST.md`. Do nothing launch-related without them. Neon 9/10 branches. QA accounts disabled; remove them after the final check (owner OK given).
-2. Local Postgres in `/tmp/agy_pg` can vanish (macOS cleanup): re-run initdb. A suite that fails on everything: check that first.
-3. Open owner questions keep their defaults: `CHECKPOINT_8B.md` §3, 8c design §17, 9-Q1…Q8 in `PRODUCT_DECISIONS.md`. Optional 8c teacher test.
-4. Fix the flaky PG test `tests/lms/test_enrollments_api.py::test_ip_failure_limit_counts_failures_only`; an unidentified intermittent `backend-sqlite` CI failure was seen once (55e3348).
-5. Phase 11 hardening list: sweep retired test students' hand-in files.
+1. Follow **`docs/ROADMAP_EXAM_PREP.md`**: S1 protect control → S2 exam-prep home and ORT page → S3 free and paid exams (`phases/S3_ACCESS_DESIGN.md`) → S4 person page and payments control → S5 installable app → S6 AI chat (owner decision D5 first). Defaults D2–D4 apply until the owner changes them.
+2. Content is the owner's: ORT (Russian) has one published test on production, ORT (Kyrgyz) none.
+3. Launch still waits on `docs/LAUNCH_CHECKLIST.md` (lawyer, keys, paid plan, 6,000-student test).
+4. Local Postgres in `/tmp/agy_pg` can vanish (macOS cleanup): re-run initdb. A suite that fails on everything: check that first.
+5. Older open items: flaky PG test `test_ip_failure_limit_counts_failures_only`; sweep retired test students' hand-in files; QA accounts disabled (remove after the owner's final check).
 
 ## 6. Models and token usage (Claude Max subscription)
 
