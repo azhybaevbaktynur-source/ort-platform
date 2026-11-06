@@ -5,7 +5,6 @@
 // give there (design 7.8).
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
-import { fmtApiDateTimeShort } from "@/lib/format";
 import { fmtPassEnd, fmtPassShort, getUserAccess, grantAccess, revokePass, type PassOut, type UserAccessOut } from "@/lib/lms/access";
 import { Badge, Button, Card, ConfirmDialog, ErrorState, Input, ReasonDialog, Skeleton, Textarea, cn, toast, type BadgeTone } from "@/components/ui";
 import { useErrorText } from "@/components/lms/home/useErrorText";
@@ -140,7 +139,7 @@ export function UserAccessSection({ userId, name, readOnly = false }: { userId: 
                 <h3 className="mb-1 mt-4 text-sm font-semibold text-slate-800">{t("access.admin.user.redemptions")}</h3>
                 <ul className="space-y-1 text-sm text-slate-700">
                   {data.redemptions.map((r) => (
-                    <li key={r.code_id}>{t("access.admin.user.redemption", { last4: r.last4, batch: r.batch_label })} · {fmtApiDateTimeShort(r.redeemed_at, lang)}</li>
+                    <li key={r.code_id}>{t("access.admin.user.redemption", { last4: r.last4, batch: r.batch_label })} · {fmtPassShort(r.redeemed_at, lang)}</li>
                   ))}
                 </ul>
               </>
