@@ -17,7 +17,7 @@
 export type CourseNavRole = "teacher" | "assistant" | "student" | "observer";
 export type CourseNavKey =
   | "course" | "announcements" | "assignments" | "grades" | "people" | "bank" | "settings" | "files"
-  | "practice" | "progress" | "analytics";
+  | "practice" | "progress" | "saved" | "analytics";
 
 export interface CourseNavCourse {
   id: string;
@@ -83,6 +83,8 @@ export function courseNavItems(course: CourseNavCourse, role: CourseNavRole, pat
     // Phase 10: practice (staff always, students once a practice quiz is published), progress (students), analytics (staff and observers)
     ...item("practice", `${base}/practice`, t("practice.nav"), under(pathname, `${base}/practice`), staff || (role === "student" && !!f.practice), !!f.practice),
     ...item("progress", `${base}/progress`, t("progress.nav"), under(pathname, `${base}/progress`), role === "student"),
+    // Student UI U8: flagged questions and the mistakes notebook (moved off the progress page)
+    ...item("saved", `${base}/saved`, t("student.nav.saved"), under(pathname, `${base}/saved`), role === "student"),
     ...item("analytics", `${base}/analytics`, t("analytics.nav"), under(pathname, `${base}/analytics`), staff || role === "observer"),
   ];
 }

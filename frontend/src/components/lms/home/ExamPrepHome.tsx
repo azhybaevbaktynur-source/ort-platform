@@ -23,6 +23,7 @@ import { GoalEditor, fmtExamDate } from "@/components/lms/examPrep/GoalStrip";
 import { PlatformCourses } from "./PlatformCourses";
 import { HOME_CARD, StreakCard, StreakCardSkeleton } from "./StreakCard";
 import { useErrorText } from "./useErrorText";
+import { GettingStartedCard } from "@/components/lms/student/gettingStarted"; // Student UI U8
 
 /** Course cards: as many 16rem columns as fit (one at 375 px, never thin at 1920 px). */
 export const HOME_CARD_GRID = "grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-4";
@@ -313,6 +314,7 @@ export function ExamPrepHome({ courseId, courseTitle, home, side, courses, embed
             {activity && <StreakCard activity={activity} />}
             <ScoreTiles prep={prep} courseId={courseId} best={best} onGoal={(goal) => setPrep({ ...prep, goal })} />
           </div>
+          <GettingStartedCard courseId={courseId} prep={prep} />{/* Student UI U8: until every item is done */}
           {prep.needs_pass && <UnlockCard />}
           <div className={cn("flex flex-col gap-6", side && "lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start")}>
             <SectionRows prep={prep} />

@@ -2,12 +2,12 @@
  * Student UI U2 (docs/phases/STUDENT_UI_DESIGN.md §2.2, §2.3): the links of the student shell for the current exam
  * course, with the active one for the current path. Dependency-free (structural types only).
  *
- * Pages that do not exist yet point to existing routes (TODO):
- * - Сохранённые: the mistakes tab of progress for now (TODO U8: `/courses/{c}/saved`);
- * - Видеоуроки: the syllabus `/courses/{c}/modules` (U7; its module sub-links come from `modules/lessonNav.ts`).
+ * U8 (§5.1 a): the mistakes notebook lives only on Сохранённые (`/courses/{c}/saved?tab=mistakes`), so there is no
+ * separate "Мои ошибки" link. Видеоуроки: the syllabus `/courses/{c}/modules` (its module sub-links come from
+ * `modules/lessonNav.ts`).
  */
 
-export type StudentNavKey = "home" | "analytics" | "saved" | "lessons" | "tests" | "practice" | "mistakes" | "catalog";
+export type StudentNavKey = "home" | "analytics" | "saved" | "lessons" | "tests" | "practice" | "catalog";
 
 export interface StudentNavLink {
   key: StudentNavKey;
@@ -41,28 +41,25 @@ function under(rest: string, prefix: string): boolean {
 }
 
 /** Every link the shell may show, in sidebar order; items the course does not have are left out. */
-export function studentNavLinks({ lang, rest, tab, courseId, features }: StudentNavInput): Record<StudentNavKey, StudentNavLink | null> {
+export function studentNavLinks({ lang, rest, courseId, features }: StudentNavInput): Record<StudentNavKey, StudentNavLink | null> {
   const base = `/${lang}`;
   const home: StudentNavLink = { key: "home", href: `${base}/courses`, active: rest === "/courses" };
   const catalog: StudentNavLink = { key: "catalog", href: `${base}/courses/catalog`, active: under(rest, "/courses/catalog") };
   if (!courseId) {
-    return { home, catalog, analytics: null, saved: null, lessons: null, tests: null, practice: null, mistakes: null };
+    return { home, catalog, analytics: null, saved: null, lessons: null, tests: null, practice: null };
   }
   const c = `/courses/${courseId}`;
-  const progress = under(rest, `${c}/progress`);
-  const mistakesTab = progress && tab === "mistakes";
   return {
     home,
     catalog,
-    analytics: { key: "analytics", href: `${base}${c}/progress`, active: progress && !mistakesTab },
-    // TODO U8: `/courses/{c}/saved` (flagged questions); never active until it has its own page
-    saved: { key: "saved", href: `${base}${c}/progress?tab=mistakes`, active: false },
+    analytics: { key: "analytics", href: `${base}${c}/progress`, active: under(rest, `${c}/progress`) },
+    // U8: flagged questions and the mistakes notebook (`?tab=mistakes`); `/progress?tab=mistakes` redirects there
+    saved: { key: "saved", href: `${base}${c}/saved`, active: under(rest, `${c}/saved`) },
     lessons: features?.modules
       ? { key: "lessons", href: `${base}${c}/modules`, active: under(rest, `${c}/modules`) || under(rest, `${c}/pages`) }
       : null,
     // U4: the Тесты page (the course page redirects there for exam-prep students)
     tests: { key: "tests", href: `${base}${c}/tests`, active: rest === c || under(rest, `${c}/tests`) },
     practice: { key: "practice", href: `${base}${c}/practice`, active: under(rest, `${c}/practice`) },
-    mistakes: { key: "mistakes", href: `${base}${c}/progress?tab=mistakes`, active: mistakesTab },
   };
 }

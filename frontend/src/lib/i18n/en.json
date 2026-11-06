@@ -5542,7 +5542,8 @@
       "poolTooSmall": "The bank has too few questions for this block. Lower the count or change the filters."
     },
     "locked": "Practice needs a pass",
-    "unlock": "Unlock"
+    "unlock": "Unlock",
+    "lastAt": "Last attempt {date}"
   },
   "progress": {
     "nav": "My progress",
@@ -6596,6 +6597,31 @@
     },
     "account": {
       "title": "Account"
+    },
+    "saved": {
+      "title": "Saved",
+      "tabsLabel": "Saved sections",
+      "tabs": {
+        "saved": "Saved",
+        "mistakes": "Mistakes"
+      },
+      "open": "Open",
+      "question": "Question {n}",
+      "empty": "Flag questions during a test and they will appear here",
+      "emptyHint": "An easy way to come back to hard questions after the test.",
+      "hiddenOnPage": "Questions from tests whose results are not open yet will appear later."
+    },
+    "gettingStarted": {
+      "progress": "{done} of {total}",
+      "intro": "A few steps to get your preparation going.",
+      "done": "Done",
+      "todo": "Not done yet",
+      "items": {
+        "goal": "Set your target score",
+        "test": "Take your first test",
+        "practice": "Do a practice set",
+        "install": "Install the app"
+      }
     }
   }
 }
