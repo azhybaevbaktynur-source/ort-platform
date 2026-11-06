@@ -5118,7 +5118,9 @@
       "durationHours": "{h} ч",
       "durationHoursMin": "{h} ч {m} мин",
       "aboutTests": "Тестов",
-      "aboutDuration": "Длительность"
+      "aboutDuration": "Длительность",
+      "emptyTitle": "Уроков пока нет",
+      "emptyBody": "Уроки появятся здесь, когда их опубликуют."
     },
     "lesson": {
       "back": "Все уроки",

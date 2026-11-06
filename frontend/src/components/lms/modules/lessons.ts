@@ -77,7 +77,22 @@ export function nextOpen(lessons: LessonRef[], upNext: ItemRefOut | null): Lesso
   return lessons.find((l) => !isLocked(l.mod, l.item) && !isDone(l.item)) ?? null;
 }
 
-type Translate = (key: string, vars?: Record<string, string | number>) => string;
+/** The overview banner's one state (design 4): no rows yet, a next row, only Pro rows left, only rule-locked rows left
+ * (they open later), or everything done. */
+export type OverviewState =
+  | { kind: "empty" } | { kind: "next"; next: LessonRef } | { kind: "pro" } | { kind: "later" } | { kind: "finished" };
+
+export function overviewState(lessons: LessonRef[], upNext: ItemRefOut | null): OverviewState {
+  if (lessons.length === 0) return { kind: "empty" };
+  const next = nextOpen(lessons, upNext);
+  if (next) return { kind: "next", next };
+  const left = lessons.filter((l) => isLocked(l.mod, l.item) && !isDone(l.item));
+  if (left.some((l) => isAccessLocked(l.item))) return { kind: "pro" };
+  if (left.length > 0) return { kind: "later" };
+  return { kind: "finished" };
+}
+
+type Translate =(key: string, vars?: Record<string, string | number>) => string;
 
 /** "6 мин", "1 ч", "1 ч 10 мин" (whole minutes, at least one); empty without a duration. */
 export function formatDuration(seconds: number | null | undefined, t: Translate): string {

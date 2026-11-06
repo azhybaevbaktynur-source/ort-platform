@@ -179,6 +179,9 @@ test.describe("course lessons (ru)", () => {
       await expect(sec3.getByText(PG_PRO)).toBeVisible();
       await expect(sec3).toContainText(t("modules.overview.durationMin", { n: 7 }));
       await expect(sec3.getByRole("link")).toHaveCount(1); // the unlock pill only
+      // Pro rows: title and duration only, no guessed kind ("Ссылка") for a video the server does not name
+      await expect(sec3).not.toContainText(t("modules.kinds.url"));
+      await expect(sec3).not.toContainText(t("modules.kinds.page"));
       expect(await page.content()).not.toContain(PRO_YT);
       expect(await page.content()).not.toContain(pgPro.page.id);
       await expect(page.locator(`a[href*="${PRO_YT}"]`)).toHaveCount(0);
@@ -268,7 +271,10 @@ test.describe("course lessons (ru)", () => {
       await page.setViewportSize(VIEWPORTS.phone);
       await page.goto(`${base}/modules/${m1.id}/items/${v2.id}`);
       await expect(page.getByRole("heading", { level: 1, name: V2 })).toBeVisible();
-      const summary = page.locator("summary").filter({ hasText: t("modules.overview.outlineTitle") });
+      // the phone breadcrumb names the module and leads back to it in the syllabus
+      await expect(page.getByRole("navigation", { name: t("modules.overview.breadcrumbLabel") }).getByRole("link", { name: M1 }))
+        .toHaveAttribute("href", `${base}/modules#module-${m1.id}`);
+      const summary =page.locator("summary").filter({ hasText: t("modules.overview.outlineTitle") });
       await expect(summary).toBeVisible();
       await expect(page.getByRole("navigation", { name: t("modules.overview.outlineTitle") })).toBeHidden();
       await summary.click();
@@ -285,6 +291,77 @@ test.describe("course lessons (ru)", () => {
     } finally {
       for (const id of created.reverse()) await api(admin, "DELETE", `/courses/${cid}/modules/${id}`);
       for (const id of pages) await api(admin, "DELETE", `/courses/${cid}/pages/${id}`);
+    }
+  });
+
+  test("overview banner states: no lessons, only locked left, only Pro left, all done", async ({ browser }) => {
+    test.setTimeout(180_000);
+    const s = seed();
+    const cid = s.course_id;
+    const base = `/${L}/courses/${cid}`;
+    const admin = s.admin;
+    const student = s.modules.ort_student;
+    const created: string[] = [];
+    const ctx = await browser.newContext({ viewport: VIEWPORTS.desktop, locale: "ru-RU", timezoneId: "UTC", colorScheme: "light" });
+    try {
+      const page = await ctx.newPage();
+      await signIn(page, student);
+      const hero = page.locator('section[aria-labelledby="course-overview-title"]');
+      const open = async () => {
+        await page.goto(`${base}/modules`);
+        await expect(hero).toBeVisible();
+        await settle(page);
+      };
+      /** One state: its line, no empty paragraph, never "Продолжим?" / "Готовы начать?" next to it. */
+      const only = async (text: string) => {
+        await expect(hero.getByText(text, { exact: true })).toBeVisible();
+        await expect(hero.getByText(t("modules.syllabus.continueTitle"))).toHaveCount(0);
+        await expect(hero.getByText(t("modules.syllabus.readyTitle"))).toHaveCount(0);
+        expect(await hero.locator("p:empty").count()).toBe(0);
+      };
+
+      // a published module without any row: "no lessons yet", no action, no bar
+      const empty = await api(admin, "POST", `/courses/${cid}/modules`, { title: { ru: "Пустой модуль E2E" }, published: true });
+      created.push(empty.id);
+      await open();
+      await only(t("modules.overview.emptyTitle"));
+      await expect(hero.getByRole("link")).toHaveCount(0);
+      await expect(page.getByRole("progressbar")).toHaveCount(0);
+      await api(admin, "DELETE", `/courses/${cid}/modules/${created.pop()}`);
+
+      // one lesson the student has seen, one in a module that opens later: "the next lessons open later", no action
+      const a = await api(admin, "POST", `/courses/${cid}/modules`, { title: { ru: "Открытый модуль E2E" }, published: true });
+      created.push(a.id);
+      const la = await api(admin, "POST", `/courses/${cid}/modules/${a.id}/items`, { kind: "url", url: "https://example.org/a", title_override: { ru: "Урок А" }, published: true });
+      const b = await api(admin, "POST", `/courses/${cid}/modules`, {
+        title: { ru: "Модуль позже E2E" }, published: true, unlock_at: new Date(Date.now() + 3 * 86_400_000).toISOString(),
+      });
+      created.push(b.id);
+      await api(admin, "POST", `/courses/${cid}/modules/${b.id}/items`, { kind: "url", url: "https://example.org/b", title_override: { ru: "Урок Б" }, published: true });
+      await api(student, "GET", `/courses/${cid}/modules`);
+      await api(student, "POST", `/courses/${cid}/modules/${a.id}/items/${la.id}/view`, {});
+      await open();
+      await only(t("modules.overview.later"));
+      await expect(hero.getByRole("link")).toHaveCount(0);
+
+      // a Pro module left as well: the gold unlock pill
+      const c = await api(admin, "POST", `/courses/${cid}/modules`, { title: { ru: "Pro позже E2E" }, published: true, access_tier: "paid" });
+      created.push(c.id);
+      await api(admin, "POST", `/courses/${cid}/modules/${c.id}/items`, { kind: "url", url: "https://example.org/c", title_override: { ru: "Урок В" }, published: true });
+      await open();
+      await only(t("modules.overview.proLeft"));
+      await expect(hero.getByRole("link", { name: t("modules.overview.unlock") })).toHaveAttribute("href", `/${L}/unlock`);
+
+      // everything open is done: "Курс пройден" and "Повторить с начала" to the first lesson
+      await api(admin, "DELETE", `/courses/${cid}/modules/${created.pop()}`);
+      await api(admin, "DELETE", `/courses/${cid}/modules/${created.pop()}`);
+      await open();
+      await only(t("modules.overview.completed"));
+      await expect(hero.getByRole("link", { name: t("modules.overview.restart") })).toHaveAttribute("href", `${base}/modules/${a.id}/items/${la.id}`);
+      await expect(page.getByRole("progressbar", { name: t("modules.syllabus.progressLabel") })).toHaveAttribute("aria-valuenow", "1");
+    } finally {
+      await ctx.close();
+      for (const id of created.reverse()) await api(admin, "DELETE", `/courses/${cid}/modules/${id}`);
     }
   });
 });
