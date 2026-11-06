@@ -68,7 +68,7 @@ Neon backups (free plan: **max 10 branches, 1 manual snapshot**): before-ux-rewo
 ## 5. What to do next
 
 1. Follow **`docs/ROADMAP_EXAM_PREP.md`**: S1 protect control → S2 exam-prep home and ORT page → S3 free and paid exams (`phases/S3_ACCESS_DESIGN.md`) → S4 person page and payments control → S5 installable app → S6 AI chat (owner decision D5 first). Defaults D2–D4 apply until the owner changes them.
-1a. **Now (owner 2026-11-06): student area redesign U1–U9**, plan and build order in `docs/phases/STUDENT_UI_DESIGN.md`. The owner's reference screenshots are local only (`docs/oneprep_design/`, git-excluded).
+1a. **Student area redesign (owner 2026-11-06/07)**: `docs/phases/STUDENT_UI_DESIGN.md` (plan, §1.1 palette, §5.1 coherence), `docs/phases/STUDENT_UI_REVIEW.md` (review; LATER items open). Student frame = `components/lms/student/StudentShell.tsx` (theme class `.student-theme` overrides the CSS-variable `brand`/`navy`); ORT lobby/attempt routes keep the old frame. The owner's reference screenshots are local only (`docs/oneprep_design/`, git-excluded).
 2. Content is the owner's: ORT (Russian) has one published test on production, ORT (Kyrgyz) none.
 3. Launch still waits on `docs/LAUNCH_CHECKLIST.md` (lawyer, keys, paid plan, 6,000-student test).
 4. Local Postgres in `/tmp/agy_pg` can vanish (macOS cleanup): re-run initdb. A suite that fails on everything: check that first.
