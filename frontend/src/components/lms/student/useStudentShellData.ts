@@ -28,6 +28,8 @@ export interface StudentShellData {
   setCurrent: (id: string) => void;
   features: StudentCourseFeatures | null;
   access: MyAccessOut | null;
+  /** U9: the student left this course: drop it from the list at once, then read the list again. */
+  forget: (id: string) => void;
 }
 
 interface Cache {
@@ -156,8 +158,9 @@ export function useStudentShellData({ enabled, pathCourseId, declared, onHome, p
     writeCurrent(id);
   }, []);
 
-  // what the current course has: from the course layout when the student is inside it, else one request
-  const features = current ? cache?.features[current.id] ?? null : null;
+  // what the current course has: with the course list (U9: the same menu on every page), else from the course layout
+  // when the student is inside it, else one request (an older backend or cache without `features`)
+  const features = current ? current.features ?? cache?.features[current.id] ?? null : null;
   const waitForLayout = !!current && pathCourseId === current.id && declared?.id !== current.id;
   useEffect(() => {
     if (!enabled || !current || features || waitForLayout) return;
@@ -167,6 +170,12 @@ export function useStudentShellData({ enabled, pathCourseId, declared, onHome, p
       setCache(writeCache({ features: { ...readCache().features, [id]: featuresOf(c) } }));
     });
   }, [enabled, current, features, waitForLayout, once]);
+
+  const forget = useCallback((id: string) => {
+    const known = readCache().courses;
+    if (known) setCache(writeCache({ courses: known.filter((c) => c.id !== id) }));
+    void loadCourses();
+  }, [loadCourses]);
 
   // the pass: only students with an exam course see the access pill; read again after leaving /unlock
   const hasCourses = courses.length > 0;
@@ -184,5 +193,5 @@ export function useStudentShellData({ enabled, pathCourseId, declared, onHome, p
     if (readCache().access) void loadAccess(); // a cached pass shown at once is refreshed once per shell
   }, [enabled, hasCourses, loadAccess]);
 
-  return { courses, loaded: known, current, setCurrent, features, access: cache?.access ?? null };
+  return { courses, loaded: known, current, setCurrent, features, access: cache?.access ?? null, forget };
 }

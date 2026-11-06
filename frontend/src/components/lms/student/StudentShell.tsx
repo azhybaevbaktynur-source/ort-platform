@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useEffect, useId, useState } from "react";
+import React, { useId, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  BarChart3, Bookmark, ClipboardList, Compass, Download, Dumbbell, Ellipsis, GraduationCap, House, LogOut,
+  BarChart3, Bookmark, ClipboardList, Compass, Download, Dumbbell, Ellipsis, GraduationCap, House, KeyRound, LogOut,
   PlayCircle, Plus, Settings,
 } from "lucide-react";
 import { useTranslation, type Language } from "@/lib/i18n/context";
@@ -21,7 +21,7 @@ import { TabBar, TAB_BAR_SPACE, type TabBarItem } from "@/components/ui/TabBar";
 import { cn, focusRing } from "@/components/ui/utils";
 import type { AppHeaderArea, AppHeaderLink } from "@/components/ui/AppHeader";
 import type { StudentShellData } from "./useStudentShellData";
-import { useLessonModules } from "@/components/lms/modules/lessonNav";
+import { LeaveCourseDialog } from "@/components/lms/home/LeaveCourseLink"; // U9
 import { GettingStartedSheet, ProgressRing, useGettingStarted, type GettingStartedState } from "./gettingStarted"; // U8
 
 /*
@@ -89,34 +89,21 @@ function useNav(props: StudentShellProps) {
   return { links, label, item };
 }
 
-/** U7 (§2.2): "Видеоуроки" with up to five module sub-links (`#module-{id}` on the syllabus). `fetchIfMissing`: the
- * desktop sidebar may ask the server once per course and tab; the phone sheet shows only what is already known. */
-function useLessonsItem(props: StudentShellProps, link: StudentNavLink | null, fetchIfMissing: boolean): SidebarNavItem[] {
-  const { lang, t } = useTranslation();
-  const { label } = useNav(props);
-  const current = props.data.current;
-  const modules = useLessonModules(current?.id ?? null, !!link, fetchIfMissing);
-  if (!link) return [];
-  const children: SidebarNavItem[] = (modules ?? []).map((m) => ({
-    key: `module-${m.id}`,
-    href: `${link.href}#module-${m.id}`,
-    label: pickLocalized(m.title, lang, current?.default_language) || t("modules.untitledModule"),
-  }));
-  return [{ key: link.key, href: link.href, label: label[link.key], icon: ICONS[link.key], active: link.active, children }];
+/** U9 (review 5, 6): the same links on every page and in the same order as the tab bar: Главная, Тесты, Практика,
+ * Аналитика, then Видеоуроки and Сохранённые (no module sub-links: the phone has none either). */
+function useMenuGroups(props: StudentShellProps): SidebarNavGroup[] {
+  const { links, item } = useNav(props);
+  const { data } = props;
+  if (!data.current) return [{ key: "main", items: [...item(links.home), ...item(links.catalog)] }];
+  return [
+    { key: "main", items: [...item(links.home), ...item(links.tests), ...(data.features?.practice ? item(links.practice) : []), ...item(links.analytics)] },
+    { key: "more", items: [...item(links.lessons), ...item(links.saved)] },
+  ];
 }
 
-/** True from 1024 px (the desktop sidebar is shown); false during the server render. */
-function useWide(): boolean {
-  const [wide, setWide] = useState(false);
-  useEffect(() => {
-    const q = window.matchMedia("(min-width: 1024px)");
-    const on = () => setWide(q.matches);
-    on();
-    q.addEventListener("change", on);
-    return () => q.removeEventListener("change", on);
-  }, []);
-  return wide;
-}
+/** A row of the account and exam sheets. */
+const SHEET_ROW = cn("flex min-h-11 w-full items-center gap-3 rounded-control px-3 text-left text-sm font-medium leading-5 text-slate-800 hover:bg-slate-100",
+  focusRing, "focus-visible:ring-offset-0");
 
 /** Course title in the student's language. */
 function useCourseTitle() {
@@ -142,8 +129,7 @@ function AccountPanel({ props, onNavigate }: { props: StudentShellProps; onNavig
   const langLabelId = useId();
   const langName: Record<Language, string> = { en: t("common.english"), ky: t("common.kyrgyz"), ru: t("common.russian") };
   const { user, accountLinks } = props;
-  const row = cn("flex min-h-11 w-full items-center gap-3 rounded-control px-3 text-left text-sm font-medium leading-5 text-slate-800 hover:bg-slate-100",
-    focusRing, "focus-visible:ring-offset-0");
+  const row = SHEET_ROW;
   return (
     <div className="space-y-3">
       <div className="px-3">
@@ -186,8 +172,11 @@ function AccountPanel({ props, onNavigate }: { props: StudentShellProps; onNavig
   );
 }
 
-/** The exam courses as chips (switch) plus "+" (catalog). One course: its title only. */
-function ExamSwitcher({ props, tone, onNavigate }: { props: StudentShellProps; tone: "navy" | "light"; onNavigate?: () => void }) {
+/** The exam courses as chips (switch) plus "+" (U9: opens the exam sheet with the catalog, the code and leaving; the
+ * sheet itself has no "+"). One course: its title only. */
+function ExamSwitcher({ props, tone, onNavigate, onAdd }: {
+  props: StudentShellProps; tone: "navy" | "light"; onNavigate?: () => void; onAdd?: { open: () => void; expanded: boolean; controls: string };
+}) {
   const { lang, t } = useTranslation();
   const router = useRouter();
   const title = useCourseTitle();
@@ -203,15 +192,16 @@ function ExamSwitcher({ props, tone, onNavigate }: { props: StudentShellProps; t
       router.push(`/${lang}/courses/${id}${keep}`);
     }
   };
-  const add = (
-    <Link href={`/${lang}/courses/catalog`} aria-label={t("student.switcher.add")} title={t("student.switcher.add")} onClick={onNavigate}
+  const add = onAdd ? (
+    <button type="button" onClick={onAdd.open} aria-label={t("student.switcher.add")} title={t("student.switcher.add")}
+      aria-haspopup="dialog" aria-expanded={onAdd.expanded} aria-controls={onAdd.controls}
       className={cn("inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-control border",
         tone === "navy"
           ? "border-white/20 text-white hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
           : cn("border-slate-300 text-slate-700 hover:bg-slate-100", focusRing))}>
       <Plus aria-hidden="true" className="h-5 w-5" />
-    </Link>
-  );
+    </button>
+  ) : null;
   if (data.courses.length <= 1) {
     return (
       <div className="flex items-center gap-2">
@@ -240,6 +230,37 @@ function ExamSwitcher({ props, tone, onNavigate }: { props: StudentShellProps; t
         );
       })}
       {add}
+    </div>
+  );
+}
+
+/** U9 (review 1, 2): the exam sheet: switch, then find a course in the catalog, join by code, leave the current one. */
+function ExamSheetBody({ props, onNavigate, onLeave }: { props: StudentShellProps; onNavigate: () => void; onLeave: () => void }) {
+  const { lang, t } = useTranslation();
+  const { data, testStudent } = props;
+  const icon = "h-5 w-5 shrink-0 text-slate-600";
+  return (
+    <div className="space-y-3 px-3 pb-2">
+      <ExamSwitcher props={props} tone="light" onNavigate={onNavigate} />
+      <ul className="space-y-0.5 border-t border-slate-100 pt-2">
+        <li>
+          <Link href={`/${lang}/courses/catalog`} onClick={onNavigate} className={SHEET_ROW}>
+            <Plus aria-hidden="true" className={icon} /><span className="min-w-0 flex-1 break-words">{t("home.prep.addCourse")}</span>
+          </Link>
+        </li>
+        <li>
+          <Link href={`/${lang}/courses/join`} onClick={onNavigate} className={SHEET_ROW}>
+            <KeyRound aria-hidden="true" className={icon} /><span className="min-w-0 flex-1 break-words">{t("home.primary.join")}</span>
+          </Link>
+        </li>
+        {!testStudent && data.current && (
+          <li className="border-t border-slate-100 pt-2">
+            <button type="button" onClick={onLeave} className={cn(SHEET_ROW, "text-danger-700 hover:bg-danger-50")}>
+              <LogOut aria-hidden="true" className="h-5 w-5 shrink-0" /><span className="min-w-0 flex-1 break-words">{t("courses.home.leave")}</span>
+            </button>
+          </li>
+        )}
+      </ul>
     </div>
   );
 }
@@ -289,27 +310,16 @@ function GettingStartedPill({ state, tone, onOpen }: { state: GettingStartedStat
 export function StudentChrome(props: StudentShellProps) {
   const { lang, t } = useTranslation();
   const title = useCourseTitle();
-  const { links, item } = useNav(props);
   const { data, user, testStudent } = props;
-  const wide = useWide();
-  const lessonsItem = useLessonsItem(props, links.lessons, wide);
+  const groups = useMenuGroups(props);
   const [sheet, setSheet] = useState<"account" | "exam" | "start" | null>(null);
   const close = () => setSheet(null);
   const accountId = useId();
   const examId = useId();
   const startId = useId();
   const start = useShellGettingStarted(props);
-
-  const groups: SidebarNavGroup[] = data.current
-    ? [
-      { key: "main", items: [...item(links.home), ...item(links.analytics), ...item(links.saved)] },
-      { key: "lessons", label: t("student.nav.lessonsGroup"), items: lessonsItem },
-      {
-        key: "practice", label: t("student.nav.practiceGroup"),
-        items: [...item(links.tests), ...(data.features?.practice ? item(links.practice) : [])],
-      },
-    ]
-    : [{ key: "main", items: [...item(links.home), ...item(links.catalog)] }];
+  // U9: leaving the current exam course, confirmed in a dialog opened after the exam sheet closed (one modal at a time)
+  const [leaving, setLeaving] = useState<HomeCourseOut | null>(null);
 
   return (
     <>
@@ -323,7 +333,9 @@ export function StudentChrome(props: StudentShellProps) {
             </span>
             <span className="min-w-0 truncate text-base font-bold leading-5 text-white">{t("common.appName")}</span>
           </Link>
-          {data.loaded && data.courses.length > 0 && <ExamSwitcher props={props} tone="navy" />}
+          {data.loaded && data.courses.length > 0 && (
+            <ExamSwitcher props={props} tone="navy" onAdd={{ open: () => setSheet("exam"), expanded: sheet === "exam", controls: examId }} />
+          )}
           <SidebarNav label={t("student.nav.label")} groups={groups} />
           <div className="mt-auto space-y-3">
             <GettingStartedPill state={start} tone="navy" onOpen={() => setSheet("start")} />
@@ -372,9 +384,16 @@ export function StudentChrome(props: StudentShellProps) {
       <Sheet id={accountId} open={sheet === "account"} onClose={close} title={t("student.account.title")}>
         <AccountPanel props={props} onNavigate={close} />
       </Sheet>
-      <Sheet id={examId} open={sheet === "exam"} onClose={close} title={t("student.switcher.title")}>
-        <div className="px-3 pb-2"><ExamSwitcher props={props} tone="light" onNavigate={close} /></div>
+      <Sheet id={examId} open={sheet === "exam"} onClose={close} title={t("student.switcher.label")}>
+        <ExamSheetBody props={props} onNavigate={close} onLeave={() => { setLeaving(data.current); close(); }} />
       </Sheet>
+      {leaving && (
+        <LeaveCourseDialog courseId={leaving.id} courseTitle={title(leaving)} open onCancel={() => setLeaving(null)}
+          onLeft={() => {
+            data.forget(leaving.id);
+            window.location.assign(`/${lang}/courses`); // the home and the menu read everything again
+          }} />
+      )}
       <GettingStartedSheet id={startId} state={start} open={sheet === "start"} onClose={close} />
     </>
   );
@@ -385,7 +404,6 @@ export function StudentTabBar(props: StudentShellProps) {
   const { t } = useTranslation();
   const { links, item, label } = useNav(props);
   const { data, testStudent } = props;
-  const lessonsItem = useLessonsItem(props, links.lessons, false);
   const [more, setMore] = useState(false);
   const [startOpen, setStartOpen] = useState(false);
   const moreId = useId();
@@ -398,7 +416,7 @@ export function StudentTabBar(props: StudentShellProps) {
   const items: TabBarItem[] = data.current
     ? [...slot(links.home), ...slot(links.tests), ...slot(links.practice), ...slot(links.analytics), moreSlot]
     : [...slot(links.home), ...slot(links.catalog), moreSlot];
-  const moreLinks: SidebarNavItem[] = data.current ? [...lessonsItem, ...item(links.saved)] : [];
+  const moreLinks: SidebarNavItem[] = data.current ? [...item(links.lessons), ...item(links.saved)] : [];
   return (
     <>
       <TabBar label={t("student.nav.tabBar")} items={items} />

@@ -69,8 +69,6 @@ const config: Config = {
         // the student sidebar, the phone top bar's brand mark and the "More" sheet header
         // (Student UI colour: CSS variables like `brand`; `.student-theme` turns them into the owner's teal)
         navy: { 800: "rgb(var(--navy-800) / <alpha-value>)", 900: "rgb(var(--navy-900) / <alpha-value>)" },
-        // Student UI colour (§1.1): the violet accent, only for the one main call to action of a student screen
-        accent: { 50: "#f5f3ff", 100: "#ede9fe", 600: "#7c3aed", 700: "#6d28d9", 800: "#5b21b6" },
         // ORT section pills: `bg-tag-<key>` with `text-tag-<key>-fg`
         tag: {
           math1: { DEFAULT: "#e0f2fe", fg: "#075985" },

@@ -63,7 +63,7 @@ The owner found the grey look dull and chose this palette. It applies **only ins
 | page bg | `#EEF6FC` |
 | home hero | gradient `#DFF1FF → #F5FBFF` with the mascot |
 | primary (`brand` in the student frame) | 600 `#1E7BEA`, 700 `#1764C4`, 50 `#EAF4FE`, 100 `#D4E9FD` |
-| accent | violet `#7C3AED` (the main "Начать тест" call and highlights) |
+| accent | none; one blue primary, gold is the only accent (owner 2026-11-07: harmony) |
 | unlock | gold `#FDE68A` / `#F59E0B` (unchanged) |
 | stat tile icons | on pastel: blue `#DBEAFE/#1D4ED8`, green `#DCFCE7/#15803D`, violet `#EDE9FE/#6D28D9`, orange `#FFEDD5/#C2410C` |
 | correct / wrong | `#16A34A` / `#EF4444` |

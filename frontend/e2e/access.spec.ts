@@ -93,7 +93,9 @@ test.describe("free and paid exams (ru)", () => {
       const paidCard = library.locator("li").filter({ has: student.getByRole("heading", { name: "ОРТ S3 платный", exact: true }) });
       const freeCard = library.locator("li").filter({ has: student.getByRole("heading", { name: "ОРТ S3 бесплатный", exact: true }) });
       await expect(paidCard).toContainText(t("access.paid"));
-      await expect(paidCard.getByText(t("access.lockedLabel"))).toHaveCount(1);
+      // U9 (review 8): "Платный" and the gold pill are the lock signals; no "Нужен доступ", no "Не начат" chip
+      await expect(paidCard.getByText(t("access.lockedLabel"))).toHaveCount(0);
+      await expect(paidCard).not.toContainText(t("examPrep.library.status.not_started"));
       await expect(freeCard).not.toContainText(t("access.paid"));
       await expect(freeCard.getByRole("link", { name: t("examPrep.tests.start"), exact: true })).toBeVisible();
       await shoot(student, "library-locks");

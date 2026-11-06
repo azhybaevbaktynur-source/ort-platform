@@ -7,11 +7,13 @@ import { Meter, SectionTag, accuracyBand, cn, focusRing, type AccuracyBand } fro
 import { useTranslation } from "@/lib/i18n/context";
 import type { TopicStat } from "@/lib/lms/progress";
 import { AnalyticsCard, BandLegend, CardEmpty } from "./AnalyticsCard";
-import { toPercent, topicGroup, twoDigits, weakestTopics, type TopicGroup } from "./analyticsData";
+import { isGraded, toPercent, topicGroup, twoDigits, weakestTopics, type TopicGroup } from "./analyticsData";
 
 /*
  * Student UI U6 (STUDENT_UI_DESIGN §3.3): "5 слабых тем" and accuracy by topic (math vs language). Both take `locked`
  * so the owner can move them behind the pass later without a layout change (D8: free today).
+ * U9 (STUDENT_UI_REVIEW 11): a topic shows a percent and a band only from 5 answers (else "Мало данных", grey); the
+ * weak-topic card only once 3 topics are graded; the band legend once, under the last topic card.
  */
 
 const RING: Record<AccuracyBand, string> = { low: "#f43f5e", mid: "#f59e0b", high: "#10b981" };
@@ -34,6 +36,7 @@ function Ring({ percent }: { percent: number }) {
 export function WeakTopics({ topics, practiceHref, locked = false }: { topics: TopicStat[]; practiceHref: string | null; locked?: boolean }) {
   const { t } = useTranslation();
   const weak = weakestTopics(topics);
+  if (weak === null) return null;
   return (
     <AnalyticsCard locked={locked}
       title={weak.length ? t("progress.analytics.weak.title", { count: weak.length }) : t("progress.analytics.weak.titleEmpty")}
@@ -81,7 +84,9 @@ export function WeakTopics({ topics, practiceHref, locked = false }: { topics: T
 
 function TopicRows({ topics }: { topics: TopicStat[] }) {
   const { t } = useTranslation();
-  const rows = topics.filter((x) => x.total > 0).slice().sort((a, b) => a.accuracy - b.accuracy || b.total - a.total);
+  // graded topics first (weakest first), then the ones with too few answers (most answers first)
+  const rows = topics.filter((x) => x.total > 0).slice().sort((a, b) =>
+    Number(isGraded(b)) - Number(isGraded(a)) || (isGraded(a) ? a.accuracy - b.accuracy : 0) || b.total - a.total);
   return (
     <ul className="space-y-3">
       {rows.map((tp) => (
@@ -90,12 +95,19 @@ function TopicRows({ topics }: { topics: TopicStat[] }) {
             <span className="min-w-0 break-words text-sm font-medium leading-5 text-slate-900">{tp.topic}</span>
             <span className="shrink-0 text-xs leading-4 text-slate-600">{t("progress.analytics.answers", { count: tp.total })}</span>
           </div>
-          <div className="flex items-center gap-3">
-            <Meter className="flex-1" value={toPercent(tp.accuracy)} showValue={false} label={t("progress.analytics.topics.meter", { topic: tp.topic })} />
-            <span aria-hidden="true" className={cn("shrink-0 whitespace-nowrap text-right text-sm font-semibold tabular-nums", BAND_TEXT[accuracyBand(toPercent(tp.accuracy))])} style={{ minWidth: "3.25rem" }}>
-              {toPercent(tp.accuracy)} %
-            </span>
-          </div>
+          {isGraded(tp) ? (
+            <div className="flex items-center gap-3">
+              <Meter className="flex-1" value={toPercent(tp.accuracy)} showValue={false} label={t("progress.analytics.topics.meter", { topic: tp.topic })} />
+              <span aria-hidden="true" className={cn("shrink-0 whitespace-nowrap text-right text-sm font-semibold tabular-nums", BAND_TEXT[accuracyBand(toPercent(tp.accuracy))])} style={{ minWidth: "3.25rem" }}>
+                {toPercent(tp.accuracy)} %
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <span aria-hidden="true" className="h-2 flex-1 rounded-full bg-slate-100" />
+              <span className="shrink-0 whitespace-nowrap text-right text-xs font-medium leading-4 text-slate-500">{t("progress.analytics.lowData")}</span>
+            </div>
+          )}
         </li>
       ))}
     </ul>
@@ -111,6 +123,8 @@ export function TopicAccuracy({ topics, split, locked = false }: { topics: Topic
   for (const tp of topics) by[topicGroup(tp.section)].push(tp);
   const useSplit = split || by.math.length > 0 || by.language.length > 0;
   const groups: TopicGroup[] = useSplit ? ["math", "language", ...(by.other.length ? ["other" as const] : [])] : ["other"];
+  // the band legend once: under the last card that shows a graded topic
+  const legendIn = [...groups].reverse().find((g) => by[g].some(isGraded)) ?? null;
   return (
     <div className={cn("grid min-w-0 gap-4", groups.length > 1 && "lg:grid-cols-2")}>
       {groups.map((g) => (
@@ -122,7 +136,7 @@ export function TopicAccuracy({ topics, split, locked = false }: { topics: Topic
           ) : (
             <>
               <TopicRows topics={by[g]} />
-              <BandLegend className="mt-4 border-t border-slate-100 pt-3" />
+              {g === legendIn && <BandLegend className="mt-4 border-t border-slate-100 pt-3" />}
             </>
           )}
         </AnalyticsCard>

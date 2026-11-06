@@ -10,7 +10,6 @@ import { getExamPrep, type ExamPrepOut } from "@/lib/lms/examPrep";
 import { useCourse } from "@/components/lms/CourseContext";
 import { ErrorState, Skeleton } from "@/components/ui";
 import { useErrorText } from "@/components/lms/home/useErrorText";
-import { LeaveCourseLink } from "@/components/lms/home/LeaveCourseLink";
 import { GoalStrip } from "./GoalStrip";
 import { NextCard } from "./NextCard";
 import { ScoreHistory } from "./ScoreHistory";
@@ -65,7 +64,6 @@ export function ExamPrepPage() {
         <SectionBars data={data} className="order-5 lg:order-none" />
         <TestLibrary courseId={course.id} sources={data.sources} total={data.library_total} className="order-3 lg:order-none lg:col-span-2" />
       </div>
-      <LeaveCourseLink />
     </div>
   );
 }

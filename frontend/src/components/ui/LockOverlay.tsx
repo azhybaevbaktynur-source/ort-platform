@@ -11,7 +11,8 @@ import { cn } from "./utils";
 
 export interface LockOverlayProps {
   locked: boolean;
-  title: React.ReactNode;
+  /** Optional (U9: a test card shows the blur and the icon only; its "Платный" chip says it). */
+  title?: React.ReactNode;
   body?: React.ReactNode;
   /** The way to unlock (a GoldPill to /unlock). */
   action?: React.ReactNode;
@@ -29,7 +30,7 @@ export function LockOverlay({ locked, title, body, action, children, className }
         <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-full bg-navy-800 text-white">
           <Lock className="h-5 w-5" />
         </span>
-        <p className="max-w-xs text-base font-semibold leading-6 text-slate-900">{title}</p>
+        {title && <p className="max-w-xs text-base font-semibold leading-6 text-slate-900">{title}</p>}
         {body && <p className="max-w-xs text-sm leading-5 text-slate-700">{body}</p>}
         {action && <div className="mt-1">{action}</div>}
       </div>

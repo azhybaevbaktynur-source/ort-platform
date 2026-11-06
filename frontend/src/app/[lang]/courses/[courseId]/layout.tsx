@@ -128,7 +128,7 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
       || pathname === `${base}/saved` || pathname === `${base}/practice`; // U8: Сохранённые, Практика
     return (
       <CourseContext.Provider value={ctx}>
-        {ownTitle ? null : header}
+        {ownTitle ? null : <StudentCourseHeader course={course} breadcrumbs={false} />}
         {hidden ? <AreaUnavailable courseId={course.id} /> : children}
       </CourseContext.Provider>
     );

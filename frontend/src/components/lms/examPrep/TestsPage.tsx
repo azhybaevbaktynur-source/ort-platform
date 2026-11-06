@@ -6,11 +6,12 @@
 // unchanged lobby; a paid test without a pass shows a "Платный" lock pill, a blurred score and "Открыть доступ"
 // (/unlock; the sidebar's gold pill is the page-wide way). Two reads in parallel: the exam-prep page (sources, total)
 // and the paginated library.
-// Footer: breadcrumb back and "Покинуть курс" (moved here from the course page, §2.2).
+// U9 (STUDENT_UI_REVIEW 2, 7, 8, 10): no score tiles (the numbers live on the home and in Аналитика), no breadcrumbs
+// and no "Покинуть курс" (the shell navigates; leaving is in its exam sheet), one lock signal pair on a paid card
+// ("Платный" chip and the gold pill); one blue primary (owner 2026-11-07: no violet accent, gold is the only accent).
 import React, { useCallback, useEffect, useId, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Clock, ListChecks, Lock, Target, TrendingUp, Trophy } from "lucide-react";
+import { Clock, ListChecks, Lock } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
 import { templateUi } from "@/lib/lms/templates";
@@ -20,13 +21,11 @@ import {
 } from "@/lib/lms/examPrep";
 import { useCourse } from "@/components/lms/CourseContext";
 import {
-  Badge, EmptyState, ErrorState, GoldPill, LinkButton, LockOverlay, Pagination, STAT_ICON_TONE, Skeleton, cn, focusRing, type BadgeTone,
-  type StatIconTone,
+  Badge, EmptyState, ErrorState, GoldPill, LinkButton, LockOverlay, Pagination, Skeleton, cn, focusRing, type BadgeTone,
 } from "@/components/ui";
 import { StudentPageHeader } from "@/components/lms/student/StudentPageHeader";
 import { fmtDuration } from "@/components/lms/home/format";
 import { useErrorText } from "@/components/lms/home/useErrorText";
-import { LeaveCourseLink } from "@/components/lms/home/LeaveCourseLink";
 
 const STATUSES: LibraryStatus[] = ["not_started", "in_progress", "done"];
 const STATUS_TONE: Record<LibraryStatus, BadgeTone> = { not_started: "neutral", in_progress: "info", done: "success" };
@@ -52,7 +51,7 @@ function ScoreArea({ card }: { card: LibraryCardOut }) {
   const box = "flex min-h-[5.5rem] flex-col justify-center rounded-xl bg-slate-50 px-4 py-3";
   if (card.locked) {
     return (
-      <div className={cn(box, "min-h-[7.5rem]")}>
+      <div className={box}>
         <span className="text-sm text-slate-600">{t("examPrep.library.best")}</span>
         <span className="text-3xl font-bold leading-9 tabular-nums text-slate-900">—</span>
       </div>
@@ -85,36 +84,6 @@ function ScoreArea({ card }: { card: LibraryCardOut }) {
   );
 }
 
-/** Student UI colour (§1.1): the score summary as tiles with coloured icon chips; only once there is a result. */
-function TestsStats({ prep }: { prep: ExamPrepOut }) {
-  const { t } = useTranslation();
-  if (prep.history.length === 0) return null;
-  const max = wholeNumber(prep.goal.scale_max);
-  const outOf = max !== null ? t("examPrep.goal.outOf", { max }) : undefined;
-  const values = prep.history.map((p) => wholeNumber(p.value)).filter((v): v is number => v !== null);
-  const latest = wholeNumber(prep.latest?.value);
-  const best = values.length > 0 ? Math.max(...values) : null;
-  const target = prep.goal.target_score;
-  // one row of three at every width; on phones a compact column (chip, label, number) so the row stays short
-  const tile = (icon: React.ReactNode, tone: StatIconTone, label: string, v: number | null, hint?: string) => (
-    <div className="flex min-w-0 flex-col gap-2 rounded-card border border-slate-200 bg-white p-3 sm:flex-row sm:items-start sm:gap-3 sm:p-4">
-      <span aria-hidden="true" className={cn("inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl [&>svg]:h-4 [&>svg]:w-4 sm:h-10 sm:w-10 sm:[&>svg]:h-5 sm:[&>svg]:w-5", STAT_ICON_TONE[tone])}>{icon}</span>
-      <span className="min-w-0">
-        <span className="block break-words text-xs font-medium leading-4 text-slate-600 sm:text-sm sm:leading-5">{label}</span>
-        <span className="mt-0.5 block text-xl font-bold leading-7 tabular-nums text-slate-900 sm:mt-1 sm:text-2xl sm:leading-8">{v ?? "—"}</span>
-        {hint && v !== null && <span className="hidden text-sm leading-5 text-slate-600 sm:block">{hint}</span>}
-      </span>
-    </div>
-  );
-  return (
-    <div className="grid grid-cols-3 gap-2 sm:gap-4">
-      {tile(<TrendingUp />, "blue", t("examPrep.goal.latestLabel"), latest, outOf)}
-      {tile(<Trophy />, "green", t("examPrep.library.best"), best, outOf)}
-      {tile(<Target />, "orange", t("examPrep.goal.targetLabel"), target)}
-    </div>
-  );
-}
-
 function TestCard({ card, lobby, primary }: { card: LibraryCardOut; lobby: string; primary: boolean }) {
   const { lang, t } = useTranslation();
   const titleId = useId();
@@ -135,7 +104,7 @@ function TestCard({ card, lobby, primary }: { card: LibraryCardOut; lobby: strin
   return (
     <li className="flex min-w-0 flex-col gap-3 rounded-card border border-slate-200 bg-white p-4 sm:p-5">
       <div className="flex flex-wrap items-center gap-2">
-        <Badge tone={STATUS_TONE[card.status]}>{t(`examPrep.library.status.${card.status}`)}</Badge>
+        {!(card.locked && card.status === "not_started") && <Badge tone={STATUS_TONE[card.status]}>{t(`examPrep.library.status.${card.status}`)}</Badge>}
         {card.locked && (
           <Badge className="border-gold-300 bg-gold-100 text-gold-900" icon={<Lock aria-hidden="true" />}>{t("access.paid")}</Badge>
         )}
@@ -146,7 +115,7 @@ function TestCard({ card, lobby, primary }: { card: LibraryCardOut; lobby: strin
         {duration && <span className="inline-flex items-center gap-1.5"><Clock aria-hidden="true" className="h-4 w-4" />{duration}</span>}
       </p>
       <div className="mt-auto space-y-3">
-        <LockOverlay locked={card.locked} title={t("access.lockedLabel")} className="min-h-0 rounded-xl">
+        <LockOverlay locked={card.locked} className="min-h-0 rounded-xl">
           <ScoreArea card={card} />
         </LockOverlay>
         {action}
@@ -234,7 +203,6 @@ function TestsLibrary() {
         <StudentPageHeader id={headingId} title={title} subtitle={courseTitle} />
 
         {metaError && !meta ? <ErrorState variant="inline" message={errorText(metaError)} onRetry={() => void loadMeta()} /> : null}
-        {meta && <TestsStats prep={meta} />}
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {sources.length > 1 && (
@@ -281,24 +249,6 @@ function TestsLibrary() {
         <Pagination nextCursor={cursor} loading={loading} onLoadMore={() => void load(cursor)} />
       </section>
 
-      <footer className="space-y-2 pt-4">
-        <nav aria-label={t("ui.breadcrumbs")}>
-          <ol className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm leading-6 text-slate-600">
-            <li className="inline-flex min-w-0 items-center gap-1">
-              <Link href={`/${lang}/courses`} className={cn("inline-flex min-h-11 items-center break-words rounded font-medium text-brand-700 hover:underline sm:min-h-0", focusRing)}>
-                {t("lms.nav.myCourses")}
-              </Link>
-              <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400" />
-            </li>
-            <li className="inline-flex min-w-0 items-center gap-1"><span className="break-words">{courseTitle}</span></li>
-            <li className="inline-flex min-w-0 items-center gap-1">
-              <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400" />
-              <span aria-current="page" className="break-words">{t("examPrep.library.title")}</span>
-            </li>
-          </ol>
-        </nav>
-        <LeaveCourseLink />
-      </footer>
     </div>
   );
 }

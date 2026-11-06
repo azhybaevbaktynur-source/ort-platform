@@ -86,7 +86,7 @@ test.describe("video lessons (ru)", () => {
       const page = await ctx.newPage();
       await signIn(page, s.modules.ort_student);
 
-      // ---- the sidebar: "Видеоуроки" with the module sub-link
+      // ---- the sidebar: "Видеоуроки", already on Главная (U9: the course list carries what the course has)
       await page.goto(`/${L}/courses`);
       const nav = page.getByRole("navigation", { name: t("student.nav.label") });
       const lessonsLink = nav.getByRole("link", { name: t("student.nav.lessons"), exact: true });
@@ -94,7 +94,8 @@ test.describe("video lessons (ru)", () => {
       await lessonsLink.click();
       await page.waitForURL(new RegExp(`${base}/modules$`));
       await expect(lessonsLink).toHaveAttribute("aria-current", "page");
-      await expect(nav.getByRole("link", { name: M1, exact: true })).toHaveAttribute("href", `${base}/modules#module-${m1.id}`);
+      // U9 (review 5): the same menu on every page, no module sub-links (the phone never had them)
+      await expect(nav.getByRole("link", { name: M1, exact: true })).toHaveCount(0);
 
       // ---- the syllabus (exam-prep: its own title instead of the course header)
       await expect(page.getByRole("heading", { level: 1, name: t("student.nav.lessons") })).toBeVisible();

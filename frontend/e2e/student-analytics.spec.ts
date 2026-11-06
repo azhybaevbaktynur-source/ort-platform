@@ -7,9 +7,9 @@ import { E2E_DIR, seed, settle, signIn, tr, type SeedUser } from "./helpers";
 /**
  * Student UI U6 (docs/phases/STUDENT_UI_DESIGN.md §3.3): the analytics page of the ORT (Russian) course, empty and
  * with data, at 375, 1440 and 1920 px; fails on sideways page scroll. The data student takes the seeded ORT exam
- * through the API. With UX_SCREENS_DIR set it also spreads that student's answers over the last weeks and gives the
- * bank questions topics, straight in the scratch e2e database, so the screenshots show full charts (run it alone:
- * the topics change other specs' data).
+ * through the API, then its answers are spread over the last weeks straight in the scratch e2e database (U9: the
+ * charts need a few active days). With UX_SCREENS_DIR set the bank questions also get topics, so the screenshots show
+ * full charts (run it alone: the topics change other specs' data).
  */
 const OUT = process.env.UX_SCREENS_DIR ? path.resolve(process.env.UX_SCREENS_DIR) : null;
 const SIZES = [[375, 812], [1440, 900], [1920, 1080]] as const;
@@ -47,11 +47,11 @@ async function takeExam(user: SeedUser) {
   await api(user, "POST", `/attempts/${st.id}/submit`, {});
 }
 
-/** Screens only: answers of `userId` spread over the last 40 days at different hours; bank questions get topics. */
-function spreadInDb(userId: string, courseId: string) {
+/** Answers of `userId` spread over the last 40 days at different hours; with `topics` (screens only) bank questions get topics. */
+function spreadInDb(userId: string, courseId: string, topics: boolean) {
   const code = `
 import sqlite3, sys, datetime
-db, uid, cid = sys.argv[1], sys.argv[2], sys.argv[3]
+db, uid, cid, with_topics = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4] == "1"
 con = sqlite3.connect(db)
 cur = con.cursor()
 rows = cur.execute("select i.rowid, i.answered_at from attempt_items i join attempts a on a.id = i.attempt_id "
@@ -70,14 +70,14 @@ for k, (iid, old) in enumerate(rows):
     cur.execute("update attempt_items set answered_at = ? where rowid = ?", (text, iid))
 topics = {"math_1": ["Дроби", "Проценты"], "math_2": ["Уравнения", "Геометрия"], "analogies": ["Синонимы", "Части целого"],
           "reading": ["Главная мысль", "Детали текста"], "grammar": ["Падежи", "Пунктуация"]}
-for sec, names in topics.items():
+for sec, names in (topics.items() if with_topics else []):
     ids = [r[0] for r in cur.execute("select id from bank_questions where section = ? order by id", (sec,)).fetchall()]
     for n, qid in enumerate(ids):
         cur.execute("update bank_questions set topic = ? where id = ?", (names[n % len(names)], qid))
 con.commit()
 print(len(rows))
 `;
-  const out = execFileSync("python3", ["-I", "-c", code, path.join(E2E_DIR, "e2e.db"), userId, courseId], { encoding: "utf-8" });
+  const out = execFileSync("python3", ["-I", "-c", code, path.join(E2E_DIR, "e2e.db"), userId, courseId, topics ? "1" : "0"], { encoding: "utf-8" });
   expect(Number(out.trim()), "answers moved").toBeGreaterThan(0);
 }
 
@@ -126,7 +126,7 @@ test.describe("student analytics", () => {
   test("with data: tiles, charts, period switch", async ({ browser }) => {
     const user = seed().students["analytics-data-ru"];
     await takeExam(user);
-    if (OUT) spreadInDb(String(user.profile.id), seed().course_id);
+    spreadInDb(String(user.profile.id), seed().course_id, !!OUT);
     await walk(browser, user, "analytics-data", async (page) => {
       await expect(page.getByText(tr("ru", "progress.analytics.empty.pageTitle"))).toHaveCount(0);
       await expect(page.getByRole("img", { name: /Ответов за период/ })).toBeVisible();

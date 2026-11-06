@@ -5,20 +5,18 @@ import Link from "next/link";
 import { CheckCircle2, ChevronRight, Circle } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
-import { useAuth } from "@/lib/auth-context";
 import { getExamPrep, type ExamPrepOut } from "@/lib/lms/examPrep";
 import { listPractice } from "@/lib/lms/practice";
 import { usePwa } from "@/components/pwa/PwaProvider";
 import { Sheet } from "@/components/ui/Sheet";
 import { cn, focusRing } from "@/components/ui/utils";
-import { useStudentShellDataContext } from "./StudentShellDataContext";
 
 /*
  * Student UI U8 (STUDENT_UI_DESIGN §3.6): "Начало работы", a client-side checklist of the current exam course from data
  * that already exists: a target score is set (exam-prep page), a test has a result (exam-prep page), a practice set was
  * started (practice list, only when the course has practice), the app is installed (PWA; only where the browser can
- * install it or already did). Shown as a sidebar pill with a sheet and a small home card; gone once every item is done.
- * One store per tab, so the pill and the home card share one answer; the home seeds it from the page it already loaded.
+ * install it or already did). Shown as a sidebar pill (phone: in "More") with a sheet; gone once every item is done
+ * (U9: no home card, review item 3). One store per tab; the home seeds it from the page it already loaded.
  * Data items that are done are remembered on this device (no more requests); the install item is always read live.
  */
 
@@ -194,32 +192,5 @@ export function GettingStartedSheet({ state, open, onClose, id }: { state: Getti
         <GettingStartedList state={state} onNavigate={onClose} />
       </div>
     </Sheet>
-  );
-}
-
-/** Home (§3.6): a small card until every item is done; nothing afterwards. Seeds the store from the loaded page. */
-export function GettingStartedCard({ courseId, prep, className }: { courseId: string; prep: ExamPrepOut; className?: string }) {
-  const { t } = useTranslation();
-  const shell = useStudentShellDataContext();
-  const { userProfile } = useAuth();
-  // only inside the student frame, for its current exam course (the test student never sees it)
-  const mine = !!shell && shell.current?.id === courseId && !userProfile?.is_test_student;
-  const practice = mine && shell ? shell.features?.practice ?? null : null;
-  useEffect(() => { noteExamPrep(courseId, prep); }, [courseId, prep]);
-  const state = useGettingStarted({ courseId, practice, pathKey: "home", enabled: mine, seeded: true });
-  if (!mine || !state.ready || state.complete) return null;
-  return (
-    <section aria-labelledby="home-getting-started" className={cn("min-w-0 rounded-card border border-slate-200 bg-white p-4 sm:p-5", className)}>
-      <div className="mb-3 flex items-center gap-3">
-        <ProgressRing done={state.done} total={state.total} className="h-7 w-7 shrink-0 text-brand-600" />
-        <h2 id="home-getting-started" className="min-w-0 flex-1 break-words text-lg font-semibold leading-7 text-slate-900">
-          {t("student.nav.gettingStarted")}
-        </h2>
-        <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-600">
-          {t("student.gettingStarted.progress", { done: state.done, total: state.total })}
-        </span>
-      </div>
-      <GettingStartedList state={state} compact />
-    </section>
   );
 }

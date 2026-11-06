@@ -9,8 +9,7 @@ import { pickLocalized } from "@/lib/lms/localized";
 import type { ExamNextOut } from "@/lib/lms/examPrep";
 import { LinkButton, cn } from "@/components/ui";
 
-/** `accent` (Student UI colour §1.1, the student home only): the button in the violet accent, the screen's one main call. */
-export function NextCard({ next, courseId, accent = false, className }: { next: ExamNextOut | null; courseId: string; accent?: boolean; className?: string }) {
+export function NextCard({ next, courseId, className }: { next: ExamNextOut | null; courseId: string; className?: string }) {
   const { lang, t } = useTranslation();
   const base = `/${lang}/courses/${courseId}`;
   if (!next) {
@@ -41,8 +40,7 @@ export function NextCard({ next, courseId, accent = false, className }: { next: 
         <p className="mt-1 break-words text-xl font-bold leading-7 text-slate-900">{title}</p>
         <p className="mt-1 text-base leading-6 text-slate-700 sm:text-sm sm:leading-5">{t(`examPrep.next.reason.${next.kind}`, { section })}</p>
       </div>
-      <LinkButton href={href} size="lg" rightIcon={<ArrowRight aria-hidden="true" className="h-5 w-5" />}
-        className={cn("w-full shrink-0 sm:w-auto", accent && next.kind !== "unlock" && "bg-accent-600 hover:bg-accent-700 active:bg-accent-800 focus-visible:ring-accent-600")}>
+      <LinkButton href={href} size="lg" rightIcon={<ArrowRight aria-hidden="true" className="h-5 w-5" />} className="w-full shrink-0 sm:w-auto">
         {t(`examPrep.next.action.${next.kind}`)}
       </LinkButton>
     </section>

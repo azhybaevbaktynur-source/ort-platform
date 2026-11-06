@@ -102,16 +102,24 @@ export function niceCount(v: number): number {
   return 20 * p;
 }
 
+/** U9 (STUDENT_UI_REVIEW 11, §5.1 c): a topic is graded (percent, band) only from this many answers; below: "Мало данных". */
+export const TOPIC_MIN_ANSWERS = 5;
+/** Graded topics needed before the weak-topic card appears at all. */
+export const WEAK_MIN_TOPICS = 3;
+/** Active days (all time) before the activity calendar appears. */
+export const HEATMAP_MIN_DAYS = 7;
+
+export const isGraded = (t: TopicStat) => t.total >= TOPIC_MIN_ANSWERS;
+
 /**
- * The five weakest topics: lowest accuracy first, more answers first on a tie. Only topics with at least two answers
- * qualify (one wrong answer is not a weak topic), unless fewer than three do; then one answer is enough.
+ * The five weakest topics: lowest accuracy first, more answers first on a tie, graded topics only. Null while fewer than
+ * `WEAK_MIN_TOPICS` topics are graded (the card is not shown); an empty list: enough data and nothing weak.
  */
-export function weakestTopics(topics: TopicStat[], n = 5): TopicStat[] {
+export function weakestTopics(topics: TopicStat[], n = 5): TopicStat[] | null {
+  const graded = topics.filter(isGraded);
+  if (graded.length < WEAK_MIN_TOPICS) return null;
   // a topic in the green band (85 % and above) is never "weak"
-  const open = topics.filter((t) => t.total > 0 && toPercent(t.accuracy) < 85);
-  const solid = open.filter((t) => t.total >= 2);
-  return (solid.length >= 3 ? solid : open)
-    .slice()
+  return graded.filter((t) => toPercent(t.accuracy) < 85)
     .sort((a, b) => a.accuracy - b.accuracy || b.total - a.total || a.topic.localeCompare(b.topic))
     .slice(0, n);
 }

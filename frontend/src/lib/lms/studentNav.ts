@@ -3,8 +3,7 @@
  * course, with the active one for the current path. Dependency-free (structural types only).
  *
  * U8 (§5.1 a): the mistakes notebook lives only on Сохранённые (`/courses/{c}/saved?tab=mistakes`), so there is no
- * separate "Мои ошибки" link. Видеоуроки: the syllabus `/courses/{c}/modules` (its module sub-links come from
- * `modules/lessonNav.ts`).
+ * separate "Мои ошибки" link. Видеоуроки: the syllabus `/courses/{c}/modules` (U9: no module sub-links).
  */
 
 export type StudentNavKey = "home" | "analytics" | "saved" | "lessons" | "tests" | "practice" | "catalog";
