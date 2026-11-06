@@ -39,6 +39,7 @@ from app.lms.privacy.models import ConsentRecord, DataRequest
 from app.lms.privacy.registry import ENTRIES
 from app.lms.privacy.service import current_policies
 from app.lms.progress.models import CourseGoal
+from app.lms.exam_prep.models import ExamGoal  # Exam prep S2
 from app.lms.teachers.models import TeacherRequest
 from app.models.user import User
 from tests.auth_helpers import capture_email_codes, signup_fields
@@ -87,6 +88,7 @@ def fill(db):
     db.add(enr)
     db.flush()
     db.add(CourseGoal(enrollment_id=enr.id, target_percent=80))
+    db.add(ExamGoal(user_id=u.id, course_id=w.course.id, target_score=200))  # Exam prep S2
     db.add(EnrollmentAccommodation(enrollment_id=enr.id, course_id=w.course.id, note=S))
     a = make_assignment(db, w.course, db.get(User, teacher), kind="file")
     t = make_assignment(db, w.course, db.get(User, teacher), kind="text")
@@ -182,6 +184,7 @@ def test_side_tables_after_anonymizing(db):
                                                   EnrollmentEvent.event == "removed")).one()
     assert ev.details == {"reason": "account_deleted"}
     assert db.scalars(select(CourseGoal).where(CourseGoal.enrollment_id == enr.id)).first() is None
+    assert db.scalars(select(ExamGoal).where(ExamGoal.user_id == u.id)).first() is None  # Exam prep S2
     texts = db.scalars(select(AssignmentSubmission.body_text).where(AssignmentSubmission.kind == "text",
                                                                     AssignmentSubmission.user_id == u.id)).all()
     assert texts == [""]

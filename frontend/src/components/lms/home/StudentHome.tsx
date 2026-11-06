@@ -5,6 +5,7 @@
 // first, then to-do, grades and announcements (owner, 2026-11-03; replaces "to-do first", PUR-5). A teacher's Learning
 // tab is the same screen.
 import React, { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { KeyRound, LayoutGrid, Trophy } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { getHome, listHomeCourses } from "@/lib/lms/home";
@@ -15,6 +16,7 @@ import { CourseCard } from "@/components/lms/course/CourseCard";
 import { useGradeListText } from "@/components/lms/results/GradeBadge";
 import { PendingApplicationsLine } from "@/components/lms/catalog/ApplicationStatus"; // Phase 9 S4
 import { TeacherApplicationNotice } from "./TeacherApplicationNotice"; // Accounts
+import { PlatformCourses } from "./PlatformCourses"; // Exam prep S2
 import { fmtDayMonthTime } from "./format";
 import { SideRow, SideSection, TodoRows } from "./TodoList";
 import { useErrorText } from "./useErrorText";
@@ -83,17 +85,29 @@ function Dashboard({ data }: { data: HomeOut }) {
     </>
   );
 
+  const platform = data.platform_courses ?? []; // Exam prep S2: "From the platform"
+
   if (data.courses_total === 0 && todo.length === 0) {
     return (
       <div className="space-y-6">
         {pendingApps}
-        <EmptyState mascot="hello" title={t("home.courses.emptyTitle")} description={t("home.courses.emptyBody")}
-          action={(
-            <>
-              <LinkButton size="lg" href={`${base}/join`} leftIcon={<KeyRound aria-hidden="true" className="h-5 w-5" />}>{t("home.primary.join")}</LinkButton>
-              <LinkButton size="lg" href={`${base}/catalog`} leftIcon={<LayoutGrid aria-hidden="true" className="h-5 w-5" />}>{t("home.openCatalog")}</LinkButton>
-            </>
-          )} />
+        <PlatformCourses courses={platform} grid={CARD_GRID} />
+        {platform.length > 0 ? (
+          // Exam prep S2 UX review: the platform cards carry the action; the code and the catalog stay one quiet line
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-base leading-6 text-slate-700 sm:text-sm">
+            <span>{t("home.platform.haveCode")}</span>
+            <Link href={`${base}/join`} className="inline-flex min-h-11 items-center font-medium text-brand-700 hover:underline sm:min-h-0">{t("home.primary.join")}</Link>
+            <Link href={`${base}/catalog`} className="inline-flex min-h-11 items-center font-medium text-brand-700 hover:underline sm:min-h-0">{t("home.openCatalog")}</Link>
+          </p>
+        ) : (
+          <EmptyState mascot="hello" title={t("home.courses.emptyTitle")} description={t("home.courses.emptyBody")}
+            action={(
+              <>
+                <LinkButton size="lg" href={`${base}/join`} leftIcon={<KeyRound aria-hidden="true" className="h-5 w-5" />}>{t("home.primary.join")}</LinkButton>
+                <LinkButton size="lg" href={`${base}/catalog`} leftIcon={<LayoutGrid aria-hidden="true" className="h-5 w-5" />}>{t("home.openCatalog")}</LinkButton>
+              </>
+            )} />
+        )}
       </div>
     );
   }
@@ -103,10 +117,13 @@ function Dashboard({ data }: { data: HomeOut }) {
       {pendingApps}
       {/* phones: cards, then to-do, grades, announcements. From `lg` the side lists are the right column. */}
       <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
-        <section aria-labelledby="home-courses" className="min-w-0">
-          <h2 id="home-courses" className="mb-2 text-lg font-semibold leading-7 text-slate-900">{t("home.courses.title")}</h2>
-          <CourseCards data={data} />
-        </section>
+        <div className="min-w-0 space-y-8">
+          <section aria-labelledby="home-courses" className="min-w-0">
+            <h2 id="home-courses" className="mb-2 text-lg font-semibold leading-7 text-slate-900">{t("home.courses.title")}</h2>
+            <CourseCards data={data} />
+          </section>
+          <PlatformCourses courses={platform} grid={CARD_GRID} />
+        </div>
         <div className="min-w-0 space-y-6">
           <SideSection id="home-todo" title={t("home.todo.title")}>
             {todo.length > 0

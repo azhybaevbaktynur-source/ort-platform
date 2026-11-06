@@ -724,6 +724,15 @@ def seed_landing(api: Api, log: Path, admin_tok: str, ort_course_id: str) -> dic
 # --- Landing screens end ---
 
 
+# --- Exam prep S2 begin --- (frontend/e2e/exam-prep.spec.ts: a newcomer who joins ORT from the home; written after
+# every other row, so earlier rows and screens are exactly as before)
+def seed_exam_prep(api: Api, log: Path) -> dict:
+    newcomer = register(api, log, "e2e-exam-prep-ru@example.com", "Exam Prep Student")
+    newcomer["profile"] = profile(api, newcomer["token"])
+    return {"newcomer": newcomer}
+# --- Exam prep S2 end ---
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--api", required=True)
@@ -802,6 +811,7 @@ def main() -> int:
     privacy = seed_privacy(api, log, cid, exam["id"])  # Phase 11 S3 (after every other row)
     landing = seed_landing(api, log, tok, cid)  # landing page screenshots (after every other row)
     teacher_signup = seed_teacher_signup(api, log, tok, org_admin["organization_id"], org_admin["org_admin"])  # Accounts
+    exam_prep = seed_exam_prep(api, log)  # Exam prep S2 (after every other row)
 
     seed = {
         "quiz_editor": quiz_editor,
@@ -814,6 +824,7 @@ def main() -> int:
         "privacy": privacy,
         "landing": landing,
         "teacher_signup": teacher_signup,
+        "exam_prep": exam_prep,
         "api": args.api, "course_id": cid, "bank_id": bank_id, "exam": exam, "staff_exam": staff_exam,
         "picks": picks, "keys": keys, "comparison_question_id": comparison_qid, "passage_id": passage_id,
         "staff_attempt_id": staff_attempt, "admin": admin, "students": students,

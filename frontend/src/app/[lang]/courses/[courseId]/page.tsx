@@ -12,6 +12,8 @@ import { TeacherCoursePage } from "@/components/lms/course/TeacherCoursePage"; /
 import { StudentCourseHome } from "@/components/lms/home/StudentCourseHome"; // Phase 6 S6b
 import { StudentModulesView } from "@/components/lms/modules/StudentModulesView"; // Phase 8a S4a
 import { PageView } from "@/components/lms/pages/PageView"; // Phase 8a S4a (home_kind = page)
+import { ExamPrepPage } from "@/components/lms/examPrep/ExamPrepPage"; // Exam prep S2
+import { templateUi } from "@/lib/lms/templates";
 
 export default function CourseHomePage() {
   const { lang, t } = useTranslation();
@@ -46,6 +48,8 @@ export default function CourseHomePage() {
   // --- UX rework B (PUR-4): `page` shows the chosen page, then the modules below it; otherwise published modules are
   // the home whatever `home_kind` says, ORT included (its exam rows open the same lobby); without them, today's home.
   if (course.my_enrollment.role === "student") {
+    // Exam prep S2 (owner 2026-11-06): the course template chooses the exam-prep page (ORT first); Student view too
+    if (templateUi(course).studentLayout === "exam_prep") return <ExamPrepPage />;
     if (course.home_kind === "page" && course.home_page_id) {
       return (
         <div className="space-y-6">

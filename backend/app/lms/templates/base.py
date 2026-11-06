@@ -58,6 +58,14 @@ class CourseTemplate:
     # --- Phase 8a S1 end ---
     # --- Phase 10 S1 --- (PHASE_10_DESIGN 2: question types this template refuses; ORT refuses the structured ones)
     refused_question_types: tuple[str, ...] = ()
+    # --- Exam prep S2 begin --- (docs/ROADMAP_EXAM_PREP.md S2: the students' course page layout)
+    # `exam_prep`: students open the course on the exam-prep page (goal, history, section bars, next, library).
+    student_layout: Literal["standard", "exam_prep"] = "standard"
+    # The preset whose scaled result is "the exam score" (history, latest score, the target's range) and the section
+    # keys of its bars, in display order. Only read when `student_layout == "exam_prep"`.
+    exam_prep_preset: Optional[str] = None
+    exam_prep_sections: tuple[str, ...] = ()
+    # --- Exam prep S2 end ---
 
     def locks(self, field_name: str) -> bool:
         return field_name in self.lock_scope

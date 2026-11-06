@@ -28,6 +28,8 @@ export interface TemplateUi {
   importerProfiles: ImportExamType[];
   /** Default import format ("" = general). */
   defaultImportProfile: ImportExamType | "";
+  /** Exam prep S2: how students open the course (`exam_prep`: the exam-prep page). */
+  studentLayout: "standard" | "exam_prep";
 }
 
 const KNOWN_PROFILES: ImportExamType[] = ["full_main", "subject", "practice_bank"];
@@ -49,6 +51,7 @@ export const GENERAL_UI: TemplateUi = Object.freeze({
   assessmentPresets: ["none"],
   importerProfiles: [],
   defaultImportProfile: "",
+  studentLayout: "standard",
 }) as TemplateUi;
 
 /**
@@ -65,6 +68,7 @@ export const LEGACY_UI: TemplateUi = Object.freeze({
   assessmentPresets: ASSESSMENT_PRESETS,
   importerProfiles: KNOWN_PROFILES,
   defaultImportProfile: "full_main",
+  studentLayout: "standard",
 }) as TemplateUi;
 
 export function templateUiFrom(tpl: CourseTemplateOut | null | undefined): TemplateUi {
@@ -84,6 +88,7 @@ export function templateUiFrom(tpl: CourseTemplateOut | null | undefined): Templ
     assessmentPresets: presets,
     importerProfiles: profiles,
     defaultImportProfile: profiles[0] ?? "",
+    studentLayout: tpl.student_layout === "exam_prep" ? "exam_prep" : "standard",
   };
 }
 

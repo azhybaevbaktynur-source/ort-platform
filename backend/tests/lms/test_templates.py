@@ -30,7 +30,8 @@ from tests.lms.test_import_api import imp, zbytes
 
 MAIN_KEYS = [k for k, _ in ORT_MAIN_SECTIONS]
 TEMPLATE_OUT_KEYS = {"key", "version", "locked", "result_view", "passage_display", "section_keys",
-                     "assessment_presets", "importer_profiles", "title_key"}
+                     "assessment_presets", "importer_profiles", "title_key",
+                     "student_layout"}  # Exam prep S2
 
 
 def err(res):
@@ -133,6 +134,7 @@ async def test_seeded_ort_course_has_todays_options(db, api):
             "section_keys": MAIN_KEYS + list(ORT_SUBJECT_KEYS), "assessment_presets": ["none", "ort_main",
                                                                                      "ort_subject"],
             "importer_profiles": ["full_main", "subject", "practice_bank"], "title_key": "templates.ort.title",
+            "student_layout": "exam_prep",  # Exam prep S2 (owner 2026-11-06): students open ORT on the exam-prep page
         }
     # every preset of today is still available in the ORT course
     cid = str(course.id)

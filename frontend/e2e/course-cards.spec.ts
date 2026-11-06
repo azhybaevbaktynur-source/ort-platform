@@ -150,10 +150,10 @@ test.describe("course cards", () => {
     const row = (await api(student, "GET", "/me/home")).courses.find((c: { title: { ru?: string } }) => c.title.ru === WITH_ALL);
     expect(row.organization_display_name).toBeNull();
 
-    // the platform course names its organization, not a generic label
+    // the platform course names the platform in the UI language (Exam prep S2 UX review; the stored name is English)
     const platform = (await api(student, "GET", "/me/home")).courses.find((c: { is_platform_course: boolean }) => c.is_platform_course);
     const ort = courses(page).locator("li", { has: page.locator(`a[href="/ru/courses/${platform.id}"]`) });
-    await expect(ort).toContainText(platform.organization_display_name);
+    await expect(ort).toContainText(t("common.appName"));
 
     // a zero has its maximum
     await expect(grades(page).getByText("0 / 10", { exact: true })).toBeVisible();
@@ -199,7 +199,7 @@ test.describe("course cards", () => {
     }
   });
 
-  test("the Teaching list uses the card; an empty dashboard greets with the mascot", async ({ browser }) => {
+  test("the Teaching list uses the card; an empty dashboard offers the platform courses", async ({ browser }) => {
     test.setTimeout(120_000);
     const tp = await open(browser, teacher(), 1440, 900);
     await tp.goto("/ru/courses?view=teaching");
@@ -210,8 +210,12 @@ test.describe("course cards", () => {
 
     const ep = await open(browser, empty, 375, 812);
     await ep.goto("/ru/courses");
-    await expect(ep.getByText(t("home.courses.emptyTitle"))).toBeVisible();
-    await expect(ep.locator('img[src*="/mascot/hello"]')).toHaveCount(1);
+    // Exam prep S2 UX review: with platform courses (the seeded ORT courses) they carry the action, and the code and
+    // the catalog are one quiet line instead of the mascot empty state (which stays when nothing is offered)
+    await expect(ep.getByRole("region", { name: t("home.platform.title") })).toBeVisible();
+    await expect(ep.getByRole("region", { name: t("home.platform.title") }).getByRole("button", { name: t("catalog.join") }).first()).toBeVisible();
+    await expect(ep.getByText(t("home.platform.haveCode"))).toBeVisible();
+    await expect(ep.locator('img[src*="/mascot/hello"]')).toHaveCount(0);
     await expect(ep.getByRole("link", { name: t("home.primary.join") })).toBeVisible();
     await expect(ep.getByRole("link", { name: t("home.openCatalog") })).toBeVisible();
     await look(ep, "dashboard-empty-375");

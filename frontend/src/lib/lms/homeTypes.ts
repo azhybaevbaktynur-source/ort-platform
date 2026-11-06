@@ -100,6 +100,20 @@ export interface HomeOut {
   todo?: HomeTodoOut[];
   /** Accounts: null unless there is something to say about the person's teacher application. */
   teacher_application?: HomeTeacherApplicationOut | null;
+  /** Exam prep S2: open platform courses the student is not in ("From the platform"); optional: older backend. */
+  platform_courses?: HomePlatformCourseOut[];
+}
+
+/** Exam prep S2: a platform course card with the one-tap join. */
+export interface HomePlatformCourseOut {
+  id: string;
+  title: LocalizedText;
+  description: LocalizedText | null;
+  languages: Lang[];
+  default_language: Lang;
+  owner_display_name: string;
+  organization_display_name: string | null;
+  is_platform_course: boolean;
 }
 
 export interface HomeTeacherApplicationOut {

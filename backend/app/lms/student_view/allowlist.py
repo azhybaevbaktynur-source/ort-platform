@@ -31,6 +31,11 @@ TEST_STUDENT_ROUTES: frozenset[tuple[str, str]] = frozenset({
     ("PUT", f"{_C}/my/goal"),
     ("DELETE", f"{_C}/my/goal"),
     # --- Phase 10 S4 end ---
+    # --- Exam prep S2: the exam-prep page and the student's own target ---
+    ("GET", f"{_C}/exam-prep"),
+    ("GET", f"{_C}/exam-prep/library"),
+    ("PUT", f"{_C}/exam-prep/goal"),
+    ("DELETE", f"{_C}/exam-prep/goal"),
     # the app frame and the student home
     ("GET", f"{_V}/auth/me"),
     ("GET", f"{_V}/me/lms"),
