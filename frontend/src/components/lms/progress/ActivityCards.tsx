@@ -263,8 +263,7 @@ export function AllTimeHeatmap({ data }: { data: ActivityOut }) {
   const total = data.heatmap.reduce((s, d) => s + d.answered, 0);
   const today = data.days.length ? data.days[data.days.length - 1].date : new Date().toISOString().slice(0, 10);
   return (
-    <AnalyticsCard title={t("progress.analytics.heat.title")}
-      subtitle={total > 0 ? t("progress.analytics.heat.streaks", { current: data.streak_current, longest: data.streak_longest }) : undefined}>
+    <AnalyticsCard title={t("progress.analytics.heat.title")}>
       {total === 0 ? (
         <CardEmpty compact pose="hello" hint={t("progress.analytics.heat.empty")} />
       ) : (

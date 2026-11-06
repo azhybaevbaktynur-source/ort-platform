@@ -67,6 +67,8 @@ export interface HomeCourseOut {
   progress: { done: number; total: number } | null;
   /** Student UI U2: `exam_prep` courses go in the student shell's exam switcher (optional: older backend). */
   student_layout?: "exam_prep" | "general";
+  /** Student UI U9: what an exam-prep course has for the shell's menu (null for other courses; absent: older backend). */
+  features?: { modules: boolean; practice: boolean } | null;
 }
 
 /** UX rework: one "To do" row of the dashboard. `attempt_id`: an attempt in progress. Dates are the caller's own. */

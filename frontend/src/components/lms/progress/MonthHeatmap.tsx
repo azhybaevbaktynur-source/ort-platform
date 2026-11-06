@@ -9,11 +9,15 @@ import { useTranslation } from "@/lib/i18n/context";
  * a column per week), months in a row. It shows at least the months with answers and as many earlier months as fill
  * the card (at most 13); the newest month is on the right and visible first: on a phone the row scrolls sideways
  * inside the card, starting at the end. Levels as the Heatmap primitive (0, 1-4, 5-14, 15-29, 30+ answers a day).
+ * U9 (STUDENT_UI_REVIEW 11): where fewer than three full-size months fit (phones), exactly the last three months with
+ * smaller cells, so nothing scrolls.
  */
 
 const LEVEL_BG = ["bg-heat-0", "bg-heat-1", "bg-heat-2", "bg-heat-3", "bg-heat-4"] as const;
 const CELL = 15; // px, gap 3 px
 const MONTH_W = 6 * (CELL + 3) + 16; // widest month plus the gap between months
+const PHONE_MONTHS = 3;
+const PHONE_GAP = 12;
 
 type Day = { date: string; n: number; future: boolean } | null;
 interface Month { key: string; label: string; weeks: Day[][] }
@@ -49,10 +53,17 @@ export function MonthHeatmap({ days, last, label, summary }: {
   const { lang, t } = useTranslation();
   const scroller = useRef<HTMLDivElement | null>(null);
   const [fit, setFit] = useState(6);
+  const [cell, setCell] = useState(CELL); // smaller on phones: three months fit
+  const phone = fit < PHONE_MONTHS;
   useLayoutEffect(() => {
     const el = scroller.current;
     if (!el) return;
-    const measure = () => setFit(Math.max(3, Math.floor(el.clientWidth / MONTH_W)));
+    const measure = () => {
+      const w = el.clientWidth;
+      const full = Math.floor(w / MONTH_W);
+      setFit(full);
+      setCell(full < PHONE_MONTHS ? Math.max(8, Math.min(CELL, Math.floor(((w - (PHONE_MONTHS - 1) * PHONE_GAP) / PHONE_MONTHS + 3) / 6) - 3)) : CELL);
+    };
     measure();
     if (typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(measure);
@@ -66,7 +77,7 @@ export function MonthHeatmap({ days, last, label, summary }: {
     const firstData = days.length ? days[0].date : last;
     const [fy, fm] = firstData.split("-").map(Number);
     const withData = (ly - fy) * 12 + (lm - fm) + 1;
-    const n = Math.min(13, Math.max(withData, fit));
+    const n = phone ? PHONE_MONTHS : Math.min(13, Math.max(withData, fit));
     const out: Month[] = [];
     for (let k = n - 1; k >= 0; k--) {
       const idx = ly * 12 + (lm - 1) - k;
@@ -74,7 +85,7 @@ export function MonthHeatmap({ days, last, label, summary }: {
       out.push(buildMonth(Math.floor(idx / 12), idx % 12, counts, last, lang, k === n - 1 || idx % 12 === 0));
     }
     return out;
-  }, [days, last, fit, lang]);
+  }, [days, last, fit, phone, lang]);
 
   // the newest month first: start scrolled to the end
   useLayoutEffect(() => {
@@ -94,7 +105,7 @@ export function MonthHeatmap({ days, last, label, summary }: {
   return (
     <figure className="min-w-0">
       <div ref={scroller} className="overflow-x-auto pb-1">
-        <div role="img" aria-label={label} className={cn("flex w-max min-w-full gap-4", months.length <= fit ? "justify-between" : "justify-end")}>
+        <div role="img" aria-label={label} className={cn("flex w-max min-w-full", phone ? "gap-3" : "gap-4", months.length <= Math.max(fit, PHONE_MONTHS) ? "justify-between" : "justify-end")}>
           {months.map((mo) => (
             <div key={mo.key} className="shrink-0">
               <p aria-hidden="true" className="mb-1.5 text-xs font-medium leading-4 text-slate-600">{mo.label}</p>
@@ -103,7 +114,7 @@ export function MonthHeatmap({ days, last, label, summary }: {
                   <div key={i} className="flex flex-col gap-[3px]">
                     {w.map((d, j) => (
                       <span key={j} title={d && !d.future ? t("ui.heatmap.cell", { date: fmt(d.date), n: d.n }) : undefined}
-                        style={{ width: CELL, height: CELL }}
+                        style={{ width: cell, height: cell }}
                         className={cn("rounded-[3px]", !d || d.future ? "bg-transparent" : LEVEL_BG[heatLevel(d.n)])} />
                     ))}
                   </div>

@@ -96,9 +96,10 @@ test.describe("student saved, checklist, practice, unlock (ru)", () => {
       await noSideScroll(page, `mistakes empty at ${w}px`);
       await shot(page, `mistakes-empty-${w}`);
 
-      // getting started: the home card and the pill (sidebar on desktop, "More" on phones) open the checklist
+      // getting started: the pill (sidebar on desktop, "More" on phones) opens the checklist; U9 (review 3): no home card
       await page.goto("/ru/courses");
-      await expect(page.getByRole("heading", { level: 2, name: t("student.nav.gettingStarted") })).toBeVisible();
+      await expect(page.getByRole("region", { name: t("examPrep.next.title") })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 2, name: t("student.nav.gettingStarted") })).toHaveCount(0);
       const pillName = new RegExp(`^${t("student.nav.gettingStarted")}\\s*\\d/\\d$`);
       if (w >= 1024) {
         await page.getByRole("button", { name: pillName }).click();
@@ -145,11 +146,13 @@ test.describe("student saved, checklist, practice, unlock (ru)", () => {
       await noSideScroll(page, `mistakes at ${w}px`);
       await shot(page, `mistakes-data-${w}`);
 
-      // one day of answers: no study time, active hours or sessions card (not even an empty one)
+      // one day of answers: no answers chart, study time, active hours, sessions or calendar card (not even an empty
+      // one; U9, review 11), the topic cards are there
       await page.goto(`/ru/courses/${seed().course_id}/progress`);
       await expect(page.getByRole("heading", { level: 1, name: t("progress.analytics.title") })).toBeVisible();
-      await expect(page.getByRole("img", { name: /Ответов за период/ })).toBeVisible();
-      for (const k of ["time", "hours", "sessions"]) await expect(page.getByText(t(`progress.analytics.${k}.title`), { exact: true })).toHaveCount(0);
+      await expect(page.getByText(t("progress.analytics.topics.math"), { exact: true }).first()).toBeVisible();
+      await expect(page.getByRole("img", { name: /Ответов за период/ })).toHaveCount(0);
+      for (const k of ["activity", "time", "hours", "sessions", "heat"]) await expect(page.getByText(t(`progress.analytics.${k}.title`), { exact: true })).toHaveCount(0);
       await settle(page);
       await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
       await noSideScroll(page, `analytics at ${w}px`);

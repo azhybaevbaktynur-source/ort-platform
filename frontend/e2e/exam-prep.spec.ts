@@ -10,7 +10,7 @@ import { OrtExam } from "./ort-exam";
  * with the count, status chips, cards), starts the seeded test from its card, and back on the course sees it done with
  * the best score and "Результат" (the lobby). The exam player and the result page are the ORT ones, unchanged (OrtExam
  * asserts them). Student UI U3: the countdown, target, Next card, score and section rows are on the home, checked
- * before and after the test.
+ * before and after the test (U9: before it, score and target are one slim line; the sections only after).
  *
  * Data: `seed.exam_prep.newcomer` (registered, in no course); the exam date is set by the admin and cleared after.
  * Screens of the page at 375 / 1440 / 1920 (ru) go to $S2_SHOTS (default /tmp/s2_shots).
@@ -86,7 +86,9 @@ test.describe("exam-prep page (ru)", () => {
       await statuses.getByRole("button", { name: t("examPrep.library.status.done"), exact: true }).click();
       await expect(library.getByText(t("examPrep.tests.emptyStatus"))).toBeVisible();
       await statuses.getByRole("button", { name: t("examPrep.tests.allStatuses"), exact: true }).click();
-      await expect(page.getByRole("button", { name: t("courses.home.leave") })).toBeVisible();
+      // U9 (review 2): no breadcrumbs and no "Покинуть курс" on Тесты (leaving is in the shell's exam sheet)
+      await expect(page.getByRole("button", { name: t("courses.home.leave") })).toHaveCount(0);
+      await expect(page.getByRole("navigation", { name: t("ui.breadcrumbs") })).toHaveCount(0);
       await shoot(page, "tests-new");
 
       // ---- Student UI U3: the home is now the exam-prep home of ORT (Russian): greeting, countdown, Next, no score yet
@@ -95,7 +97,7 @@ test.describe("exam-prep page (ru)", () => {
       await expect(page.getByRole("group", { name: new RegExp(`^${t("examPrep.goal.daysLabel")}: \\d+ `) })).toBeVisible();
       await expect(page.getByRole("region", { name: t("examPrep.next.title") })).toContainText("ОРТ E2E");
       const scores = page.getByRole("region", { name: t("home.prep.score.title") });
-      await expect(scores).toContainText(t("examPrep.goal.noScore"));
+      await expect(scores).toContainText(t("examPrep.goal.latestLabel")); // U9: the slim line before a result
 
       // ---- the target, inline on the home: out of range is refused, 200 is kept
       await scores.getByRole("button", { name: t("examPrep.goal.setTarget") }).click();
@@ -145,13 +147,14 @@ test.describe("exam-prep page (ru)", () => {
 
       // ---- the home: ORT (Russian) is one of the student's courses now, no longer under "From the platform"
       await page.goto(`/${L}/courses`);
-      await expect(page.getByRole("region", { name: t("home.courses.title") }).locator(`a[href="/${L}/courses/${cid}"]`)).toHaveCount(1);
+      await expect(page.getByRole("navigation", { name: t("student.nav.label") }).getByRole("link", { name: t("student.nav.tests") }))
+        .toHaveAttribute("href", `/${L}/courses/${cid}/tests`); // U9: the course is the shell's exam, no course grid
       await expect(page.locator(`a[href="/${L}/courses/catalog/${cid}"]`)).toHaveCount(0);
       // Student UI U3: current vs target, the section rows of the latest result, the streak of today's answers
       await expect(scores).toContainText(t("examPrep.goal.outOf", { max: 245 }));
       await expect(scores).toContainText("200");
       await expect(page.getByRole("region", { name: t("examPrep.sections.title") }).getByRole("meter")).toHaveCount(5);
-      await expect(page.getByRole("region", { name: t("home.prep.streak.title") })).toContainText(t("home.prep.streak.days_one", { count: 1 }));
+      await expect(page.getByRole("region", { name: t("progress.analytics.tiles.streak") })).toContainText(t("home.prep.streak.days_one", { count: 1 }));
       await expect(page.getByRole("region", { name: t("examPrep.next.title") })).toContainText("ОРТ E2E staff");
       await shoot(page, "home-prep-after");
     } finally {

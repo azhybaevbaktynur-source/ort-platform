@@ -11,7 +11,7 @@ import { ActiveHours, ActivityBars, AllTimeHeatmap, Sessions, StudyTime } from "
 import { AnalyticsCard } from "./AnalyticsCard";
 import { GoalInput } from "./GoalInput";
 import { TopicAccuracy, WeakTopics } from "./TopicCards";
-import { PERIODS, toPercent } from "./analyticsData";
+import { HEATMAP_MIN_DAYS, PERIODS, toPercent } from "./analyticsData";
 
 /*
  * Student UI U6 (STUDENT_UI_DESIGN §3.3): the analytics page body. Three requests in parallel (progress, activity of
@@ -19,7 +19,7 @@ import { PERIODS, toPercent } from "./analyticsData";
  * Free for everyone (D8): `LOCK_ANALYTICS` moves the weak-topic and by-topic cards behind the pass when the owner says so.
  */
 const LOCK_ANALYTICS = false;
-/** Active days in the period before the history cards (study time, active hours, sessions) appear (U8, §5.1 c). */
+/** Active days in the period before the history cards (answers, study time, active hours, sessions) appear (U8, U9, §5.1 c). */
 const HISTORY_DAYS = 3;
 
 /** The period buttons ("7 дней", "30 дней", "90 дней", "Год"); a toggle group, one pressed. */
@@ -103,6 +103,8 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
   const graded = activity.totals.correct + activity.days.reduce((s, d) => s + d.wrong, 0);
   const nothingYet = progress.attempts_total === 0 && answered === 0 && activity.heatmap.length === 0;
   const history = activity.days.filter((d) => d.answered > 0).length >= HISTORY_DAYS;
+  // U9 (review 11): the calendar only after a week of active days
+  const calendar = activity.heatmap.filter((d) => d.answered > 0).length >= HEATMAP_MIN_DAYS;
   const practiceHref = course.features?.practice ? `/${lang}/courses/${courseId}/practice` : null;
   const split = !!course.template?.section_keys?.length;
   const pct = (v: number | null) => (v === null ? "-" : `${Math.round(v)} %`);
@@ -134,7 +136,8 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
       )}
 
       <WeakTopics topics={progress.by_topic} practiceHref={practiceHref} locked={LOCK_ANALYTICS} />
-      <ActivityBars data={activity} period={period} />
+      {/* U9 (review 11): the answers chart too needs history (a chart of one bar says nothing) */}
+      {history && <ActivityBars data={activity} period={period} />}
       <TopicAccuracy topics={progress.by_topic} split={split} locked={LOCK_ANALYTICS} />
       {/* U8 (§5.1 c): study time, active hours and sessions need history; before that they are not drawn at all */}
       {history && <StudyTime data={activity} period={period} />}
@@ -144,7 +147,7 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
           <Sessions data={activity} />
         </div>
       )}
-      <AllTimeHeatmap data={activity} />
+      {calendar && <AllTimeHeatmap data={activity} />}
 
       {!examPrep && <AnalyticsCard title={t("progress.analytics.goal.title")}
         subtitle={progress.current_percent === null && progress.goal_percent === null

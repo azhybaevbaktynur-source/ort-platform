@@ -44,9 +44,9 @@ export function StreakCard({ activity, className }: { activity: ActivityOut; cla
   return (
     <section aria-labelledby="home-streak" className={cn(HOME_CARD, className)}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 id="home-streak" className="text-base font-semibold leading-6 text-slate-900">{t("home.prep.streak.title")}</h2>
+        <h2 id="home-streak" className="text-base font-semibold leading-6 text-slate-900">{t("progress.analytics.tiles.streak")}</h2>
         {activity.streak_longest > 0 && (
-          <p className="text-sm leading-5 text-slate-600">{t("home.prep.streak.best", { count: activity.streak_longest })}</p>
+          <p className="text-sm leading-5 text-slate-600">{t("progress.analytics.tiles.streakBest", { count: activity.streak_longest })}</p>
         )}
       </div>
       {streak > 0 ? (

@@ -20,7 +20,7 @@ import { PendingApplicationsLine } from "@/components/lms/catalog/ApplicationSta
 import { useStudentShellDataContext } from "@/components/lms/student/StudentShellDataContext"; // Student UI U3
 import { TeacherApplicationNotice } from "./TeacherApplicationNotice"; // Accounts
 import { PlatformCourses } from "./PlatformCourses"; // Exam prep S2
-import { CatalogCard, ExamPrepHome, HOME_CARD_GRID } from "./ExamPrepHome"; // Student UI U3
+import { ExamPrepHome, HOME_CARD_GRID } from "./ExamPrepHome"; // Student UI U3
 import { fmtDayMonthTime } from "./format";
 import { SideRow, SideSection, TodoRows } from "./TodoList";
 import { useErrorText } from "./useErrorText";
@@ -36,7 +36,7 @@ function PersonalBestBadge() {
   );
 }
 
-function CourseCards({ data, extra }: { data: HomeOut; extra?: React.ReactNode }) {
+function CourseCards({ data }: { data: HomeOut }) {
   const { lang, t } = useTranslation();
   const errorText = useErrorText();
   const [more, setMore] = useState<HomeCourseOut[] | null>(null); // every course, once the student asked for them
@@ -62,7 +62,6 @@ function CourseCards({ data, extra }: { data: HomeOut; extra?: React.ReactNode }
         {(more ?? data.courses).map((c) => (
           <CourseCard key={c.id} course={c} href={`/${lang}/courses/${c.id}`} progress={c.progress} nextDue={c.next_due_at} />
         ))}
-        {extra}
       </ul>
       {error ? <ErrorState variant="inline" message={errorText(error)} onRetry={() => void load(cursor)} className="mt-3" /> : null}
       {more
@@ -262,17 +261,14 @@ export function StudentHome({ embedded = false }: { embedded?: boolean }) {
   const prepCourse = shell?.current ?? data?.courses.find((c) => c.student_layout === "exam_prep") ?? null;
   if (prepCourse) {
     const side = data && sideListsShown(data, prepCourse.id) ? <SideLists data={data} skipCourse={prepCourse.id} /> : null;
-    const courses = data
-      ? <CourseCards data={data} extra={<CatalogCard />} />
-      : error
-        ? <ErrorState message={errorText(error)} onRetry={() => void load()} retrying={loading} />
-        : <CardGridSkeleton />;
+    // U9 (review 1): no course grid here; the platform courses and the other courses are compact rows in ExamPrepHome
+    const homeError = error && !data ? <ErrorState variant="inline" message={errorText(error)} onRetry={() => void load()} /> : null;
     return (
       <div className="w-full space-y-6">
         {data?.teacher_application && <TeacherApplicationNotice application={data.teacher_application} />}
         {data && <PendingApplicationsLine items={data.pending_applications ?? []} />}
-        <ExamPrepHome courseId={prepCourse.id} courseTitle={prepCourse.title} home={data} embedded={embedded}
-          side={side} courses={courses} />
+        <ExamPrepHome courseId={prepCourse.id} courseTitle={prepCourse.title} home={data} homeError={homeError} embedded={embedded}
+          side={side} />
       </div>
     );
   }

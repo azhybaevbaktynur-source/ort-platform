@@ -78,6 +78,12 @@ class HomeProgressOut(BaseModel):
     total: int
 
 
+class HomeCourseFeaturesOut(BaseModel):
+    """Student UI U9 (review item 5): what an exam-prep course has for the student shell's menu, read with the list."""
+    modules: bool
+    practice: bool
+
+
 class HomeCourseOut(BaseModel):
     id: uuid.UUID
     title: dict
@@ -92,6 +98,8 @@ class HomeCourseOut(BaseModel):
     progress: Optional[HomeProgressOut] = None  # null: no module item with a requirement, so no bar
     # Student UI U2 (STUDENT_UI_DESIGN §4.1): `exam_prep` courses are listed in the student shell's exam switcher
     student_layout: Literal["exam_prep", "general"] = "general"
+    # Student UI U9: exam-prep courses only (null otherwise), so the shell draws the same menu on every page
+    features: Optional[HomeCourseFeaturesOut] = None
 
 
 # --- Phase 8a S3 begin --- (PHASE_8A_DESIGN 5.4, 6.7, 8.1: "continue in course" strip and announcements)
