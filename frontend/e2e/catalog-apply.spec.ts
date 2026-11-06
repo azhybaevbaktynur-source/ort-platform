@@ -129,7 +129,7 @@ test("student finds the course, opens the landing and applies", async ({ browser
   const card = page.locator("li", { has: page.getByRole("link", { name: "Курс с анкетой E2E" }) });
   await expect(card).toBeVisible();
   await expect(page.getByRole("link", { name: /ОРТ/ })).toHaveCount(0); // the search (debounced) hides the ORT courses
-  await expect(card.getByText(t("catalog.modes.form_review"))).toBeVisible();
+  await expect(card.getByText(t("courses.card.byApplication"))).toBeVisible(); // F7c: a badge only when it matters
   await shot(page, "catalog-search");
   await uxShots(page, UX, "student-catalog-search", STUDENT, search);
 
