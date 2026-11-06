@@ -88,9 +88,10 @@ function Item({ item, tone, sub, onNavigate }: { item: SidebarNavItem; tone: "na
 
 export function SidebarNav({ label, groups, tone = "navy", onNavigate, className }: SidebarNavProps) {
   return (
-    <nav aria-label={label} className={cn("space-y-4", className)}>
-      {groups.filter((g) => g.items.length > 0).map((g) => (
-        <div key={g.key}>
+    <nav aria-label={label} className={className}>
+      {groups.filter((g) => g.items.length > 0).map((g, idx) => (
+        // the group gap only before a labelled group; unlabelled groups continue the 2 px item rhythm
+        <div key={g.key} className={idx === 0 ? undefined : g.label ? "mt-4" : "mt-0.5"}>
           {g.label && (
             <p className={cn("mb-1 px-3 text-[11px] font-semibold uppercase leading-4 tracking-[0.08em]",
               tone === "navy" ? "text-white/80" : "text-slate-500")}>

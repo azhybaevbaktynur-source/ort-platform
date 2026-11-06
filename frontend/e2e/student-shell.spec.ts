@@ -44,6 +44,23 @@ test.describe("student shell (ru)", () => {
     await expect(page.getByRole("navigation", { name: t("student.nav.tabBar") })).toHaveCount(0);
   });
 
+  test("desktop sidebar: equal vertical rhythm between links (1440, 1920)", async ({ page }) => {
+    const s = seed();
+    await signIn(page, s.students["vis-desktop-ru"]);
+    for (const width of [1440, 1920]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(`/${L}/courses`);
+      const nav = page.getByRole("navigation", { name: t("student.nav.label") });
+      await expect(nav).toBeVisible();
+      await settle(page);
+      const boxes = await nav.getByRole("link").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; }));
+      expect(boxes.length).toBeGreaterThanOrEqual(3);
+      const gaps = boxes.slice(1).map((b, i) => b.top - boxes[i].bottom);
+      for (const g of gaps) expect(Math.abs(g - gaps[0])).toBeLessThanOrEqual(1);
+      if (process.env.F1_SHOTS) await nav.screenshot({ path: path.join(process.env.F1_SHOTS, `sidebar-${width}.png`) });
+    }
+  });
+
   test("phone: tab bar, More sheet, no horizontal scroll", async ({ page }) => {
     const s = seed();
     await page.setViewportSize(VIEWPORTS.phone);
