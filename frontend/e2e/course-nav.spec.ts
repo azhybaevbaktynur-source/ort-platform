@@ -363,8 +363,9 @@ test.describe("course navigation (ru)", () => {
       const v = JSON.parse(window.sessionStorage.getItem("studentView") || "{}");
       window.sessionStorage.setItem("studentView", JSON.stringify({ ...v, token: "dead.token.value" }));
     });
-    await tp.reload();
-    await tp.waitForURL(new RegExp(`/courses/${cid}$`));
+    // the dead token makes the page redirect while it reloads; a reload aborted by that redirect is expected
+    await tp.reload({ waitUntil: "commit" }).catch(() => undefined);
+    await expect(tp).toHaveURL(new RegExp(`/courses/${cid}$`), { timeout: 15_000 });
     await expect(link(tp, LINKS.settings)).toBeVisible();
     expect(await tabSession(tp)).toBeNull();
     expect(await tp.evaluate(() => !!localStorage.getItem("ort_token"))).toBe(true);
