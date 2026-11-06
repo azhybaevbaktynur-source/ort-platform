@@ -3,7 +3,7 @@ import { seed, settle, signIn, tr, VIEWPORTS, type SeedUser } from "./helpers";
 
 /**
  * SF-1 F3 (docs/phases/STUDENT_UI_FIX_PLAN.md §3): the link audit of the student area. Every new student page (home,
- * Тесты, Аналитика, Сохранённые with both tabs, Видеоуроки, Практика, /unlock, a result) is opened, and every internal
+ * Тесты, Аналитика, Сохранённые with both tabs, Видеоуроки, Практика, /pro, a result) is opened, and every internal
  * link on it is visited: each must land on a page inside the student frame (`.student-theme`; the player route has
  * only that frame) without the old course header, breadcrumbs or "Назад к заданию". The rows of Сохранённые and of
  * Ошибки land on the review card `#item-n`, in view.
@@ -96,7 +96,7 @@ test.describe("student link audit (ru)", () => {
 
     const pages = [
       `/${L}/courses`, `${c}/tests`, `${c}/progress`, `${c}/saved`, `${c}/saved?tab=mistakes`, `${c}/modules`,
-      `${c}/practice`, `/${L}/unlock`, `${c}/attempts/${attemptId}/result`,
+      `${c}/practice`, `/${L}/pro`, `${c}/attempts/${attemptId}/result`,
     ];
     const visited = new Set<string>();
     for (const from of pages) {

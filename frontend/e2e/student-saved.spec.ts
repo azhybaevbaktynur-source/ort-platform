@@ -6,7 +6,7 @@ import { seed, settle, signIn, tr, type SeedUser } from "./helpers";
 /**
  * Student UI U8 (docs/phases/STUDENT_UI_DESIGN.md §3.4, §3.6, §5.1): Сохранённые (flagged questions and the mistakes
  * notebook, `/progress?tab=mistakes` redirects there), the history-only analytics cards, the "Начало работы" checklist
- * (sidebar pill, phone "More", home card), the practice list and /unlock in the student shell, at 375, 1440 and 1920 px
+ * (sidebar pill, phone "More", home card), the practice list and /pro in the student shell, at 375, 1440 and 1920 px
  * in ru; fails on sideways page scroll. One student without flags, one who takes the seeded ORT exam through the API and
  * flags three questions. With UX_SCREENS_DIR set it saves the screens there and adds a practice set to the ORT course
  * (run it alone then: that set changes what other specs see).
@@ -164,13 +164,13 @@ test.describe("student saved, checklist, practice, unlock (ru)", () => {
       await noSideScroll(page, `practice at ${w}px`);
       await shot(page, `practice-${w}`);
 
-      await page.goto("/ru/unlock");
-      await expect(page.getByRole("heading", { level: 1, name: t("access.unlock.title") })).toBeVisible();
+      await page.goto("/ru/pro");
+      await expect(page.getByRole("heading", { level: 1, name: t("access.pro.title") })).toBeVisible();
       // inside the student shell: its navigation, not the AppHeader's areas
       const shellNav = w >= 1024 ? t("student.nav.label") : t("student.nav.tabBar");
       await expect(page.getByRole("navigation", { name: shellNav })).toBeVisible();
       await settle(page);
-      await noSideScroll(page, `unlock at ${w}px`);
+      await noSideScroll(page, `pro at ${w}px`);
       await shot(page, `unlock-${w}`);
     });
   });

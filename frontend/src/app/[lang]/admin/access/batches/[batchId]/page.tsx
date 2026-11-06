@@ -2,17 +2,17 @@
 
 // S3 access, platform admin: one batch's codes. A code shows as its last four characters; "Show" reveals the full code
 // (audited, one at a time), "Copy" copies it, "Mark as sold" keeps who bought it (personal data, never in the audit).
-// Export downloads the unused codes as CSV (audited); Revoke stops every code nobody has redeemed.
+// Export downloads the unused codes as CSV (audited); Revoke stops every code nobody has redeemed. F6b: both under «Ещё».
 import React, { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Copy, Download, Eye, EyeOff } from "lucide-react";
+import { Copy, Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { fmtApiDateTimeShort } from "@/lib/format";
 import {
   exportBatch, getBatch, listCodes, markGiven, revealCode, revokeBatch, type BatchOut, type CodeOut, type CodeStatus,
 } from "@/lib/lms/access";
 import {
-  Badge, Button, Card, DescriptionList, Dialog, EmptyState, ErrorState, IconButton, Input, LoadingState, PageHeader,
+  Badge, Button, Card, DescriptionList, Dialog, EmptyState, ErrorState, IconButton, Input, LoadingState, MenuButton, PageHeader,
   ReasonDialog, Select, Table, toast, type BadgeTone, type TableColumn,
 } from "@/components/ui";
 import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
@@ -107,10 +107,11 @@ export default function AdminBatchPage() {
   };
 
   const accessCrumb = { label: t("access.admin.nav"), href: `/${lang}/admin/access` };
+  const vouchersCrumb = { label: t("access.admin.tabs.vouchers"), href: `/${lang}/admin/access/vouchers` };
   if (error && !batch) {
     return (
       <div>
-        <PageHeader title={t("access.admin.codes.title")} breadcrumbs={crumbs(accessCrumb, { label: "…" })} />
+        <PageHeader title={t("access.admin.codes.title")} breadcrumbs={crumbs(accessCrumb, vouchersCrumb, { label: "…" })} />
         <ErrorState message={errorText(error)} onRetry={() => { void loadBatch(); void load(); }} />
       </div>
     );
@@ -147,10 +148,19 @@ export default function AdminBatchPage() {
 
   return (
     <div>
-      <PageHeader title={batch.label} breadcrumbs={crumbs(accessCrumb, { label: batch.label })}
+      <PageHeader title={batch.label} breadcrumbs={crumbs(accessCrumb, vouchersCrumb, { label: batch.label })}
         badge={batch.revoked_at ? <Badge tone="danger">{t("access.admin.batches.revoked")}</Badge> : undefined}
-        primaryAction={<Button variant="secondary" loading={exporting} onClick={() => void runExport()} leftIcon={<Download aria-hidden="true" className="h-4 w-4" />}>{t("access.admin.batches.export")}</Button>}
-        secondaryActions={!batch.revoked_at ? <Button variant="dangerOutline" onClick={() => { setDialogError(null); setRevoking(true); }}>{t("access.admin.batches.revoke")}</Button> : undefined} />
+        secondaryActions={
+          <MenuButton label={t("access.admin.more")} variant="secondary" disabled={exporting}
+            items={[
+              { id: "export", label: t("access.admin.batches.export") },
+              ...(!batch.revoked_at ? [{ id: "revoke", label: <span className="text-danger-700">{t("access.admin.batches.revoke")}</span> }] : []),
+            ]}
+            onSelect={(id) => {
+              if (id === "export") void runExport();
+              else { setDialogError(null); setRevoking(true); }
+            }} />
+        } />
       <AccessTabs />
       <Card className="mb-6">
         <DescriptionList twoColumns items={[

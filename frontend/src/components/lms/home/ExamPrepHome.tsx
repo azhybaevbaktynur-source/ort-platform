@@ -191,7 +191,7 @@ function ScoreLine({ prep, courseId, onGoal }: { prep: ExamPrepOut; courseId: st
   );
 }
 
-/** §5.1 b, U9 (review 9): one short gold card for a student without results; the details stay on /unlock. */
+/** §5.1 b, U9 (review 9): one short gold card for a student without results; the details stay on /pro. */
 function UnlockCard() {
   const { lang, t } = useTranslation();
   return (
@@ -201,7 +201,7 @@ function UnlockCard() {
         <h2 id="home-unlock" className="text-base font-semibold leading-6 text-gold-900">{t("home.prep.unlock.title")}</h2>
         <p className="text-base leading-6 text-slate-800 sm:text-sm sm:leading-5">{t("home.prep.unlock.body")}</p>
       </div>
-      <GoldPill href={`/${lang}/unlock`} className="justify-center sm:shrink-0">{t("access.needsPassLink")}</GoldPill>
+      <GoldPill href={`/${lang}/pro`} className="justify-center sm:shrink-0">{t("access.needsPassLink")}</GoldPill>
     </section>
   );
 }

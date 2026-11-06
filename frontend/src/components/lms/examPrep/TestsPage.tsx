@@ -4,7 +4,7 @@
 // Title "Тесты · N", filter chips (sources from the server, statuses over the loaded cards), then the library as cards
 // in a 3 / 2 / 1 grid: status pill, title, questions and duration, best score and one action. Every card opens the
 // unchanged lobby; a paid test without a pass shows a "Платный" lock pill, a blurred score and "Открыть доступ"
-// (/unlock; the sidebar's gold pill is the page-wide way). Two reads in parallel: the exam-prep page (sources, total)
+// (/pro; the sidebar's gold pill is the page-wide way). Two reads in parallel: the exam-prep page (sources, total)
 // and the paginated library.
 // U9 (STUDENT_UI_REVIEW 2, 7, 8, 10): no score tiles (the numbers live on the home and in Аналитика), no breadcrumbs
 // and no "Покинуть курс" (the shell navigates; leaving is in its exam sheet), one lock signal pair on a paid card
@@ -91,7 +91,7 @@ function TestCard({ card, lobby, primary }: { card: LibraryCardOut; lobby: strin
   const duration = fmtDuration(card.time_limit_s, t);
   let action: React.ReactNode;
   if (card.locked) {
-    action = <GoldPill href={`/${lang}/unlock`} icon={<Lock />} block className="justify-center">{t("examPrep.tests.unlock")}</GoldPill>;
+    action = <GoldPill href={`/${lang}/pro`} icon={<Lock />} block className="justify-center">{t("examPrep.tests.unlock")}</GoldPill>;
   } else if (card.status === "done") {
     action = <LinkButton href={lobby} variant="secondary" fullWidth aria-describedby={titleId}>{t("examPrep.tests.result")}</LinkButton>;
   } else {

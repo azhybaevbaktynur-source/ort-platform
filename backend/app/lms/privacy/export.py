@@ -76,7 +76,7 @@ def sections() -> list[Section]:
         Section("teacher_requests", _cols(TeacherRequest, "id", "status", "created_at", "decided_at"),
                 lambda uid: TeacherRequest.user_id == uid, TeacherRequest.id),
         # S3 access: own passes; never the buyer's name on a sold code (design 7.5) nor an admin's reason
-        Section("access_passes", _cols(AccessPass, "id", "scope", "source", "revoked_at", "created_at"),
+        Section("access_passes", _cols(AccessPass, "id", "scope", "source", "plan", "revoked_at", "created_at"),
                 lambda uid: AccessPass.user_id == uid, AccessPass.id),
         # S4: a pending email change (never the token)
         Section("email_change_requests", _cols(EmailChangeRequest, "id", "expires_at", "created_at"),

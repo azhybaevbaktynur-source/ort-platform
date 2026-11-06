@@ -131,6 +131,7 @@ ENTRIES: list[Entry] = [
     *_refs("access_passes", "granted_by_id", "revoked_by_id"),
     *_refs("activation_code_batches", "created_by_id"),
     *_refs("activation_codes", "redeemed_by_id", action="keep_tombstone"),
+    *_refs("platform_settings", "updated_by_id"),  # F6a: the admin who last saved the Pro settings
     *_refs("exam_template_versions", "published_by_id"),
     *_refs("exam_templates", "owner_user_id", action="keep_tombstone"),
     *_refs("exam_templates", "created_by_id", "deleted_by_id"),
