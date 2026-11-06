@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { sectionCounts, seed, settle, signIn, tr } from "./helpers";
+import { sectionCounts, seed, settle, signIn, tr, type SeedUser } from "./helpers";
 import { OrtExam } from "./ort-exam";
 
 /**
@@ -9,9 +9,10 @@ import { OrtExam } from "./ort-exam";
  * ORT (Russian) under "From the platform" on the home, joins it with one tap, lands on the course's Тесты page (title
  * with the count, status chips, cards), starts the seeded test from its card, and back on the course sees it done with
  * the best score and "Результат" (the lobby). The exam player and the result page are the ORT ones, unchanged (OrtExam
- * asserts them). The countdown, target, Next card, history and section bars move to the home (U3, tested there).
+ * asserts them). Student UI U3: the countdown, target, Next card, score and section rows are on the home, checked
+ * before and after the test.
  *
- * Data: `seed.exam_prep.newcomer` (registered, in no course).
+ * Data: `seed.exam_prep.newcomer` (registered, in no course); the exam date is set by the admin and cleared after.
  * Screens of the page at 375 / 1440 / 1920 (ru) go to $S2_SHOTS (default /tmp/s2_shots).
  */
 
@@ -19,6 +20,22 @@ const L = "ru" as const;
 const t = (key: string, vars: Record<string, string | number> = {}) => tr(L, key, vars);
 const SHOTS = process.env.S2_SHOTS || "/tmp/s2_shots";
 const WIDTHS = [375, 1440, 1920] as const;
+
+async function api(user: SeedUser, method: string, p: string, body?: unknown) {
+  const r = await fetch(`${seed().api}/api/v1${p}`, {
+    method,
+    headers: { Authorization: `Bearer ${user.token}`, "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  expect(r.status, `${method} ${p}`).toBeLessThan(300);
+  return r.status === 204 ? null : r.json();
+}
+
+function isoInDays(days: number): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
 
 async function shoot(page: Page, name: string) {
   fs.mkdirSync(SHOTS, { recursive: true });
@@ -40,6 +57,7 @@ test.describe("exam-prep page (ru)", () => {
     const s = seed();
     const cid = s.course_id;
     const newcomer = s.exam_prep!.newcomer;
+    await api(s.admin, "PATCH", `/courses/${cid}`, { exam_date: isoInDays(30) });
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: "ru-RU", timezoneId: "UTC", colorScheme: "light" });
     const page = await ctx.newPage();
     try {
@@ -71,7 +89,29 @@ test.describe("exam-prep page (ru)", () => {
       await expect(page.getByRole("button", { name: t("courses.home.leave") })).toBeVisible();
       await shoot(page, "tests-new");
 
-      // ---- "Начать" -> the lobby -> the ORT player -> the ORT result (all unchanged)
+      // ---- Student UI U3: the home is now the exam-prep home of ORT (Russian): greeting, countdown, Next, no score yet
+      await page.goto(`/${L}/courses`);
+      await expect(page.getByRole("heading", { level: 1 })).toContainText(newcomer.name.split(" ")[0]);
+      await expect(page.getByRole("group", { name: new RegExp(`^${t("examPrep.goal.daysLabel")}: \\d+ `) })).toBeVisible();
+      await expect(page.getByRole("region", { name: t("examPrep.next.title") })).toContainText("ОРТ E2E");
+      const scores = page.getByRole("region", { name: t("home.prep.score.title") });
+      await expect(scores).toContainText(t("examPrep.goal.noScore"));
+
+      // ---- the target, inline on the home: out of range is refused, 200 is kept
+      await scores.getByRole("button", { name: t("examPrep.goal.setTarget") }).click();
+      const input = page.getByLabel(t("examPrep.goal.inputLabel", { min: 60, max: 245 }));
+      await input.fill("300");
+      await page.getByRole("button", { name: t("examPrep.goal.save"), exact: true }).click();
+      await expect(page.getByText(t("examPrep.goal.invalid", { min: 60, max: 245 }))).toBeVisible();
+      await input.fill("200");
+      await page.getByRole("button", { name: t("examPrep.goal.save"), exact: true }).click();
+      await expect(scores.getByText("200", { exact: true })).toBeVisible();
+      await expect(scores.getByRole("button", { name: t("examPrep.goal.edit") })).toBeVisible();
+      await shoot(page, "home-prep-new");
+
+      // ---- the course's Тесты page: "Начать" -> the lobby -> the ORT player -> the ORT result (all unchanged)
+      await page.goto(`/${L}/courses/${cid}`);
+      await page.waitForURL(new RegExp(`/${L}/courses/${cid}/tests$`));
       await first.getByRole("link", { name: t("examPrep.tests.start"), exact: true }).click();
       await page.waitForURL(new RegExp(`/courses/${cid}/assessments/${s.exam.id}$`));
       const exam = new OrtExam(page, L);
@@ -107,7 +147,15 @@ test.describe("exam-prep page (ru)", () => {
       await page.goto(`/${L}/courses`);
       await expect(page.getByRole("region", { name: t("home.courses.title") }).locator(`a[href="/${L}/courses/${cid}"]`)).toHaveCount(1);
       await expect(page.locator(`a[href="/${L}/courses/catalog/${cid}"]`)).toHaveCount(0);
+      // Student UI U3: current vs target, the section rows of the latest result, the streak of today's answers
+      await expect(scores).toContainText(t("examPrep.goal.outOf", { max: 245 }));
+      await expect(scores).toContainText("200");
+      await expect(page.getByRole("region", { name: t("examPrep.sections.title") }).getByRole("meter")).toHaveCount(5);
+      await expect(page.getByRole("region", { name: t("home.prep.streak.title") })).toContainText(t("home.prep.streak.days_one", { count: 1 }));
+      await expect(page.getByRole("region", { name: t("examPrep.next.title") })).toContainText("ОРТ E2E staff");
+      await shoot(page, "home-prep-after");
     } finally {
+      await api(s.admin, "PATCH", `/courses/${cid}`, { exam_date: null });
       await ctx.close();
     }
   });

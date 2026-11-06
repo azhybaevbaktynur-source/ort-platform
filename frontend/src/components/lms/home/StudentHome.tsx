@@ -4,6 +4,8 @@
 // banners when needed, course cards on the left, "To do", recent grades and announcements on the right. Phone: cards
 // first, then to-do, grades and announcements (owner, 2026-11-03; replaces "to-do first", PUR-5). A teacher's Learning
 // tab is the same screen.
+// Student UI U3 (STUDENT_UI_DESIGN §3.1): a student with an exam-prep course (the student shell's current course) gets
+// the exam-prep home (`ExamPrepHome`); everyone else keeps this dashboard in the new tokens.
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { KeyRound, LayoutGrid, Trophy } from "lucide-react";
@@ -15,13 +17,16 @@ import { Badge, Button, EmptyState, ErrorState, LinkButton, Pagination, Skeleton
 import { CourseCard } from "@/components/lms/course/CourseCard";
 import { useGradeListText } from "@/components/lms/results/GradeBadge";
 import { PendingApplicationsLine } from "@/components/lms/catalog/ApplicationStatus"; // Phase 9 S4
+import { useStudentShellDataContext } from "@/components/lms/student/StudentShellDataContext"; // Student UI U3
 import { TeacherApplicationNotice } from "./TeacherApplicationNotice"; // Accounts
 import { PlatformCourses } from "./PlatformCourses"; // Exam prep S2
+import { CatalogCard, ExamPrepHome, HOME_CARD_GRID } from "./ExamPrepHome"; // Student UI U3
 import { fmtDayMonthTime } from "./format";
 import { SideRow, SideSection, TodoRows } from "./TodoList";
 import { useErrorText } from "./useErrorText";
 
-const CARD_GRID = "grid gap-4 sm:grid-cols-2 xl:grid-cols-3 min-[1700px]:grid-cols-4";
+// Student UI U3: as many 16rem columns as fit, so cards stay readable at 1920 px inside the student shell
+const CARD_GRID = HOME_CARD_GRID;
 
 /** Small celebration: gold is for achievements only (UX §5). */
 function PersonalBestBadge() {
@@ -31,7 +36,7 @@ function PersonalBestBadge() {
   );
 }
 
-function CourseCards({ data }: { data: HomeOut }) {
+function CourseCards({ data, extra }: { data: HomeOut; extra?: React.ReactNode }) {
   const { lang, t } = useTranslation();
   const errorText = useErrorText();
   const [more, setMore] = useState<HomeCourseOut[] | null>(null); // every course, once the student asked for them
@@ -57,6 +62,7 @@ function CourseCards({ data }: { data: HomeOut }) {
         {(more ?? data.courses).map((c) => (
           <CourseCard key={c.id} course={c} href={`/${lang}/courses/${c.id}`} progress={c.progress} nextDue={c.next_due_at} />
         ))}
+        {extra}
       </ul>
       {error ? <ErrorState variant="inline" message={errorText(error)} onRetry={() => void load(cursor)} className="mt-3" /> : null}
       {more
@@ -70,14 +76,77 @@ function CourseCards({ data }: { data: HomeOut }) {
   );
 }
 
-function Dashboard({ data }: { data: HomeOut }) {
+/**
+ * To do, recent grades and announcements. `skipCourse`: the exam-prep home leaves out the to-do rows and grades of its
+ * own course (the Next card and the score tiles show them) and an empty to-do list (`sideListsShown` tells whether anything is left).
+ */
+function sideListsShown(data: HomeOut, skipCourse: string): boolean {
+  return (data.todo ?? []).some((r) => r.course_id !== skipCourse) || (data.announcements ?? []).length > 0
+    || data.latest_results.some((r) => r.course_id !== skipCourse);
+}
+
+function SideLists({ data, skipCourse }: { data: HomeOut; skipCourse?: string }) {
   const { lang, t } = useTranslation();
   const gradeText = useGradeListText();
   const base = `/${lang}/courses`;
   const untitled = t("assessments.untitled");
-  const todo = data.todo ?? [];
-  const grades = data.latest_results.slice(0, 3);
+  const todo = (data.todo ?? []).filter((r) => r.course_id !== skipCourse); // the exam course: its Next card and tests
+  const grades = data.latest_results.filter((r) => r.course_id !== skipCourse).slice(0, 3);
   const news = (data.announcements ?? []).slice(0, 3);
+  const showTodo = !skipCourse || todo.length > 0;
+  return (
+    <>
+      {showTodo && (
+        <SideSection id="home-todo" title={t("home.todo.title")}>
+          {todo.length > 0
+            ? <TodoRows rows={todo} />
+            : <p className="px-3 py-3 text-base leading-6 text-slate-600 sm:text-sm">{t("home.todo.empty")}</p>}
+        </SideSection>
+      )}
+      {grades.length > 0 && (
+        <SideSection id="home-results" title={t("home.results.title")}>
+          <ul className="divide-y divide-slate-100">
+            {grades.map((r) => {
+              // a released manual grade opens its assignment page (grade and feedback)
+              const href = r.kept_attempt_id ? `${base}/${r.course_id}/attempts/${r.kept_attempt_id}/result`
+                : r.assignment_id && r.kind && r.kind !== "quiz" ? `${base}/${r.course_id}/assignments/${r.assignment_id}` : `${base}/${r.course_id}/grades`;
+              return (
+                <SideRow key={r.assignment_id ?? r.assessment_id ?? href} href={href} title={pickLocalized(r.title, lang) || untitled}
+                  lines={(
+                    <>
+                      <span className="block break-words">{pickLocalized(r.course_title, lang)}</span>
+                      {r.is_personal_best && <span className="mt-1 block"><PersonalBestBadge /></span>}
+                    </>
+                  )}
+                  aside={gradeText(r) || null} />
+              );
+            })}
+          </ul>
+        </SideSection>
+      )}
+      {news.length > 0 && (
+        <SideSection id="home-announcements" title={t("home.announcements.title")}>
+          <ul className="divide-y divide-slate-100">
+            {news.map((r) => (
+              <SideRow key={r.id} href={`${base}/${r.course_id}/announcements`} title={r.title}
+                lines={(
+                  <>
+                    <span className="block break-words">{pickLocalized(r.course_title, lang) || t("courses.list.untitled")}</span>
+                    <span className="block">{fmtDayMonthTime(r.published_at, lang)}</span>
+                  </>
+                )} />
+            ))}
+          </ul>
+        </SideSection>
+      )}
+    </>
+  );
+}
+
+function Dashboard({ data }: { data: HomeOut }) {
+  const { lang, t } = useTranslation();
+  const base = `/${lang}/courses`;
+  const todo = data.todo ?? [];
   const pendingApps = (
     <>
       {data.teacher_application && <TeacherApplicationNotice application={data.teacher_application} />}
@@ -122,52 +191,25 @@ function Dashboard({ data }: { data: HomeOut }) {
             <h2 id="home-courses" className="mb-2 text-lg font-semibold leading-7 text-slate-900">{t("home.courses.title")}</h2>
             <CourseCards data={data} />
           </section>
-          <PlatformCourses courses={platform} grid={CARD_GRID} />
+          <PlatformCourses courses={platform} grid={CARD_GRID} joinVariant="secondary" />
         </div>
         <div className="min-w-0 space-y-6">
-          <SideSection id="home-todo" title={t("home.todo.title")}>
-            {todo.length > 0
-              ? <TodoRows rows={todo} />
-              : <p className="px-3 py-3 text-base leading-6 text-slate-600 sm:text-sm">{t("home.todo.empty")}</p>}
-          </SideSection>
-          {grades.length > 0 && (
-            <SideSection id="home-results" title={t("home.results.title")}>
-              <ul className="divide-y divide-slate-100">
-                {grades.map((r) => {
-                  // a released manual grade opens its assignment page (grade and feedback)
-                  const href = r.kept_attempt_id ? `${base}/${r.course_id}/attempts/${r.kept_attempt_id}/result`
-                    : r.assignment_id && r.kind && r.kind !== "quiz" ? `${base}/${r.course_id}/assignments/${r.assignment_id}` : `${base}/${r.course_id}/grades`;
-                  return (
-                    <SideRow key={r.assignment_id ?? r.assessment_id ?? href} href={href} title={pickLocalized(r.title, lang) || untitled}
-                      lines={(
-                        <>
-                          <span className="block break-words">{pickLocalized(r.course_title, lang)}</span>
-                          {r.is_personal_best && <span className="mt-1 block"><PersonalBestBadge /></span>}
-                        </>
-                      )}
-                      aside={gradeText(r) || null} />
-                  );
-                })}
-              </ul>
-            </SideSection>
-          )}
-          {news.length > 0 && (
-            <SideSection id="home-announcements" title={t("home.announcements.title")}>
-              <ul className="divide-y divide-slate-100">
-                {news.map((r) => (
-                  <SideRow key={r.id} href={`${base}/${r.course_id}/announcements`} title={r.title}
-                    lines={(
-                      <>
-                        <span className="block break-words">{pickLocalized(r.course_title, lang) || t("courses.list.untitled")}</span>
-                        <span className="block">{fmtDayMonthTime(r.published_at, lang)}</span>
-                      </>
-                    )} />
-                ))}
-              </ul>
-            </SideSection>
-          )}
+          <SideLists data={data} />
         </div>
       </div>
+    </div>
+  );
+}
+
+function CardGridSkeleton({ count = 3 }: { count?: number }) {
+  return (
+    <div className={CARD_GRID}>
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="overflow-hidden rounded-card border border-slate-200 bg-white">
+          <Skeleton className="h-24 w-full rounded-none" />
+          <div className="space-y-2 p-4"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-4 w-1/2" /><Skeleton className="h-4 w-full" /></div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -180,18 +222,11 @@ function DashboardSkeleton() {
       <div aria-hidden="true" className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
         <div className="min-w-0 lg:col-start-1 lg:row-start-1">
           <Skeleton className="mb-3 h-6 w-32" />
-          <div className={CARD_GRID}>
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                <Skeleton className="h-24 w-full rounded-none" />
-                <div className="space-y-2 p-4"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-4 w-1/2" /><Skeleton className="h-4 w-full" /></div>
-              </div>
-            ))}
-          </div>
+          <CardGridSkeleton />
         </div>
         <div className="min-w-0 lg:col-start-2 lg:row-start-1">
           <Skeleton className="mb-3 h-6 w-32" />
-          <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="space-y-3 rounded-card border border-slate-200 bg-white p-4">
             <Skeleton className="h-5 w-3/4" /><Skeleton className="h-5 w-2/3" /><Skeleton className="h-5 w-3/4" />
           </div>
         </div>
@@ -204,6 +239,7 @@ function DashboardSkeleton() {
 export function StudentHome({ embedded = false }: { embedded?: boolean }) {
   const { lang, t } = useTranslation();
   const errorText = useErrorText();
+  const shell = useStudentShellDataContext();
   const [data, setData] = useState<HomeOut | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
@@ -221,12 +257,35 @@ export function StudentHome({ embedded = false }: { embedded?: boolean }) {
   }, []);
   useEffect(() => { void load(); }, [load]);
 
+  // Student UI U3: the shell's current exam course (known at once from its cache, so the three reads start together),
+  // else the first exam-prep course of the home's answer
+  const prepCourse = shell?.current ?? data?.courses.find((c) => c.student_layout === "exam_prep") ?? null;
+  if (prepCourse) {
+    const side = data && sideListsShown(data, prepCourse.id) ? <SideLists data={data} skipCourse={prepCourse.id} /> : null;
+    const courses = data
+      ? <CourseCards data={data} extra={<CatalogCard />} />
+      : error
+        ? <ErrorState message={errorText(error)} onRetry={() => void load()} retrying={loading} />
+        : <CardGridSkeleton />;
+    return (
+      <div className="w-full space-y-6">
+        {data?.teacher_application && <TeacherApplicationNotice application={data.teacher_application} />}
+        {data && <PendingApplicationsLine items={data.pending_applications ?? []} />}
+        <ExamPrepHome courseId={prepCourse.id} courseTitle={prepCourse.title} home={data} embedded={embedded}
+          side={side} courses={courses} />
+      </div>
+    );
+  }
+
+  // the shell is still reading the student's exam courses for the first time: no title yet (it may be the greeting)
+  if (!data && !error && shell && !shell.loaded) return <DashboardSkeleton />;
+
   const Title = embedded ? "h2" : "h1";
   const isNew = !!data && data.courses_total === 0 && (data.todo ?? []).length === 0; // its empty state has the two actions
   return (
     <div className="w-full space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <Title className="text-2xl font-bold leading-8 text-slate-900">{t("home.dashboard")}</Title>
+        <Title className="text-2xl font-bold leading-8 text-slate-900 lg:text-[28px] lg:leading-9">{t("home.dashboard")}</Title>
         {!isNew && (
           <div className="flex flex-wrap gap-2">
             <LinkButton variant="secondary" href={`/${lang}/courses/join`} leftIcon={<KeyRound aria-hidden="true" className="h-4 w-4" />}>{t("home.primary.join")}</LinkButton>

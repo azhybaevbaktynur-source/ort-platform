@@ -38,7 +38,8 @@ test.describe("student shell (ru)", () => {
     await expect(page.getByRole("navigation", { name: t("courses.home.tabsLabel") })).toHaveCount(0);
     // the lobby: the AppHeader frame, no student navigation
     await page.goto(`/${L}/courses/${s.course_id}/assessments/${s.exam.id}`);
-    await expect(page.getByRole("button", { name: t("assessments.lobby.start"), exact: true })).toBeVisible();
+    // the lobby's own heading (not "Start": another spec may have used this student's one attempt)
+    await expect(page.getByRole("heading", { name: "ОРТ E2E", exact: true })).toBeVisible();
     await expect(page.getByRole("navigation", { name: t("student.nav.label") })).toHaveCount(0);
     await expect(page.getByRole("navigation", { name: t("student.nav.tabBar") })).toHaveCount(0);
   });

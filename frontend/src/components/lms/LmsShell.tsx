@@ -20,6 +20,7 @@ import type { CourseOut } from "@/lib/lms/types";
 import { courseIdOfPath } from "@/lib/lms/studentNav";
 import { STUDENT_FRAME, STUDENT_MAIN, StudentChrome, StudentTabBar } from "./student/StudentShell";
 import { useStudentShellData } from "./student/useStudentShellData";
+import { StudentShellDataContext } from "./student/StudentShellDataContext"; // Student UI U3
 
 /*
  * Phase 6b S5b: the frame of every signed-in page (courses/*, admin/*, org/*, grading-schemes, invitations).
@@ -268,6 +269,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
     <AreaDeclareContext.Provider value={setDeclared}>
       <StudentCourseDeclareContext.Provider value={setDeclaredCourse}>
       <LmsMeProvider value={meState}>
+        <StudentShellDataContext.Provider value={studentFrame ? studentData : null}>
         <Suspense fallback={null}><ViewParam onChange={setView} onTab={setTab} /></Suspense>
         <div className={cn("min-h-screen bg-slate-50", studentFrame && STUDENT_FRAME)}>
           <a href="#main"
@@ -296,6 +298,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
           </main>
           {studentFrame ? <StudentTabBar {...studentProps} /> : null}
         </div>
+        </StudentShellDataContext.Provider>
       </LmsMeProvider>
       </StudentCourseDeclareContext.Provider>
     </AreaDeclareContext.Provider>
