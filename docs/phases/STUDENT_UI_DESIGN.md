@@ -52,6 +52,22 @@ Tailwind: add `navy`, `tag`, `acc`, `heat`, `chart` under `theme.extend.colors`,
 and `fontFamily.system = [system stack]`; the same values as `:root` CSS variables in `globals.css` so the service worker's
 offline page and the sanitizer-rendered pages use them too. No dark mode.
 
+### 1.1 Owner palette: "Sky and teal" (owner 2026-11-06, replaces the grey/navy values above for the student frame)
+The owner found the grey look dull and chose this palette. It applies **only inside the student frame** (a class on the
+`StudentShell` root overrides CSS variables); teacher/admin frames, the ORT lobby and attempt routes keep today's colours
+(ORT parity). `brand` becomes CSS-variable driven (`rgb(var(--brand-600) / <alpha-value>)`, defaults = today's blue).
+
+| Token | Value |
+|---|---|
+| sidebar | gradient `#0E4A6B → #13698F`; active pill white, text `#0E4A6B`; hover white 10 % |
+| page bg | `#EEF6FC` |
+| home hero | gradient `#DFF1FF → #F5FBFF` with the mascot |
+| primary (`brand` in the student frame) | 600 `#1E7BEA`, 700 `#1764C4`, 50 `#EAF4FE`, 100 `#D4E9FD` |
+| accent | violet `#7C3AED` (the main "Начать тест" call and highlights) |
+| unlock | gold `#FDE68A` / `#F59E0B` (unchanged) |
+| stat tile icons | on pastel: blue `#DBEAFE/#1D4ED8`, green `#DCFCE7/#15803D`, violet `#EDE9FE/#6D28D9`, orange `#FFEDD5/#C2410C` |
+| correct / wrong | `#16A34A` / `#EF4444` |
+
 ## 2. Shell
 
 ### 2.1 Where it applies
