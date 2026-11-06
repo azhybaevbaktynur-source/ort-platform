@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useId, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -21,6 +21,7 @@ import { TabBar, TAB_BAR_SPACE, type TabBarItem } from "@/components/ui/TabBar";
 import { cn, focusRing } from "@/components/ui/utils";
 import type { AppHeaderArea, AppHeaderLink } from "@/components/ui/AppHeader";
 import type { StudentShellData } from "./useStudentShellData";
+import { useLessonModules } from "@/components/lms/modules/lessonNav";
 
 /*
  * Student UI U2 (docs/phases/STUDENT_UI_DESIGN.md §2): the frame of the student area.
@@ -82,6 +83,35 @@ function useNav(props: StudentShellProps) {
   const item = (l: StudentNavLink | null): SidebarNavItem[] =>
     l ? [{ key: l.key, href: l.href, label: label[l.key], icon: ICONS[l.key], active: l.active }] : [];
   return { links, label, item };
+}
+
+/** U7 (§2.2): "Видеоуроки" with up to five module sub-links (`#module-{id}` on the syllabus). `fetchIfMissing`: the
+ * desktop sidebar may ask the server once per course and tab; the phone sheet shows only what is already known. */
+function useLessonsItem(props: StudentShellProps, link: StudentNavLink | null, fetchIfMissing: boolean): SidebarNavItem[] {
+  const { lang, t } = useTranslation();
+  const { label } = useNav(props);
+  const current = props.data.current;
+  const modules = useLessonModules(current?.id ?? null, !!link, fetchIfMissing);
+  if (!link) return [];
+  const children: SidebarNavItem[] = (modules ?? []).map((m) => ({
+    key: `module-${m.id}`,
+    href: `${link.href}#module-${m.id}`,
+    label: pickLocalized(m.title, lang, current?.default_language) || t("modules.untitledModule"),
+  }));
+  return [{ key: link.key, href: link.href, label: label[link.key], icon: ICONS[link.key], active: link.active, children }];
+}
+
+/** True from 1024 px (the desktop sidebar is shown); false during the server render. */
+function useWide(): boolean {
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const q = window.matchMedia("(min-width: 1024px)");
+    const on = () => setWide(q.matches);
+    on();
+    q.addEventListener("change", on);
+    return () => q.removeEventListener("change", on);
+  }, []);
+  return wide;
 }
 
 /** Course title in the student's language. */
@@ -235,6 +265,7 @@ export function StudentChrome(props: StudentShellProps) {
   const title = useCourseTitle();
   const { links, item } = useNav(props);
   const { data, user, testStudent } = props;
+  const lessonsItem = useLessonsItem(props, links.lessons, useWide());
   const [sheet, setSheet] = useState<"account" | "exam" | null>(null);
   const close = () => setSheet(null);
   const accountId = useId();
@@ -243,7 +274,7 @@ export function StudentChrome(props: StudentShellProps) {
   const groups: SidebarNavGroup[] = data.current
     ? [
       { key: "main", items: [...item(links.home), ...item(links.analytics), ...item(links.saved)] },
-      { key: "lessons", label: t("student.nav.lessonsGroup"), items: item(links.lessons) },
+      { key: "lessons", label: t("student.nav.lessonsGroup"), items: lessonsItem },
       {
         key: "practice", label: t("student.nav.practiceGroup"),
         items: [...item(links.tests), ...(data.features?.practice ? item(links.practice) : []), ...item(links.mistakes)],
@@ -323,6 +354,7 @@ export function StudentTabBar(props: StudentShellProps) {
   const { t } = useTranslation();
   const { links, item, label } = useNav(props);
   const { data, testStudent } = props;
+  const lessonsItem = useLessonsItem(props, links.lessons, false);
   const [more, setMore] = useState(false);
   const moreId = useId();
   const close = () => setMore(false);
@@ -332,7 +364,7 @@ export function StudentTabBar(props: StudentShellProps) {
   const items: TabBarItem[] = data.current
     ? [...slot(links.home), ...slot(links.tests), ...slot(links.practice), ...slot(links.analytics), moreSlot]
     : [...slot(links.home), ...slot(links.catalog), moreSlot];
-  const moreLinks: SidebarNavItem[] = data.current ? [...item(links.lessons), ...item(links.saved), ...item(links.mistakes)] : [];
+  const moreLinks: SidebarNavItem[] = data.current ? [...lessonsItem, ...item(links.saved), ...item(links.mistakes)] : [];
   return (
     <>
       <TabBar label={t("student.nav.tabBar")} items={items} />

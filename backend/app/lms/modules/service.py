@@ -26,6 +26,7 @@ from app.lms.enrollments.models import not_test_enrollment
 from app.lms.modules import evaluator as ev_mod
 from app.lms.modules import ids
 from app.lms.modules import schemas as sch
+from app.lms.modules.video import parse_video
 from app.lms.modules.models import (
     CourseModule, ItemCompletionRequirement, ItemRequirementStatus, ModuleItem, ModulePrerequisite, ModuleProgress,
 )
@@ -650,8 +651,13 @@ def _item_student_out(course: Course, ie: ev_mod.ItemEval, *, evaluated: bool,
         if r.kind == "url" and not r.item.title_override:
             title = {}  # the fallback title of a url item is the url itself (the UI shows "Untitled item")
     due = None if locked else (due_overrides or {}).get(r.item.assignment_id) or r.due_at
+    # U7: a video lesson (allowlisted YouTube / Vimeo url); like the link, never on a locked row
+    video = None
+    if r.kind == "url" and not locked:
+        parsed = parse_video(r.item.url)
+        video = sch.VideoOut(**parsed) if parsed else None
     return sch.ItemStudentOut(id=r.id, kind=r.kind, title=title, indent=r.item.indent,
-                              locked=locked, requirement=req, link=link, due_at=_utc(due))
+                              locked=locked, requirement=req, link=link, due_at=_utc(due), video=video)
 
 
 def module_student_out(st: ev_mod.Structure, me: ev_mod.ModuleEval, *, evaluated: bool = True,

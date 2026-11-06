@@ -34,7 +34,7 @@ const CSP = [
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
-  "frame-src 'self' blob:",
+  "frame-src 'self' blob: https://www.youtube-nocookie.com https://player.vimeo.com", // U7: click-to-load lesson videos
   "worker-src 'self'", // S5: the service worker (/service-worker.js loads public/sw.js)
   "manifest-src 'self'", // S5: /manifest.webmanifest
 ].join("; ");

@@ -5,7 +5,7 @@
  * Pages that do not exist yet point to existing routes (TODO):
  * - Тесты: the course page for now (TODO U4: `/courses/{c}/tests`);
  * - Сохранённые: the mistakes tab of progress for now (TODO U8: `/courses/{c}/saved`);
- * - Видеоуроки: the course's modules list (TODO U7: lesson sub-links and the lesson page).
+ * - Видеоуроки: the syllabus `/courses/{c}/modules` (U7; its module sub-links come from `modules/lessonNav.ts`).
  */
 
 export type StudentNavKey = "home" | "analytics" | "saved" | "lessons" | "tests" | "practice" | "mistakes" | "catalog";
