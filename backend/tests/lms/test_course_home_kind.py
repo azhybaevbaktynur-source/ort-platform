@@ -15,7 +15,7 @@ from app.lms.pages.models import Page
 from tests.lms.assignment_support import api, clean_rate_limits, db, fresh_storage  # noqa: F401
 from tests.lms.factories import make_course
 from tests.lms.modules_support import (
-    C, make_announcement, make_course_file, make_module, make_page, structure_world,
+    C, make_announcement, make_course_file, make_item, make_module, make_page, structure_world,
 )
 from tests.lms.org_support import add_member, grant, make_org
 from tests.lms.s3_support import teacher
@@ -156,10 +156,34 @@ async def test_features_follow_published_rows(api, db):
     gone.soft_delete(w.O.id)
     db.commit()
     assert await features(w.S) == none
-    make_module(db, w.course, w.O)
+    m = make_module(db, w.course, w.O)
+    make_item(db, m)  # F5a: a teacher course keeps the 8a rule (a published module, even with only a header)
     assert await features(w.S) == {"modules": True, "files": False, "announcements": False, "practice": False}
     make_course_file(db, w.course, w.O)
     make_announcement(db, w.course, w.O)
     full = {"modules": True, "files": True, "announcements": True, "practice": False}
     assert await features(w.S) == full
     assert await features(w.O) == full  # staff shape carries the same flags
+
+
+async def test_exam_prep_features_need_a_lesson(api, db):
+    """F5a (COURSE_LESSONS_DESIGN 3, L7): in an exam-prep course `modules` means at least one lesson."""
+    from tests.lms.factories import enroll, make_user
+
+    owner = teacher(db)
+    ort = make_course(db, owner, status="published", template_key="ort", template_version=1, template_locked=True,
+                      template_settings={"language": "en"})
+    s = make_user(db)
+    enroll(db, ort, s)
+
+    async def modules_flag():
+        res = await api.call(s, "GET", f"/courses/{ort.id}")
+        assert res.status_code == 200, res.text
+        return res.json()["features"]["modules"]
+
+    m = make_module(db, ort, owner)
+    make_item(db, m)  # a header is no lesson
+    make_item(db, m, "https://example.com/x", published=False)
+    assert await modules_flag() is False
+    make_item(db, m, "https://example.com/y")
+    assert await modules_flag() is True

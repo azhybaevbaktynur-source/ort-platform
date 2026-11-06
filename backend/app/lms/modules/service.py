@@ -187,16 +187,100 @@ def _utc(dt):
     return ev_mod.utc(dt)
 
 
+# --- F5a begin --- (COURSE_LESSONS_DESIGN 2, 3, 5: lesson durations and Pro modules)
+
+def is_platform_course(db: Session, course: Course) -> bool:
+    """The course's organization tree is the platform organization's (one statement)."""
+    from app.lms.access.service import is_platform_path
+    from app.lms.organizations.models import Organization
+
+    path = db.execute(select(Organization.path).where(Organization.id == course.organization_id)).scalar()
+    return is_platform_path(path)
+
+
+def _check_tier(db: Session, course: Course, tier: Optional[str]) -> None:
+    """Owner 2026-11-07: the Pro switch exists only in platform courses (422 elsewhere; `free` is always accepted)."""
+    if tier == "paid" and not is_platform_course(db, course):
+        raise _invalid("Pro modules exist only in platform courses", "validation_failed",
+                       [{"loc": ["access_tier"], "msg": "paid only in platform courses"}])
+
+
+def _check_duration(kind: str, duration_s: Optional[int]) -> None:
+    if duration_s is not None and kind not in ids.DURATION_KINDS:
+        raise _invalid("A duration fits only a lesson (page, file or link)", "validation_failed",
+                       [{"loc": ["duration_s"], "msg": f"no duration on a {kind} item"}])
+
+
+def has_paid_module(st: ev_mod.Structure) -> bool:
+    return any(m.published and m.access_tier == "paid" for m in st.modules)
+
+
+def tier_gated(db: Session, course: Course, user_id: str, st: Optional[ev_mod.Structure] = None) -> bool:
+    """Whether Pro modules lock for this student here: the S3 `Gate` (platform course, no active pass, not a test
+    student). No statement when the course has no published `paid` module."""
+    if st is not None and not has_paid_module(st):
+        return False
+    from app.lms.access import service as access
+
+    return access.course_gate(db, course, user_id).gated
+
+
+def lesson_exists(course_id_expr):
+    """EXISTS a lesson (L2): a live, published `page|file|url` item of a live, published module of the course whose
+    target is published and live. `course_id_expr` may be a value or a correlated column (home)."""
+    from app.lms.course_files.models import CourseFile
+    from app.lms.pages.models import Page
+
+    return (select(ModuleItem.id).join(CourseModule, CourseModule.id == ModuleItem.module_id)
+            .outerjoin(Page, Page.id == ModuleItem.page_id)
+            .outerjoin(CourseFile, CourseFile.id == ModuleItem.file_id)
+            .where(CourseModule.course_id == course_id_expr, CourseModule.deleted_at.is_(None),
+                   CourseModule.published.is_(True), ModuleItem.deleted_at.is_(None),
+                   ModuleItem.published.is_(True), ModuleItem.kind.in_(ids.LESSON_KINDS),
+                   or_(ModuleItem.kind == "url",
+                       and_(ModuleItem.kind == "page", Page.published.is_(True), Page.deleted_at.is_(None)),
+                       and_(ModuleItem.kind == "file", CourseFile.published.is_(True),
+                            CourseFile.deleted_at.is_(None))))
+            .exists())
+
+
+def _assignment_ref(assignment_id_expr, tier_cond):
+    return (select(ModuleItem.id).join(CourseModule, CourseModule.id == ModuleItem.module_id)
+            .where(ModuleItem.assignment_id == assignment_id_expr, ModuleItem.deleted_at.is_(None),
+                   ModuleItem.published.is_(True), CourseModule.deleted_at.is_(None),
+                   CourseModule.published.is_(True), tier_cond)
+            .exists())
+
+
+def pro_only_assignment(assignment_id_expr):
+    """SQL: the assignment is referenced by a live, published item of a live, published Pro (`paid`) module and by
+    no such item of a free module (the `require_access` rule before the module evaluation). Correlates with the
+    caller's `assignment_id_expr` (a column or a scalar subquery)."""
+    return and_(_assignment_ref(assignment_id_expr, CourseModule.access_tier == "paid"),
+                ~_assignment_ref(assignment_id_expr, CourseModule.access_tier != "paid"))
+
+
+def pro_only_assessment(model):
+    """`pro_only_assignment` for a quiz: through its mirrored assignment (`Assignment.assessment_id`)."""
+    from app.lms.assignments.models import Assignment
+
+    return pro_only_assignment(select(Assignment.id).where(Assignment.assessment_id == model.id)
+                               .limit(1).scalar_subquery())
+# --- F5a end ---
+
+
 # =========================================================================== modules
 
 def create_module(db: Session, ctx: AuthzContext, course: Course, data: sch.ModuleIn) -> CourseModule:
     _manage(db, ctx, course)
+    _check_tier(db, course, data.access_tier)
     live = _live_modules(db, course)
     if len(live) >= ids.MODULES_PER_COURSE_MAX:
         raise _limit("modules", ids.MODULES_PER_COURSE_MAX)
     m = CourseModule(course_id=course.id, title=dict(data.title), position=len(live) + 1,
                      published=data.published, unlock_at=_utc(data.unlock_at), sequential=data.sequential,
-                     completion_mode=data.completion_mode, rules_version=1, created_by_id=ctx.user.id)
+                     completion_mode=data.completion_mode, rules_version=1, created_by_id=ctx.user.id,
+                     access_tier=data.access_tier)
     db.add(m)
     db.commit()
     return m
@@ -207,6 +291,8 @@ def update_module(db: Session, ctx: AuthzContext, course: Course, module_id: uui
     _manage(db, ctx, course)
     m = load_module(db, course, module_id)
     fields = data.model_fields_set
+    if "access_tier" in fields:
+        _check_tier(db, course, data.access_tier)
     published_changed = "published" in fields and bool(data.published) != bool(m.published)
     for f in fields:
         v = getattr(data, f)
@@ -332,6 +418,7 @@ def add_item(db: Session, ctx: AuthzContext, course: Course, module_id: uuid.UUI
     _manage(db, ctx, course)
     m = load_module(db, course, module_id)
     _check_requirement(data.kind, data.requirement)
+    _check_duration(data.kind, data.duration_s)
     url = _check_url(data.url) if data.kind == "url" else None
     _check_target(db, course, data)
     items = _live_items(db, m.id)
@@ -340,7 +427,7 @@ def add_item(db: Session, ctx: AuthzContext, course: Course, module_id: uuid.UUI
     it = ModuleItem(module_id=m.id, kind=data.kind, position=len(items) + 1, indent=data.indent,
                     title_override=dict(data.title_override) if data.title_override else None,
                     published=data.published, page_id=data.page_id, file_id=data.file_id,
-                    assignment_id=data.assignment_id, url=url)
+                    assignment_id=data.assignment_id, url=url, duration_s=data.duration_s)
     db.add(it)
     db.flush()
     _place(items, it, data.position)
@@ -370,6 +457,9 @@ def update_item(db: Session, ctx: AuthzContext, course: Course, module_id: uuid.
         it.indent = data.indent
     if "published" in fields:
         it.published = data.published
+    if "duration_s" in fields:
+        _check_duration(it.kind, data.duration_s)
+        it.duration_s = data.duration_s
     db.flush()
     _bump(db, [m.id])
     db.commit()
@@ -566,7 +656,7 @@ def item_staff_out(r: ev_mod.ItemRow) -> sch.ItemStaffOut:
         title_override=it.title_override, published=bool(it.published), page_id=it.page_id, file_id=it.file_id,
         assignment_id=it.assignment_id, url=it.url,
         requirement=sch.RequirementStaffOut(type=r.req_type, threshold=_f(r.threshold)) if r.req_type else None,
-        target=target, warnings=_item_warnings(r))
+        target=target, warnings=_item_warnings(r), duration_s=it.duration_s)
 
 
 def _module_staff_out(st: ev_mod.Structure, m: CourseModule) -> sch.ModuleStaffOut:
@@ -577,11 +667,14 @@ def _module_staff_out(st: ev_mod.Structure, m: CourseModule) -> sch.ModuleStaffO
             warnings.append(sch.WarningOut(code=ids.W_PREREQUISITE_DELETED, module_id=pid))
         elif not pm.published:
             warnings.append(sch.WarningOut(code=ids.W_PREREQUISITE_UNPUBLISHED, module_id=pid))
+    visible = [r for r in st.items.get(m.id, []) if r.visible and r.kind != "header"]
     return sch.ModuleStaffOut(
         id=m.id, title=m.title or {}, position=m.position, published=bool(m.published), unlock_at=_utc(m.unlock_at),
         sequential=bool(m.sequential), completion_mode=m.completion_mode, rules_version=m.rules_version,
         prerequisites=list(st.prereqs.get(m.id, [])), items=[item_staff_out(r) for r in st.items.get(m.id, [])],
-        warnings=warnings, deleted_at=_utc(m.deleted_at))
+        warnings=warnings, deleted_at=_utc(m.deleted_at), access_tier=m.access_tier or "free",
+        duration_s=sum(r.item.duration_s or 0 for r in visible),
+        lessons_count=sum(1 for r in visible if r.kind in ids.LESSON_KINDS))
 
 
 def staff_outline(db: Session, course: Course, *, include_deleted: bool = False) -> sch.ModulesStaffOut:
@@ -632,8 +725,23 @@ def _gating_exempt(course: Course, r: ev_mod.ItemRow) -> bool:
     return tpl.is_locked(course, LOCK_GATING, preset=r.preset)
 
 
+def item_done(ie: ev_mod.ItemEval, mem: Optional[ev_mod.Memory]) -> bool:
+    """F5a (design 4): requirement -> met; no requirement: lesson -> a `viewed` fact, assignment -> a submission in
+    `SUBMIT_MET_STATES`. Reported truthfully on a locked row too."""
+    r = ie.row
+    if r.kind == "header" or mem is None:
+        return False
+    if r.req_type is not None:
+        return bool(ie.met)
+    if r.kind == "assignment":
+        sub = mem.subs.get(r.item.assignment_id)
+        return sub is not None and sub.state in ids.SUBMIT_MET_STATES
+    return r.id in mem.facts.viewed
+
+
 def _item_student_out(course: Course, ie: ev_mod.ItemEval, *, evaluated: bool,
-                      due_overrides: Optional[dict] = None) -> sch.ItemStudentOut:
+                      due_overrides: Optional[dict] = None, mem: Optional[ev_mod.Memory] = None,
+                      tier_locked: bool = False) -> sch.ItemStudentOut:
     lang = course.default_language
     r = ie.row
     req = None
@@ -642,7 +750,12 @@ def _item_student_out(course: Course, ie: ev_mod.ItemEval, *, evaluated: bool,
                                         met=bool(ie.met) if evaluated else False,
                                         best_score_percent=_f(ie.best) if evaluated else None)
     # an exempt item is open even in a locked module (the module itself may still read `locked`)
-    locked = bool(ie.locked) and not _gating_exempt(course, r) if evaluated else False
+    exempt = _gating_exempt(course, r)
+    rules_locked = bool(ie.locked) and not exempt if evaluated else False
+    # F5a: a Pro module without a pass locks every row (ORT preset exams keep their own tier); a rule wins the reason
+    access_locked = evaluated and tier_locked and not exempt and r.kind != "header"
+    locked = rules_locked or access_locked
+    reason = ids.REASON_MODULE if rules_locked else (ids.REASON_ACCESS if access_locked else None)
     # a locked item carries no destination (a url item would leak it before the gate opens); an assignment keeps
     # only its kind, which picks the row icon (quiz / file / text)
     link, title = _link(r), r.title(lang)
@@ -657,34 +770,46 @@ def _item_student_out(course: Course, ie: ev_mod.ItemEval, *, evaluated: bool,
         parsed = parse_video(r.item.url)
         video = sch.VideoOut(**parsed) if parsed else None
     return sch.ItemStudentOut(id=r.id, kind=r.kind, title=title, indent=r.item.indent,
-                              locked=locked, requirement=req, link=link, due_at=_utc(due), video=video)
+                              locked=locked, requirement=req, link=link, due_at=_utc(due), video=video,
+                              duration_s=r.item.duration_s if r.kind != "header" else None,
+                              done=item_done(ie, mem) if evaluated else False, locked_reason=reason)
 
 
 def module_student_out(st: ev_mod.Structure, me: ev_mod.ModuleEval, *, evaluated: bool = True,
-                       due_overrides: Optional[dict] = None) -> sch.ModuleStudentOut:
+                       due_overrides: Optional[dict] = None, mem: Optional[ev_mod.Memory] = None,
+                       gated: bool = False) -> sch.ModuleStudentOut:
+    """`gated`: the caller's S3 `Gate.gated` for the course (`tier_gated`); a `paid` module then locks for them."""
     from app.lms.modules.gate import lock_details
 
     m = me.module
     reasons = []
     if evaluated and me.state == "locked":
         reasons = [sch.LockReasonOut(**r) for r in lock_details(st, me)["reasons"]]
+    tier_locked = bool(evaluated and gated and m.access_tier == "paid")
+    items = [_item_student_out(st.course, ie, evaluated=evaluated, due_overrides=due_overrides, mem=mem,
+                               tier_locked=tier_locked) for ie in me.items]
+    rows = [i for i in items if i.kind != "header"]
     return sch.ModuleStudentOut(
         id=m.id, title=m.title or {}, state=me.state if evaluated else None, unlock_at=_utc(m.unlock_at),
         sequential=bool(m.sequential), completion_mode=m.completion_mode,
-        current_position=me.current_position if evaluated else None, lock_reasons=reasons,
-        items=[_item_student_out(st.course, ie, evaluated=evaluated, due_overrides=due_overrides) for ie in me.items])
+        current_position=me.current_position if evaluated else None, lock_reasons=reasons, items=items,
+        access_tier=m.access_tier or "free", access_locked=tier_locked, done=sum(1 for i in rows if i.done),
+        total=len(rows), duration_s=sum(i.duration_s or 0 for i in rows))
 
 
-def _up_next(st: ev_mod.Structure, ev: ev_mod.Evaluation) -> Optional[sch.ItemRefOut]:
-    lang = st.course.default_language
-    for me in ev.modules.values():
-        if not me.visible or me.state not in ("unlocked", "started"):
-            continue
-        for ie in me.items:
-            if ie.met is False and not ie.locked:
-                return sch.ItemRefOut(module_id=me.module.id, module_title=me.module.title or {}, item_id=ie.row.id,
-                                      kind=ie.row.kind, title=ie.row.title(lang), link=_link(ie.row))
+def _up_next(modules: list[sch.ModuleStudentOut]) -> Optional[sch.ItemRefOut]:
+    """F5a (design 4): the first visible non-header item in course order that is not locked and not done."""
+    for mo in modules:
+        for io in mo.items:
+            if io.kind != "header" and not io.locked and not io.done:
+                return sch.ItemRefOut(module_id=mo.id, module_title=mo.title, item_id=io.id, kind=io.kind,
+                                      title=io.title, link=io.link)
     return None
+
+
+def _progress(modules: list[sch.ModuleStudentOut]) -> sch.ProgressOut:
+    return sch.ProgressOut(done=sum(m.done for m in modules), total=sum(m.total for m in modules),
+                           duration_s=sum(m.duration_s for m in modules))
 
 
 def _due_overrides(db: Session, st: ev_mod.Structure, enrollment_id: uuid.UUID) -> dict:
@@ -699,11 +824,12 @@ def _due_overrides(db: Session, st: ev_mod.Structure, enrollment_id: uuid.UUID) 
 
 
 def student_outline(st: ev_mod.Structure, ev: ev_mod.Evaluation, *, db: Optional[Session] = None,
-                    enrollment_id: Optional[uuid.UUID] = None) -> sch.ModulesStudentOut:
+                    enrollment_id: Optional[uuid.UUID] = None, mem: Optional[ev_mod.Memory] = None,
+                    gated: bool = False) -> sch.ModulesStudentOut:
     overrides = _due_overrides(db, st, enrollment_id) if db is not None and enrollment_id is not None else None
-    return sch.ModulesStudentOut(modules=[module_student_out(st, me, due_overrides=overrides)
-                                          for me in ev.modules.values() if me.visible],
-                                 up_next=_up_next(st, ev))
+    modules = [module_student_out(st, me, due_overrides=overrides, mem=mem, gated=gated)
+               for me in ev.modules.values() if me.visible]
+    return sch.ModulesStudentOut(modules=modules, up_next=_up_next(modules), progress=_progress(modules))
 
 
 def observer_outline(st: ev_mod.Structure) -> sch.ModulesStudentOut:
@@ -715,7 +841,7 @@ def observer_outline(st: ev_mod.Structure) -> sch.ModulesStudentOut:
         me = ev_mod.ModuleEval(module=m, visible=True, state="locked",
                                items=[ev_mod.ItemEval(row=r) for r in st.items.get(m.id, []) if r.visible])
         out.append(module_student_out(st, me, evaluated=False))
-    return sch.ModulesStudentOut(modules=out, up_next=None)
+    return sch.ModulesStudentOut(modules=out, up_next=None, progress=_progress(out))
 
 
 def outline_for(db: Session, ctx: AuthzContext, course: Course, *, include_deleted: bool = False):
@@ -726,9 +852,10 @@ def outline_for(db: Session, ctx: AuthzContext, course: Course, *, include_delet
         return staff_outline(db, course, include_deleted=include_deleted)
     if role == "student":
         enr = course_svc.get_enrollment(db, course.id, ctx.user.id)
-        st, _mem, ev = ev_mod.evaluate(db, course, enr.id, clock.now())
+        st, mem, ev = ev_mod.evaluate(db, course, enr.id, clock.now())
         db.commit()
-        return student_outline(st, ev, db=db, enrollment_id=enr.id)
+        gated = tier_gated(db, course, ctx.user.id, st)
+        return student_outline(st, ev, db=db, enrollment_id=enr.id, mem=mem, gated=gated)
     return observer_outline(ev_mod.load_structure(db, course))
 
 
@@ -743,9 +870,10 @@ def student_progress(db: Session, ctx: AuthzContext, course: Course, enrollment_
                                               Enrollment.is_test_student.is_(False))).scalar_one_or_none()
     if enr is None:
         raise NotFound("Enrollment not found", code="enrollment_not_found")
-    st, _mem, ev = ev_mod.evaluate(db, course, enr.id, clock.now(), persist_changes=enr.state == "active")
+    st, mem, ev = ev_mod.evaluate(db, course, enr.id, clock.now(), persist_changes=enr.state == "active")
     db.commit()
-    return student_outline(st, ev, db=db, enrollment_id=enr.id)
+    gated = tier_gated(db, course, enr.user_id, st)  # as that student would see it
+    return student_outline(st, ev, db=db, enrollment_id=enr.id, mem=mem, gated=gated)
 
 
 # --- Phase 8c S1 begin --- (PHASE_8C_DESIGN 3.4, 7: the "Unsorted" group and module duplicate)
@@ -889,7 +1017,8 @@ def duplicate_module(db: Session, ctx: AuthzContext, course: Course, module_id: 
         raise _limit("modules", ids.MODULES_PER_COURSE_MAX)
     copy = CourseModule(course_id=course.id, title=_copy_title(src.title), position=src.position + 1,
                         published=False, unlock_at=src.unlock_at, sequential=bool(src.sequential),
-                        completion_mode=src.completion_mode, rules_version=1, created_by_id=ctx.user.id)
+                        completion_mode=src.completion_mode, rules_version=1, created_by_id=ctx.user.id,
+                        access_tier=src.access_tier)
     db.add(copy)
     db.flush()
     before = {m.id: m.position for m in live}
@@ -901,7 +1030,7 @@ def duplicate_module(db: Session, ctx: AuthzContext, course: Course, module_id: 
         new = ModuleItem(module_id=copy.id, kind=it.kind, position=it.position, indent=it.indent,
                          title_override=dict(it.title_override) if it.title_override else None,
                          published=bool(it.published), page_id=it.page_id, file_id=it.file_id,
-                         assignment_id=it.assignment_id, url=it.url)
+                         assignment_id=it.assignment_id, url=it.url, duration_s=it.duration_s)
         db.add(new)
         db.flush()
         req = reqs.get(it.id)

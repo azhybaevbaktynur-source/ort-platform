@@ -120,6 +120,12 @@ class Structure:
         return list({r.item.assignment_id for rows in self.items.values() for r in rows
                      if r.req_type is not None and r.item.assignment_id is not None})
 
+    def item_assignment_ids(self) -> list[uuid.UUID]:
+        """F5a: every assignment item's target, with or without a requirement (a test without one is `done` once
+        submitted, design 4)."""
+        return list({r.item.assignment_id for rows in self.items.values() for r in rows
+                     if r.item.assignment_id is not None})
+
 
 def load_structure(db: Session, course: Course, *, include_deleted: bool = False) -> Structure:
     """3 queries: modules, prerequisites, items (+ requirement + target columns through outer joins)."""
@@ -222,7 +228,8 @@ _PROGRESS_FIELDS = ("state", "unlocked_at", "completed_at", "current_position", 
 
 
 def load_memory(db: Session, structure: Structure, enrollment_id: uuid.UUID) -> Memory:
-    """4 queries at most: progress rows, status rows, facts grouped per (item, event), submissions."""
+    """4 queries at most: progress rows, status rows, facts grouped per (item, event), submissions (of every
+    assignment item; `compute` reads only those with a requirement)."""
     mem = Memory(enrollment_id=enrollment_id)
     for row in db.execute(select(*[getattr(ModuleProgress, f) for f in ("module_id",) + _PROGRESS_FIELDS])
                           .where(ModuleProgress.enrollment_id == enrollment_id)):
@@ -238,7 +245,7 @@ def load_memory(db: Session, structure: Structure, enrollment_id: uuid.UUID) -> 
                                      .where(ItemProgress.enrollment_id == enrollment_id)
                                      .group_by(ItemProgress.item_id, ItemProgress.event)):
         mem.facts.add(iid, event, at)
-    assignment_ids = structure.requirement_assignment_ids()
+    assignment_ids = structure.item_assignment_ids()  # F5a: also tests without a requirement (`done`)
     if assignment_ids:
         for aid, state, eff, pts, rel, upd in db.execute(
                 select(Submission.assignment_id, Submission.state, Submission.effective_points,

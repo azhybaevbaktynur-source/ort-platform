@@ -71,8 +71,23 @@ def get_assessment(course_id: uuid.UUID, assessment_id: uuid.UUID, ctx: AuthzCon
     from app.lms.modules import gate
 
     a = repo.load_assessment(ctx.db, course.id, assessment_id)
-    gate.require_access(ctx.db, ctx, course, assignment=assignment_id_for(a.id), preset=a.preset)
-    return builder.lobby(ctx.db, ctx, course, assessment_id)
+    # F5a (COURSE_LESSONS_DESIGN 3): a quiz only in Pro modules without a pass shows the lobby's existing S3 lock
+    # (`locked`, `can_start` false, `reason = access_required`) instead of an error; start still answers 403
+    from app.lms.core.errors import Forbidden
+
+    try:
+        gate.require_access(ctx.db, ctx, course, assignment=assignment_id_for(a.id), preset=a.preset)
+        tier_locked = False
+    except Forbidden as e:
+        if e.code != "access_required":
+            raise
+        tier_locked = True
+    out = builder.lobby(ctx.db, ctx, course, assessment_id)
+    if tier_locked:
+        out.locked = True
+        if out.can_start:
+            out.can_start, out.reason = False, "access_required"
+    return out
 
 
 @router.patch("/{course_id}/assessments/{assessment_id}", response_model=sch.AssessmentStaffOut)

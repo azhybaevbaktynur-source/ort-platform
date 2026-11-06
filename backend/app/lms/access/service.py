@@ -113,6 +113,8 @@ class Gate:
     has_pass: bool
     test_student: bool
     practice_free: bool
+    pro_modules: bool = False     # F5a: the course has a live, published Pro (`paid`) module
+    presets_exempt: bool = False  # F5a: the course template exempts preset (ORT) exams from module gating
 
     @property
     def gated(self) -> bool:
@@ -124,29 +126,57 @@ class Gate:
         return (not self.practice_free) if is_practice else access_tier == "paid"
 
     def locked_sql(self, model):
-        """`locked` as a SQL predicate over an Assessment entity (or alias)."""
+        """`locked` as a SQL predicate over an Assessment entity (or alias). F5a: also a test that only Pro modules
+        hold (COURSE_LESSONS_DESIGN 5; preset exams of an exempting template keep their own tier)."""
         if not self.gated:
             return false()
         practice_locked = false() if self.practice_free else true()
-        return or_(and_(model.is_practice.is_(True), practice_locked),
-                   and_(model.is_practice.is_(False), model.access_tier == "paid"))
+        own = or_(and_(model.is_practice.is_(True), practice_locked),
+                  and_(model.is_practice.is_(False), model.access_tier == "paid"))
+        if not self.pro_modules:
+            return own
+        from sqlalchemy import func
+
+        from app.lms.modules.service import pro_only_assessment
+
+        pro = pro_only_assessment(model)
+        if self.presets_exempt:
+            pro = and_(pro, func.coalesce(model.preset, "none") == "none")
+        return or_(own, pro)
 
 
 OPEN_GATE = Gate(platform=False, has_pass=False, test_student=False, practice_free=False)
+
+
+def active_pass_clause(user_id: str, now: datetime):
+    """F5a: SQL EXISTS of the user's active pass (for list predicates that cannot read the Gate)."""
+    return _active_pass(user_id, now)
+
+
+def platform_path_clause(path_col):
+    """F5a: SQL: an organization path inside the platform organization's tree (`is_platform_path`)."""
+    return path_col.like(f"{_platform_hex()}%")
 
 
 def course_gate(db: Session, course, user_id: str, *, now: Optional[datetime] = None) -> Gate:
     """One statement: the course's organization path, an active pass and the caller's test-student flag."""
     from app.lms.enrollments.models import Enrollment
 
+    from app.lms.modules.models import CourseModule
+    from app.lms.templates import service as tpl
+    from app.lms.templates.base import LOCK_GATING
+
     now = now or clock.now()
-    path, has_pass, is_test = db.execute(select(
+    path, has_pass, is_test, pro = db.execute(select(
         _org_path(course.organization_id), _active_pass(user_id, now),
         select(Enrollment.is_test_student).where(Enrollment.course_id == course.id, Enrollment.user_id == user_id,
                                                  Enrollment.state == "active").scalar_subquery(),
+        exists().where(CourseModule.course_id == course.id, CourseModule.deleted_at.is_(None),  # F5a
+                       CourseModule.published.is_(True), CourseModule.access_tier == "paid"),
     )).one()
     return Gate(platform=is_platform_path(path), has_pass=bool(has_pass), test_student=bool(is_test),
-                practice_free=practice_free(course.settings))
+                practice_free=practice_free(course.settings), pro_modules=bool(pro),
+                presets_exempt=tpl.is_locked(course, LOCK_GATING, preset="ort_main"))
 
 
 def _platform_and_pass(db: Session, organization_id, user_id: str, now: datetime) -> tuple[bool, bool]:

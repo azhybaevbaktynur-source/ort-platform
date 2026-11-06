@@ -190,13 +190,13 @@ def clear_requirement(course_id: uuid.UUID, module_id: uuid.UUID, item_id: uuid.
 def record_view(course_id: uuid.UUID, module_id: uuid.UUID, item_id: uuid.UUID,
                 ctx: AuthzContext = Depends(get_authz)):
     course = _course(ctx, course_id)
-    st, _ev, me = facts.record_view(ctx.db, ctx, course, module_id, item_id)
-    return svc.module_student_out(st, me)
+    st, _ev, me, mem, gated = facts.record_view(ctx.db, ctx, course, module_id, item_id)
+    return svc.module_student_out(st, me, mem=mem, gated=gated)
 
 
 @router.post(_I + "/done", response_model=sch.ModuleStudentOut)
 def set_done(course_id: uuid.UUID, module_id: uuid.UUID, item_id: uuid.UUID, data: sch.DoneIn,
              ctx: AuthzContext = Depends(get_authz)):
     course = _course(ctx, course_id)
-    st, _ev, me = facts.set_done(ctx.db, ctx, course, module_id, item_id, data.done)
-    return svc.module_student_out(st, me)
+    st, _ev, me, mem, gated = facts.set_done(ctx.db, ctx, course, module_id, item_id, data.done)
+    return svc.module_student_out(st, me, mem=mem, gated=gated)

@@ -387,12 +387,17 @@ def course_features(db: Session, course: Course):
     from app.lms.assessments.models import Assessment
     from app.lms.course_files.models import CourseFile
     from app.lms.courses.schemas import CourseFeaturesOut
+    from app.lms.exam_prep.layout import is_exam_prep
     from app.lms.modules.models import CourseModule
+    from app.lms.modules.service import lesson_exists
 
     now = utcnow()
+    # F5a (COURSE_LESSONS_DESIGN 3, L7): an exam-prep course's "Уроки" entry needs at least one lesson; teacher
+    # courses keep the 8a rule (a published live module)
+    modules = lesson_exists(course.id) if is_exam_prep(course) else exists().where(
+        CourseModule.course_id == course.id, CourseModule.deleted_at.is_(None), CourseModule.published.is_(True))
     row = db.execute(select(
-        exists().where(CourseModule.course_id == course.id, CourseModule.deleted_at.is_(None),
-                       CourseModule.published.is_(True)),
+        modules,
         exists().where(CourseFile.course_id == course.id, CourseFile.deleted_at.is_(None),
                        CourseFile.published.is_(True)),
         exists().where(Announcement.course_id == course.id, Announcement.deleted_at.is_(None),

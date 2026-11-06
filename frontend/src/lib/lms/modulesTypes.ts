@@ -11,6 +11,12 @@ export type ModuleWarningCode =
   | "target_unpublished" | "target_deleted" | "prerequisite_unpublished" | "prerequisite_deleted"
   | "requirement_on_unpublished_target" | "unlock_in_past_with_locked_students";
 export type LockReasonKind = "unlock_at" | "prerequisite" | "sequential";
+/** F5a (COURSE_LESSONS_DESIGN 2, 3): Pro module tier; why a student row is locked. */
+export type AccessTier = "free" | "paid";
+export type ItemLockedReason = "module" | "access_required";
+/** F5a: `duration_s` range (the editor sends minutes x 60, 1..600 minutes). */
+export const DURATION_S_MIN = 60;
+export const DURATION_S_MAX = 36000;
 
 export const ITEM_KINDS: ItemKind[] = ["page", "file", "assignment", "url", "header"];
 export const THRESHOLD_REQUIREMENTS: RequirementType[] = ["min_score", "min_percent"];
@@ -29,6 +35,8 @@ export interface ModuleIn {
   unlock_at?: string | null;
   sequential?: boolean;
   completion_mode?: CompletionMode;
+  /** F5a: `paid` only in platform courses (422 otherwise) */
+  access_tier?: AccessTier;
 }
 export type ModuleUpdateIn = Partial<ModuleIn>;
 
@@ -48,6 +56,8 @@ export interface ItemIn {
   published?: boolean;
   position?: number;
   requirement?: RequirementIn | null;
+  /** F5a: page / file / url only, 60..36000 seconds */
+  duration_s?: number | null;
 }
 
 export interface ItemUpdateIn {
@@ -55,6 +65,8 @@ export interface ItemUpdateIn {
   indent?: number;
   published?: boolean;
   url?: string;
+  /** F5a: `null` clears; page / file / url only */
+  duration_s?: number | null;
 }
 
 // ---- shared ----
@@ -102,6 +114,8 @@ export interface ItemStaffOut {
   requirement: RequirementStaffOut | null;
   target: ItemTargetOut | null;
   warnings: ModuleWarningOut[];
+  /** F5a */
+  duration_s?: number | null;
 }
 
 export interface ModuleStaffOut {
@@ -117,6 +131,10 @@ export interface ModuleStaffOut {
   items: ItemStaffOut[];
   warnings: ModuleWarningOut[];
   deleted_at: string | null;
+  /** F5a: tier, sum of the published items' durations, number of published lessons (page / file / url) */
+  access_tier?: AccessTier;
+  duration_s?: number;
+  lessons_count?: number;
 }
 
 export interface ModulesStaffOut {
@@ -168,6 +186,10 @@ export interface ItemStudentOut {
   due_at?: string | null;
   /** U7: set on unlocked url items that are YouTube / Vimeo videos (absent on an older backend) */
   video?: VideoOut | null;
+  /** F5a: lesson length; done decided by the server (also on locked rows); why the row is locked */
+  duration_s?: number | null;
+  done?: boolean;
+  locked_reason?: ItemLockedReason | null;
 }
 
 export interface ModuleStudentOut {
@@ -181,6 +203,19 @@ export interface ModuleStudentOut {
   current_position: number | null;
   lock_reasons: LockReasonOut[];
   items: ItemStudentOut[];
+  /** F5a: Pro tier and whether it locks this module for the caller; done / total non-header rows; total duration */
+  access_tier?: AccessTier;
+  access_locked?: boolean;
+  done?: number;
+  total?: number;
+  duration_s?: number;
+}
+
+/** F5a: the course bar (the same rows as the modules' done / total; tests count). */
+export interface ProgressOut {
+  done: number;
+  total: number;
+  duration_s: number;
 }
 
 export interface ItemRefOut {
@@ -194,7 +229,9 @@ export interface ItemRefOut {
 
 export interface ModulesStudentOut {
   modules: ModuleStudentOut[];
+  /** F5a: the first visible non-header item, in course order, that is neither locked nor done */
   up_next: ItemRefOut | null;
+  progress?: ProgressOut;
 }
 
 /** `GET _C/modules` answers with the staff or the student shape; staff modules carry `rules_version`. */

@@ -3,7 +3,7 @@ checkbox. Append-only rows in `item_progress`; never updated or deleted.
 
 Both routes: active student enrollment in a published course (`A.PROGRESS_RECORD`: 404 for outsiders, 403 for staff,
 org admins and concluded courses), the item must be visible to the student (404 otherwise) and **not locked** (423
-`module_locked`), shared rate limit `progress_limit` (600/h per user) before any write. Then the course is evaluated
+`module_locked`) nor in a Pro module the caller has no pass for (403 `access_required`, F5a), shared rate limit `progress_limit` (600/h per user) before any write. Then the course is evaluated
 with the new fact folded in, the changed caches are written and the item's module is returned."""
 from __future__ import annotations
 
@@ -51,14 +51,26 @@ def _open_item(db: Session, ctx: AuthzContext, course: Course, module_id: uuid.U
     if ie.locked:
         raise gate.ModuleLocked("This item is locked until the module requirements are met",
                                 details=gate.lock_details(structure, me, ie))
-    return enr, structure, mem, now
+    # F5a (design 3, 5): a Pro module without a pass refuses with 403 `access_required` (a module rule, above, wins
+    # the answer as it wins the outline's `locked_reason`); one statement, only for an item of a `paid` module
+    from app.lms.modules import service as svc
+
+    gated = False
+    if me.module.access_tier == "paid":
+        gated = svc.tier_gated(db, course, ctx.user.id)
+        if gated and not svc._gating_exempt(course, ie.row):
+            from app.lms.access.service import access_required
+
+            raise access_required()
+    return enr, structure, mem, now, gated
 
 
-def _finish(db: Session, structure, mem, now, module_id: uuid.UUID):
+def _finish(db: Session, structure, mem, now, module_id: uuid.UUID, gated: bool):
+    """(structure, evaluation, the item's module, memory, the caller's tier gate) for `module_student_out`."""
     ev = ev_mod.compute(structure, mem, now)
     ev_mod.persist(db, ev, mem, now)
     db.commit()
-    return structure, ev, ev.modules[module_id]
+    return structure, ev, ev.modules[module_id], mem, gated
 
 
 def _insert_ignore(db: Session, **values) -> int:
@@ -67,17 +79,17 @@ def _insert_ignore(db: Session, **values) -> int:
 
 def record_view(db: Session, ctx: AuthzContext, course: Course, module_id: uuid.UUID, item_id: uuid.UUID):
     """Idempotent: the partial unique index keeps one `viewed` row per (enrollment, item)."""
-    enr, structure, mem, now = _open_item(db, ctx, course, module_id, item_id)
+    enr, structure, mem, now, gated = _open_item(db, ctx, course, module_id, item_id)
     if item_id not in mem.facts.viewed:
         _insert_ignore(db, id=uuid.uuid4(), enrollment_id=enr.id, item_id=item_id, event="viewed", created_at=now)
         mem.facts.add(item_id, "viewed", now)
-    return _finish(db, structure, mem, now, module_id)
+    return _finish(db, structure, mem, now, module_id, gated)
 
 
 def set_done(db: Session, ctx: AuthzContext, course: Course, module_id: uuid.UUID, item_id: uuid.UUID, done: bool):
     """Appends `marked_done` / `unmarked_done` (only when it changes the checkbox). Timestamps of one student's done
     facts on one item strictly increase, so "latest wins" never ties."""
-    enr, structure, mem, now = _open_item(db, ctx, course, module_id, item_id)
+    enr, structure, mem, now, gated = _open_item(db, ctx, course, module_id, item_id)
     if mem.facts.done(item_id) != done:
         last = db.execute(select(func.max(ItemProgress.created_at)).where(
             ItemProgress.enrollment_id == enr.id, ItemProgress.item_id == item_id,
@@ -88,7 +100,7 @@ def set_done(db: Session, ctx: AuthzContext, course: Course, module_id: uuid.UUI
         db.add(ItemProgress(id=uuid.uuid4(), enrollment_id=enr.id, item_id=item_id, event=event, created_at=at))
         db.flush()
         mem.facts.add(item_id, event, at)
-    return _finish(db, structure, mem, now, module_id)
+    return _finish(db, structure, mem, now, module_id, gated)
 
 
 __all__ = ["record_view", "set_done"]
