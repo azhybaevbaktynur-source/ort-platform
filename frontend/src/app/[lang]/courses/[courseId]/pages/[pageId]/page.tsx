@@ -2,15 +2,17 @@
 
 // Phase 8a S4b: the page. Phase 8c S3 (PHASE_8C_DESIGN §5.2): staff get the page object (Edit and Preview tabs by
 // `?tab=`); students (and read-only org admins) the page view as before.
-// Student UI U7 (STUDENT_UI_DESIGN §3.5): a page opened from the syllabus (`?m={module}&i={item}`) gets the previous /
-// next lesson footer.
-import React, { Suspense } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+// F5b (COURSE_LESSONS_DESIGN L3): a page lesson renders inline on the lesson page; an older link opened from the
+// syllabus (`?from=module&m={module}&i={item}`) forwards a student there. Other links keep the page view.
+import React, { Suspense, useEffect } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useTranslation } from "@/lib/i18n/context";
 import { useCourse } from "@/components/lms/CourseContext";
 import { PageObject } from "@/components/lms/pages/PageObject";
 import { PageView } from "@/components/lms/pages/PageView";
-import { PageLessonFooter } from "@/components/lms/modules/LessonView";
 import { LoadingState } from "@/components/ui";
+
+const UUID = /^[0-9a-f-]{36}$/;
 
 export default function PageRoute() {
   const { course } = useCourse();
@@ -19,19 +21,21 @@ export default function PageRoute() {
   if (role === "teacher" || role === "assistant") {
     return <Suspense fallback={<LoadingState />}><PageObject key={pageId} pageId={pageId} /></Suspense>;
   }
-  return (
-    <>
-      <PageView pageId={pageId} />
-      {role === "student" && <Suspense fallback={null}><LessonFooter /></Suspense>}
-    </>
-  );
+  if (role === "student") return <Suspense fallback={<LoadingState />}><StudentPage pageId={pageId} /></Suspense>;
+  return <PageView pageId={pageId} />;
 }
 
-function LessonFooter() {
+function StudentPage({ pageId }: { pageId: string }) {
+  const { lang } = useTranslation();
+  const { course } = useCourse();
+  const router = useRouter();
   const params = useSearchParams();
-  const m = params?.get("m");
-  const i = params?.get("i");
-  const uuid = /^[0-9a-f-]{36}$/;
-  if (!m || !i || !uuid.test(m) || !uuid.test(i)) return null;
-  return <PageLessonFooter moduleId={m} itemId={i} />;
+  const m = params?.get("m") ?? "";
+  const i = params?.get("i") ?? "";
+  const lesson = params?.get("from") === "module" && UUID.test(m) && UUID.test(i) ? `/${lang}/courses/${course.id}/modules/${m}/items/${i}` : null;
+  useEffect(() => {
+    if (lesson) router.replace(lesson);
+  }, [lesson, router]);
+  if (lesson) return <LoadingState />;
+  return <PageView pageId={pageId} />;
 }

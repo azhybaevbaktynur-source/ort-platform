@@ -5056,6 +5056,30 @@
       "doneCount": "Өтүлдү: {total} ичинен {done}",
       "doneCountShort": "өтүлдү: {total} ичинен {done}"
     },
+    "overview": {
+      "syllabusTitle": "Программа",
+      "outlineTitle": "Курстун программасы",
+      "breadcrumbLabel": "Курстагы ордуңуз",
+      "toSyllabus": "Программага кайтуу",
+      "nextUp": "Кийинки: {title}",
+      "proLeft": "Калган сабактар Pro менен ачылат.",
+      "later": "Кийинки сабактар кийинчерээк ачылат.",
+      "completed": "Курс өтүлдү",
+      "restart": "Башынан кайталоо",
+      "unlock": "Жеткиликти ачуу",
+      "pro": "Pro",
+      "proModuleBody": "Бул модулдун сабактары жеткилик менен ачылат. Азыр алардын аталыштарын гана көрөсүз.",
+      "proLockTitle": "Бул сабак Pro менен ачылат",
+      "proLockBody": "Бардык сабактарды көрүү жана бардык акылуу сынактарды тапшыруу үчүн жеткиликти ачыңыз.",
+      "moduleDone": "{total} ичинен {done}",
+      "moduleLocked": "Модуль азырынча жабык",
+      "approx": "≈ {duration}",
+      "durationMin": "{n} мүн",
+      "durationHours": "{h} саат",
+      "durationHoursMin": "{h} саат {m} мүн",
+      "aboutTests": "Тесттер",
+      "aboutDuration": "Узактыгы"
+    },
     "lesson": {
       "back": "Бардык сабактар",
       "position": "{total} сабактын {n}-сабагы",
@@ -5074,7 +5098,10 @@
       "externalTitle": "Бул материал башка сайтта",
       "externalBody": "Шилтеме жаңы өтмөктө ачылат.",
       "openLink": "Шилтемени ачуу",
-      "fileBody": "Бул сабактын файлы."
+      "fileBody": "Бул сабактын файлы.",
+      "prevShort": "Артка",
+      "positionShort": "{n}/{total}",
+      "nextShort": "Кийинки"
     }
   },
   "courseNav": {
@@ -6584,7 +6611,7 @@
       "analytics": "Аналитика",
       "saved": "Сакталгандар",
       "lessonsGroup": "Сабактар",
-      "lessons": "Видеосабактар",
+      "lessons": "Сабактар",
       "practiceGroup": "Машыгуу",
       "tests": "Тесттер",
       "practice": "Машыгуу",

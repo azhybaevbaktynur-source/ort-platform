@@ -10,7 +10,8 @@ import type { VideoOut } from "@/lib/lms/modulesTypes";
 import { cn, focusRing } from "@/components/ui";
 import { videoEmbedUrl } from "./lessons";
 
-export function VideoPlayer({ video, title }: { video: VideoOut; title: string }) {
+/** F5b (COURSE_LESSONS_DESIGN 4): `onPlay` runs on the tap; the lesson page records the view there, not on open. */
+export function VideoPlayer({ video, title, onPlay }: { video: VideoOut; title: string; onPlay?: () => void }) {
   const { t } = useTranslation();
   const [on, setOn] = useState(false);
   const frame = useRef<HTMLIFrameElement>(null);
@@ -26,7 +27,7 @@ export function VideoPlayer({ video, title }: { video: VideoOut; title: string }
           allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowFullScreen
           referrerPolicy="strict-origin-when-cross-origin" sandbox="allow-scripts allow-same-origin allow-presentation" />
       ) : (
-        <button type="button" onClick={() => setOn(true)} aria-label={t("modules.lesson.play", { title })} aria-describedby={hintId}
+        <button type="button" onClick={() => { setOn(true); onPlay?.(); }} aria-label={t("modules.lesson.play", { title })} aria-describedby={hintId}
           className={cn("group absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center text-white", focusRing, "focus-visible:ring-inset focus-visible:ring-offset-0")}>
           <span aria-hidden="true" className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-navy-800 shadow-lg transition-transform group-hover:scale-105 sm:h-20 sm:w-20">
             <Play className="ml-1 h-8 w-8 fill-current sm:h-9 sm:w-9" />

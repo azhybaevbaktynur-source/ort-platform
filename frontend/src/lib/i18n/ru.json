@@ -5056,6 +5056,30 @@
       "doneCount": "Пройдено {done} из {total}",
       "doneCountShort": "пройдено {done} из {total}"
     },
+    "overview": {
+      "syllabusTitle": "Программа",
+      "outlineTitle": "Программа курса",
+      "breadcrumbLabel": "Где вы в курсе",
+      "toSyllabus": "К программе",
+      "nextUp": "Далее: {title}",
+      "proLeft": "Остальные уроки открываются с доступом Pro.",
+      "later": "Следующие уроки откроются позже.",
+      "completed": "Курс пройден",
+      "restart": "Повторить с начала",
+      "unlock": "Открыть доступ",
+      "pro": "Pro",
+      "proModuleBody": "Уроки этого модуля открываются с доступом. Сейчас видны только их названия.",
+      "proLockTitle": "Этот урок доступен с Pro",
+      "proLockBody": "Откройте доступ, чтобы смотреть все уроки и сдавать все платные экзамены.",
+      "moduleDone": "{done} из {total}",
+      "moduleLocked": "Модуль пока закрыт",
+      "approx": "≈ {duration}",
+      "durationMin": "{n} мин",
+      "durationHours": "{h} ч",
+      "durationHoursMin": "{h} ч {m} мин",
+      "aboutTests": "Тестов",
+      "aboutDuration": "Длительность"
+    },
     "lesson": {
       "back": "Все уроки",
       "position": "Урок {n} из {total}",
@@ -5074,7 +5098,10 @@
       "externalTitle": "Материал на другом сайте",
       "externalBody": "Ссылка откроется в новой вкладке.",
       "openLink": "Открыть ссылку",
-      "fileBody": "Файл к этому уроку."
+      "fileBody": "Файл к этому уроку.",
+      "prevShort": "Назад",
+      "positionShort": "{n}/{total}",
+      "nextShort": "Далее"
     }
   },
   "courseNav": {
@@ -6584,7 +6611,7 @@
       "analytics": "Аналитика",
       "saved": "Сохранённые",
       "lessonsGroup": "Уроки",
-      "lessons": "Видеоуроки",
+      "lessons": "Уроки",
       "practiceGroup": "Практика",
       "tests": "Тесты",
       "practice": "Практика",

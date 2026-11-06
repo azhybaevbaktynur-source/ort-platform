@@ -90,7 +90,8 @@ function useNav(props: StudentShellProps) {
 }
 
 /** U9 (review 5, 6): the same links on every page and in the same order as the tab bar: Главная, Тесты, Практика,
- * Аналитика, then Видеоуроки and Сохранённые (no module sub-links: the phone has none either). */
+ * Аналитика, then Уроки (F5b: the course overview, shown when the course has a lesson; tests stay under Тесты) and
+ * Сохранённые (no module sub-links: the phone has none either). */
 function useMenuGroups(props: StudentShellProps): SidebarNavGroup[] {
   const { links, item } = useNav(props);
   const { data } = props;

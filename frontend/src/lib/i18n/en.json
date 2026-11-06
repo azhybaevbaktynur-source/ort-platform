@@ -5056,6 +5056,30 @@
       "doneCount": "Done: {done} of {total}",
       "doneCountShort": "done {done} of {total}"
     },
+    "overview": {
+      "syllabusTitle": "Syllabus",
+      "outlineTitle": "Course outline",
+      "breadcrumbLabel": "Where you are in the course",
+      "toSyllabus": "Back to the syllabus",
+      "nextUp": "Next: {title}",
+      "proLeft": "The remaining lessons are part of Pro.",
+      "later": "The next lessons will open later.",
+      "completed": "Course completed",
+      "restart": "Start again from the beginning",
+      "unlock": "Get access",
+      "pro": "Pro",
+      "proModuleBody": "The lessons of this module open with access. You can see their titles now.",
+      "proLockTitle": "This lesson is part of Pro",
+      "proLockBody": "Get access to watch every lesson and take every paid exam.",
+      "moduleDone": "{done} of {total}",
+      "moduleLocked": "Module locked for now",
+      "approx": "≈ {duration}",
+      "durationMin": "{n} min",
+      "durationHours": "{h} h",
+      "durationHoursMin": "{h} h {m} min",
+      "aboutTests": "Tests",
+      "aboutDuration": "Duration"
+    },
     "lesson": {
       "back": "All lessons",
       "position": "Lesson {n} of {total}",
@@ -5074,7 +5098,10 @@
       "externalTitle": "This material is on another website",
       "externalBody": "The link opens in a new tab.",
       "openLink": "Open the link",
-      "fileBody": "A file for this lesson."
+      "fileBody": "A file for this lesson.",
+      "prevShort": "Back",
+      "positionShort": "{n}/{total}",
+      "nextShort": "Next"
     }
   },
   "courseNav": {
@@ -6584,7 +6611,7 @@
       "analytics": "Analytics",
       "saved": "Saved",
       "lessonsGroup": "Lessons",
-      "lessons": "Video lessons",
+      "lessons": "Lessons",
       "practiceGroup": "Practice",
       "tests": "Tests",
       "practice": "Practice",

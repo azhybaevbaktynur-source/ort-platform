@@ -1,7 +1,8 @@
 // Student UI U7 (docs/phases/STUDENT_UI_DESIGN.md §3.5, §4.4): pure helpers of the syllabus and the lesson page:
 // the lessons in course order, where each one opens, the progress counts and the click-to-load player's address.
 // Locks come from the server (`ItemStudentOut.locked`, the module state); nothing here unlocks anything.
-import type { ItemRefOut, ItemStudentOut, ModuleStudentOut, VideoOut } from "@/lib/lms/modulesTypes";
+// F5b (COURSE_LESSONS_DESIGN 4, 8): done, progress and "up next" are the server's; these helpers only read them.
+import type { ItemRefOut, ItemStudentOut, ModuleStudentOut, ModulesStudentOut, VideoOut } from "@/lib/lms/modulesTypes";
 import { itemHref } from "./moduleUi";
 
 export interface LessonRef {
@@ -36,38 +37,57 @@ export function lessonRoute(base: string, moduleId: string, itemId: string): str
   return `${base}/modules/${moduleId}/items/${itemId}`;
 }
 
-/** Where a lesson opens from the syllabus CTA and the prev / next links: a page keeps `/pages/{id}` (with the lesson
- * so its footer can offer prev / next), an assignment its own route, everything else the lesson page. */
+/** Where a row opens from the overview CTA, the outline and the prev / next links: an assignment its own route (the
+ * lobby); every lesson (video, link, page, file) and every locked row the lesson page (F5b: pages render inline). */
 export function lessonHref(base: string, ref: LessonRef): string {
   const { mod, item } = ref;
-  if (!isLocked(mod, item)) {
-    if (item.kind === "page" && item.link?.page_id) {
-      return `${base}/pages/${item.link.page_id}?from=module&m=${encodeURIComponent(mod.id)}&i=${encodeURIComponent(item.id)}`;
-    }
-    if (item.kind === "assignment") {
-      const href = itemHref(base, item.kind, item.link);
-      if (href) return href;
-    }
+  if (!isLocked(mod, item) && item.kind === "assignment") {
+    const href = itemHref(base, item.kind, item.link);
+    if (href) return href;
   }
   return lessonRoute(base, mod.id, item.id);
 }
 
-/** Done/total over the lessons that have a requirement (others have no "done" state). */
-export function syllabusProgress(lessons: LessonRef[]): { done: number; total: number } {
-  const withReq = lessons.filter((l) => l.item.requirement);
-  return { done: withReq.filter((l) => l.item.requirement?.met).length, total: withReq.length };
+/** F5b (COURSE_LESSONS_DESIGN 5): the row is closed by the Pro tier (a module rule would give `module`). */
+export function isAccessLocked(item: ItemStudentOut): boolean {
+  return item.locked_reason === "access_required";
 }
 
-/** The lesson the "Start" / "Continue" button opens: the server's "up next", else the first open lesson while nothing
- * is done yet; null when every lesson with a requirement is done. */
-export function nextLesson(lessons: LessonRef[], upNext: ItemRefOut | null): LessonRef | null {
+/** F5b (design 4): done as the server decides it; an older backend without `done` falls back to the requirement. */
+export function isDone(item: ItemStudentOut): boolean {
+  return item.done ?? !!item.requirement?.met;
+}
+
+/** Done / total / duration of the course (the server's `progress`, else counted over the same rows). */
+export function courseProgress(data: ModulesStudentOut, lessons: LessonRef[]): { done: number; total: number; duration_s: number } {
+  if (data.progress) return data.progress;
+  return {
+    done: lessons.filter((l) => isDone(l.item)).length,
+    total: lessons.length,
+    duration_s: lessons.reduce((a, l) => a + (l.item.duration_s ?? 0), 0),
+  };
+}
+
+/** The row "Продолжить" opens: the server's `up_next` when it is an open row, else the first open row not done. */
+export function nextOpen(lessons: LessonRef[], upNext: ItemRefOut | null): LessonRef | null {
   if (upNext) {
-    const hit = lessons.find((l) => l.item.id === upNext.item_id);
+    const hit = lessons.find((l) => l.item.id === upNext.item_id && l.mod.id === upNext.module_id);
     if (hit && !isLocked(hit.mod, hit.item)) return hit;
   }
-  const { done, total } = syllabusProgress(lessons);
-  if (total > 0 && done >= total) return null;
-  return lessons.find((l) => !isLocked(l.mod, l.item) && !l.item.requirement?.met) ?? null;
+  return lessons.find((l) => !isLocked(l.mod, l.item) && !isDone(l.item)) ?? null;
+}
+
+type Translate = (key: string, vars?: Record<string, string | number>) => string;
+
+/** "6 мин", "1 ч", "1 ч 10 мин" (whole minutes, at least one); empty without a duration. */
+export function formatDuration(seconds: number | null | undefined, t: Translate): string {
+  if (!seconds || seconds <= 0) return "";
+  const total = Math.max(1, Math.round(seconds / 60));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h === 0) return t("modules.overview.durationMin", { n: m });
+  if (m === 0) return t("modules.overview.durationHours", { h });
+  return t("modules.overview.durationHoursMin", { h, m });
 }
 
 const YT_ID = /^[A-Za-z0-9_-]{11}$/;
