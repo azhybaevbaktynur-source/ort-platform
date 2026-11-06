@@ -4,7 +4,8 @@ import React, { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCourse } from "@/components/lms/CourseContext";
 import { AnalyticsOverview, PeriodPicker } from "@/components/lms/progress/AnalyticsOverview";
-import { LoadingState, PageHeader } from "@/components/ui";
+import { LoadingState } from "@/components/ui";
+import { StudentPageHeader } from "@/components/lms/student/StudentPageHeader";
 import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
 import { templateUi } from "@/lib/lms/templates";
@@ -26,9 +27,9 @@ function Analytics() {
   if (mistakes) return <LoadingState label={t("lms.common.loading")} />;
   return (
     <div className="space-y-4">
-      <PageHeader title={t("progress.analytics.title")}
-        description={examPrep ? pickLocalized(course.title, lang, course.default_language) : undefined}
-        secondaryActions={<PeriodPicker value={period} onChange={setPeriod} />} />
+      <StudentPageHeader title={t("progress.analytics.title")} className="mb-2"
+        subtitle={examPrep ? pickLocalized(course.title, lang, course.default_language) : undefined}
+        action={<PeriodPicker value={period} onChange={setPeriod} />} />
       <AnalyticsOverview courseId={course.id} period={period} examPrep={examPrep} />
     </div>
   );

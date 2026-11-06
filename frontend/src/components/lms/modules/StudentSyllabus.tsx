@@ -22,6 +22,7 @@ import { Checkbox, EmptyState, ErrorState, LinkButton, LoadingState, Mascot, cn,
 import { ExternalIcon, ItemKindIcon, ModuleStateBadge, useItemKindText, useLockReasonText, useModuleErrorText, useRequirementText } from "./moduleUi";
 import { isExempt, isLocked, lessonHref, lessonList, lessonRoute, nextLesson, syllabusProgress, type LessonRef } from "./lessons";
 import { rememberLessonModules } from "./lessonNav";
+import { StudentPageHeader } from "@/components/lms/student/StudentPageHeader";
 
 interface RowCtx {
   base: string;
@@ -283,12 +284,7 @@ function AboutCard({ modules, lessons }: { modules: number; lessons: number }) {
 function SyllabusTitle() {
   const { lang, t } = useTranslation();
   const { course } = useCourse();
-  return (
-    <div className="min-w-0">
-      <h1 className="break-words text-2xl font-bold leading-8 text-slate-900 lg:text-[28px] lg:leading-9">{t("student.nav.lessons")}</h1>
-      <p className="mt-1 break-words text-sm leading-5 text-slate-600">{pickLocalized(course.title, lang, course.default_language)}</p>
-    </div>
-  );
+  return <StudentPageHeader title={t("student.nav.lessons")} subtitle={pickLocalized(course.title, lang, course.default_language)} />;
 }
 
 export function StudentSyllabus() {

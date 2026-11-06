@@ -63,6 +63,43 @@
   --sidebar-w: 264px;
   --topbar-h: 56px;
   --tabbar-h: 64px;
+
+  /* Student UI colour (STUDENT_UI_DESIGN §1.1): Tailwind's `brand-*` and `navy-*` read these RGB channels. These
+     defaults are exactly the colours used before (Tailwind blue, our navy), so the teacher, admin, lobby and attempt
+     frames do not change; `.student-theme` below overrides them inside the student frame only. */
+  --brand-50: 239 246 255;
+  --brand-100: 219 234 254;
+  --brand-200: 191 219 254;
+  --brand-300: 147 197 253;
+  --brand-400: 96 165 250;
+  --brand-500: 59 130 246;
+  --brand-600: 37 99 235;
+  --brand-700: 29 78 216;
+  --brand-800: 30 64 175;
+  --brand-900: 30 58 138;
+  --brand-950: 23 37 84;
+  --navy-800: 27 42 74;
+  --navy-900: 19 32 58;
+}
+
+/* Student UI colour, "Sky and teal" (owner 2026-11-06, STUDENT_UI_DESIGN §1.1): set on the StudentShell root only.
+   Primary sky blue: 50 #eaf4fe, 100 #d4e9fd, 500 #1e7bea (the owner's 600), 700 #1764c4; 600 is #1a70d8, a shade
+   deeper than the owner's #1e7bea so white button text keeps 4.5:1 (it has 4.8:1; #1e7bea has 4.1:1). Teal sidebar
+   #0e4a6b (navy-800) to #13698f; page background #eef6fc (STUDENT_FRAME). */
+.student-theme {
+  --brand-50: 234 244 254;
+  --brand-100: 212 233 253;
+  --brand-200: 174 214 251;
+  --brand-300: 125 189 247;
+  --brand-400: 74 159 241;
+  --brand-500: 30 123 234;
+  --brand-600: 26 112 216;
+  --brand-700: 23 100 196;
+  --brand-800: 20 79 156;
+  --brand-900: 18 64 124;
+  --brand-950: 12 42 82;
+  --navy-800: 14 74 107;
+  --navy-900: 11 58 85;
 }
 
 body {

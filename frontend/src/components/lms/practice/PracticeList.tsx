@@ -17,8 +17,8 @@ import { fmtDayMonthTime } from "@/components/lms/home/format";
 import { startAttempt } from "@/lib/lms/attempts";
 import { ORT_SECTIONS } from "@/lib/lms/contentTypes";
 import { pickLocalized } from "@/lib/lms/localized";
-import { deletePractice, listPractice, updatePractice, type PracticeSetOut } from "@/lib/lms/practice";
 import { templateUi } from "@/lib/lms/templates";
+import { deletePractice, listPractice, updatePractice, type PracticeSetOut } from "@/lib/lms/practice";
 import { PracticeDialog } from "./PracticeDialog";
 
 /** The ORT sections a set draws from (its blocks), in ORT order; blocks without a known section add no tag. */
@@ -92,6 +92,10 @@ export function PracticeList() {
   // title in exam-prep courses, whose course header is dropped here) and cards with section tags; staff keep theirs
   const examPrep = templateUi(course).studentLayout === "exam_prep";
 
+  // §5.1 e (students): one primary button, on the set to continue (else the first open one); the rest secondary
+  const startable = items.filter((s) => s.status === "published" && !s.locked);
+  const primaryId = (startable.find((s) => s.open_attempt_id) ?? startable.find((s) => !s.my_attempts) ?? startable[0])?.id ?? null;
+
   return (
     <div className={cn(!canEdit && "space-y-5")}>
       {canEdit ? <PageHeader title={t("practice.title")} primaryAction={newButton} /> : (
@@ -129,7 +133,7 @@ export function PracticeList() {
                   </span>
                 ) : (
                   <Button loading={busyId === s.id} onClick={() => void start(s)} className="flex-1 sm:flex-none"
-                    variant={s.my_attempts && !s.open_attempt_id ? "secondary" : "primary"}>
+                    variant={canEdit || s.id === primaryId ? "primary" : "secondary"}>
                     {t(s.open_attempt_id ? "practice.continue" : "practice.start")}<span className="sr-only">: {name(s)}</span>
                   </Button>
                 ))}

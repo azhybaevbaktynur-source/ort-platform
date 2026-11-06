@@ -18,7 +18,7 @@ import { PrivacyBanner } from "@/components/privacy/PrivacyBanner"; // Phase 11 
 // --- Student UI U2 ---
 import type { CourseOut } from "@/lib/lms/types";
 import { courseIdOfPath } from "@/lib/lms/studentNav";
-import { STUDENT_FRAME, STUDENT_MAIN, StudentChrome, StudentTabBar } from "./student/StudentShell";
+import { STUDENT_FRAME, STUDENT_MAIN, STUDENT_SIDEBAR_BG, StudentChrome, StudentTabBar } from "./student/StudentShell";
 import { useStudentShellData } from "./student/useStudentShellData";
 import { StudentShellDataContext } from "./student/StudentShellDataContext"; // Student UI U3
 
@@ -208,7 +208,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
     if (!ortFrame && urlArea === "learning" && !teachesCached) {
       return (
         <div className={cn("min-h-screen bg-slate-50", STUDENT_FRAME)}>
-          <div aria-hidden="true" className="fixed inset-y-0 left-0 hidden w-[264px] bg-navy-800 lg:block" />
+          <div aria-hidden="true" className={cn("fixed inset-y-0 left-0 hidden w-[264px] lg:block", STUDENT_SIDEBAR_BG)} />
           <div aria-hidden="true" className="flex h-14 items-center gap-2 border-b border-slate-200 bg-white px-4 lg:hidden">
             <span className="h-9 w-9 rounded-control bg-navy-800" />
             <Skeleton className="ml-auto h-9 w-9 rounded-full" />

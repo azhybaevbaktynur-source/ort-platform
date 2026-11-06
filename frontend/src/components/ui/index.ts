@@ -48,8 +48,8 @@ export { PageHeader } from "./PageHeader";
 export type { PageHeaderProps, Breadcrumb } from "./PageHeader";
 export { DescriptionList } from "./DescriptionList";
 export type { DescriptionListProps, DescriptionItem } from "./DescriptionList";
-export { StatTile } from "./StatTile";
-export type { StatTileProps } from "./StatTile";
+export { StatTile, STAT_ICON_TONE } from "./StatTile";
+export type { StatTileProps, StatIconTone } from "./StatTile";
 export { FilterBar, SearchInput } from "./FilterBar";
 export type { FilterBarProps, SearchInputProps } from "./FilterBar";
 // Student UI U1 (docs/phases/STUDENT_UI_DESIGN.md §1)

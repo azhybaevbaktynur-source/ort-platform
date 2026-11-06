@@ -7,7 +7,7 @@
 // the caller, the exam-prep page and the last 7 days of activity); a skeleton first; the page works without activity.
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, KeyRound, Plus, Trophy } from "lucide-react";
+import { Check, KeyRound, Plus, Target, TrendingUp, Trophy } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
 import { getExamPrep, wholeNumber, type ExamGoalOut, type ExamPrepOut } from "@/lib/lms/examPrep";
@@ -16,8 +16,10 @@ import type { HomeOut } from "@/lib/lms/homeTypes";
 import type { LocalizedText } from "@/lib/lms/types";
 import { pickLocalized } from "@/lib/lms/localized";
 import {
-  Badge, Button, Countdown, ErrorState, GoldPill, Mascot, Meter, SectionTag, Skeleton, cn, examDayStart, focusRing,
+  Badge, Button, Countdown, ErrorState, GoldPill, Mascot, Meter, STAT_ICON_TONE, SectionTag, Skeleton, cn, examDayStart, focusRing,
+  type StatIconTone,
 } from "@/components/ui";
+import { STUDENT_TITLE } from "@/components/lms/student/StudentPageHeader";
 import { NextCard } from "@/components/lms/examPrep/NextCard";
 import { GoalEditor, fmtExamDate } from "@/components/lms/examPrep/GoalStrip";
 import { PlatformCourses } from "./PlatformCourses";
@@ -62,13 +64,15 @@ function Hero({ title, prep, best, embedded }: {
   const target = date ? examDayStart(date) : null;
   const over = !!target && Date.now() - target.getTime() >= 86_400_000; // the exam day has passed
   const course = pickLocalized(title, lang);
+  // Student UI colour (§1.1): the greeting sits in the sky band (#dff1ff → #f5fbff) with the mascot; the same header
+  // pattern as the other student pages (§5.1 d): title, small subtitle, one thing on the right (the countdown)
   return (
-    <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <header className="flex flex-col gap-4 rounded-card border border-[#cde5fa] bg-gradient-to-br from-[#dff1ff] to-[#f5fbff] p-4 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-        <Mascot pose={best ? "celebrating" : "hello"} size={72} eager className="h-14 w-auto sm:h-[72px]" />
+        <Mascot pose={best ? "celebrating" : "hello"} size={88} eager className="h-16 w-auto sm:h-[88px]" />
         <div className="min-w-0">
-          <Title className="break-words text-2xl font-bold leading-8 text-slate-900 lg:text-[28px] lg:leading-9">{greeting}</Title>
-          <p className="mt-0.5 break-words text-base leading-6 text-slate-600 sm:text-sm sm:leading-5">
+          <Title className={STUDENT_TITLE}>{greeting}</Title>
+          <p className="mt-1 break-words text-sm leading-5 text-slate-700">
             {course}
             {course && date && !over ? " · " : ""}
             {date && !over ? t("examPrep.goal.examOn", { date: fmtExamDate(date, lang) }) : ""}
@@ -89,6 +93,18 @@ function Hero({ title, prep, best, embedded }: {
   );
 }
 
+/** A tile's label with its coloured icon chip (§1.1 stat tiles). */
+function TileLabel({ icon, tone, children }: { icon: React.ReactNode; tone: StatIconTone; children: React.ReactNode }) {
+  return (
+    <p className={cn(label, "flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-2.5")}>
+      <span aria-hidden="true" className={cn("inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl [&>svg]:h-5 [&>svg]:w-5", STAT_ICON_TONE[tone])}>
+        {icon}
+      </span>
+      <span className="min-w-0 break-words">{children}</span>
+    </p>
+  );
+}
+
 function ScoreTiles({ prep, courseId, best, onGoal, className }: {
   prep: ExamPrepOut; courseId: string; best: boolean; onGoal: (g: ExamGoalOut) => void; className?: string;
 }) {
@@ -103,7 +119,7 @@ function ScoreTiles({ prep, courseId, best, onGoal, className }: {
     <section aria-labelledby="home-score" className={cn("grid grid-cols-2 gap-3 sm:gap-4", className)}>
       <h2 id="home-score" className="sr-only">{t("home.prep.score.title")}</h2>
       <div className={tile}>
-        <p className={label}>{t("home.prep.score.current")}</p>
+        <TileLabel icon={<TrendingUp />} tone="blue">{t("home.prep.score.current")}</TileLabel>
         {latest !== null ? (
           <>
             <p className="mt-1 flex flex-wrap items-baseline gap-x-2">
@@ -122,7 +138,7 @@ function ScoreTiles({ prep, courseId, best, onGoal, className }: {
         )}
       </div>
       <div className={tile}>
-        <p className={label}>{t("examPrep.goal.targetLabel")}</p>
+        <TileLabel icon={<Target />} tone="orange">{t("examPrep.goal.targetLabel")}</TileLabel>
         {target !== null ? (
           <>
             <p className={cn(big, "mt-1")}>{target}</p>
@@ -298,6 +314,7 @@ export function ExamPrepHome({ courseId, courseTitle, home, side, courses, embed
 
   // personal best: the newest released result of this course beats the student's other attempts
   const best = !!home?.latest_results.find((r) => r.course_id === courseId)?.is_personal_best;
+  const hasResult = (prep?.history.length ?? 0) > 0 || (home?.latest_results.length ?? 0) > 0;
 
   return (
     <div className="w-full space-y-6">
@@ -308,14 +325,15 @@ export function ExamPrepHome({ courseId, courseTitle, home, side, courses, embed
         <PrepSkeleton />
       ) : (
         <>
-          <NextCard next={prep.next} courseId={courseId} className="rounded-card shadow-none" />
+          <NextCard next={prep.next} courseId={courseId} accent className="rounded-card shadow-none" />
           <div className={cn("grid gap-4", activityState !== "failed" && "lg:grid-cols-2")}>
             {activityState === "loading" && <StreakCardSkeleton />}
             {activity && <StreakCard activity={activity} />}
             <ScoreTiles prep={prep} courseId={courseId} best={best} onGoal={(goal) => setPrep({ ...prep, goal })} />
           </div>
           <GettingStartedCard courseId={courseId} prep={prep} />{/* Student UI U8: until every item is done */}
-          {prep.needs_pass && <UnlockCard />}
+          {/* §5.1 b: the gold card only for a student without any released result; the sidebar pill is always there */}
+          {prep.needs_pass && !hasResult && <UnlockCard />}
           <div className={cn("flex flex-col gap-6", side && "lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start")}>
             <SectionRows prep={prep} />
             {side && <div className="min-w-0 space-y-6">{side}</div>}

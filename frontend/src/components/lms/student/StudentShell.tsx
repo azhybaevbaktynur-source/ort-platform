@@ -33,8 +33,12 @@ import { GettingStartedSheet, ProgressRing, useGettingStarted, type GettingStart
  * this frame on the ORT lobby and attempt routes (§2.4). Inter applies inside `STUDENT_FRAME` only.
  */
 
-/** Classes of the frame's root: Inter (scoped here), room for the sidebar from 1024 px. */
-export const STUDENT_FRAME = cn(inter.variable, "font-sans lg:pl-[264px]");
+/** Classes of the frame's root: Inter (scoped here), the "Sky and teal" palette (§1.1: `.student-theme` re-points the
+ * `brand` and `navy` colours, page background #eef6fc), room for the sidebar from 1024 px. Put it after `bg-slate-50`
+ * in `cn()` so the background wins. */
+export const STUDENT_FRAME = cn(inter.variable, "student-theme bg-[#eef6fc] font-sans lg:pl-[264px]");
+/** The sidebar's teal gradient (§1.1: #0e4a6b → #13698f; `navy-800` is #0e4a6b inside `.student-theme`). */
+export const STUDENT_SIDEBAR_BG = "bg-gradient-to-b from-navy-800 to-[#13698f]";
 /** Classes of <main> in the student frame: content up to 1200 px, room for the tab bar on phones. */
 export const STUDENT_MAIN = cn("mx-auto w-full max-w-[1200px] px-4 pt-6 sm:px-6 lg:px-8 lg:pt-8", TAB_BAR_SPACE);
 
@@ -310,7 +314,7 @@ export function StudentChrome(props: StudentShellProps) {
   return (
     <>
       {/* ---- desktop: the navy sidebar ---- */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col bg-navy-800 text-white lg:flex">
+      <aside className={cn("fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col text-white lg:flex", STUDENT_SIDEBAR_BG)}>
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pb-4 pt-5">
           <Link href={`/${lang}/courses`}
             className="inline-flex min-h-11 items-center gap-2.5 rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
@@ -360,7 +364,7 @@ export function StudentChrome(props: StudentShellProps) {
           <button type="button" onClick={() => setSheet("account")} aria-haspopup="dialog" aria-expanded={sheet === "account"} aria-controls={accountId}
             aria-label={t("shell.account.menu", { name: user.name })}
             className={cn("ml-auto inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full", focusRing)}>
-            <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 text-sm font-semibold text-white">{initials(user.name)}</span>
+            <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-full bg-navy-800 text-sm font-semibold text-white">{initials(user.name)}</span>
           </button>
         </div>
       </header>

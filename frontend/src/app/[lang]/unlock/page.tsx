@@ -63,8 +63,8 @@ export default function UnlockPage() {
 
   return (
     <div className="w-full max-w-[60rem]">
-      {/* Student UI U8 (§3.6, §5.1 d): inside the student shell, with the student pages' header */}
-      <div className="mb-6"><StudentPageHeader title={t("access.unlock.title")} subtitle={t("access.unlock.intro")} /></div>
+      {/* Student UI coherence (§5.1 d): the student header; one line about the page under the title */}
+      <StudentPageHeader title={t("access.unlock.title")} subtitle={t("access.unlock.intro")} className="mb-6" />
       {loadError && !access ? <ErrorState message={errorText(loadError)} onRetry={() => void load()} className="mb-6" /> : null}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
         <div className="space-y-6">
