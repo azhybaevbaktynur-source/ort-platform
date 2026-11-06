@@ -506,6 +506,7 @@ def home(db: Session, user: User) -> sch.HomeOut:
         # --- Phase 8a S3 end ---
         pending_applications=_pending_applications(db, uid),  # Phase 9 S4
         teacher_application=_teacher_application(db, user, now),  # Accounts
+        platform_courses=_platform_courses(db, user),  # Exam prep S2
     )
 
 
@@ -532,6 +533,29 @@ def _pending_applications(db: Session, uid: str) -> list:
     return [sch.HomeApplicationOut(application_id=a, course_id=c, course_title=t, submitted_at=at)
             for a, c, t, at in rows]
 # --- Phase 9 S4 end ---
+
+
+# --- Exam prep S2 begin --- (docs/ROADMAP_EXAM_PREP.md S2: "From the platform"; one statement)
+def _platform_courses(db: Session, user: User) -> list[sch.HomePlatformCourseOut]:
+    """Open courses of the platform organization in the catalog (published, catalog-visible, not unlisted, live
+    organization tree: `courses.scopes._catalog_select`), the caller holds no active enrollment in, newest first. A
+    test student (Student view) gets none: it cannot join anything."""
+    if getattr(user, "is_test_student", False):
+        return []
+    stmt, root = course_scopes._catalog_select(user.id)
+    rows = db.execute(
+        stmt.add_columns(root.name.label("root_name"), User.display_name.label("owner"))
+        .outerjoin(User, User.id == Course.owner_id)
+        .where(root.kind == "platform", Course.enrollment_mode == "open",
+               ~exists().where(Enrollment.course_id == Course.id, Enrollment.user_id == user.id,
+                               Enrollment.state == "active"))
+        .order_by(Course.published_at.desc(), Course.id.desc()).limit(sch.PLATFORM_COURSES_MAX)
+    ).all()
+    return [sch.HomePlatformCourseOut(
+        id=r[0].id, title=r[0].title, description=r[0].description, languages=list(r[0].languages),
+        default_language=r[0].default_language, owner_display_name=r.owner or "—",
+        organization_display_name=card_organization_name("platform", r.root_name)) for r in rows]
+# --- Exam prep S2 end ---
 
 
 # --- Accounts begin --- (docs/phases/ACCOUNTS.md B: the dashboard's one line; what the person already sees elsewhere)

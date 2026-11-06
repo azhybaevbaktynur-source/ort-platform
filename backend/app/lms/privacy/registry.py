@@ -58,6 +58,7 @@ ENTRIES: list[Entry] = [
     Entry("enrollment_applications", "answers", "form answers", "scrub"),
     Entry("enrollment_applications", "decision_note", "about the person", "null"),
     Entry("course_goals", "target_percent", "own goal", "delete_row"),
+    Entry("exam_goals", "target_score", "own goal", "delete_row"),  # Exam prep S2
     # hand-ins and grades
     Entry("assignment_submissions", "body_text", "own work", "scrub", True),
     Entry("assets", "original_filename", "own work (hand-in and feedback files)", "erase_file", True),
@@ -113,6 +114,7 @@ ENTRIES: list[Entry] = [
     *_refs("enrollment_forms", "created_by_id"),
     *_refs("enrollments", "user_id", action="keep_tombstone"),
     *_refs("enrollments", "removed_by_id"),
+    *_refs("exam_goals", "user_id", action="delete_row"),  # Exam prep S2
     *_refs("exam_template_versions", "published_by_id"),
     *_refs("exam_templates", "owner_user_id", action="keep_tombstone"),
     *_refs("exam_templates", "created_by_id", "deleted_by_id"),

@@ -22,6 +22,7 @@ Erased data stays in the database provider's history until its restore window pa
 | `enrollment_applications` | `answers` | form answers | Replaced | No |
 | `enrollment_applications` | `decision_note` | about the person | Emptied | No |
 | `enrollments` | `invite_token_hash` | credential | Emptied | No |
+| `exam_goals` | `target_score` | own goal | Row deleted | No |
 | `grade_events` | `reason` | about the person | Kept unchanged: immutable record (for the lawyer, design 9) | No |
 | `invitations` | `email` | contact | Replaced | No |
 | `invitations` | `message` | about the person | Emptied | No |
@@ -73,6 +74,7 @@ These point at the tombstone row, which holds nothing personal after deletion.
 | `enrollment_events` | `actor_id` |
 | `enrollment_forms` | `created_by_id` |
 | `enrollments` | `removed_by_id`, `user_id` |
+| `exam_goals` | `user_id` |
 | `exam_template_versions` | `published_by_id` |
 | `exam_templates` | `created_by_id`, `deleted_by_id`, `owner_user_id` |
 | `grade_categories` | `deleted_by_id` |

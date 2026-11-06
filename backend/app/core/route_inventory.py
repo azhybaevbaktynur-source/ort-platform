@@ -120,6 +120,9 @@ from app.lms.statistics.policies import STATISTICS_POLICIES  # noqa: E402
 for _d in (PRACTICE_POLICIES, PROGRESS_POLICIES, STATISTICS_POLICIES, ANALYTICS_POLICIES):
     ROUTE_POLICIES.update(_d)
 # --- Phase 10 S0 end ---
+from app.lms.exam_prep.policies import EXAM_PREP_POLICIES  # noqa: E402  (Exam prep S2)
+
+ROUTE_POLICIES.update(EXAM_PREP_POLICIES)
 # --- Phase 8b S1 begin --- (PHASE_8B_DESIGN 6.1: no new route in S1; the preview policy name is registered here and
 # S2 moves `exam_templates.policies.PLANNED_POLICIES` into EXAM_TEMPLATE_POLICIES when it mounts the routes)
 from app.lms.exam_templates.ids import POLICY_NAMES as _EXAM_TEMPLATE_POLICY_NAMES_8B  # noqa: E402

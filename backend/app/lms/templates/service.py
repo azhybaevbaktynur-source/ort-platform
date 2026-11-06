@@ -77,7 +77,7 @@ def course_template_out(course) -> Optional[CourseTemplateOut]:
         locked=bool(course.template_locked), result_view=template.result_view,
         passage_display=template.passage_display, section_keys=list(template.section_keys),
         assessment_presets=list(template.assessment_presets), importer_profiles=list(template.importer_profiles),
-        title_key=template.title_key,
+        title_key=template.title_key, student_layout=template.student_layout,  # Exam prep S2
     )
 
 

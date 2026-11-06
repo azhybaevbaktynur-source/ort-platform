@@ -15,6 +15,7 @@ import { CourseCard } from "@/components/lms/course/CourseCard";
 import { useGradeListText } from "@/components/lms/results/GradeBadge";
 import { PendingApplicationsLine } from "@/components/lms/catalog/ApplicationStatus"; // Phase 9 S4
 import { TeacherApplicationNotice } from "./TeacherApplicationNotice"; // Accounts
+import { PlatformCourses } from "./PlatformCourses"; // Exam prep S2
 import { fmtDayMonthTime } from "./format";
 import { SideRow, SideSection, TodoRows } from "./TodoList";
 import { useErrorText } from "./useErrorText";
@@ -83,10 +84,13 @@ function Dashboard({ data }: { data: HomeOut }) {
     </>
   );
 
+  const platform = data.platform_courses ?? []; // Exam prep S2: "From the platform"
+
   if (data.courses_total === 0 && todo.length === 0) {
     return (
       <div className="space-y-6">
         {pendingApps}
+        <PlatformCourses courses={platform} grid={CARD_GRID} />
         <EmptyState mascot="hello" title={t("home.courses.emptyTitle")} description={t("home.courses.emptyBody")}
           action={(
             <>
@@ -103,10 +107,13 @@ function Dashboard({ data }: { data: HomeOut }) {
       {pendingApps}
       {/* phones: cards, then to-do, grades, announcements. From `lg` the side lists are the right column. */}
       <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
-        <section aria-labelledby="home-courses" className="min-w-0">
-          <h2 id="home-courses" className="mb-2 text-lg font-semibold leading-7 text-slate-900">{t("home.courses.title")}</h2>
-          <CourseCards data={data} />
-        </section>
+        <div className="min-w-0 space-y-8">
+          <section aria-labelledby="home-courses" className="min-w-0">
+            <h2 id="home-courses" className="mb-2 text-lg font-semibold leading-7 text-slate-900">{t("home.courses.title")}</h2>
+            <CourseCards data={data} />
+          </section>
+          <PlatformCourses courses={platform} grid={CARD_GRID} />
+        </div>
         <div className="min-w-0 space-y-6">
           <SideSection id="home-todo" title={t("home.todo.title")}>
             {todo.length > 0

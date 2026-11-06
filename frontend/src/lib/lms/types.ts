@@ -293,6 +293,8 @@ export const LMS_ERROR_CODES = [
   "test_student_forbidden",
   // Accounts: the teacher application and personal organizations
   "reapply_wait", "teacher_age_required", "age_confirmation_required", "personal_org_no_members",
+  // Exam prep S2: the exam date (course settings) and the student's target score
+  "exam_date_invalid", "exam_date_not_supported", "goal_out_of_range", "exam_prep_not_available",
 ] as const;
 export type LmsErrorCode = (typeof LMS_ERROR_CODES)[number];
 
@@ -311,6 +313,8 @@ export interface CourseTemplateOut {
   assessment_presets: string[];
   importer_profiles: string[];
   title_key: string;
+  /** Exam prep S2: `exam_prep` opens the students' course page on the exam-prep page (optional: older backend). */
+  student_layout?: "standard" | "exam_prep";
 }
 
 export interface CourseStudentOut {
@@ -350,6 +354,13 @@ export interface CourseStudentOut {
 export interface CourseUpdateIn {
   home_kind?: HomeKind;
   home_page_id?: string | null;
+  /** Exam prep S2: exam-prep courses only; null clears it. */
+  exam_date?: string | null;
+}
+
+/** Exam prep S2: the course's exam date (ISO date), only on exam-prep courses. */
+export interface CourseStudentOut {
+  exam_date?: string | null;
 }
 // --- Phase 8a S4a end ---
 

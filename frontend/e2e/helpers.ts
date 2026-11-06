@@ -16,6 +16,8 @@ export interface SeedUser {
   profile: Record<string, unknown> & { id: string };
 }
 export interface Seed {
+  /** Exam prep S2: a registered student in no course (joins ORT from the home in exam-prep.spec.ts). */
+  exam_prep?: { newcomer: SeedUser };
   api: string;
   course_id: string;
   bank_id: string;
