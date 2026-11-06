@@ -128,6 +128,9 @@ async function studentModules(page: Page, cid: string) {
   await page.goto(`/${L}/courses/${cid}/modules`);
   await expect(page.getByRole("heading", { name: M1, exact: true })).toBeVisible();
   await settle(page);
+  // F5b (COURSE_LESSONS_DESIGN 7.1): only the current module opens; the walk reads every module's rows
+  const closed = page.locator('section[id^="module-"] h3 button[aria-expanded="false"]');
+  while (await closed.count() > 0) await closed.first().click();
 }
 
 /** Publish icon button of a module header or item row (design 3.6): `aria-pressed` = published. */
@@ -291,19 +294,23 @@ test.describe("modules walk (ru)", () => {
     await expect(badge(sp, M3, "locked")).toBeVisible();
 
     // ---- the page (KaTeX) records "view": M1 has its only requirement met
+    // F5b (COURSE_LESSONS_DESIGN L3): the page lesson renders inline on the lesson page (view on open)
     await moduleCard(sp, M1).getByRole("link", { name: new RegExp(PAGE_TITLE) }).click();
-    await sp.waitForURL(new RegExp(`/pages/${pageId}\\?from=module`));
+    await sp.waitForURL(new RegExp(`/modules/[0-9a-f-]{36}/items/[0-9a-f-]{36}$`));
     await expect(sp.getByRole("heading", { name: PAGE_TITLE })).toBeVisible();
     await expect(sp.locator(".katex").first()).toBeVisible();
-    // 8a UX / 8c: the Course link of the sidebar stays active on a page (design 2.2) and the page offers the way back (M7)
+    // 8a UX / 8c: the Course link of the sidebar stays active on a lesson (design 2.2); the breadcrumb leads back
     await expect(sidebar(sp).getByRole("link", { name: t("courses.home.tab"), exact: true })).toHaveAttribute("aria-current", "page");
-    await sp.getByRole("link", { name: t("pages.locked.toModules") }).click();
+    await expect.poll(async () => (await api(md.student, "GET", `/courses/${cid}/modules`)).modules[0].state).toBe("completed");
+    await sp.getByRole("link", { name: t("modules.overview.syllabusTitle"), exact: true }).click();
     await sp.waitForURL(new RegExp(`/courses/${cid}/modules$`));
     await studentModules(sp, cid);
     await expect(badge(sp, M1, "completed")).toBeVisible();
-    // ---- the PDF downloads through the authenticated content route
+    // ---- the PDF downloads through the authenticated content route (from the file lesson's page)
+    await moduleCard(sp, M1).getByRole("link", { name: new RegExp(FILE_TITLE) }).click();
+    await sp.waitForURL(new RegExp(`/modules/[0-9a-f-]{36}/items/[0-9a-f-]{36}$`));
     const download = sp.waitForEvent("download");
-    await moduleCard(sp, M1).getByRole("button", { name: new RegExp(FILE_TITLE) }).click();
+    await sp.getByRole("button", { name: t("modules.download") }).click();
     const file = await download;
     const saved = await file.path();
     expect(saved).toBeTruthy();
@@ -501,7 +508,9 @@ test.describe("modules walk (ru)", () => {
       await sp.goto(`${base}/modules`);
       await expect(badge(sp, "Пробный ОРТ", "locked")).toBeVisible();
       await expect(badge(sp, "Подготовка", "completed")).toHaveCount(0); // UX rework: no requirement, so no state badge
-      // 8a UX M6: the exam row inside the locked module is open (gating-exempt) and says where it lives
+      // 8a UX M6: the exam row inside the locked module is open (gating-exempt) and says where it lives (F5b: open the
+      // module first, only the current one starts open)
+      await moduleCard(sp, "Пробный ОРТ").getByRole("button", { name: "Пробный ОРТ", exact: true }).click();
       await expect(moduleCard(sp, "Пробный ОРТ").getByRole("link")).toContainText(t("modules.availableInAssignments"));
       await review(sp, "ort-student-modules");
       const exam = new OrtExam(sp, "ru");
