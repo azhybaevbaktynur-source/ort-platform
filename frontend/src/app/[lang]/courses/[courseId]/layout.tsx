@@ -12,7 +12,8 @@ import { CourseContext } from "@/components/lms/CourseContext";
 import { StatusBadge } from "@/components/lms/course/CourseCard";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { StaffCourseBar } from "@/components/lms/course/StaffCourseUi"; // Phase 6b S5c
-import { useDeclareArea } from "@/components/lms/LmsShell"; // Phase 6b integration
+import { useDeclareArea, useDeclareStudentCourse } from "@/components/lms/LmsShell"; // Phase 6b integration; Student UI U2
+import { templateUi } from "@/lib/lms/templates"; // Student UI U2
 // --- Phase 8c S1 begin --- (course sidebar, Student view, hidden areas: PHASE_8C_DESIGN §2, §6)
 import { CourseSidebar } from "@/components/lms/course/CourseSidebar";
 import { AreaUnavailable } from "@/components/lms/course/AreaUnavailable";
@@ -48,6 +49,7 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
   // Phase 9 UX: the server's staff serializer decides (org admins reading a course of their organization get it too).
   const staffRole = !!course && isStaffCourse(course);
   useDeclareArea(course ? (staffRole ? "teaching" : "learning") : null, { hideSections: true });
+  useDeclareStudentCourse(course); // Student UI U2: the student shell's links for this course
 
   // Phase 11 S3 (invariant 1): the gate refuses the course but never an open attempt; the player needs no course frame
   if ((error as { code?: string } | null)?.code === "consent_required" && /\/attempts\/[^/]+$/.test(pathname)) return <>{children}</>;
@@ -115,6 +117,22 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
   }
   // students (and org admins reading the course) opening an area whose link is hidden get the "not available" page
   const hidden = hiddenAreaFor(course, courseNavRole(course), pathname);
+  // --- Student UI U2 (STUDENT_UI_DESIGN §2.2): inside an exam-prep course the student shell's sidebar navigates, so
+  // the course sidebar is not shown; the assessment lobby keeps today's frame to the pixel (§2.4) ---
+  const lobby = /^\/[^/]+\/courses\/[^/]+\/assessments\/[^/]+$/.test(pathname);
+  if (!staffFrame && role === "student" && templateUi(course).studentLayout === "exam_prep" && !lobby) {
+    // Student UI U4 (§3.2) / U6 (§3.3) / U7 (§3.5): Тесты, Аналитика and the lesson pages have their own title (course
+    // name as subtitle); the course page only redirects there
+    const ownTitle = pathname === base || pathname === `${base}/tests` || pathname === `${base}/progress`
+      || pathname === `${base}/modules` || pathname.startsWith(`${base}/modules/`)
+      || pathname === `${base}/saved` || pathname === `${base}/practice`; // U8: Сохранённые, Практика
+    return (
+      <CourseContext.Provider value={ctx}>
+        {ownTitle ? null : <StudentCourseHeader course={course} breadcrumbs={false} />}
+        {hidden ? <AreaUnavailable courseId={course.id} /> : children}
+      </CourseContext.Provider>
+    );
+  }
   return (
     <CourseContext.Provider value={ctx}>
       {header}

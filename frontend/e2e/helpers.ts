@@ -24,6 +24,8 @@ export interface Seed {
     free_exam: { id: string; items: number };
     paid_exam: { id: string; items: number };
     student: SeedUser;
+    /** Student UI U3: joined the same course and never takes a test (the home without results). */
+    home_student: SeedUser;
     counts: number[];
   };
   api: string;

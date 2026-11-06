@@ -6,6 +6,100 @@
   --foreground-rgb: 15, 23, 42;
   --background-start-rgb: 248, 250, 252;
   --background-end-rgb: 255, 255, 255;
+
+  /* Student UI U1 (docs/phases/STUDENT_UI_DESIGN.md §1): the design tokens as variables, the same values as
+     tailwind.config.ts, for CSS outside Tailwind (the offline page, sanitizer-rendered pages). */
+  --c-bg: #f8fafc;
+  --c-surface: #ffffff;
+  --c-border: #e2e8f0;
+  --c-border-subtle: #f1f5f9;
+  --c-ink-900: #0f172a;
+  --c-ink-700: #334155;
+  --c-ink-500: #64748b;
+  --c-brand-50: #eff6ff;
+  --c-brand-100: #dbeafe;
+  --c-brand-200: #bfdbfe;
+  --c-brand-600: #2563eb;
+  --c-brand-700: #1d4ed8;
+  --c-brand-800: #1e40af;
+  --c-navy-800: #1b2a4a;
+  --c-navy-900: #13203a;
+  --c-navy-hover: rgba(255, 255, 255, 0.08);
+  --c-navy-label: rgba(255, 255, 255, 0.62);
+  --c-navy-icon: rgba(255, 255, 255, 0.72);
+  --c-tag-math1-bg: #e0f2fe;
+  --c-tag-math1-fg: #075985;
+  --c-tag-math2-bg: #e0e7ff;
+  --c-tag-math2-fg: #3730a3;
+  --c-tag-analogies-bg: #ede9fe;
+  --c-tag-analogies-fg: #5b21b6;
+  --c-tag-reading-bg: #ccfbf1;
+  --c-tag-reading-fg: #115e59;
+  --c-tag-grammar-bg: #ffedd5;
+  --c-tag-grammar-fg: #9a3412;
+  --c-acc-low: #f43f5e;
+  --c-acc-mid: #f59e0b;
+  --c-acc-high: #10b981;
+  --c-acc-low-text: #be123c;
+  --c-acc-mid-text: #b45309;
+  --c-acc-high-text: #047857;
+  --c-heat-0: #eef2f7;
+  --c-heat-1: #c7d7fb;
+  --c-heat-2: #8fb0f6;
+  --c-heat-3: #4f82ee;
+  --c-heat-4: #1d4ed8;
+  --c-chart-1: #2563eb;
+  --c-chart-2: #10b981;
+  --c-chart-3: #f97316;
+  --c-chart-4: #8b5cf6;
+  --c-chart-5: #f59e0b;
+  --c-gold-from: #fef3c7;
+  --c-gold-to: #fde68a;
+  --c-gold-border: #fcd34d;
+  --c-gold-text: #78350f;
+  --r-sm: 8px;
+  --r-control: 12px;
+  --r-card: 16px;
+  --sidebar-w: 264px;
+  --topbar-h: 56px;
+  --tabbar-h: 64px;
+
+  /* Student UI colour (STUDENT_UI_DESIGN §1.1): Tailwind's `brand-*` and `navy-*` read these RGB channels. These
+     defaults are exactly the colours used before (Tailwind blue, our navy), so the teacher, admin, lobby and attempt
+     frames do not change; `.student-theme` below overrides them inside the student frame only. */
+  --brand-50: 239 246 255;
+  --brand-100: 219 234 254;
+  --brand-200: 191 219 254;
+  --brand-300: 147 197 253;
+  --brand-400: 96 165 250;
+  --brand-500: 59 130 246;
+  --brand-600: 37 99 235;
+  --brand-700: 29 78 216;
+  --brand-800: 30 64 175;
+  --brand-900: 30 58 138;
+  --brand-950: 23 37 84;
+  --navy-800: 27 42 74;
+  --navy-900: 19 32 58;
+}
+
+/* Student UI colour, "Sky and teal" (owner 2026-11-06, STUDENT_UI_DESIGN §1.1): set on the StudentShell root only.
+   Primary sky blue: 50 #eaf4fe, 100 #d4e9fd, 500 #1e7bea (the owner's 600), 700 #1764c4; 600 is #1a70d8, a shade
+   deeper than the owner's #1e7bea so white button text keeps 4.5:1 (it has 4.8:1; #1e7bea has 4.1:1). Teal sidebar
+   #0e4a6b (navy-800) to #13698f; page background #eef6fc (STUDENT_FRAME). */
+.student-theme {
+  --brand-50: 234 244 254;
+  --brand-100: 212 233 253;
+  --brand-200: 174 214 251;
+  --brand-300: 125 189 247;
+  --brand-400: 74 159 241;
+  --brand-500: 30 123 234;
+  --brand-600: 26 112 216;
+  --brand-700: 23 100 196;
+  --brand-800: 20 79 156;
+  --brand-900: 18 64 124;
+  --brand-950: 12 42 82;
+  --navy-800: 14 74 107;
+  --navy-900: 11 58 85;
 }
 
 body {

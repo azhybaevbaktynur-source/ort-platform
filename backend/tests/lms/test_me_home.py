@@ -395,6 +395,49 @@ async def test_other_students_data_never_appears(db, api):
     assert enr.id != oenr.id
 
 
+# ------------------------------------------------------------------ Student UI U2 (STUDENT_UI_DESIGN §4.1)
+
+async def test_student_layout_exam_prep_for_ort_general_for_teacher_course(db, api):
+    ensure_platform_org(db.connection())
+    db.commit()
+    t = teacher(db)
+    s = make_user(db)
+    ort = course(db, t, organization_id=platform_org_id(), template_key="ort", template_version=1, template_locked=True)
+    own = course(db, t)
+    enroll(db, ort, s)
+    enroll(db, own, s)
+    rows = {x["id"]: x for x in (await home(api, s))["courses"]}
+    assert rows[str(ort.id)]["student_layout"] == "exam_prep"
+    assert rows[str(own.id)]["student_layout"] == "general"
+    r = await api.call(s, "GET", "/me/home/courses")  # the "show all" list carries the same field
+    assert r.status_code == 200, r.text
+    assert {x["id"]: x["student_layout"] for x in r.json()["items"]} == {str(ort.id): "exam_prep", str(own.id): "general"}
+
+
+async def test_exam_prep_course_carries_menu_features(db, api):
+    """Student UI U9 (review item 5): the shell's menu reads `features` from the course list, exam-prep courses only."""
+    from tests.lms.modules_support import make_module
+
+    ensure_platform_org(db.connection())
+    db.commit()
+    t = teacher(db)
+    s = make_user(db)
+    ort = course(db, t, organization_id=platform_org_id(), template_key="ort", template_version=1, template_locked=True)
+    own = course(db, t)
+    enroll(db, ort, s)
+    enroll(db, own, s)
+    make_module(db, own, t)  # a general course never gets the field
+    rows = {x["id"]: x for x in (await home(api, s))["courses"]}
+    assert rows[str(ort.id)]["features"] == {"modules": False, "practice": False}
+    assert rows[str(own.id)]["features"] is None
+    make_module(db, ort, t)
+    make_module(db, ort, t, published=False)
+    assessment(db, ort, t, is_practice=True)
+    r = await api.call(s, "GET", "/me/home/courses")
+    assert r.status_code == 200, r.text
+    assert {x["id"]: x["features"] for x in r.json()["items"]}[str(ort.id)] == {"modules": True, "practice": True}
+
+
 # ------------------------------------------------------------------ statement budget
 
 def _fill(db, n_courses, n_assessments):

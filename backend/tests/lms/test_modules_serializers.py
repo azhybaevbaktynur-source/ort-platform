@@ -13,7 +13,7 @@ from tests.lms.s3_support import api, clean_rate_limits, db  # noqa: F401
 
 MODULE_KEYS = {"id", "title", "state", "unlock_at", "sequential", "completion_mode", "current_position",
                "lock_reasons", "items"}
-ITEM_KEYS = {"id", "kind", "title", "indent", "locked", "requirement", "link", "due_at"}
+ITEM_KEYS = {"id", "kind", "title", "indent", "locked", "requirement", "link", "due_at", "video"}
 REQ_KEYS = {"type", "threshold", "met", "best_score_percent"}
 LINK_KEYS = {"page_id", "file_id", "assignment_id", "assessment_id", "assignment_kind", "url"}
 FORBIDDEN = ("rules_version", "warnings", "created_by_id", "deleted_at", "body_md", "evaluated_rules_version",

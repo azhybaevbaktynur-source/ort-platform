@@ -430,10 +430,20 @@ test.describe("modules walk (ru)", () => {
       // before: the ORT student's sidebar has no Files / Announcements (auto-hide), the home lists the exams
       const sp = await open(browser, ortStudent);
       await sp.goto(base);
-      await expect(sp.getByRole("link", { name: "ОРТ E2E", exact: true }).first()).toBeVisible();
-      await expect(tabs(sp).getByRole("link", { name: t("courses.home.tab"), exact: true })).toBeVisible();
-      await expect(tabs(sp).getByRole("link", { name: t("announcements.title"), exact: true })).toHaveCount(0);
-      await expect(tabs(sp).getByRole("link", { name: t("courseFiles.title"), exact: true })).toHaveCount(0);
+      await sp.waitForURL(`${base}/tests`); // Student UI U4: the course page redirects to the Тесты page
+      await expect(sp.getByRole("heading", { name: "ОРТ E2E", exact: true }).first()).toBeVisible();
+      // Student UI U2/U4: inside an exam-prep course the student shell navigates (no course sidebar); without modules
+      // it has no Видеоуроки link, and Files / Announcements stay hidden from the student (auto-hide)
+      const studentNav = sp.getByRole("navigation", { name: t("student.nav.label") });
+      await expect(studentNav.getByRole("link", { name: t("student.nav.tests") })).toHaveAttribute("aria-current", "page");
+      await expect(studentNav.getByRole("link", { name: t("student.nav.lessons") })).toHaveCount(0);
+      await expect(tabs(sp)).toHaveCount(0);
+      for (const area of ["files", "announcements"]) {
+        await sp.goto(`${base}/${area}`);
+        await expect(sp.getByText(t("courseNav.unavailable.title"))).toBeVisible();
+      }
+      await sp.goto(base);
+      await sp.waitForURL(`${base}/tests`);
       const course0 = await api(ortStudent, "GET", `/courses/${cid}`);
       expect(course0.home_kind).toBe("assignments");
       expect(course0.features).toEqual({ modules: false, files: false, announcements: false, practice: false });
@@ -471,15 +481,22 @@ test.describe("modules walk (ru)", () => {
       await api(admin, "POST", `/courses/${cid}/modules/${mB.id}/items`, { kind: "assignment", assignment_id: examAssignment.id, published: true });
 
       // after: the student sees Modules and Files; the ORT module lists the exam as locked, yet the exam starts
+      // (U2/U4: the student shell shows Видеоуроки now; the Files page opens instead of "not available")
+      await sp.goto(`${base}/files`);
+      await expect(sp.getByText("Правила ОРТ").first()).toBeVisible();
+      await expect(sp.getByText(t("courseNav.unavailable.title"))).toHaveCount(0);
       await sp.goto(base);
-      await expect(tabs(sp).getByRole("link", { name: t("courseFiles.title"), exact: true })).toBeVisible();
+      await sp.waitForURL(`${base}/tests`);
+      await expect(sp.getByRole("navigation", { name: t("student.nav.label") }).getByRole("link", { name: t("student.nav.lessons") })).toBeVisible();
       // Exam prep S2 (owner 2026-11-06): ORT students open the exam-prep page; the module is a source of the test library
       // and the exam card opens the same lobby (the Modules page below keeps the module view)
       const lib = sp.getByRole("region", { name: t("examPrep.library.title") });
       await lib.getByRole("button", { name: "Пробный ОРТ", exact: true }).click();
       await expect(lib.getByRole("button", { name: "Пробный ОРТ", exact: true })).toHaveAttribute("aria-pressed", "true");
-      await expect(lib.getByRole("link", { name: "ОРТ E2E", exact: true })).toHaveAttribute("href", `${base}/assessments/${s.exam.id}`);
-      await expect(lib.getByRole("link", { name: "ОРТ E2E staff", exact: true })).toHaveCount(0);
+      // Student UI U4: the Тесты page; each card's action opens the same lobby
+      const examCard = lib.locator("li").filter({ has: sp.getByRole("heading", { name: "ОРТ E2E", exact: true }) });
+      await expect(examCard.getByRole("link", { name: t("examPrep.tests.start"), exact: true })).toHaveAttribute("href", `${base}/assessments/${s.exam.id}`);
+      await expect(lib.getByRole("heading", { name: "ОРТ E2E staff", exact: true })).toHaveCount(0);
       await review(sp, "ort-student-course-home-with-structure");
       await sp.goto(`${base}/modules`);
       await expect(badge(sp, "Пробный ОРТ", "locked")).toBeVisible();

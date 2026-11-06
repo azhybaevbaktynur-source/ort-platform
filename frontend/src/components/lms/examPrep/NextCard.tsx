@@ -40,7 +40,7 @@ export function NextCard({ next, courseId, className }: { next: ExamNextOut | nu
         <p className="mt-1 break-words text-xl font-bold leading-7 text-slate-900">{title}</p>
         <p className="mt-1 text-base leading-6 text-slate-700 sm:text-sm sm:leading-5">{t(`examPrep.next.reason.${next.kind}`, { section })}</p>
       </div>
-      <LinkButton href={href} size="lg" className="w-full shrink-0 sm:w-auto" rightIcon={<ArrowRight aria-hidden="true" className="h-5 w-5" />}>
+      <LinkButton href={href} size="lg" rightIcon={<ArrowRight aria-hidden="true" className="h-5 w-5" />} className="w-full shrink-0 sm:w-auto">
         {t(`examPrep.next.action.${next.kind}`)}
       </LinkButton>
     </section>

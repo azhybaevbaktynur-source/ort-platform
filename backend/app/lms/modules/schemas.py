@@ -260,6 +260,13 @@ class ItemLinkOut(BaseModel):
     url: Optional[str] = None
 
 
+class VideoOut(BaseModel):
+    """Student UI U7 (4.4): an allowlisted YouTube / Vimeo `url` item (`modules/video.py`); the client embeds only the
+    provider's own player URL built from `id`, never the stored address."""
+    provider: Literal["youtube", "vimeo"]
+    id: str
+
+
 class ItemStudentOut(BaseModel):
     id: uuid.UUID
     kind: ItemKind
@@ -269,6 +276,7 @@ class ItemStudentOut(BaseModel):
     requirement: Optional[RequirementStudentOut] = None
     link: Optional[ItemLinkOut] = None
     due_at: Optional[datetime] = None  # UX rework: assignment rows, the student's effective date (never on a locked row)
+    video: Optional[VideoOut] = None  # U7: url items only, never on a locked row
 
 
 class ModuleStudentOut(BaseModel):

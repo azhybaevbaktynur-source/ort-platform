@@ -86,19 +86,22 @@ test.describe("free and paid exams (ru)", () => {
       await expect(admin.getByRole("switch", { name: t("access.admin.exams.paidToggle", { title: "ОРТ S3 бесплатный" }) })).not.toBeChecked();
       await shoot(admin, "admin-exams");
 
-      // ---- student: the paid test is locked in the library, the free one is not
+      // ---- student: the paid test is locked on the Тесты page (U4: the course page redirects there), the free one is not
       await student.goto(`/${L}/courses/${acc.course_id}`);
+      await student.waitForURL(new RegExp(`/${L}/courses/${acc.course_id}/tests$`));
       const library = student.getByRole("region", { name: t("examPrep.library.title") });
-      const paidCard = library.locator("li").filter({ has: student.getByRole("link", { name: "ОРТ S3 платный", exact: true }) });
-      const freeCard = library.locator("li").filter({ has: student.getByRole("link", { name: "ОРТ S3 бесплатный", exact: true }) });
+      const paidCard = library.locator("li").filter({ has: student.getByRole("heading", { name: "ОРТ S3 платный", exact: true }) });
+      const freeCard = library.locator("li").filter({ has: student.getByRole("heading", { name: "ОРТ S3 бесплатный", exact: true }) });
       await expect(paidCard).toContainText(t("access.paid"));
-      await expect(paidCard.getByText(t("access.lockedLabel"))).toHaveCount(1);
+      // U9 (review 8): "Платный" and the gold pill are the lock signals; no "Нужен доступ", no "Не начат" chip
+      await expect(paidCard.getByText(t("access.lockedLabel"))).toHaveCount(0);
+      await expect(paidCard).not.toContainText(t("examPrep.library.status.not_started"));
       await expect(freeCard).not.toContainText(t("access.paid"));
-      await expect(student.getByRole("link", { name: t("access.needsPassLink") })).toBeVisible();
+      await expect(freeCard.getByRole("link", { name: t("examPrep.tests.start"), exact: true })).toBeVisible();
       await shoot(student, "library-locks");
 
       // ---- the lock opens the unlock page; a wrong code is refused, the sold one opens everything
-      await paidCard.getByRole("link", { name: "ОРТ S3 платный", exact: true }).click();
+      await paidCard.getByRole("link", { name: t("examPrep.tests.unlock"), exact: true }).click();
       await student.waitForURL(new RegExp(`/${L}/unlock$`));
       await expect(student.getByText(t("access.unlock.statusNone"))).toBeVisible();
       await expect(student.getByText(t("access.howToPay"))).toBeVisible();
@@ -115,10 +118,11 @@ test.describe("free and paid exams (ru)", () => {
       await shoot(student, "unlock-after");
 
       // ---- the paid test opens in the lobby and runs in the ORT player
-      await student.goto(`/${L}/courses/${acc.course_id}`);
+      await student.goto(`/${L}/courses/${acc.course_id}/tests`);
       await expect(paidCard).not.toContainText(t("access.paid"));
-      await expect(student.getByRole("link", { name: t("access.needsPassLink") })).toHaveCount(0);
-      await paidCard.getByRole("link", { name: "ОРТ S3 платный", exact: true }).click();
+      await expect(paidCard.getByRole("link", { name: t("examPrep.tests.unlock") })).toHaveCount(0);
+      await shoot(student, "library-unlocked");
+      await paidCard.getByRole("link", { name: t("examPrep.tests.start"), exact: true }).click();
       await student.waitForURL(new RegExp(`/courses/${acc.course_id}/assessments/${acc.paid_exam.id}$`));
       const exam = new OrtExam(student, L);
       await exam.assertLobby();

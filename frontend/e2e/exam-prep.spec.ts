@@ -5,10 +5,12 @@ import { sectionCounts, seed, settle, signIn, tr, type SeedUser } from "./helper
 import { OrtExam } from "./ort-exam";
 
 /**
- * Exam prep S2 (docs/ROADMAP_EXAM_PREP.md S2): a newcomer finds ORT (Russian) under "From the platform" on the home,
- * joins it with one tap, lands on the exam-prep page (countdown, target, Next, library), sets a target, takes the
- * seeded test from the Next card, and back on the page sees the score, the history, five section bars and the next
- * step. The exam player and the result page are the ORT ones, unchanged (OrtExam asserts them).
+ * Exam prep S2 (docs/ROADMAP_EXAM_PREP.md S2), Student UI U4 (docs/phases/STUDENT_UI_DESIGN.md §3.2): a newcomer finds
+ * ORT (Russian) under "From the platform" on the home, joins it with one tap, lands on the course's Тесты page (title
+ * with the count, status chips, cards), starts the seeded test from its card, and back on the course sees it done with
+ * the best score and "Результат" (the lobby). The exam player and the result page are the ORT ones, unchanged (OrtExam
+ * asserts them). Student UI U3: the countdown, target, Next card, score and section rows are on the home, checked
+ * before and after the test (U9: before it, score and target are one slim line; the sections only after).
  *
  * Data: `seed.exam_prep.newcomer` (registered, in no course); the exam date is set by the admin and cleared after.
  * Screens of the page at 375 / 1440 / 1920 (ru) go to $S2_SHOTS (default /tmp/s2_shots).
@@ -29,6 +31,12 @@ async function api(user: SeedUser, method: string, p: string, body?: unknown) {
   return r.status === 204 ? null : r.json();
 }
 
+function isoInDays(days: number): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 async function shoot(page: Page, name: string) {
   fs.mkdirSync(SHOTS, { recursive: true });
   for (const width of WIDTHS) {
@@ -41,16 +49,10 @@ async function shoot(page: Page, name: string) {
   await page.setViewportSize({ width: 1440, height: 900 });
 }
 
-function isoInDays(days: number): string {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
 test.describe("exam-prep page (ru)", () => {
   test.describe.configure({ mode: "serial" });
 
-  test("home -> join ORT -> exam-prep page -> take the test -> score, sections, next", async ({ browser }) => {
+  test("home -> join ORT -> Тесты page -> take the test -> done with the best score", async ({ browser }) => {
     test.setTimeout(300_000);
     const s = seed();
     const cid = s.course_id;
@@ -69,34 +71,50 @@ test.describe("exam-prep page (ru)", () => {
       await expect(card).toHaveCount(1);
       await shoot(page, "home-platform");
       await card.getByRole("button", { name: t("catalog.join"), exact: true }).click();
-      await page.waitForURL(new RegExp(`/${L}/courses/${cid}$`));
+      // Student UI U4: the course page of an exam-prep course is its Тесты page for students
+      await page.waitForURL(new RegExp(`/${L}/courses/${cid}/tests$`));
 
-      // ---- the exam-prep page: countdown, no score yet, Next = the first test of the library
-      await expect(page.getByText(t("examPrep.goal.daysLabel"), { exact: true })).toBeVisible();
-      await expect(page.getByText("30", { exact: true })).toBeVisible();
-      await expect(page.getByText(t("examPrep.goal.noScore"))).toBeVisible();
-      const next = page.getByRole("region", { name: t("examPrep.next.title") });
-      await expect(next).toContainText("ОРТ E2E");
-      await expect(next).toContainText(t("examPrep.next.reason.start"));
+      // ---- the Тесты page: title with the count, status chips, one card per test, nothing done yet
       const library = page.getByRole("region", { name: t("examPrep.library.title") });
-      await expect(library.getByRole("link", { name: "ОРТ E2E", exact: true })).toBeVisible();
-      await expect(library.getByRole("link", { name: "ОРТ E2E staff", exact: true })).toBeVisible();
-      await expect(library.getByText(t("examPrep.library.status.not_started")).first()).toBeVisible();
-      await shoot(page, "exam-prep-new");
+      await expect(library.getByRole("heading", { level: 1 })).toHaveText(new RegExp(`^${t("examPrep.library.title")} · \\d+$`));
+      const first = library.locator("li").filter({ has: page.getByRole("heading", { name: "ОРТ E2E", exact: true }) });
+      await expect(first).toHaveCount(1);
+      await expect(library.getByRole("heading", { name: "ОРТ E2E staff", exact: true })).toBeVisible();
+      await expect(first).toContainText(t("examPrep.library.status.not_started"));
+      await expect(first).toContainText(t("examPrep.tests.noScore"));
+      const statuses = page.getByRole("group", { name: t("examPrep.tests.statusFilter") });
+      await statuses.getByRole("button", { name: t("examPrep.library.status.done"), exact: true }).click();
+      await expect(library.getByText(t("examPrep.tests.emptyStatus"))).toBeVisible();
+      await statuses.getByRole("button", { name: t("examPrep.tests.allStatuses"), exact: true }).click();
+      // U9 (review 2): no breadcrumbs and no "Покинуть курс" on Тесты (leaving is in the shell's exam sheet)
+      await expect(page.getByRole("button", { name: t("courses.home.leave") })).toHaveCount(0);
+      await expect(page.getByRole("navigation", { name: t("ui.breadcrumbs") })).toHaveCount(0);
+      await shoot(page, "tests-new");
 
-      // ---- the target, inline: out of range is refused, 200 is kept
-      await page.getByRole("button", { name: t("examPrep.goal.setTarget") }).click();
+      // ---- Student UI U3: the home is now the exam-prep home of ORT (Russian): greeting, countdown, Next, no score yet
+      await page.goto(`/${L}/courses`);
+      await expect(page.getByRole("heading", { level: 1 })).toContainText(newcomer.name.split(" ")[0]);
+      await expect(page.getByRole("group", { name: new RegExp(`^${t("examPrep.goal.daysLabel")}: \\d+ `) })).toBeVisible();
+      await expect(page.getByRole("region", { name: t("examPrep.next.title") })).toContainText("ОРТ E2E");
+      const scores = page.getByRole("region", { name: t("home.prep.score.title") });
+      await expect(scores).toContainText(t("examPrep.goal.latestLabel")); // U9: the slim line before a result
+
+      // ---- the target, inline on the home: out of range is refused, 200 is kept
+      await scores.getByRole("button", { name: t("examPrep.goal.setTarget") }).click();
       const input = page.getByLabel(t("examPrep.goal.inputLabel", { min: 60, max: 245 }));
       await input.fill("300");
       await page.getByRole("button", { name: t("examPrep.goal.save"), exact: true }).click();
       await expect(page.getByText(t("examPrep.goal.invalid", { min: 60, max: 245 }))).toBeVisible();
       await input.fill("200");
       await page.getByRole("button", { name: t("examPrep.goal.save"), exact: true }).click();
-      await expect(page.getByText("200", { exact: true })).toBeVisible();
-      await expect(page.getByRole("button", { name: t("examPrep.goal.edit") })).toBeVisible();
+      await expect(scores.getByText("200", { exact: true })).toBeVisible();
+      await expect(scores.getByRole("button", { name: t("examPrep.goal.edit") })).toBeVisible();
+      await shoot(page, "home-prep-new");
 
-      // ---- Next -> the lobby -> the ORT player -> the ORT result (both unchanged)
-      await next.getByRole("link", { name: t("examPrep.next.action.start") }).click();
+      // ---- the course's Тесты page: "Начать" -> the lobby -> the ORT player -> the ORT result (all unchanged)
+      await page.goto(`/${L}/courses/${cid}`);
+      await page.waitForURL(new RegExp(`/${L}/courses/${cid}/tests$`));
+      await first.getByRole("link", { name: t("examPrep.tests.start"), exact: true }).click();
       await page.waitForURL(new RegExp(`/courses/${cid}/assessments/${s.exam.id}$`));
       const exam = new OrtExam(page, L);
       await exam.assertLobby();
@@ -113,28 +131,32 @@ test.describe("exam-prep page (ru)", () => {
       await exam.confirmSubmit();
       await exam.assertResult(1, total);
 
-      // ---- back on the page: latest score, history, five section bars, the next test
+      // ---- back on the course: the test is done with its best score and a "Результат" button; the "done" chip finds it
       await page.goto(`/${L}/courses/${cid}`);
-      await expect(page.getByText(t("examPrep.goal.latestLabel"), { exact: true })).toBeVisible();
-      await expect(page.getByText(t("examPrep.goal.outOf", { max: 245 })).first()).toBeVisible();
-      await expect(page.getByRole("img", { name: t("examPrep.history.chart") })).toBeVisible();
-      const sections = page.getByRole("region", { name: t("examPrep.sections.title") });
-      await expect(sections.getByRole("progressbar")).toHaveCount(5);
-      for (const key of ["math_1", "math_2", "analogies", "reading", "grammar"]) {
-        await expect(sections).toContainText(t(`sections.${key}`));
-      }
-      await expect(sections).toContainText(t("examPrep.sections.score", { raw: 1, possible: counts[0] }));
-      await expect(next).toContainText("ОРТ E2E staff");
-      await expect(next).toContainText(t("examPrep.next.reason.start"));
-      const done = library.locator("li").filter({ has: page.getByRole("link", { name: "ОРТ E2E", exact: true }) });
-      await expect(done).toContainText(t("examPrep.library.status.done"));
-      await expect(done).toContainText(t("examPrep.library.best"));
-      await shoot(page, "exam-prep-after");
+      await page.waitForURL(new RegExp(`/${L}/courses/${cid}/tests$`));
+      await expect(first).toContainText(t("examPrep.library.status.done"));
+      await expect(first).toContainText(t("examPrep.library.best"));
+      await expect(first.getByRole("link", { name: t("examPrep.tests.result"), exact: true })).toBeVisible();
+      await statuses.getByRole("button", { name: t("examPrep.library.status.done"), exact: true }).click();
+      await expect(library.locator("li")).toHaveCount(1);
+      await expect(first).toBeVisible();
+      await statuses.getByRole("button", { name: t("examPrep.tests.allStatuses"), exact: true }).click();
+      await shoot(page, "tests-after");
+      await first.getByRole("link", { name: t("examPrep.tests.result"), exact: true }).click();
+      await page.waitForURL(new RegExp(`/courses/${cid}/assessments/${s.exam.id}$`));
 
       // ---- the home: ORT (Russian) is one of the student's courses now, no longer under "From the platform"
       await page.goto(`/${L}/courses`);
-      await expect(page.getByRole("region", { name: t("home.courses.title") }).locator(`a[href="/${L}/courses/${cid}"]`)).toHaveCount(1);
+      await expect(page.getByRole("navigation", { name: t("student.nav.label") }).getByRole("link", { name: t("student.nav.tests") }))
+        .toHaveAttribute("href", `/${L}/courses/${cid}/tests`); // U9: the course is the shell's exam, no course grid
       await expect(page.locator(`a[href="/${L}/courses/catalog/${cid}"]`)).toHaveCount(0);
+      // Student UI U3: current vs target, the section rows of the latest result, the streak of today's answers
+      await expect(scores).toContainText(t("examPrep.goal.outOf", { max: 245 }));
+      await expect(scores).toContainText("200");
+      await expect(page.getByRole("region", { name: t("examPrep.sections.title") }).getByRole("meter")).toHaveCount(5);
+      await expect(page.getByRole("region", { name: t("progress.analytics.tiles.streak") })).toContainText(t("home.prep.streak.days_one", { count: 1 }));
+      await expect(page.getByRole("region", { name: t("examPrep.next.title") })).toContainText("ОРТ E2E staff");
+      await shoot(page, "home-prep-after");
     } finally {
       await api(s.admin, "PATCH", `/courses/${cid}`, { exam_date: null });
       await ctx.close();

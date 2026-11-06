@@ -5,7 +5,8 @@ import { E2E_DIR, seed, settle, signIn, tr, type SeedUser } from "./helpers";
 
 /**
  * One course card everywhere (dashboard, catalog, Teaching list), grades with their maximum, and the dashboard order:
- * cards first on phones, side lists on the right from `lg`. Screenshots only with UX_SCREENS_DIR set.
+ * cards left, side lists right. Once the student joins ORT it is the exam-prep home (Student UI U3, U9: no course
+ * grid): to-do and grades, then the other courses as one compact list. Screenshots only with UX_SCREENS_DIR set.
  */
 const OUT = process.env.UX_SCREENS_DIR ? path.resolve(process.env.UX_SCREENS_DIR) : null;
 const t = (key: string, vars: Record<string, string | number> = {}) => tr("ru", key, vars);
@@ -76,7 +77,9 @@ async function look(page: Page, name: string) {
 const courses = (page: Page) => page.locator('section[aria-labelledby="home-courses"]');
 const todo = (page: Page) => page.locator('section[aria-labelledby="home-todo"]');
 const grades = (page: Page) => page.locator('section[aria-labelledby="home-results"]');
+const sections = (page: Page) => page.locator('section[aria-labelledby="home-sections"]'); // Student UI U3
 const card = (page: Page, title: string) => courses(page).locator("li", { has: page.getByRole("link", { name: title }) });
+const otherCourses = (page: Page) => page.locator('section[aria-labelledby="home-other-courses"]'); // U9
 
 test.describe("course cards", () => {
   test.describe.configure({ mode: "serial" });
@@ -102,8 +105,6 @@ test.describe("course cards", () => {
     const school = seed().org_admin;
     const inSchool = await api(school.maths, "GET", `/courses/${school.maths_course_id}`);
     await api(student, "POST", "/courses/join", { code: inSchool.join_code });
-    // the platform's ORT course
-    await api(student, "POST", `/courses/${seed().course_id}/join`, {});
 
     // progress: one of two requirements met, read from the caches the student's own Modules page writes
     const m = await api(T, "POST", `/courses/${main}/modules`, { title: ti("Неделя 1"), published: true });
@@ -151,14 +152,14 @@ test.describe("course cards", () => {
     expect(row.organization_display_name).toBeNull();
 
     // the platform course names the platform in the UI language (Exam prep S2 UX review; the stored name is English)
-    const platform = (await api(student, "GET", "/me/home")).courses.find((c: { is_platform_course: boolean }) => c.is_platform_course);
-    const ort = courses(page).locator("li", { has: page.locator(`a[href="/ru/courses/${platform.id}"]`) });
+    const ort = page.getByRole("region", { name: t("home.platform.title") })
+      .locator("li", { has: page.locator(`a[href="/ru/courses/catalog/${seed().course_id}"]`) });
     await expect(ort).toContainText(t("common.appName"));
 
     // a zero has its maximum
     await expect(grades(page).getByText("0 / 10", { exact: true })).toBeVisible();
 
-    // side lists right of the cards; cards of one row are equally high
+    // the side lists sit right of the cards; cards of one row are equally high
     const left = (await courses(page).boundingBox())!;
     const right = (await todo(page).boundingBox())!;
     expect(right.x).toBeGreaterThan(left.x + left.width - 1);
@@ -167,17 +168,24 @@ test.describe("course cards", () => {
     await page.context().close();
   });
 
-  test("phone: cards first, then to-do and grades, no sideways scroll", async ({ browser }) => {
+  test("phone, after joining ORT: to-do and grades, then the other courses, no sideways scroll", async ({ browser }) => {
     test.setTimeout(120_000);
+    await api(student, "POST", `/courses/${seed().course_id}/join`, {}); // the platform's ORT course
     const page = await open(browser, student, 375, 812);
     await page.goto("/ru/courses");
-    await expect(courses(page).getByRole("link", { name: WITH_ALL })).toBeVisible();
+    await expect(otherCourses(page).getByRole("link", { name: WITH_ALL })).toBeVisible();
     await look(page, "dashboard-375");
-    const a = (await courses(page).boundingBox())!;
+    // Student UI U3 / U9 (exam-prep home without a result): no sections card and no course grid; to-do, grades, then
+    // the other courses (the ORT course is the shell's exam, not in that list)
+    await expect(sections(page)).toHaveCount(0);
+    await expect(courses(page)).toHaveCount(0);
+    await expect(otherCourses(page).locator(`a[href="/ru/courses/${seed().course_id}"]`)).toHaveCount(0);
     const b = (await todo(page).boundingBox())!;
     const c = (await grades(page).boundingBox())!;
-    expect(a.y + a.height).toBeLessThanOrEqual(b.y);
+    const d = (await otherCourses(page).boundingBox())!;
     expect(b.y + b.height).toBeLessThanOrEqual(c.y);
+    expect(c.y + c.height).toBeLessThanOrEqual(d.y);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
     await page.context().close();
   });
 

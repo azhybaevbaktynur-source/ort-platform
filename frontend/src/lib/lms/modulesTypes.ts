@@ -150,6 +150,12 @@ export interface ItemLinkOut {
   url?: string | null;
 }
 
+/** Student UI U7 (§4.4): an allowlisted YouTube / Vimeo url item; the player URL is built from `id` only. */
+export interface VideoOut {
+  provider: "youtube" | "vimeo";
+  id: string;
+}
+
 export interface ItemStudentOut {
   id: string;
   kind: ItemKind;
@@ -160,6 +166,8 @@ export interface ItemStudentOut {
   link: ItemLinkOut | null;
   /** UX rework: assignment rows, the student's own due date (absent on an older backend) */
   due_at?: string | null;
+  /** U7: set on unlocked url items that are YouTube / Vimeo videos (absent on an older backend) */
+  video?: VideoOut | null;
 }
 
 export interface ModuleStudentOut {

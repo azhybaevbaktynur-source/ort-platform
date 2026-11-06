@@ -26,7 +26,7 @@ const ROUTES: [string, string][] = [
   ["/attempts/t1", "assignments"], ["/grades", "grades"], ["/people", "people"], ["/bank", "bank"],
   ["/bank/questions/q1", "bank"], ["/bank/passages/p1", "bank"], ["/bank/import", "bank"], ["/settings", "settings"],
   ["/files", "files"],
-  ["/practice", "practice"], ["/practice/p1", "practice"], ["/progress", "progress"], ["/analytics", "analytics"],
+  ["/practice", "practice"], ["/practice/p1", "practice"], ["/progress", "progress"], ["/saved", "saved"], ["/analytics", "analytics"],
 ];
 
 const ROLES: CourseNavRole[] = ["teacher", "assistant", "student", "observer"];
@@ -45,8 +45,8 @@ const keys = (role: CourseNavRole, f = { modules: true, files: false, announceme
   courseNavItems(course(role, f), role, base, t).map((i) => i.key).join(",");
 ok(keys("teacher") === "course,announcements,assignments,grades,people,bank,settings,files,practice,analytics", "teacher: all links");
 ok(keys("assistant") === "course,announcements,assignments,grades,people,bank,files,practice,analytics", "assistant: no settings");
-ok(keys("student") === "course,assignments,grades,people,progress", "student: announcements, files, practice auto-hidden");
-ok(keys("student", { modules: true, files: true, announcements: true, practice: true }) === "course,announcements,assignments,grades,people,files,practice,progress",
+ok(keys("student") === "course,assignments,grades,people,progress,saved", "student: announcements, files, practice auto-hidden");
+ok(keys("student", { modules: true, files: true, announcements: true, practice: true }) === "course,announcements,assignments,grades,people,files,practice,progress,saved",
   "student: shown with published content");
 ok(keys("observer") === "course,assignments,grades,people,analytics", "observer without the staff shape: no banks, no settings");
 ok(courseNavItems(course("observer"), "observer", base, t, { staffShape: true }).map((i) => i.key).join(",")

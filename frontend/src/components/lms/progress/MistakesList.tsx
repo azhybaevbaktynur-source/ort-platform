@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { EmptyState, ErrorState, Skeleton, Tabs } from "@/components/ui";
+import { EmptyState, ErrorState, SectionTag, Skeleton, Tabs } from "@/components/ui";
 import { Pager } from "@/components/lms/Pager";
 import { ReviewItemCard } from "@/components/lms/results/ReviewItemCard";
 import { useErrorText } from "@/components/lms/home/useErrorText";
@@ -44,22 +44,25 @@ export function MistakesList({ courseId }: { courseId: string }) {
       {error ? <ErrorState message={errorText(error)} onRetry={() => void load(items ? cursor : undefined)} retrying={loading} /> : null}
       {!error && items === null && <div className="space-y-3"><Skeleton className="h-40 w-full" /><Skeleton className="h-40 w-full" /></div>}
       {!error && items !== null && items.length === 0 && (
-        <EmptyState mascot="reading" title={t(status === "open" ? "progress.mistakes.emptyOpen" : "progress.mistakes.emptyFixed")} />
+        <EmptyState mascot={status === "open" ? "celebrating" : "reading"} title={t(status === "open" ? "progress.mistakes.emptyOpen" : "progress.mistakes.emptyFixed")}
+          description={t(status === "open" ? "progress.analytics.mistakes.emptyOpenHint" : "progress.analytics.mistakes.emptyFixedHint")} />
       )}
       {items !== null && items.length > 0 && (
-        <ul className="space-y-4">
+        <ul className="space-y-6">
           {items.map((m, i) => (
-            <li key={`${m.attempt_id}:${m.item.position}`} className="space-y-1">
-              <p className="flex flex-wrap items-center justify-between gap-x-3 text-sm text-slate-600">
-                <span className="min-w-0 break-words">
-                  {pickLocalized(m.assessment_title, lang) || t("assessments.untitled")}
-                  {m.topic ? ` · ${m.topic}` : ""}
-                  {m.submitted_at ? ` · ${fmtShortDateTime(m.submitted_at, lang)}` : ""}
-                </span>
-                <Link href={`/${lang}/courses/${courseId}/attempts/${m.attempt_id}/result`} className="inline-flex min-h-11 items-center font-medium text-brand-700 hover:underline sm:min-h-0">
+            <li key={`${m.attempt_id}:${m.item.position}`} className="space-y-2">
+              {/* Student UI U6: the notebook in the analytics style (section tag, test, topic, date) */}
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm leading-5 text-slate-600">
+                  {m.section && <SectionTag section={m.section} />}
+                  <span className="min-w-0 break-words font-medium text-slate-800">{pickLocalized(m.assessment_title, lang) || t("assessments.untitled")}</span>
+                  {m.topic && <span className="min-w-0 break-words">· {m.topic}</span>}
+                  {m.submitted_at && <span>· {fmtShortDateTime(m.submitted_at, lang)}</span>}
+                </p>
+                <Link href={`/${lang}/courses/${courseId}/attempts/${m.attempt_id}/result`} className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-700 hover:underline sm:min-h-0">
                   {t("progress.mistakes.viewAttempt")}
                 </Link>
-              </p>
+              </div>
               <ReviewItemCard item={m.item} number={i + 1} maxPoints={m.item.points} />
             </li>
           ))}

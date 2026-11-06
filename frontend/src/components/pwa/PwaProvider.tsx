@@ -23,9 +23,11 @@ interface PwaContextValue {
   /** What "Install the app" does here, or null when the entry is hidden. */
   installKind: InstallKind;
   install: () => void;
+  /** Student UI U8: this device runs the installed app, or installed it from this browser (remembered). */
+  installed: boolean;
 }
 
-const PwaContext = createContext<PwaContextValue>({ installKind: null, install: () => undefined });
+const PwaContext = createContext<PwaContextValue>({ installKind: null, install: () => undefined, installed: false });
 export const usePwa = () => useContext(PwaContext);
 
 interface InstallPromptEvent extends Event {
@@ -39,6 +41,7 @@ declare global {
 const SW_URL = "/service-worker.js";
 const DISMISS_KEY = "pwa_install_dismissed_at";
 const DISMISS_MS = 14 * 24 * 60 * 60 * 1000;
+const INSTALLED_KEY = "pwa_installed"; // Student UI U8: the getting-started checklist
 const UPDATE_CHECK_MS = 30 * 60 * 1000;
 
 /** Exam routes: the assessment lobby, the player, attempt results and practice. No update toast there. */
@@ -74,6 +77,7 @@ function isIos(): boolean {
 export function PwaProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [installKind, setInstallKind] = useState<InstallKind>(null);
+  const [installed, setInstalled] = useState(false);
   const [iosOpen, setIosOpen] = useState(false);
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
   const [updateHidden, setUpdateHidden] = useState(false);
@@ -123,12 +127,20 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
 
   // ---- install entry
   useEffect(() => {
+    const remember = () => {
+      try { localStorage.setItem(INSTALLED_KEY, "1"); } catch { /* private mode: only this session knows */ }
+      setInstalled(true);
+    };
     const refresh = () => {
+      if (isStandalone()) remember();
+      else {
+        try { if (localStorage.getItem(INSTALLED_KEY) === "1") setInstalled(true); } catch { /* storage blocked */ }
+      }
       if (isStandalone() || recentlyDismissed()) setInstallKind(null);
       else if (window.__pwaInstallPrompt) setInstallKind("prompt");
       else setInstallKind(isIos() ? "ios" : null);
     };
-    const onInstalled = () => { window.__pwaInstallPrompt = null; refresh(); };
+    const onInstalled = () => { window.__pwaInstallPrompt = null; remember(); refresh(); };
     refresh();
     window.addEventListener("pwa-install-available", refresh);
     window.addEventListener("appinstalled", onInstalled);
@@ -164,7 +176,7 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <PwaContext.Provider value={{ installKind, install }}>
+    <PwaContext.Provider value={{ installKind, install, installed }}>
       {children}
       {waiting && !updateHidden && !isExamRoute(pathname) && (
         <UpdateToast onUpdate={update} onHide={() => setUpdateHidden(true)} />

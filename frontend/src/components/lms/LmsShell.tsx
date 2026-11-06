@@ -15,6 +15,12 @@ import { PendingInvitationsBanner } from "./PendingInvitationsBanner"; // Phase 
 import { InvitationAcceptedNotice } from "./InvitationAcceptedNotice"; // Phase 6 S8
 import { StudentViewBanner } from "./course/StudentViewBanner"; // UX rework S1
 import { PrivacyBanner } from "@/components/privacy/PrivacyBanner"; // Phase 11 S3
+// --- Student UI U2 ---
+import type { CourseOut } from "@/lib/lms/types";
+import { courseIdOfPath } from "@/lib/lms/studentNav";
+import { STUDENT_FRAME, STUDENT_MAIN, STUDENT_SIDEBAR_BG, StudentChrome, StudentTabBar } from "./student/StudentShell";
+import { useStudentShellData } from "./student/useStudentShellData";
+import { StudentShellDataContext } from "./student/StudentShellDataContext"; // Student UI U3
 
 /*
  * Phase 6b S5b: the frame of every signed-in page (courses/*, admin/*, org/*, grading-schemes, invitations).
@@ -45,13 +51,33 @@ export function useDeclareArea(area: AreaKey | null, opts: { hideSections?: bool
   }, [area, hideSections, declare]);
 }
 
-/** Reads `?view=` (needs a Suspense boundary for static pages). */
-function ViewParam({ onChange }: { onChange: (v: string | null) => void }) {
+/** Reads `?view=` (needs a Suspense boundary for static pages). Student UI U2: also `?tab=` (the shell's active link). */
+function ViewParam({ onChange, onTab }: { onChange: (v: string | null) => void; onTab: (v: string | null) => void }) {
   const params = useSearchParams();
   const view = params.get("view");
+  const tab = params.get("tab");
   useEffect(() => { onChange(view); }, [view, onChange]);
+  useEffect(() => { onTab(tab); }, [tab, onTab]);
   return null;
 }
+
+// --- Student UI U2 begin --- (STUDENT_UI_DESIGN §2): the course layout tells the student shell which course it loaded
+type DeclareCourse = (course: CourseOut | null) => void;
+const StudentCourseDeclareContext = createContext<DeclareCourse>(() => {});
+
+/** The course layout's loaded course, for the student shell (its lessons/practice links, a course joined just now). */
+export function useDeclareStudentCourse(course: CourseOut | null) {
+  const declare = useContext(StudentCourseDeclareContext);
+  useEffect(() => {
+    declare(course);
+    return () => declare(null);
+  }, [course, declare]);
+}
+
+/** ORT frames that never change (§2.4): the assessment lobby and every attempt page keep the AppHeader frame. */
+const ORT_FRAME = [/^\/courses\/[^/]+\/assessments\/[^/]+$/, /^\/courses\/[^/]+\/attempts(\/|$)/];
+const isOrtFrame = (rest: string) => ORT_FRAME.some((re) => re.test(rest));
+// --- Student UI U2 end ---
 
 /**
  * Area of a URL. `/courses` follows `?view=`; without it, `coursesDefault` (the tab `/courses` opens with:
@@ -84,6 +110,8 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const { me } = meState;
   const unauthorized = meState.error?.status === 401;
   const [view, setView] = useState<string | null>(null);
+  const [tab, setTab] = useState<string | null>(null); // Student UI U2
+  const [declaredCourse, setDeclaredCourse] = useState<CourseOut | null>(null); // Student UI U2
   const [declaredArea, setDeclared] = useState<DeclaredArea | null>(null);
   const declared = declaredArea?.area ?? null;
   const testStudent = !!userProfile?.is_test_student; // UX rework S1: Student view
@@ -162,7 +190,36 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
     return hideSections ? list.map((a) => ({ ...a, sections: undefined })) : list;
   }, [lang, t, hasTeaching, isAdmin, canCreate, isGuardian, me, rest, urlArea, hideSections]); // `orgs` comes from `me`
 
+  // --- Student UI U2 begin --- (STUDENT_UI_DESIGN §2.1, §2.4): the Learning area gets the student shell, except the
+  // ORT lobby and attempt routes. A course page of someone who teaches waits for the course's own declaration (a
+  // course they teach is Teaching); the frames share one tree, so switching never remounts the page.
+  const pathCourseId = courseIdOfPath(rest);
+  const ortFrame = isOrtFrame(rest);
+  const awaitingCourseArea = !!pathCourseId && !declared && (hasTeaching || isAdmin);
+  const studentFrame = signedIn && !unauthorized && activeArea === "learning" && !ortFrame && !awaitingCourseArea;
+  const studentData = useStudentShellData({
+    enabled: studentFrame, pathCourseId, declared: declaredCourse, onHome: rest === "/courses", pathKey: rest,
+  });
+  // --- Student UI U2 end ---
+
   if (authLoading || !user || unauthorized) {
+    // Student UI U2: a student path (the cached profile does not teach) gets the student frame's skeleton
+    const teachesCached = userProfile?.teacher_status === "approved" || !!userProfile?.is_platform_admin;
+    if (!ortFrame && urlArea === "learning" && !teachesCached) {
+      return (
+        <div className={cn("min-h-screen bg-slate-50", STUDENT_FRAME)}>
+          <div aria-hidden="true" className={cn("fixed inset-y-0 left-0 hidden w-[264px] lg:block", STUDENT_SIDEBAR_BG)} />
+          <div aria-hidden="true" className="flex h-14 items-center gap-2 border-b border-slate-200 bg-white px-4 lg:hidden">
+            <span className="h-9 w-9 rounded-control bg-navy-800" />
+            <Skeleton className="ml-auto h-9 w-9 rounded-full" />
+          </div>
+          <main className={STUDENT_MAIN}>
+            <Skeleton className="mb-6 h-8 w-2/3 max-w-sm" />
+            <LoadingState label={t("lms.common.loading")} />
+          </main>
+        </div>
+      );
+    }
     // Student finding S16: the frame (header + skeleton content) shows at once, never a blank screen.
     return (
       <div className="min-h-screen bg-slate-50">
@@ -203,35 +260,47 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
       ) : children}
     </>
   );
+  // Student UI U2: the same children in both frames (chrome slot, banner, main, tab bar slot), so React keeps <main>
+  const studentProps = {
+    data: studentData, rest, tab, user: { name, email }, accountLinks, onLanguageChange: switchLang,
+    onLogout: () => void logout(), testStudent, otherAreas: areas.filter((a) => a.key !== "learning"),
+  };
   return (
     <AreaDeclareContext.Provider value={setDeclared}>
+      <StudentCourseDeclareContext.Provider value={setDeclaredCourse}>
       <LmsMeProvider value={meState}>
-        <Suspense fallback={null}><ViewParam onChange={setView} /></Suspense>
-        <div className="min-h-screen bg-slate-50">
+        <StudentShellDataContext.Provider value={studentFrame ? studentData : null}>
+        <Suspense fallback={null}><ViewParam onChange={setView} onTab={setTab} /></Suspense>
+        <div className={cn("min-h-screen bg-slate-50", studentFrame && STUDENT_FRAME)}>
           <a href="#main"
             className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-2 focus:z-50 focus:rounded-xl focus:bg-white focus:px-4 focus:py-3 focus:text-sm focus:font-semibold focus:text-brand-800 focus:shadow-lg">
             {t("shell.skipToContent")}
           </a>
-          <AppHeader
-            brandHref={`/${lang}/courses`}
-            areas={areas}
-            areasLoading={areasLoading}
-            activeArea={activeArea}
-            user={{ name, email }}
-            accountLinks={accountLinks}
-            onLanguageChange={switchLang}
-            onLogout={() => void logout()}
-            routeKey={pathname}
-          />
+          {studentFrame ? <StudentChrome {...studentProps} /> : (
+            <AppHeader
+              brandHref={`/${lang}/courses`}
+              areas={areas}
+              areasLoading={areasLoading}
+              activeArea={activeArea}
+              user={{ name, email }}
+              accountLinks={accountLinks}
+              onLanguageChange={switchLang}
+              onLogout={() => void logout()}
+              routeKey={pathname}
+            />
+          )}
           <StudentViewBanner />
-          <main id="main" tabIndex={-1} className={cn("py-6 focus:outline-none sm:py-8", SHELL_WIDTH)}>
+          <main id="main" tabIndex={-1} className={studentFrame ? cn(STUDENT_MAIN, "focus:outline-none") : cn("py-6 focus:outline-none sm:py-8", SHELL_WIDTH)}>
             {/* UX rework (PUR-6): the attempt pages (result, review) keep their column; the player is its own overlay */}
             {/^\/courses\/[^/]+\/attempts(\/|$)/.test(rest)
               ? <div className={EXAM_COLUMN_OUTER}><div className={EXAM_COLUMN_INNER}>{content}</div></div>
               : content}
           </main>
+          {studentFrame ? <StudentTabBar {...studentProps} /> : null}
         </div>
+        </StudentShellDataContext.Provider>
       </LmsMeProvider>
+      </StudentCourseDeclareContext.Provider>
     </AreaDeclareContext.Provider>
   );
 }

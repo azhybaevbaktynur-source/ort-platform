@@ -3048,7 +3048,8 @@
         "states": "Empty, error and loading states",
         "dialogs": "Dialogs",
         "toasts": "Notifications",
-        "picker": "User picker"
+        "picker": "User picker",
+        "student": "Student area"
       },
       "b": {
         "save": "Save changes",
@@ -3189,7 +3190,36 @@
       "picker": {
         "label": "New owner",
         "hint": "Search by name or email (try “ai”)."
+      },
+      "student": {
+        "tags": "Section tags",
+        "meters": "Accuracy by topic",
+        "meterLabel": "Accuracy: {name}",
+        "topicA": "Equations",
+        "topicB": "Percentages",
+        "topicC": "Word analogies",
+        "heatmap": "My activity",
+        "heatmapSummary": "{n} answers in 3 months",
+        "countdown": "Until the exam",
+        "lockTitle": "Detailed analytics",
+        "lockBody": "Open all exams to see every topic.",
+        "sidebar": "Sidebar",
+        "tabBar": "Phone tab bar",
+        "sheet": "Bottom sheet",
+        "openSheet": "Open the sheet",
+        "sheetBody": "Sheets hold the phone menus: the exam switcher, More and the account."
       }
+    },
+    "heatmap": {
+      "less": "Less",
+      "more": "More",
+      "cell": "{date}: {n} answers"
+    },
+    "countdown": {
+      "days": "days",
+      "hours": "hrs",
+      "minutes": "min",
+      "today": "Today"
     }
   },
   "teaching": {
@@ -3314,6 +3344,36 @@
       "title": "From the platform",
       "subtitle": "Exam prep courses. Join with one tap.",
       "haveCode": "Have a code from your teacher?"
+    },
+    "greeting": {
+      "morning": "Good morning, {name}",
+      "afternoon": "Good afternoon, {name}",
+      "evening": "Good evening, {name}",
+      "morningPlain": "Good morning!",
+      "afternoonPlain": "Good afternoon!",
+      "eveningPlain": "Good evening!"
+    },
+    "prep": {
+      "streak": {
+        "days": "{count} days in a row",
+        "days_one": "{count} day in a row",
+        "days_few": "{count} days in a row",
+        "days_many": "{count} days in a row",
+        "days_other": "{count} days in a row",
+        "none": "Answer at least one question today to start a streak.",
+        "week": "Last 7 days",
+        "dayActive": "{day}: studied",
+        "dayIdle": "{day}: no study"
+      },
+      "score": {
+        "title": "Scores"
+      },
+      "unlock": {
+        "title": "Unlock all exams",
+        "body": "The free tests are already yours. A pass opens the other exams and practice."
+      },
+      "addCourse": "Find a course in the catalog",
+      "otherCourses": "Other courses"
     }
   },
   "shell": {
@@ -4954,7 +5014,56 @@
       "home_page_invalid": "This page cannot be the course home. Choose a page of this course.",
       "template_locked": "The course template fixes this setting."
     },
-    "availableInAssignments": "Available from Assignments"
+    "availableInAssignments": "Available from Assignments",
+    "syllabus": {
+      "readyTitle": "Ready to start?",
+      "readyBody": "First lesson: {title}",
+      "continueTitle": "Pick up where you left off",
+      "continueBody": "Next lesson: {title}",
+      "start": "Start the course",
+      "continue": "Continue the course",
+      "doneTitle": "All lessons done",
+      "doneBody": "Great work! You can go back to any lesson.",
+      "progressLabel": "Your progress",
+      "percent": "{percent}%",
+      "lessonCount": "{count} lessons",
+      "lessonCount_one": "{count} lesson",
+      "lessonCount_few": "{count} lessons",
+      "lessonCount_many": "{count} lessons",
+      "lessonCount_other": "{count} lessons",
+      "aboutTitle": "About the course",
+      "aboutModules": "Modules",
+      "aboutLessons": "Lessons",
+      "aboutLanguage": "Language",
+      "video": "Video",
+      "status": {
+        "done": "Lesson done",
+        "open": "Lesson not done yet",
+        "locked": "Lesson not available yet"
+      },
+      "doneCount": "Done: {done} of {total}",
+      "doneCountShort": "done {done} of {total}"
+    },
+    "lesson": {
+      "back": "All lessons",
+      "position": "Lesson {n} of {total}",
+      "play": "Play the video: {title}",
+      "playHintYoutube": "Tap to watch. The video loads from YouTube.",
+      "playHintVimeo": "Tap to watch. The video loads from Vimeo.",
+      "markDone": "Mark as done",
+      "done": "Lesson done",
+      "undo": "Undo",
+      "prev": "Previous lesson",
+      "next": "Next lesson",
+      "pagerLabel": "Lessons",
+      "lockedTitle": "This lesson is locked for now",
+      "notFoundTitle": "Lesson not found",
+      "notFoundBody": "It may have been removed from the course. Go back to the list of lessons.",
+      "externalTitle": "This material is on another website",
+      "externalBody": "The link opens in a new tab.",
+      "openLink": "Open the link",
+      "fileBody": "A file for this lesson."
+    }
   },
   "courseNav": {
     "menu": "Course menu",
@@ -5430,7 +5539,8 @@
       "poolTooSmall": "The bank has too few questions for this block. Lower the count or change the filters."
     },
     "locked": "Practice needs a pass",
-    "unlock": "Unlock"
+    "unlock": "Unlock",
+    "lastAt": "Last attempt {date}"
   },
   "progress": {
     "nav": "My progress",
@@ -5470,6 +5580,149 @@
       "emptyOpen": "No open mistakes.",
       "emptyFixed": "No fixed mistakes yet.",
       "viewAttempt": "View attempt"
+    },
+    "analytics": {
+      "title": "Analytics",
+      "period": {
+        "label": "Period",
+        "d7": "7 days",
+        "d30": "30 days",
+        "d90": "90 days",
+        "d365": "Year",
+        "in": {
+          "d7": "in the last 7 days",
+          "d30": "in the last 30 days",
+          "d90": "in the last 90 days",
+          "d365": "in the last year"
+        }
+      },
+      "tiles": {
+        "answered": "Questions answered",
+        "accuracy": "Accuracy",
+        "accuracyHint": "{correct} of {total} correct",
+        "saved": "Saved",
+        "savedHint": "flagged questions",
+        "streak": "Streak",
+        "streakValue": "{count} days",
+        "streakValue_one": "{count} day",
+        "streakValue_few": "{count} days",
+        "streakValue_many": "{count} days",
+        "streakValue_other": "{count} days",
+        "streakBest": "Best: {count} days",
+        "streakBest_one": "Best: {count} day",
+        "streakBest_few": "Best: {count} days",
+        "streakBest_many": "Best: {count} days",
+        "streakBest_other": "Best: {count} days"
+      },
+      "answers": "{count} answers",
+      "answers_one": "{count} answer",
+      "answers_few": "{count} answers",
+      "answers_many": "{count} answers",
+      "answers_other": "{count} answers",
+      "empty": {
+        "title": "No data yet",
+        "pageTitle": "Your analytics will appear here",
+        "pageBody": "Take your first test and we will show where you are strong and what to work on.",
+        "pageAction": "Go to tests"
+      },
+      "lock": {
+        "title": "Available with full access",
+        "body": "Open full access to see this analysis.",
+        "action": "Open access"
+      },
+      "legend": {
+        "label": "Legend",
+        "high": "85 % and above: good",
+        "mid": "60–84 %: fair",
+        "low": "below 60 %: weak"
+      },
+      "band": {
+        "low": "Weak",
+        "mid": "Fair",
+        "high": "Good"
+      },
+      "weak": {
+        "title": "{count} weak topics",
+        "title_one": "{count} weak topic",
+        "title_few": "{count} weak topics",
+        "title_many": "{count} weak topics",
+        "title_other": "{count} weak topics",
+        "titleEmpty": "Weak topics",
+        "subtitle": "Start with these: they have the most mistakes",
+        "empty": "Answer a few questions and we will show the topics worth working on.",
+        "practice": "Practice"
+      },
+      "topics": {
+        "math": "Mathematics",
+        "language": "Language",
+        "other": "Other topics",
+        "all": "Accuracy by topic",
+        "subtitle": "Accuracy by topic",
+        "meter": "{topic}: accuracy",
+        "empty": {
+          "math": "Topics appear after your first answers in mathematics.",
+          "language": "Topics appear after your first answers in the language sections.",
+          "other": "Topics appear after your first answers."
+        }
+      },
+      "activity": {
+        "title": "Activity",
+        "byDay": "Answers per day",
+        "byWeek": "Answers per week",
+        "correct": "Correct",
+        "wrong": "Wrong",
+        "summary": "Answers in this period: {answered}; correct {correct}, wrong {wrong}",
+        "bar": "{date}: correct {correct}, wrong {wrong}",
+        "empty": "Answer questions every day and your bars will grow here."
+      },
+      "time": {
+        "title": "Daily study time",
+        "byDay": "Minutes per day by section",
+        "byWeek": "Time per week by section",
+        "other": "Other",
+        "avg": "Average: {value}",
+        "summary": "Study time in this period: {total}; average {avg} on a study day",
+        "empty": "Time spent on tests and practice will appear here."
+      },
+      "hours": {
+        "title": "Most active time",
+        "peak": "You study most often at {from}–{to}",
+        "summary": "Most answers at {from}–{to}: {n}",
+        "bar": "{from}–{to}: {n} answers",
+        "empty": "We will show the hours when you study most."
+      },
+      "sessions": {
+        "title": "Study sessions",
+        "subtitle": "Last 7 days",
+        "correct": "{percent} % correct",
+        "more": "Show all ({count})",
+        "less": "Show fewer",
+        "empty": "No sessions in the last 7 days. A short session today keeps your streak going."
+      },
+      "heat": {
+        "title": "My activity",
+        "label": "Activity calendar: {count} answers in total",
+        "label_one": "Activity calendar: {count} answer in total",
+        "label_few": "Activity calendar: {count} answers in total",
+        "label_many": "Activity calendar: {count} answers in total",
+        "label_other": "Activity calendar: {count} answers in total",
+        "summary": "{count} answers",
+        "summary_one": "{count} answer",
+        "summary_few": "{count} answers",
+        "summary_many": "{count} answers",
+        "summary_other": "{count} answers",
+        "empty": "Every day you answer questions will light up here."
+      },
+      "goal": {
+        "title": "My goal",
+        "subtitle": "Now {current} · goal {goal}",
+        "hint": "Set the percent of correct answers you are aiming for."
+      },
+      "mistakes": {
+        "emptyOpenHint": "When you get a question wrong in a test, it will appear here so you can fix it.",
+        "emptyFixedHint": "Questions you answer right after a mistake move here."
+      },
+      "lowData": "Not enough data"
     }
   },
   "quizStats": {
@@ -5947,6 +6200,17 @@
       "best": "Best score",
       "bestPercent": "Best result",
       "pending": "Your result appears once it is released."
+    },
+    "tests": {
+      "heading": "Tests · {count}",
+      "statusFilter": "Status",
+      "allStatuses": "Any status",
+      "noScore": "No result yet",
+      "emptyStatus": "No tests with this status.",
+      "start": "Start",
+      "resume": "Continue",
+      "result": "Result",
+      "unlock": "Unlock"
     }
   },
   "adminSecurity": {
@@ -6298,6 +6562,62 @@
       "title": "No internet connection",
       "body": "Check your Wi-Fi or mobile data and try again.",
       "retry": "Try again"
+    }
+  },
+  "student": {
+    "nav": {
+      "label": "Student menu",
+      "home": "Home",
+      "analytics": "Analytics",
+      "saved": "Saved",
+      "lessonsGroup": "Lessons",
+      "lessons": "Video lessons",
+      "practiceGroup": "Practice",
+      "tests": "Tests",
+      "practice": "Practice",
+      "mistakes": "My mistakes",
+      "gettingStarted": "Getting started",
+      "otherAreas": "Other areas",
+      "catalog": "Catalog",
+      "more": "More",
+      "tabBar": "Main sections"
+    },
+    "switcher": {
+      "label": "My exams",
+      "add": "Add an exam",
+      "open": "Exam: {name}. Change"
+    },
+    "access": {
+      "until": "Access until {date}",
+      "open": "Access is open"
+    },
+    "account": {
+      "title": "Account"
+    },
+    "saved": {
+      "title": "Saved",
+      "tabsLabel": "Saved sections",
+      "tabs": {
+        "saved": "Saved",
+        "mistakes": "Mistakes"
+      },
+      "open": "Open",
+      "question": "Question {n}",
+      "empty": "Flag questions during a test and they will appear here",
+      "emptyHint": "An easy way to come back to hard questions after the test.",
+      "hiddenOnPage": "Questions from tests whose results are not open yet will appear later."
+    },
+    "gettingStarted": {
+      "progress": "{done} of {total}",
+      "intro": "A few steps to get your preparation going.",
+      "done": "Done",
+      "todo": "Not done yet",
+      "items": {
+        "goal": "Set your target score",
+        "test": "Take your first test",
+        "practice": "Do a practice set",
+        "install": "Install the app"
+      }
     }
   }
 }

@@ -7,8 +7,20 @@ import { seed, signIn, tr, VIEWPORTS } from "./helpers";
  */
 const t = (key: string) => tr("ru", key);
 
-/** Area labels as drawn on the desktop header. */
-const areas = (page: Page) => page.getByRole("navigation", { name: t("shell.areas.label") }).getByRole("link").allInnerTexts();
+const headerAreas = (page: Page) => page.getByRole("navigation", { name: t("shell.areas.label") });
+/** Student UI U2: in the Learning area the student sidebar replaces the header; it lists the other areas. */
+const otherAreas = (page: Page) => page.getByRole("navigation", { name: t("student.nav.otherAreas") });
+
+/** Area labels as drawn on the desktop header, or (Learning, student sidebar) Learning plus the sidebar's other areas. */
+async function areas(page: Page): Promise<string[]> {
+  if (await headerAreas(page).count()) return headerAreas(page).getByRole("link").allInnerTexts();
+  if (await otherAreas(page).count()) return [t("shell.areas.learning"), ...await otherAreas(page).getByRole("link").allInnerTexts()];
+  return [];
+}
+
+/** The link to an area: on the header, or on the student sidebar's "other areas". */
+const areaLink = (page: Page, key: string) => headerAreas(page).getByRole("link", { name: t(key) })
+  .or(otherAreas(page).getByRole("link", { name: t(key) }));
 
 test("the same menu on every page, also while the API is slow", async ({ page }) => {
   await page.setViewportSize(VIEWPORTS.desktop);
@@ -30,7 +42,7 @@ test("the same menu on every page, also while the API is slow", async ({ page })
     await route.continue();
   });
   for (const area of ["shell.areas.platform", "shell.areas.organization", "shell.areas.learning", "shell.areas.platform"]) {
-    await page.getByRole("navigation", { name: t("shell.areas.label") }).getByRole("link", { name: t(area) }).click();
+    await areaLink(page, area).click();
     for (const wait of [50, 300, 700]) {
       await page.waitForTimeout(wait);
       expect(await areas(page), `${area} after ${wait} ms`).toEqual(full);
@@ -58,9 +70,11 @@ test("a student's menu has no extra areas on any page", async ({ page }) => {
   await signIn(page, data.modules.student);
   await page.goto("/ru/courses");
   await expect(page.getByRole("heading", { name: t("home.dashboard") })).toBeVisible();
-  await expect(page.getByRole("navigation", { name: t("shell.areas.label") })).toHaveCount(0);
+  await expect(headerAreas(page)).toHaveCount(0);
+  await expect(otherAreas(page)).toHaveCount(0);
   await page.goto("/ru/parent"); // a page of another area must not add a tab
-  await expect(page.getByRole("navigation", { name: t("shell.areas.label") })).toHaveCount(0);
+  await expect(headerAreas(page)).toHaveCount(0);
+  await expect(otherAreas(page)).toHaveCount(0);
 });
 
 test("an independent teacher has no Organization area", async ({ page }) => {

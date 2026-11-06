@@ -37,6 +37,7 @@ from app.lms.accommodations.effective import MAX_ALLOWED_ATTEMPTS
 from app.lms.accommodations.models import EnrollmentAccommodation
 from app.lms.assessments.models import Assessment
 from app.lms.assignments.models import Assignment, AssignmentOverride, AssignmentSubmission
+from app.lms.exam_prep.layout import is_exam_prep  # Student UI U2
 from app.lms.attempts.models import Attempt
 from app.lms.core import clock
 from app.lms.core.pagination import PageOut
@@ -212,11 +213,28 @@ def _progress(db: Session, uid: str, course_ids: list) -> dict:
     return {cid: (int(done), int(total)) for cid, done, total in rows}
 
 
+def _exam_features(db: Session, course_ids: list) -> dict:
+    """Student UI U9: course id -> (modules, practice) for the page's exam-prep courses, one statement (two correlated
+    EXISTS, the same rows `course_features` reads); none when the page has no exam-prep course."""
+    if not course_ids:
+        return {}
+    from app.lms.modules.models import CourseModule
+
+    modules = exists().where(CourseModule.course_id == Course.id, CourseModule.deleted_at.is_(None),
+                             CourseModule.published.is_(True))
+    practice = exists().where(Assessment.course_id == Course.id, Assessment.deleted_at.is_(None),
+                              Assessment.status == "published", Assessment.is_practice.is_(True))
+    rows = db.execute(select(Course.id, modules, practice).where(Course.id.in_(course_ids))).all()
+    return {cid: (bool(m), bool(p)) for cid, m, p in rows}
+
+
 def _course_cards(db: Session, uid: str, rows: list, now: datetime) -> list[sch.HomeCourseOut]:
-    """One page of cards: the page's own statement plus one grouped statement each for next due and progress."""
+    """One page of cards: the page's own statement plus one grouped statement each for next due and progress (and
+    the menu features of its exam-prep courses)."""
     ids = [r[0].id for r in rows]
     due = _next_due(db, uid, ids, now)
     progress = _progress(db, uid, ids)
+    features = _exam_features(db, [r[0].id for r in rows if is_exam_prep(r[0])])
     platform = platform_org_id()
     out = []
     for r in rows:
@@ -228,7 +246,10 @@ def _course_cards(db: Session, uid: str, rows: list, now: datetime) -> list[sch.
             organization_display_name=card_organization_name(r.org_kind, r.org_name),
             is_platform_course=c.organization_id == platform, next_due_at=due.get(c.id),
             in_progress=bool(r.in_progress),
-            progress=sch.HomeProgressOut(done=done_total[0], total=done_total[1]) if done_total else None))
+            progress=sch.HomeProgressOut(done=done_total[0], total=done_total[1]) if done_total else None,
+            student_layout="exam_prep" if is_exam_prep(c) else "general",
+            features=sch.HomeCourseFeaturesOut(modules=features[c.id][0], practice=features[c.id][1])
+            if c.id in features else None))
     return out
 
 

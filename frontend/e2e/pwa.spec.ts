@@ -6,7 +6,8 @@ import { seed, settle, signIn, tr, type SeedUser } from "./helpers";
 /**
  * S5 installable app (docs/ROADMAP_EXAM_PREP.md): manifest and icons, the service worker (production build only),
  * nothing from the API or any page in its caches, the offline page, the update toast (never on exam routes) and the
- * "Install the app" account menu entry (Chrome prompt, iOS sheet, hidden in the installed app).
+ * "Install the app" entry (Chrome prompt, iOS sheet, hidden in the installed app); since the student shell (Student UI
+ * U2) the entry sits in the student sidebar (desktop) and the "More" sheet (phone), no longer in the account menu.
  *
  * Screens (ru, 375 / 1440 / 1920) go to $S5_SHOTS (default /tmp/s5_shots).
  */
@@ -50,6 +51,18 @@ async function cachedUrls(page: Page): Promise<string[]> {
 }
 
 const accountMenu = (page: Page, user: SeedUser) => page.getByRole("button", { name: t("shell.account.menu", { name: user.name }) });
+/** Student UI U2: the student shell's link list (desktop sidebar). */
+const studentNav = (page: Page) => page.getByRole("navigation", { name: t("student.nav.label") }).first();
+/** Student UI U2: "Install the app" moved from the account menu to the student sidebar (desktop) and "More" (phone). */
+const installEntry = (page: Page) => page.getByRole("button", { name: t("pwa.install.menu") });
+
+/** Opens the phone tab bar's "More" sheet and returns it. */
+async function openMore(page: Page) {
+  await page.getByRole("navigation", { name: t("student.nav.tabBar") }).getByRole("button", { name: t("student.nav.more") }).click();
+  const sheet = page.getByRole("dialog", { name: t("student.nav.more") });
+  await expect(sheet).toBeVisible();
+  return sheet;
+}
 
 test.describe("installable app (ru)", () => {
   test.describe.configure({ mode: "serial" });
@@ -183,7 +196,7 @@ test.describe("installable app (ru)", () => {
     }
   });
 
-  test("Install the app: Chrome prompt from the account menu, dismissal remembered", async ({ browser }) => {
+  test("Install the app: Chrome prompt from the student sidebar, dismissal remembered", async ({ browser }) => {
     const s = seed();
     const user = s.modules.ort_student;
     const ctx = await newContext(browser);
@@ -191,10 +204,10 @@ test.describe("installable app (ru)", () => {
     try {
       await signIn(page, user);
       await page.goto(`/${L}/courses`);
+      // Student UI U2: the entry sits in the sidebar of the student shell (desktop), above the other areas
+      await expect(studentNav(page)).toBeVisible();
       await expect(accountMenu(page, user)).toBeVisible();
-      await accountMenu(page, user).click();
-      await expect(page.getByRole("button", { name: t("pwa.install.menu") })).toHaveCount(0); // no prompt yet
-      await accountMenu(page, user).click();
+      await expect(installEntry(page)).toHaveCount(0); // no prompt yet
 
       // Chrome offers installation (the event the browser fires, with a stub prompt)
       await page.evaluate(() => {
@@ -203,8 +216,7 @@ test.describe("installable app (ru)", () => {
         e.userChoice = Promise.resolve({ outcome: "dismissed" });
         window.dispatchEvent(e);
       });
-      await accountMenu(page, user).click();
-      const entry = page.getByRole("button", { name: t("pwa.install.menu") });
+      const entry = installEntry(page);
       await expect(entry).toBeVisible();
       await shoot(page, "menu-install");
       await entry.click();
@@ -213,21 +225,24 @@ test.describe("installable app (ru)", () => {
 
       // dismissed: not offered again, even when Chrome fires the event again
       await page.reload();
+      await expect(studentNav(page)).toBeVisible();
       await page.evaluate(() => {
         const e = new Event("beforeinstallprompt", { cancelable: true }) as Event & Record<string, unknown>;
         e.prompt = async () => undefined;
         e.userChoice = Promise.resolve({ outcome: "dismissed" });
         window.dispatchEvent(e);
       });
-      await accountMenu(page, user).click();
+      await accountMenu(page, user).click(); // the page answers (hydrated) before the entry's absence is checked
       await expect(page.getByText(t("shell.account.signedInAs"))).toBeVisible();
-      await expect(page.getByRole("button", { name: t("pwa.install.menu") })).toHaveCount(0);
+      await page.keyboard.press("Escape");
+      await expect(page.getByText(t("shell.account.signedInAs"))).toBeHidden();
+      await expect(installEntry(page)).toHaveCount(0);
     } finally {
       await ctx.close();
     }
   });
 
-  test("Install the app on iPhone: the Share steps sheet; hidden in the installed app", async ({ browser }) => {
+  test("Install the app on iPhone: the Share steps sheet from More; hidden in the installed app", async ({ browser }) => {
     const s = seed();
     const user = s.modules.ort_student;
     const ctx = await newContext(browser, { viewport: { width: 375, height: 812 }, userAgent: IPHONE_UA, isMobile: true, hasTouch: true });
@@ -235,8 +250,9 @@ test.describe("installable app (ru)", () => {
     try {
       await signIn(page, user);
       await page.goto(`/${L}/courses`);
-      await accountMenu(page, user).click();
-      await page.getByRole("button", { name: t("pwa.install.menu") }).click();
+      // Student UI U2: on phones the entry is in the "More" sheet of the tab bar
+      const more = await openMore(page);
+      await more.getByRole("button", { name: t("pwa.install.menu") }).click();
       const sheet = page.getByRole("dialog", { name: t("pwa.install.iosTitle") });
       await expect(sheet).toBeVisible();
       for (const k of ["iosStep1", "iosStep2", "iosStep3"]) await expect(sheet).toContainText(t(`pwa.install.${k}`));
@@ -245,9 +261,9 @@ test.describe("installable app (ru)", () => {
       await page.screenshot({ path: path.join(SHOTS, "ios-sheet-375-ru.png"), animations: "disabled", caret: "hide" });
       await sheet.getByRole("button", { name: t("pwa.install.iosDone") }).click();
       await expect(sheet).toHaveCount(0);
-      await accountMenu(page, user).click();
-      await expect(page.getByText(t("shell.account.signedInAs"))).toBeVisible();
-      await expect(page.getByRole("button", { name: t("pwa.install.menu") })).toHaveCount(0); // dismissal remembered
+      const again = await openMore(page);
+      await expect(again.getByText(t("shell.account.signedInAs"))).toBeVisible();
+      await expect(again.getByRole("button", { name: t("pwa.install.menu") })).toHaveCount(0); // dismissal remembered
     } finally {
       await ctx.close();
     }
@@ -259,9 +275,9 @@ test.describe("installable app (ru)", () => {
       await p2.addInitScript(() => Object.defineProperty(navigator, "standalone", { get: () => true }));
       await signIn(p2, user);
       await p2.goto(`/${L}/courses`);
-      await accountMenu(p2, user).click();
-      await expect(p2.getByText(t("shell.account.signedInAs"))).toBeVisible();
-      await expect(p2.getByRole("button", { name: t("pwa.install.menu") })).toHaveCount(0);
+      const more = await openMore(p2);
+      await expect(more.getByText(t("shell.account.signedInAs"))).toBeVisible();
+      await expect(more.getByRole("button", { name: t("pwa.install.menu") })).toHaveCount(0);
     } finally {
       await app.close();
     }

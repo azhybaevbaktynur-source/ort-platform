@@ -11,7 +11,7 @@ from app.lms.core import clock
 from app.lms.core.pagination import PageOut
 from app.lms.courses.service import load_course, require_course
 from app.lms.progress import service
-from app.lms.progress.schemas import GoalIn, GoalOut, MistakeOut, ProgressOut
+from app.lms.progress.schemas import ActivityOut, GoalIn, GoalOut, MistakeOut, ProgressOut, SavedOut
 
 router = APIRouter()
 
@@ -33,6 +33,21 @@ def my_mistakes(course_id: uuid.UUID, status: Literal["open", "fixed"] = "open",
                 limit: int = Query(25, ge=1, le=100), ctx: AuthzContext = Depends(get_authz)):
     course, _ = _enrollment(ctx, course_id)
     return service.mistakes(ctx.db, course, ctx.user.id, status=status, cursor=cursor, limit=limit, now=clock.now())
+
+
+@router.get("/courses/{course_id}/my/activity", response_model=ActivityOut)
+def my_activity(course_id: uuid.UUID, days: int = Query(30), ctx: AuthzContext = Depends(get_authz)):
+    """STUDENT_UI_DESIGN 4.2; `days` in 7, 30, 90, 365 (else 422 invalid_days)."""
+    course, _ = _enrollment(ctx, course_id)
+    return service.activity(ctx.db, course, ctx.user.id, days=days, now=clock.now())
+
+
+@router.get("/courses/{course_id}/my/saved", response_model=PageOut[SavedOut])
+def my_saved(course_id: uuid.UUID, cursor: Optional[str] = None, limit: int = Query(25, ge=1, le=50),
+             ctx: AuthzContext = Depends(get_authz)):
+    """STUDENT_UI_DESIGN 4.3: questions the caller flagged in their submitted attempts, newest first."""
+    course, _ = _enrollment(ctx, course_id)
+    return service.saved(ctx.db, course, ctx.user.id, cursor=cursor, limit=limit, now=clock.now())
 
 
 @router.put("/courses/{course_id}/my/goal", response_model=GoalOut)

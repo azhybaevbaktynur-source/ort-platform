@@ -25,8 +25,9 @@ export function fmtExamDate(iso: string, lang: string): string {
   }
 }
 
-function GoalEditor({ courseId, goal, onDone, onCancel }: {
-  courseId: string; goal: ExamGoalOut; onDone: (g: ExamGoalOut) => void; onCancel: () => void;
+/** Student UI U3: exported for the home's score tiles (`className` replaces the strip's column span). */
+export function GoalEditor({ courseId, goal, onDone, onCancel, className }: {
+  courseId: string; goal: ExamGoalOut; onDone: (g: ExamGoalOut) => void; onCancel: () => void; className?: string;
 }) {
   const { t } = useTranslation();
   const errorText = useErrorText();
@@ -62,7 +63,7 @@ function GoalEditor({ courseId, goal, onDone, onCancel }: {
     }
   };
   return (
-    <form onSubmit={save} noValidate className={cn(tile, "col-span-2 gap-3 sm:col-span-3")}>
+    <form onSubmit={save} noValidate className={cn(tile, "col-span-2 gap-3 sm:col-span-3", className)}>
       <Input label={t("examPrep.goal.inputLabel", { min, max })} containerClassName="max-w-xs" inputMode="numeric"
         autoFocus value={text} error={error ?? undefined}
         onChange={(e) => setText(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))} />
