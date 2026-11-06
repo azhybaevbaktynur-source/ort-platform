@@ -4,7 +4,7 @@ Strategy research is kept outside the public repo (`docs/strategy/`, git-exclude
 
 ## Direction (owner)
 - An exam-prep platform for **individual students** first. Tutors and schools come later, once there are enough students.
-- **ORT first**, then olympiads and the national test (owner: "NCT"), on the same exam-prep page.
+- **ORT first**, then olympiads and the tests of НЦТ (Национальный центр тестирования), on the same exam-prep page.
 - **One ORT course per language**, run by the platform. No family of similar ORT courses.
 - **Free and paid:** some exams free; a payment unlocks all exams.
 - **Explanations** come from the CSV the owner prepares (already imported and shown in the result review). No AI spending per student for them.
@@ -27,10 +27,10 @@ Strategy research is kept outside the public repo (`docs/strategy/`, git-exclude
 ## Decisions for the owner
 | # | Question | Default until you answer |
 |---|---|---|
-| D1 | Delete the four oldest Neon backups (before phases 7b, 7c, 8a, 8b; all later ones stay) so new database changes can get their own backup? | Waiting: nothing reaches production without it |
+| D1 | Delete the four oldest Neon backups | **Done 2026-11-06** with the owner's OK; 6/10 branches |
 | D2 | What is free? | The first full test in each language, plus the result review; the admin can switch any test at any time |
 | D3 | First payment method | Activation codes you sell by QR transfer; automatic payment later with a provider contract |
 | D4 | Length of paid access | Set per code batch; suggested "until 31 May" for the season |
 | D5 | AI chat provider | Not built before S1–S4. Free tiers (e.g. Google's free Gemini) may use what students type to train their models, which the 2026 Digital Code doesn't allow for children's data without consent, and they allow few requests per minute. A paid low-cost model with a hard monthly cap is the safe option |
 | D6 | Android app in Google Play | After S5's installable web app shows use |
-| D7 | The national test: its exact name and format, for later | — |
+| D7 | The national test | **Owner:** НЦТ, Национальный центр тестирования (state body under the Ministry) that runs independent testing of school students. Its test formats are researched when that slice starts |
