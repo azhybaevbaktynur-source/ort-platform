@@ -42,6 +42,7 @@ from app.lms.attempts.models import Attempt
 from app.lms.core import clock
 from app.lms.core.pagination import PageOut
 from app.lms.courses import scopes as course_scopes
+from app.lms.courses.cover import NO_EXTRAS, card_extras  # F7a
 from app.lms.courses.models import Course
 from app.lms.courses.schemas import card_organization_name
 from app.lms.courses.service import paginate_rows
@@ -246,11 +247,13 @@ def _course_cards(db: Session, uid: str, rows: list, now: datetime) -> list[sch.
     due = _next_due(db, uid, ids, now)
     progress = _progress(db, uid, ids)
     features = _exam_features(db, [r[0].id for r in rows if is_exam_prep(r[0])])
+    extras = card_extras(db, ids)  # F7a: cover, tests and lessons, one statement
     platform = platform_org_id()
     out = []
     for r in rows:
         c = r[0]
         done_total = progress.get(c.id)
+        x = extras.get(c.id, NO_EXTRAS)
         out.append(sch.HomeCourseOut(
             id=c.id, title=c.title, description=c.description, languages=list(c.languages),
             default_language=c.default_language, owner_display_name=r.owner or "—",
@@ -260,7 +263,8 @@ def _course_cards(db: Session, uid: str, rows: list, now: datetime) -> list[sch.
             progress=sch.HomeProgressOut(done=done_total[0], total=done_total[1]) if done_total else None,
             student_layout="exam_prep" if is_exam_prep(c) else "general",
             features=sch.HomeCourseFeaturesOut(modules=features[c.id][0], practice=features[c.id][1])
-            if c.id in features else None))
+            if c.id in features else None,
+            cover_url=x.cover_url, tests_count=x.tests_count, lessons_count=x.lessons_count))
     return out
 
 
@@ -611,10 +615,13 @@ def _platform_courses(db: Session, user: User) -> list[sch.HomePlatformCourseOut
                                Enrollment.state == "active"))
         .order_by(Course.published_at.desc(), Course.id.desc()).limit(sch.PLATFORM_COURSES_MAX)
     ).all()
+    extras = card_extras(db, (r[0].id for r in rows))  # F7a
     return [sch.HomePlatformCourseOut(
         id=r[0].id, title=r[0].title, description=r[0].description, languages=list(r[0].languages),
         default_language=r[0].default_language, owner_display_name=r.owner or "—",
-        organization_display_name=card_organization_name("platform", r.root_name)) for r in rows]
+        organization_display_name=card_organization_name("platform", r.root_name),
+        cover_url=extras.get(r[0].id, NO_EXTRAS).cover_url, tests_count=extras.get(r[0].id, NO_EXTRAS).tests_count,
+        lessons_count=extras.get(r[0].id, NO_EXTRAS).lessons_count) for r in rows]
 # --- Exam prep S2 end ---
 
 

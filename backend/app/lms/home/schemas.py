@@ -100,6 +100,10 @@ class HomeCourseOut(BaseModel):
     student_layout: Literal["exam_prep", "general"] = "general"
     # Student UI U9: exam-prep courses only (null otherwise), so the shell draws the same menu on every page
     features: Optional[HomeCourseFeaturesOut] = None
+    # F7a (STUDENT_UI_FIX_PLAN 7.2): the one course card's cover and meta line
+    cover_url: Optional[str] = None
+    tests_count: int = 0
+    lessons_count: int = 0
 
 
 # --- Phase 8a S3 begin --- (PHASE_8A_DESIGN 5.4, 6.7, 8.1: "continue in course" strip and announcements)
@@ -165,6 +169,10 @@ class HomePlatformCourseOut(BaseModel):
     owner_display_name: str
     organization_display_name: Optional[str] = None
     is_platform_course: bool = True
+    # F7a (STUDENT_UI_FIX_PLAN 7.2)
+    cover_url: Optional[str] = None
+    tests_count: int = 0
+    lessons_count: int = 0
 # --- Exam prep S2 end ---
 
 

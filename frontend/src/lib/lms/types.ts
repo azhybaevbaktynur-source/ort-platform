@@ -85,6 +85,23 @@ export interface CourseCard {
   starts_at: string | null;
   ends_at: string | null;
   deleted_at?: string | null;
+  /** F7a: public WebP cover (16:9, at most 1280 x 720); null: draw the generated default cover. Absent: older backend. */
+  cover_url?: string | null;
+  /** F7a: published exams with a published version, as the Tests page lists them (no practice quizzes) */
+  tests_count?: number;
+  /** F7a: lessons (page, file, link) of published modules */
+  lessons_count?: number;
+  /** F7a: the platform organization's course: no teacher or organization line */
+  is_platform_course?: boolean;
+}
+
+/** F7a: `POST /courses/{id}/cover` (multipart `file`, optional `focus_x` / `focus_y` 0..1); `DELETE` clears it. */
+export interface CourseCoverOut {
+  cover_url: string;
+  asset_id: string;
+  width: number;
+  height: number;
+  deduplicated: boolean;
 }
 
 export interface MyEnrollmentOut {
@@ -108,6 +125,8 @@ export interface CourseStudentOut {
   ends_at: string | null;
   owner_display_name: string | null;
   my_enrollment: MyEnrollmentOut;
+  /** F7a: the course page banner; null: generated default cover (absent: older backend) */
+  cover_url?: string | null;
 }
 
 export interface CourseStaffOut extends CourseStudentOut {
