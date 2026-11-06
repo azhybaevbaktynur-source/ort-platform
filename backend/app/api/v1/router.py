@@ -136,3 +136,8 @@ from app.lms.access.router import admin_router as _access_admin_router, me_route
 api_router.include_router(_access_me_router, prefix="/me", tags=["Me"])
 api_router.include_router(_access_admin_router, prefix="/platform", tags=["Platform Admin"])
 # --- S3 access end ---
+# --- S4 person page begin --- (the caller's own email change and the public confirmation link)
+from app.lms.email_change.router import router as _email_change_router  # noqa: E402
+
+api_router.include_router(_email_change_router, tags=["Email change"])
+# --- S4 person page end ---

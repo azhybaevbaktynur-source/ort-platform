@@ -161,6 +161,9 @@ class Settings(BaseSettings):
     EMAIL_FROM_NAME: str = "Platform"  # default = per-language platform name in auth emails; any other value overrides
     RESEND_API_KEY: str = ""
     BREVO_API_KEY: str = ""
+    # S4: the browser e2e backend only (scripts/e2e_backend.sh) reads private emails (the email-change link) from the
+    # console log. Honoured only by the console provider outside production; never set it anywhere else.
+    EMAIL_CONSOLE_SHOW_PRIVATE: bool = False
 
     # Email one-time codes (registration) and password reset
     EMAIL_CODE_TTL_MINUTES: int = 10

@@ -162,7 +162,17 @@ def _sign_in(user: User) -> TokenResponse:
     if mfa.is_enabled(user):
         raise _error(403, "mfa_required", "Enter the code from your authenticator app.",
                      challenge=mfa.issue_challenge(user), expiresInSeconds=settings.MFA_CHALLENGE_TTL_SECONDS)
+    _mark_login(user)
     return _token_response(user)
+
+
+def _mark_login(user: User) -> None:
+    """S4 person page: a full sign-in (password or email code, and the two-step login step) records its time. Never on
+    /auth/refresh."""
+    user.last_login_at = _now()
+    db = object_session(user)
+    if db is not None:
+        db.commit()
 
 
 @router.get("/ping")
@@ -320,8 +330,9 @@ def login_user(
     Universal user authentication:
     Verifies credentials against the SQL database and returns a token and the profile.
     Accounts whose email is not verified yet get a fresh code instead of a token.
-    Only failures count, and the check runs before bcrypt: a successful login costs one read and writes nothing, so a
-    whole school signing in from one address never adds up (PHASE_11_DESIGN 5.1).
+    Only failures count, and the check runs before bcrypt: a successful login costs one read of the limiter and writes
+    nothing to it, so a whole school signing in from one address never adds up (PHASE_11_DESIGN 5.1). S4: the account's
+    row records the time of the sign-in (`last_login_at`).
     """
     clean_email = req.email.strip().lower()
     ip_key = client_ip_hash(request) if request is not None else None
@@ -384,6 +395,7 @@ def complete_mfa(req: MfaCompleteRequest, db: Session = Depends(get_db), request
     if kind == "recovery":
         audit.record(db, actor=user, action="mfa.recovery_code.used", target_type="user", target_id=user.id,
                      details={"left": mfa.recovery_codes_left(db, user.id)}, request=request)
+    user.last_login_at = _now()  # S4 person page
     db.commit()
     return _token_response(user)
 # --- S1 admin security end ---
@@ -428,17 +440,28 @@ def forgot_password(
 
     # Disabled accounts (incl. the ORT system teacher) get no token and no email; the answer stays the same
     if user and user.disabled_at is None and not _cooldown_left(user.reset_requested_at):
-        token = secrets.token_urlsafe(32)
-        user.reset_token = _secret_hash(token)
-        user.reset_token_expires = _now() + timedelta(minutes=settings.PASSWORD_RESET_TTL_MINUTES)
-        user.reset_requested_at = _now()
-        db.commit()
-        send_password_reset_email(to_email=user.email, token=token, lang=req.lang or "ky")
+        issue_password_reset(db, user, req.lang or "ky")
 
     return {
         "success": True,
         "message": "Эгерде мындай email катталган болсо, сырсөздү калыбына келтирүү шилтемеси жөнөтүлдү / Если аккаунт с таким email существует, ссылка для сброса пароля отправлена",
     }
+
+
+def reset_cooldown_left(user: User) -> int:
+    """Seconds until another reset email may go to this account (S4: the person page asks the same)."""
+    return _cooldown_left(user.reset_requested_at)
+
+
+def issue_password_reset(db: Session, user: User, lang: str) -> bool:
+    """A new reset link (only its keyed hash is stored), committed, then emailed. Callers check the account is enabled
+    and the cooldown first. S4: the person page sends the same email."""
+    token = secrets.token_urlsafe(32)
+    user.reset_token = _secret_hash(token)
+    user.reset_token_expires = _now() + timedelta(minutes=settings.PASSWORD_RESET_TTL_MINUTES)
+    user.reset_requested_at = _now()
+    db.commit()
+    return send_password_reset_email(to_email=user.email, token=token, lang=lang)
 
 
 @router.post("/reset-password")

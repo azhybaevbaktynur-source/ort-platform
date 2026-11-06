@@ -206,3 +206,8 @@ from app.lms.access.policies import ACCESS_POLICIES  # noqa: E402
 
 ROUTE_POLICIES.update(ACCESS_POLICIES)
 # --- S3 access end ---
+# --- S4 person page begin --- (email change; the admin's person-page routes are in platform_admin/policies.py)
+from app.lms.email_change.policies import EMAIL_CHANGE_POLICIES  # noqa: E402
+
+ROUTE_POLICIES.update(EMAIL_CHANGE_POLICIES)
+# --- S4 person page end ---

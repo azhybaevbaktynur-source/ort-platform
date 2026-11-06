@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import Request
-from sqlalchemy import func, or_, select
+from sqlalchemy import exists, func, or_, select
 from sqlalchemy.orm import Session, aliased
 
 from app.lms.audit import service as audit
@@ -61,13 +61,18 @@ def enable_user(db: Session, admin: User, user_id: str, request: Request) -> Use
     return target
 
 
-def search_users(q: Optional[str], teacher_status: Optional[str], disabled: Optional[bool]):
+def search_users(q: Optional[str], teacher_status: Optional[str], disabled: Optional[bool], *,
+                 email_unverified: bool = False, platform_admin: bool = False, has_access: bool = False,
+                 now=None):
+    """S4: email or name substring (case-insensitive), plus filters; one statement, paged by (created_at, id) on
+    `ix_users_created_at_id`, so a page reads index order until it has its rows (bounded by the page, not the table).
+    Past ~50k users, a pg_trgm index on lower(email) and lower(display_name) is the fix for substring search."""
     stmt = select(User).where(User.is_test_student.is_(False))
     if q:
         term = q.strip().lower()
         if term:
             stmt = stmt.where(or_(
-                func.lower(User.email).startswith(term, autoescape=True),
+                func.lower(User.email).contains(term, autoescape=True),
                 func.lower(User.display_name).contains(term, autoescape=True),
             ))
     if teacher_status:
@@ -76,6 +81,17 @@ def search_users(q: Optional[str], teacher_status: Optional[str], disabled: Opti
         stmt = stmt.where(User.disabled_at.is_not(None))
     elif disabled is False:
         stmt = stmt.where(User.disabled_at.is_(None))
+    if email_unverified:
+        stmt = stmt.where(User.email_verified.is_(False))
+    if platform_admin:
+        stmt = stmt.where(User.is_platform_admin.is_(True))
+    if has_access:
+        from app.lms.access.models import AccessPass
+        from app.lms.core import clock
+
+        at = now or clock.now()
+        stmt = stmt.where(exists().where(AccessPass.user_id == User.id, AccessPass.revoked_at.is_(None),
+                                         AccessPass.starts_at <= at, AccessPass.ends_at > at))
     return stmt
 
 
@@ -120,6 +136,7 @@ def user_out(user: User) -> AdminUserOut:
         email_verified=bool(user.email_verified), is_platform_admin=bool(user.is_platform_admin),
         teacher_status=user.teacher_status, disabled_at=user.disabled_at,
         disabled_reason=user.disabled_reason, mfa_enabled=user.mfa_enabled_at is not None,
+        last_login_at=user.last_login_at,
     )
 
 
@@ -202,7 +219,17 @@ def user_detail(db: Session, user: User) -> AdminUserDetailOut:
         active_enrollment_count=active,
         teacher_requests=requests_out(db, list(reqs)),
         revoke_impact=revoke_impact(db, user),
+        **person_extras(db, user),
     )
+
+
+def person_extras(db: Session, user: User) -> dict:
+    """S4 person page: age and consent, parent links (display names only), the pending email change."""
+    from app.lms.platform_admin.persons import parent_links, pending_email
+
+    return dict(age_band=user.age_band, consent_state=user.consent_state, consent_due_at=user.consent_due_at,
+                deleted=user.deleted_at is not None, parent_links=parent_links(db, user.id),
+                pending_email_change=pending_email(db, user.id))
 
 
 def audit_out(db: Session, row: AdminAuditLog) -> AuditEntryOut:

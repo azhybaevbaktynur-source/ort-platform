@@ -11,10 +11,11 @@ const TONES: Record<string, BadgeTone> = {
   approved: "success",
   revoked: "danger",
   disabled: "danger",
+  active: "success",
   admin: "info",
 };
 
-export function UserStatusBadge({ kind, status }: { kind: "teacher" | "account"; status: TeacherStatus | "disabled" | "admin" }) {
+export function UserStatusBadge({ kind, status }: { kind: "teacher" | "account"; status: TeacherStatus | "disabled" | "admin" | "active" }) {
   const { t } = useTranslation();
   const label = kind === "teacher" ? t(`platformAdmin.teacherStatus.${status}`) : t(`platformAdmin.accountStatus.${status}`);
   return <Badge tone={TONES[status] ?? "neutral"}>{label}</Badge>;

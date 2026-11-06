@@ -231,6 +231,7 @@ async def test_school_behind_one_address_signs_in_all_day(db, api, enforce_ip, f
 
 
 async def test_a_successful_login_costs_one_read_and_no_write(db, api, enforce_ip, frozen):
+    """No write to the limiter; S4: the one write is the account's own last-login time."""
     user = account(db)
     assert buckets(db) == 0
     statements = []
@@ -243,7 +244,8 @@ async def test_a_successful_login_costs_one_read_and_no_write(db, api, enforce_i
         assert (await login(api, user.email)).status_code == 200
     finally:
         event.remove(Engine, "before_cursor_execute", record)
-    assert [s for s in statements if s.lstrip().upper().startswith(("INSERT", "UPDATE", "DELETE"))] == []
+    writes = [s for s in statements if s.lstrip().upper().startswith(("INSERT", "UPDATE", "DELETE"))]
+    assert len(writes) == 1 and writes[0].lstrip().upper().startswith("UPDATE USERS SET LAST_LOGIN_AT")
     assert len([s for s in statements if "rate_limit_buckets" in s]) == 1
     assert buckets(db) == 0
 

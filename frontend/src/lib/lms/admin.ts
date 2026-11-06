@@ -1,6 +1,6 @@
 import { lmsFetch } from "./client";
 import type {
-  AdminCourseOut, AdminUserDetailOut, AdminUserOut, AuditEntryOut, PageOut, PlatformSummaryOut,
+  AdminAttemptOut, AdminCourseOut, AdminUserDetailOut, AdminUserOut, AuditEntryOut, PageOut, PlatformSummaryOut,
   RosterEntryOut, TeacherRequestAdminOut, TeacherRequestStatus, TeacherStatus,
 } from "./types";
 
@@ -20,6 +20,10 @@ export interface ListUsersParams {
   q?: string;
   teacher_status?: TeacherStatus | "";
   disabled?: boolean;
+  /** S4 filters */
+  email_unverified?: boolean;
+  platform_admin?: boolean;
+  has_access?: boolean;
   cursor?: string | null;
   limit?: number;
 }
@@ -66,3 +70,16 @@ export interface ListAuditParams {
 }
 export const listAuditLog = (p: ListAuditParams) =>
   lmsFetch<PageOut<AuditEntryOut>>("/platform/audit-log", { params: { limit: 50, ...p } });
+
+// --- S4 person page ---
+export const listUserAttempts = (id: string, cursor?: string | null, limit = 10) =>
+  lmsFetch<PageOut<AdminAttemptOut>>(`/platform/users/${enc(id)}/attempts`, { params: { cursor, limit } });
+export const sendPasswordReset = (id: string, reason: string) =>
+  post<{ sent: boolean }>(`/platform/users/${enc(id)}/password-reset`, { reason });
+export const adminChangeEmail = (id: string, newEmail: string, reason: string) =>
+  post<AdminUserDetailOut>(`/platform/users/${enc(id)}/email-change`, { new_email: newEmail, reason });
+export const adminCancelEmailChange = (id: string, reason: string) =>
+  post<AdminUserDetailOut>(`/platform/users/${enc(id)}/email-change/cancel`, { reason });
+/** The privacy function: correcting to under 14 starts the parent-consent grace period; correcting up grants nothing. */
+export const correctAgeBand = (id: string, ageBand: string, reason: string) =>
+  post<{ user_id: string; age_band: string; consent_state: string }>(`/admin/privacy/users/${enc(id)}/age-band`, { age_band: ageBand, reason });

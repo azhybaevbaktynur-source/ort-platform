@@ -58,6 +58,9 @@ def grant(db: Session, target: User) -> None:
     """Not committed. Not a teacher by this: the new admin is only an admin (and sets up two-step login first)."""
     target.is_platform_admin = True
     ensure_platform_membership(db, target.id)
+    from app.lms.email_change.service import drop_for  # S4 security review: no admin-started change survives
+
+    drop_for(db, target.id)
 
 
 def revoke(db: Session, target: User) -> None:
