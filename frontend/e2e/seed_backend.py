@@ -41,6 +41,8 @@ STUDENTS = [
     "bb-review-ru", "bb-split-ru", "bb-screens-ru",
     # UX rework 2: mascot spec (no mascot in the player; on the result page)
     "mascot-player-ru", "mascot-result-ru",
+    # Student UI U6: analytics page (one student without answers, one the spec fills through the API)
+    "analytics-empty-ru", "analytics-data-ru",
 ]
 
 
