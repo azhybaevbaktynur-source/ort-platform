@@ -42,11 +42,12 @@ test("an admin without two-step login is sent to set it up, then reaches the ove
   await page.goto("/ru/login");
   await passwordStep(page, admin.email, admin.password); // no two-step login yet: the password signs in
   // every page refuses the account (403 mfa_enrollment_required), so the first page after the login sends it on
-  await page.waitForURL(/\/ru\/admin\/security$/);
+  await expect(page).toHaveURL(/\/ru\/admin\/security$/, { timeout: 15_000 });
   await page.waitForLoadState("networkidle");
 
-  await page.goto("/ru/admin");
-  await page.waitForURL(/\/ru\/admin\/security$/);
+  // the client redirect can abort the first navigation (ERR_ABORTED), so wait on the URL, not the load
+  await page.goto("/ru/admin", { waitUntil: "commit" }).catch((e) => { if (!String(e).includes("ERR_ABORTED")) throw e; });
+  await expect(page).toHaveURL(/\/ru\/admin\/security$/, { timeout: 15_000 });
   await expect(page.getByText(tr("ru", "adminSecurity.setup.required"))).toBeVisible();
   const nav = page.getByRole("navigation", { name: tr("ru", "platformAdmin.nav.label") });
   await expect(nav.getByRole("link", { name: tr("ru", "platformAdmin.nav.overview") })).toHaveCount(0);
