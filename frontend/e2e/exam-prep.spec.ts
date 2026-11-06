@@ -84,6 +84,15 @@ test.describe("exam-prep page (ru)", () => {
       await expect(library.getByText(t("examPrep.library.status.not_started")).first()).toBeVisible();
       await shoot(page, "exam-prep-new");
 
+      // ---- Student UI U3: the home is now the exam-prep home of ORT (Russian): greeting, countdown, Next, no score yet
+      await page.goto(`/${L}/courses`);
+      await expect(page.getByRole("heading", { level: 1 })).toContainText(newcomer.name.split(" ")[0]);
+      await expect(page.getByRole("group", { name: new RegExp(`^${t("examPrep.goal.daysLabel")}: \\d+ `) })).toBeVisible();
+      await expect(page.getByRole("region", { name: t("examPrep.next.title") })).toContainText("ОРТ E2E");
+      await expect(page.getByRole("region", { name: t("home.prep.score.title") })).toContainText(t("examPrep.goal.noScore"));
+      await shoot(page, "home-prep-new");
+      await page.goto(`/${L}/courses/${cid}`);
+
       // ---- the target, inline: out of range is refused, 200 is kept
       await page.getByRole("button", { name: t("examPrep.goal.setTarget") }).click();
       const input = page.getByLabel(t("examPrep.goal.inputLabel", { min: 60, max: 245 }));
@@ -135,6 +144,14 @@ test.describe("exam-prep page (ru)", () => {
       await page.goto(`/${L}/courses`);
       await expect(page.getByRole("region", { name: t("home.courses.title") }).locator(`a[href="/${L}/courses/${cid}"]`)).toHaveCount(1);
       await expect(page.locator(`a[href="/${L}/courses/catalog/${cid}"]`)).toHaveCount(0);
+      // Student UI U3: current vs target, the section rows of the latest result, the streak of today's answers
+      const scores = page.getByRole("region", { name: t("home.prep.score.title") });
+      await expect(scores).toContainText(t("examPrep.goal.outOf", { max: 245 }));
+      await expect(scores).toContainText("200");
+      await expect(page.getByRole("region", { name: t("examPrep.sections.title") }).getByRole("meter")).toHaveCount(5);
+      await expect(page.getByRole("region", { name: t("home.prep.streak.title") })).toContainText(t("home.prep.streak.days_one", { count: 1 }));
+      await expect(page.getByRole("region", { name: t("examPrep.next.title") })).toContainText("ОРТ E2E staff");
+      await shoot(page, "home-prep-after");
     } finally {
       await api(s.admin, "PATCH", `/courses/${cid}`, { exam_date: null });
       await ctx.close();
