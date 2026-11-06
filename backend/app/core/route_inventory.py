@@ -201,3 +201,8 @@ def find_unlisted_routes(app) -> list[tuple[str, str]]:
 
 def find_stale_policies(app) -> list[tuple[str, str]]:
     return sorted(set(ROUTE_POLICIES) - _actual(app))
+# --- S3 access begin --- (free and paid exams, docs/phases/S3_ACCESS_DESIGN.md 4)
+from app.lms.access.policies import ACCESS_POLICIES  # noqa: E402
+
+ROUTE_POLICIES.update(ACCESS_POLICIES)
+# --- S3 access end ---

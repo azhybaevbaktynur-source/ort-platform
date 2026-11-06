@@ -58,3 +58,4 @@ from app.lms.privacy.models import ConsentRecord, DataRequest, PolicyVersion  # 
 from app.lms.guardian.models import GuardianLink, GuardianPairingCode  # noqa: F401,E402
 # --- Phase 11 S1 end ---
 from app.lms.mfa.models import MfaRecoveryCode  # noqa: F401,E402  (S1 admin security)
+from app.lms.access.models import AccessPass, ActivationCode, ActivationCodeBatch  # noqa: F401,E402  (S3 access)

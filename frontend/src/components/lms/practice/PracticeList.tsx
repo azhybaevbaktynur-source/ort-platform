@@ -3,13 +3,13 @@
 // Phase 10 S3: the course Practice page. Students: published sets with best %, attempts and Start / Continue.
 // Staff: the same rows plus a menu (Rename, Refresh questions, Delete) and "New set".
 import React, { useCallback, useEffect, useState } from "react";
-import { Dumbbell, Plus } from "lucide-react";
+import { Dumbbell, Lock, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { useCourse } from "@/components/lms/CourseContext";
 import { useCanEditContent } from "@/components/lms/content/StaffGate";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
-import { Button, ConfirmDialog, Dialog, EmptyState, Input, LoadingState, MenuButton, PageHeader, Pagination, toast } from "@/components/ui";
+import { Button, ConfirmDialog, Dialog, EmptyState, Input, LinkButton, LoadingState, MenuButton, PageHeader, Pagination, toast } from "@/components/ui";
 import { startAttempt } from "@/lib/lms/attempts";
 import { pickLocalized } from "@/lib/lms/localized";
 import { deletePractice, listPractice, updatePractice, type PracticeSetOut } from "@/lib/lms/practice";
@@ -98,11 +98,16 @@ export function PracticeList() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                {s.status === "published" && (
+                {s.status === "published" && (s.locked ? ( // S3 access: practice of a platform course needs a pass
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 text-sm text-slate-600"><Lock aria-hidden="true" className="h-4 w-4" />{t("practice.locked")}</span>
+                    <LinkButton variant="secondary" href={`/${lang}/unlock`}>{t("practice.unlock")}</LinkButton>
+                  </span>
+                ) : (
                   <Button loading={busyId === s.id} onClick={() => void start(s)}>
                     {t(s.open_attempt_id ? "practice.continue" : "practice.start")}<span className="sr-only">: {name(s)}</span>
                   </Button>
-                )}
+                ))}
                 {canEdit && (
                   <MenuButton label={<span aria-label={t("practice.actions")}>…</span>} variant="secondary" align="end"
                     items={[

@@ -32,7 +32,7 @@ from app.lms.attempts.schemas import (
     AttemptItemStateOut, AttemptSectionStateOut, AttemptStateOut, MyAttemptOut, RejectedAnswer, StartIn, SubmitIn,
     SubmitOut,
 )
-from app.lms.core import ratelimit
+from app.lms.core import clock, ratelimit
 from app.lms.core.errors import Conflict, NotFound, ValidationFailed
 from app.lms.courses.models import Course
 from app.lms.enrollments.models import Enrollment
@@ -138,7 +138,8 @@ def load_attempt_bundle(db: Session, user, attempt_id, *, for_update: bool = Fal
         select(Attempt, Assessment, Course.status, Course.deleted_at, Enrollment.state, Enrollment.role,
                Course.template_key,  # Phase 8b S1
                Course.sandbox_for_template_id,  # Phase 8b fix M1
-               Enrollment.is_test_student)  # UX rework S1
+               Enrollment.is_test_student,  # UX rework S1
+               Course.organization_id, Course.settings)  # S3 access: the resume rule below, same statement
         .join(Assessment, Assessment.id == Attempt.assessment_id)
         .join(Course, Course.id == Attempt.course_id)
         .join(Enrollment, Enrollment.id == Attempt.enrollment_id)
@@ -149,13 +150,19 @@ def load_attempt_bundle(db: Session, user, attempt_id, *, for_update: bool = Fal
     row = db.execute(stmt).first()
     if row is None:
         raise attempt_not_found()
-    attempt, assessment, cstatus, cdeleted, estate, erole, tkey, sandbox_tid, is_test = row
+    attempt, assessment, cstatus, cdeleted, estate, erole, tkey, sandbox_tid, is_test, org_id, csettings = row
     if is_test and cstatus == "draft":  # UX rework S1: a draft course works for its test student (`authz.can`)
         cstatus = "published"
     # Phase 8b fix M1: a preview attempt in a template sandbox stays the caller's only while they manage the
     # template (the sandbox enrollment is a cache); regular courses pay nothing (the column is in the same row)
     if sandbox_tid is not None and not AuthzContext(user, db).sandbox_ok(attempt.course_id, sandbox_tid):
         raise attempt_not_found()
+    # --- S3 access --- (design 7.1: an untimed open attempt of a paid test or a practice set needs a pass to go on;
+    # no statement unless the attempt is open, untimed and of such a test)
+    from app.lms.access import service as access
+
+    access.check_resume(db, attempt, assessment, organization_id=org_id, course_settings=csettings,
+                        test_student=bool(is_test), now=clock.now())
     return attempt, AttemptEnv(cstatus, cdeleted is not None, estate, erole, assessment, tkey)
 
 
@@ -699,6 +706,12 @@ def start_attempt(db: Session, ctx: AuthzContext, course: Course, aid, data: Sta
         from app.lms.accommodations import service as accommodations
 
         s4_enr, eff = accommodations.start_context(db, course.id, user.id, assessment)  # enrollment row comes along
+        # --- S3 access --- (design 1.3, 7.3: a new attempt of a paid test or a practice set of a platform course needs
+        # a pass; no open attempt exists here; test students never locked; no statement for a free test)
+        from app.lms.access import service as access
+
+        access.require_start(db, course, assessment, user.id,
+                             test_student=bool(s4_enr is not None and s4_enr.is_test_student), now=now)
         af, au = timing.as_utc(eff.available_from), timing.as_utc(eff.available_until)
         if af is not None and now < af:
             raise Conflict("Assessment is not open yet", code="assessment_not_available",

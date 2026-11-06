@@ -93,9 +93,13 @@ class Assessment(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
     # --- Phase 7b S1 end ---
     # --- Phase 10 S0 --- (PHASE_10_DESIGN 1: practice quizzes write no grades; never an ORT preset)
     is_practice: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    # --- S3 access --- (docs/phases/S3_ACCESS_DESIGN.md 1-2: `paid` needs a pass, in platform courses only; elsewhere
+    # the column is ignored. New tests of platform courses start `paid` (builder); migration 0022 set the rest `free`)
+    access_tier: Mapped[str] = mapped_column(String(8), nullable=False, default="free", server_default="free")
 
     __table_args__ = (
         CheckConstraint("NOT is_practice OR preset = 'none'", name="practice_preset_none"),
+        CheckConstraint("access_tier IN ('free','paid')", name="access_tier_valid"),  # S3 access
         CheckConstraint("preset IN ('none','ort_main','ort_subject')", name="preset_valid"),
         CheckConstraint("grade_release IN ('auto','manual')", name="grade_release_valid"),
         CheckConstraint("status IN ('draft','published')", name="status_valid"),

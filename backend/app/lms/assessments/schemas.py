@@ -496,6 +496,8 @@ class AssessmentStudentSummaryOut(BaseModel):
     last_result: Optional[LastResultOut] = None
     due_at: Optional[datetime] = None
     scheme: Optional[SchemeStudentRefOut] = None
+    access_tier: str = "free"  # S3 access: `paid` needs a pass in a platform course
+    locked: bool = False  # S3 access: the caller needs a pass to start it
 
 
 class LobbySectionOut(BaseModel):
@@ -524,6 +526,8 @@ class AssessmentLobbyOut(BaseModel):
     due_at: Optional[datetime] = None
     scheme: Optional[SchemeStudentRefOut] = None
     requires_access_code: bool = False  # --- Phase 7a S4 --- (3.8: a student must enter the code at start)
+    access_tier: str = "free"  # S3 access
+    locked: bool = False  # S3 access: start refused with `access_required`; the page links to the unlock page
 
 
 # Exact key sets, asserted by the contract tests.

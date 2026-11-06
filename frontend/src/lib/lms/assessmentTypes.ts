@@ -118,6 +118,9 @@ export interface AssessmentStudentSummaryOut {
   /** Phase 4 */
   due_at?: string | null;
   scheme?: SchemeStudentRef | null;
+  /** S3 access: `locked` = the student needs a pass to start it */
+  access_tier?: "free" | "paid";
+  locked?: boolean;
 }
 
 export type AssessmentSummaryOut = AssessmentStaffSummaryOut | AssessmentStudentSummaryOut;
@@ -141,7 +144,7 @@ export interface DraftConflictDetails {
 }
 
 /** Student lobby `reason` when `can_start` is false (anything else falls back to the generic message). */
-export const LOBBY_REASONS = ["not_open_yet", "closed", "attempts_exhausted", "unpublished", "not_a_student", "course_not_active"] as const; // Phase 6 S4b: last two
+export const LOBBY_REASONS = ["not_open_yet", "closed", "attempts_exhausted", "unpublished", "not_a_student", "course_not_active", "access_required"] as const; // Phase 6 S4b: course_not_active, not_a_student; S3: access_required
 export type LobbyReason = (typeof LOBBY_REASONS)[number];
 
 export interface AssessmentStaffOut extends AssessmentStaffSummaryOut, AssessmentGradingFields {
@@ -185,6 +188,9 @@ export interface AssessmentLobbyOut {
   /** Phase 4 */
   due_at?: string | null;
   scheme?: SchemeStudentRef | null;
+  /** S3 access */
+  access_tier?: "free" | "paid";
+  locked?: boolean;
 }
 
 /** GET /assessments/{a} returns the staff or lobby shape depending on the caller's role. */

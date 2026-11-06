@@ -81,10 +81,20 @@ def _commit(db: Session, a: Assessment) -> None:
 
 # =========================================================================== assessments
 
+def default_access_tier(db: Session, course: Course) -> str:
+    """S3 access (design 1.2): new tests of platform-organization courses start `paid`; everywhere else `free`."""
+    from app.lms.access.service import is_platform_path
+    from app.lms.organizations.models import Organization
+
+    path = db.execute(select(Organization.path).where(Organization.id == course.organization_id)).scalar()
+    return "paid" if is_platform_path(path) else "free"
+
+
 def create_assessment(db: Session, ctx: AuthzContext, course: Course, data: sch.AssessmentCreateIn,
-                      *, practice: bool = False) -> Assessment:
+                      *, practice: bool = False, access_tier: Optional[str] = None) -> Assessment:
     """`practice=True` (Phase 10 S2): the forced settings, one section, no quiz assignment; flushes only, the caller
-    (`practice.service`) adds the blocks, publishes and commits."""
+    (`practice.service`) adds the blocks, publishes and commits. `access_tier` (S3): None = the default of the course
+    (`paid` in a platform course, `free` elsewhere); the ORT seed passes `free`."""
     require_course(ctx, A.CONTENT_MANAGE, course)
     assert_not_sandbox(course)  # Phase 8b fix L1: the sample quiz is never published; no other assessments
     # --- Phase 7b S2 begin --- (PHASE_7B_DESIGN 5.3 / 9.1: the template branch; `preset` and a template never mix.
@@ -119,6 +129,7 @@ def create_assessment(db: Session, ctx: AuthzContext, course: Course, data: sch.
         show_correct_answers=ort, allowed_attempts=1, score_policy="highest",
         grading_scheme_version_id=PRESET_SCHEME_VERSIONS.get(data.preset),
     )
+    a.access_tier = access_tier or default_access_tier(db, course)  # S3 access
     # --- Phase 10 S2 begin --- (PHASE_10_DESIGN 3: no assignments row, so grades and lists never see the set)
     if practice:
         a.is_practice, a.allowed_attempts, a.score_policy, a.show_correct_answers = True, -1, "latest", True
@@ -1055,7 +1066,7 @@ def _student_attempts(db: Session, user_id: str, ids: list[uuid.UUID]) -> dict[u
         return out
     rows = db.execute(
         select(Attempt.assessment_id, Attempt.id, Attempt.attempt_no, Attempt.status, Attempt.raw_score,
-               Attempt.points_possible)
+               Attempt.points_possible, Attempt.assessment_version_id)  # S3 access: a timed open attempt resumes
         .where(Attempt.user_id == user_id, Attempt.assessment_id.in_(ids), Attempt.is_preview.is_(False))
         .order_by(Attempt.attempt_no)
     ).all()
@@ -1076,6 +1087,29 @@ def _start_state(a: Assessment, used: int, in_progress_id, now: datetime) -> tup
     if a.allowed_attempts != -1 and used >= a.allowed_attempts:
         return False, "attempts_exhausted"
     return True, None
+
+
+# --- S3 access begin --- (design 4, 7.1: `locked` per row; the gate is read once, only when a row could need a pass)
+def student_gate(db: Session, ctx: AuthzContext, course: Course, rows: list):
+    """`rows`: assessments. The caller's `access.service.Gate` for the course, or the open gate (no statement) when
+    no row is a paid test or a practice set."""
+    from app.lms.access import service as access
+
+    if not any(access.needs_pass(is_practice=bool(a.is_practice), access_tier=a.access_tier,
+                                 course_settings=course.settings) for a in rows):
+        return access.OPEN_GATE
+    return access.course_gate(db, course, ctx.user.id)
+
+
+def locked_for(db: Session, gate, a: Assessment, atts: list) -> bool:
+    """Locked unless the caller's open attempt is timed, i.e. its version has a time limit (it may be finished: design
+    7.1). `atts`: _student_attempts rows (the version id is the last column)."""
+    from app.lms.access.service import version_is_timed
+
+    if not gate.locked(is_practice=bool(a.is_practice), access_tier=a.access_tier):
+        return False
+    return not any(r[3] == "in_progress" and version_is_timed(db, r[6]) for r in atts)
+# --- S3 access end ---
 
 
 def list_student(db: Session, ctx: AuthzContext, course: Course, *, cursor: Optional[str], limit: Optional[int]):
@@ -1099,6 +1133,7 @@ def list_student(db: Session, ctx: AuthzContext, course: Course, *, cursor: Opti
 
     _effs = _acc.effective_for_assessments(db, course.id, ctx.user.id, assessments)
     # --- Phase 7a S6 end ---
+    gate = student_gate(db, ctx, course, assessments)  # S3 access
     out = []
     for a, snap, item_count in rows:
         atts = mine[a.id]
@@ -1115,7 +1150,8 @@ def list_student(db: Session, ctx: AuthzContext, course: Course, *, cursor: Opti
             item_count=item_count, available_from=_e.available_from, available_until=_e.available_until,
             allowed_attempts=_e.allowed_attempts, attempts_used=used, in_progress_attempt_id=open_id,
             last_result=last, due_at=utc(_e.due_at),
-            scheme=sch.scheme_student_ref(briefs.get(a.grading_scheme_version_id))))
+            scheme=sch.scheme_student_ref(briefs.get(a.grading_scheme_version_id)),
+            access_tier=a.access_tier, locked=locked_for(db, gate, a, atts)))  # S3 access
     return out, nxt
 
 
@@ -1176,5 +1212,10 @@ def lobby(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID) -> sch
             _s.time_limit_s = _limits.get(int(_s.pos), _s.time_limit_s)
     out.requires_access_code = (a.access_code_hash is not None and (a.preset or "none") == "none"
                                 and ctx.role_for(course.id) not in ("teacher", "assistant"))
+    # --- S3 access --- (a locked test: the lobby says so and offers the unlock page instead of Start)
+    out.access_tier = a.access_tier
+    out.locked = locked_for(db, student_gate(db, ctx, course, [a]), a, atts)
+    if out.locked and out.can_start:
+        out.can_start, out.reason = False, "access_required"
     return out
     # --- Phase 7a S4 end ---

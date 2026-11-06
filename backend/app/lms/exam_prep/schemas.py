@@ -43,8 +43,9 @@ class SectionBar(BaseModel):
 
 class NextOut(BaseModel):
     """The one suggested step. `kind`: resume (an open attempt), start (a test not taken yet), practice (practice of
-    the weakest section), retake (the test taken longest ago). `section`: the weakest section of `practice`."""
-    kind: Literal["resume", "start", "practice", "retake"]
+    the weakest section), retake (the test taken longest ago), unlock (S3: only tests that need a pass remain).
+    `section`: the weakest section of `practice`."""
+    kind: Literal["resume", "start", "practice", "retake", "unlock"]
     assessment_id: Optional[uuid.UUID] = None
     attempt_id: Optional[uuid.UUID] = None
     title: Optional[dict] = None
@@ -68,12 +69,14 @@ class ExamPrepOut(BaseModel):
     next: Optional[NextOut] = None
     sources: list[SourceOut] = []
     library_total: int = 0
+    needs_pass: bool = False  # S3: some tests here need a pass the student does not have (the page links to unlock)
 
 
 class LibraryCardOut(BaseModel):
     """One published test. `status`: not_started, in_progress (`attempt_id` is the open attempt) or done.
     `best_value`: the best released scaled value; `best_percent`: when the test has no scaled scheme. Both null while
-    nothing is released. `locked`: reserved for paid tests (S3), always false now."""
+    nothing is released. `access_tier`, `locked` (S3): a paid test the caller needs a pass for (a timed open attempt
+    stays resumable, so its card is not locked)."""
     id: uuid.UUID
     title: dict
     item_count: int
@@ -84,6 +87,7 @@ class LibraryCardOut(BaseModel):
     best_value: Optional[Decimal] = None
     best_percent: Optional[float] = None
     scale_max: Optional[Decimal] = None
+    access_tier: str = "free"
     locked: bool = False
 
 

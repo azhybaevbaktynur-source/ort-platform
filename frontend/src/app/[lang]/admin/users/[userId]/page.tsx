@@ -17,6 +17,7 @@ import { LoadError, OrgError, SystemAccountBadge } from "@/components/lms/org/Or
 import { OutlineMenu } from "@/components/lms/modules/OutlineMenu";
 import { UserOrganizationsSection } from "@/components/lms/org/admin/UserOrganizationsSection"; // Phase 6 S4b
 import { CodeReasonDialog } from "@/components/lms/admin/CodeReasonDialog";
+import { UserAccessSection } from "@/components/lms/access/UserAccessSection"; // S3 access
 import { endUserSessions, setPlatformAdmin } from "@/lib/lms/security";
 
 type Action = "disable" | "revoke" | "grant" | "endSessions";
@@ -163,6 +164,9 @@ export default function AdminUserDetailPage() {
           ...(user.disabled_at ? [{ key: "reason", term: t("platformAdmin.users.disabledReason"), description: user.disabled_reason || "—" }] : []),
         ]} />
       </Card>
+
+      {/* S3 access: exam passes, give and revoke (right after the summary: what the admin looks up most for a student) */}
+      <UserAccessSection userId={user.id} name={user.display_name ? `${user.display_name} · ${user.email}` : user.email} readOnly={system} />
 
       {/* Phase 6 S4b: organizations and roles, add to organization */}
       <UserOrganizationsSection user={user} readOnly={system} />

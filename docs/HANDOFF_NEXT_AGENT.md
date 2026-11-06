@@ -36,11 +36,11 @@
 | UX rework part 2 (items 7–12) | **Deployed 2026-11-03** (`main` 06c7d4e, no migration) | `UX_REWORK_2.md` |
 | Accounts and teacher sign-up | **Deployed 2026-11-03** (`main` 061bf6a, migration 0019) | `ACCOUNTS.md`, `DISCUSSION_ACCOUNTS.md` |
 | Admin control center review | Written 2026-11-03, revised 2026-11-06 for the new direction (A1–A11) | `DISCUSSION_ADMIN_CENTER.md` |
-| **Exam-prep roadmap** (owner 2026-11-06) | **In progress:** S1 admin protection and S2 exam-prep page being built; S3 design written | `ROADMAP_EXAM_PREP.md`, `phases/S3_ACCESS_DESIGN.md` |
+| **Exam-prep roadmap** (owner 2026-11-06) | S2 deployed (`main` d13fde2, migration 0020), S1 deployed (`main` 3846718, migration 0021); S3 merged into `lms` (1d8b353, migration 0022), not deployed; S4 stopped mid-build (uncommitted work in worktree `.claude/worktrees/agent-ad73cdcf1e21727c6`, branch `s4-person`). **Paused by the owner 2026-11-06: resume only on their command** | `ROADMAP_EXAM_PREP.md`, `phases/EXAM_PREP.md`, `phases/S3_ACCESS_DESIGN.md` |
 
 Production: Vercel https://ort-platform-nu.vercel.app + Render https://ort-platform-w77q.onrender.com (`/health` shows `commit`; Render deploys only when backend files change) + Neon project `noisy-sound-20763725` (production branch `br-cool-firefly-b227gbuy`, Alembic head `0018_phase11_indexes`) + Cloudflare R2. Production data is small: 6 users, 3 courses (2 ORT + the owner's draft), 299 question versions, ~4 attempts, 1 submission; one organization "Platform".
 
-Neon backups (free plan: **max 10 branches, 1 manual snapshot**): before-phase9, before-ux-rework, before-phase10, before-phase11, before-accounts (**6/10 branches** incl. production; 6a, 7a, 7b, 7c, 8a, 8b deleted with the owner's OK, last on 2026-11-06). Before each `main` merge with a migration create `backup-<date>-before-<slice>`; when full, ask the owner which old backup to delete (deleting Neon data always needs the owner's OK).
+Neon backups (free plan: **max 10 branches, 1 manual snapshot**): before-phase9, before-ux-rework, before-phase10, before-phase11, before-accounts, before-exam-prep-s2, before-admin-mfa-s1 (**8/10 branches** incl. production; 6a, 7a, 7b, 7c, 8a, 8b deleted with the owner's OK, last on 2026-11-06). Before each `main` merge with a migration create `backup-<date>-before-<slice>`; when full, ask the owner which old backup to delete (deleting Neon data always needs the owner's OK).
 
 ## 3b. Waiting for the owner
 

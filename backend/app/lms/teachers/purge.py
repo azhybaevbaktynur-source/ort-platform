@@ -61,11 +61,18 @@ def run_purge(db: Optional[Session] = None, *, limit: int = PURGE_BATCH, now: Op
 
 
 def run_task() -> None:
-    """Never raises: a failed run is logged and the next one picks the rows up."""
+    """Never raises: a failed run is logged and the next one picks the rows up. S3 access: the buyer's name on codes
+    redeemed long ago goes in the same run (`access/purge.py`)."""
     try:
         run_purge(limit=OPPORTUNISTIC_LIMIT)
     except Exception:
         logger.warning("teacher applicant phone purge failed", exc_info=True)
+    try:
+        from app.lms.access.purge import run_purge as run_given_note_purge
+
+        run_given_note_purge(limit=OPPORTUNISTIC_LIMIT)
+    except Exception:
+        logger.warning("activation code buyer note purge failed", exc_info=True)
 
 
 def reset_throttle() -> None:
