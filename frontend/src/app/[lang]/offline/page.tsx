@@ -2,12 +2,13 @@
 
 import React from "react";
 import { WifiOff } from "lucide-react";
-import { Button, Mascot } from "@/components/ui";
+import { Mascot, buttonClasses } from "@/components/ui";
 import { useTranslation } from "@/lib/i18n/context";
 
 /**
  * S5 installable app: what the service worker (public/sw.js) shows instead of a page when there is no network.
- * Static, no data, no links that need the network; "Try again" reloads the address the person asked for.
+ * Static, no data. "Try again" is a plain link to the address the person asked for (`href=""`), so it works even
+ * when the page's scripts cannot load offline.
  */
 export default function OfflinePage() {
   const { t } = useTranslation();
@@ -19,7 +20,7 @@ export default function OfflinePage() {
         {t("pwa.offline.title")}
       </h1>
       <p className="mt-2 text-sm leading-6 text-slate-600">{t("pwa.offline.body")}</p>
-      <Button className="mt-6 w-full sm:w-auto" onClick={() => window.location.reload()}>{t("pwa.offline.retry")}</Button>
+      <a href="" className={buttonClasses({ className: "mt-6 w-full sm:w-auto" })}>{t("pwa.offline.retry")}</a>
     </main>
   );
 }

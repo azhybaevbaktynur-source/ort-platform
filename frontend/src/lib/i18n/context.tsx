@@ -1,11 +1,9 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
-import kyDict from "./ky.json";
-import ruDict from "./ru.json";
-import enDict from "./en.json";
+import React, { createContext, use, useContext, useState, useEffect, useRef } from "react";
 
 export type Language = "en" | "ky" | "ru";
+type Dictionary = Record<string, any>;
 
 interface LanguageContextType {
   lang: Language;
@@ -13,11 +11,30 @@ interface LanguageContextType {
   t: (keyPath: string, params?: Record<string, string | number>) => string;
 }
 
-const dictionaries: Record<Language, any> = {
-  ky: kyDict,
-  ru: ruDict,
-  en: enDict,
+/*
+ * S5 performance (low-end phones): the three dictionaries are about 1 MB together (230 kB compressed, more than half
+ * of every page's JavaScript). Each is now its own chunk: a page loads only its language, another language is
+ * loaded the first time it is chosen.
+ */
+const dictionaries: Partial<Record<Language, Dictionary>> = {};
+const loading: Partial<Record<Language, Promise<void>>> = {};
+const LOADERS: Record<Language, () => Promise<{ default: unknown }>> = {
+  en: () => import("./en.json?lazy"),
+  ky: () => import("./ky.json?lazy"),
+  ru: () => import("./ru.json?lazy"),
 };
+
+/** Never rejects: a failed download (no network) is tried again later, and until then the server's HTML stays. */
+function loadDictionary(lang: Language): Promise<void> {
+  loading[lang] ??= new Promise<void>((resolve) => {
+    const attempt = (n: number) => {
+      LOADERS[lang]().then((m) => { dictionaries[lang] = m.default as Dictionary; resolve(); })
+        .catch(() => { setTimeout(() => attempt(n + 1), Math.min(30_000, 1000 * 2 ** n)); });
+    };
+    attempt(0);
+  });
+  return loading[lang];
+}
 
 /** Value at a dotted path, or undefined. */
 function lookupPath(dict: any, keys: string[]): unknown {
@@ -29,7 +46,7 @@ function lookupPath(dict: any, keys: string[]): unknown {
   return current;
 }
 
-/** String at `keyPath` in `lang`; a path missing in `lang` falls back to Russian. */
+/** String at `keyPath` in `lang`; a path missing in `lang` falls back to Russian (when loaded). */
 function resolveKey(lang: Language, keyPath: string): string | undefined {
   const keys = keyPath.split(".");
   let value = lookupPath(dictionaries[lang], keys);
@@ -68,13 +85,25 @@ export function LanguageProvider({
   children: React.ReactNode;
   initialLang?: Language;
 }) {
+  // The page's language before anything renders: the server waits for it, and in the browser hydration waits while
+  // the server's HTML stays on screen. Loaded once; later pages of the session find it here.
+  if (!dictionaries[initialLang]) use(loadDictionary(initialLang));
   const [lang, setLangState] = useState<Language>(initialLang);
+  const wanted = useRef<Language>(initialLang);
+
+  /** Shows `next` once its dictionary is here; a later choice wins over a slower earlier one. */
+  const switchTo = (next: Language) => {
+    wanted.current = next;
+    if (dictionaries[next]) { setLangState(next); return; }
+    loadDictionary(next).then(() => { if (wanted.current === next) setLangState(next); }).catch(() => undefined);
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem("ort_preferred_language") as Language;
     if (saved && (saved === "ky" || saved === "ru" || saved === "en")) {
-      setLangState(saved);
+      switchTo(saved);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Phase 6b: the document language follows the UI language (screen readers, hyphenation, api.ts messages).
@@ -83,7 +112,7 @@ export function LanguageProvider({
   }, [lang]);
 
   const setLang = (newLang: Language) => {
-    setLangState(newLang);
+    switchTo(newLang);
     localStorage.setItem("ort_preferred_language", newLang);
   };
 

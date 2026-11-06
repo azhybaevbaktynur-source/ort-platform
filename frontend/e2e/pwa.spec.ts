@@ -134,7 +134,7 @@ test.describe("installable app (ru)", () => {
       await page.goto(`/ky/courses`).catch(() => undefined);
       await expect(page.getByRole("heading", { name: tr("ky", "pwa.offline.title") })).toBeVisible();
       await ctx.setOffline(false);
-      await page.getByRole("button", { name: tr("ky", "pwa.offline.retry") }).click();
+      await page.getByRole("link", { name: tr("ky", "pwa.offline.retry") }).click();
       await expect(page.getByRole("heading", { name: tr("ky", "pwa.offline.title") })).toHaveCount(0);
       expect(fromWorker).toEqual([]);
     } finally {
