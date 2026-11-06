@@ -96,8 +96,7 @@ function useMenuGroups(props: StudentShellProps): SidebarNavGroup[] {
   const { data } = props;
   if (!data.current) return [{ key: "main", items: [...item(links.home), ...item(links.catalog)] }];
   return [
-    { key: "main", items: [...item(links.home), ...item(links.tests), ...(data.features?.practice ? item(links.practice) : []), ...item(links.analytics)] },
-    { key: "more", items: [...item(links.lessons), ...item(links.saved)] },
+    { key: "main", items: [...item(links.home), ...item(links.tests), ...(data.features?.practice ? item(links.practice) : []), ...item(links.analytics), ...item(links.lessons), ...item(links.saved)] },
   ];
 }
 
