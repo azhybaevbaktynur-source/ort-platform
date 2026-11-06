@@ -5,6 +5,7 @@
 // first, then to-do, grades and announcements (owner, 2026-11-03; replaces "to-do first", PUR-5). A teacher's Learning
 // tab is the same screen.
 import React, { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { KeyRound, LayoutGrid, Trophy } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { getHome, listHomeCourses } from "@/lib/lms/home";
@@ -91,13 +92,22 @@ function Dashboard({ data }: { data: HomeOut }) {
       <div className="space-y-6">
         {pendingApps}
         <PlatformCourses courses={platform} grid={CARD_GRID} />
-        <EmptyState mascot="hello" title={t("home.courses.emptyTitle")} description={t("home.courses.emptyBody")}
-          action={(
-            <>
-              <LinkButton size="lg" href={`${base}/join`} leftIcon={<KeyRound aria-hidden="true" className="h-5 w-5" />}>{t("home.primary.join")}</LinkButton>
-              <LinkButton size="lg" href={`${base}/catalog`} leftIcon={<LayoutGrid aria-hidden="true" className="h-5 w-5" />}>{t("home.openCatalog")}</LinkButton>
-            </>
-          )} />
+        {platform.length > 0 ? (
+          // Exam prep S2 UX review: the platform cards carry the action; the code and the catalog stay one quiet line
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-base leading-6 text-slate-700 sm:text-sm">
+            <span>{t("home.platform.haveCode")}</span>
+            <Link href={`${base}/join`} className="inline-flex min-h-11 items-center font-medium text-brand-700 hover:underline sm:min-h-0">{t("home.primary.join")}</Link>
+            <Link href={`${base}/catalog`} className="inline-flex min-h-11 items-center font-medium text-brand-700 hover:underline sm:min-h-0">{t("home.openCatalog")}</Link>
+          </p>
+        ) : (
+          <EmptyState mascot="hello" title={t("home.courses.emptyTitle")} description={t("home.courses.emptyBody")}
+            action={(
+              <>
+                <LinkButton size="lg" href={`${base}/join`} leftIcon={<KeyRound aria-hidden="true" className="h-5 w-5" />}>{t("home.primary.join")}</LinkButton>
+                <LinkButton size="lg" href={`${base}/catalog`} leftIcon={<LayoutGrid aria-hidden="true" className="h-5 w-5" />}>{t("home.openCatalog")}</LinkButton>
+              </>
+            )} />
+        )}
       </div>
     );
   }

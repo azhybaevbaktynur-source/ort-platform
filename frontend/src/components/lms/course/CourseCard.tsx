@@ -77,7 +77,8 @@ export function CourseCard({ course, href, headingLevel = 3, badges, progress, n
   const description = pickLocalized(course.description, uiLang, course.default_language);
   const owner = course.owner_display_name && course.owner_display_name !== "—" ? course.owner_display_name : null;
   const teacher = course.is_platform_course ? null : owner;
-  const organization = course.organization_display_name || null;
+  // a platform course shows the platform's name in the UI language, not the stored organization name (UR2-5)
+  const organization = course.is_platform_course ? t("common.appName") : course.organization_display_name || null;
   const languages = course.languages.map((l) => t(`courses.languages.${l}`)).join(", ");
   const soon = isDueSoon(nextDue);
   const Heading = headingLevel === 2 ? "h2" : "h3";

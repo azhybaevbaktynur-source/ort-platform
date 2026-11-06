@@ -2,7 +2,7 @@
 
 // Exam prep S2 (docs/ROADMAP_EXAM_PREP.md S2): the students' page of an exam-prep course (the course template chooses
 // it; ORT first). One read for the page, one paginated read for the library. Top to bottom on a wide screen: goal
-// strip, score history and section bars, the one "Next" card, the test library. Phones put the cards first: goal strip,
+// strip, the one "Next" card, score history and section bars, the test library (UX review: Next right after the goals). Phones put the cards first: goal strip,
 // Next, the library, then the history and the bars. Numbers are big and plain; unreleased results carry no number.
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
@@ -60,9 +60,9 @@ export function ExamPrepPage() {
     <div className="space-y-8">
       <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
         <GoalStrip data={data} courseId={course.id} onGoal={(goal) => setData({ ...data, goal })} className="lg:col-span-2" />
+        <NextCard next={data.next} courseId={course.id} className="order-2 lg:order-none lg:col-span-2" />
         <ScoreHistory data={data} className="order-4 lg:order-none" />
         <SectionBars data={data} className="order-5 lg:order-none" />
-        <NextCard next={data.next} courseId={course.id} className="order-2 lg:order-none lg:col-span-2" />
         <TestLibrary courseId={course.id} sources={data.sources} total={data.library_total} className="order-3 lg:order-none lg:col-span-2" />
       </div>
       <LeaveCourseLink />

@@ -40,7 +40,7 @@ export function PlatformCourses({ courses, grid }: { courses: HomePlatformCourse
           <CourseCard key={c.id} course={c} href={`/${lang}/courses/catalog/${c.id}`}
             action={(
               <>
-                <Button variant="secondary" fullWidth loading={joining === c.id} disabled={joining !== null && joining !== c.id}
+                <Button fullWidth loading={joining === c.id} disabled={joining !== null && joining !== c.id}
                   onClick={() => void join(c.id)}>
                   {t("catalog.join")}
                 </Button>
