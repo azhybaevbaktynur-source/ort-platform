@@ -15,4 +15,8 @@ PLATFORM_POLICIES: dict[tuple[str, str], str] = {
     ("POST", f"{_P}/users/{{user_id}}/platform-admin"): "platform_admin",  # + acting admin's current code; audited
     ("POST", f"{_P}/users/{{user_id}}/end-sessions"): "platform_admin",  # audited
     ("GET", f"{_P}/health"): "platform_admin",  # database, migrations, email and storage configuration
+    # --- S4 person page ---
+    ("GET", f"{_P}/users/{{user_id}}/attempts"): "platform_admin",  # status only: never answers, scores or grades
+    ("POST", f"{_P}/users/{{user_id}}/password-reset"): "platform_admin",  # reason; audited
+    ("POST", f"{_P}/users/{{user_id}}/email-change"): "platform_admin",  # reason; link to the new address; audited
 }

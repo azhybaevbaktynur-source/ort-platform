@@ -16,6 +16,10 @@ from app.lms.platform_admin.schemas import (
     SummaryOut, TeacherRequestAdminOut, TeacherStatusIn,
 )
 from app.lms.platform_admin import admins
+from app.lms.platform_admin import persons  # S4
+from app.lms.platform_admin.schemas import AdminAttemptOut, PasswordResetSentOut, ReasonIn  # S4
+from app.lms.email_change import service as email_change  # S4
+from app.lms.email_change.schemas import AdminEmailChangeIn  # S4
 from app.lms.platform_admin.health import PlatformHealthOut, platform_health
 from app.lms.teachers import purge as teacher_purge
 from app.lms.teachers import service as teacher_service
@@ -63,10 +67,12 @@ def list_users(
     q: Optional[str] = Query(None, max_length=200),
     teacher_status: Optional[Literal["none", "pending", "approved", "revoked"]] = None,
     disabled: Optional[bool] = None, cursor: Optional[str] = None, limit: Optional[int] = Query(None),
+    email_unverified: bool = False, platform_admin: bool = False, has_access: bool = False,  # S4 filters
     admin: User = Depends(require_platform_admin), db: Session = Depends(get_db),
 ):
-    page = paginate(us.search_users(q, teacher_status, disabled), db, sort_col=User.created_at,
-                    id_col=User.id, cursor=cursor, limit=limit)
+    stmt = us.search_users(q, teacher_status, disabled, email_unverified=email_unverified,
+                           platform_admin=platform_admin, has_access=has_access)
+    page = paginate(stmt, db, sort_col=User.created_at, id_col=User.id, cursor=cursor, limit=limit)
     return PageOut(items=[us.user_out(u) for u in page.items], next_cursor=page.next_cursor)
 
 
@@ -106,6 +112,27 @@ def set_platform_admin(user_id: str, body: PlatformAdminIn, request: Request,
 def end_sessions(user_id: str, body: EndSessionsIn, request: Request,
                  admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
     return us.user_out(admins.end_sessions(db, admin, user_id, body.reason, request))
+
+
+# --- S4 person page begin ---
+@router.get("/users/{user_id}/attempts", response_model=PageOut[AdminAttemptOut])
+def user_attempts(user_id: str, cursor: Optional[str] = None, limit: Optional[int] = Query(None),
+                  admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
+    return persons.attempts_page(db, user_id, cursor, limit)
+
+
+@router.post("/users/{user_id}/password-reset", response_model=PasswordResetSentOut)
+def user_password_reset(user_id: str, body: ReasonIn, request: Request,
+                        admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
+    return persons.send_password_reset(db, admin, user_id, body.reason, request)
+
+
+@router.post("/users/{user_id}/email-change", response_model=AdminUserDetailOut)
+def user_email_change(user_id: str, body: AdminEmailChangeIn, request: Request,
+                      admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
+    email_change.request_by_admin(db, admin, user_id, str(body.new_email), body.reason, request)
+    return us.user_detail(db, us.get_user_or_404(db, user_id))
+# --- S4 person page end ---
 
 
 @router.get("/health", response_model=PlatformHealthOut)

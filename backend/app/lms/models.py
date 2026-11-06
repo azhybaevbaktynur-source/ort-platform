@@ -59,3 +59,4 @@ from app.lms.guardian.models import GuardianLink, GuardianPairingCode  # noqa: F
 # --- Phase 11 S1 end ---
 from app.lms.mfa.models import MfaRecoveryCode  # noqa: F401,E402  (S1 admin security)
 from app.lms.access.models import AccessPass, ActivationCode, ActivationCodeBatch  # noqa: F401,E402  (S3 access)
+from app.lms.email_change.models import EmailChangeRequest  # noqa: F401,E402  (S4 email change)

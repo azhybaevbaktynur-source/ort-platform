@@ -53,6 +53,10 @@ ENTRIES: list[Entry] = [
     Entry("users", "disabled_reason", "account state", "scrub"),
     Entry("users", "mfa_secret_enc", "credential (encrypted)", "null"),
     Entry("users", "mfa_pending_secret_enc", "credential (encrypted)", "null"),
+    Entry("users", "last_login_at", "activity (last sign-in)", "null", True),  # S4 person page
+    # S4 email change: a pending change, deleted with the account
+    Entry("email_change_requests", "new_email", "contact", "delete_row", True),
+    Entry("email_change_requests", "token_hash", "credential (keyed hash)", "delete_row"),
     # enrollment
     Entry("enrollments", "invite_token_hash", "credential", "null"),
     Entry("enrollment_accommodations", "note", "may be medical", "null"),
@@ -159,6 +163,8 @@ ENTRIES: list[Entry] = [
     *_refs("teacher_requests", "decided_by_id"),
     *_refs("translation_groups", "created_by_id"),
     *_refs("user_mfa_recovery_codes", "user_id", action="delete_row"),
+    *_refs("email_change_requests", "user_id", action="delete_row"),  # S4
+    *_refs("email_change_requests", "requested_by_id"),
     *_refs("users", "disabled_by_id"),
 ]
 

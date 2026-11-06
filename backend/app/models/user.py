@@ -47,6 +47,9 @@ class User(Base):
     mfa_pending_secret_enc = Column(String(255), nullable=True)
     mfa_enabled_at = Column(DateTime(timezone=True), nullable=True)
     mfa_last_step = Column(BigInteger, nullable=True)
+    # S4 person page: set when a full sign-in issues a token (password, email-code verify, the two-step login step);
+    # never on /auth/refresh
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint("teacher_status IN ('none','pending','approved','revoked')", name="teacher_status_valid"),
@@ -58,5 +61,6 @@ class User(Base):
             "consent_state IN ('legacy','ok','pending_guardian','exempt')", name="consent_state_valid"
         ),
         Index("ix_users_teacher_status", "teacher_status"),
+        Index("ix_users_created_at_id", "created_at", "id"),  # S4: the admin users list pages by (created_at, id)
     )
 

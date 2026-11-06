@@ -5,11 +5,11 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
-import { disableUser, enableUser, getUser, setTeacherStatus } from "@/lib/lms/admin";
-import type { AdminUserDetailOut } from "@/lib/lms/types";
+import { adminChangeEmail, correctAgeBand, disableUser, enableUser, getUser, sendPasswordReset, setTeacherStatus } from "@/lib/lms/admin";
+import type { AdminUserDetailOut, LinkedAccountOut } from "@/lib/lms/types";
 import { pickLocalized } from "@/lib/lms/localized";
 import { isSystemAccount } from "@/lib/lms/organizations";
-import { fmtApiDateTimeShort } from "@/lib/format";
+import { fmtApiDate, fmtApiDateTimeShort } from "@/lib/format";
 import { Badge, Button, Card, DescriptionList, LoadingState, PageHeader, ReasonDialog, toast } from "@/components/ui";
 import { UserStatusBadge } from "@/components/lms/admin/UserStatusBadge";
 import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
@@ -19,8 +19,10 @@ import { UserOrganizationsSection } from "@/components/lms/org/admin/UserOrganiz
 import { CodeReasonDialog } from "@/components/lms/admin/CodeReasonDialog";
 import { UserAccessSection } from "@/components/lms/access/UserAccessSection"; // S3 access
 import { endUserSessions, setPlatformAdmin } from "@/lib/lms/security";
+import { AgeBandDialog, AttemptLookupSection, ChangeEmailDialog } from "@/components/lms/admin/PersonParts"; // S4
 
-type Action = "disable" | "revoke" | "grant" | "endSessions";
+type Action = "disable" | "revoke" | "grant" | "endSessions" | "resetPassword";
+type PersonDialog = "changeEmail" | "correctAge"; // S4
 type AdminAction = "makeAdmin" | "removeAdmin";
 
 export default function AdminUserDetailPage() {
@@ -35,6 +37,7 @@ export default function AdminUserDetailPage() {
   const [enabling, setEnabling] = useState(false);
   const [dialogError, setDialogError] = useState<unknown>(null);
   const [adminAction, setAdminAction] = useState<AdminAction | null>(null); // S1
+  const [personDialog, setPersonDialog] = useState<PersonDialog | null>(null); // S4
 
   const load = useCallback(async () => {
     setError(null);
@@ -54,8 +57,10 @@ export default function AdminUserDetailPage() {
     try {
       if (action === "disable") await disableUser(user.id, reason);
       else if (action === "endSessions") await endUserSessions(user.id, reason);
+      else if (action === "resetPassword") await sendPasswordReset(user.id, reason); // S4
       else await setTeacherStatus(user.id, action === "grant" ? "approved" : "revoked", reason || undefined);
-      toast.success(t(action === "disable" ? "platformAdmin.toast.disabled" : action === "endSessions" ? "adminSecurity.toast.sessionsEnded" : action === "grant" ? "platformAdmin.toast.granted" : "platformAdmin.toast.revoked", { name: userName }));
+      if (action === "resetPassword") toast.success(t("person.resetDone", { email: user.email }));
+      else toast.success(t(action === "disable" ? "platformAdmin.toast.disabled" : action === "endSessions" ? "adminSecurity.toast.sessionsEnded" : action === "grant" ? "platformAdmin.toast.granted" : "platformAdmin.toast.revoked", { name: userName }));
       setAction(null);
       await load();
     } catch (e) {
@@ -72,6 +77,21 @@ export default function AdminUserDetailPage() {
       await setPlatformAdmin(user.id, adminAction === "makeAdmin", reason, code);
       toast.success(t(adminAction === "makeAdmin" ? "adminSecurity.toast.adminGranted" : "adminSecurity.toast.adminRemoved", { name: userName }));
       setAdminAction(null);
+      await load();
+    } catch (e) {
+      setDialogError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  // S4: the change-email and age dialogs
+  const runPerson = async (fn: () => Promise<unknown>, done: string) => {
+    setBusy(true);
+    setDialogError(null);
+    try {
+      await fn();
+      toast.success(done);
+      setPersonDialog(null);
       await load();
     } catch (e) {
       setDialogError(e);
@@ -125,6 +145,12 @@ export default function AdminUserDetailPage() {
       <OutlineMenu label={t("coursePage.moreActions")} disabled={enabling}
         groups={[
           { id: "sessions", items: [{ id: "endSessions", label: t("adminSecurity.user.endSessions") }] },
+          // S4: one person's problem (a disabled or deleted account gets neither; an admin changes their own address)
+          ...(!user.disabled_at && !user.deleted ? [{ id: "person", items: [
+            { id: "resetPassword", label: t("person.resetPassword") },
+            ...(!user.is_platform_admin ? [{ id: "changeEmail", label: t("person.changeEmail") }] : []),
+            { id: "correctAge", label: t("person.correctAge") },
+          ] }] : []),
           // S1: platform admins, confirmed with the acting admin's code
           { id: "admin", items: [user.is_platform_admin
             ? { id: "removeAdmin", label: t("adminSecurity.user.removeAdmin"), danger: true }
@@ -137,7 +163,8 @@ export default function AdminUserDetailPage() {
           setDialogError(null);
           if (id === "enable") void enable();
           else if (id === "makeAdmin" || id === "removeAdmin") setAdminAction(id);
-          else if (id === "endSessions" || id === "disable") setAction(id);
+          else if (id === "endSessions" || id === "disable" || id === "resetPassword") setAction(id);
+          else if (id === "changeEmail" || id === "correctAge") setPersonDialog(id);
         }} />
     </>
   ) : undefined;
@@ -159,6 +186,22 @@ export default function AdminUserDetailPage() {
           { key: "id", term: t("organizations.adminUser.userId"), description: <span className="break-all font-mono text-sm">{user.id}</span> },
           { key: "created", term: t("platformAdmin.users.created"), description: fmtApiDateTimeShort(user.created_at, lang) },
           { key: "verified", term: t("platformAdmin.users.emailVerified"), description: user.email_verified ? t("platformAdmin.yes") : t("platformAdmin.no") },
+          // S4 person page
+          { key: "login", term: t("person.lastLogin"), description: user.last_login_at ? fmtApiDateTimeShort(user.last_login_at, lang) : t("person.never") },
+          { key: "age", term: t("person.age"), description: user.age_band ? t(`privacy.age.${user.age_band}`) : t("person.ageUnknown") },
+          { key: "consent", term: t("person.consent"), description: user.consent_state
+            ? `${t(`person.consentState.${user.consent_state}`)}${user.consent_state === "pending_guardian" && user.consent_due_at ? ` (${t("person.consentDue", { date: fmtApiDate(user.consent_due_at, lang) })})` : ""}`
+            : "—" },
+          ...(user.parent_links ? [
+            { key: "parents", term: t("person.parents"), description: <LinkedNames lang={lang} items={user.parent_links.parents} count={user.parent_links.parents_count} /> },
+            ...(user.parent_links.children_count ? [{ key: "children", term: t("person.children"), description: <LinkedNames lang={lang} items={user.parent_links.children} count={user.parent_links.children_count} /> }] : []),
+          ] : []),
+          ...(user.pending_email_change ? [{ key: "pendingEmail", term: t("person.pendingEmail"), description: (
+            <span className="break-all">
+              {t("person.pendingEmailValue", { email: user.pending_email_change.new_email, date: fmtApiDateTimeShort(user.pending_email_change.expires_at, lang) })}
+              {user.pending_email_change.by_admin ? ` · ${t("person.pendingByAdmin")}` : ""}
+            </span>
+          ) }] : []),
           ...(user.is_platform_admin ? [{ key: "mfa", term: t("adminSecurity.user.mfa"), description: user.mfa_enabled ? t("adminSecurity.on") : t("adminSecurity.off") }] : []),
           { key: "enrollments", term: t("platformAdmin.users.activeEnrollments"), description: user.active_enrollment_count },
           ...(user.disabled_at ? [{ key: "reason", term: t("platformAdmin.users.disabledReason"), description: user.disabled_reason || "—" }] : []),
@@ -167,6 +210,9 @@ export default function AdminUserDetailPage() {
 
       {/* S3 access: exam passes, give and revoke (right after the summary: what the admin looks up most for a student) */}
       <UserAccessSection userId={user.id} name={user.display_name ? `${user.display_name} · ${user.email}` : user.email} readOnly={system} />
+
+      {/* S4: the person's attempts, status only (never answers, scores or grades) */}
+      <AttemptLookupSection userId={user.id} />
 
       {/* Phase 6 S4b: organizations and roles, add to organization */}
       <UserOrganizationsSection user={user} readOnly={system} />
@@ -204,14 +250,22 @@ export default function AdminUserDetailPage() {
 
       <ReasonDialog
         open={!!action}
-        title={action === "disable" ? t("platformAdmin.users.disableTitle") : action === "endSessions" ? t("adminSecurity.user.endSessionsTitle") : action === "revoke" ? t("platformAdmin.users.revokeTitle") : t("platformAdmin.users.grantTitle")}
+        title={action === "resetPassword" ? t("person.resetTitle") : action === "disable" ? t("platformAdmin.users.disableTitle") : action === "endSessions" ? t("adminSecurity.user.endSessionsTitle") : action === "revoke" ? t("platformAdmin.users.revokeTitle") : t("platformAdmin.users.grantTitle")}
         object={user.display_name ? `${user.display_name} · ${user.email}` : user.email}
-        effect={action === "disable" ? t("platformAdmin.users.disableBody") : action === "endSessions" ? t("adminSecurity.user.endSessionsBody") : action === "revoke" ? t("platformAdmin.users.revokeImpact", { students: user.revoke_impact.students, courses: user.revoke_impact.courses }) : t("organizations.adminUser.grantBody")}
-        confirmLabel={action === "disable" ? t("platformAdmin.users.disable") : action === "endSessions" ? t("adminSecurity.user.endSessions") : action === "revoke" ? t("platformAdmin.requests.revoke") : t("platformAdmin.users.grantTeacher")}
-        tone={action === "grant" ? "primary" : "danger"} optional={action === "grant"} busy={busy}
+        effect={action === "resetPassword" ? t("person.resetBody") : action === "disable" ? t("platformAdmin.users.disableBody") : action === "endSessions" ? t("adminSecurity.user.endSessionsBody") : action === "revoke" ? t("platformAdmin.users.revokeImpact", { students: user.revoke_impact.students, courses: user.revoke_impact.courses }) : t("organizations.adminUser.grantBody")}
+        confirmLabel={action === "resetPassword" ? t("person.resetSend") : action === "disable" ? t("platformAdmin.users.disable") : action === "endSessions" ? t("adminSecurity.user.endSessions") : action === "revoke" ? t("platformAdmin.requests.revoke") : t("platformAdmin.users.grantTeacher")}
+        tone={action === "grant" || action === "resetPassword" ? "primary" : "danger"} optional={action === "grant"} busy={busy}
         error={dialogError ? <OrgError error={dialogError} /> : undefined}
         onConfirm={(r) => void run(r)} onCancel={() => setAction(null)}
       />
+      <ChangeEmailDialog open={personDialog === "changeEmail"} name={user.display_name ? `${user.display_name} · ${user.email}` : user.email}
+        busy={busy} error={dialogError ? <OrgError error={dialogError} /> : undefined}
+        onConfirm={(email, reason) => void runPerson(() => adminChangeEmail(user.id, email, reason), t("person.changeEmailDone", { email }))}
+        onCancel={() => setPersonDialog(null)} />
+      <AgeBandDialog open={personDialog === "correctAge"} name={user.display_name ? `${user.display_name} · ${user.email}` : user.email}
+        current={user.age_band} busy={busy} error={dialogError ? <OrgError error={dialogError} /> : undefined}
+        onConfirm={(band, reason) => void runPerson(() => correctAgeBand(user.id, band, reason), t("person.ageDone"))}
+        onCancel={() => setPersonDialog(null)} />
       <CodeReasonDialog
         open={!!adminAction}
         title={adminAction === "makeAdmin" ? t("adminSecurity.user.makeAdminTitle") : t("adminSecurity.user.removeAdminTitle")}
@@ -223,5 +277,19 @@ export default function AdminUserDetailPage() {
         onConfirm={(r, c) => void runAdmin(r, c)} onCancel={() => setAdminAction(null)}
       />
     </div>
+  );
+}
+
+/** S4: the linked accounts' display names (each opens their person page), "and N more" past the shown ones. */
+function LinkedNames({ lang, items, count }: { lang: string; items: LinkedAccountOut[]; count: number }) {
+  const { t } = useTranslation();
+  if (count === 0) return <>{t("person.linksNone")}</>;
+  return (
+    <span className="flex flex-wrap gap-x-2 gap-y-1">
+      {items.map((p) => (
+        <Link key={p.id} href={`/${lang}/admin/users/${p.id}`} className="text-brand-700 hover:underline">{p.display_name || t("person.noName")}</Link>
+      ))}
+      {count > items.length && <span className="text-slate-600">{t("person.linksMore", { count: count - items.length })}</span>}
+    </span>
   );
 }

@@ -144,7 +144,7 @@ def send_email(to_email: str, subject: str, text: str, html: str, *, from_name: 
     who = "(recipient hidden)" if private else to_email
     if provider == "console":
         if not is_production():
-            if private:
+            if private and not settings.EMAIL_CONSOLE_SHOW_PRIVATE:  # S4: the e2e backend sets it to read links
                 logger.warning("[EMAIL console] Subject: %s (recipient and body not shown)", subject)
             else:
                 # Dev-only console delivery: the code must be visible to the developer.
@@ -342,3 +342,78 @@ def send_security_notice_email(to_email: str, kind: str, lang: Optional[str] = N
         logger.error("security notice email failed (%s)", kind)
         return False
 # --- S1 admin security end ---
+
+
+# --- S4 email change begin --- (docs/DISCUSSION_ADMIN_CENTER.md A9) the link to the new address; a notice to the old one
+_EMAIL_CHANGE_TEXTS: dict[str, dict[str, str]] = {
+    "en": {
+        "subject": "{app}: confirm your new email address",
+        "title": "Confirm your new email address",
+        "intro": "This address was given for an account on {app}. Open the link to confirm it. Until then, the account keeps its old address.",
+        "button": "Confirm this address",
+        "copy_hint": "Or copy this link into your browser:",
+        "footer": "The link is valid for {hours} hours. If you did not ask for this, ignore this email: nothing changes.",
+        "notice_subject": "{app}: the email address of your account was changed",
+        "notice_body": "The email address of your account was changed. This address no longer signs in to the account, and every session of the account was ended.",
+        "notice_footer": "If this was not you, contact the platform administrator at once.",
+    },
+    "ru": {
+        "subject": "{app}: подтвердите новый адрес почты",
+        "title": "Подтверждение нового адреса почты",
+        "intro": "Этот адрес указали для аккаунта на платформе. Откройте ссылку, чтобы подтвердить его. До этого у аккаунта остаётся прежний адрес.",
+        "button": "Подтвердить адрес",
+        "copy_hint": "Или скопируйте ссылку в адресную строку браузера:",
+        "footer": "Ссылка действительна {hours} часа. Если вы этого не запрашивали, просто проигнорируйте письмо: ничего не изменится.",
+        "notice_subject": "{app}: адрес почты вашего аккаунта изменён",
+        "notice_body": "Адрес почты вашего аккаунта изменён. С этим адресом в аккаунт больше не войти, и все сеансы аккаунта завершены.",
+        "notice_footer": "Если это были не вы, сразу свяжитесь с администратором платформы.",
+    },
+    "ky": {
+        "subject": "{app}: жаңы почта дарегиңизди ырастаңыз",
+        "title": "Жаңы почта дарегин ырастоо",
+        "intro": "Бул дарек платформадагы аккаунт үчүн көрсөтүлдү. Ырастоо үчүн шилтемени ачыңыз. Ага чейин аккаунтта мурунку дарек калат.",
+        "button": "Даректи ырастоо",
+        "copy_hint": "Же шилтемени көчүрүп, браузерге чаптаңыз:",
+        "footer": "Шилтеме {hours} саат жарактуу. Эгер сиз муну сурабасаңыз, катты этибарга албаңыз: эч нерсе өзгөрбөйт.",
+        "notice_subject": "{app}: аккаунтуңуздун почта дареги өзгөртүлдү",
+        "notice_body": "Аккаунтуңуздун почта дареги өзгөртүлдү. Бул дарек менен аккаунтка мындан ары кире албайсыз, аккаунттун бардык сеанстары аяктады.",
+        "notice_footer": "Эгер бул сиз болбосоңуз, дароо платформанын администраторуна кайрылыңыз.",
+    },
+}
+
+
+def send_email_change_email(to_email: str, token: str, hours: int, lang: Optional[str] = None) -> bool:
+    """The confirmation link, to the new address only. Nothing about the recipient reaches the logs."""
+    frontend_base = (settings.FRONTEND_URL or "http://localhost:3000").rstrip("/")
+    clean_lang = _auth_lang(lang)
+    link = f"{frontend_base}/{clean_lang}/confirm-email?token={token}"
+    fmt = dict(app=APP_NAME[clean_lang], hours=hours)
+    t = {k: v.format(**fmt) for k, v in _EMAIL_CHANGE_TEXTS[clean_lang].items()}
+    text = f"{t['intro']}\n\n{link}\n\n{t['footer']}\n"
+    safe_link = escape(link, quote=True)
+    html = _wrap_html(t["title"], f"""
+  <p style="color: #475569; font-size: 14px;">{escape(t['intro'])}</p>
+  <div style="margin: 24px 0;">
+    <a href="{safe_link}" style="background-color: #4f46e5; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">{escape(t['button'])}</a>
+  </div>
+  <p style="color: #64748b; font-size: 12px;">{escape(t['copy_hint'])}<br><a href="{safe_link}">{safe_link}</a></p>
+""", t["footer"])
+    return send_email(to_email, t["subject"], text, html, from_name=_auth_from_name(clean_lang), private=True)
+
+
+def send_email_changed_notice(to_email: str, lang: Optional[str] = None) -> bool:
+    """To the old address after a change: no link back and not the new address. Never fails the caller."""
+    clean_lang = _auth_lang(lang)
+    texts = _EMAIL_CHANGE_TEXTS[clean_lang]
+    subject = texts["notice_subject"].format(app=APP_NAME[clean_lang])
+    body = texts["notice_body"]
+    text = f"{body}\n\n{texts['notice_footer']}\n"
+    html = _wrap_html(subject, f"""
+  <p style="color: #475569; font-size: 14px;">{escape(body)}</p>
+""", texts["notice_footer"])
+    try:
+        return send_email(to_email, subject, text, html, from_name=_auth_from_name(clean_lang), private=True)
+    except Exception:
+        logger.error("email change notice failed")
+        return False
+# --- S4 email change end ---

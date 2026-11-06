@@ -54,7 +54,8 @@ PASSWORD = "secret-pass-123"
 # CHECKs limit these two: asserted NULL below instead of holding the sentinel
 UNFILLABLE = {("users", "locale"), ("users", "age_band"), ("consent_records", "locale"),
               ("data_requests", "reject_code"), ("course_goals", "target_percent"),
-              ("teacher_requests", "phone_purge_after")}  # a date: `scan` reads text and JSON columns
+              ("teacher_requests", "phone_purge_after"),  # a date: `scan` reads text and JSON columns
+              ("users", "last_login_at")}  # S4, a date too (test_person_page checks it is emptied)
 
 
 def _is_text(col) -> bool:

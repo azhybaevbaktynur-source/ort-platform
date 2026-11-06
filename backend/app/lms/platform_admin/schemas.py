@@ -41,6 +41,7 @@ class AdminUserOut(BaseModel):
     disabled_at: Optional[datetime] = None
     disabled_reason: Optional[str] = None
     mfa_enabled: bool = False  # S1: two-step login on
+    last_login_at: Optional[datetime] = None  # S4: the last full sign-in
 
 
 class OwnedCourseBrief(BaseModel):
@@ -55,11 +56,63 @@ class RevokeImpactOut(BaseModel):
     courses: int
 
 
+class LinkedAccountOut(BaseModel):
+    """S4: the other side of an active parent link; the display name only."""
+    id: str
+    display_name: Optional[str] = None
+
+
+class ParentLinksOut(BaseModel):
+    parents_count: int  # active links where this person is the student
+    parents: list[LinkedAccountOut]  # at most PARENT_LINKS_SHOWN
+    children_count: int  # active links where this person is the parent
+    children: list[LinkedAccountOut]
+
+
+class PendingEmailOut(BaseModel):
+    new_email: str
+    expires_at: datetime
+    by_admin: bool
+
+
 class AdminUserDetailOut(AdminUserOut):
     owned_courses: list[OwnedCourseBrief]
     active_enrollment_count: int
     teacher_requests: list[TeacherRequestAdminOut]
     revoke_impact: RevokeImpactOut  # Accounts: who a revoke freezes (the user's personal organization)
+    # --- S4 person page ---
+    age_band: Optional[str] = None
+    consent_state: str = "legacy"
+    consent_due_at: Optional[datetime] = None
+    deleted: bool = False
+    parent_links: Optional[ParentLinksOut] = None
+    pending_email_change: Optional[PendingEmailOut] = None
+
+
+class AdminAttemptOut(BaseModel):
+    """S4 attempt lookup: that an attempt exists and where it stands. Never answers, scores, results or grades."""
+    id: uuid.UUID
+    course_id: uuid.UUID
+    course_title: dict
+    course_default_language: str
+    assessment_id: uuid.UUID
+    assessment_title: dict
+    status: str
+    is_practice: bool
+    language: str
+    started_at: datetime
+    submitted_at: Optional[datetime] = None
+    submit_reason: Optional[str] = None
+    item_count: int
+    saved_answers: int
+
+
+class ReasonIn(BaseModel):
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class PasswordResetSentOut(BaseModel):
+    sent: bool
 
 
 class AuditEntryOut(BaseModel):

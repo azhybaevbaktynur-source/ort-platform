@@ -22,6 +22,8 @@ Erased data stays in the database provider's history until its restore window pa
 | `consent_records` | `locale` | consent evidence | Kept: holds no personal data once the account is a tombstone | Yes |
 | `course_goals` | `target_percent` | own goal | Row deleted | No |
 | `data_requests` | `reject_code` | request evidence | Kept: holds no personal data once the account is a tombstone | Yes |
+| `email_change_requests` | `new_email` | contact | Row deleted | Yes |
+| `email_change_requests` | `token_hash` | credential (keyed hash) | Row deleted | No |
 | `enrollment_accommodations` | `note` | may be medical | Emptied | No |
 | `enrollment_applications` | `answers` | form answers | Replaced | No |
 | `enrollment_applications` | `decision_note` | about the person | Emptied | No |
@@ -46,6 +48,7 @@ Erased data stays in the database provider's history until its restore window pa
 | `users` | `display_name` | identity | Emptied | Yes |
 | `users` | `email` | contact | Replaced | Yes |
 | `users` | `email_code_hash` | credential | Emptied | No |
+| `users` | `last_login_at` | activity (last sign-in) | Emptied | Yes |
 | `users` | `locale` | preference | Emptied | Yes |
 | `users` | `mfa_pending_secret_enc` | credential (encrypted) | Emptied | No |
 | `users` | `mfa_secret_enc` | credential (encrypted) | Emptied | No |
@@ -78,6 +81,7 @@ These point at the tombstone row, which holds nothing personal after deletion.
 | `course_modules` | `created_by_id`, `deleted_by_id` |
 | `courses` | `deleted_by_id`, `owner_id` |
 | `data_requests` | `handled_by_id`, `requested_by_id`, `user_id` |
+| `email_change_requests` | `requested_by_id`, `user_id` |
 | `enrollment_accommodations` | `set_by_id` |
 | `enrollment_applications` | `decided_by_id`, `user_id` |
 | `enrollment_events` | `actor_id` |
