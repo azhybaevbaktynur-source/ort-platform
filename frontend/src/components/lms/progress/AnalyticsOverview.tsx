@@ -19,6 +19,8 @@ import { PERIODS, toPercent } from "./analyticsData";
  * Free for everyone (D8): `LOCK_ANALYTICS` moves the weak-topic and by-topic cards behind the pass when the owner says so.
  */
 const LOCK_ANALYTICS = false;
+/** Active days in the period before the history cards (study time, active hours, sessions) appear (U8, §5.1 c). */
+const HISTORY_DAYS = 3;
 
 /** The period buttons ("7 дней", "30 дней", "90 дней", "Год"); a toggle group, one pressed. */
 export function PeriodPicker({ value, onChange }: { value: ActivityDays; onChange: (d: ActivityDays) => void }) {
@@ -100,6 +102,7 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
   const answered = activity.totals.answered;
   const graded = activity.totals.correct + activity.days.reduce((s, d) => s + d.wrong, 0);
   const nothingYet = progress.attempts_total === 0 && answered === 0 && activity.heatmap.length === 0;
+  const history = activity.days.filter((d) => d.answered > 0).length >= HISTORY_DAYS;
   const practiceHref = course.features?.practice ? `/${lang}/courses/${courseId}/practice` : null;
   const split = !!course.template?.section_keys?.length;
   const pct = (v: number | null) => (v === null ? "-" : `${Math.round(v)} %`);
@@ -133,11 +136,14 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
       <WeakTopics topics={progress.by_topic} practiceHref={practiceHref} locked={LOCK_ANALYTICS} />
       <ActivityBars data={activity} period={period} />
       <TopicAccuracy topics={progress.by_topic} split={split} locked={LOCK_ANALYTICS} />
-      <StudyTime data={activity} period={period} />
-      <div className="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-2">
-        <ActiveHours data={activity} />
-        <Sessions data={activity} />
-      </div>
+      {/* U8 (§5.1 c): study time, active hours and sessions need history; before that they are not drawn at all */}
+      {history && <StudyTime data={activity} period={period} />}
+      {history && (
+        <div className="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-2">
+          <ActiveHours data={activity} />
+          <Sessions data={activity} />
+        </div>
+      )}
       <AllTimeHeatmap data={activity} />
 
       {!examPrep && <AnalyticsCard title={t("progress.analytics.goal.title")}

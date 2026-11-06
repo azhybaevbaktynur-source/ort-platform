@@ -43,6 +43,8 @@ STUDENTS = [
     "mascot-player-ru", "mascot-result-ru",
     # Student UI U6: analytics page (one student without answers, one the spec fills through the API)
     "analytics-empty-ru", "analytics-data-ru",
+    # Student UI U8: Сохранённые (one student without flags, one the spec gives flagged answers), getting started
+    "saved-empty-ru", "saved-data-ru",
 ]
 
 

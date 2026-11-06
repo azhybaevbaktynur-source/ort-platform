@@ -4,7 +4,7 @@ import React, { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  BarChart3, Bookmark, ClipboardList, Compass, Download, Dumbbell, Ellipsis, GraduationCap, House, LogOut, NotebookPen,
+  BarChart3, Bookmark, ClipboardList, Compass, Download, Dumbbell, Ellipsis, GraduationCap, House, LogOut,
   PlayCircle, Plus, Settings,
 } from "lucide-react";
 import { useTranslation, type Language } from "@/lib/i18n/context";
@@ -22,6 +22,7 @@ import { cn, focusRing } from "@/components/ui/utils";
 import type { AppHeaderArea, AppHeaderLink } from "@/components/ui/AppHeader";
 import type { StudentShellData } from "./useStudentShellData";
 import { useLessonModules } from "@/components/lms/modules/lessonNav";
+import { GettingStartedSheet, ProgressRing, useGettingStarted, type GettingStartedState } from "./gettingStarted"; // U8
 
 /*
  * Student UI U2 (docs/phases/STUDENT_UI_DESIGN.md §2): the frame of the student area.
@@ -63,7 +64,6 @@ const ICONS: Record<StudentNavKey, React.ReactNode> = {
   lessons: <PlayCircle />,
   tests: <ClipboardList />,
   practice: <Dumbbell />,
-  mistakes: <NotebookPen />,
   catalog: <Compass />,
 };
 
@@ -82,7 +82,7 @@ function useNav(props: StudentShellProps) {
   const label: Record<StudentNavKey, string> = {
     home: t("student.nav.home"), analytics: t("student.nav.analytics"), saved: t("student.nav.saved"),
     lessons: t("student.nav.lessons"), tests: t("student.nav.tests"), practice: t("student.nav.practice"),
-    mistakes: t("student.nav.mistakes"), catalog: t("student.nav.catalog"),
+    catalog: t("student.nav.catalog"),
   };
   const item = (l: StudentNavLink | null): SidebarNavItem[] =>
     l ? [{ key: l.key, href: l.href, label: label[l.key], icon: ICONS[l.key], active: l.active }] : [];
@@ -199,7 +199,7 @@ function ExamSwitcher({ props, tone, onNavigate }: { props: StudentShellProps; t
     // inside a page of the old exam: the same section of the new one (course page, progress, practice, modules)
     if (old && old !== id && rest.startsWith(`/courses/${old}`)) {
       const section = rest.slice(`/courses/${old}`.length).split("/")[1] ?? "";
-      const keep = ["progress", "practice", "modules"].includes(section) ? `/${section}` : "";
+      const keep = ["progress", "practice", "modules", "saved"].includes(section) ? `/${section}` : "";
       router.push(`/${lang}/courses/${id}${keep}`);
     }
   };
@@ -263,17 +263,42 @@ function InstallItem({ tone, onNavigate }: { tone: "navy" | "light"; onNavigate?
   );
 }
 
+/** U8 (§3.6): the checklist of the current exam course; nothing for the test student or without an exam course. */
+function useShellGettingStarted(props: StudentShellProps): GettingStartedState {
+  const { data, rest, testStudent } = props;
+  return useGettingStarted({
+    courseId: data.current?.id ?? null, practice: data.current ? data.features?.practice ?? null : null, pathKey: rest,
+    enabled: !testStudent && !!data.current, seeded: rest === "/courses", // the home seeds it from its own page
+  });
+}
+
+/** "Начало работы 2/4": a sidebar item that opens the checklist sheet; hidden until known and once complete. */
+function GettingStartedPill({ state, tone, onOpen }: { state: GettingStartedState; tone: "navy" | "light"; onOpen: () => void }) {
+  const { t } = useTranslation();
+  if (!state.ready || state.complete) return null;
+  return (
+    <SidebarNav label={t("student.nav.gettingStarted")} tone={tone}
+      groups={[{ key: "getting-started", items: [{
+        key: "getting-started", label: t("student.nav.gettingStarted"), onClick: onOpen,
+        icon: <ProgressRing done={state.done} total={state.total} />, badge: `${state.done}/${state.total}`,
+      }] }]} />
+  );
+}
+
 /** Desktop sidebar plus the phone top bar, the exam and account sheets. */
 export function StudentChrome(props: StudentShellProps) {
   const { lang, t } = useTranslation();
   const title = useCourseTitle();
   const { links, item } = useNav(props);
   const { data, user, testStudent } = props;
-  const lessonsItem = useLessonsItem(props, links.lessons, useWide());
-  const [sheet, setSheet] = useState<"account" | "exam" | null>(null);
+  const wide = useWide();
+  const lessonsItem = useLessonsItem(props, links.lessons, wide);
+  const [sheet, setSheet] = useState<"account" | "exam" | "start" | null>(null);
   const close = () => setSheet(null);
   const accountId = useId();
   const examId = useId();
+  const startId = useId();
+  const start = useShellGettingStarted(props);
 
   const groups: SidebarNavGroup[] = data.current
     ? [
@@ -281,7 +306,7 @@ export function StudentChrome(props: StudentShellProps) {
       { key: "lessons", label: t("student.nav.lessonsGroup"), items: lessonsItem },
       {
         key: "practice", label: t("student.nav.practiceGroup"),
-        items: [...item(links.tests), ...(data.features?.practice ? item(links.practice) : []), ...item(links.mistakes)],
+        items: [...item(links.tests), ...(data.features?.practice ? item(links.practice) : [])],
       },
     ]
     : [{ key: "main", items: [...item(links.home), ...item(links.catalog)] }];
@@ -301,6 +326,7 @@ export function StudentChrome(props: StudentShellProps) {
           {data.loaded && data.courses.length > 0 && <ExamSwitcher props={props} tone="navy" />}
           <SidebarNav label={t("student.nav.label")} groups={groups} />
           <div className="mt-auto space-y-3">
+            <GettingStartedPill state={start} tone="navy" onOpen={() => setSheet("start")} />
             {!testStudent && <AccessPill data={data} />}
             {!testStudent && <InstallItem tone="navy" />}
             <OtherAreas areas={props.otherAreas} tone="navy" />
@@ -349,6 +375,7 @@ export function StudentChrome(props: StudentShellProps) {
       <Sheet id={examId} open={sheet === "exam"} onClose={close} title={t("student.switcher.title")}>
         <div className="px-3 pb-2"><ExamSwitcher props={props} tone="light" onNavigate={close} /></div>
       </Sheet>
+      <GettingStartedSheet id={startId} state={start} open={sheet === "start"} onClose={close} />
     </>
   );
 }
@@ -360,27 +387,33 @@ export function StudentTabBar(props: StudentShellProps) {
   const { data, testStudent } = props;
   const lessonsItem = useLessonsItem(props, links.lessons, false);
   const [more, setMore] = useState(false);
+  const [startOpen, setStartOpen] = useState(false);
   const moreId = useId();
+  const startId = useId();
   const close = () => setMore(false);
+  const start = useShellGettingStarted(props);
   const slot = (l: StudentNavLink | null): TabBarItem[] =>
     l ? [{ key: l.key, href: l.href, label: label[l.key], icon: ICONS[l.key], active: l.active && !more }] : [];
   const moreSlot: TabBarItem = { key: "more", label: t("student.nav.more"), icon: <Ellipsis />, onClick: () => setMore(true), expanded: more, controls: moreId };
   const items: TabBarItem[] = data.current
     ? [...slot(links.home), ...slot(links.tests), ...slot(links.practice), ...slot(links.analytics), moreSlot]
     : [...slot(links.home), ...slot(links.catalog), moreSlot];
-  const moreLinks: SidebarNavItem[] = data.current ? [...lessonsItem, ...item(links.saved), ...item(links.mistakes)] : [];
+  const moreLinks: SidebarNavItem[] = data.current ? [...lessonsItem, ...item(links.saved)] : [];
   return (
     <>
       <TabBar label={t("student.nav.tabBar")} items={items} />
       <Sheet id={moreId} open={more} onClose={close} title={t("student.nav.more")} tone="navy">
         <div className="space-y-4">
           {moreLinks.length > 0 && <SidebarNav label={t("student.nav.label")} tone="light" onNavigate={close} groups={[{ key: "more", items: moreLinks }]} />}
+          {/* U8: the checklist sheet opens after "More" closed (one modal at a time) */}
+          <GettingStartedPill state={start} tone="light" onOpen={() => { close(); setStartOpen(true); }} />
           {!testStudent && data.current && <div className="px-3"><AccessPill data={data} onNavigate={close} /></div>}
           {!testStudent && <InstallItem tone="light" onNavigate={close} />}
           <OtherAreas areas={props.otherAreas} tone="light" onNavigate={close} />
           <div className="border-t border-slate-100 pt-3"><AccountPanel props={props} onNavigate={close} /></div>
         </div>
       </Sheet>
+      <GettingStartedSheet id={startId} state={start} open={startOpen} onClose={() => setStartOpen(false)} />
     </>
   );
 }

@@ -7,8 +7,8 @@ import { CheckCircle2, KeyRound } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { fmtPassEnd, getMyAccess, redeemCode, type MyAccessOut } from "@/lib/lms/access";
 import { Badge, Button, Card, ErrorState, Input, LinkButton, Skeleton, toast } from "@/components/ui";
-import { StudentPageHeader } from "@/components/lms/student/StudentPageHeader";
 import { useErrorText } from "@/components/lms/home/useErrorText";
+import { StudentPageHeader } from "@/components/lms/student/StudentPageHeader";
 
 function Included({ practice }: { practice: boolean }) {
   const { t } = useTranslation();

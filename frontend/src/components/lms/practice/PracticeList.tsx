@@ -9,13 +9,23 @@ import { useTranslation } from "@/lib/i18n/context";
 import { useCourse } from "@/components/lms/CourseContext";
 import { useCanEditContent } from "@/components/lms/content/StaffGate";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
-import { Button, ConfirmDialog, Dialog, EmptyState, Input, LinkButton, LoadingState, MenuButton, PageHeader, Pagination, toast } from "@/components/ui";
+import {
+  Button, ConfirmDialog, Dialog, EmptyState, GoldPill, Input, LoadingState, MenuButton, PageHeader, Pagination, SectionTag, cn, toast,
+} from "@/components/ui";
+import { StudentPageHeader } from "@/components/lms/student/StudentPageHeader";
+import { fmtDayMonthTime } from "@/components/lms/home/format";
 import { startAttempt } from "@/lib/lms/attempts";
+import { ORT_SECTIONS } from "@/lib/lms/contentTypes";
 import { pickLocalized } from "@/lib/lms/localized";
 import { templateUi } from "@/lib/lms/templates";
-import { StudentPageHeader } from "@/components/lms/student/StudentPageHeader";
 import { deletePractice, listPractice, updatePractice, type PracticeSetOut } from "@/lib/lms/practice";
 import { PracticeDialog } from "./PracticeDialog";
+
+/** The ORT sections a set draws from (its blocks), in ORT order; blocks without a known section add no tag. */
+function sectionsOf(s: PracticeSetOut): string[] {
+  const used = new Set(s.blocks.map((b) => b.section));
+  return ORT_SECTIONS.filter((k) => used.has(k));
+}
 
 export function PracticeList() {
   const { lang, t } = useTranslation();
@@ -78,43 +88,52 @@ export function PracticeList() {
   const newButton = canEdit ? (
     <Button onClick={() => setDialog(true)} leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}>{t("practice.new")}</Button>
   ) : undefined;
+  // Student UI U8 (STUDENT_UI_DESIGN §3.6, §5.1 d): students get the student pages' header (course name under the
+  // title in exam-prep courses, whose course header is dropped here) and cards with section tags; staff keep theirs
+  const examPrep = templateUi(course).studentLayout === "exam_prep";
 
   // §5.1 e (students): one primary button, on the set to continue (else the first open one); the rest secondary
   const startable = items.filter((s) => s.status === "published" && !s.locked);
-  const primaryId = (startable.find((s) => s.open_attempt_id) ?? startable[0])?.id ?? null;
+  const primaryId = (startable.find((s) => s.open_attempt_id) ?? startable.find((s) => !s.my_attempts) ?? startable[0])?.id ?? null;
 
   return (
-    <div>
-      {canEdit ?<PageHeader title={t("practice.title")} primaryAction={newButton} /> : (
-        // Student UI coherence (§5.1 d): the student header; the course name under the title in exam-prep courses
-        <StudentPageHeader title={t("practice.title")} className="mb-6"
-          subtitle={templateUi(course).studentLayout === "exam_prep" ? pickLocalized(course.title, lang, course.default_language) : undefined} />
+    <div className={cn(!canEdit && "space-y-5")}>
+      {canEdit ? <PageHeader title={t("practice.title")} primaryAction={newButton} /> : (
+        <StudentPageHeader title={t("practice.title")}
+          subtitle={examPrep ? pickLocalized(course.title, lang, course.default_language) : undefined} />
       )}
       <ErrorMessage error={actionError} className="mb-4" />
       {loading ? <LoadingState /> : error ? <ErrorMessage error={error} onRetry={() => void load()} /> : items.length === 0 ? (
         <EmptyState mascot={canEdit ? "working" : "reading"} title={t(canEdit ? "practice.emptyStaff" : "practice.empty")} icon={<Dumbbell className="h-6 w-6" aria-hidden="true" />} action={newButton} />
       ) : (
-        <ul className="space-y-3">
+        <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {items.map((s) => (
-            <li key={s.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+            <li key={s.id} className="flex min-w-0 flex-col gap-3 rounded-card border border-slate-200 bg-white p-4 sm:p-5">
+              {sectionsOf(s).length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {sectionsOf(s).map((k) => <SectionTag key={k} section={k} />)}
+                </div>
+              )}
               <div className="min-w-0">
-                <h2 className="break-words text-base font-semibold text-slate-900">{name(s)}</h2>
-                <p className="mt-0.5 text-sm text-slate-600">
+                <h2 className="break-words text-base font-semibold leading-6 text-slate-900">{name(s)}</h2>
+                <p className="mt-1 text-sm leading-5 text-slate-600">
                   {[
                     t("practice.questions", { n: s.item_count }),
                     s.my_best_percent !== null && s.my_best_percent !== undefined ? t("practice.best", { percent: Math.round(s.my_best_percent) }) : null,
                     s.my_attempts ? t("practice.attempts", { n: s.my_attempts }) : null,
                   ].filter(Boolean).join(" · ")}
                 </p>
+                {s.my_last_at && <p className="mt-0.5 text-sm leading-5 text-slate-600">{t("practice.lastAt", { date: fmtDayMonthTime(s.my_last_at, lang) })}</p>}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="mt-auto flex flex-wrap items-center gap-2">
                 {s.status === "published" && (s.locked ? ( // S3 access: practice of a platform course needs a pass
-                  <span className="flex flex-wrap items-center gap-2">
+                  <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                     <span className="inline-flex items-center gap-1.5 text-sm text-slate-600"><Lock aria-hidden="true" className="h-4 w-4" />{t("practice.locked")}</span>
-                    <LinkButton variant="secondary" href={`/${lang}/unlock`}>{t("practice.unlock")}</LinkButton>
+                    <GoldPill href={`/${lang}/unlock`} icon={<Lock />} block className="justify-center">{t("practice.unlock")}</GoldPill>
                   </span>
                 ) : (
-                  <Button loading={busyId === s.id} onClick={() => void start(s)} variant={canEdit || s.id === primaryId ? "primary" : "secondary"}>
+                  <Button loading={busyId === s.id} onClick={() => void start(s)} className="flex-1 sm:flex-none"
+                    variant={canEdit || s.id === primaryId ? "primary" : "secondary"}>
                     {t(s.open_attempt_id ? "practice.continue" : "practice.start")}<span className="sr-only">: {name(s)}</span>
                   </Button>
                 ))}

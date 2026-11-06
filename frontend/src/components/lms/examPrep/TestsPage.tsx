@@ -20,7 +20,8 @@ import {
 } from "@/lib/lms/examPrep";
 import { useCourse } from "@/components/lms/CourseContext";
 import {
-  Badge, EmptyState, ErrorState, GoldPill, LinkButton, LockOverlay, Pagination, Skeleton, StatTile, cn, focusRing, type BadgeTone,
+  Badge, EmptyState, ErrorState, GoldPill, LinkButton, LockOverlay, Pagination, STAT_ICON_TONE, Skeleton, cn, focusRing, type BadgeTone,
+  type StatIconTone,
 } from "@/components/ui";
 import { StudentPageHeader } from "@/components/lms/student/StudentPageHeader";
 import { fmtDuration } from "@/components/lms/home/format";
@@ -94,12 +95,22 @@ function TestsStats({ prep }: { prep: ExamPrepOut }) {
   const latest = wholeNumber(prep.latest?.value);
   const best = values.length > 0 ? Math.max(...values) : null;
   const target = prep.goal.target_score;
-  const n = (v: number | null) => <span className="tabular-nums">{v ?? "—"}</span>;
+  // one row of three at every width; on phones a compact column (chip, label, number) so the row stays short
+  const tile = (icon: React.ReactNode, tone: StatIconTone, label: string, v: number | null, hint?: string) => (
+    <div className="flex min-w-0 flex-col gap-2 rounded-card border border-slate-200 bg-white p-3 sm:flex-row sm:items-start sm:gap-3 sm:p-4">
+      <span aria-hidden="true" className={cn("inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl [&>svg]:h-4 [&>svg]:w-4 sm:h-10 sm:w-10 sm:[&>svg]:h-5 sm:[&>svg]:w-5", STAT_ICON_TONE[tone])}>{icon}</span>
+      <span className="min-w-0">
+        <span className="block break-words text-xs font-medium leading-4 text-slate-600 sm:text-sm sm:leading-5">{label}</span>
+        <span className="mt-0.5 block text-xl font-bold leading-7 tabular-nums text-slate-900 sm:mt-1 sm:text-2xl sm:leading-8">{v ?? "—"}</span>
+        {hint && v !== null && <span className="hidden text-sm leading-5 text-slate-600 sm:block">{hint}</span>}
+      </span>
+    </div>
+  );
   return (
-    <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
-      <StatTile icon={<TrendingUp />} iconTone="blue" label={t("examPrep.goal.latestLabel")} value={n(latest)} hint={latest !== null ? outOf : undefined} className="rounded-card shadow-none" />
-      <StatTile icon={<Trophy />} iconTone="green" label={t("examPrep.library.best")} value={n(best)} hint={best !== null ? outOf : undefined} className="rounded-card shadow-none" />
-      <StatTile icon={<Target />} iconTone="orange" label={t("examPrep.goal.targetLabel")} value={n(target)} className="rounded-card shadow-none" />
+    <div className="grid grid-cols-3 gap-2 sm:gap-4">
+      {tile(<TrendingUp />, "blue", t("examPrep.goal.latestLabel"), latest, outOf)}
+      {tile(<Trophy />, "green", t("examPrep.library.best"), best, outOf)}
+      {tile(<Target />, "orange", t("examPrep.goal.targetLabel"), target)}
     </div>
   );
 }
