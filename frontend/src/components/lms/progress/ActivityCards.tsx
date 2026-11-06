@@ -9,7 +9,7 @@ import type { ActivityDays, ActivityOut } from "@/lib/lms/progress";
 import { AnalyticsCard, CardEmpty, ChartScroll, Legend, type LegendItem } from "./AnalyticsCard";
 import { MonthHeatmap } from "./MonthHeatmap";
 import {
-  CORRECT_FILL, OTHER_FILL, SECTION_FILL, SECTION_ORDER, WRONG_STYLE,
+  CORRECT_FILL, OTHER_FILL, SECTION_FILL, SECTION_ORDER, TOPIC_MIN_GRADED, WRONG_STYLE,
   bucketize, dayMs, niceCount, niceMax, type Bucket,
 } from "./analyticsData";
 
@@ -241,7 +241,8 @@ export function Sessions({ data }: { data: ActivityOut }) {
                   <span className="flex flex-wrap items-center gap-x-3 text-sm leading-5 text-slate-700">
                     <span>{fmtDuration(secs, t)}</span>
                     <span>{t("progress.analytics.answers", { count: s.answered })}</span>
-                    <span className={cn("font-semibold tabular-nums", BAND_TEXT[accuracyBand(p)])}>{t("progress.analytics.sessions.correct", { percent: p })}</span>
+                    {/* 4.3: a band colour only from TOPIC_MIN_GRADED graded answers, else neutral */}
+                    <span className={cn("font-semibold tabular-nums", s.graded >= TOPIC_MIN_GRADED ? BAND_TEXT[accuracyBand(p)] : "text-slate-600")}>{t("progress.analytics.sessions.correct", { percent: p })}</span>
                   </span>
                 </li>
               );

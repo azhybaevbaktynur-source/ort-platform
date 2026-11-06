@@ -7,7 +7,7 @@ export type Num = string | number;
 
 export interface ExamGoalOut { target_score: number | null; scale_min: Num | null; scale_max: Num | null }
 export interface ScorePoint { attempt_id: string; assessment_id: string; title: LocalizedText; at: string | null; value: Num | null }
-export interface SectionBar { key: string; raw: Num; possible: Num; correct: number }
+export interface SectionBar { key: string; raw: Num; possible: Num; correct: number; rated: boolean } // rated: enough graded answers (server rule)
 export type NextKind = "resume" | "start" | "practice" | "retake" | "unlock";
 export interface ExamNextOut {
   kind: NextKind;

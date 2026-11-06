@@ -53,7 +53,7 @@ export interface ActivityDay {
   study_seconds: number;
   by_section: Record<string, number>; // section key -> seconds
 }
-export interface ActivitySession { started_at: string; ended_at: string; answered: number; correct: number }
+export interface ActivitySession { started_at: string; ended_at: string; answered: number; correct: number; graded: number }
 export interface ActivityOut {
   days_window: ActivityDays;
   streak_current: number;

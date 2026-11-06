@@ -153,7 +153,7 @@ test.describe("exam-prep page (ru)", () => {
       // Student UI U3: current vs target, the section rows of the latest result, the streak of today's answers
       await expect(scores).toContainText(t("examPrep.goal.outOf", { max: 245 }));
       await expect(scores).toContainText("200");
-      await expect(page.getByRole("region", { name: t("examPrep.sections.title") }).getByRole("meter")).toHaveCount(5);
+      await expect(page.getByRole("region", { name: t("examPrep.sections.title") }).locator('[role="meter"], [role="img"]')).toHaveCount(5); // rated sections a meter, others a neutral bar (F4c)
       await expect(page.getByRole("region", { name: t("progress.analytics.tiles.streak") })).toContainText(t("home.prep.streak.days_one", { count: 1 }));
       await expect(page.getByRole("region", { name: t("examPrep.next.title") })).toContainText("ОРТ E2E staff");
       await shoot(page, "home-prep-after");

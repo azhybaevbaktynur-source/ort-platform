@@ -102,6 +102,7 @@ class ActivitySession(BaseModel):
     ended_at: datetime
     answered: int
     correct: int
+    graded: int = 0  # answers whose correctness is not pending; the band needs TOPIC_MIN_GRADED of them (4.3)
 
 
 class HeatmapDay(BaseModel):

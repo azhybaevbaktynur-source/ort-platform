@@ -100,7 +100,8 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
   const topics = namedTopics(progress.by_topic);
   // correct counts a partial answer as half: one decimal at most
   const correctText = Number.isInteger(activity.totals.correct) ? String(activity.totals.correct) : activity.totals.correct.toFixed(1);
-  const nothingYet = progress.attempts_total === 0 && answered === 0 && activity.heatmap.length === 0;
+  // zero answers ever (the heatmap is all time): only the hero below
+  const nothingYet = answered === 0 && activity.heatmap.length === 0;
   const history = activity.days.filter((d) => d.answered > 0).length >= HISTORY_DAYS;
   // U9 (review 11): the calendar only after a week of active days
   const calendar = activity.heatmap.filter((d) => d.answered > 0).length >= HEATMAP_MIN_DAYS;
@@ -111,14 +112,14 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
   return (
     <div className={cn("space-y-4 transition-opacity sm:space-y-6", busy && "opacity-60")} aria-busy={busy}>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile icon={<ListChecks />} iconTone="blue" label={t("progress.analytics.tiles.answered")} value={<span className="tabular-nums">{answered}</span>}
+        <StatTile icon={<ListChecks />} label={t("progress.analytics.tiles.answered")} value={<span className="tabular-nums">{answered}</span>}
           hint={t(`progress.analytics.period.in.d${period}`)} />
-        <StatTile icon={<Target />} iconTone="green" label={t("progress.analytics.tiles.accuracy")}
+        <StatTile icon={<Target />} label={t("progress.analytics.tiles.accuracy")}
           value={<span className="tabular-nums">{graded > 0 ? `${toPercent(activity.totals.accuracy)} %` : "-"}</span>}
           hint={graded > 0 ? t("progress.analytics.tiles.accuracyHint", { correct: correctText, total: graded }) : t(`progress.analytics.period.in.d${period}`)} />
-        <StatTile icon={<Bookmark />} iconTone="violet" label={t("progress.analytics.tiles.saved")} value={<span className="tabular-nums">{saved ?? "-"}</span>}
+        <StatTile icon={<Bookmark />} label={t("progress.analytics.tiles.saved")} value={<span className="tabular-nums">{saved ?? "-"}</span>}
           hint={t("progress.analytics.tiles.savedHint")} />
-        <StatTile icon={<Flame />} iconTone="orange" label={t("progress.analytics.tiles.streak")}
+        <StatTile icon={<Flame />} label={t("progress.analytics.tiles.streak")}
           value={<span className="whitespace-nowrap">{t("progress.analytics.tiles.streakValue", { count: activity.streak_current })}</span>}
           hint={t("progress.analytics.tiles.streakBest", { count: activity.streak_longest })} />
       </div>
@@ -134,10 +135,11 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
         </section>
       )}
 
-      <WeakTopics topics={topics} ready={progress.weak_topics_ready} practiceHref={practiceHref} locked={LOCK_ANALYTICS} />
+      {/* zero answers: the hero above is the whole story; "Пока мало данных" only once there is some data (one mascot, one action) */}
+      {!nothingYet && <WeakTopics topics={topics} ready={progress.weak_topics_ready} practiceHref={practiceHref} testsHref={`/${lang}/courses/${courseId}`} locked={LOCK_ANALYTICS} />}
       {/* U9 (review 11): the answers chart too needs history (a chart of one bar says nothing) */}
       {history && <ActivityBars data={activity} period={period} />}
-      <TopicAccuracy topics={topics} split={split} locked={LOCK_ANALYTICS} />
+      {!nothingYet && <TopicAccuracy topics={topics} split={split} locked={LOCK_ANALYTICS} />}
       {/* U8 (§5.1 c): study time, active hours and sessions need history; before that they are not drawn at all */}
       {history && <StudyTime data={activity} period={period} />}
       {history && (
