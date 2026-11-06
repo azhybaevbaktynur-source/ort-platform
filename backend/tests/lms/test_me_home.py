@@ -96,7 +96,8 @@ async def test_empty_home(db, api):
                     "pending_invitations": 0, "modules_next": [], "announcements": [],  # + Phase 8a S3
                     "pending_applications": [],  # + Phase 9 S4
                     "todo": [],  # + UX rework
-                    "teacher_application": None}  # + Accounts
+                    "teacher_application": None,  # + Accounts
+                    "platform_courses": []}  # + Exam prep S2
 
 
 async def test_full_shape_and_no_private_fields(db, api):
@@ -432,8 +433,9 @@ async def test_statement_count_is_fixed(db, api):
         # Phase 8a S3: modules strip (+ its current items when any module is open), announcements;
         # UX rework: todo's in-progress attempts (its other rows are the next_up statement's);
         # one course card: module progress of the page's courses, one grouped statement;
-        # Accounts: the caller's latest teacher request, one indexed statement
-        assert counts[name] <= 14, "\n".join(st[:120] for st in c.statements)
+        # Accounts: the caller's latest teacher request, one indexed statement;
+        # Exam prep S2: the platform's open courses ("From the platform"), one statement
+        assert counts[name] <= 15, "\n".join(st[:120] for st in c.statements)
     assert counts["small"] == counts["big"], counts
 
 

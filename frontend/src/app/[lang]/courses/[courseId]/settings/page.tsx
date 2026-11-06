@@ -27,6 +27,7 @@ import { listFormVersions } from "@/lib/lms/enrollmentForms";
 import { templateUi } from "@/lib/lms/templates";
 import { ErrorState, Select, Switch } from "@/components/ui";
 import { useApplicationErrorText } from "@/components/lms/catalog/useApplicationErrorText";
+import { ExamDateSection } from "@/components/lms/examPrep/ExamDateSection"; // Exam prep S2
 
 const SETTINGS_MODES: EnrollmentMode[] = ["invite_code", "open", "form_review", "form_auto", "closed"];
 // --- Phase 9 S4 end ---
@@ -175,6 +176,7 @@ function Settings({ course }: { course: CourseStaffOut }) {
       {/* --- Phase 8a S4a: course home (locked on ORT with the template note) --- */}
       <CourseHomeSection course={course} />
       {/* --- Phase 8a S4a end --- */}
+      {templateUi(course).studentLayout === "exam_prep" && <ExamDateSection course={course} />}
 
       <section className={`${card} space-y-5`}>
         <h2 className="text-lg font-bold text-slate-900">{t("courses.settings.enrollment")}</h2>

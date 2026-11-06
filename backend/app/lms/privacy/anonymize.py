@@ -36,6 +36,7 @@ from app.lms.organizations.ids import personal_org_id
 from app.lms.organizations.models import Invitation, Organization
 from app.lms.privacy.service import holder_lost
 from app.lms.progress.models import CourseGoal
+from app.lms.exam_prep.models import ExamGoal  # Exam prep S2
 from app.lms.teachers.models import TeacherRequest
 from app.models.user import User
 
@@ -79,6 +80,8 @@ def _scrub_enrollments(db: Session, user_id: str, actor_id: str, now) -> tuple[l
                    .execution_options(synchronize_session=False))
         db.execute(delete(CourseGoal).where(CourseGoal.enrollment_id.in_(ids))
                    .execution_options(synchronize_session=False))
+    db.execute(delete(ExamGoal).where(ExamGoal.user_id == user_id)  # Exam prep S2: keyed by the person, not a row
+               .execution_options(synchronize_session=False))
     return ids, staff
 
 

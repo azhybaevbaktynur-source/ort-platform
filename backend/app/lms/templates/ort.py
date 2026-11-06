@@ -38,4 +38,8 @@ ORT = CourseTemplate(
     default_structure=None,
     # --- Phase 8a S1 end ---
     refused_question_types=STRUCTURED_TYPES,  # Phase 10 S1
+    # --- Exam prep S2 --- (owner 2026-11-06: students open ORT courses on the exam-prep page)
+    student_layout="exam_prep",
+    exam_prep_preset="ort_main",
+    exam_prep_sections=tuple(k for k, _ in ORT_MAIN_SECTIONS),
 )

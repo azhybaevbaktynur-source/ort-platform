@@ -25,7 +25,8 @@ def test_declared_key_sets():
                                                   "status", "starts_at", "ends_at", "owner_display_name",
                                                   "my_enrollment", "organization_id", "organization_name",
                                                   "template",  # Phase 6 S2b: course template (design 5.3)
-                                                  "home_kind", "home_page_id", "features"}  # Phase 8a (5.5, 8.2)
+                                                  "home_kind", "home_page_id", "features",  # Phase 8a (5.5, 8.2)
+                                                  "exam_date"}  # Exam prep S2: exam-prep courses only
     assert set(CourseStaffOut.model_fields) == set(CourseStudentOut.model_fields) | {
         "join_code", "enrollment_mode", "enrollment_limit", "visibility", "unlisted_by_admin",
         "active_student_count", "owner", "is_owner", "created_at", "updated_at", "published_at", "concluded_at",

@@ -139,6 +139,24 @@ class HomeTeacherApplicationOut(BaseModel):
 # --- Accounts end ---
 
 
+# --- Exam prep S2 begin --- (docs/ROADMAP_EXAM_PREP.md S2: "From the platform", one-tap join)
+PLATFORM_COURSES_MAX = 6
+
+
+class HomePlatformCourseOut(BaseModel):
+    """A published, catalog-listed, open course of the platform organization the caller is not a member of. Card
+    fields only: no join code, limit or roster data."""
+    id: uuid.UUID
+    title: dict
+    description: Optional[dict] = None
+    languages: list[str]
+    default_language: str
+    owner_display_name: str
+    organization_display_name: Optional[str] = None
+    is_platform_course: bool = True
+# --- Exam prep S2 end ---
+
+
 class HomeOut(BaseModel):
     in_progress: list[HomeInProgressOut]
     next_up: list[HomeNextUpOut]
@@ -153,6 +171,7 @@ class HomeOut(BaseModel):
     pending_applications: list[HomeApplicationOut] = []  # Phase 9 S4: newest three, never answers
     todo: list[HomeTodoOut] = []  # UX rework: at most TODO_MAX rows, in-progress attempts first
     teacher_application: Optional[HomeTeacherApplicationOut] = None  # Accounts: null unless there is something to say
+    platform_courses: list[HomePlatformCourseOut] = []  # Exam prep S2: at most PLATFORM_COURSES_MAX
 
 
 HOME_KEYS = frozenset(HomeOut.model_fields)
@@ -168,3 +187,4 @@ TODO_KEYS = frozenset(HomeTodoOut.model_fields)
 RESULT_KEYS = frozenset(HomeResultOut.model_fields)
 COURSE_KEYS = frozenset(HomeCourseOut.model_fields)
 PROGRESS_KEYS = frozenset(HomeProgressOut.model_fields)
+PLATFORM_COURSE_KEYS = frozenset(HomePlatformCourseOut.model_fields)  # Exam prep S2

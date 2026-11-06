@@ -104,6 +104,9 @@ from app.lms.statistics.router import router as _statistics_router  # noqa: E402
 for _r in (_practice_router, _progress_router, _statistics_router, _analytics_router):
     api_router.include_router(_r)
 # --- Phase 10 S0 end ---
+from app.lms.exam_prep.router import router as _exam_prep_router  # noqa: E402  (Exam prep S2)
+
+api_router.include_router(_exam_prep_router, tags=["Exam prep"])
 # --- Phase 9 S4 begin --- (enrollment forms, applications, /me/applications; PHASE_9_DESIGN 5)
 from app.lms.enrollment_forms.router import router as _enrollment_forms_router  # noqa: E402
 

@@ -18,6 +18,7 @@ class CourseTemplateOut(BaseModel):
     assessment_presets: list[str]
     importer_profiles: list[str]
     title_key: str
+    student_layout: str = "standard"  # Exam prep S2: `exam_prep` opens the students' course page on the exam-prep page
 
 
 class TemplateBriefOut(BaseModel):

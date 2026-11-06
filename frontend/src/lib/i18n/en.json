@@ -261,7 +261,11 @@
       "teacher_age_required": "Independent teachers must be 18 or older.",
       "age_confirmation_required": "Confirm that you are 18 or older and accept the policies.",
       "personal_org_no_members": "Other teachers can't be invited to your own courses as an organization. Invite the person from the course's People page.",
-      "teacher_account_disabled": "This account is disabled. Enable it first, then approve."
+      "teacher_account_disabled": "This account is disabled. Enable it first, then approve.",
+      "exam_date_invalid": "Choose a date between 2020 and 2100.",
+      "exam_date_not_supported": "This course has no exam date.",
+      "goal_out_of_range": "This score is outside the exam's scale.",
+      "exam_prep_not_available": "This page is not available in this course."
     }
   },
   "courses": {
@@ -381,7 +385,13 @@
       "deleteBody": "The course disappears for everyone. You can restore it from deleted courses.",
       "joinCodeInactiveMode": "The code is off because students join by application form. Choose “{code}” to use it.",
       "joinCodeInactiveOpen": "The code is off because students join from the catalog without it. Choose “{code}” to use it.",
-      "joinCodeInactiveClosed": "The code is off because enrollment is closed. Choose “{code}” to use it."
+      "joinCodeInactiveClosed": "The code is off because enrollment is closed. Choose “{code}” to use it.",
+      "examDate": {
+        "title": "Exam",
+        "label": "Exam date",
+        "hint": "Students see how many days are left. Leave it empty to hide the countdown.",
+        "clear": "Clear the date"
+      }
     },
     "status": {
       "draft": "Draft",
@@ -3228,6 +3238,11 @@
       "rejectedWait": "You can apply again from {date}.",
       "revoked": "Your teacher access was revoked. Your courses are read-only: students can't start tests or hand in work. You can apply again.",
       "applyLink": "Apply"
+    },
+    "platform": {
+      "title": "From the platform",
+      "subtitle": "Exam prep courses. Join with one tap.",
+      "haveCode": "Have a code from your teacher?"
     }
   },
   "shell": {
@@ -5758,5 +5773,86 @@
     "schemesBody": "Grading schemes are available to teachers who can create courses.",
     "courseBody": "Courses are created by teachers.",
     "back": "Back to my courses"
+  },
+  "examPrep": {
+    "goal": {
+      "daysLabel": "Until the exam",
+      "daysUnit": "days",
+      "daysUnit_one": "day",
+      "daysUnit_few": "days",
+      "daysUnit_many": "days",
+      "daysUnit_other": "days",
+      "today": "Today",
+      "examOn": "Exam on {date}",
+      "targetLabel": "My target",
+      "setTarget": "Set a target",
+      "noTarget": "Choose the score you are aiming for.",
+      "edit": "Change",
+      "inputLabel": "Target score ({min}–{max})",
+      "save": "Save",
+      "cancel": "Cancel",
+      "remove": "Remove target",
+      "invalid": "Enter a whole number from {min} to {max}.",
+      "latestLabel": "Latest score",
+      "outOf": "out of {max}",
+      "noScore": "Your score appears after your first released result.",
+      "toTarget": "{count} points to your target",
+      "toTarget_one": "{count} point to your target",
+      "toTarget_few": "{count} points to your target",
+      "toTarget_many": "{count} points to your target",
+      "toTarget_other": "{count} points to your target",
+      "reached": "Target reached!"
+    },
+    "history": {
+      "title": "My scores",
+      "empty": "Your scores appear here as a chart once your first result is released.",
+      "chart": "Scores from the first result to the latest",
+      "point": "{title}: {value}, {date}",
+      "target": "Target {value}"
+    },
+    "sections": {
+      "title": "Sections",
+      "subtitle": "From your latest result",
+      "score": "{raw} of {possible}",
+      "empty": "Sections appear after your first released result."
+    },
+    "next": {
+      "title": "Next step",
+      "reason": {
+        "resume": "You have a test in progress.",
+        "start": "You haven't taken this test yet.",
+        "practice": "Your weakest section right now: {section}.",
+        "retake": "You took this test the longest time ago."
+      },
+      "action": {
+        "resume": "Continue",
+        "start": "Start the test",
+        "practice": "Practise",
+        "retake": "Take it again"
+      },
+      "practiceTitle": "Practice: {section}",
+      "none": "You have taken every test available. New tests will appear here."
+    },
+    "library": {
+      "title": "Tests",
+      "count": "{count} tests",
+      "count_one": "{count} test",
+      "count_few": "{count} tests",
+      "count_many": "{count} tests",
+      "count_other": "{count} tests",
+      "filter": "Source",
+      "all": "All",
+      "other": "Other",
+      "empty": "No tests yet. They appear here once they are published.",
+      "emptyFilter": "No tests from this source.",
+      "status": {
+        "not_started": "Not started",
+        "in_progress": "In progress",
+        "done": "Done"
+      },
+      "best": "Best score",
+      "bestPercent": "Best result",
+      "pending": "Your result appears once it is released."
+    }
   }
 }

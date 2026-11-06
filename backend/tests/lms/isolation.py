@@ -113,7 +113,9 @@ def reset_lms_state() -> None:
         from app.lms.progress.models import CourseGoal
         from app.lms.statistics.models import AssessmentItemStat, AssessmentVersionStats
 
-        for model in (AssessmentItemStat, AssessmentVersionStats, CourseGoal):
+        from app.lms.exam_prep.models import ExamGoal  # Exam prep S2
+
+        for model in (AssessmentItemStat, AssessmentVersionStats, CourseGoal, ExamGoal):
             conn.execute(delete(model.__table__))
         conn.execute(update(Assessment.__table__).values(published_version_id=None))
         conn.execute(delete(AssessmentItem.__table__).where(AssessmentItem.parent_item_id.isnot(None)))

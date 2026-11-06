@@ -473,9 +473,13 @@ test.describe("modules walk (ru)", () => {
       // after: the student sees Modules and Files; the ORT module lists the exam as locked, yet the exam starts
       await sp.goto(base);
       await expect(tabs(sp).getByRole("link", { name: t("courseFiles.title"), exact: true })).toBeVisible();
-      // UX rework B: published modules are the home, ORT included; the exam row opens the same lobby
-      await expect(badge(sp, "Пробный ОРТ", "locked")).toBeVisible();
-      await expect(moduleCard(sp, "Пробный ОРТ").getByRole("link")).toHaveAttribute("href", `${base}/assessments/${s.exam.id}`);
+      // Exam prep S2 (owner 2026-11-06): ORT students open the exam-prep page; the module is a source of the test library
+      // and the exam card opens the same lobby (the Modules page below keeps the module view)
+      const lib = sp.getByRole("region", { name: t("examPrep.library.title") });
+      await lib.getByRole("button", { name: "Пробный ОРТ", exact: true }).click();
+      await expect(lib.getByRole("button", { name: "Пробный ОРТ", exact: true })).toHaveAttribute("aria-pressed", "true");
+      await expect(lib.getByRole("link", { name: "ОРТ E2E", exact: true })).toHaveAttribute("href", `${base}/assessments/${s.exam.id}`);
+      await expect(lib.getByRole("link", { name: "ОРТ E2E staff", exact: true })).toHaveCount(0);
       await review(sp, "ort-student-course-home-with-structure");
       await sp.goto(`${base}/modules`);
       await expect(badge(sp, "Пробный ОРТ", "locked")).toBeVisible();

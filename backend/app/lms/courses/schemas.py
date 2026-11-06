@@ -3,7 +3,7 @@ limits, emails or other students' data to CourseCard / CourseStudentOut / JoinOu
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -88,6 +88,8 @@ class CourseUpdateIn(BaseModel):
     home_kind: Optional[HomeKind] = None
     home_page_id: Optional[uuid.UUID] = None
     # --- Phase 8a S1 end ---
+    # Exam prep S2: exam-prep courses only (422 `exam_date_not_supported` otherwise); null clears it
+    exam_date: Optional[date] = None
 
 
 class TransferIn(BaseModel):
@@ -150,6 +152,7 @@ class CourseStudentOut(BaseModel):
     home_page_id: Optional[uuid.UUID] = None
     features: CourseFeaturesOut = Field(default_factory=CourseFeaturesOut)
     # --- Phase 8a S1 end ---
+    exam_date: Optional[date] = None  # Exam prep S2: set only on exam-prep courses (course template)
 
 
 class CourseStaffOut(CourseStudentOut):
@@ -238,7 +241,14 @@ def course_student_out(course, enrollment, owner, organization_name: str = "") -
         home_page_id=getattr(course, "home_page_id", None),
         # --- Phase 8a S1 end ---
         features=_course_features(course),  # --- Phase 8a S3 --- (one line)
+        exam_date=_exam_date(course),  # Exam prep S2
     )
+
+
+def _exam_date(course):
+    from app.lms.exam_prep.layout import exam_date_of
+
+    return exam_date_of(course)
 
 
 # --- Phase 8a S3 begin --- (student tabs, PHASE_8A_DESIGN 8.2: three EXISTS on the course's own session)

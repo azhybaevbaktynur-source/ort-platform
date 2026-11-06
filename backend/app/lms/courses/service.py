@@ -289,6 +289,17 @@ def update_course(db: Session, ctx: AuthzContext, course: Course, data: CourseUp
         raise ValidationFailed("ends_at must be after starts_at")
 
     _apply_home(db, course, fields)  # --- Phase 8a S3 --- (one line; validates before any field is set)
+    # --- Exam prep S2 begin --- (the exam date of an exam-prep course; validated before any field is set)
+    if "exam_date" in fields:
+        from app.lms.exam_prep import layout as exam_layout
+
+        if not exam_layout.is_exam_prep(course):
+            raise ValidationFailed("This course has no exam date", code="exam_date_not_supported")
+        value = fields["exam_date"]
+        if value is not None and not (exam_layout.EXAM_DATE_MIN <= value <= exam_layout.EXAM_DATE_MAX):
+            raise ValidationFailed("Exam date out of range", code="exam_date_invalid")
+        exam_layout.apply_exam_date(course, value)
+    # --- Exam prep S2 end ---
     course.title, course.description = title, description
     course.languages, course.default_language = languages, default_language
     course.starts_at, course.ends_at = starts, ends
