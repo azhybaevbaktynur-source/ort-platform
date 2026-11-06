@@ -11,16 +11,18 @@ export interface CourseAnalyticsOut {
 }
 export interface ModuleRowOut {
   module_id: string; title: LocalizedText; position: number;
+  // not_started includes unlocked (open, nothing done): completed + started + not_started + locked = students
   locked: number; unlocked: number; started: number; completed: number; not_started: number;
 }
 export interface AssignmentRowOut {
   assignment_id: string; assessment_id: string | null; kind: string; title: LocalizedText; due_at: string | null;
-  students: number; submitted: number; graded: number; pending_review: number; excused: number; missing: number;
+  students: number; submitted: number; graded: number; pending_review: number; excused: number;
+  missing: number | null; // null without a due date
   late: number; mean_percent: number | null;
 }
 export interface QuizRollupRowOut {
   assessment_id: string; title: LocalizedText; preset: string; is_practice: boolean;
-  attempts: number; students: number; mean_percent: number | null;
+  attempts: number; students: number; mean_percent: number | null; // first counted attempt per student
 }
 export interface OrgQuizRollupRowOut extends QuizRollupRowOut { course_id: string; course_title: LocalizedText }
 export interface OrgAnalyticsOut { courses: number; students: number; score: ScoreOut; submissions: SubmissionCountsOut }

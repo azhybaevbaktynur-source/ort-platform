@@ -120,7 +120,7 @@ function ScoreTiles({ prep, courseId, best, onGoal, className }: {
     <section id="home-score" aria-labelledby="home-score-title" className={cn("grid grid-cols-2 gap-3 sm:gap-4", className)}>
       <h2 id="home-score-title" className="sr-only">{t("home.prep.score.title")}</h2>
       <div className={tile}>
-        <TileLabel icon={<TrendingUp />} tone="blue">{t("examPrep.goal.latestLabel")}</TileLabel>
+        <TileLabel icon={<TrendingUp />} tone="brand">{t("examPrep.goal.latestLabel")}</TileLabel>
         {latest !== null ? (
           <>
             <p className="mt-1 flex flex-wrap items-baseline gap-x-2">
@@ -139,7 +139,7 @@ function ScoreTiles({ prep, courseId, best, onGoal, className }: {
         )}
       </div>
       <div className={tile}>
-        <TileLabel icon={<Target />} tone="orange">{t("examPrep.goal.targetLabel")}</TileLabel>
+        <TileLabel icon={<Target />} tone="brand">{t("examPrep.goal.targetLabel")}</TileLabel>
         {target !== null ? (
           <>
             <p className={cn(big, "mt-1")}>{target}</p>
@@ -223,11 +223,18 @@ function SectionRows({ prep, className }: { prep: ExamPrepOut; className?: strin
               const pct = possible > 0 ? (raw / possible) * 100 : 0;
               const name = t(`sections.${s.key}`);
               const score = t("examPrep.sections.score", { raw: plain(raw), possible: plain(possible) });
+              // STUDENT_UI_FIX_PLAN 4.3: too few questions in the section: the raw "n из m", no band colour, no percent
+              const rated = s.rated; // the server's rule (progress SECTION_MIN_GRADED graded answers)
               return (
                 <li key={s.key} className="grid grid-cols-1 gap-1.5 sm:grid-cols-[12.5rem_minmax(0,1fr)_5rem] sm:items-center sm:gap-3">
                   <span className="min-w-0"><SectionTag section={s.key} /></span>
-                  <Meter value={pct} label={`${name}: ${score}`} />
-                  <span className="hidden text-right text-sm tabular-nums text-slate-600 sm:block">{score}</span>
+                  {rated ? <Meter value={pct} label={`${name}: ${score}`} /> : (
+                    <div role="img" aria-label={`${name}: ${score}. ${t("examPrep.sections.fewAnswers")}`} title={t("examPrep.sections.fewAnswers")}
+                      className="h-2 min-w-0 overflow-hidden rounded-full bg-slate-100">
+                      <div className="h-full rounded-full bg-slate-300" style={{ width: `${pct}%` }} />
+                    </div>
+                  )}
+                  <span className={cn("text-right text-sm tabular-nums text-slate-600", rated ? "hidden sm:block" : "sm:block")}>{score}</span>
                 </li>
               );
             })}

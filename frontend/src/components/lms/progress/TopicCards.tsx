@@ -5,9 +5,8 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Meter, SectionTag, accuracyBand, cn, focusRing, type AccuracyBand } from "@/components/ui";
 import { useTranslation } from "@/lib/i18n/context";
-import type { TopicStat } from "@/lib/lms/progress";
-import { AnalyticsCard, BandLegend, CardEmpty } from "./AnalyticsCard";
-import { isGraded, toPercent, topicGroup, twoDigits, weakestTopics, type TopicGroup } from "./analyticsData";
+import { AnalyticsCard, BandLegend, CardEmpty, NotEnoughData } from "./AnalyticsCard";
+import { TOPIC_MIN_GRADED, isGraded, toPercent, topicGroup, twoDigits, weakestTopics, type NamedTopic, type TopicGroup } from "./analyticsData";
 
 /*
  * Student UI U6 (STUDENT_UI_DESIGN §3.3): "5 слабых тем" and accuracy by topic (math vs language). Both take `locked`
@@ -33,10 +32,16 @@ function Ring({ percent }: { percent: number }) {
   );
 }
 
-export function WeakTopics({ topics, practiceHref, locked = false }: { topics: TopicStat[]; practiceHref: string | null; locked?: boolean }) {
+export function WeakTopics({ topics, ready, practiceHref, testsHref, locked = false }: { topics: NamedTopic[]; ready: boolean; practiceHref: string | null; testsHref: string; locked?: boolean }) {
   const { t } = useTranslation();
-  const weak = weakestTopics(topics);
-  if (weak === null) return null;
+  const weak = weakestTopics(topics, ready);
+  if (weak === null) {
+    return (
+      <AnalyticsCard locked={locked} title={t("progress.analytics.weak.titleEmpty")}>
+        <NotEnoughData body={t("progress.analytics.notEnough.weakBody")} href={testsHref} />
+      </AnalyticsCard>
+    );
+  }
   return (
     <AnalyticsCard locked={locked}
       title={weak.length ? t("progress.analytics.weak.title", { count: weak.length }) : t("progress.analytics.weak.titleEmpty")}
@@ -82,7 +87,7 @@ export function WeakTopics({ topics, practiceHref, locked = false }: { topics: T
   );
 }
 
-function TopicRows({ topics }: { topics: TopicStat[] }) {
+function TopicRows({ topics }: { topics: NamedTopic[] }) {
   const { t } = useTranslation();
   // graded topics first (weakest first), then the ones with too few answers (most answers first)
   const rows = topics.filter((x) => x.total > 0).slice().sort((a, b) =>
@@ -105,7 +110,7 @@ function TopicRows({ topics }: { topics: TopicStat[] }) {
           ) : (
             <div className="flex items-center gap-3">
               <span aria-hidden="true" className="h-2 flex-1 rounded-full bg-slate-100" />
-              <span className="shrink-0 whitespace-nowrap text-right text-xs font-medium leading-4 text-slate-500">{t("progress.analytics.lowData")}</span>
+              <span className="shrink-0 whitespace-nowrap text-right text-xs font-medium leading-4 text-slate-500">{t("progress.analytics.lowDataCount", { graded: tp.graded, min: TOPIC_MIN_GRADED })}</span>
             </div>
           )}
         </li>
@@ -114,12 +119,10 @@ function TopicRows({ topics }: { topics: TopicStat[] }) {
   );
 }
 
-const GROUP_POSE = { math: "working", language: "reading", other: "thinking" } as const;
-
 /** Accuracy by topic: a math card and a language card on ORT-like courses, one card on general courses. */
-export function TopicAccuracy({ topics, split, locked = false }: { topics: TopicStat[]; split: boolean; locked?: boolean }) {
+export function TopicAccuracy({ topics, split, locked = false }: { topics: NamedTopic[]; split: boolean; locked?: boolean }) {
   const { t } = useTranslation();
-  const by: Record<TopicGroup, TopicStat[]> = { math: [], language: [], other: [] };
+  const by: Record<TopicGroup, NamedTopic[]> = { math: [], language: [], other: [] };
   for (const tp of topics) by[topicGroup(tp.section)].push(tp);
   const useSplit = split || by.math.length > 0 || by.language.length > 0;
   const groups: TopicGroup[] = useSplit ? ["math", "language", ...(by.other.length ? ["other" as const] : [])] : ["other"];
@@ -131,8 +134,9 @@ export function TopicAccuracy({ topics, split, locked = false }: { topics: Topic
         <AnalyticsCard key={g} locked={locked} className={g === "other" && groups.length === 3 ? "lg:col-span-2" : undefined}
           title={t(useSplit ? `progress.analytics.topics.${g}` : "progress.analytics.topics.all")}
           subtitle={t("progress.analytics.topics.subtitle")}>
-          {by[g].length === 0 ? (
-            <CardEmpty pose={GROUP_POSE[g]} compact hint={t(`progress.analytics.topics.empty.${g}`)} />
+          {/* no answers in this group: one quiet line (the mascot and the action live in the weak-topics card) */}
+          {by[g].every((x) => x.total === 0) ? (
+            <p className="text-sm leading-5 text-slate-600">{t("progress.analytics.notEnough.topicsBody")}</p>
           ) : (
             <>
               <TopicRows topics={by[g]} />

@@ -62,7 +62,6 @@ function Modules({ courseId }: { courseId: string }) {
     { key: "title", header: t("analytics.col.module"), primary: true, cell: (r) => pickLocalized(r.title, lang, course.default_language) },
     num("completed", t("analytics.col.completed"), (r) => r.completed),
     num("started", t("analytics.col.started"), (r) => r.started),
-    num("unlocked", t("analytics.col.unlocked"), (r) => r.unlocked),
     num("locked", t("analytics.col.locked"), (r) => r.locked),
     num("not_started", t("analytics.col.notStarted"), (r) => r.not_started),
   ];
@@ -88,7 +87,7 @@ function Assignments({ courseId }: { courseId: string }) {
     num("submitted", t("analytics.col.submitted"), (r) => `${r.submitted}/${r.students}`),
     num("graded", t("analytics.graded"), (r) => r.graded),
     num("pending", t("analytics.pendingReview"), (r) => r.pending_review),
-    num("missing", t("analytics.missing"), (r) => r.missing),
+    num("missing", t("analytics.missing"), (r) => r.missing ?? "—"),
     num("late", t("analytics.col.late"), (r) => r.late),
     num("mean", t("analytics.col.mean"), (r) => pct(r.mean_percent)),
   ];
@@ -117,7 +116,7 @@ function Quizzes({ courseId }: { courseId: string }) {
     },
     { key: "attempts", header: t("analytics.col.attempts"), label: t("analytics.col.attempts"), align: "right", nowrap: true, cell: (r) => r.attempts },
     { key: "students", header: t("analytics.students"), label: t("analytics.students"), align: "right", nowrap: true, cell: (r) => r.students },
-    { key: "mean", header: t("analytics.col.mean"), label: t("analytics.col.mean"), align: "right", nowrap: true, cell: (r) => pct(r.mean_percent) },
+    { key: "mean", header: t("analytics.col.meanFirst"), label: t("analytics.col.meanFirst"), align: "right", nowrap: true, cell: (r) => pct(r.mean_percent) },
   ];
   return (
     <>

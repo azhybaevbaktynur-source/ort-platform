@@ -125,6 +125,65 @@ async def test_quizzes_exclude_preview_void_in_progress_and_test_student(db, api
     assert len(pr) == 1 and pr[0]["is_practice"] is True
 
 
+# ------------------------------------------------------------------ STUDENT_UI_FIX_PLAN 4.4 T1-T3
+
+async def test_quiz_mean_is_first_attempt_and_equals_statistics_mean(db, api):
+    """T1: the quizzes tab and the quiz statistics page show the same mean (first counted attempt per student)."""
+    w = build(db)
+    qa, q = _quiz(db, w)
+    from app.lms.assessments.models import AssessmentVersion
+
+    v = db.get(AssessmentVersion, q.published_version_id)
+    # a second, better attempt of student 0 (first was 5/10): every-attempt mean would be (50+100+90)/3 = 80
+    make_attempt(db, q, v, w.students[0], enrollment=w.enrs[0], status="graded", raw_score=Decimal(9),
+                 points_possible=Decimal("10"), attempt_no=2)
+    r = (await api.call(w.owner, "GET", f"/courses/{w.course.id}/analytics/quizzes")).json()["items"]
+    assert (r[0]["attempts"], r[0]["students"], r[0]["mean_percent"]) == (3, 2, 75.0)
+    s = await api.call(w.owner, "GET", f"/courses/{w.course.id}/assessments/{q.id}/statistics")
+    assert s.status_code == 200, s.text
+    assert s.json()["mean_percent"] == r[0]["mean_percent"]
+
+
+async def test_quiz_mean_follows_the_published_version_as_statistics(db, api):
+    """T1 with two versions: the mean is the statistics page's default (published version, first attempt there)."""
+    from tests.lms.factories import make_assessment_version
+
+    w = build(db)
+    qa, q = _quiz(db, w)  # v1: student 0 at 50 %, student 1 at 100 %
+    v2 = make_assessment_version(db, q, w.owner)
+    make_attempt(db, q, v2, w.students[0], enrollment=w.enrs[0], status="graded", raw_score=Decimal(9),
+                 points_possible=Decimal("10"), attempt_no=2)
+    make_attempt(db, q, v2, w.students[2], enrollment=w.enrs[2], status="graded", raw_score=Decimal(4),
+                 points_possible=Decimal("10"), attempt_no=3)
+    r = (await api.call(w.owner, "GET", f"/courses/{w.course.id}/analytics/quizzes")).json()["items"]
+    # v2 only: (90 + 40) / 2 = 65 (one first attempt per student across versions would give 63.3)
+    assert (r[0]["attempts"], r[0]["students"], r[0]["mean_percent"]) == (4, 3, 65.0)
+    s = await api.call(w.owner, "GET", f"/courses/{w.course.id}/assessments/{q.id}/statistics")
+    assert s.status_code == 200, s.text
+    assert s.json()["mean_percent"] == r[0]["mean_percent"]
+
+
+async def test_missing_is_null_without_due_date(db, api):
+    """T2: an assignment without a due date has no "missing" (null), not a confident 0."""
+    w = build(db)
+    make_assignment(db, w.course, w.owner, due_at=None)
+    rows = (await api.call(w.owner, "GET", f"/courses/{w.course.id}/analytics/assignments")).json()["items"]
+    past, future, undated = rows
+    assert past["missing"] == 1 and future["missing"] == 0 and undated["missing"] is None
+
+
+async def test_module_columns_add_up(db, api):
+    """T3: "not started" includes `unlocked` (open, nothing done): completed + started + not_started + locked =
+    students."""
+    w = build(db)
+    _progress(db, w.enrs[2], w.m1, "unlocked")
+    _progress(db, w.enrs[2], w.m2, "locked")
+    rows = (await api.call(w.owner, "GET", f"/courses/{w.course.id}/analytics/modules")).json()["items"]
+    assert [(x["completed"], x["started"], x["not_started"], x["locked"]) for x in rows] == [(2, 0, 1, 0),
+                                                                                         (1, 1, 0, 1)]
+    assert all(x["completed"] + x["started"] + x["not_started"] + x["locked"] == 3 for x in rows)
+
+
 async def test_course_policy_matrix(db, api):
     w = build(db)
     base = f"/courses/{w.course.id}/analytics/overview"

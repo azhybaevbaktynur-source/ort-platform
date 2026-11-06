@@ -254,14 +254,14 @@ export function ReviewItemCard({
       )}
 
       {item.explanation ? (
-        <div className="rounded-xl border border-sky-200 bg-sky-50 p-3">
-          <p className="mb-1 text-xs font-semibold text-sky-800">{t("results.explanation")}</p>
+        <div className="rounded-xl border border-brand-100 bg-brand-50 p-3">
+          <p className="mb-1 text-xs font-semibold text-brand-800">{t("results.explanation")}</p>
           <MathRenderer content={item.explanation} className="text-sm text-slate-900" />
         </div>
       ) : null}
       {item.feedback ? (
-        <div className="rounded-xl border border-violet-200 bg-violet-50 p-3">
-          <p className="mb-1 text-xs font-semibold text-violet-800">{t("results.teacherFeedback")}</p>
+        <div className="rounded-xl border border-brand-200 bg-brand-50 p-3">
+          <p className="mb-1 text-xs font-semibold text-brand-800">{t("results.teacherFeedback")}</p>
           <p className="whitespace-pre-wrap text-sm text-slate-900">{item.feedback}</p>
         </div>
       ) : null}

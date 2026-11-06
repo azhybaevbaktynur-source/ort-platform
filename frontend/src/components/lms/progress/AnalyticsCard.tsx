@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useId } from "react";
-import { GoldPill, LockOverlay, Mascot, cn, type MascotPose } from "@/components/ui";
+import { GoldPill, LinkButton, LockOverlay, Mascot, cn, type MascotPose } from "@/components/ui";
 import { useTranslation } from "@/lib/i18n/context";
 
 /*
@@ -52,6 +52,21 @@ export function CardEmpty({ hint, pose = "thinking", compact = false }: { hint: 
   );
 }
 
+/** STUDENT_UI_FIX_PLAN 4.3: "Пока мало данных" (mascot, one line, the action) instead of rows rated on too few answers. */
+export function NotEnoughData({ body, href, compact = false }: { body: React.ReactNode; href: string; compact?: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <div className={cn("flex flex-col items-start gap-3 rounded-xl bg-slate-50 px-4 sm:flex-row sm:items-center sm:gap-4", compact ? "py-3" : "py-5")}>
+      <Mascot pose="thinking" size={compact ? 48 : 64} />
+      <div className="min-w-0 flex-1">
+        <p className="text-base font-semibold leading-6 text-slate-900">{t("progress.analytics.notEnough.title")}</p>
+        <p className="text-sm leading-5 text-slate-600">{body}</p>
+      </div>
+      <LinkButton href={href} variant="secondary" className="shrink-0">{t("progress.analytics.notEnough.action")}</LinkButton>
+    </div>
+  );
+}
+
 export interface LegendItem {
   key: string;
   label: React.ReactNode;
@@ -83,7 +98,7 @@ export function BandLegend({ className }: { className?: string }) {
   const { t } = useTranslation();
   return (
     <Legend className={className} label={t("progress.analytics.legend.label")} items={[
-      { key: "high", color: "#10b981", label: t("progress.analytics.legend.high") },
+      { key: "high", color: "rgb(16 185 129)", label: t("progress.analytics.legend.high") },
       { key: "mid", color: "#f59e0b", label: t("progress.analytics.legend.mid") },
       { key: "low", color: "#f43f5e", label: t("progress.analytics.legend.low") },
     ]} />

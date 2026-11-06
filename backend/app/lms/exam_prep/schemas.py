@@ -35,10 +35,13 @@ class ScorePoint(BaseModel):
 
 
 class SectionBar(BaseModel):
+    """`rated`: the section of this result has enough graded answers to be judged (`progress.service.
+    SECTION_MIN_GRADED`, the same rule as `SectionStat.rated`); below it the home shows "Мало данных" (FIX_PLAN 4.3)."""
     key: str
     raw: Decimal
     possible: Decimal
     correct: int = 0
+    rated: bool = False
 
 
 class NextOut(BaseModel):

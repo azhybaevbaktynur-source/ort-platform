@@ -16,18 +16,18 @@ export const LANGUAGE_SECTIONS = new Set(["analogies", "reading", "grammar", "na
  */
 export const SECTION_ORDER = ["math_1", "math_2", "analogies", "reading", "grammar"] as const;
 export const SECTION_FILL: Record<string, string> = {
-  math_1: "#2563eb", // chart-1
-  math_2: "#f59e0b", // chart-5
-  analogies: "#8b5cf6", // chart-4
-  reading: "#10b981", // chart-2
-  grammar: "#f97316", // chart-3
+  math_1: "rgb(var(--brand-800))", // brand ramp (800 .. 200), darkest first; the legend names the sections
+  math_2: "rgb(var(--brand-600))",
+  analogies: "rgb(var(--brand-400))",
+  reading: "rgb(var(--brand-300))",
+  grammar: "rgb(var(--brand-200))",
 };
 export const OTHER_FILL = "#94a3b8"; // slate-400
 
-/** Correct answers (chart-2) and wrong ones (acc-low, hatched so colour is never the only difference). */
-export const CORRECT_FILL = "#10b981";
+/** Correct answers: `acc.high`; wrong ones: `acc.low`, hatched so colour is never the only difference (4.1). */
+export const CORRECT_FILL = "var(--c-acc-high)";
 export const WRONG_STYLE: CSSProperties = {
-  backgroundImage: "repeating-linear-gradient(135deg, #f43f5e 0 3px, #fecdd3 3px 5px)",
+  backgroundImage: "repeating-linear-gradient(135deg, var(--c-acc-low) 0 3px, #fecdd3 3px 5px)",
 };
 
 /** One bar of a time chart: a day, or a week (Monday first) for the one-year period. */
@@ -102,24 +102,26 @@ export function niceCount(v: number): number {
   return 20 * p;
 }
 
-/** U9 (STUDENT_UI_REVIEW 11, §5.1 c): a topic is graded (percent, band) only from this many answers; below: "Мало данных". */
-export const TOPIC_MIN_ANSWERS = 5;
-/** Graded topics needed before the weak-topic card appears at all. */
-export const WEAK_MIN_TOPICS = 3;
 /** Active days (all time) before the activity calendar appears. */
 export const HEATMAP_MIN_DAYS = 7;
 
-export const isGraded = (t: TopicStat) => t.total >= TOPIC_MIN_ANSWERS;
+/** A named topic (the server's no-topic bucket, `topic` null, only keeps the sums equal and is never listed). */
+export type NamedTopic = TopicStat & { topic: string };
+export const namedTopics = (topics: TopicStat[]): NamedTopic[] => topics.filter((t): t is NamedTopic => t.topic !== null);
+
+/** STUDENT_UI_FIX_PLAN 4.3: a topic shows a percent and a band only when the server rates it (5 graded answers). */
+export const isGraded = (t: TopicStat) => t.rated;
+/** The server's `TOPIC_MIN_GRADED` (progress/service.py), for "2 из 5 ответов" and the session band; the server decides `rated`. */
+export const TOPIC_MIN_GRADED = 5;
 
 /**
- * The five weakest topics: lowest accuracy first, more answers first on a tie, graded topics only. Null while fewer than
- * `WEAK_MIN_TOPICS` topics are graded (the card is not shown); an empty list: enough data and nothing weak.
+ * The five weakest topics: lowest accuracy first, more answers first on a tie, rated topics only. Null until the server
+ * says `weak_topics_ready` (3 rated topics; the card is not shown); an empty list: enough data and nothing weak.
  */
-export function weakestTopics(topics: TopicStat[], n = 5): TopicStat[] | null {
-  const graded = topics.filter(isGraded);
-  if (graded.length < WEAK_MIN_TOPICS) return null;
+export function weakestTopics(topics: NamedTopic[], ready: boolean, n = 5): NamedTopic[] | null {
+  if (!ready) return null;
   // a topic in the green band (85 % and above) is never "weak"
-  return graded.filter((t) => toPercent(t.accuracy) < 85)
+  return topics.filter((t) => t.rated && toPercent(t.accuracy) < 85)
     .sort((a, b) => a.accuracy - b.accuracy || b.total - a.total || a.topic.localeCompare(b.topic))
     .slice(0, n);
 }
