@@ -2,7 +2,7 @@
 
 // F6b Pro (docs/phases/SUBSCRIPTION_DESIGN.md 6): the student's plan (Pro until a date, or Free), what Free and Pro
 // include (from `/me/access/offer`), the plans (the season plan and the prices only when the admin set them), how to pay
-// (the owner's text, or the `access.howToPay` placeholder) and the gift-code field under a disclosure. No payment yet:
+// (the owner's text, or the `access.howToPay` placeholder); a plan without a price says «уточняйте» and the gift-code field under a disclosure. No payment yet:
 // choosing a plan only shows the "how to pay" text for it. The exam countdown is not here.
 import React, { useCallback, useEffect, useId, useState } from "react";
 import { Check, ChevronRight, KeyRound, Star } from "lucide-react";
@@ -83,8 +83,10 @@ function Plans({ offer, t, lang }: { offer: OfferOut; t: T; lang: string }) {
                   <span className="block text-base font-semibold leading-6 text-slate-900">{t(`access.plan.${p.id}`)}</span>
                   <span className="block text-sm leading-5 text-slate-600">{planSub(p, t, lang)}</span>
                 </span>
-                {p.price_kgs !== null && (
+                {p.price_kgs !== null ? (
                   <span className="shrink-0 text-base font-semibold tabular-nums text-slate-900">{t("access.pro.plans.price", { price: fmtPrice(p.price_kgs, lang) })}</span>
+                ) : (
+                  <span className="shrink-0 text-sm font-medium text-slate-600">{t("access.pro.plans.priceOnRequest")}</span>
                 )}
               </label>
             );
@@ -102,7 +104,7 @@ function Plans({ offer, t, lang }: { offer: OfferOut; t: T; lang: string }) {
           <p className="mt-1 text-sm font-medium leading-5 text-slate-800">
             {plan.price_kgs !== null
               ? t("access.pro.pay.chosenPrice", { plan: t(`access.plan.${plan.id}`), price: fmtPrice(plan.price_kgs, lang) })
-              : t("access.pro.pay.chosen", { plan: t(`access.plan.${plan.id}`) })}
+              : t("access.pro.pay.chosenOnRequest", { plan: t(`access.plan.${plan.id}`) })}
           </p>
         )}
         <p className="mt-2 whitespace-pre-line break-words text-base leading-6 text-slate-700">{text}</p>

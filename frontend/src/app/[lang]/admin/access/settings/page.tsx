@@ -1,7 +1,7 @@
 "use client";
 
 // F6b Pro settings, platform admin (docs/phases/SUBSCRIPTION_DESIGN.md 7): the season end (no date: no season plan),
-// a price per plan (empty: no price shown) and the "how to pay" text per language (ky/en fall back to ru at read time;
+// a price per plan (empty: «уточняйте») and the "how to pay" text per language (ky/en fall back to ru at read time;
 // all empty: the `access.howToPay` placeholder). Save sends only what changed (the API merges, audited).
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
@@ -98,7 +98,7 @@ export default function AdminProSettingsPage() {
           {!form.season_end && <p className="mt-1 text-sm font-medium leading-5 text-slate-700">{t("access.admin.settings.seasonNone")}</p>}
         </Card>
         <Card title={t("access.admin.settings.pricesTitle")} description={t("access.admin.settings.pricesHint")}>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-3 sm:items-end">
             {PLANS.map((p) => (
               <Input key={p} id={`pro-price-${p}`} label={t("access.admin.settings.priceLabel", { plan: t(`access.plan.${p}`) })}
                 inputMode="numeric" value={form.prices[p]} optional
