@@ -43,6 +43,7 @@ from app.lms.modules.models import CourseModule, ModuleItem
 
 FINAL = ("graded", "needs_review")
 OTHER = "other"
+OPEN_SCAN_MAX = 20  # S3: open attempts read for the Next card (one per test at most; bounded)
 PRACTICE_SCAN_MAX = 500  # pick blocks read to find a practice set of one section (bounded; practice sets are few)
 
 
@@ -196,17 +197,19 @@ def _weakest(bars: list[sch.SectionBar]) -> Optional[str]:
 
 
 def _open_attempt(db: Session, course: Course, user_id: str, gate: Gate = OPEN_GATE) -> Optional[sch.NextOut]:
-    """S3: an untimed open attempt of a locked test cannot be resumed without a pass (design 7.1): not offered."""
-    row = db.execute(
-        select(Attempt.id, Attempt.assessment_id, Assessment.title)
+    """S3: an untimed open attempt of a locked test cannot be resumed without a pass (design 7.1): not offered. "Timed"
+    is the attempt's version time limit (plan cache), so the few open attempts are read and checked here."""
+    rows = db.execute(
+        select(Attempt.id, Attempt.assessment_id, Assessment.title, Attempt.assessment_version_id,
+               gate.locked_sql(Assessment).label("locked"))
         .select_from(Attempt).join(Assessment, Assessment.id == Attempt.assessment_id)
-        .where(_mine(user_id, course.id), Attempt.status == "in_progress", Assessment.deleted_at.is_(None),
-               ~and_(gate.locked_sql(Assessment), Attempt.deadline_at.is_(None)))
-        .order_by(Attempt.started_at.desc(), Attempt.id.desc()).limit(1)
-    ).first()
-    if row is None:
-        return None
-    return sch.NextOut(kind="resume", attempt_id=row.id, assessment_id=row.assessment_id, title=row.title)
+        .where(_mine(user_id, course.id), Attempt.status == "in_progress", Assessment.deleted_at.is_(None))
+        .order_by(Attempt.started_at.desc(), Attempt.id.desc()).limit(OPEN_SCAN_MAX)
+    ).all()
+    for row in rows:
+        if not row.locked or access.version_is_timed(db, row.assessment_version_id):
+            return sch.NextOut(kind="resume", attempt_id=row.id, assessment_id=row.assessment_id, title=row.title)
+    return None
 
 
 def _first_untaken(db: Session, course: Course, user_id: str, now: datetime,
@@ -361,16 +364,16 @@ def library(db: Session, course: Course, user_id: str, *, now: datetime, source:
                               entity_of=lambda r: r[0], cursor=cursor, limit=limit, descending=False)
     ids = [r[0].id for r in rows]
     attempts: dict = {i: [] for i in ids}
-    timed_open: set = set()  # S3: a timed open attempt stays resumable without a pass
+    timed_open: set = set()  # S3: open attempts (test, version); a timed one stays resumable without a pass
     best: dict = {}
     if ids:
-        for aid, att_id, status, deadline in db.execute(
-                select(Attempt.assessment_id, Attempt.id, Attempt.status, Attempt.deadline_at)
+        for aid, att_id, status, vid in db.execute(
+                select(Attempt.assessment_id, Attempt.id, Attempt.status, Attempt.assessment_version_id)
                 .where(_mine(user_id, course.id), Attempt.assessment_id.in_(ids), Attempt.status != "void")
                 .order_by(Attempt.started_at.desc(), Attempt.id.desc())).all():
             attempts[aid].append((att_id, status))
-            if status == "in_progress" and deadline is not None:
-                timed_open.add(aid)
+            if status == "in_progress":
+                timed_open.add((aid, vid))
         ratio = case((Attempt.points_possible > 0, Attempt.raw_score * 100 / Attempt.points_possible))
         best = {r[0]: r for r in db.execute(
             select(Attempt.assessment_id, func.max(AttemptGrade.display_value), func.max(ratio))
@@ -396,7 +399,8 @@ def library(db: Session, course: Course, user_id: str, *, now: datetime, source:
             attempt_id=open_id, attempts_used=len(mine), best_value=value, best_percent=percent,
             scale_max=scales.get(a.grading_scheme_version_id) if value is not None else None,
             access_tier=a.access_tier,
-            locked=gate.locked(is_practice=False, access_tier=a.access_tier) and a.id not in timed_open))
+            locked=gate.locked(is_practice=False, access_tier=a.access_tier)
+            and not any(x == a.id and access.version_is_timed(db, v) for x, v in timed_open)))
     return PageOut[sch.LibraryCardOut](items=out, next_cursor=nxt)
 
 

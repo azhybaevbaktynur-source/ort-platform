@@ -5,15 +5,19 @@ Revision ID: 0022_access
 Revises: 0021_admin_mfa
 Create Date: 2026-11-06
 
-Additive. `assessments.access_tier` is `free` for every existing row (server default), so nothing locks on deploy; the
-owner then switches what should be paid. Three new tables, empty. The audit log accepts three more target types
+Additive. `assessments.access_tier` is `free` for every existing row (server default), and every existing course of the
+platform organization's tree gets `settings.practice_free = true` (review of S3), so nothing locks on deploy; the owner
+switches tests to paid and practice off when selling starts. New platform courses keep the default (practice needs a
+pass). The downgrade leaves `practice_free` in the settings (an unknown key is ignored there). Three new tables, empty. The audit log accepts three more target types
 (`access_batch`, `access_code`, `access_pass`). Downgrade drops the tables and the column and deletes the audit rows of
 the new target types (lossy by design: passes and codes go away with the feature).
 """
+import uuid
 from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import JSONB
 
 revision: str = "0022_access"
 down_revision: Union[str, None] = "0021_admin_mfa"
@@ -24,6 +28,25 @@ OLD_TARGETS = ("target_type IN ('user','course','teacher_request','enrollment','
                "'exam_template','assessment')")
 NEW_TARGETS = ("target_type IN ('user','course','teacher_request','enrollment','organization','invitation',"
                "'exam_template','assessment','access_batch','access_code','access_pass')")
+
+
+# app/lms/organizations/ids.py::platform_org_id, copied (a migration never imports app code that may change)
+PLATFORM_HEX = uuid.uuid5(uuid.uuid5(uuid.NAMESPACE_URL, "https://ort-platform/lms/organizations"), "org:platform").hex
+
+
+def _practice_free_for_existing_platform_courses() -> None:
+    conn = op.get_bind()
+    json_type = sa.JSON().with_variant(JSONB(), "postgresql")
+    courses = sa.table("courses", sa.column("id", sa.Uuid()), sa.column("settings", json_type),
+                       sa.column("organization_id", sa.Uuid()))
+    orgs = sa.table("organizations", sa.column("id", sa.Uuid()), sa.column("path", sa.String()))
+    rows = conn.execute(sa.select(courses.c.id, courses.c.settings)
+                        .select_from(courses.join(orgs, orgs.c.id == courses.c.organization_id))
+                        .where(orgs.c.path.like(f"{PLATFORM_HEX}%"))).all()
+    for cid, settings in rows:
+        merged = dict(settings or {})
+        merged["practice_free"] = True
+        conn.execute(courses.update().where(courses.c.id == cid).values(settings=merged))
 
 
 def upgrade() -> None:
@@ -112,6 +135,8 @@ def upgrade() -> None:
     with op.batch_alter_table("admin_audit_log") as b:
         b.drop_constraint(op.f("ck_admin_audit_log_target_type_valid"), type_="check")
         b.create_check_constraint(op.f("ck_admin_audit_log_target_type_valid"), NEW_TARGETS)
+
+    _practice_free_for_existing_platform_courses()
 
 
 def downgrade() -> None:

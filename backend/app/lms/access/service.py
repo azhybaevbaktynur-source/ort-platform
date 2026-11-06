@@ -6,8 +6,9 @@ course** without an active pass, on a test whose `access_tier` is `paid`, or on 
 
 - Start (`attempts.engine.start_attempt`): checked where the module gate runs, only when no open attempt exists.
 - Resume (`attempts.engine.load_attempt_bundle`, every read and write of an open attempt): an open attempt of a paid
-  test may be resumed after the pass ended only when it is timed (`deadline_at` set), so it closes by itself; an
-  untimed one (practice sets too) is refused with `access_required` until there is a pass again. Answers are kept.
+  test may be resumed after the pass ended only when it is timed (its version has a total time limit, `is_timed`), so
+  it closes by itself; an untimed one (practice sets too) is refused with `access_required` until there is a pass
+  again. Answers are kept. A window end (`available_until`) also sets `deadline_at`, so `deadline_at` is not "timed".
 - Lists and the exam-prep page: `Gate` (one statement per request: the course's organization path, an active pass,
   the caller's test-student flag), then `locked` per row in Python or as a SQL predicate.
 
@@ -36,7 +37,10 @@ BISHKEK = timezone(timedelta(hours=6), "Asia/Bishkek")  # no daylight saving sin
 MAX_GRANT_DAYS = 400
 PASS_SCAN_MAX = 200  # passes of one person read to find the end of their chain (bounded; a person has a few)
 REDEEM_USER_1H = ratelimit.Limit("access_redeem_user_1h", 10, 3600)
-REDEEM_IP_1H = ratelimit.Limit("access_redeem_ip_1h", 30, 3600, is_ip_rule=True)
+# Enforced even while RATE_LIMIT_IP_ENFORCE is off (review of S3): a code is a bearer secret worth money, so the network
+# rule must hold. `client_ip_hash` reads the address through the trusted proxy chain (docs/runbooks/IP_CHAIN.md); a
+# school behind one address gets 30 tries an hour, plenty for students typing codes they bought.
+REDEEM_IP_1H = ratelimit.Limit("access_redeem_ip_1h", 30, 3600)
 
 AUDIT_REDEEM = "access.redeem"
 AUDIT_GRANT = "access.grant"
@@ -161,13 +165,28 @@ def require_start(db: Session, course, assessment, user_id: str, *, test_student
         raise access_required()
 
 
+def is_timed(snapshot: Optional[dict]) -> bool:
+    """The version has a total time limit (its own, or every section's): an attempt of it closes by itself."""
+    from app.lms.assessments.builder import _total_limit
+
+    return _total_limit(snapshot or {}) is not None
+
+
+def version_is_timed(db: Session, version_id) -> bool:
+    """Through the process plan cache (`assessments.cache.get_plan`): usually no statement."""
+    from app.lms.attempts import engine
+
+    return is_timed(engine.cache_api().get_plan(db, version_id).snapshot)
+
+
 def check_resume(db: Session, attempt, assessment, *, organization_id, course_settings, test_student: bool,
                  now: datetime) -> None:
     """Any read or write of an open attempt by its owner (design 7.1). A timed attempt always continues (it closes by
     itself); previews and test students are never locked; finished attempts and their results stay visible."""
-    if (attempt.status != "in_progress" or attempt.is_preview or test_student or attempt.deadline_at is not None
+    if (attempt.status != "in_progress" or attempt.is_preview or test_student
             or not needs_pass(is_practice=bool(assessment.is_practice), access_tier=assessment.access_tier,
-                              course_settings=course_settings)):
+                              course_settings=course_settings)
+            or version_is_timed(db, attempt.assessment_version_id)):
         return
     platform, has_pass = _platform_and_pass(db, organization_id, attempt.user_id, now)
     if platform and not has_pass:
@@ -333,8 +352,20 @@ def revoke_pass(db: Session, admin: User, pass_id: uuid.UUID, *, reason: str,
         raise Conflict("The pass is already revoked", code="pass_already_revoked")
     now = clock.now()
     p.revoked_at, p.revoked_by_id = now, admin.id
+    # Review of S3: passes chained after this one move earlier by its unused time, so nobody loses days by accident
+    start, end = as_utc(p.starts_at), as_utc(p.ends_at)
+    remaining = end - max(now, start) if end > now else timedelta(0)
+    shifted = []
+    if remaining > timedelta(0):
+        later = db.execute(select(AccessPass).where(
+            AccessPass.user_id == p.user_id, AccessPass.revoked_at.is_(None), AccessPass.id != p.id,
+            AccessPass.starts_at >= p.ends_at).with_for_update().execution_options(populate_existing=True)).scalars()
+        for q in later:
+            q.starts_at, q.ends_at = as_utc(q.starts_at) - remaining, as_utc(q.ends_at) - remaining
+            shifted.append(str(q.id))
     audit.record(db, actor=admin, action=AUDIT_PASS_REVOKE, target_type="access_pass", target_id=str(p.id),
-                 reason=reason, details={"user_id": p.user_id}, request=request)
+                 reason=reason, details={"user_id": p.user_id, "unused_seconds": int(remaining.total_seconds()),
+                                         "shifted_passes": shifted}, request=request)
     db.commit()
     db.refresh(p)
     return p

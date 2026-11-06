@@ -9,6 +9,7 @@ the key loses no code."""
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import hmac
 import logging
@@ -72,13 +73,32 @@ def seal(code: str, code_id: uuid.UUID) -> str:
 def unseal(blob: Optional[str], code_id: uuid.UUID) -> Optional[str]:
     if not blob or not blob.startswith(_ENC_PREFIX):
         return None
-    raw = base64.urlsafe_b64decode(blob[len(_ENC_PREFIX):].encode("ascii"))
+    try:
+        raw = base64.urlsafe_b64decode(blob[len(_ENC_PREFIX):].encode("ascii"))
+    except (binascii.Error, ValueError, UnicodeEncodeError):
+        logger.warning("activation code %s has a malformed sealed copy", code_id)
+        return None
     nonce, sealed = raw[:12], raw[12:]
+    if len(nonce) != 12 or len(sealed) < 16:
+        logger.warning("activation code %s has a malformed sealed copy", code_id)
+        return None
     for key in _signing_keys():
         try:
             return AESGCM(_derive(key, _ENC_PURPOSE)).decrypt(nonce, sealed, str(code_id).encode("ascii")).decode(
                 "ascii")
-        except InvalidTag:
+        except (InvalidTag, ValueError, UnicodeDecodeError):
             continue
     logger.warning("activation code %s does not open with the current or previous key", code_id)
     return None
+
+
+def opens_with_current_key(blob: Optional[str], code_id: uuid.UUID) -> bool:
+    """Whether the sealed copy opens with SECRET_KEY itself (the key rotation script re-seals the others)."""
+    if not blob or not blob.startswith(_ENC_PREFIX):
+        return False
+    try:
+        raw = base64.urlsafe_b64decode(blob[len(_ENC_PREFIX):].encode("ascii"))
+        AESGCM(_derive(settings.SECRET_KEY, _ENC_PURPOSE)).decrypt(raw[:12], raw[12:], str(code_id).encode("ascii"))
+        return True
+    except (binascii.Error, ValueError, UnicodeEncodeError, InvalidTag):
+        return False

@@ -65,7 +65,8 @@ ENTRIES: list[Entry] = [
     Entry("access_passes", "starts_at", "own pass", "none", True),
     Entry("access_passes", "ends_at", "own pass", "none", True),
     Entry("access_passes", "reason", "about the person (an admin's grant reason)", "null"),
-    Entry("activation_codes", "given_note", "the buyer (maybe a third person)", "null"),
+    Entry("activation_codes", "given_note",
+          "the buyer (maybe a third person); emptied 90 days after redemption or when its batch is revoked", "null"),
     # hand-ins and grades
     Entry("assignment_submissions", "body_text", "own work", "scrub", True),
     Entry("assets", "original_filename", "own work (hand-in and feedback files)", "erase_file", True),

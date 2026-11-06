@@ -10,7 +10,7 @@ Erased data stays in the database provider's history until its restore window pa
 | `access_passes` | `ends_at` | own pass | Kept: holds no personal data once the account is a tombstone | Yes |
 | `access_passes` | `reason` | about the person (an admin's grant reason) | Emptied | No |
 | `access_passes` | `starts_at` | own pass | Kept: holds no personal data once the account is a tombstone | Yes |
-| `activation_codes` | `given_note` | the buyer (maybe a third person) | Emptied | No |
+| `activation_codes` | `given_note` | the buyer (maybe a third person); emptied 90 days after redemption or when its batch is revoked | Emptied | No |
 | `admin_audit_log` | `details` | keys email, display_name, age band | Replaced | No |
 | `admin_audit_log` | `ip_hash` | network | Emptied | No |
 | `admin_audit_log` | `reason` | about the person | Emptied | No |

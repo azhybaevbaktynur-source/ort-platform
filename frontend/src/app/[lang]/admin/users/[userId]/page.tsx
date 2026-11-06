@@ -165,11 +165,11 @@ export default function AdminUserDetailPage() {
         ]} />
       </Card>
 
+      {/* S3 access: exam passes, give and revoke (right after the summary: what the admin looks up most for a student) */}
+      <UserAccessSection userId={user.id} name={user.display_name ? `${user.display_name} · ${user.email}` : user.email} readOnly={system} />
+
       {/* Phase 6 S4b: organizations and roles, add to organization */}
       <UserOrganizationsSection user={user} readOnly={system} />
-
-      {/* S3 access: exam passes, give and revoke */}
-      <UserAccessSection userId={user.id} name={user.display_name ? `${user.display_name} · ${user.email}` : user.email} readOnly={system} />
 
       <Card className="mb-6" title={t("platformAdmin.users.ownedCourses")} padding={user.owned_courses.length ? "none" : "md"}>
         {user.owned_courses.length === 0 ? <p className="text-sm text-slate-600">{t("platformAdmin.users.noCourses")}</p> : (

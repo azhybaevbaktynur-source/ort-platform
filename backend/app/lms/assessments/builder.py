@@ -1066,7 +1066,7 @@ def _student_attempts(db: Session, user_id: str, ids: list[uuid.UUID]) -> dict[u
         return out
     rows = db.execute(
         select(Attempt.assessment_id, Attempt.id, Attempt.attempt_no, Attempt.status, Attempt.raw_score,
-               Attempt.points_possible, Attempt.deadline_at)  # S3 access: a timed open attempt stays resumable
+               Attempt.points_possible, Attempt.assessment_version_id)  # S3 access: a timed open attempt resumes
         .where(Attempt.user_id == user_id, Attempt.assessment_id.in_(ids), Attempt.is_preview.is_(False))
         .order_by(Attempt.attempt_no)
     ).all()
@@ -1101,11 +1101,14 @@ def student_gate(db: Session, ctx: AuthzContext, course: Course, rows: list):
     return access.course_gate(db, course, ctx.user.id)
 
 
-def locked_for(gate, a: Assessment, atts: list) -> bool:
-    """Locked unless the caller's open attempt is timed (it may be finished: design 7.1). `atts`: _student_attempts."""
+def locked_for(db: Session, gate, a: Assessment, atts: list) -> bool:
+    """Locked unless the caller's open attempt is timed, i.e. its version has a time limit (it may be finished: design
+    7.1). `atts`: _student_attempts rows (the version id is the last column)."""
+    from app.lms.access.service import version_is_timed
+
     if not gate.locked(is_practice=bool(a.is_practice), access_tier=a.access_tier):
         return False
-    return not any(r[3] == "in_progress" and r[6] is not None for r in atts)
+    return not any(r[3] == "in_progress" and version_is_timed(db, r[6]) for r in atts)
 # --- S3 access end ---
 
 
@@ -1148,7 +1151,7 @@ def list_student(db: Session, ctx: AuthzContext, course: Course, *, cursor: Opti
             allowed_attempts=_e.allowed_attempts, attempts_used=used, in_progress_attempt_id=open_id,
             last_result=last, due_at=utc(_e.due_at),
             scheme=sch.scheme_student_ref(briefs.get(a.grading_scheme_version_id)),
-            access_tier=a.access_tier, locked=locked_for(gate, a, atts)))  # S3 access
+            access_tier=a.access_tier, locked=locked_for(db, gate, a, atts)))  # S3 access
     return out, nxt
 
 
@@ -1211,7 +1214,7 @@ def lobby(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID) -> sch
                                 and ctx.role_for(course.id) not in ("teacher", "assistant"))
     # --- S3 access --- (a locked test: the lobby says so and offers the unlock page instead of Start)
     out.access_tier = a.access_tier
-    out.locked = locked_for(student_gate(db, ctx, course, [a]), a, atts)
+    out.locked = locked_for(db, student_gate(db, ctx, course, [a]), a, atts)
     if out.locked and out.can_start:
         out.can_start, out.reason = False, "access_required"
     return out

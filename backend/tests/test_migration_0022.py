@@ -6,6 +6,7 @@ CHECKs and the unique code hash hold; the audit log accepts the new target types
 tables and the column; the upgrade again yields the same.
 
 SQLite: always (throwaway files). PostgreSQL: with ALEMBIC_TEST_DATABASE_URL (an empty database that is wiped)."""
+import json
 import os
 import uuid
 
@@ -14,6 +15,7 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import IntegrityError
 
 from app.db.migrate import _config
+from app.lms.organizations.ids import platform_org_id
 from tests.test_migration_0014 import _migrate
 from tests.test_migration_0015 import _upgrade
 
@@ -26,9 +28,24 @@ def _uid(conn, v) -> str:
     return str(v) if conn.dialect.name == "postgresql" else uuid.UUID(str(v)).hex
 
 
+def _practice_free(conn) -> dict:
+    """{course id: (in the platform organization's tree, practice_free)}."""
+    hexid = platform_org_id().hex
+    out = {}
+    for cid, settings, path in conn.execute(text(
+            "SELECT c.id, c.settings, o.path FROM courses c JOIN organizations o ON o.id = c.organization_id")).all():
+        s = settings if isinstance(settings, dict) else json.loads(settings or "{}")
+        out[str(cid)] = (path.startswith(hexid), s.get("practice_free"))
+    return out
+
+
 def _check(conn, n_assessments: int) -> None:
     rows = conn.execute(text("SELECT access_tier FROM assessments")).scalars().all()
     assert len(rows) == n_assessments and n_assessments > 0 and set(rows) == {"free"}
+    free = _practice_free(conn)  # nothing locks on deploy: practice stays free in every existing platform course
+    assert any(platform for platform, _ in free.values()) and any(not platform for platform, _ in free.values())
+    assert all(value is True for platform, value in free.values() if platform)
+    assert all(value is None for platform, value in free.values() if not platform)
     for t in TABLES:
         assert conn.execute(text(f"SELECT count(*) FROM {t}")).scalar() == 0
     insp = inspect(conn)

@@ -134,7 +134,8 @@ def get_batch(db: Session, batch_id: uuid.UUID) -> dict:
 
 
 def revoke_batch(db: Session, admin: User, batch_id: uuid.UUID, *, reason: str, request: Optional[Request]) -> dict:
-    """Revokes the batch's unused codes (sold ones too, when not redeemed yet); redeemed codes and their passes stay."""
+    """Revokes the batch's unused codes (sold ones too, when not redeemed yet); redeemed codes and their passes stay. The
+    buyer's name on a revoked code goes with it (review of S3: nothing left to sell, nothing to keep)."""
     b = load_batch(db, batch_id, for_update=True)
     if b.revoked_at is not None:
         db.rollback()
@@ -142,7 +143,7 @@ def revoke_batch(db: Session, admin: User, batch_id: uuid.UUID, *, reason: str, 
     now = clock.now()
     t = ActivationCode.__table__
     res = db.execute(update(t).where(t.c.batch_id == b.id, t.c.redeemed_at.is_(None), t.c.revoked_at.is_(None))
-                     .values(revoked_at=now))
+                     .values(revoked_at=now, given_note=None))
     b.revoked_at = now
     audit.record(db, actor=admin, action=AUDIT_BATCH_REVOKE, target_type="access_batch", target_id=str(b.id),
                  reason=reason, details={"codes_revoked": int(res.rowcount or 0)}, request=request)

@@ -6145,7 +6145,7 @@
         "grantDone": "Access given.",
         "revoke": "Revoke",
         "revokeTitle": "Revoke this pass?",
-        "revokeBody": "The person loses this access. To move access to another account, revoke it here and give access there.",
+        "revokeBody": "The person loses this access. Later passes of this person move earlier by the unused time. To move access to another account, revoke it here and give access there.",
         "revokedToast": "The pass is revoked.",
         "passes": "Passes",
         "noPasses": "No passes yet.",

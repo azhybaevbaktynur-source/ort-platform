@@ -353,7 +353,7 @@ def test_redeem_rate_limits(client, db, frozen_clock, monkeypatch):
         assert redeem(client, s, "ZZZZ-ZZZZ-ZZZZ").status_code == 400
     res = redeem(client, s, "ZZZZ-ZZZZ-ZZZZ")
     assert res.status_code == 429
-    monkeypatch.setattr(settings, "RATE_LIMIT_IP_ENFORCE", True)
+    assert settings.RATE_LIMIT_IP_ENFORCE is False  # the network rule of redeem holds even with IP rules off
     others = [make_user(db) for _ in range(31)]
     statuses = [client.post(f"{V}/me/access/redeem", json={"code": "ZZZZ-ZZZZ-ZZZZ"},
                             headers={**auth(u), "x-forwarded-for": "10.9.9.9, 10.255.255.1"}).status_code
@@ -581,3 +581,108 @@ async def test_exam_prep_has_no_lock_outside_the_platform(db, api):
     body = await page(api, w.s, w)
     assert body["needs_pass"] is False and body["next"]["kind"] == "start"
     assert [c["locked"] for c in (await library(api, w.s, w))["items"]] == [False]
+
+
+
+# ------------------------------------------------------------------ review of S3
+
+def test_window_end_is_not_a_time_limit(client, db, frozen_clock):
+    """An untimed test that closes at a window end has `deadline_at` set; it still waits for a new pass."""
+    q = paid_quiz(db, available_until=T0 + timedelta(days=5))
+    give_pass(db, q.student, ends_in=timedelta(minutes=10))
+    first = start(client, q).json()
+    assert first["deadline_at"]
+    frozen_clock.advance(20 * 60)
+    assert code_of(client.get(f"{V}/attempts/{first['id']}", headers=auth(q.student))) == "access_required"
+    items = client.get(f"{V}/courses/{q.course.id}/assessments", headers=auth(q.student)).json()["items"]
+    assert items[0]["locked"] is True
+    lobby = client.get(f"{V}/courses/{q.course.id}/assessments/{q.assessment.id}", headers=auth(q.student)).json()
+    assert lobby["locked"] is True
+
+
+def test_revoking_a_pass_moves_later_passes_earlier(client, db, frozen_clock):
+    admin = admin_user(db)
+    s = make_user(db)
+    url = f"{V}/platform/users/{s.id}/access/grant"
+    for days in (30, 10, 5):
+        assert client.post(url, json={"duration_days": days, "reason": "x"}, headers=auth(admin)).status_code == 201
+    frozen_clock.advance(86400 * 4)  # 26 days of the first pass unused
+    passes = client.get(f"{V}/platform/users/{s.id}/access", headers=auth(admin)).json()["passes"]
+    first = next(p for p in passes if p["ends_at"].startswith((T0 + timedelta(days=30)).date().isoformat()))
+    out = client.post(f"{ADMIN}/passes/{first['id']}/revoke", json={"reason": "refund"}, headers=auth(admin)).json()
+    now = T0 + timedelta(days=4)
+    assert out["active"] is True
+    assert datetime.fromisoformat(out["ends_at"].replace("Z", "+00:00")) == now + timedelta(days=15)
+    db.expire_all()
+    spans = sorted((as_utc(p.starts_at), as_utc(p.ends_at)) for p in db.execute(
+        select(AccessPass).where(AccessPass.user_id == s.id, AccessPass.revoked_at.is_(None))).scalars())
+    assert spans == [(now, now + timedelta(days=10)), (now + timedelta(days=10), now + timedelta(days=15))]
+    row = db.execute(select(AdminAuditLog).where(AdminAuditLog.action == "access.pass_revoke")).scalar_one()
+    assert row.details["unused_seconds"] == 26 * 86400 and len(row.details["shifted_passes"]) == 2
+
+
+def test_given_note_goes_with_a_revoked_batch_and_90_days_after_redemption(client, db, frozen_clock):
+    from app.lms.access.purge import run_purge
+
+    admin = admin_user(db)
+    b = new_batch(client, admin, count=2)
+    items = client.get(f"{ADMIN}/batches/{b['id']}/codes", headers=auth(admin)).json()["items"]
+    for i in items:
+        client.post(f"{ADMIN}/codes/{i['id']}/given", json={"note": "Buyer"}, headers=auth(admin))
+    s = make_user(db)
+    assert redeem(client, s, plain_codes(db, b["id"])[0]).status_code == 200
+    client.post(f"{ADMIN}/batches/{b['id']}/revoke", json={"reason": "end"}, headers=auth(admin))
+    db.expire_all()
+    notes = dict(db.execute(select(ActivationCode.position, ActivationCode.given_note)
+                            .where(ActivationCode.batch_id == uuid.UUID(b["id"]))).all())
+    assert notes == {1: "Buyer", 2: None}  # the revoked code loses its buyer; the redeemed one keeps it for now
+    assert run_purge(now=T0 + timedelta(days=89)) == 0
+    assert run_purge(now=T0 + timedelta(days=90, seconds=1)) == 1
+    db.expire_all()
+    assert db.execute(select(ActivationCode.given_note).where(ActivationCode.position == 1)).scalar() is None
+
+
+def test_purge_runs_with_the_teacher_phone_purge(db, frozen_clock, monkeypatch):
+    from app.lms.access import purge
+    from app.lms.teachers import purge as teacher_purge
+
+    calls = []
+    monkeypatch.setattr(purge, "run_purge", lambda **kw: calls.append(kw) or 0)
+    teacher_purge.run_task()
+    assert calls
+
+
+def test_malformed_sealed_copy_is_none():
+    cid = uuid.uuid4()
+    for blob in ("v1.!!!", "v1.", "v1.AAAA", "v1." + "A" * 7, "nope", None):
+        assert codes.unseal(blob, cid) is None
+    good = codes.seal("ABCDEFGHJKMN", cid)
+    assert codes.unseal(good, cid) == "ABCDEFGHJKMN" and codes.unseal(good, uuid.uuid4()) is None
+
+
+def test_reveal_of_a_damaged_code_is_a_conflict_not_a_500(client, db, frozen_clock):
+    admin = admin_user(db)
+    b = new_batch(client, admin, count=1)
+    row = db.execute(select(ActivationCode).where(ActivationCode.batch_id == uuid.UUID(b["id"]))).scalar_one()
+    row.code_enc = "v1.%%%"
+    db.commit()
+    res = client.post(f"{ADMIN}/codes/{row.id}/reveal", headers=auth(admin))
+    assert res.status_code == 409 and code_of(res) == "code_not_available"
+    exp = client.post(f"{ADMIN}/batches/{b['id']}/export", headers=auth(admin))
+    assert exp.status_code == 200 and exp.text.strip() == "number,code,given"
+
+
+def test_rekey_after_a_key_rotation(client, db, frozen_clock, monkeypatch):
+    from app.lms.access.rekey import rekey
+
+    admin = admin_user(db)
+    b = new_batch(client, admin, count=3)
+    plain = plain_codes(db, b["id"])
+    old = settings.SECRET_KEY
+    monkeypatch.setattr(settings, "SECRET_KEY", old + "-rotated")
+    monkeypatch.setattr(settings, "SECRET_KEY_PREVIOUS", old)
+    assert rekey(db) == {"resealed": 3, "rehashed": 3, "unreadable": 0}
+    assert rekey(db) == {"resealed": 0, "rehashed": 0, "unreadable": 0}
+    monkeypatch.setattr(settings, "SECRET_KEY_PREVIOUS", "")  # the old key is gone: every code still works
+    assert plain_codes(db, b["id"]) == plain
+    assert redeem(client, make_user(db), plain[0]).status_code == 200
