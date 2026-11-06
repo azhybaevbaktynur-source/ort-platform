@@ -17,6 +17,7 @@ import { LoadError, OrgError, SystemAccountBadge } from "@/components/lms/org/Or
 import { OutlineMenu } from "@/components/lms/modules/OutlineMenu";
 import { UserOrganizationsSection } from "@/components/lms/org/admin/UserOrganizationsSection"; // Phase 6 S4b
 import { CodeReasonDialog } from "@/components/lms/admin/CodeReasonDialog";
+import { UserAccessSection } from "@/components/lms/access/UserAccessSection"; // S3 access
 import { endUserSessions, setPlatformAdmin } from "@/lib/lms/security";
 
 type Action = "disable" | "revoke" | "grant" | "endSessions";
@@ -166,6 +167,9 @@ export default function AdminUserDetailPage() {
 
       {/* Phase 6 S4b: organizations and roles, add to organization */}
       <UserOrganizationsSection user={user} readOnly={system} />
+
+      {/* S3 access: exam passes, give and revoke */}
+      <UserAccessSection userId={user.id} name={user.display_name ? `${user.display_name} · ${user.email}` : user.email} readOnly={system} />
 
       <Card className="mb-6" title={t("platformAdmin.users.ownedCourses")} padding={user.owned_courses.length ? "none" : "md"}>
         {user.owned_courses.length === 0 ? <p className="text-sm text-slate-600">{t("platformAdmin.users.noCourses")}</p> : (

@@ -289,7 +289,22 @@
       "not_platform_admin": "This person is not a platform admin.",
       "target_email_not_verified": "This person has not confirmed their email yet.",
       "target_disabled": "This account is disabled.",
-      "wrong_password": "Wrong password."
+      "wrong_password": "Wrong password.",
+      "access_required": "A pass is needed for this exam.",
+      "code_invalid": "This code does not work. Check it and try again.",
+      "code_no_benefit": "Your access already lasts longer than this code would give.",
+      "grant_no_benefit": "This person's access already lasts longer.",
+      "grant_too_long": "At most 400 days.",
+      "grant_date_passed": "This date has already passed.",
+      "grant_length_required": "Choose a number of days or an end date.",
+      "batch_length_required": "Choose a number of days or an end date.",
+      "batch_date_passed": "This date has already passed.",
+      "batch_already_revoked": "This batch is already revoked.",
+      "batch_not_found": "Batch not found.",
+      "activation_code_not_found": "Code not found.",
+      "code_not_available": "This code is used or revoked.",
+      "pass_not_found": "Pass not found.",
+      "pass_already_revoked": "This pass is already revoked."
     }
   },
   "courses": {
@@ -1213,7 +1228,8 @@
         "not_available": "This assessment is not available.",
         "course_not_active": "The course is not active.",
         "unpublished": "This assessment is not published.",
-        "not_a_student": "Only students of this course can take this assessment."
+        "not_a_student": "Only students of this course can take this assessment.",
+        "access_required": "A pass is needed to start this exam."
       },
       "startHint": "The timer starts as soon as you press the button.",
       "startHintSection": "The timer for section {n} starts as soon as you press the button.",
@@ -5387,7 +5403,9 @@
       "create": "Create",
       "save": "Save",
       "poolTooSmall": "The bank has too few questions for this block. Lower the count or change the filters."
-    }
+    },
+    "locked": "Practice needs a pass",
+    "unlock": "Unlock"
   },
   "progress": {
     "nav": "My progress",
@@ -5852,16 +5870,19 @@
         "resume": "You have a test in progress.",
         "start": "You haven't taken this test yet.",
         "practice": "Your weakest section right now: {section}.",
-        "retake": "You took this test the longest time ago."
+        "retake": "You took this test the longest time ago.",
+        "unlock": "You have done the free tests. A pass opens the rest."
       },
       "action": {
         "resume": "Continue",
         "start": "Start the test",
         "practice": "Practise",
-        "retake": "Take it again"
+        "retake": "Take it again",
+        "unlock": "Unlock"
       },
       "practiceTitle": "Practice: {section}",
-      "none": "You have taken every test available. New tests will appear here."
+      "none": "You have taken every test available. New tests will appear here.",
+      "unlockTitle": "Unlock all exams"
     },
     "library": {
       "title": "Tests",
@@ -5973,5 +5994,174 @@
     "storageDetail": "Driver: {driver}. R2 configured: {r2}",
     "commit": "Deployed version: {commit}",
     "migrationsUntracked": "The database has no version table (built without migrations). The code expects: {expected}"
+  },
+  "access": {
+    "menu": "Unlock exams",
+    "paid": "Paid",
+    "free": "Free",
+    "lockedLabel": "Needs a pass",
+    "needsPass": "Some tests here are paid.",
+    "needsPassLink": "Unlock all exams",
+    "howToPay": "Payment details will appear here soon. Until then, ask the platform team for a code.",
+    "unlock": {
+      "title": "Unlock all exams",
+      "intro": "Some exams are free. A pass opens every paid exam on the platform.",
+      "includedTitle": "What the pass includes",
+      "includedExams": "Every paid exam on the platform, with as many attempts as each exam allows",
+      "includedPractice": "Practice sets in the platform's courses",
+      "includedResults": "Your results and reviews stay with you after the pass ends",
+      "payTitle": "How to pay",
+      "codeTitle": "Enter your code",
+      "codeLabel": "Activation code",
+      "codeHint": "12 characters, for example ABCD-EFGH-JKMN. Spaces and dashes do not matter.",
+      "redeem": "Activate",
+      "success": "Done! Exams are open until {date}.",
+      "statusTitle": "Your access",
+      "statusActive": "Open until {date}",
+      "statusNone": "No pass yet. Free exams are open to you.",
+      "back": "Back to my courses"
+    },
+    "lobby": {
+      "title": "This exam needs a pass",
+      "body": "A pass opens every paid exam on the platform. Results you already have stay with you.",
+      "action": "Unlock all exams"
+    },
+    "admin": {
+      "nav": "Access",
+      "title": "Free and paid exams",
+      "description": "Activation codes, passes and which exams are paid.",
+      "tabs": {
+        "batches": "Code batches",
+        "exams": "Paid exams"
+      },
+      "recent": {
+        "title": "Exams published in the last 14 days",
+        "hint": "New exams in platform courses start as paid. Check that this is what you want.",
+        "empty": "No exams were published in the last 14 days.",
+        "manage": "Manage paid exams"
+      },
+      "revealAlert": "{count} codes were shown in the last hour. If that was not you, check the audit log.",
+      "batches": {
+        "create": "New batch",
+        "createTitle": "New batch of codes",
+        "label": "Name",
+        "labelHint": "For example: \"November, 30 days\"",
+        "count": "Number of codes",
+        "countHint": "From 1 to 500",
+        "length": "How long a code gives access",
+        "lengthDays": "A number of days",
+        "lengthDate": "Until a date",
+        "days": "Days",
+        "daysHint": "From 1 to 400. The days add to the student's current pass.",
+        "endsOn": "Last day",
+        "endsOnHint": "Access ends at the end of this day, Bishkek time.",
+        "note": "Note",
+        "noteHint": "For you only, for example the price",
+        "submit": "Create codes",
+        "created": "{count} codes created.",
+        "empty": "No batches yet. Create one to start selling codes.",
+        "columns": {
+          "name": "Batch",
+          "length": "Gives",
+          "codes": "Codes",
+          "created": "Created"
+        },
+        "lengthDaysValue": "{count} days",
+        "lengthDaysValue_one": "{count} day",
+        "lengthDaysValue_few": "{count} days",
+        "lengthDaysValue_many": "{count} days",
+        "lengthDaysValue_other": "{count} days",
+        "lengthUntil": "until {date}",
+        "counts": "{unused} free · {given} sold · {redeemed} used",
+        "revoked": "Revoked",
+        "revoke": "Revoke unused codes",
+        "revokeTitle": "Revoke the batch?",
+        "revokeBody": "Codes nobody has used yet stop working, sold ones too. Passes already activated stay.",
+        "revokedToast": "The batch is revoked.",
+        "export": "Download unused codes (CSV)",
+        "exported": "The file is downloaded. The download is recorded in the audit log.",
+        "open": "Codes"
+      },
+      "codes": {
+        "title": "Codes",
+        "filter": "Status",
+        "all": "All",
+        "status": {
+          "unused": "Not sold",
+          "given": "Sold",
+          "redeemed": "Used",
+          "revoked": "Revoked"
+        },
+        "columns": {
+          "number": "No.",
+          "code": "Code",
+          "status": "Status",
+          "buyer": "Sold to",
+          "used": "Used by"
+        },
+        "show": "Show",
+        "hide": "Hide",
+        "copy": "Copy",
+        "copied": "Code copied.",
+        "markGiven": "Mark as sold",
+        "editGiven": "Change note",
+        "givenTitle": "Mark the code as sold",
+        "givenNote": "Who it was sold to",
+        "givenNoteHint": "For you only. It is removed if the student deletes their account.",
+        "givenSave": "Save",
+        "givenToast": "Saved.",
+        "empty": "No codes with this status.",
+        "showHint": "Every time a code is shown, it is recorded in the audit log."
+      },
+      "exams": {
+        "title": "Paid exams",
+        "hint": "A paid exam needs a pass to start. Free exams are open to everyone in the course.",
+        "course": "Course",
+        "allCourses": "All courses",
+        "tier": "Shown",
+        "allTiers": "Free and paid",
+        "columns": {
+          "exam": "Exam",
+          "course": "Course",
+          "published": "Published",
+          "paid": "Paid"
+        },
+        "draft": "Draft",
+        "paidToggle": "Paid: {title}",
+        "saved": "Saved.",
+        "empty": "No exams in platform courses yet.",
+        "practiceTitle": "Practice in platform courses",
+        "practiceHint": "Practice needs a pass unless you make it free for the course.",
+        "practiceFree": "Practice is free",
+        "practiceEmpty": "There are no platform courses yet."
+      },
+      "user": {
+        "title": "Exam access",
+        "active": "Open until {date}",
+        "none": "No active pass",
+        "grant": "Give access",
+        "grantTitle": "Give exam access",
+        "grantBody": "The new pass starts when the current one ends. At most 400 days.",
+        "grantDone": "Access given.",
+        "revoke": "Revoke",
+        "revokeTitle": "Revoke this pass?",
+        "revokeBody": "The person loses this access. To move access to another account, revoke it here and give access there.",
+        "revokedToast": "The pass is revoked.",
+        "passes": "Passes",
+        "noPasses": "No passes yet.",
+        "period": "{from} – {to}",
+        "source": {
+          "code": "Code …{last4}",
+          "admin": "Given by {name}",
+          "payment": "Payment"
+        },
+        "statusActive": "Active",
+        "statusRevoked": "Revoked",
+        "statusEnded": "Ended",
+        "statusFuture": "Not started yet",
+        "redemptions": "Codes used",
+        "redemption": "…{last4} · {batch}"
+      }
+    }
   }
 }

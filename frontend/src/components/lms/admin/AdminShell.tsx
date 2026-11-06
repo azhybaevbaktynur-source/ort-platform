@@ -88,6 +88,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     { href: `${base}/users`, label: t("platformAdmin.nav.users") },
     { href: `${base}/courses`, label: t("platformAdmin.nav.courses") },
     { href: `${base}/exam-templates`, label: t("examTemplates.nav.title") }, // Phase 7b S4
+    { href: `${base}/access`, label: t("access.admin.nav") }, // S3 access: codes, passes, paid exams
     { href: `${base}/audit-log`, label: t("platformAdmin.nav.auditLog") },
     { href: `${base}/storage`, label: t("storage.nav") },
     { href: `${base}/privacy`, label: t("privacy.admin.title") }, // Phase 11 S3

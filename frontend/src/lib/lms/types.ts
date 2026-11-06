@@ -300,6 +300,10 @@ export const LMS_ERROR_CODES = [
   // S1 admin security: two-step login, platform admins
   "mfa_enrollment_required", "mfa_invalid_code", "mfa_already_enabled", "mfa_setup_missing", "last_platform_admin",
   "already_platform_admin", "not_platform_admin", "target_email_not_verified", "target_disabled", "wrong_password",
+  // S3 access: paid exams, activation codes, passes
+  "access_required", "code_invalid", "code_no_benefit", "grant_no_benefit", "grant_too_long", "grant_date_passed",
+  "grant_length_required", "batch_length_required", "batch_date_passed", "batch_already_revoked", "batch_not_found",
+  "activation_code_not_found", "code_not_available", "pass_not_found", "pass_already_revoked",
 ] as const;
 export type LmsErrorCode = (typeof LMS_ERROR_CODES)[number];
 

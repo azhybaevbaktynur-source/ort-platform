@@ -25,6 +25,8 @@ export interface PracticeSetOut {
   my_best_percent: number | null;
   my_last_at: string | null;
   open_attempt_id: string | null;
+  /** S3 access (students): a pass is needed to practise here */
+  locked?: boolean | null;
 }
 export interface PracticeCreateIn { title: LocalizedText; languages: Lang[]; blocks: PracticeBlock[] }
 export interface PracticeUpdateIn { title?: LocalizedText; blocks?: PracticeBlock[] }

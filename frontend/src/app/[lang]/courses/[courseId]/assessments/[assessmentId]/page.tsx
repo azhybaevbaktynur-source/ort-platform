@@ -18,6 +18,7 @@ import { sectionName } from "@/components/lms/assessments/SectionCard";
 import { fmtDateTime, fmtPoints } from "@/components/lms/assessments/format";
 import { MyAttemptsPanel } from "@/components/lms/home/MyAttemptsPanel"; // Phase 6 S6b
 import { LockedState, isModuleLocked } from "@/components/lms/pages/ApiError"; // Phase 8a fix1
+import { UnlockCallout } from "@/components/lms/access/UnlockCallout"; // S3 access
 
 export default function AssessmentPage() {
   const { lang, t } = useTranslation();
@@ -65,6 +66,7 @@ export default function AssessmentPage() {
       <div className="mx-auto w-full max-w-[54rem] space-y-4">{/* UX rework (PUR-6): today's lobby column */}
         <Link href={base} className="inline-flex min-h-11 items-center text-sm font-medium text-brand-700 hover:underline sm:min-h-0">{t("assessments.backToList")}</Link>
         {exhausted && attempts}
+        {data.locked && <UnlockCallout />}
         <LobbyView lobby={data} />
         {!exhausted && attempts}
       </div>
