@@ -46,7 +46,8 @@ function Loading() {
   );
 }
 
-export function AnalyticsOverview({ courseId, period }: { courseId: string; period: ActivityDays }) {
+/** `examPrep`: the percent goal card is hidden (those courses set a scaled target on Главная). */
+export function AnalyticsOverview({ courseId, period, examPrep = false }: { courseId: string; period: ActivityDays; examPrep?: boolean }) {
   const { lang, t } = useTranslation();
   const { course } = useCourse();
   const errorText = useErrorText();
@@ -114,7 +115,7 @@ export function AnalyticsOverview({ courseId, period }: { courseId: string; peri
         <StatTile icon={<Bookmark />} label={t("progress.analytics.tiles.saved")} value={<span className="tabular-nums">{saved ?? "-"}</span>}
           hint={t("progress.analytics.tiles.savedHint")} />
         <StatTile icon={<Flame />} label={t("progress.analytics.tiles.streak")}
-          value={t("progress.analytics.tiles.streakValue", { count: activity.streak_current })}
+          value={<span className="whitespace-nowrap">{t("progress.analytics.tiles.streakValue", { count: activity.streak_current })}</span>}
           hint={t("progress.analytics.tiles.streakBest", { count: activity.streak_longest })} />
       </div>
 
@@ -139,12 +140,12 @@ export function AnalyticsOverview({ courseId, period }: { courseId: string; peri
       </div>
       <AllTimeHeatmap data={activity} />
 
-      <AnalyticsCard title={t("progress.analytics.goal.title")}
+      {!examPrep && <AnalyticsCard title={t("progress.analytics.goal.title")}
         subtitle={progress.current_percent === null && progress.goal_percent === null
           ? t("progress.analytics.goal.hint")
           : t("progress.analytics.goal.subtitle", { current: pct(progress.current_percent), goal: pct(progress.goal_percent) })}>
         <GoalInput courseId={courseId} value={progress.goal_percent} onChange={(v) => setProgress({ ...progress, goal_percent: v })} />
-      </AnalyticsCard>
+      </AnalyticsCard>}
     </div>
   );
 }

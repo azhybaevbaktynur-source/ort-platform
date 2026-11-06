@@ -96,6 +96,7 @@ async function walk(browser: Browser, user: SeedUser, name: string, check: (page
     await expect(page.getByRole("heading", { level: 1, name: tr("ru", "progress.analytics.title") })).toBeVisible();
     await settle(page);
     await check(page);
+    await expect(page.locator('[aria-busy="true"]')).toHaveCount(0); // the period switch has reloaded
     await noSideScroll(page, `${name} at ${w}px`);
     if (OUT) await page.screenshot({ path: path.join(OUT, `${name}-${w}.jpg`), type: "jpeg", quality: 70, fullPage: true, animations: "disabled" });
     if (name === "analytics-data") {

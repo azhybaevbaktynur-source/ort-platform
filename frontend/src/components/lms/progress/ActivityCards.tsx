@@ -1,15 +1,16 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { Button, Heatmap, accuracyBand, cn } from "@/components/ui";
+import { Button, accuracyBand, cn } from "@/components/ui";
 import { fmtDuration } from "@/components/lms/home/format";
 import { parseApiDate } from "@/lib/format";
 import { useTranslation } from "@/lib/i18n/context";
 import type { ActivityDays, ActivityOut } from "@/lib/lms/progress";
 import { AnalyticsCard, CardEmpty, ChartScroll, Legend, type LegendItem } from "./AnalyticsCard";
+import { MonthHeatmap } from "./MonthHeatmap";
 import {
   CORRECT_FILL, OTHER_FILL, SECTION_FILL, SECTION_ORDER, WRONG_STYLE,
-  bucketize, dayMs, daySpan, niceCount, niceMax, type Bucket,
+  bucketize, dayMs, niceCount, niceMax, type Bucket,
 } from "./analyticsData";
 
 /*
@@ -260,16 +261,14 @@ export function Sessions({ data }: { data: ActivityOut }) {
 export function AllTimeHeatmap({ data }: { data: ActivityOut }) {
   const { t } = useTranslation();
   const total = data.heatmap.reduce((s, d) => s + d.answered, 0);
-  const today = data.days.length ? data.days[data.days.length - 1].date : undefined;
-  const first = data.heatmap.length ? data.heatmap[0].date : today;
-  const weeks = first && today ? Math.max(13, Math.min(53, Math.ceil(daySpan(first, today) / 7) + 1)) : 13;
+  const today = data.days.length ? data.days[data.days.length - 1].date : new Date().toISOString().slice(0, 10);
   return (
     <AnalyticsCard title={t("progress.analytics.heat.title")}
       subtitle={total > 0 ? t("progress.analytics.heat.streaks", { current: data.streak_current, longest: data.streak_longest }) : undefined}>
       {total === 0 ? (
         <CardEmpty compact pose="hello" hint={t("progress.analytics.heat.empty")} />
       ) : (
-        <Heatmap days={data.heatmap} end={today} weeks={weeks} label={t("progress.analytics.heat.label", { count: total })}
+        <MonthHeatmap days={data.heatmap} last={today} label={t("progress.analytics.heat.label", { count: total })}
           summary={<span className="text-sm font-medium text-slate-700">{t("progress.analytics.heat.summary", { count: total })}</span>} />
       )}
     </AnalyticsCard>

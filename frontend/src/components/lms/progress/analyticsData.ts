@@ -102,10 +102,13 @@ export function niceCount(v: number): number {
   return 20 * p;
 }
 
-/** The five weakest topics: lowest accuracy first, more answers first on a tie. */
+/**
+ * The five weakest topics: lowest accuracy first, more answers first on a tie. Only topics with at least two answers
+ * qualify (one wrong answer is not a weak topic), unless fewer than three do; then one answer is enough.
+ */
 export function weakestTopics(topics: TopicStat[], n = 5): TopicStat[] {
-  return topics
-    .filter((t) => t.total > 0)
+  const solid = topics.filter((t) => t.total >= 2);
+  return (solid.length >= 3 ? solid : topics.filter((t) => t.total > 0))
     .slice()
     .sort((a, b) => a.accuracy - b.accuracy || b.total - a.total || a.topic.localeCompare(b.topic))
     .slice(0, n);
@@ -123,6 +126,3 @@ export const twoDigits = (n: number) => String(n).padStart(2, "0");
 
 /** Percent 0-100 from a 0..1 share. */
 export const toPercent = (share: number) => Math.round(Math.max(0, Math.min(1, share || 0)) * 100);
-
-/** Day count between two `YYYY-MM-DD` days, inclusive. */
-export const daySpan = (first: string, last: string) => Math.round((dayMs(last) - dayMs(first)) / DAY_MS) + 1;
