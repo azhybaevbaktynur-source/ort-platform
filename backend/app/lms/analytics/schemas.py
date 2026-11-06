@@ -34,10 +34,10 @@ class ModuleRowOut(BaseModel):
     title: dict
     position: int
     locked: int
-    unlocked: int
+    unlocked: int  # open but not started; included in `not_started`
     started: int
     completed: int
-    not_started: int
+    not_started: int  # no progress row + unlocked: completed + started + not_started + locked = students
 
 
 class AssignmentRowOut(BaseModel):
@@ -51,7 +51,7 @@ class AssignmentRowOut(BaseModel):
     graded: int
     pending_review: int
     excused: int
-    missing: int
+    missing: Optional[int] = None  # None without a due date
     late: int
     mean_percent: Optional[float] = None
 
@@ -63,7 +63,7 @@ class QuizRollupRowOut(BaseModel):
     is_practice: bool
     attempts: int
     students: int
-    mean_percent: Optional[float] = None
+    mean_percent: Optional[float] = None  # first counted attempt per student (as the quiz statistics)
 
 
 class OrgQuizRollupRowOut(QuizRollupRowOut):

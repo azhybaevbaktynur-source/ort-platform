@@ -5,9 +5,8 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Meter, SectionTag, accuracyBand, cn, focusRing, type AccuracyBand } from "@/components/ui";
 import { useTranslation } from "@/lib/i18n/context";
-import type { TopicStat } from "@/lib/lms/progress";
 import { AnalyticsCard, BandLegend, CardEmpty } from "./AnalyticsCard";
-import { isGraded, toPercent, topicGroup, twoDigits, weakestTopics, type TopicGroup } from "./analyticsData";
+import { isGraded, toPercent, topicGroup, twoDigits, weakestTopics, type NamedTopic, type TopicGroup } from "./analyticsData";
 
 /*
  * Student UI U6 (STUDENT_UI_DESIGN §3.3): "5 слабых тем" and accuracy by topic (math vs language). Both take `locked`
@@ -33,9 +32,9 @@ function Ring({ percent }: { percent: number }) {
   );
 }
 
-export function WeakTopics({ topics, practiceHref, locked = false }: { topics: TopicStat[]; practiceHref: string | null; locked?: boolean }) {
+export function WeakTopics({ topics, ready, practiceHref, locked = false }: { topics: NamedTopic[]; ready: boolean; practiceHref: string | null; locked?: boolean }) {
   const { t } = useTranslation();
-  const weak = weakestTopics(topics);
+  const weak = weakestTopics(topics, ready);
   if (weak === null) return null;
   return (
     <AnalyticsCard locked={locked}
@@ -82,7 +81,7 @@ export function WeakTopics({ topics, practiceHref, locked = false }: { topics: T
   );
 }
 
-function TopicRows({ topics }: { topics: TopicStat[] }) {
+function TopicRows({ topics }: { topics: NamedTopic[] }) {
   const { t } = useTranslation();
   // graded topics first (weakest first), then the ones with too few answers (most answers first)
   const rows = topics.filter((x) => x.total > 0).slice().sort((a, b) =>
@@ -117,9 +116,9 @@ function TopicRows({ topics }: { topics: TopicStat[] }) {
 const GROUP_POSE = { math: "working", language: "reading", other: "thinking" } as const;
 
 /** Accuracy by topic: a math card and a language card on ORT-like courses, one card on general courses. */
-export function TopicAccuracy({ topics, split, locked = false }: { topics: TopicStat[]; split: boolean; locked?: boolean }) {
+export function TopicAccuracy({ topics, split, locked = false }: { topics: NamedTopic[]; split: boolean; locked?: boolean }) {
   const { t } = useTranslation();
-  const by: Record<TopicGroup, TopicStat[]> = { math: [], language: [], other: [] };
+  const by: Record<TopicGroup, NamedTopic[]> = { math: [], language: [], other: [] };
   for (const tp of topics) by[topicGroup(tp.section)].push(tp);
   const useSplit = split || by.math.length > 0 || by.language.length > 0;
   const groups: TopicGroup[] = useSplit ? ["math", "language", ...(by.other.length ? ["other" as const] : [])] : ["other"];

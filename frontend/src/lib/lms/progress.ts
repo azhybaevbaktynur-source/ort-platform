@@ -4,9 +4,16 @@ import type { ReviewItemOut } from "./attemptTypes";
 import type { LocalizedText } from "./types";
 
 export interface TrendPoint { attempt_id: string; at: string | null; title: LocalizedText | null; percent: number; practice: boolean }
-export interface SectionStat { section: string; correct: number; total: number; accuracy: number }
-export interface TopicStat { topic: string; section: string | null; correct: number; total: number; accuracy: number }
+/*
+ * STUDENT_UI_FIX_PLAN 4.2/4.3: one definition for every number. `total` = answers (answered items of submitted,
+ * visible attempts; blanks never count), `graded` = answers not awaiting manual grading, `correct` = correct + 0.5 x
+ * partial, `accuracy` = correct / graded. `rated` (server rule): topic from 5 graded answers, section from 10.
+ */
+export interface SectionStat { section: string | null; correct: number; total: number; graded: number; accuracy: number; rated: boolean }
+/** `topic` null: the section's answers without a topic (kept so the sums match; not shown as a topic). */
+export interface TopicStat { topic: string | null; section: string | null; correct: number; total: number; graded: number; accuracy: number; rated: boolean }
 export interface ProgressOut {
+  days_window: ActivityDays | null; // null: all time
   goal_percent: number | null;
   current_percent: number | null;
   attempts_total: number;
@@ -15,6 +22,7 @@ export interface ProgressOut {
   trend: TrendPoint[];
   by_section: SectionStat[];
   by_topic: TopicStat[];
+  weak_topics_ready: boolean; // >= 3 rated topics
 }
 export interface MistakeOut {
   attempt_id: string;
@@ -29,8 +37,9 @@ export type MistakeStatus = "open" | "fixed";
 
 const base = (courseId: string) => `/courses/${encodeURIComponent(courseId)}/my`;
 
-export const getProgress = (courseId: string, opts: { signal?: AbortSignal } = {}) =>
-  lmsFetch<ProgressOut>(`${base(courseId)}/progress`, { signal: opts.signal });
+/** `days`: the same window as `getActivity` (analytics page); absent: all time (home, goal). */
+export const getProgress = (courseId: string, opts: { signal?: AbortSignal; days?: ActivityDays } = {}) =>
+  lmsFetch<ProgressOut>(`${base(courseId)}/progress`, { params: { days: opts.days }, signal: opts.signal });
 export const listMistakes = (courseId: string, status: MistakeStatus, cursor?: string | null, signal?: AbortSignal) =>
   lmsFetch<MistakePage>(`${base(courseId)}/mistakes`, { params: { status, cursor, limit: 25 }, signal });
 
@@ -49,7 +58,7 @@ export interface ActivityOut {
   days_window: ActivityDays;
   streak_current: number;
   streak_longest: number;
-  totals: { answered: number; correct: number; accuracy: number };
+  totals: { answered: number; correct: number; graded: number; accuracy: number }; // same definition as SectionStat
   days: ActivityDay[];
   by_hour: number[]; // 24 answer counts by Bishkek hour
   sessions: ActivitySession[]; // last 7 days, newest first, at most 50

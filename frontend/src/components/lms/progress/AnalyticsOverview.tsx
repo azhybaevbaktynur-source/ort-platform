@@ -11,11 +11,12 @@ import { ActiveHours, ActivityBars, AllTimeHeatmap, Sessions, StudyTime } from "
 import { AnalyticsCard } from "./AnalyticsCard";
 import { GoalInput } from "./GoalInput";
 import { TopicAccuracy, WeakTopics } from "./TopicCards";
-import { HEATMAP_MIN_DAYS, PERIODS, toPercent } from "./analyticsData";
+import { HEATMAP_MIN_DAYS, PERIODS, namedTopics, toPercent } from "./analyticsData";
 
 /*
- * Student UI U6 (STUDENT_UI_DESIGN §3.3): the analytics page body. Three requests in parallel (progress, activity of
- * the period, the first page of saved questions for the count); the period only reloads the activity.
+ * Student UI U6 (STUDENT_UI_DESIGN §3.3): the analytics page body. Three requests in parallel (progress and activity of
+ * the period, the first page of saved questions for the count); the period reloads progress and activity together, so
+ * every number on the page has one definition and one period (STUDENT_UI_FIX_PLAN 4.2).
  * Free for everyone (D8): `LOCK_ANALYTICS` moves the weak-topic and by-topic cards behind the pass when the owner says so.
  */
 const LOCK_ANALYTICS = false;
@@ -59,12 +60,7 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
 
-  const loadBase = useCallback(async (signal?: AbortSignal) => {
-    try {
-      setProgress(await getProgress(courseId, { signal }));
-    } catch (e) {
-      if (!signal?.aborted) setError(e);
-    }
+  const loadBase = useCallback((signal?: AbortSignal) => {
     // the count is a convenience: a failure leaves the tile at "-"
     listSaved(courseId, null, signal, 50)
       .then((p) => { if (!signal?.aborted) setSaved(`${p.items.length}${p.next_cursor ? "+" : ""}`); })
@@ -74,8 +70,8 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
   const loadActivity = useCallback(async (signal?: AbortSignal) => {
     setBusy(true);
     try {
-      const a = await getActivity(courseId, period, signal);
-      if (!signal?.aborted) setActivity(a);
+      const [p, a] = await Promise.all([getProgress(courseId, { signal, days: period }), getActivity(courseId, period, signal)]);
+      if (!signal?.aborted) { setProgress(p); setActivity(a); }
     } catch (e) {
       if (!signal?.aborted) setError(e);
     } finally {
@@ -85,7 +81,7 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
 
   useEffect(() => {
     const c = new AbortController();
-    void loadBase(c.signal);
+    loadBase(c.signal);
     return () => c.abort();
   }, [loadBase]);
   useEffect(() => {
@@ -94,13 +90,16 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
     return () => c.abort();
   }, [loadActivity]);
 
-  const retry = () => { setError(null); void loadBase(); void loadActivity(); };
+  const retry = () => { setError(null); loadBase(); void loadActivity(); };
 
   if (error) return <ErrorState message={errorText(error)} onRetry={retry} />;
   if (!progress || !activity) return <Loading />;
 
   const answered = activity.totals.answered;
-  const graded = activity.totals.correct + activity.days.reduce((s, d) => s + d.wrong, 0);
+  const graded = activity.totals.graded;
+  const topics = namedTopics(progress.by_topic);
+  // correct counts a partial answer as half: one decimal at most
+  const correctText = Number.isInteger(activity.totals.correct) ? String(activity.totals.correct) : activity.totals.correct.toFixed(1);
   const nothingYet = progress.attempts_total === 0 && answered === 0 && activity.heatmap.length === 0;
   const history = activity.days.filter((d) => d.answered > 0).length >= HISTORY_DAYS;
   // U9 (review 11): the calendar only after a week of active days
@@ -116,7 +115,7 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
           hint={t(`progress.analytics.period.in.d${period}`)} />
         <StatTile icon={<Target />} iconTone="green" label={t("progress.analytics.tiles.accuracy")}
           value={<span className="tabular-nums">{graded > 0 ? `${toPercent(activity.totals.accuracy)} %` : "-"}</span>}
-          hint={graded > 0 ? t("progress.analytics.tiles.accuracyHint", { correct: activity.totals.correct, total: graded }) : t(`progress.analytics.period.in.d${period}`)} />
+          hint={graded > 0 ? t("progress.analytics.tiles.accuracyHint", { correct: correctText, total: graded }) : t(`progress.analytics.period.in.d${period}`)} />
         <StatTile icon={<Bookmark />} iconTone="violet" label={t("progress.analytics.tiles.saved")} value={<span className="tabular-nums">{saved ?? "-"}</span>}
           hint={t("progress.analytics.tiles.savedHint")} />
         <StatTile icon={<Flame />} iconTone="orange" label={t("progress.analytics.tiles.streak")}
@@ -135,10 +134,10 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
         </section>
       )}
 
-      <WeakTopics topics={progress.by_topic} practiceHref={practiceHref} locked={LOCK_ANALYTICS} />
+      <WeakTopics topics={topics} ready={progress.weak_topics_ready} practiceHref={practiceHref} locked={LOCK_ANALYTICS} />
       {/* U9 (review 11): the answers chart too needs history (a chart of one bar says nothing) */}
       {history && <ActivityBars data={activity} period={period} />}
-      <TopicAccuracy topics={progress.by_topic} split={split} locked={LOCK_ANALYTICS} />
+      <TopicAccuracy topics={topics} split={split} locked={LOCK_ANALYTICS} />
       {/* U8 (§5.1 c): study time, active hours and sessions need history; before that they are not drawn at all */}
       {history && <StudyTime data={activity} period={period} />}
       {history && (

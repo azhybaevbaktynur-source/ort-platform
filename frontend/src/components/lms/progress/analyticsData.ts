@@ -102,24 +102,24 @@ export function niceCount(v: number): number {
   return 20 * p;
 }
 
-/** U9 (STUDENT_UI_REVIEW 11, §5.1 c): a topic is graded (percent, band) only from this many answers; below: "Мало данных". */
-export const TOPIC_MIN_ANSWERS = 5;
-/** Graded topics needed before the weak-topic card appears at all. */
-export const WEAK_MIN_TOPICS = 3;
 /** Active days (all time) before the activity calendar appears. */
 export const HEATMAP_MIN_DAYS = 7;
 
-export const isGraded = (t: TopicStat) => t.total >= TOPIC_MIN_ANSWERS;
+/** A named topic (the server's no-topic bucket, `topic` null, only keeps the sums equal and is never listed). */
+export type NamedTopic = TopicStat & { topic: string };
+export const namedTopics = (topics: TopicStat[]): NamedTopic[] => topics.filter((t): t is NamedTopic => t.topic !== null);
+
+/** STUDENT_UI_FIX_PLAN 4.3: a topic shows a percent and a band only when the server rates it (5 graded answers). */
+export const isGraded = (t: TopicStat) => t.rated;
 
 /**
- * The five weakest topics: lowest accuracy first, more answers first on a tie, graded topics only. Null while fewer than
- * `WEAK_MIN_TOPICS` topics are graded (the card is not shown); an empty list: enough data and nothing weak.
+ * The five weakest topics: lowest accuracy first, more answers first on a tie, rated topics only. Null until the server
+ * says `weak_topics_ready` (3 rated topics; the card is not shown); an empty list: enough data and nothing weak.
  */
-export function weakestTopics(topics: TopicStat[], n = 5): TopicStat[] | null {
-  const graded = topics.filter(isGraded);
-  if (graded.length < WEAK_MIN_TOPICS) return null;
+export function weakestTopics(topics: NamedTopic[], ready: boolean, n = 5): NamedTopic[] | null {
+  if (!ready) return null;
   // a topic in the green band (85 % and above) is never "weak"
-  return graded.filter((t) => toPercent(t.accuracy) < 85)
+  return topics.filter((t) => t.rated && toPercent(t.accuracy) < 85)
     .sort((a, b) => a.accuracy - b.accuracy || b.total - a.total || a.topic.localeCompare(b.topic))
     .slice(0, n);
 }
