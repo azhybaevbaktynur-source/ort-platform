@@ -18,11 +18,19 @@ class _In(BaseModel):
 
 # ------------------------------------------------------------------ student
 
+PlanId = Literal["month_1", "month_3", "season"]
+Source = Literal["code", "admin", "payment"]
+
+
 class MyAccessOut(BaseModel):
     active: bool
     ends_at: Optional[datetime] = None  # the end of the unbroken run of passes from now
     scope: Literal["all"] = "all"
     practice_free: bool = False  # practice is free in every platform course (the pass then adds only tests)
+    # F6a: of the pass that ends the chain (null when inactive); whole days left, rounded up
+    plan: Optional[PlanId] = None
+    days_left: int = 0
+    source: Optional[Source] = None
 
 
 class RedeemIn(_In):
@@ -34,6 +42,38 @@ class RedeemOut(MyAccessOut):
 
 
 MY_ACCESS_KEYS = frozenset(MyAccessOut.model_fields)
+
+
+class OfferPlanOut(BaseModel):
+    id: PlanId
+    days: Optional[int] = None          # month plans
+    season_end: Optional[date] = None   # the season plan (valid all that day, Asia/Bishkek)
+    price_kgs: Optional[int] = None     # null: the owner set no price (the page shows none)
+    new_ends_at: datetime               # the chain end after this plan
+
+
+class OfferStatusOut(BaseModel):
+    active: bool
+    ends_at: Optional[datetime] = None
+    plan: Optional[PlanId] = None
+    days_left: int = 0
+    source: Optional[Source] = None
+
+
+class HowToPayOut(BaseModel):
+    """Per language; ky/en fall back to ru; empty → the page's placeholder text."""
+    ru: str = ""
+    ky: str = ""
+    en: str = ""
+
+
+class OfferOut(BaseModel):
+    plans: list[OfferPlanOut]
+    includes: list[Literal["tests", "practice", "lessons"]]
+    practice_free: bool
+    how_to_pay: HowToPayOut
+    season_end: Optional[date] = None  # null until the owner sets one (then the season plan exists)
+    status: OfferStatusOut
 
 
 # ------------------------------------------------------------------ admin: batches and codes
@@ -100,9 +140,18 @@ class GivenIn(_In):
 
 # ------------------------------------------------------------------ admin: a person's passes
 
-class GrantIn(_Length):
+class GrantIn(_In):
+    """Exactly one of `plan` (F6a), `duration_days`, `ends_on`."""
+    plan: Optional[PlanId] = None
     duration_days: Optional[int] = Field(default=None, ge=1, le=MAX_GRANT_DAYS)
+    ends_on: Optional[date] = None
     reason: str = Field(min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def _one(self):
+        if sum(x is not None for x in (self.plan, self.duration_days, self.ends_on)) != 1:
+            raise ValueError("give plan, duration_days or ends_on")
+        return self
 
 
 class PassOut(BaseModel):
@@ -111,6 +160,7 @@ class PassOut(BaseModel):
     starts_at: datetime
     ends_at: datetime
     source: Literal["code", "admin", "payment"]
+    plan: Optional[PlanId] = None  # F6a
     code_last4: Optional[str] = None
     granted_by: Optional[str] = None
     reason: Optional[str] = None
@@ -170,3 +220,54 @@ class AccessOverviewOut(BaseModel):
     recent_exams: list[ExamOut]
     reveals_last_hour: int
     reveal_alert: bool
+
+
+# ------------------------------------------------------------------ F6a: Pro list and settings
+
+class ProRowOut(BaseModel):
+    user_id: str
+    name: Optional[str] = None
+    email: Optional[str] = None
+    ends_at: datetime        # the chain end
+    started_at: datetime     # the first start of the person's non-revoked passes
+    days_left: int
+    active: bool
+    plan: Optional[PlanId] = None     # of the chain-ending pass; null: legacy, voucher or custom length
+    source: Optional[Source] = None
+
+
+class ProSummaryOut(BaseModel):
+    active: int
+    expiring: int  # ends within 14 days
+    expired: int   # ended in the last 90 days
+
+
+class ProPricesIn(_In):
+    month_1: Optional[int] = None
+    month_3: Optional[int] = None
+    season: Optional[int] = None
+
+
+class HowToPayIn(_In):
+    ru: Optional[str] = None
+    ky: Optional[str] = None
+    en: Optional[str] = None
+
+
+class ProSettingsIn(_In):
+    season_end: Optional[date] = None
+    prices: ProPricesIn = Field(default_factory=ProPricesIn)
+    how_to_pay: HowToPayIn = Field(default_factory=HowToPayIn)
+
+
+class ProPricesOut(BaseModel):
+    month_1: Optional[int] = None
+    month_3: Optional[int] = None
+    season: Optional[int] = None
+
+
+class ProSettingsOut(BaseModel):
+    """As stored (no fallback): the admin edits what the owner typed."""
+    season_end: Optional[date] = None
+    prices: ProPricesOut
+    how_to_pay: HowToPayOut

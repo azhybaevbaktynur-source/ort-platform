@@ -11,7 +11,7 @@ from datetime import date, datetime, timedelta
 from typing import Optional
 
 from fastapi import Request
-from sqlalchemy import case, func, select, update
+from sqlalchemy import case, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.lms.access import codes
@@ -272,7 +272,7 @@ def user_access(db: Session, user_id: str) -> dict:
         .order_by(AccessPass.created_at.desc(), AccessPass.id.desc()).limit(PASSES_MAX)
     ).all()
     passes = [dict(id=p.id, scope=p.scope, starts_at=as_utc(p.starts_at), ends_at=as_utc(p.ends_at), source=p.source,
-                   code_last4=last4, granted_by=g, reason=p.reason, revoked_at=as_utc(p.revoked_at), revoked_by=r,
+                   plan=p.plan, code_last4=last4, granted_by=g, reason=p.reason, revoked_at=as_utc(p.revoked_at), revoked_by=r,
                    created_at=as_utc(p.created_at),
                    active=p.revoked_at is None and as_utc(p.starts_at) <= now < as_utc(p.ends_at))
               for p, last4, g, r in rows]
@@ -288,6 +288,80 @@ def user_access(db: Session, user_id: str) -> dict:
     return dict(active=active, ends_at=ends_at, passes=passes,
                 redemptions=[dict(code_id=i, last4=l4, redeemed_at=as_utc(at), batch_label=label, batch_id=bid)
                              for i, l4, at, label, bid in redemptions])
+
+
+# ------------------------------------------------------------------ F6a: the Pro list
+
+PRO_EXPIRING_DAYS = 14
+PRO_EXPIRED_DAYS = 90
+PRO_STATUSES = ("active", "expiring", "expired")
+
+
+def _pro_chains():
+    """One row per person with a non-revoked pass: the chain end (`max(ends_at)`; a person's non-revoked passes form
+    one unbroken run, because `extend` starts at the latest end and `revoke_pass` shifts later passes back) and the
+    first start. Grouped in SQL; never loads the passes of all users."""
+    return (select(AccessPass.user_id.label("user_id"), func.max(AccessPass.ends_at).label("ends_at"),
+                   func.min(AccessPass.starts_at).label("started_at"))
+            .where(AccessPass.revoked_at.is_(None)).group_by(AccessPass.user_id).subquery("pro_chain"))
+
+
+def _status_filter(ch, status: Optional[str], now: datetime):
+    if status == "active":
+        return ch.c.ends_at > now
+    if status == "expiring":
+        return (ch.c.ends_at > now) & (ch.c.ends_at <= now + timedelta(days=PRO_EXPIRING_DAYS))
+    if status == "expired":
+        return (ch.c.ends_at <= now) & (ch.c.ends_at > now - timedelta(days=PRO_EXPIRED_DAYS))
+    return None
+
+
+def list_pro(db: Session, *, status: Optional[str], q: Optional[str], cursor: Optional[str], limit: Optional[int],
+             now: datetime) -> tuple[list[dict], Optional[str]]:
+    """People with Pro (or who had it), by chain end: soonest first for active/expiring/all, latest first for expired.
+    `q`: email or name substring, case-insensitive (as the users list). Plan and source of the chain-ending pass by a
+    correlated subquery each (bounded by the page)."""
+    from app.lms.access.service import days_left
+
+    ch = _pro_chains()
+    last = AccessPass.__table__.alias("last_pass")
+
+    def _of_last(col):
+        return (select(col).where(last.c.user_id == ch.c.user_id, last.c.revoked_at.is_(None),
+                                  last.c.ends_at == ch.c.ends_at)
+                .order_by(last.c.id).limit(1).correlate(ch).scalar_subquery())
+
+    stmt = (select(ch.c.user_id, ch.c.ends_at, ch.c.started_at, User.display_name, User.email,
+                   _of_last(last.c.plan).label("plan"), _of_last(last.c.source).label("source"))
+            .join(User, User.id == ch.c.user_id))
+    cond = _status_filter(ch, status, now)
+    if cond is not None:
+        stmt = stmt.where(cond)
+    term = (q or "").strip().lower()
+    if term:
+        stmt = stmt.where(or_(func.lower(User.email).contains(term, autoescape=True),
+                              func.lower(User.display_name).contains(term, autoescape=True)))
+    rows, nxt = paginate_rows(db, stmt, sort_col=ch.c.ends_at, id_col=ch.c.user_id, entity_of=lambda r: r,
+                              cursor=cursor, limit=limit, descending=(status == "expired"))
+    out = []
+    for uid, ends_at, started_at, name, email, plan, source in rows:
+        end = as_utc(ends_at)
+        out.append(dict(user_id=uid, name=name, email=email, ends_at=end, started_at=as_utc(started_at),
+                        days_left=days_left(end, now), active=end > now, plan=plan, source=source))
+    return out, nxt
+
+
+def pro_summary(db: Session, *, now: datetime) -> dict:
+    """Counts: active, expiring within 14 days, expired in the last 90 days (one statement over the grouped chains)."""
+    ch = _pro_chains()
+
+    def _n(cond):
+        return func.coalesce(func.sum(case((cond, 1), else_=0)), 0)
+
+    active, expiring, expired = db.execute(select(
+        _n(_status_filter(ch, "active", now)), _n(_status_filter(ch, "expiring", now)),
+        _n(_status_filter(ch, "expired", now)))).one()
+    return {"active": int(active), "expiring": int(expiring), "expired": int(expired)}
 
 
 # ------------------------------------------------------------------ paid/free toggles

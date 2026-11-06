@@ -155,3 +155,95 @@ def test_double_redeem_by_one_person_burns_one_code_once(pg):
     assert len(ok) == 1 and set(refused) == {"code_invalid"}
     with Session() as s:
         assert s.execute(select(func.count()).select_from(AccessPass).where(AccessPass.user_id == uid)).scalar() == 1
+
+
+# ------------------------------------------------------------------ F6a Pro (SUBSCRIPTION_DESIGN 8)
+
+def test_grants_by_plan_from_two_admins_and_a_redeem_never_overlap(pg):
+    Session = sessionmaker(bind=pg, autoflush=False)
+    with Session() as s:
+        admins = [make_user(s, platform_admin=True).id for _ in range(2)]
+        uid = make_user(s).id
+    rounds = 5
+    plain = _batch(Session, admins[0], rounds, days=30)
+    errors = []
+
+    def grant(admin_id, plan):
+        with Session() as s:
+            try:
+                service.grant(s, s.get(User, admin_id), uid, plan=plan, reason="race")
+            except Exception as exc:  # pragma: no cover
+                errors.append(exc)
+
+    def redeem(code):
+        with Session() as s:
+            try:
+                service.redeem(s, s.get(User, uid), code, ip_hash=None)
+            except Exception as exc:  # pragma: no cover
+                errors.append(exc)
+
+    for i in range(rounds):
+        _run([threading.Thread(target=grant, args=(admins[0], "month_1")),
+              threading.Thread(target=grant, args=(admins[1], "month_3")),
+              threading.Thread(target=redeem, args=(plain[i],))])
+    assert not errors, errors
+    with Session() as s:
+        passes = s.execute(select(AccessPass.starts_at, AccessPass.ends_at, AccessPass.plan, AccessPass.source)
+                           .where(AccessPass.user_id == uid).order_by(AccessPass.starts_at)).all()
+    assert len(passes) == rounds * 3
+    assert sorted((p or "") for _, _, p, _ in passes) == sorted(["month_1", "month_3", ""] * rounds)
+    assert all(p is None for _, _, p, src in passes if src == "code")
+    spans = [(as_utc(a), as_utc(b)) for a, b, _, _ in passes]
+    for (_, e1), (s2, _) in zip(spans, spans[1:]):
+        assert e1 == s2, "every pass starts where the one before it ends"
+    assert spans[-1][1] - spans[0][0] == timedelta(days=rounds * (30 + 90 + 30))
+
+
+def test_grant_and_cancel_at_once_never_leave_a_half_state(pg):
+    Session = sessionmaker(bind=pg, autoflush=False)
+    with Session() as s:
+        admin_id = make_user(s, platform_admin=True).id
+    for _ in range(6):
+        with Session() as s:
+            uid = make_user(s).id
+            service.grant(s, s.get(User, admin_id), uid, days=20, ends_on=None, reason="base")
+        barrier = threading.Barrier(2)
+        errors, refused = [], []
+
+        def grant():
+            with Session() as s:
+                barrier.wait()
+                try:
+                    service.grant(s, s.get(User, admin_id), uid, plan="month_1", reason="renew")
+                except Exception as exc:  # pragma: no cover
+                    errors.append(exc)
+
+        def cancel():
+            with Session() as s:
+                barrier.wait()
+                try:
+                    service.cancel_pro(s, s.get(User, admin_id), uid, reason="refund")
+                except LMSError as exc:  # pragma: no cover
+                    refused.append(exc.code)
+                except Exception as exc:  # pragma: no cover
+                    errors.append(exc)
+
+        _run([threading.Thread(target=grant), threading.Thread(target=cancel)])
+        assert not errors and not refused, (errors, refused)
+        with Session() as s:
+            rows = s.execute(select(AccessPass).where(AccessPass.user_id == uid)
+                             .order_by(AccessPass.created_at)).scalars().all()
+            assert len(rows) == 2
+            base, renew = rows
+            assert base.revoked_at is not None  # the cancel always revokes the base pass
+            now = service.clock.now()
+            if renew.revoked_at is not None:
+                # granted, then cancelled: the renewal had extended the base chain and went with it
+                assert as_utc(renew.starts_at) == as_utc(base.ends_at)
+                assert not service.status(s, uid, now=now)["active"]
+            else:
+                # cancelled, then granted: the renewal starts afresh, not at the revoked chain's end
+                assert as_utc(renew.starts_at) < as_utc(base.ends_at)
+                assert as_utc(renew.ends_at) - as_utc(renew.starts_at) == timedelta(days=30)
+                st = service.status(s, uid, now=now)
+                assert st["active"] and st["plan"] == "month_1"

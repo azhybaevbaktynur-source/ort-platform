@@ -7,6 +7,7 @@ ACCESS_POLICIES: dict[tuple[str, str], str] = {
     # the caller's own pass; redeem: 10 tries per hour per person, 30 per network, every try counts
     ("GET", f"{_V}/me/access"): "authenticated",
     ("POST", f"{_V}/me/access/redeem"): "authenticated+ratelimit",
+    ("GET", f"{_V}/me/access/offer"): "authenticated",  # F6a: own passes only; read, two-three statements
     # platform admin (two-step login); every write audited, reason where the body has one
     ("GET", f"{_A}/overview"): "platform_admin",
     ("GET", f"{_A}/batches"): "platform_admin",
@@ -23,5 +24,11 @@ ACCESS_POLICIES: dict[tuple[str, str], str] = {
     ("GET", f"{_A}/courses"): "platform_admin",
     ("PATCH", f"{_A}/courses/{{course_id}}"): "platform_admin",
     ("GET", f"{_P}/users/{{user_id}}/access"): "platform_admin",
-    ("POST", f"{_P}/users/{{user_id}}/access/grant"): "platform_admin",  # reason, at most 400 days
+    ("POST", f"{_P}/users/{{user_id}}/access/grant"): "platform_admin",  # reason, at most 400 days; plan|days|ends_on
+    # F6a Pro: cancel (reason, one audit event), the Pro list and its counts, the owner's settings (audited)
+    ("POST", f"{_P}/users/{{user_id}}/access/cancel"): "platform_admin",
+    ("GET", f"{_A}/pro"): "platform_admin",
+    ("GET", f"{_A}/pro/summary"): "platform_admin",
+    ("GET", f"{_A}/settings"): "platform_admin",
+    ("PUT", f"{_A}/settings"): "platform_admin",
 }

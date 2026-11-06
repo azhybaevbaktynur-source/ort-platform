@@ -57,9 +57,9 @@ def reset_lms_state() -> None:
 
         conn.execute(delete(MfaRecoveryCode.__table__))
         # --- S3 access --- passes reference codes and users; codes reference batches and users (RESTRICT)
-        from app.lms.access.models import AccessPass, ActivationCode, ActivationCodeBatch
+        from app.lms.access.models import AccessPass, ActivationCode, ActivationCodeBatch, PlatformSetting
 
-        for model in (AccessPass, ActivationCode, ActivationCodeBatch):
+        for model in (AccessPass, ActivationCode, ActivationCodeBatch, PlatformSetting):
             conn.execute(delete(model.__table__))
         # --- S4 email change --- pending changes reference users
         from app.lms.email_change.models import EmailChangeRequest
