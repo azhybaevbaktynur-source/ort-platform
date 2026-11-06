@@ -121,9 +121,10 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
   // the course sidebar is not shown; the assessment lobby keeps today's frame to the pixel (§2.4) ---
   const lobby = /^\/[^/]+\/courses\/[^/]+\/assessments\/[^/]+$/.test(pathname);
   if (!staffFrame && role === "student" && templateUi(course).studentLayout === "exam_prep" && !lobby) {
-    // Student UI U4 (§3.2) / U6 (§3.3): the Тесты and Аналитика pages have their own title (course name as subtitle);
-    // the course page only redirects there
-    const ownTitle = pathname === base || pathname === `${base}/tests` || pathname === `${base}/progress`;
+    // Student UI U4 (§3.2) / U6 (§3.3) / U7 (§3.5): Тесты, Аналитика and the lesson pages have their own title (course
+    // name as subtitle); the course page only redirects there
+    const ownTitle = pathname === base || pathname === `${base}/tests` || pathname === `${base}/progress`
+      || pathname === `${base}/modules` || pathname.startsWith(`${base}/modules/`);
     return (
       <CourseContext.Provider value={ctx}>
         {ownTitle ? null : header}

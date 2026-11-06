@@ -4984,7 +4984,56 @@
       "home_page_invalid": "Эта страница не может быть главной. Выберите страницу этого курса.",
       "template_locked": "Это задано шаблоном курса."
     },
-    "availableInAssignments": "Доступен в разделе «Задания»"
+    "availableInAssignments": "Доступен в разделе «Задания»",
+    "syllabus": {
+      "readyTitle": "Готовы начать?",
+      "readyBody": "Первый урок: {title}",
+      "continueTitle": "Продолжим?",
+      "continueBody": "Следующий урок: {title}",
+      "start": "Начать курс",
+      "continue": "Продолжить курс",
+      "doneTitle": "Все уроки пройдены",
+      "doneBody": "Отличная работа! К любому уроку можно вернуться.",
+      "progressLabel": "Ваш прогресс",
+      "percent": "{percent} %",
+      "lessonCount": "{count} уроков",
+      "lessonCount_one": "{count} урок",
+      "lessonCount_few": "{count} урока",
+      "lessonCount_many": "{count} уроков",
+      "lessonCount_other": "{count} урока",
+      "aboutTitle": "О курсе",
+      "aboutModules": "Модулей",
+      "aboutLessons": "Уроков",
+      "aboutLanguage": "Язык",
+      "video": "Видео",
+      "status": {
+        "done": "Урок пройден",
+        "open": "Урок не пройден",
+        "locked": "Урок пока недоступен"
+      },
+      "doneCount": "Пройдено {done} из {total}",
+      "doneCountShort": "пройдено {done} из {total}"
+    },
+    "lesson": {
+      "back": "Все уроки",
+      "position": "Урок {n} из {total}",
+      "play": "Смотреть видео: {title}",
+      "playHintYoutube": "Нажмите, чтобы смотреть. Видео загрузится с YouTube.",
+      "playHintVimeo": "Нажмите, чтобы смотреть. Видео загрузится с Vimeo.",
+      "markDone": "Отметить как пройденный",
+      "done": "Урок пройден",
+      "undo": "Снять отметку",
+      "prev": "Предыдущий урок",
+      "next": "Следующий урок",
+      "pagerLabel": "Уроки",
+      "lockedTitle": "Этот урок пока закрыт",
+      "notFoundTitle": "Урок не найден",
+      "notFoundBody": "Возможно, его убрали из курса. Вернитесь к списку уроков.",
+      "externalTitle": "Материал на другом сайте",
+      "externalBody": "Ссылка откроется в новой вкладке.",
+      "openLink": "Открыть ссылку",
+      "fileBody": "Файл к этому уроку."
+    }
   },
   "courseNav": {
     "menu": "Меню курса",

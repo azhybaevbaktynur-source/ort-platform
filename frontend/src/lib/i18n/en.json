@@ -4984,7 +4984,56 @@
       "home_page_invalid": "This page cannot be the course home. Choose a page of this course.",
       "template_locked": "The course template fixes this setting."
     },
-    "availableInAssignments": "Available from Assignments"
+    "availableInAssignments": "Available from Assignments",
+    "syllabus": {
+      "readyTitle": "Ready to start?",
+      "readyBody": "First lesson: {title}",
+      "continueTitle": "Pick up where you left off",
+      "continueBody": "Next lesson: {title}",
+      "start": "Start the course",
+      "continue": "Continue the course",
+      "doneTitle": "All lessons done",
+      "doneBody": "Great work! You can go back to any lesson.",
+      "progressLabel": "Your progress",
+      "percent": "{percent}%",
+      "lessonCount": "{count} lessons",
+      "lessonCount_one": "{count} lesson",
+      "lessonCount_few": "{count} lessons",
+      "lessonCount_many": "{count} lessons",
+      "lessonCount_other": "{count} lessons",
+      "aboutTitle": "About the course",
+      "aboutModules": "Modules",
+      "aboutLessons": "Lessons",
+      "aboutLanguage": "Language",
+      "video": "Video",
+      "status": {
+        "done": "Lesson done",
+        "open": "Lesson not done yet",
+        "locked": "Lesson not available yet"
+      },
+      "doneCount": "Done: {done} of {total}",
+      "doneCountShort": "done {done} of {total}"
+    },
+    "lesson": {
+      "back": "All lessons",
+      "position": "Lesson {n} of {total}",
+      "play": "Play the video: {title}",
+      "playHintYoutube": "Tap to watch. The video loads from YouTube.",
+      "playHintVimeo": "Tap to watch. The video loads from Vimeo.",
+      "markDone": "Mark as done",
+      "done": "Lesson done",
+      "undo": "Undo",
+      "prev": "Previous lesson",
+      "next": "Next lesson",
+      "pagerLabel": "Lessons",
+      "lockedTitle": "This lesson is locked for now",
+      "notFoundTitle": "Lesson not found",
+      "notFoundBody": "It may have been removed from the course. Go back to the list of lessons.",
+      "externalTitle": "This material is on another website",
+      "externalBody": "The link opens in a new tab.",
+      "openLink": "Open the link",
+      "fileBody": "A file for this lesson."
+    }
   },
   "courseNav": {
     "menu": "Course menu",
