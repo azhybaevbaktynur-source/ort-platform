@@ -1,6 +1,7 @@
 "use client";
 
-import React, { createContext, use, useContext, useState, useEffect, useRef } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 
 export type Language = "en" | "ky" | "ru";
 type Dictionary = Record<string, any>;
@@ -14,7 +15,8 @@ interface LanguageContextType {
 /*
  * S5 performance (low-end phones): the three dictionaries are about 1 MB together (230 kB compressed, more than half
  * of every page's JavaScript). Each is now its own chunk: a page loads only its language, another language is
- * loaded the first time it is chosen.
+ * loaded the first time it is chosen. `?lazy` (lazy-json.d.ts) keeps these imports apart from the small static
+ * reads of the same files (mascot/staticText.ts), which webpack trims to the parts they use.
  */
 const dictionaries: Partial<Record<Language, Dictionary>> = {};
 const loading: Partial<Record<Language, Promise<void>>> = {};
@@ -24,17 +26,36 @@ const LOADERS: Record<Language, () => Promise<{ default: unknown }>> = {
   ru: () => import("./ru.json?lazy"),
 };
 
-/** Never rejects: a failed download (no network) is tried again later, and until then the server's HTML stays. */
-function loadDictionary(lang: Language): Promise<void> {
-  loading[lang] ??= new Promise<void>((resolve) => {
+/** Called by dictionaries/<lang>.tsx when it renders. */
+export function registerDictionary(lang: Language, dictionary: unknown) {
+  dictionaries[lang] ??= dictionary as Dictionary;
+}
+
+/** A download that never rejects: when it fails (no network) it is tried again later; meanwhile the server's HTML stays. */
+function retrying<T>(load: () => Promise<T>): Promise<T> {
+  return new Promise<T>((resolve) => {
     const attempt = (n: number) => {
-      LOADERS[lang]().then((m) => { dictionaries[lang] = m.default as Dictionary; resolve(); })
-        .catch(() => { setTimeout(() => attempt(n + 1), Math.min(30_000, 1000 * 2 ** n)); });
+      load().then(resolve, () => { setTimeout(() => attempt(n + 1), Math.min(30_000, 1000 * 2 ** n)); });
     };
     attempt(0);
   });
+}
+
+function loadDictionary(lang: Language): Promise<void> {
+  loading[lang] ??= retrying(LOADERS[lang]).then((m) => registerDictionary(lang, m.default));
   return loading[lang];
 }
+
+/*
+ * The page's own language arrives with the page: rendered through next/dynamic, its chunk is named in the server's
+ * HTML, so the browser fetches it together with the other scripts, and hydration waits for it (the server's HTML stays
+ * on screen) instead of fetching it only after the app's code ran.
+ */
+const PAGE_DICTIONARY: Record<Language, React.ComponentType<{ children: React.ReactNode }>> = {
+  en: dynamic(() => retrying(() => import("./dictionaries/en"))),
+  ky: dynamic(() => retrying(() => import("./dictionaries/ky"))),
+  ru: dynamic(() => retrying(() => import("./dictionaries/ru"))),
+};
 
 /** Value at a dotted path, or undefined. */
 function lookupPath(dict: any, keys: string[]): unknown {
@@ -85,9 +106,7 @@ export function LanguageProvider({
   children: React.ReactNode;
   initialLang?: Language;
 }) {
-  // The page's language before anything renders: the server waits for it, and in the browser hydration waits while
-  // the server's HTML stays on screen. Loaded once; later pages of the session find it here.
-  if (!dictionaries[initialLang]) use(loadDictionary(initialLang));
+  const PageDictionary = PAGE_DICTIONARY[initialLang];
   const [lang, setLangState] = useState<Language>(initialLang);
   const wanted = useRef<Language>(initialLang);
 
@@ -136,7 +155,7 @@ export function LanguageProvider({
 
   return (
     <LanguageContext.Provider value={{ lang, setLang, t }}>
-      {children}
+      <PageDictionary>{children}</PageDictionary>
     </LanguageContext.Provider>
   );
 }
