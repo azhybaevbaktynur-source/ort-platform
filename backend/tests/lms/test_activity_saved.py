@@ -102,7 +102,7 @@ def test_study_seconds_cap_gaps_at_ten_minutes(db, client, at_now):
     assert day["study_seconds"] == 120 + 600 + 60
     assert day["by_section"] == {"math": 720, "verbal": 60}
     assert day["answered"] == 4 and day["correct"] == 2 and day["wrong"] == 2  # sc wrong, st wrong
-    assert body["totals"] == {"answered": 4, "correct": 2, "accuracy": 0.5}
+    assert body["totals"] == {"answered": 4, "correct": 2, "graded": 4, "accuracy": 0.5}
     assert len(body["sessions"]) == 1
     s = body["sessions"][0]
     assert s["answered"] == 4 and s["correct"] == 2
@@ -123,12 +123,14 @@ def test_sessions_split_after_thirty_minutes(db, client, at_now):
     assert s[0]["started_at"] > s[1]["started_at"]
 
 
-def test_hidden_results_count_answers_but_not_correctness(db, client, at_now):
+def test_hidden_results_count_nowhere(db, client, at_now):
+    """STUDENT_UI_FIX_PLAN 4.2: answers count only where the results are visible (one definition everywhere)."""
     w = _world(db, results_policy="never")
     t = datetime(2026, 3, 10, 4, 0, tzinfo=UTC)
     _attempt(db, w, CORRECT, {1: t, 2: t + timedelta(minutes=1)}, submit_at=t + timedelta(minutes=2))
     body = _get(client, w.student, w, "activity", days=7).json()
-    assert body["totals"] == {"answered": 2, "correct": 0, "accuracy": 0.0}
+    assert body["totals"] == {"answered": 0, "correct": 0, "graded": 0, "accuracy": 0.0}
+    assert body["heatmap"] == [] and body["streak_current"] == 0
 
 
 def test_preview_attempts_excluded(db, client, at_now):
@@ -141,12 +143,17 @@ def test_preview_attempts_excluded(db, client, at_now):
     assert body["streak_current"] == 0 and sum(body["by_hour"]) == 0
 
 
-def test_in_progress_attempt_counts_as_activity(db, client, at_now):
+def test_in_progress_attempt_counts_nowhere_until_final(db, client, at_now):
     w = _world(db)
     t = datetime(2026, 3, 10, 4, 0, tzinfo=UTC)
-    _attempt(db, w, CORRECT, {1: t, 2: t + timedelta(minutes=3)})
+    att = _attempt(db, w, CORRECT, {1: t, 2: t + timedelta(minutes=3)})
     body = _get(client, w.student, w, "activity", days=7).json()
-    assert body["totals"] == {"answered": 2, "correct": 0, "accuracy": 0.0}
+    assert body["totals"] == {"answered": 0, "correct": 0, "graded": 0, "accuracy": 0.0}
+    assert body["heatmap"] == [] and body["streak_current"] == 0 and sum(body["by_hour"]) == 0
+    assert _get(client, w.student, w, "progress", days=7).json()["by_section"] == []
+    _finish(db, att, t + timedelta(minutes=4))
+    body = _get(client, w.student, w, "activity", days=7).json()
+    assert body["totals"] == {"answered": 2, "correct": 2, "graded": 2, "accuracy": 1.0}
     assert body["days"][-1]["study_seconds"] == 180 and body["streak_current"] == 1
 
 

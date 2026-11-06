@@ -8,7 +8,7 @@ from decimal import Decimal
 from typing import Optional
 
 from sqlalchemy import (
-    Date, DateTime, Float, Integer, String, and_, case, cast, false, func, literal_column, not_, null, or_, select, text, union_all,
+    Date, DateTime, Float, Integer, String, and_, case, cast, false, func, literal_column, null, or_, select, text, union_all,
 )
 from sqlalchemy.orm import Session
 
@@ -177,23 +177,65 @@ def mistakes(db: Session, course: Course, user_id: str, *, status: str, cursor: 
     return PageOut[MistakeOut](items=out, next_cursor=nxt)
 
 
-# ------------------------------------------------------------------ progress
+# ------------------------------------------------------------------ counting (STUDENT_UI_FIX_PLAN 4.2, 4.3)
+#
+# One definition for every analytics number (progress by section / topic, activity days, totals, sessions, hours,
+# heatmap, streaks). An *answer* is an `attempt_items` row with `answered_at` set and a real answer (correctness not
+# `unanswered`: a cleared answer keeps its `answered_at`), in a final (`graded`/`needs_review`), non-preview attempt
+# of the course on an assessment whose results the review page shows. In-progress attempts and blank items count
+# nowhere. *Correct* = correct + 0.5 x partial; *graded* = answers not `pending`; accuracy = correct / graded.
+
+TOPIC_MIN_GRADED = 5  # TopicStat.rated
+SECTION_MIN_GRADED = 10  # SectionStat.rated
+WEAK_MIN_TOPICS = 3  # ProgressOut.weak_topics_ready
+MAX_TOPICS = 100
+
+
+def _answer(i):
+    """Item-level half of the answer predicate (the attempt half is final + visible + non-preview)."""
+    return and_(i.answered_at.is_not(None), i.correctness.is_not(None), i.correctness != "unanswered")
+
+
+def _weight(i):
+    return case((i.correctness == "correct", 1.0), (i.correctness == "partial", 0.5), else_=0.0)
+
 
 def _acc(correct: float, total: int) -> float:
     return round(correct / total, 4) if total else 0.0
 
 
-def progress(db: Session, course: Course, user_id: str, enrollment_id: uuid.UUID, *, now: datetime) -> ProgressOut:
+def check_days(days: Optional[int]) -> None:
+    if days is not None and days not in ACTIVITY_DAYS:
+        raise ValidationFailed("days must be one of 7, 30, 90, 365", code="invalid_days")
+
+
+def window(days: int, now: datetime) -> tuple[date, date, datetime]:
+    """(today, first day, UTC start) of the last `days` Asia/Bishkek days, today included."""
+    today = now.astimezone(BISHKEK).date()
+    first = today - timedelta(days=days - 1)
+    return today, first, datetime.combine(first, time(0), tzinfo=BISHKEK).astimezone(timezone.utc)
+
+
+# ------------------------------------------------------------------ progress
+
+def progress(db: Session, course: Course, user_id: str, enrollment_id: uuid.UUID, *, now: datetime,
+             days: Optional[int] = None) -> ProgressOut:
+    """`days` None: all time (home, goal); else the last `days` Bishkek days, the same window as `activity`.
+    `open_mistakes` is all time either way."""
+    check_days(days)
     goal = db.execute(select(CourseGoal.target_percent).where(CourseGoal.enrollment_id == enrollment_id)).scalar()
     assessments = visible_assessments(db, course.id, user_id, now)
-    out = ProgressOut(goal_percent=goal)
+    out = ProgressOut(goal_percent=goal, days_window=days)
     if not assessments:
         return out
+    start = window(days, now)[2] if days is not None else None
     visible = list(assessments)
     _prefer_item_index(db)
     ratio = cast(Attempt.raw_score, Float) / func.nullif(cast(Attempt.points_possible, Float), 0.0)
     base = [Attempt.user_id == user_id, Attempt.course_id == course.id, final_attempt(_A),
             Attempt.assessment_id.in_(visible), Attempt.raw_score.is_not(None)]
+    if start is not None:
+        base.append(Attempt.submitted_at >= start)
     per = db.execute(select(Attempt.assessment_id, func.count(), func.max(ratio)).where(*base)
                      .group_by(Attempt.assessment_id)).all()
     out.assessments_done = len(per)
@@ -208,29 +250,35 @@ def progress(db: Session, course: Course, user_id: str, enrollment_id: uuid.UUID
         out.trend.append(TrendPoint(attempt_id=t.id, at=t.submitted_at, title=assessments[t.assessment_id].title,
                                     percent=round(100 * float(t.raw_score) / pp, 1) if pp > 0 else 0.0,
                                     practice=bool(t.is_practice)))
-    # accuracy by section and topic: `pending` items are not counted, `unanswered` are
     i, qv, bq = AttemptItem, QuestionVersion, BankQuestion
-    weight = case((i.correctness == "correct", 1.0), (i.correctness == "partial", 0.5), else_=0.0)
     mine = _final_attempts(user_id, course.id, visible)
+    cond = [_answer(i)]
+    if start is not None:
+        cond.append(i.answered_at >= start)
+    graded = case((i.correctness != "pending", 1), else_=0)
     rows = db.execute(
-        select(bq.section, bq.topic, func.sum(weight), func.count())
+        select(bq.section, bq.topic, func.sum(_weight(i)), func.count(), func.sum(graded))
         .select_from(mine).join(i, i.attempt_id == mine.c.id).join(qv, qv.id == i.question_version_id)
         .join(bq, bq.id == qv.question_id)
-        .where(i.correctness.is_not(None), i.correctness != "pending")
+        .where(*cond)
         .group_by(bq.section, bq.topic)).all()
-    sections: dict[str, list[float]] = {}
+    sections: dict[Optional[str], list] = {}
     topics: list[TopicStat] = []
-    for sec, top, corr, tot in rows:
-        corr, tot = float(corr or 0), int(tot)
-        if sec:
-            s = sections.setdefault(sec, [0.0, 0])
-            s[0] += corr
-            s[1] += tot
-        if top:
-            topics.append(TopicStat(topic=top, section=sec, correct=corr, total=tot, accuracy=_acc(corr, tot)))
-    out.by_section = [SectionStat(section=k, correct=v[0], total=int(v[1]), accuracy=_acc(v[0], int(v[1])))
-                      for k, v in sorted(sections.items())]
-    out.by_topic = sorted(topics, key=lambda t: (t.accuracy, -t.total, t.topic, t.section or ""))[:30]
+    for sec, top, corr, tot, gr in rows:
+        corr, tot, gr = float(corr or 0), int(tot), int(gr or 0)
+        s = sections.setdefault(sec, [0.0, 0, 0])
+        s[0] += corr
+        s[1] += tot
+        s[2] += gr
+        topics.append(TopicStat(topic=top, section=sec, correct=corr, total=tot, graded=gr, accuracy=_acc(corr, gr),
+                                rated=gr >= TOPIC_MIN_GRADED))
+    out.by_section = [SectionStat(section=k, correct=v[0], total=v[1], graded=v[2], accuracy=_acc(v[0], v[2]),
+                                  rated=v[2] >= SECTION_MIN_GRADED)
+                      for k, v in sorted(sections.items(), key=lambda kv: (kv[0] is None, kv[0] or ""))]
+    out.weak_topics_ready = sum(1 for t in topics if t.rated and t.topic is not None) >= WEAK_MIN_TOPICS
+    # rated topics first (weakest first), then the rest (most answers first)
+    out.by_topic = sorted(topics, key=lambda t: (not t.rated, t.accuracy if t.rated else 0.0, -t.total,
+                                                 t.topic or "", t.section or ""))[:MAX_TOPICS]
     out.open_mistakes = count_open(db, user_id, course.id, visible)
     return out
 
@@ -356,26 +404,25 @@ def _streaks(active_desc: list[date], today: date) -> tuple[int, int]:
 
 
 def activity(db: Session, course: Course, user_id: str, *, days: int, now: datetime) -> ActivityOut:
-    """The caller's answering activity in the course: all their non-preview attempts (in progress included), from
-    `attempt_items.answered_at`. Correct/wrong count only items of final attempts whose results the review page
-    would show. One statement (UNION ALL of the per-day, per-hour, session and all-time branches) after the
-    visible-assessments read; every branch is grouped in SQL and bounded."""
-    if days not in ACTIVITY_DAYS:
+    """The caller's answers in the course (the one definition above), by `attempt_items.answered_at`. One statement
+    (UNION ALL of the per-day, per-hour, session and all-time branches) after the visible-assessments read; every
+    branch is grouped in SQL and bounded."""
+    check_days(days)
+    if days is None:
         raise ValidationFailed("days must be one of 7, 30, 90, 365", code="invalid_days")
     dialect = db.get_bind().dialect.name
-    today = now.astimezone(BISHKEK).date()
-    first = today - timedelta(days=days - 1)
-    start = datetime.combine(first, time(0), tzinfo=BISHKEK).astimezone(timezone.utc)
-    start7 = datetime.combine(today - timedelta(days=6), time(0), tzinfo=BISHKEK).astimezone(timezone.utc)
+    today, first, start = window(days, now)
+    start7 = window(7, now)[2]
     visible = list(visible_assessments(db, course.id, user_id, now))
     _prefer_item_index(db)
     a, i, qv, bq = _A, AttemptItem, QuestionVersion, BankQuestion
-    mine = [a.c.user_id == user_id, a.c.course_id == course.id, not_(a.c.is_preview), i.answered_at.is_not(None)]
-    shown = and_(a.c.status.in_(results.FINAL_STATUSES), a.c.assessment_id.in_(visible)) if visible else false()
-    # attempts still open at the window start: the gap of the first answer in the window uses the answer before it
+    shown = and_(final_attempt(a), a.c.assessment_id.in_(visible)) if visible else false()
+    mine = [a.c.user_id == user_id, a.c.course_id == course.id, shown, _answer(i)]
+    # the gap of the first answer in the window uses the answer before it (same attempt)
     src = (select(i.answered_at.label("at"), i.attempt_id.label("aid"), bq.section.label("section"),
-                  case((and_(shown, i.correctness == "correct"), 1), else_=0).label("is_c"),
-                  case((and_(shown, i.correctness.in_(_WRONG)), 1), else_=0).label("is_w"),
+                  case((i.correctness == "correct", 1), else_=0).label("is_c"),
+                  case((i.correctness.in_(_WRONG), 1), else_=0).label("is_w"),
+                  case((i.correctness == "partial", 1), else_=0).label("is_p"),
                   func.lag(i.answered_at).over(partition_by=i.attempt_id,
                                                order_by=(i.answered_at, i.position)).label("prev"))
            .select_from(a).join(i, i.attempt_id == a.c.id).join(qv, qv.id == i.question_version_id)
@@ -385,16 +432,16 @@ def activity(db: Session, course: Course, user_id: str, *, days: int, now: datet
     secs = seconds_between(dialect, src.c.at, src.c.prev)
     gap = case((src.c.prev.is_(None), 0.0), (secs > GAP_CAP_S, float(GAP_CAP_S)), else_=secs)
     day, hour = _local(dialect, src.c.at)
-    per = (select(src.c.at, src.c.aid, src.c.section, src.c.is_c, src.c.is_w, gap.label("gap"),
+    per = (select(src.c.at, src.c.aid, src.c.section, src.c.is_c, src.c.is_w, src.c.is_p, gap.label("gap"),
                   day.label("day"), hour.label("hour")).where(src.c.at >= start).cte("act_per"))
     # typed NULLs: PostgreSQL resolves UNION column types branch by branch (NULL, NULL -> text)
     n, nd, ns, nh, nt = (func.count(), cast(null(), Date), cast(null(), String), cast(null(), Integer),
                          cast(null(), DateTime(timezone=True)))
     by_day = (select(literal_column("'d'").label("k"), per.c.day, per.c.section, nh, n, func.sum(per.c.is_c),
-                     func.sum(per.c.is_w), func.sum(per.c.gap), nt, nt)
+                     func.sum(per.c.is_w), func.sum(per.c.is_p), func.sum(per.c.gap), nt, nt)
               .group_by(per.c.day, per.c.section))
     by_hour = (select(literal_column("'h'"), nd, ns, per.c.hour, n, func.sum(per.c.is_c), func.sum(per.c.is_w),
-                      func.sum(per.c.gap), nt, nt).group_by(per.c.hour))
+                      func.sum(per.c.is_p), func.sum(per.c.gap), nt, nt).group_by(per.c.hour))
     s1 = (select(per.c.at, per.c.aid, per.c.is_c,
                  func.lag(per.c.at).over(order_by=(per.c.at, per.c.aid)).label("p"))
           .where(per.c.at >= start7).subquery("s1"))
@@ -406,11 +453,11 @@ def activity(db: Session, course: Course, user_id: str, *, days: int, now: datet
                  func.sum(s2.c.is_c).label("c"))
           .group_by(s2.c.sid).order_by(t0.desc()).limit(MAX_SESSIONS).subquery("s3"))
     zero = literal_column("0")
-    sessions = select(literal_column("'s'"), nd, ns, nh, s3.c.n, s3.c.c, zero, zero, s3.c.t0, s3.c.t1)
+    sessions = select(literal_column("'s'"), nd, ns, nh, s3.c.n, s3.c.c, zero, zero, zero, s3.c.t0, s3.c.t1)
     yday, _ = _local(dialect, i.answered_at)
     y1 = (select(yday.label("day"), func.count().label("n")).select_from(a).join(i, i.attempt_id == a.c.id)
           .where(*mine).group_by(yday).order_by(yday.desc()).limit(STREAK_SCAN_DAYS).subquery("y1"))
-    heat = select(literal_column("'y'"), y1.c.day, ns, nh, y1.c.n, zero, zero, zero, nt, nt)
+    heat = select(literal_column("'y'"), y1.c.day, ns, nh, y1.c.n, zero, zero, zero, zero, nt, nt)
     rows = db.execute(union_all(by_day, by_hour, sessions, heat)).all()
 
     out = ActivityOut(days_window=days)
@@ -418,7 +465,8 @@ def activity(db: Session, course: Course, user_id: str, *, days: int, now: datet
     seconds: dict[date, float] = {}
     section_s: dict[date, dict[str, float]] = {}
     active: list[tuple[date, int]] = []
-    for k, d, sec, h, cnt, c, w, s, t_0, t_1 in rows:
+    partial = 0
+    for k, d, sec, h, cnt, c, w, p, s, t_0, t_1 in rows:
         if k == "d":
             dd = _as_date(d)
             e = by_date.get(dd)
@@ -427,6 +475,7 @@ def activity(db: Session, course: Course, user_id: str, *, days: int, now: datet
             e.answered += int(cnt)
             e.correct += int(c or 0)
             e.wrong += int(w or 0)
+            partial += int(p or 0)
             seconds[dd] = seconds.get(dd, 0.0) + float(s or 0)
             if sec:
                 bucket = section_s.setdefault(dd, {})
@@ -445,7 +494,9 @@ def activity(db: Session, course: Course, user_id: str, *, days: int, now: datet
     answered = sum(e.answered for e in out.days)
     correct = sum(e.correct for e in out.days)
     wrong = sum(e.wrong for e in out.days)
-    out.totals = ActivityTotals(answered=answered, correct=correct, accuracy=_acc(correct, correct + wrong))
+    weighted = correct + 0.5 * partial
+    out.totals = ActivityTotals(answered=answered, correct=weighted, graded=correct + wrong,
+                                accuracy=_acc(weighted, correct + wrong))
     out.sessions.sort(key=lambda x: x.started_at, reverse=True)
     active.sort(key=lambda x: x[0], reverse=True)
     out.streak_current, out.streak_longest = _streaks([d for d, _ in active], today)

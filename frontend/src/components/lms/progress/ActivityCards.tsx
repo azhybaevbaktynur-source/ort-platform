@@ -113,7 +113,7 @@ export function ActivityBars({ data, period }: { data: ActivityOut; period: Acti
         <CardEmpty pose="working" hint={t("progress.analytics.activity.empty")} />
       ) : (
         <BarFrame n={buckets.length} minStep={unit === "week" ? 10 : 7} yTop={String(top)} yMid={String(top / 2)}
-          label={t("progress.analytics.activity.summary", { answered: data.totals.answered, correct: data.totals.correct, wrong: data.days.reduce((s, d) => s + d.wrong, 0) })}
+          label={t("progress.analytics.activity.summary", { answered: data.totals.answered, correct: data.days.reduce((s, d) => s + d.correct, 0), wrong: data.days.reduce((s, d) => s + d.wrong, 0) })}
           xLabel={(i) => fmtDay(buckets[i].start, lang)}>
           {buckets.map((b) => (
             <Column key={b.start} title={t("progress.analytics.activity.bar", { date: fmtRange(b, lang), correct: b.correct, wrong: b.wrong })}>

@@ -23,9 +23,10 @@ def _enrollment(ctx: AuthzContext, course_id: uuid.UUID):
 
 
 @router.get("/courses/{course_id}/my/progress", response_model=ProgressOut)
-def my_progress(course_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
+def my_progress(course_id: uuid.UUID, days: Optional[int] = Query(None), ctx: AuthzContext = Depends(get_authz)):
+    """`days` in 7, 30, 90, 365 (the `/my/activity` window; else 422 invalid_days); absent: all time."""
     course, eid = _enrollment(ctx, course_id)
-    return service.progress(ctx.db, course, ctx.user.id, eid, now=clock.now())
+    return service.progress(ctx.db, course, ctx.user.id, eid, now=clock.now(), days=days)
 
 
 @router.get("/courses/{course_id}/my/mistakes", response_model=PageOut[MistakeOut])

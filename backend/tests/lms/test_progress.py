@@ -10,6 +10,7 @@ from sqlalchemy import event
 
 from app.db import session as db_session
 from app.lms.attempts import grading
+from app.lms.attempts.models import AttemptItem
 from app.lms.content.models import QuestionVersion
 from app.lms.core import clock
 from app.main import app
@@ -39,7 +40,13 @@ def _world(db, **kw):
 
 
 def _submit(db, w, responses, minutes, user=None, **kw):
+    """A submitted attempt; every item with a response was saved (`answered_at` set), as autosave does."""
     att = new_attempt(db, w, user=user, responses=responses, attempt_no=minutes, **kw)
+    stamped = [k + 1 for k, name in enumerate(w.questions) if name in (responses or {})]
+    if stamped:
+        db.query(AttemptItem).filter(AttemptItem.attempt_id == att.id, AttemptItem.position.in_(stamped)).update(
+            {"answered_at": T0 + timedelta(minutes=minutes) - timedelta(seconds=30)}, synchronize_session=False)
+        db.commit()
     grading.finalize(db, att.id, reason="manual", now=T0 + timedelta(minutes=minutes))
     db.commit()
     return att
@@ -177,8 +184,10 @@ def test_progress_numbers(db, client):
     assert p["trend"][0]["percent"] < p["trend"][1]["percent"]
     assert p["current_percent"] == p["trend"][1]["percent"]  # best attempt of the one assessment
     sec = {s["section"]: s for s in p["by_section"]}
-    assert sec["math"]["total"] == 10 and sec["verbal"]["total"] == 2  # 5 math items x2 attempts; essay is pending
-    assert sec["verbal"]["accuracy"] == 1.0
+    # answered items only: math sc+num, then sc+num; verbal st+es twice (the essay is an answer, pending: not graded)
+    assert (sec["math"]["total"], sec["math"]["graded"]) == (4, 4)
+    assert (sec["verbal"]["total"], sec["verbal"]["graded"]) == (4, 2)
+    assert sec["verbal"]["accuracy"] == 1.0 and sec["math"]["accuracy"] == 0.5
     topics = {t["topic"]: t for t in p["by_topic"]}
     assert topics["read"]["accuracy"] == 1.0 and topics["alg"]["accuracy"] < 1.0
     assert p["by_topic"][0]["accuracy"] <= p["by_topic"][-1]["accuracy"]

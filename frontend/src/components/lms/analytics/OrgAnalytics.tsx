@@ -79,7 +79,7 @@ function Quizzes({ orgId }: { orgId: string }) {
     { key: "course", header: t("analytics.col.course"), label: t("analytics.col.course"), cell: (r) => pickLocalized(r.course_title, lang) },
     { key: "attempts", header: t("analytics.col.attempts"), label: t("analytics.col.attempts"), align: "right", nowrap: true, cell: (r) => r.attempts },
     { key: "students", header: t("analytics.students"), label: t("analytics.students"), align: "right", nowrap: true, cell: (r) => r.students },
-    { key: "mean", header: t("analytics.col.mean"), label: t("analytics.col.mean"), align: "right", nowrap: true, cell: (r) => pct(r.mean_percent) },
+    { key: "mean", header: t("analytics.col.meanFirst"), label: t("analytics.col.meanFirst"), align: "right", nowrap: true, cell: (r) => pct(r.mean_percent) },
   ];
   return (
     <section className="mt-8">
