@@ -8,7 +8,8 @@ import { LOBBY_REASONS, previewAttemptId, type AssessmentLobbyOut } from "@/lib/
 import { pickLocalized } from "@/lib/lms/localized";
 import type { Lang } from "@/lib/lms/types";
 import { useCourse } from "@/components/lms/CourseContext";
-import { Button, DescriptionList, Input, Select, type DescriptionItem } from "@/components/ui";
+import { Info } from "lucide-react";
+import { Button, DescriptionList, Input, Select, cn, type DescriptionItem } from "@/components/ui";
 import { startAttemptWithCode } from "@/lib/lms/accommodations"; // Phase 7a S5
 import { fmtDuration } from "@/components/lms/home/format";
 import { AssessmentError } from "./AssessmentError";
@@ -16,6 +17,8 @@ import { LockedState, isModuleLocked } from "@/components/lms/pages/ApiError"; /
 import { fmtDateTime } from "./format";
 
 const KNOWN_REASONS = new Set<string>(LOBBY_REASONS);
+/** Phones: the start / resume row sticks above the student tab bar (64 px + safe area); from 640 px it is static. */
+const STICKY_ACTION = "sticky bottom-[calc(76px+env(safe-area-inset-bottom))] z-10 rounded-card border border-slate-200 bg-white p-3 shadow-lg sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none";
 
 /** Student lobby: rules, sections and times, language choice, attempts left, Start / Resume (player route is built by F2). */
 export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {
@@ -74,29 +77,31 @@ export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <div>
-        <h2 className="text-xl font-bold text-slate-900">{title}</h2>
-        {description && <p className="mt-1 whitespace-pre-line text-sm text-slate-600">{description}</p>}
-      </div>
+    // SF-1 (STUDENT_UI_FIX_PLAN §2.2 item 8): the student tokens (cards, controls), one primary "Start"
+    <div className="space-y-4">
+      <header>
+        <h1 className="break-words text-2xl font-bold leading-8 text-slate-900">{title}</h1>
+        {description && <p className="mt-1 whitespace-pre-line text-base leading-6 text-slate-600">{description}</p>}
+      </header>
       {/* S9: empty date rows are not shown; the total time reads in hours and minutes. */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="space-y-4 rounded-card border border-slate-200 bg-white p-5 shadow-sm">
         <DescriptionList twoColumns items={info} />
+        <p className="flex items-start gap-2 rounded-control bg-slate-50 px-3.5 py-2.5 text-sm leading-6 text-slate-700">
+          <Info className="mt-1 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+          <span>{lobby.navigation === "section_forward_only" ? t("assessments.lobby.forwardOnly") : t("assessments.lobby.freeNav")}</span>
+        </p>
       </div>
-      <p className="rounded-xl bg-slate-50 px-3.5 py-2 text-sm text-slate-700">
-        {lobby.navigation === "section_forward_only" ? t("assessments.lobby.forwardOnly") : t("assessments.lobby.freeNav")}
-      </p>
       {/* Phase 7c UX: one untitled, unkeyed section (the quiz editor's hidden default section) has nothing to list. */}
       {!(lobby.sections.length === 1 && !pickLocalized(lobby.sections[0].title, lang, course.default_language) && !lobby.sections[0].key) && (
-      <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <h3 className="mb-2 text-sm font-semibold text-slate-900">{t("assessments.lobby.sections")}</h3>
-        <ol className="space-y-1 text-sm">
+      <section className="rounded-card border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="lobby-sections">
+        <h2 id="lobby-sections" className="mb-1 text-base font-semibold text-slate-900">{t("assessments.lobby.sections")}</h2>
+        <ol className="divide-y divide-slate-100 text-sm">
           {lobby.sections.map((s) => {
             const name = pickLocalized(s.title, lang, course.default_language) || (s.key ? (t(`sections.${s.key}`) !== `sections.${s.key}` ? t(`sections.${s.key}`) : s.key) : t("assessments.section.n", { n: s.pos }));
             return (
-              <li key={s.pos} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-3 py-0.5">
-                <span className="text-slate-800">{s.pos}. {name}</span>
-                <span className="whitespace-nowrap text-right text-slate-600">
+              <li key={s.pos} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-3 py-2.5">
+                <span className="font-medium text-slate-900">{s.pos}. {name}</span>
+                <span className="whitespace-nowrap text-right tabular-nums text-slate-600">
                   {t("assessments.section.itemCount", { n: s.item_count })}
                   {s.time_limit_s ? ` · ${t("assessments.student.minutes", { n: Math.round(s.time_limit_s / 60) })}` : ""}
                 </span>
@@ -104,7 +109,7 @@ export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {
             );
           })}
         </ol>
-      </div>
+      </section>
       )}
       {!resume && lobby.languages.length > 1 && (
         <Select id="lobby-lang" label={t("assessments.lobby.language")} value={language}
@@ -115,12 +120,12 @@ export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {
         ? <LockedState error={error} courseId={course.id} compact />
         : <AssessmentError error={error} />)}
       {resume ? (
-        <div className="sticky bottom-3 z-10 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
-          <Button className="w-full sm:w-auto" onClick={() => router.push(player(resume))}>{t("assessments.student.resume")}</Button>
+        <div className={STICKY_ACTION}>
+          <Button size="lg" className="w-full sm:w-auto" onClick={() => router.push(player(resume))}>{t("assessments.student.resume")}</Button>
         </div>
       ) : lobby.can_start ? (
-        // Phones: the start row stays at the bottom of the screen with its hint (L1).
-        <div className="sticky bottom-3 z-10 space-y-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
+        // Phones: the start row stays at the bottom of the screen with its hint (L1), above the student tab bar (SF-1).
+        <div className={cn(STICKY_ACTION, "space-y-2")}>
           {/* --- Phase 7a S5/S6: access code field, only when the exam has a code (S6: above Start, so the code is
               entered first; exams without a code, ORT included, render exactly as before) --- */}
           {needsCode && (
@@ -129,11 +134,11 @@ export function LobbyView({ lobby }: { lobby: AssessmentLobbyOut }) {
               onChange={(e) => { setAccessCode(e.target.value); if (codeError) setError(null); }}
               onKeyDown={(e) => { if (e.key === "Enter") void start(); }} containerClassName="sm:max-w-sm" />
           )}
-          <Button className="w-full sm:w-auto" loading={busy} onClick={() => void start()}>{t("assessments.lobby.start")}</Button>
+          <Button size="lg" className="w-full sm:w-auto" loading={busy} onClick={() => void start()}>{t("assessments.lobby.start")}</Button>
           {startHint && <p className="text-sm text-slate-600">{startHint}</p>}
         </div>
       ) : exhausted ? null : (
-        <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-sm text-amber-900">
+        <p role="status" className="rounded-control border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900">
           {lobby.reason && KNOWN_REASONS.has(lobby.reason) ? t(`assessments.lobby.reasons.${lobby.reason}`) : t("assessments.lobby.cannotStart")}
         </p>
       )}

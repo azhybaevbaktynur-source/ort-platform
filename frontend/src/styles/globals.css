@@ -65,8 +65,8 @@
   --tabbar-h: 64px;
 
   /* Student UI colour (STUDENT_UI_DESIGN §1.1): Tailwind's `brand-*` and `navy-*` read these RGB channels. These
-     defaults are exactly the colours used before (Tailwind blue, our navy), so the teacher, admin, lobby and attempt
-     frames do not change; `.student-theme` below overrides them inside the student frame only. */
+     defaults are exactly the colours used before (Tailwind blue, our navy), so the teacher and admin frames do not
+     change; `.student-theme` below overrides them inside the student frame and the full-screen player. */
   --brand-50: 239 246 255;
   --brand-100: 219 234 254;
   --brand-200: 191 219 254;

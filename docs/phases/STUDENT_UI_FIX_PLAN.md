@@ -97,7 +97,7 @@ the server's (ORT scoring untouched).
 ### 2.3 ORT baselines and behaviour guards
 - **Re-approved (look changes)**: every student image in `docs/phases/ORT_BASELINE/`: `lobby`, `comparison`,
   `flagged-palette`, `review-page`, `section-end`, `passage`, `submit`, `result`, `review` × phone/desktop ×
-  ru/ky (32) + `player-loading-phone-ru` (33 files). Teacher images (`teacher-*`) **unchanged** and must still match.
+  ru/ky (36) + `player-loading-phone-ru` (37 files). Teacher images (`teacher-*`) **unchanged** and must still match.
   Before/after pairs go to `docs/phases/STUDENT_UI_FIX_screens/ort-review/`, dated note in `ORT_BASELINE/README.md`.
 - **Behaviour guards (must stay green, unchanged)**: `frontend/e2e/ort.spec.ts` (lobby → result DOM assertions:
   section order and counts, timer, palette states, comparison columns, passage line numbers, result card raw 2/19,
@@ -119,6 +119,28 @@ general schemes); `results.back` on student pages (`results.backToTests` instead
 assertion that the lobby keeps the old header → inverted; `STUDENT_UI_DESIGN.md` §2.4 text → replaced by this
 section. Kept on purpose: `StudentHome.tsx` (students without an exam-prep course), `PlatformCourses.tsx` (rows in
 the exam sheet and the admin page), `MyAttemptsPanel` (the only list of previous attempts of one test).
+
+**F2a confirmed list (2026-11-07, `grep -rl` over `frontend/src`, `frontend/e2e`, docs; branch `fix-f2`)**
+- Already gone in F2a/F2b (replaced, nothing left for F2c): `ORT_FRAME`/`isOrtFrame` (now `isPlayerRoute` +
+  `PLAYER_FRAME` in `LmsShell.tsx`); the `lobby` exception and the exam-prep student `header` on `attemptsPage`
+  (`layout.tsx`: the exam-prep branch runs first and covers lobby, result and review); `useTabCrumbs` on the student
+  lobby (moved into `StaffOverview` in `assessments/[assessmentId]/page.tsx`); `ResultMascot` in `StudentResult.tsx`
+  (the cub is in `ExamResultHero`); `e2e/student-shell.spec.ts:40` inverted (lobby inside the student shell).
+- **Delete in F2c**: `components/lms/results/OrtResultView.tsx` (no importer left: `ResultSummary` uses
+  `SectionBreakdown`; the only other hit is a comment in `ResultSummary.tsx`). No i18n key becomes orphaned with it
+  (`results.grade.scaledShort/scaled/raw/overall/sectionsTitle` are read by `SectionBreakdown`, `results.grade.percentile`
+  by `GradeBadge`).
+- **Stale comments/docs to rewrite in F2c**: `StudentShell.tsx:33` ("never uses this frame on the ORT lobby and
+  attempt routes (§2.4)"), `lib/fonts.ts:5-10` (lobby/attempt frames keep the system font), `tailwind.config.ts:19`
+  (same), `styles/globals.css:68-69` (same), `STUDENT_UI_DESIGN.md` lines 25, 79 and §2.4 (line 128) → point to this
+  section (SF-1).
+- **Not removable as planned (keep, with reason)**: `EXAM_COLUMN_OUTER/INNER` (`ui/shellWidth.ts`, `LmsShell.tsx`):
+  still the column of result/review pages outside the student shell (staff previews, template sandbox, a teacher
+  awaiting the course's area) = "staff keep today's frames"; `StudentCourseHeader`'s `breadcrumbs` prop: exam-prep
+  course pages outside the own-title list in `layout.tsx` (e.g. `/grades`, `/pages/{id}`) still render it with
+  `breadcrumbs={false}`; dropping the prop needs those pages to get their own title first (F4b/F5 decision, not F2c);
+  `results.back`: general-course students keep "Назад к заданию" to the lobby (guarded by
+  `e2e/scrolling-player.spec.ts:273`); exam-prep students get `results.backToTests`.
 
 **Files**: `LmsShell.tsx`, `courses/[courseId]/layout.tsx`, `assessments/[assessmentId]/page.tsx`,
 `attempts/[attemptId]/result/page.tsx`, `results/StudentResult.tsx`, `ResultSummary.tsx`, `GradeBadge.tsx`,
@@ -341,7 +363,7 @@ badges), keys.
 | F2a | Shell rule: lobby/result in StudentShell, player chrome-less; layout clean-up; removal list | Opus | — |
 | F2b | Result page redesign, registry zero-raw `passed`, lobby/attempts restyle, review ids + hash scroll (3) | Opus | F2a |
 | F2c | Delete what F2a listed; keys | Sonnet | F2b |
-| ORT | Re-record 33 student baselines, before/after review, behaviour suites green | orchestrator | F2c |
+| ORT | Re-record 37 student baselines, before/after review, behaviour suites green | orchestrator | F2c |
 | F3 | Link audit e2e (`student-links.spec.ts`), MistakesList anchors | Opus | F2b |
 | F4a | Counting fix, `days` on progress, rated fields, teacher analytics T1–T3, tests | Opus | — |
 | F4b | Colour tokens and sweep, T4/T5 labels | Sonnet | F2c |
