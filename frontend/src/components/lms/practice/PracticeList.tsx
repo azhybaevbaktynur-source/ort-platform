@@ -129,7 +129,7 @@ export function PracticeList() {
                 {s.status === "published" && (s.locked ? ( // S3 access: practice of a platform course needs a pass
                   <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                     <span className="inline-flex items-center gap-1.5 text-sm text-slate-600"><Lock aria-hidden="true" className="h-4 w-4" />{t("practice.locked")}</span>
-                    <GoldPill href={`/${lang}/unlock`} icon={<Lock />} block className="justify-center">{t("practice.unlock")}</GoldPill>
+                    <GoldPill href={`/${lang}/pro`} icon={<Lock />} block className="justify-center">{t("practice.unlock")}</GoldPill>
                   </span>
                 ) : (
                   <Button loading={busyId === s.id} onClick={() => void start(s)} className="flex-1 sm:flex-none"

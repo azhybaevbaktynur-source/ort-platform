@@ -91,7 +91,7 @@ export function useStudentShellData({ enabled, pathCourseId, declared, onHome, p
   pathCourseId: string | null;
   declared: CourseOut | null;
   onHome: boolean;
-  /** Changes on every navigation (the access is read again after leaving /unlock). */
+  /** Changes on every navigation (the access is read again after leaving /pro). */
   pathKey: string;
 }): StudentShellData {
   const [cache, setCache] = useState<Cache | null>(null);
@@ -177,12 +177,12 @@ export function useStudentShellData({ enabled, pathCourseId, declared, onHome, p
     void loadCourses();
   }, [loadCourses]);
 
-  // the pass: only students with an exam course see the access pill; read again after leaving /unlock
+  // the pass: only students with an exam course see the access pill; read again after leaving /pro
   const hasCourses = courses.length > 0;
   const lastPath = useRef(pathKey);
   useEffect(() => {
     if (!enabled || !hasCourses) return;
-    const leftUnlock = lastPath.current !== pathKey && /\/unlock$/.test(lastPath.current);
+    const leftUnlock = lastPath.current !== pathKey && /\/pro$/.test(lastPath.current);
     lastPath.current = pathKey;
     if (!readCache().access || leftUnlock) void loadAccess();
   }, [enabled, hasCourses, pathKey, loadAccess]);

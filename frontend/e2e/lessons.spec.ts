@@ -173,7 +173,7 @@ test.describe("course lessons (ru)", () => {
       await expect(sec2.getByRole("link")).toHaveCount(0);
       // the Pro module: the gold chip, the unlock link and titles with durations only (no address anywhere)
       await expect(sec3.getByText(t("modules.overview.pro"), { exact: true })).toBeVisible();
-      await expect(sec3.getByRole("link", { name: t("modules.overview.unlock") })).toHaveAttribute("href", `/${L}/unlock`);
+      await expect(sec3.getByRole("link", { name: t("modules.overview.unlock") })).toHaveAttribute("href", `/${L}/pro`);
       await sec3.getByRole("button", { name: M3, exact: true }).click();
       await expect(sec3.getByText(V4)).toBeVisible();
       await expect(sec3.getByText(PG_PRO)).toBeVisible();
@@ -199,7 +199,7 @@ test.describe("course lessons (ru)", () => {
       // ---- the Pro lesson by URL: the lock card with the gold unlock pill; no iframe, no video id, no request
       await page.goto(`${base}/modules/${m3.id}/items/${v4.id}`);
       await expect(page.getByText(t("modules.overview.proLockTitle"))).toBeVisible();
-      await expect(page.getByRole("main").getByRole("link", { name: t("modules.overview.unlock") })).toHaveAttribute("href", `/${L}/unlock`);
+      await expect(page.getByRole("main").getByRole("link", { name: t("modules.overview.unlock") })).toHaveAttribute("href", `/${L}/pro`);
       await expect(page.locator("iframe")).toHaveCount(0);
       await expect(page.getByRole("button", { name: t("modules.lesson.play", { title: V4 }) })).toHaveCount(0);
       expect(await page.content()).not.toContain(PRO_YT);
@@ -350,7 +350,7 @@ test.describe("course lessons (ru)", () => {
       await api(admin, "POST", `/courses/${cid}/modules/${c.id}/items`, { kind: "url", url: "https://example.org/c", title_override: { ru: "Урок В" }, published: true });
       await open();
       await only(t("modules.overview.proLeft"));
-      await expect(hero.getByRole("link", { name: t("modules.overview.unlock") })).toHaveAttribute("href", `/${L}/unlock`);
+      await expect(hero.getByRole("link", { name: t("modules.overview.unlock") })).toHaveAttribute("href", `/${L}/pro`);
 
       // everything open is done: "Курс пройден" and "Повторить с начала" to the first lesson
       await api(admin, "DELETE", `/courses/${cid}/modules/${created.pop()}`);

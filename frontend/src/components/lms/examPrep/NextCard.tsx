@@ -30,7 +30,7 @@ export function NextCard({ next, courseId, className }: { next: ExamNextOut | nu
       : pickLocalized(next.title, lang) || t("assessments.untitled");
   const href = next.kind === "resume" && next.attempt_id ? `${base}/attempts/${next.attempt_id}`
     : next.kind === "practice" ? `${base}/practice`
-      : next.kind === "unlock" ? `/${lang}/unlock`
+      : next.kind === "unlock" ? `/${lang}/pro`
         : `${base}/assessments/${next.assessment_id}`;
   return (
     <section aria-labelledby="exam-next"

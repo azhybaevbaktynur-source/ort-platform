@@ -26,6 +26,8 @@ export interface Seed {
     student: SeedUser;
     /** Student UI U3: joined the same course and never takes a test (the home without results). */
     home_student: SeedUser;
+    /** F6b Pro: joined the same course, no pass; access.spec.ts grants and cancels Pro. */
+    pro_student: SeedUser;
     counts: number[];
   };
   api: string;

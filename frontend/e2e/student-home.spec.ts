@@ -52,8 +52,8 @@ test.describe("student home (ru)", () => {
     await expect(streak).toContainText(t("home.prep.streak.none"));
     await expect(streak.getByRole("listitem")).toHaveCount(7);
     const unlock = page.getByRole("region", { name: t("home.prep.unlock.title") });
-    await expect(unlock.getByRole("link", { name: t("access.needsPassLink") })).toHaveAttribute("href", `/${L}/unlock`);
-    await expect(unlock.getByRole("listitem")).toHaveCount(0); // the bullets stay on /unlock
+    await expect(unlock.getByRole("link", { name: t("access.needsPassLink") })).toHaveAttribute("href", `/${L}/pro`);
+    await expect(unlock.getByRole("listitem")).toHaveCount(0); // the bullets stay on /pro
     await expect(page.getByRole("region", { name: t("examPrep.sections.title") })).toHaveCount(0);
     await expect(page.getByRole("region", { name: t("home.courses.title") })).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 2, name: t("student.nav.gettingStarted") })).toHaveCount(0);

@@ -82,6 +82,32 @@ export function fmtPassShort(iso: string | null, lang: string, end = false): str
   }
 }
 
+/** A calendar day ("2027-05-31", the season end or a voucher's last day) as "31 мая 2027", whatever the browser's zone. */
+export function fmtPlanDay(day: string | null, lang: string): string {
+  if (!day) return "";
+  const d = new Date(`${day.slice(0, 10)}T12:00:00Z`);
+  if (Number.isNaN(d.getTime())) return day;
+  try {
+    return d.toLocaleDateString(lang === "en" ? "en-GB" : lang, { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  } catch {
+    return day.slice(0, 10);
+  }
+}
+
+/** A whole som amount with the language's grouping ("2 490"). */
+export function fmtPrice(kgs: number, lang: string): string {
+  try {
+    return kgs.toLocaleString(lang === "en" ? "en-GB" : lang, { maximumFractionDigits: 0 });
+  } catch {
+    return String(kgs);
+  }
+}
+
+/** The end of a calendar day in Bishkek (UTC+6, no DST): the instant a pass "until" that day ends. */
+export function bishkekDayEnd(day: string): Date {
+  return new Date(Date.parse(`${day.slice(0, 10)}T00:00:00+06:00`) + 86_400_000);
+}
+
 /** The format the admin and the student see: XXXX-XXXX-XXXX (input is free; the server normalizes). */
 export const CODE_PATTERN_LENGTH = 14;
 
