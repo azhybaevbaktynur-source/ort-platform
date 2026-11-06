@@ -10,6 +10,7 @@ class EmailChangeIn(BaseModel):
     new_email: EmailStr
     password: str = Field(min_length=1, max_length=200)
     lang: Optional[str] = Field("ky", pattern="^(en|ky|ru)$", description="Language of the confirmation email")
+    code: Optional[str] = Field(None, max_length=40, description="Platform admins: the current two-step login code")
 
 
 class AdminEmailChangeIn(BaseModel):
@@ -33,4 +34,5 @@ class MyEmailOut(BaseModel):
 
 
 class EmailChangeConfirmedOut(BaseModel):
+    user_id: str  # the page signs out only a browser signed in as this account
     email: str

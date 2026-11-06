@@ -36,17 +36,18 @@ def my_email(user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
 @router.post("/me/email-change", response_model=sch.MyEmailOut, status_code=201)
 def request_change(data: sch.EmailChangeIn, request: Request, user: User = Depends(get_lms_user),
                    db: Session = Depends(get_db)):
-    svc.request_own(db, user, data.new_email, data.password, data.lang, request)
+    svc.request_own(db, user, data.new_email, data.password, data.lang, request, code=data.code)
     return _mine(db, db.get(User, user.id))
 
 
 @router.delete("/me/email-change", status_code=204)
-def cancel_change(user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
-    svc.cancel_own(db, user)
+def cancel_change(request: Request, user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
+    svc.cancel_own(db, user, request)
     return Response(status_code=204)
 
 
 @router.post("/auth/email-change/confirm", response_model=sch.EmailChangeConfirmedOut)
 def confirm_change(data: sch.EmailChangeConfirmIn, request: Request, db: Session = Depends(get_db)):
     """Public: the link may be opened on any device, signed in or not. The token is the proof."""
-    return sch.EmailChangeConfirmedOut(email=svc.confirm(db, data.token, request))
+    user_id, email = svc.confirm(db, data.token, request)
+    return sch.EmailChangeConfirmedOut(user_id=user_id, email=email)

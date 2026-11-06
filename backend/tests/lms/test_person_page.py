@@ -391,7 +391,8 @@ def test_self_service_change_happy_path(client, db, outbox):
         "new.address@t.example"
 
     res = client.post(f"{V}/auth/email-change/confirm", json={"token": token})
-    assert res.status_code == 200, res.text and res.json() == {"email": "new.address@t.example"}
+    assert res.status_code == 200, res.text
+    assert res.json() == {"user_id": u.id, "email": "new.address@t.example"}
     db.expire_all()
     user = db.get(User, u.id)
     assert user.email == "new.address@t.example" and user.email_verified is True and user.token_version == 1
@@ -485,6 +486,74 @@ def test_cancel_drops_the_pending_change(client, db, outbox):
     assert client.delete(f"{V}/me/email-change", headers=tok(u)).status_code == 204
     assert client.get(f"{V}/me/email-change", headers=tok(u)).json()["pending"] is None
     assert client.post(f"{V}/auth/email-change/confirm", json={"token": token}).status_code == 422
+    rows = audit_rows(db, "user.email_change.cancelled", u.id)
+    assert len(rows) == 1 and rows[0].actor_id == u.id and rows[0].details == {"by": "self"}
+
+
+def test_admin_cancels_a_pending_change_with_a_reason(client, db, outbox):
+    a = admin(db)
+    u = person(db)
+    url = f"{P}/users/{u.id}/email-change/cancel"
+    res = client.post(url, json={"reason": "x"}, headers=auth(a))
+    assert res.status_code == 404 and code_of(res) == "email_change_not_found"
+    assert _request_own(client, u, "undo@t.example").status_code == 201
+    token = link_token(outbox[-1])
+    assert client.post(url, json={"reason": ""}, headers=auth(a)).status_code == 422
+    assert client.post(url, json={"reason": "x"}, headers=auth(make_user(db, teacher_status="approved"))
+                       ).status_code == 403
+    res = client.post(url, json={"reason": "asked by phone"}, headers=auth(a))
+    assert res.status_code == 200, res.text and res.json()["pending_email_change"] is None
+    assert res.json()["pending_email_change"] is None
+    assert client.post(f"{V}/auth/email-change/confirm", json={"token": token}).status_code == 422
+    rows = audit_rows(db, "user.email_change.cancelled", u.id)
+    assert len(rows) == 1 and rows[0].actor_id == a.id and rows[0].reason == "asked by phone"
+
+
+def test_an_admin_started_change_dies_when_the_person_becomes_a_platform_admin(client, db, outbox):
+    a = admin(db)
+    u = person(db)
+    assert client.post(f"{P}/users/{u.id}/email-change", json={"new_email": "later@t.example", "reason": "r"},
+                       headers=auth(a)).status_code == 200
+    token = link_token(next(m for m in outbox if m["to"] == "later@t.example"))
+    # promoted outside the grant flow (e.g. directly in the database): the link is refused at confirmation
+    db.expire_all()
+    db.get(User, u.id).is_platform_admin = True
+    db.commit()
+    res = client.post(f"{V}/auth/email-change/confirm", json={"token": token})
+    assert res.status_code == 422 and code_of(res) == "email_change_invalid"
+    db.expire_all()
+    assert db.get(User, u.id).email != "later@t.example"
+    assert db.execute(select(EmailChangeRequest).where(EmailChangeRequest.user_id == u.id)).first() is None
+
+
+def test_promoting_to_platform_admin_drops_a_pending_change(client, db, outbox):
+    from app.lms.platform_admin import admins
+
+    a = admin(db)
+    u = person(db)
+    assert client.post(f"{P}/users/{u.id}/email-change", json={"new_email": "gone2@t.example", "reason": "r"},
+                       headers=auth(a)).status_code == 200
+    db.expire_all()
+    admins.grant(db, db.get(User, u.id))
+    db.commit()
+    assert db.execute(select(EmailChangeRequest).where(EmailChangeRequest.user_id == u.id)).first() is None
+
+
+async def test_a_platform_admin_changing_their_own_address_also_gives_the_code(db, client, clock, outbox):  # noqa: F811
+    a = admin(db)
+    a.password_hash = hash_password(PASSWORD)
+    db.commit()
+    res = _request_own(client, a, "admin.new@t.example")  # no two-step login yet
+    assert res.status_code == 403 and code_of(res) == "mfa_enrollment_required"
+    secret, _codes, token = await enroll(db, a)
+    headers = {"Authorization": f"Bearer {token}"}
+    body = {"new_email": "admin.new@t.example", "password": PASSWORD, "lang": "en"}
+    res = client.post(f"{V}/me/email-change", json=body, headers=headers)
+    assert res.status_code == 400 and code_of(res) == "mfa_invalid_code"
+    clock["now"] += 30
+    res = client.post(f"{V}/me/email-change", json={**body, "code": code_at(secret)}, headers=headers)
+    assert res.status_code == 201, res.text
+    assert outbox[-1]["to"] == "admin.new@t.example"
 
 
 def test_confirm_failures_are_rate_limited_per_address(client, db, monkeypatch):
@@ -527,10 +596,15 @@ def test_admin_change_sends_the_same_link_and_is_audited(client, db, outbox):
     res = client.post(f"{P}/users/{u.id}/email-change", json={"new_email": "fixed@t.example", "reason": "typo"},
                       headers=auth(a))
     assert res.status_code == 200, res.text
-    assert outbox[-1]["to"] == "fixed@t.example" and "ырастаңыз" in outbox[-1]["subject"]
+    link_mail = next(m for m in outbox if m["to"] == "fixed@t.example")
+    assert "ырастаңыз" in link_mail["subject"]
+    # the current address hears of it too: no link, not the new address
+    notice = next(m for m in outbox if m["to"] == old)
+    assert notice["private"] is True and "http" not in notice["text"] and "fixed@" not in notice["text"]
+    assert "администратор" in notice["subject"]
     rows = audit_rows(db, "user.email_change.requested", u.id)
     assert len(rows) == 1 and rows[0].actor_id == a.id and rows[0].reason == "typo"
-    assert client.post(f"{V}/auth/email-change/confirm", json={"token": link_token(outbox[-1])}).status_code == 200
+    assert client.post(f"{V}/auth/email-change/confirm", json={"token": link_token(link_mail)}).status_code == 200
     db.expire_all()
     assert db.get(User, u.id).email == "fixed@t.example"
     rows = audit_rows(db, "user.email_changed", u.id)

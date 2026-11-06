@@ -78,6 +78,8 @@ export const sendPasswordReset = (id: string, reason: string) =>
   post<{ sent: boolean }>(`/platform/users/${enc(id)}/password-reset`, { reason });
 export const adminChangeEmail = (id: string, newEmail: string, reason: string) =>
   post<AdminUserDetailOut>(`/platform/users/${enc(id)}/email-change`, { new_email: newEmail, reason });
+export const adminCancelEmailChange = (id: string, reason: string) =>
+  post<AdminUserDetailOut>(`/platform/users/${enc(id)}/email-change/cancel`, { reason });
 /** The privacy function: correcting to under 14 starts the parent-consent grace period; correcting up grants nothing. */
 export const correctAgeBand = (id: string, ageBand: string, reason: string) =>
   post<{ user_id: string; age_band: string; consent_state: string }>(`/admin/privacy/users/${enc(id)}/age-band`, { age_band: ageBand, reason });

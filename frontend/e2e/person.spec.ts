@@ -82,6 +82,7 @@ test.describe("person page (ru)", () => {
       const link = admin.getByRole("link", { name: p.student.name }).locator("visible=true").first();
       await expect(link).toBeVisible();
       await expect(admin.getByRole("link", { name: s.admin.name })).toHaveCount(0);
+      await expect(admin.getByText(t("platformAdmin.accountStatus.active")).locator("visible=true").first()).toBeVisible();
       await shoot(admin, "users-list");
       // the filters narrow it: this student has no exam access
       await admin.getByLabel(t("platformAdmin.users.filterAccess")).check();

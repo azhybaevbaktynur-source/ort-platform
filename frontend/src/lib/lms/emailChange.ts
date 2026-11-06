@@ -11,9 +11,9 @@ export interface MyEmail {
 
 export const getMyEmail = () => lmsFetch<MyEmail>("/me/email-change");
 /** Needs the current password; a link goes to the new address and nothing changes until it is opened. */
-export const requestEmailChange = (newEmail: string, password: string, lang: string) =>
-  lmsFetch<MyEmail>("/me/email-change", { method: "POST", body: { new_email: newEmail, password, lang } });
+export const requestEmailChange = (newEmail: string, password: string, lang: string, code?: string) =>
+  lmsFetch<MyEmail>("/me/email-change", { method: "POST", body: { new_email: newEmail, password, lang, ...(code ? { code } : {}) } });
 export const cancelEmailChange = () => lmsFetch<void>("/me/email-change", { method: "DELETE" });
 /** Public: the token from the emailed link is the proof. Every session of the account ends. */
 export const confirmEmailChange = (token: string) =>
-  lmsFetch<{ email: string }>("/auth/email-change/confirm", { method: "POST", body: { token } });
+  lmsFetch<{ user_id: string; email: string }>("/auth/email-change/confirm", { method: "POST", body: { token } });

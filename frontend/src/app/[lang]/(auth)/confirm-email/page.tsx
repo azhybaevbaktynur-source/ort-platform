@@ -1,8 +1,8 @@
 "use client";
 
 // S4 email change (A9): the page of the link sent to the new address. The change happens on the button, not on load,
-// so a mail scanner that opens links cannot use it up. Afterwards every session of the account has ended, so a session
-// in this browser is cleared too.
+// so a mail scanner that opens links cannot use it up. Afterwards every session of the account has ended, so this
+// browser signs out when it is signed in as that account (another account's session stays).
 import React, { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -30,7 +30,7 @@ function ConfirmEmailForm() {
     setError(null);
     try {
       const res = await confirmEmailChange(token);
-      if (user) await signOut();
+      if (user && user.uid === res.user_id) await signOut(); // only this account's sessions ended
       setDone(res.email);
     } catch (e) {
       setError(errorText(e));

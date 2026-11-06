@@ -56,9 +56,9 @@ export default function AdminUsersPage() {
       key: "account", header: t("platformAdmin.users.account"),
       cell: (u) => {
         const system = isSystemAccount(u); // Phase 6 S4 (admin M5)
-        if (!system && !u.is_platform_admin && !u.disabled_at) return <span className="text-slate-500">—</span>;
         return (
           <span className="inline-flex flex-wrap justify-end gap-1 sm:justify-start">
+            {!u.disabled_at && !system && <UserStatusBadge kind="account" status="active" />}
             {system && <SystemAccountBadge />}
             {u.is_platform_admin && <UserStatusBadge kind="account" status="admin" />}
             {u.disabled_at && <UserStatusBadge kind="account" status="disabled" />}

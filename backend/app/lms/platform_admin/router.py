@@ -132,6 +132,11 @@ def user_email_change(user_id: str, body: AdminEmailChangeIn, request: Request,
                       admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
     email_change.request_by_admin(db, admin, user_id, str(body.new_email), body.reason, request)
     return us.user_detail(db, us.get_user_or_404(db, user_id))
+@router.post("/users/{user_id}/email-change/cancel", response_model=AdminUserDetailOut)
+def user_email_change_cancel(user_id: str, body: ReasonIn, request: Request,
+                             admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
+    email_change.cancel_by_admin(db, admin, user_id, body.reason, request)
+    return us.user_detail(db, us.get_user_or_404(db, user_id))
 # --- S4 person page end ---
 
 

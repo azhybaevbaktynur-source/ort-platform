@@ -356,6 +356,9 @@ _EMAIL_CHANGE_TEXTS: dict[str, dict[str, str]] = {
         "notice_subject": "{app}: the email address of your account was changed",
         "notice_body": "The email address of your account was changed. This address no longer signs in to the account, and every session of the account was ended.",
         "notice_footer": "If this was not you, contact the platform administrator at once.",
+        "requested_subject": "{app}: an administrator asked to change your email address",
+        "requested_body": "A platform administrator asked to change the email address of your account. The new address gets a confirmation link; until it is opened, nothing changes and you keep signing in with this address.",
+        "requested_footer": "If you did not ask for this, contact the platform administrator.",
     },
     "ru": {
         "subject": "{app}: подтвердите новый адрес почты",
@@ -367,6 +370,9 @@ _EMAIL_CHANGE_TEXTS: dict[str, dict[str, str]] = {
         "notice_subject": "{app}: адрес почты вашего аккаунта изменён",
         "notice_body": "Адрес почты вашего аккаунта изменён. С этим адресом в аккаунт больше не войти, и все сеансы аккаунта завершены.",
         "notice_footer": "Если это были не вы, сразу свяжитесь с администратором платформы.",
+        "requested_subject": "{app}: администратор запросил смену адреса почты",
+        "requested_body": "Администратор платформы запросил смену адреса почты вашего аккаунта. На новый адрес отправлена ссылка для подтверждения; пока её не откроют, ничего не меняется и вы входите с этим адресом.",
+        "requested_footer": "Если вы об этом не просили, свяжитесь с администратором платформы.",
     },
     "ky": {
         "subject": "{app}: жаңы почта дарегиңизди ырастаңыз",
@@ -378,6 +384,9 @@ _EMAIL_CHANGE_TEXTS: dict[str, dict[str, str]] = {
         "notice_subject": "{app}: аккаунтуңуздун почта дареги өзгөртүлдү",
         "notice_body": "Аккаунтуңуздун почта дареги өзгөртүлдү. Бул дарек менен аккаунтка мындан ары кире албайсыз, аккаунттун бардык сеанстары аяктады.",
         "notice_footer": "Эгер бул сиз болбосоңуз, дароо платформанын администраторуна кайрылыңыз.",
+        "requested_subject": "{app}: администратор почта дарегиңизди алмаштырууну сурады",
+        "requested_body": "Платформанын администратору аккаунтуңуздун почта дарегин алмаштырууну сурады. Жаңы дарекке ырастоо шилтемеси жөнөтүлдү; ал ачылмайынча эч нерсе өзгөрбөйт жана сиз ушул дарек менен кире бересиз.",
+        "requested_footer": "Эгер сиз муну сурабасаңыз, платформанын администраторуна кайрылыңыз.",
     },
 }
 
@@ -401,19 +410,28 @@ def send_email_change_email(to_email: str, token: str, hours: int, lang: Optiona
     return send_email(to_email, t["subject"], text, html, from_name=_auth_from_name(clean_lang), private=True)
 
 
-def send_email_changed_notice(to_email: str, lang: Optional[str] = None) -> bool:
-    """To the old address after a change: no link back and not the new address. Never fails the caller."""
+def _change_notice(to_email: str, lang: Optional[str], prefix: str) -> bool:
     clean_lang = _auth_lang(lang)
     texts = _EMAIL_CHANGE_TEXTS[clean_lang]
-    subject = texts["notice_subject"].format(app=APP_NAME[clean_lang])
-    body = texts["notice_body"]
-    text = f"{body}\n\n{texts['notice_footer']}\n"
+    subject = texts[f"{prefix}_subject"].format(app=APP_NAME[clean_lang])
+    body, footer = texts[f"{prefix}_body"], texts[f"{prefix}_footer"]
+    text = f"{body}\n\n{footer}\n"
     html = _wrap_html(subject, f"""
   <p style="color: #475569; font-size: 14px;">{escape(body)}</p>
-""", texts["notice_footer"])
+""", footer)
     try:
         return send_email(to_email, subject, text, html, from_name=_auth_from_name(clean_lang), private=True)
     except Exception:
-        logger.error("email change notice failed")
+        logger.error("email change notice failed (%s)", prefix)
         return False
+
+
+def send_email_changed_notice(to_email: str, lang: Optional[str] = None) -> bool:
+    """To the old address after a change: no link back and not the new address. Never fails the caller."""
+    return _change_notice(to_email, lang, "notice")
+
+
+def send_email_change_requested_notice(to_email: str, lang: Optional[str] = None) -> bool:
+    """To the current address when an administrator starts a change: no link, not the new address. Never fails."""
+    return _change_notice(to_email, lang, "requested")
 # --- S4 email change end ---

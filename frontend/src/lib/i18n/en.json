@@ -322,7 +322,8 @@
       "email_send_failed": "The email could not be sent. Try again later.",
       "user_deleted": "This account was deleted.",
       "target_is_platform_admin": "A platform admin changes their own address on their account page.",
-      "reset_cooldown": "An email was just sent. Wait a little before sending another."
+      "reset_cooldown": "An email was just sent. Wait a little before sending another.",
+      "email_change_not_found": "No email change is waiting."
     }
   },
   "courses": {
@@ -536,7 +537,8 @@
     },
     "accountStatus": {
       "disabled": "Disabled",
-      "admin": "Admin"
+      "admin": "Admin",
+      "active": "Active"
     },
     "requests": {
       "title": "Teacher requests",
@@ -5690,7 +5692,8 @@
       "cancelPending": "Cancel the change",
       "cancelled": "The address change was cancelled",
       "requested": "Link sent to {email}",
-      "invalid": "Enter the full address, for example name@mail.kg"
+      "invalid": "Enter the full address, for example name@mail.kg",
+      "codeHint": "Platform admins also give the code from the authenticator app."
     }
   },
   "guardian": {
@@ -6270,6 +6273,10 @@
         "sweep": "closed automatically",
         "closed": "closed"
       }
-    }
+    },
+    "cancelEmail": "Cancel the email change",
+    "cancelEmailTitle": "Cancel the email change?",
+    "cancelEmailBody": "The confirmation link stops working and the account keeps its current address.",
+    "cancelEmailDone": "The email change was cancelled"
   }
 }

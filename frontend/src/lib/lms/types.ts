@@ -335,6 +335,7 @@ export const LMS_ERROR_CODES = [
   // S4 person page: email change, password reset
   "password_incorrect", "email_taken", "email_same", "email_change_invalid", "email_change_expired",
   "email_change_conflict", "email_send_failed", "user_deleted", "target_is_platform_admin", "reset_cooldown",
+  "email_change_not_found",
 ] as const;
 export type LmsErrorCode = (typeof LMS_ERROR_CODES)[number];
 

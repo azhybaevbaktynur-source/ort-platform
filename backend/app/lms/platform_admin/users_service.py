@@ -65,7 +65,8 @@ def search_users(q: Optional[str], teacher_status: Optional[str], disabled: Opti
                  email_unverified: bool = False, platform_admin: bool = False, has_access: bool = False,
                  now=None):
     """S4: email or name substring (case-insensitive), plus filters; one statement, paged by (created_at, id) on
-    `ix_users_created_at_id`, so a page reads index order until it has its rows (bounded by the page, not the table)."""
+    `ix_users_created_at_id`, so a page reads index order until it has its rows (bounded by the page, not the table).
+    Past ~50k users, a pg_trgm index on lower(email) and lower(display_name) is the fix for substring search."""
     stmt = select(User).where(User.is_test_student.is_(False))
     if q:
         term = q.strip().lower()

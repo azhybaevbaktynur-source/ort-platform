@@ -33,6 +33,7 @@ ROUTES = [
     ("GET", f"{P}/users/usr_x/attempts", None),
     ("POST", f"{P}/users/usr_x/password-reset", {"reason": "x"}),
     ("POST", f"{P}/users/usr_x/email-change", {"new_email": "n@t.example", "reason": "x"}),
+    ("POST", f"{P}/users/usr_x/email-change/cancel", {"reason": "x"}),
 ]
 
 

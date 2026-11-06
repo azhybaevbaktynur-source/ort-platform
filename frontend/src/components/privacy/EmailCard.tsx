@@ -7,6 +7,7 @@ import { useTranslation } from "@/lib/i18n/context";
 import { EMAIL_RE, cancelEmailChange, getMyEmail, requestEmailChange, type MyEmail } from "@/lib/lms/emailChange";
 import { Button, Card, Input, Skeleton, toast } from "@/components/ui";
 import { OrgError } from "@/components/lms/org/OrgUi";
+import { useAuth } from "@/lib/auth-context";
 
 export function EmailCard() {
   const { lang, t } = useTranslation();
@@ -15,6 +16,8 @@ export function EmailCard() {
   const [editing, setEditing] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [code, setCode] = useState(""); // platform admins only: the current two-step login code
+  const isAdmin = !!useAuth().userProfile?.is_platform_admin;
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -31,10 +34,11 @@ export function EmailCard() {
     setBusy(true);
     setError(null);
     try {
-      setData(await requestEmailChange(clean, password, lang));
+      setData(await requestEmailChange(clean, password, lang, isAdmin ? code.trim() : undefined));
       setEditing(false);
       setEmail("");
       setPassword("");
+      setCode("");
       toast.success(t("privacy.email.requested", { email: clean.toLowerCase() }));
     } catch (err) {
       setError(err);
@@ -75,11 +79,15 @@ export function EmailCard() {
                 value={email} onChange={(e) => setEmail(e.target.value)} required />
               <Input id="my-email-password" type="password" autoComplete="current-password" label={t("privacy.email.password")}
                 hint={t("privacy.email.passwordHint")} value={password} onChange={(e) => setPassword(e.target.value)} required />
+              {isAdmin && (
+                <Input id="my-email-code" inputMode="numeric" autoComplete="one-time-code" label={t("adminSecurity.confirmCode.label")}
+                  hint={t("privacy.email.codeHint")} value={code} onChange={(e) => setCode(e.target.value)} required containerClassName="max-w-xs" />
+              )}
               <p className="text-sm text-slate-600">{t("privacy.email.after")}</p>
               {problem && <p role="alert" className="text-sm font-medium text-danger-700">{problem}</p>}
               {error ? <OrgError error={error} /> : null}
               <div className="flex flex-wrap gap-2">
-                <Button type="submit" loading={busy} disabled={busy || !email.trim() || !password}>{t("privacy.email.submit")}</Button>
+                <Button type="submit" loading={busy} disabled={busy || !email.trim() || !password || (isAdmin && !code.trim())}>{t("privacy.email.submit")}</Button>
                 <Button type="button" variant="secondary" disabled={busy} onClick={() => { setEditing(false); setProblem(null); setError(null); }}>{t("privacy.email.cancel")}</Button>
               </div>
             </form>

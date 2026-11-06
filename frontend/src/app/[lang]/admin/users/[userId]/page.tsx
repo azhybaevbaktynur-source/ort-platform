@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
-import { adminChangeEmail, correctAgeBand, disableUser, enableUser, getUser, sendPasswordReset, setTeacherStatus } from "@/lib/lms/admin";
+import { adminCancelEmailChange, adminChangeEmail, correctAgeBand, disableUser, enableUser, getUser, sendPasswordReset, setTeacherStatus } from "@/lib/lms/admin";
 import type { AdminUserDetailOut, LinkedAccountOut } from "@/lib/lms/types";
 import { pickLocalized } from "@/lib/lms/localized";
 import { isSystemAccount } from "@/lib/lms/organizations";
@@ -22,7 +22,7 @@ import { endUserSessions, setPlatformAdmin } from "@/lib/lms/security";
 import { AgeBandDialog, AttemptLookupSection, ChangeEmailDialog } from "@/components/lms/admin/PersonParts"; // S4
 
 type Action = "disable" | "revoke" | "grant" | "endSessions" | "resetPassword";
-type PersonDialog = "changeEmail" | "correctAge"; // S4
+type PersonDialog = "changeEmail" | "correctAge" | "cancelEmail"; // S4
 type AdminAction = "makeAdmin" | "removeAdmin";
 
 export default function AdminUserDetailPage() {
@@ -200,6 +200,11 @@ export default function AdminUserDetailPage() {
             <span className="break-all">
               {t("person.pendingEmailValue", { email: user.pending_email_change.new_email, date: fmtApiDateTimeShort(user.pending_email_change.expires_at, lang) })}
               {user.pending_email_change.by_admin ? ` · ${t("person.pendingByAdmin")}` : ""}
+              {!system && (
+                <Button variant="link" size="sm" className="ml-2 text-danger-700" onClick={() => { setDialogError(null); setPersonDialog("cancelEmail"); }}>
+                  {t("person.cancelEmail")}
+                </Button>
+              )}
             </span>
           ) }] : []),
           ...(user.is_platform_admin ? [{ key: "mfa", term: t("adminSecurity.user.mfa"), description: user.mfa_enabled ? t("adminSecurity.on") : t("adminSecurity.off") }] : []),
@@ -265,6 +270,12 @@ export default function AdminUserDetailPage() {
       <AgeBandDialog open={personDialog === "correctAge"} name={user.display_name ? `${user.display_name} · ${user.email}` : user.email}
         current={user.age_band} busy={busy} error={dialogError ? <OrgError error={dialogError} /> : undefined}
         onConfirm={(band, reason) => void runPerson(() => correctAgeBand(user.id, band, reason), t("person.ageDone"))}
+        onCancel={() => setPersonDialog(null)} />
+      <ReasonDialog open={personDialog === "cancelEmail"} title={t("person.cancelEmailTitle")}
+        object={user.pending_email_change?.new_email} effect={t("person.cancelEmailBody")}
+        confirmLabel={t("person.cancelEmail")} tone="danger" busy={busy}
+        error={dialogError ? <OrgError error={dialogError} /> : undefined}
+        onConfirm={(reason) => void runPerson(() => adminCancelEmailChange(user.id, reason), t("person.cancelEmailDone"))}
         onCancel={() => setPersonDialog(null)} />
       <CodeReasonDialog
         open={!!adminAction}

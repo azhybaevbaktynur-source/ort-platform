@@ -103,8 +103,10 @@ def _commit_and_send(db: Session, row: EmailChangeRequest, token: str, lang: Opt
 
 
 def request_own(db: Session, user: User, new_email: str, password: str, lang: Optional[str],
-                request: Optional[Request]) -> EmailChangeRequest:
-    """Self-service: the current password, and at most 5 requests an hour (10 a day), counted before the password."""
+                request: Optional[Request], code: Optional[str] = None) -> EmailChangeRequest:
+    """Self-service: the current password, and at most 5 requests an hour (10 a day), counted before the password. A
+    platform admin also gives the current two-step login code (security review of S4): the address is how the account
+    is recovered."""
     new_email = normalize(new_email)
     user_id, password_hash = user.id, user.password_hash
     db.rollback()  # end the read transaction before the limiter's own write (SQLite)
@@ -114,6 +116,10 @@ def request_own(db: Session, user: User, new_email: str, password: str, lang: Op
     if not password or not password_hash or not verify_password(password, password_hash):
         raise Forbidden("Wrong password", code="password_incorrect")
     user = db.get(User, user_id)
+    if user.is_platform_admin:
+        from app.lms.mfa import service as mfa
+
+        mfa.require_code(db, user, code or "")
     row, token = _start(db, user, new_email, user)
     audit.record(db, actor=user, action="user.email_change.requested", target_type="user", target_id=user.id,
                  details={"new_email": new_email, "by": "self"}, request=request)
@@ -137,12 +143,41 @@ def request_by_admin(db: Session, admin: User, user_id: str, new_email: str, rea
     row, token = _start(db, target, new_email, admin)
     audit.record(db, actor=admin, action="user.email_change.requested", target_type="user", target_id=target.id,
                  reason=reason, details={"new_email": new_email, "by": "admin"}, request=request)
-    return _commit_and_send(db, row, token, target.locale)
+    row = _commit_and_send(db, row, token, target.locale)
+    # security review: the current address hears of it too (no link, not the new address)
+    email_service.send_email_change_requested_notice(target.email, target.locale)
+    return row
 
 
-def cancel_own(db: Session, user: User) -> None:
-    db.execute(delete(EmailChangeRequest).where(EmailChangeRequest.user_id == user.id))
+def _cancel(db: Session, actor: User, user_id: str, reason: Optional[str], by: str,
+            request: Optional[Request]) -> None:
+    gone = db.execute(delete(EmailChangeRequest).where(EmailChangeRequest.user_id == user_id)
+                      .execution_options(synchronize_session=False)).rowcount
+    if gone:
+        audit.record(db, actor=actor, action="user.email_change.cancelled", target_type="user", target_id=user_id,
+                     reason=reason, details={"by": by}, request=request)
     db.commit()
+
+
+def cancel_own(db: Session, user: User, request: Optional[Request] = None) -> None:
+    _cancel(db, user, user.id, None, "self", request)
+
+
+def cancel_by_admin(db: Session, admin: User, user_id: str, reason: str, request: Optional[Request]) -> None:
+    """The person page: the pending link stops working. 404 `email_change_not_found` when nothing is pending."""
+    from app.lms.core.errors import NotFound
+    from app.lms.platform_admin.users_service import get_user_or_404
+
+    target = get_user_or_404(db, user_id)
+    if db.execute(select(EmailChangeRequest.id).where(EmailChangeRequest.user_id == target.id)).first() is None:
+        raise NotFound("No pending email change", code="email_change_not_found")
+    _cancel(db, admin, target.id, reason, "admin", request)
+
+
+def drop_for(db: Session, user_id: str) -> None:
+    """Not committed. Promoting someone to platform admin drops their pending change (security review of S4)."""
+    db.execute(delete(EmailChangeRequest).where(EmailChangeRequest.user_id == user_id)
+               .execution_options(synchronize_session=False))
 
 
 def _ip_rules(request: Optional[Request]) -> list[tuple[str, ratelimit.Limit]]:
@@ -155,9 +190,11 @@ def _drop(db: Session, row: EmailChangeRequest) -> None:
     db.commit()
 
 
-def confirm(db: Session, token: str, request: Optional[Request]) -> str:
-    """Opens the link: returns the new address. Unknown, used or replaced: 422 `email_change_invalid`; past 24 hours:
-    422 `email_change_expired`; taken by another account meanwhile: 409 `email_taken` (the link is used up either way)."""
+def confirm(db: Session, token: str, request: Optional[Request]) -> tuple[str, str]:
+    """Opens the link: returns (user id, new address). Unknown, used or replaced: 422 `email_change_invalid`; past 24
+    hours: 422 `email_change_expired`; taken by another account meanwhile: 409 `email_taken` (the link is used up either
+    way). An admin-started change of someone who has since become a platform admin is refused (`email_change_invalid`):
+    only they change their own address."""
     rules = _ip_rules(request)
     allowed, retry = ratelimit.peek_all(rules)
     if not allowed:
@@ -177,7 +214,8 @@ def confirm(db: Session, token: str, request: Optional[Request]) -> str:
         raise ValidationFailed("This link has expired", code="email_change_expired")
     user = db.execute(select(User).where(User.id == row.user_id).with_for_update()
                       .execution_options(populate_existing=True)).scalar_one_or_none()
-    if user is None or user.deleted_at is not None or user.disabled_at is not None:
+    admin_started_for_admin = user is not None and user.is_platform_admin and row.requested_by_id != user.id
+    if user is None or user.deleted_at is not None or user.disabled_at is not None or admin_started_for_admin:
         _drop(db, row)
         raise ValidationFailed("This link is no longer valid", code="email_change_invalid")
     new_email = row.new_email
@@ -203,4 +241,4 @@ def confirm(db: Session, token: str, request: Optional[Request]) -> str:
         db.rollback()
         raise Conflict("This email address is already used by another account", code="email_taken") from None
     email_service.send_email_changed_notice(old_email, user.locale)
-    return new_email
+    return user.id, new_email
