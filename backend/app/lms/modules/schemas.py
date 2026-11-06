@@ -239,6 +239,8 @@ class ModuleStaffOut(BaseModel):
 class ModulesStaffOut(BaseModel):
     """`GET _C/modules` for teachers and assistants (no evaluation; `?deleted` may include deleted modules)."""
     modules: list[ModuleStaffOut] = []
+    # F5c: the editor shows the Pro switch only where the server accepts `access_tier = paid` (platform courses)
+    is_platform_course: bool = False
 
 
 class QuizItemOut(BaseModel):

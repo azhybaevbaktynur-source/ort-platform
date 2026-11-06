@@ -11,10 +11,14 @@
 // UX rework D (UR-4): new module, rename and most adds happen inline (Enter saves, Esc cancels). A module's "+" menu picks
 // the kind; a file (and an ORT exam or assignment) keeps its dialog. Rows are one line from `sm`; details that are not
 // essential sit in a tooltip and in the "⋯" menu.
+// F5c (COURSE_LESSONS_DESIGN §6, §7.3): a module header shows "N уроков · 48 мин" and, on platform courses only, the Pro
+// switch (gold when on; turning it on asks first). Rows get a minutes chip (pages, files, links), a requirement chip
+// and ↑ ↓ buttons (keyboard path; drag stays on desktop pointers). Under each module an "add" row: Видео (a dialog with
+// a YouTube / Vimeo hint), Страница, Файл, Тест, Ссылка (the existing flows) and "Ещё" with the full grouped menu.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ChevronRight, CircleCheck, CircleDashed, Flag, GripVertical, Info, Plus } from "lucide-react";
+import { AlertTriangle, ChevronRight, CircleCheck, CircleDashed, Flag, GripVertical, Info, Plus, PlayCircle } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { createAssignment } from "@/lib/lms/assignments";
 import type { AssignmentKind } from "@/lib/lms/assignmentTypes";
@@ -27,6 +31,7 @@ import type { ItemStaffOut, ModuleStaffOut, ModulesStaffOut, ModuleWarningOut } 
 import type { LocalizedText } from "@/lib/lms/types";
 import { withFrom } from "@/lib/lms/nav";
 import { createPage } from "@/lib/lms/pages";
+import { parseVideo } from "@/lib/lms/video";
 import { quizAssignmentId } from "@/lib/lms/quizAssignmentId";
 import { templateUi } from "@/lib/lms/templates";
 import { duplicateModule } from "@/lib/lms/unsorted";
@@ -38,7 +43,8 @@ import { fmtShortDateTime } from "@/components/lms/home/format";
 import { CreateAssessmentDialog } from "@/components/lms/assessments/CreateAssessmentDialog";
 import { ItemKindIcon, useItemKindText, useModuleErrorText, useRequirementText } from "./moduleUi";
 import { ItemEditDialog, ModuleSettingsDialog, MoveItemDialog, PrerequisiteDialog, RequirementDialog, type ModuleSettingsValue } from "./OutlineDialogs";
-import { AddItemDialog, moduleAnchor, type AddKind } from "./AddItemDialog";
+import { AddItemDialog, VideoDialog, moduleAnchor, type AddKind } from "./AddItemDialog";
+import { DurationChip, MoveButtons, ProSwitch, parseMinutes, useDurationText } from "./EditorParts";
 import { InlineForm, type InlineValues } from "./InlineForm";
 import { OutlineMenu, type MenuGroup } from "./OutlineMenu";
 import { ProgressDrawer } from "./ProgressDrawer";
@@ -56,7 +62,9 @@ type DialogState =
   | { kind: "moveItem"; item: ItemStaffOut }
   | { kind: "deleteItem"; item: ItemStaffOut }
   | { kind: "progress" }
-  | { kind: "publishWarn"; module: ModuleStaffOut; names: string };
+  | { kind: "publishWarn"; module: ModuleStaffOut; names: string }
+  | { kind: "video"; module: ModuleStaffOut }
+  | { kind: "pro"; module: ModuleStaffOut };
 
 /** The one inline form that is open: a new module, a rename, or an add at the end of a module. */
 type InlineKind = "page" | "url" | "header" | "quiz" | "assignment";
@@ -69,6 +77,9 @@ type InlineState =
 const INLINE_KINDS: string[] = ["page", "url", "header", "quiz", "assignment"];
 /** Assignment kinds offered inline: the kind is fixed once created, so the form asks for it. A quiz has its own entry. */
 const INLINE_ASSIGNMENT_KINDS: AssignmentKind[] = ["text", "file", "none"];
+
+/** F5c: rows with a duration (lessons); tests and headers have none (the server refuses it there). */
+const LESSON_KINDS: string[] = ["page", "file", "url"];
 
 type DragState = null | { type: "module"; id: string } | { type: "item"; id: string; moduleId: string };
 
@@ -157,6 +168,7 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
   const errorText = useModuleErrorText();
   const kindText = useItemKindText();
   const reqText = useRequirementText();
+  const durationText = useDurationText();
   const base = `/${lang}/courses/${course.id}`;
   const langs = { languages: course.languages, defaultLanguage: course.default_language };
   const canEdit = course.status !== "concluded";
@@ -192,7 +204,7 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
     try {
       const out = (await getModules(course.id, { deleted: showDeleted })) as ModulesStaffOut;
       const modules = [...(out.modules ?? [])].sort((a, b) => a.position - b.position);
-      setData({ modules });
+      setData({ modules, is_platform_course: !!out.is_platform_course });
       onModulesRef.current?.(modules.filter((m) => !m.deleted_at));
     } catch (e) {
       setError(e);
@@ -202,6 +214,7 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
   }, [course.id, showDeleted]);
   useEffect(() => { void load(); }, [load, refreshKey]);
 
+  const isPlatform = !!data?.is_platform_course;
   const live = useMemo(() => (data?.modules ?? []).filter((m) => !m.deleted_at), [data]);
   const deleted = useMemo(() => (data?.modules ?? []).filter((m) => m.deleted_at), [data]);
   const moduleName = (m: ModuleStaffOut) => pickLocalized(m.title, lang, course.default_language) || t("modules.untitledModule");
@@ -291,11 +304,15 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
       toast.error(t("pages.object.addToModuleFailed"));
     }
   };
-  const submitAdd = (moduleId: string, kind: InlineKind, { title, url, assignmentKind }: InlineValues) => {
+  const submitAdd = (moduleId: string, kind: InlineKind, { title, url, assignmentKind, minutes }: InlineValues) => {
     const titled: LocalizedText = title ? { [editLang]: title } : {};
     if (kind === "url") {
       if (!/^https?:\/\/\S+$/i.test(url)) { setInlineError(t("modules.errors.url_invalid")); return; }
-      void runInline(() => addItem(course.id, moduleId, { kind: "url", url, published: true, ...(title ? { title_override: titled } : {}) }));
+      const seconds = parseMinutes(minutes);
+      if (seconds === undefined) { setInlineError(t("modules.editor.durationInvalid")); return; }
+      void runInline(() => addItem(course.id, moduleId, {
+        kind: "url", url, published: true, ...(title ? { title_override: titled } : {}), ...(seconds !== null ? { duration_s: seconds } : {}),
+      }));
       return;
     }
     if (!title) { setInlineError(t(kind === "header" ? "modules.add.headerRequired" : "modules.settings.titleRequired")); return; }
@@ -336,7 +353,7 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
   /** Optimistic reorder (drag and drop): show the new order at once, write, reload; on error reload and say why. */
   const optimistic = async (next: ModuleStaffOut[], key: string, fn: () => Promise<unknown>) => {
     const before = data;
-    setData((d) => (d ? { modules: [...next, ...d.modules.filter((m) => m.deleted_at)] } : d));
+    setData((d) => (d ? { ...d, modules: [...next, ...d.modules.filter((m) => m.deleted_at)] } : d));
     const ok = await run(key, fn);
     if (!ok && before) setData(before);
   };
@@ -445,6 +462,22 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
     void run(`ip-${it.id}`, () => updateItem(course.id, m.id, it.id, { published: !it.published }), { success: publishToast(!it.published, itemName(it)) });
   };
 
+  /** F5c: Pro on asks first (students without access see only the titles); Pro off is immediate. */
+  const toggleModulePro = (m: ModuleStaffOut) => {
+    if (m.access_tier !== "paid") { setDialogError(null); setDialog({ kind: "pro", module: m }); return; }
+    void run(`pro-${m.id}`, () => updateModule(course.id, m.id, { access_tier: "free" }), { success: t("modules.editor.toastFree", { title: moduleName(m) }) });
+  };
+  const saveDuration = (m: ModuleStaffOut, it: ItemStaffOut, seconds: number | null) =>
+    run(`dur-${it.id}`, () => updateItem(course.id, m.id, it.id, { duration_s: seconds }));
+  /** ↑ ↓ buttons: the same optimistic reorder as a drop; focus stays on the pressed button of the moved row. */
+  const moveItemBy = (m: ModuleStaffOut, ii: number, dir: -1 | 1) => {
+    if (busy) return;
+    const it = sortedItems(m)[ii];
+    if (!it) return;
+    moveItemTo(m, ii, ii + dir);
+    window.requestAnimationFrame(() => document.querySelector<HTMLElement>(`#mi-${it.id} [data-move="${dir < 0 ? "up" : "down"}"]`)?.focus());
+  };
+
   const onModuleMenu = (m: ModuleStaffOut, mi: number, id: string) => {
     setDialogError(null);
     if (id === "publish") toggleModulePublished(m);
@@ -477,6 +510,7 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
   const onAdd = (m: ModuleStaffOut, id: string) => {
     setDialogError(null);
     if (id === "ortExam") setDialog({ kind: "ortExam", module: m });
+    else if (id === "video") setDialog({ kind: "video", module: m });
     else if (id === "existing") setDialog({ kind: "addItem", module: m });
     // ORT courses take no new non-quiz assignments (7a): their "Assignment" entry picks an existing one
     else if (INLINE_KINDS.includes(id) && !(ortCourse && id === "assignment")) {
@@ -488,6 +522,7 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
   const addGroups: MenuGroup[] = [
     {
       id: "content", heading: t("coursePage.addGroups.content"), items: [
+        { id: "video", label: t("modules.editor.addVideo"), icon: <PlayCircle aria-hidden="true" /> },
         { id: "page", label: t("coursePage.addItems.page"), icon: <ItemKindIcon kind="page" /> },
         { id: "file", label: t("coursePage.addItems.file"), icon: <ItemKindIcon kind="file" /> },
         { id: "url", label: t("coursePage.addItems.link"), icon: <ItemKindIcon kind="url" /> },
@@ -503,6 +538,18 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
       ],
     },
     { id: "existing", separated: true, items: [{ id: "existing", label: t("coursePage.addExisting") }] },
+  ];
+
+  const kindIcon = (node: React.ReactNode) => <span aria-hidden="true" className="inline-flex text-slate-500 [&>svg]:h-4 [&>svg]:w-4">{node}</span>;
+  /** F5c (§6): the five buttons of a module's add row (the full grouped menu stays behind "Ещё"). */
+  const quickAdds: { id: string; label: string; icon: React.ReactNode }[] = [
+    { id: "video", label: t("modules.editor.addVideo"), icon: kindIcon(<PlayCircle />) },
+    { id: "page", label: t("coursePage.addItems.page"), icon: kindIcon(<ItemKindIcon kind="page" />) },
+    { id: "file", label: t("coursePage.addItems.file"), icon: kindIcon(<ItemKindIcon kind="file" />) },
+    ortCourse
+      ? { id: "ortExam", label: t("coursePage.addItems.ortExam"), icon: kindIcon(<ItemKindIcon kind="assignment" assignmentKind="quiz" />) }
+      : { id: "quiz", label: t("coursePage.addItems.quiz"), icon: kindIcon(<ItemKindIcon kind="assignment" assignmentKind="quiz" />) },
+    { id: "url", label: t("coursePage.addItems.link"), icon: kindIcon(<ItemKindIcon kind="url" />) },
   ];
 
   const allCollapsed = live.length > 0 && live.every((m) => collapsed.includes(m.id));
@@ -551,7 +598,8 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
   else if (!data) body = <LoadingState rows={3} />;
   else if (live.length === 0 && deleted.length === 0) {
     body = newModuleForm || (
-      <EmptyState mascot="working" title={t("modules.editor.emptyTitle")} action={canEdit ? newModuleButton : undefined} />
+      <EmptyState mascot="working" title={t("modules.editor.emptyTitle")} description={canEdit ? t("modules.editor.emptyBody") : undefined}
+        action={canEdit ? newModuleButton : undefined} />
     );
   } else {
     body = (
@@ -574,6 +622,14 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
           const renaming = inline?.type === "renameModule" && inline.id === m.id;
           const adding = inline?.type === "add" && inline.moduleId === m.id ? inline.kind : null;
           const addLabel = t("coursePage.add", { title: name });
+          // F5c: "5 уроков · 32 мин" (published lessons and their minutes, from the server)
+          const lessonsLine = [
+            m.lessons_count ? t("modules.editor.lessons", { n: m.lessons_count }) : "",
+            m.duration_s ? durationText(m.duration_s) : "",
+          ].filter(Boolean).join(" · ");
+          // F5c (§5): a free module that waits for a Pro one stays locked for students without access
+          const proPrereq = isPlatform && m.access_tier !== "paid"
+            && m.prerequisites.some((id) => live.find((x) => x.id === id)?.access_tier === "paid");
           return (
             <section key={m.id} id={`m-${m.id}`} aria-labelledby={headingId}
               onDragOver={canEdit ? onModuleDragOver(m) : undefined} onDrop={canEdit ? onModuleDrop(m, mi) : undefined}
@@ -601,6 +657,7 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
                         <p className="flex flex-wrap items-center gap-x-2 text-sm leading-5 text-slate-600 sm:shrink-0">
                           {!m.published && <span>{t("modules.editor.draft")}</span>}
                           {m.published && !canEdit && <span>{t("modules.editor.published")}</span>}
+                          {lessonsLine && <span>{lessonsLine}</span>}
                           {isCollapsed && <span>{t("coursePage.itemCount", { n: m.items.length })}</span>}
                           {details && (
                             <span title={details} className="inline-flex self-center">
@@ -612,12 +669,12 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
                       </div>
                       {canEdit && (
                         <div className="flex shrink-0 items-center">
+                          {/* F5c: only where the server accepts it (platform courses) */}
+                          {isPlatform && (
+                            <ProSwitch on={m.access_tier === "paid"} name={name} busy={busy === `pro-${m.id}`} onToggle={() => toggleModulePro(m)} />
+                          )}
                           <PublishToggle published={m.published} name={name} busy={busy === `pub-${m.id}`}
                             onToggle={() => toggleModulePublished(m)} />
-                          {/* an expanded empty module has one "+ Add": the small one in its body */}
-                          {(items.length > 0 || isCollapsed) && (
-                            <OutlineMenu label={addLabel} icon={<Plus aria-hidden="true" className="h-5 w-5" />} groups={addGroups} onSelect={(id) => onAdd(m, id)} />
-                          )}
                           <OutlineMenu label={t("modules.editor.actions")} sheetTitle={t("modules.editor.actionsFor", { title: name })}
                             onSelect={(id) => onModuleMenu(m, mi, id)} groups={[{
                             id: "module", items: [
@@ -641,6 +698,12 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
                 </div>
                 <div className="space-y-2 pb-2 pl-1 empty:hidden sm:pl-10">
                   {m.warnings.length > 0 && <Warnings warnings={m.warnings} />}
+                  {proPrereq && (
+                    <p role="note" className="flex items-start gap-1.5 text-sm leading-5 text-warning-900">
+                      <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-warning-700" />
+                      <span className="min-w-0 break-words">{t("modules.editor.proPrereqWarning")}</span>
+                    </p>
+                  )}
                   {m.published && ignoredReqItems(m).length > 0 && (
                     <div role="note" className="flex items-start gap-2 rounded-xl border border-warning-200 bg-warning-50 px-3 py-2 text-sm leading-6 text-warning-900">
                       <AlertTriangle aria-hidden="true" className="mt-1 h-4 w-4 shrink-0 text-warning-700" />
@@ -664,6 +727,8 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
                       const reqLine = it.requirement ? t("modules.editor.requirement", { text: reqText(it.requirement.type, it.requirement.threshold) }) : null;
                       const language = it.target?.language && it.kind === "page" ? t(`courses.languages.${it.target.language}`) : null;
                       const renamingItem = inline?.type === "renameItem" && inline.id === it.id;
+                      // F5c: a YouTube / Vimeo link reads as a video (the client guess; students get the player when the server agrees)
+                      const isVideo = it.kind === "url" && !!parseVideo(it.url);
                       return (
                         <li key={it.id} id={`mi-${it.id}`} onDragOver={canEdit ? onItemDragOver(it) : undefined} onDrop={canEdit ? onItemDrop(m, ii) : undefined}
                           className={cn("group/row flex min-h-11 items-center gap-1 px-1 sm:px-2", pad,
@@ -673,7 +738,9 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
                             <DragHandle scope="row" label={t("modules.editor.dragHandle", { title: iname })} onEnd={endDrag}
                               onStart={startDrag({ type: "item", id: it.id, moduleId: m.id }, `mi-${it.id}`)} />
                           )}
-                          <ItemKindIcon kind={it.kind} assignmentKind={it.target?.assignment_kind} className="ml-1 h-4 w-4 text-slate-500" />
+                          {isVideo
+                            ? <PlayCircle aria-hidden="true" className="ml-1 h-4 w-4 shrink-0 text-slate-500" />
+                            : <ItemKindIcon kind={it.kind} assignmentKind={it.target?.assignment_kind} className="ml-1 h-4 w-4 text-slate-500" />}
                           {renamingItem ? (
                             <InlineForm className="min-w-0 flex-1 py-1.5 pl-2 pr-1" label={t("coursePage.rename")} initial={iname} submitLabel={t("lms.common.save")}
                               busy={inlineBusy} error={inlineError} onSubmit={(v) => submitRenameItem(it, v)} onCancel={cancelInline} />
@@ -692,19 +759,26 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
                                   )}
                                 </div>
                                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm leading-5 text-slate-600 sm:shrink-0 sm:flex-nowrap sm:whitespace-nowrap">
-                                  {it.kind !== "header" && <span>{kindText(it.kind, it.target?.assignment_kind)}</span>}
+                                  {it.kind !== "header" && <span>{isVideo ? t("modules.editor.addVideo") : kindText(it.kind, it.target?.assignment_kind)}</span>}
                                   {!it.published && <span>{t("modules.editor.draft")}</span>}
-                                  {reqLine && (
-                                    <span title={reqLine} className="inline-flex">
-                                      <Flag aria-hidden="true" className="h-4 w-4 text-slate-500" />
+                                  {it.requirement && reqLine && (
+                                    <span title={reqLine} className="inline-flex items-center gap-1 sm:rounded-full sm:border sm:border-slate-200 sm:px-2 sm:text-xs sm:leading-5">
+                                      <Flag aria-hidden="true" className="h-4 w-4 text-slate-500 sm:h-3.5 sm:w-3.5" />
                                       <span className="sr-only">{reqLine}</span>
+                                      <span aria-hidden="true" className="hidden sm:inline">{reqText(it.requirement.type, it.requirement.threshold)}</span>
                                     </span>
                                   )}
                                   <Warnings warnings={it.warnings} />
                                 </div>
                               </div>
+                              {LESSON_KINDS.includes(it.kind) && (canEdit ? (
+                                <DurationChip seconds={it.duration_s} name={iname} onSave={(sec) => saveDuration(m, it, sec)} />
+                              ) : it.duration_s ? (
+                                <span className="shrink-0 px-1 text-sm text-slate-600">{durationText(it.duration_s)}</span>
+                              ) : null)}
                               {canEdit && (
                                 <div className="flex shrink-0 items-center">
+                                  <MoveButtons name={iname} first={ii === 0} last={ii === items.length - 1} onMove={(dir) => moveItemBy(m, ii, dir)} />
                                   <PublishToggle published={it.published} name={iname} busy={busy === `ip-${it.id}`}
                                     onToggle={() => toggleItemPublished(m, it)} />
                                   <OutlineMenu label={t("modules.editor.actionsFor", { title: iname })} onSelect={(id) => onItemMenu(m, it, ii, id)} groups={[{
@@ -737,13 +811,27 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
                     <InlineForm className="min-w-0 flex-1 pl-2 pr-1" submitLabel={t("modules.add.submit")} busy={inlineBusy} error={inlineError}
                       label={t("coursePage.inlineTitle", { kind: t(`coursePage.addItems.${adding === "url" ? "link" : adding}`) })}
                       url={adding === "url" ? { label: t("modules.add.url") } : undefined}
+                      minutes={adding === "url" ? { label: t("modules.editor.linkMinutes") } : undefined}
                       assignmentKinds={adding === "assignment" ? { label: t("assignments.create.kind"), options: INLINE_ASSIGNMENT_KINDS.map((k) => ({ value: k, label: t(`assignments.kinds.${k}`) })) } : undefined}
                       onSubmit={(v) => submitAdd(m.id, adding, v)} onCancel={cancelInline} />
                   </div>
-                ) : canEdit && items.length === 0 && (
-                  <div className="px-2 py-1 sm:px-3">
-                    <OutlineMenu trigger="button" variant="link" chevron={false} label={addLabel} text={t("modules.editor.addItem")}
-                      leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />} groups={addGroups} onSelect={(id) => onAdd(m, id)} />
+                ) : canEdit && (
+                  <div className={cn("px-2 py-2 sm:px-3", items.length > 0 && "border-t border-slate-100")}>
+                    {items.length === 0 && <p className="px-1 pb-1.5 text-sm leading-5 text-slate-600">{t("modules.editor.emptyModule")}</p>}
+                    {/* F5c: one tap per lesson kind from `sm`; phones get the same choices in one "Добавить" sheet */}
+                    <div role="group" aria-label={addLabel} className="flex flex-wrap items-center gap-1">
+                      {quickAdds.map((q) => (
+                        <button key={q.id} type="button" onClick={() => onAdd(m, q.id)}
+                          className={cn("hidden min-h-9 items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-brand-400 hover:bg-brand-50 hover:text-brand-800 sm:inline-flex", focusRing)}>
+                          <Plus aria-hidden="true" className="h-3.5 w-3.5 text-slate-500" />
+                          {q.icon}
+                          {q.label}
+                        </button>
+                      ))}
+                      <OutlineMenu trigger="button" variant="link" chevron label={addLabel} groups={addGroups} onSelect={(id) => onAdd(m, id)}
+                        leftIcon={<Plus aria-hidden="true" className="h-4 w-4 sm:hidden" />}
+                        text={<><span className="sm:hidden">{t("modules.editor.addMenu")}</span><span className="hidden sm:inline">{t("modules.editor.addMore")}</span></>} />
+                    </div>
                   </div>
                 )}
               </div>
@@ -858,6 +946,17 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
           onConfirm={() => void run("delItem", () => deleteItem(course.id, d.item.module_id, d.item.id), { inDialog: true })} onCancel={closeDialog} />
       )}
       {d?.kind === "progress" && <ProgressDrawer open onClose={closeDialog} />}
+      {d?.kind === "video" && (
+        <VideoDialog open module={d.module} courseId={course.id} editLang={editLang} defaultLang={course.default_language}
+          onAdded={() => { closeDialog(); void load(); onChanged?.(); }} onClose={closeDialog} />
+      )}
+      {d?.kind === "pro" && (
+        <ConfirmDialog open busy={busy === `pro-${d.module.id}`} title={t("modules.editor.proConfirmTitle")} object={moduleName(d.module)}
+          effect={t("modules.editor.proConfirmBody")} confirmLabel={t("modules.editor.proConfirm")} error={dialogError ?? undefined}
+          onConfirm={() => void run(`pro-${d.module.id}`, () => updateModule(course.id, d.module.id, { access_tier: "paid" }),
+            { inDialog: true, success: t("modules.editor.toastPro", { title: moduleName(d.module) }) })}
+          onCancel={closeDialog} />
+      )}
       {d?.kind === "publishWarn" && (
         <ConfirmDialog open busy={busy === `pub-${d.module.id}`} title={t("modules.warnings.requirementIgnoredTitle")} object={moduleName(d.module)}
           effect={t("modules.warnings.requirementIgnoredBody", { item: d.names })} confirmLabel={t("modules.editor.publishAnyway")}

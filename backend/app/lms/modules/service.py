@@ -655,7 +655,8 @@ def _module_staff_out(st: ev_mod.Structure, m: CourseModule) -> sch.ModuleStaffO
 
 def staff_outline(db: Session, course: Course, *, include_deleted: bool = False) -> sch.ModulesStaffOut:
     st = ev_mod.load_structure(db, course, include_deleted=include_deleted)
-    return sch.ModulesStaffOut(modules=[_module_staff_out(st, m) for m in st.modules + st.deleted_modules])
+    return sch.ModulesStaffOut(modules=[_module_staff_out(st, m) for m in st.modules + st.deleted_modules],
+                               is_platform_course=is_platform_course(db, course))  # F5c
 
 
 def staff_module_out(db: Session, course: Course, module_id: uuid.UUID) -> sch.ModuleStaffOut:

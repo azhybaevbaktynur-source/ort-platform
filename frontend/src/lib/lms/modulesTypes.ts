@@ -139,6 +139,8 @@ export interface ModuleStaffOut {
 
 export interface ModulesStaffOut {
   modules: ModuleStaffOut[];
+  /** F5c: the server accepts `access_tier = paid` here (platform course); the editor shows the Pro switch only then */
+  is_platform_course?: boolean;
 }
 
 export interface QuizItemOut {

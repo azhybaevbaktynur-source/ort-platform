@@ -113,7 +113,7 @@ async def test_locked_details_name_only_published_modules(db, api):
 async def test_staff_shape(db, api):
     w = _world(db)
     out = (await api.call(w.O, "GET", f"{C(w)}/modules")).json()
-    assert set(out) == {"modules"}
+    assert set(out) == {"modules", "is_platform_course"}  # F5c: the editor's Pro switch
     assert [m["title"]["en"] for m in out["modules"]] == ["Visible", "HIDDEN-MODULE"]
     mod = out["modules"][0]
     assert {"rules_version", "prerequisites", "warnings", "published", "position", "items", "deleted_at"} <= set(mod)
