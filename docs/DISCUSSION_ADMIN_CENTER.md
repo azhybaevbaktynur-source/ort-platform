@@ -121,3 +121,11 @@ Not urgent, but they shouldn't get lost. I'd do them within part A or B:
 - `make_admin.py` also makes the person an approved teacher, skipping the new age and disabled checks.
 - Enabling a user doesn't check whether their data was already deleted through a privacy request.
 - `PATCH` for course template locks exists with no screen, and two cleanup tools have no screen: test-student files and old practice data.
+
+## 8. Revision 2026-11-06: the new direction
+The owner chose individual students first, ORT first, free and paid exams, and tutors and schools later (`ROADMAP_EXAM_PREP.md`). The facts above were rechecked: no admin code changed since 2026-11-03. What the new direction changes:
+- **Order:** A (protect control) → B (person page) **together with payments control** → D in a light form (real health, banner) → C → E. Teachers are few for now, so C and E wait; E returns with tutors and schools.
+- **New, A10:** payments control: see a student's access and codes, grant or extend access with a reason, create code batches, see how many were used. Every action is recorded.
+- **New, A11:** for the AI chat when it comes: a monthly cost limit and an off switch on the admin page.
+- **A8** has no effect until tutors and schools return.
+- Defaults A1–A7 and A9 stand. A2 and A3 are built in S1; A9 in S4.
