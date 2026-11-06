@@ -11,10 +11,47 @@ const A = "/platform/access";
 
 // ------------------------------------------------------------------ student
 
-export interface MyAccessOut { active: boolean; ends_at: string | null; scope: "all"; practice_free: boolean }
+// F6a Pro (docs/phases/SUBSCRIPTION_DESIGN.md): a plan is only the length a pass was granted or bought with.
+export type PlanId = "month_1" | "month_3" | "season";
+export type PassSource = "code" | "admin" | "payment";
+
+export interface MyAccessOut {
+  active: boolean;
+  ends_at: string | null;
+  scope: "all";
+  practice_free: boolean;
+  /** Of the pass that ends the chain; null when inactive (or a legacy, voucher or custom-length pass). */
+  plan: PlanId | null;
+  /** Whole days left, rounded up; 0 when inactive. */
+  days_left: number;
+  source: PassSource | null;
+}
 export interface RedeemOut extends MyAccessOut { pass_ends_at: string }
 
+export interface OfferPlanOut {
+  id: PlanId;
+  days: number | null;
+  /** The season plan: valid all that day (Asia/Bishkek). */
+  season_end: string | null;
+  /** null: the owner set no price, show none. */
+  price_kgs: number | null;
+  /** The chain end after this plan. */
+  new_ends_at: string;
+}
+export interface HowToPay { ru: string; ky: string; en: string }
+export interface OfferOut {
+  /** The season plan is listed only when a season end is set, not passed, and later than the current end. */
+  plans: OfferPlanOut[];
+  includes: ("tests" | "practice" | "lessons")[];
+  practice_free: boolean;
+  /** ky/en fall back to ru; empty: show the `access.howToPay` placeholder. */
+  how_to_pay: HowToPay;
+  season_end: string | null;
+  status: { active: boolean; ends_at: string | null; plan: PlanId | null; days_left: number; source: PassSource | null };
+}
+
 export const getMyAccess = () => lmsFetch<MyAccessOut>("/me/access");
+export const getMyOffer = () => lmsFetch<OfferOut>("/me/access/offer");
 export const redeemCode = (code: string) => post<RedeemOut>("/me/access/redeem", { code });
 
 /** "until" date of a pass: the last minute it is valid, in Bishkek time (a pass ends at the start of its last
@@ -110,13 +147,13 @@ export async function exportBatch(id: string): Promise<{ name: string; blob: Blo
 
 // ------------------------------------------------------------------ admin: a person's passes
 
-export type PassSource = "code" | "admin" | "payment";
 export interface PassOut {
   id: string;
   scope: string;
   starts_at: string;
   ends_at: string;
   source: PassSource;
+  plan: PlanId | null;
   code_last4: string | null;
   granted_by: string | null;
   reason: string | null;
@@ -129,9 +166,46 @@ export interface RedemptionOut { code_id: string; last4: string; redeemed_at: st
 export interface UserAccessOut { active: boolean; ends_at: string | null; passes: PassOut[]; redemptions: RedemptionOut[] }
 
 export const getUserAccess = (userId: string) => lmsFetch<UserAccessOut>(`/platform/users/${enc(userId)}/access`);
-export const grantAccess = (userId: string, body: { duration_days?: number; ends_on?: string; reason: string }) =>
+/** Exactly one of `plan`, `duration_days`, `ends_on`. Renewal is a grant: an active chain is extended from its end. */
+export const grantAccess = (userId: string,
+  body: { plan?: PlanId; duration_days?: number; ends_on?: string; reason: string }) =>
   post<UserAccessOut>(`/platform/users/${enc(userId)}/access/grant`, body);
+/** Revokes every open pass of the person (one audit event with the reason). */
+export const cancelPro = (userId: string, reason: string) =>
+  post<UserAccessOut>(`/platform/users/${enc(userId)}/access/cancel`, { reason });
 export const revokePass = (passId: string, reason: string) => post<UserAccessOut>(`${A}/passes/${enc(passId)}/revoke`, { reason });
+
+// ------------------------------------------------------------------ admin: F6a Pro list and settings
+
+export type ProStatus = "active" | "expiring" | "expired";
+export interface ProRowOut {
+  user_id: string;
+  name: string | null;
+  email: string | null;
+  /** The chain end. */
+  ends_at: string;
+  started_at: string;
+  days_left: number;
+  active: boolean;
+  plan: PlanId | null;
+  source: PassSource | null;
+}
+export interface ProSummaryOut { active: number; expiring: number; expired: number }
+export interface ProPrices { month_1: number | null; month_3: number | null; season: number | null }
+export interface ProSettingsOut { season_end: string | null; prices: ProPrices; how_to_pay: HowToPay }
+/** A patch: a key left out keeps the stored value, an explicit null clears it. */
+export interface ProSettingsIn {
+  season_end?: string | null;
+  prices?: Partial<ProPrices>;
+  how_to_pay?: Partial<{ [K in keyof HowToPay]: string | null }>;
+}
+
+export const listPro = (p: { status?: ProStatus | ""; q?: string; cursor?: string | null; limit?: number } = {}) =>
+  lmsFetch<PageOut<ProRowOut>>(`${A}/pro`, { params: { limit: 25, ...p } });
+export const getProSummary = () => lmsFetch<ProSummaryOut>(`${A}/pro/summary`);
+export const getProSettings = () => lmsFetch<ProSettingsOut>(`${A}/settings`);
+export const putProSettings = (body: ProSettingsIn) =>
+  lmsFetch<ProSettingsOut>(`${A}/settings`, { method: "PUT", body });
 
 // ------------------------------------------------------------------ admin: paid/free
 
