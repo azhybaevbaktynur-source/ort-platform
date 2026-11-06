@@ -22,6 +22,7 @@ from app.lms.access.models import AccessPass
 from app.lms.assignments.models import AssignmentSubmission
 from app.lms.attempts.models import Attempt, AttemptItem
 from app.lms.core import clock
+from app.lms.email_change.models import EmailChangeRequest  # S4
 from app.lms.enrollments.models import Enrollment
 from app.lms.files.models import Asset
 from app.lms.grading.models import CourseGrade, Submission
@@ -77,6 +78,9 @@ def sections() -> list[Section]:
         # S3 access: own passes; never the buyer's name on a sold code (design 7.5) nor an admin's reason
         Section("access_passes", _cols(AccessPass, "id", "scope", "source", "revoked_at", "created_at"),
                 lambda uid: AccessPass.user_id == uid, AccessPass.id),
+        # S4: a pending email change (never the token)
+        Section("email_change_requests", _cols(EmailChangeRequest, "id", "expires_at", "created_at"),
+                lambda uid: EmailChangeRequest.user_id == uid, EmailChangeRequest.id),
     ]
 
 

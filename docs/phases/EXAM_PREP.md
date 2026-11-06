@@ -12,3 +12,10 @@
 - Security review (Fable) findings fixed before deploy: gate covered only `/platform/*`, enrollment hijack, removal deadlock, burst brute force.
 - Tests at deploy: SQLite 4201 passed; PG 4288 passed; migrations 15; CI green (7 jobs).
 - Owner action: on the next visit to the admin panel, set up two-step login (an authenticator app such as Google Authenticator), keep the recovery codes offline; then create the spare admin (A3).
+
+## S3 free and paid exams: deployed 2026-11-06 (`main` 7dbe770, migration `0022_access`)
+- Platform-course tests have a tier (free/paid); new tests in platform courses start paid, every existing test was set free; practice in existing platform courses starts free (`practice_free` true) so nothing locked on deploy. The owner switches tiers on Admin → Доступ → Платные экзамены.
+- A pass (scope `all`) unlocks every paid exam; it comes from an activation code (Admin → Доступ → batches: duration or end date, a note such as the price; codes copied/revealed one by one, marked as sold with a note, CSV export; all audited) or an admin grant on the user page (reason, max 400 days). Students redeem on `/unlock`; locked cards show "Платный" and a lock; the exam-prep Next card skips locked tests.
+- Rules from the design and the security review: a timed attempt finishes after a pass ends, an untimed one waits (answers kept); test students and staff never locked; per-user row lock on redeem/grant; Bishkek end of day; no-benefit codes refused; buyer note erased on revoke and 90 days after redemption; redeem network limit always on; revoke shifts later passes; `python -m app.lms.access.rekey` after a key rotation.
+- Owner to fill: `access.howToPay` (how to pay, e.g. QR transfer and contact), now a placeholder.
+- Tests at deploy: SQLite 4239, PG 4329, migration/concurrency 49, CI green.

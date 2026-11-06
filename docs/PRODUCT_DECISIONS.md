@@ -568,3 +568,4 @@ The owner agreed: the platform admin controls every organization, an organizatio
 Done the same day: «основной орт тест цоомо» (a test course of an independent teacher) unlisted from the catalog at the owner's request, recorded in the audit log; its 3 students keep access.
 Agent: slices S1–S6 and defaults D1–D7 in `ROADMAP_EXAM_PREP.md`; the admin review's order revised (section 8 of `DISCUSSION_ADMIN_CENTER.md`, new A10 payments control, A11 AI limits).
 Owner 2026-11-06: D1 yes: Neon backups before phases 7b, 7c, 8a and 8b deleted (6/10 branches left). D7: «НЦТ» is the Национальный центр тестирования, the state body under the Ministry of Education and Science that runs independent testing of school students; its tests come after ORT.
+Owner 2026-11-06: OK to delete `backup-2026-11-01-before-phase9`; deleted (8/10 branches).

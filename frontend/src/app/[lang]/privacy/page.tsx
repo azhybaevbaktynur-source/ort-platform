@@ -8,6 +8,7 @@ import { fmtApiDate, parseApiDate } from "@/lib/format";
 import { Badge, Button, Card, ErrorState, LinkButton, LoadingState, PageHeader } from "@/components/ui";
 import { AgeButtons } from "@/components/privacy/AgeButtons";
 import { DataRequests } from "@/components/privacy/DataRequests";
+import { EmailCard } from "@/components/privacy/EmailCard"; // S4 email change
 import { ParentCode } from "@/components/privacy/ParentCode";
 import { ParentsList } from "@/components/privacy/ParentsList";
 import { PolicyAccept } from "@/components/privacy/PolicyAccept";
@@ -148,6 +149,7 @@ export default function PrivacyPage() {
     <div className="max-w-3xl">
       <PageHeader title={title} />
       <div className="space-y-4">
+        <EmailCard />
         {state.age_band === null ? <ChooseAge onDone={setState} /> : (
           <>
             <Card title={t("privacy.age.label")}>

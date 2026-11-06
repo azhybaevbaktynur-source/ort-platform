@@ -117,6 +117,14 @@
       "useRecovery": "Use a recovery code",
       "useApp": "Use the code from the app",
       "back": "Back to sign in"
+    },
+    "confirmEmail": {
+      "title": "Confirm your new email address",
+      "subtitle": "Press the button to change the email address of your account.",
+      "button": "Confirm address",
+      "successTitle": "Address changed",
+      "successBody": "Sign in with {email} from now on. Every earlier session has ended.",
+      "missing": "The link has no code. Open the whole link from the email."
     }
   },
   "lms": {
@@ -304,7 +312,18 @@
       "activation_code_not_found": "Code not found.",
       "code_not_available": "This code is used or revoked.",
       "pass_not_found": "Pass not found.",
-      "pass_already_revoked": "This pass is already revoked."
+      "pass_already_revoked": "This pass is already revoked.",
+      "password_incorrect": "Wrong password.",
+      "email_taken": "This address is already used by another account.",
+      "email_same": "This is already the account's address.",
+      "email_change_invalid": "This link no longer works: it was already used or a newer one was requested.",
+      "email_change_expired": "This link has expired. Ask for the address change again.",
+      "email_change_conflict": "The change was just requested again. Refresh the page.",
+      "email_send_failed": "The email could not be sent. Try again later.",
+      "user_deleted": "This account was deleted.",
+      "target_is_platform_admin": "A platform admin changes their own address on their account page.",
+      "reset_cooldown": "An email was just sent. Wait a little before sending another.",
+      "email_change_not_found": "No email change is waiting."
     }
   },
   "courses": {
@@ -518,7 +537,8 @@
     },
     "accountStatus": {
       "disabled": "Disabled",
-      "admin": "Admin"
+      "admin": "Admin",
+      "active": "Active"
     },
     "requests": {
       "title": "Teacher requests",
@@ -570,7 +590,12 @@
       "ownedCourses": "Owned courses",
       "noCourses": "No courses.",
       "requestHistory": "Teacher requests",
-      "revokeImpact": "Students frozen: {students}. Courses frozen: {courses}. They can't start tests or hand in work. The person can no longer create courses."
+      "revokeImpact": "Students frozen: {students}. Courses frozen: {courses}. They can't start tests or hand in work. The person can no longer create courses.",
+      "filterUnverified": "Email not confirmed",
+      "filterAdmins": "Platform admins",
+      "filterAccess": "Has exam access",
+      "lastLogin": "Last sign-in",
+      "neverLoggedIn": "Never"
     },
     "courses": {
       "title": "Courses",
@@ -5651,6 +5676,24 @@
       "delete_blocked_test_student": "Test student",
       "guardian_holds_consent": "This parent is the only one who gave consent",
       "guardian_limit": "Too many parents linked"
+    },
+    "email": {
+      "title": "Email address",
+      "current": "Current address",
+      "change": "Change address",
+      "newEmail": "New email address",
+      "password": "Current password",
+      "passwordHint": "Needed to confirm that it is you.",
+      "submit": "Send link",
+      "cancel": "Cancel",
+      "sent": "We sent a link to {email}. Open it within 24 hours. Until then, sign in with your current address.",
+      "sentByAdmin": "An administrator asked to change your address to {email}. Open the link in the email sent to that address.",
+      "after": "After you confirm, you are signed out on every device and sign in with the new address.",
+      "cancelPending": "Cancel the change",
+      "cancelled": "The address change was cancelled",
+      "requested": "Link sent to {email}",
+      "invalid": "Enter the full address, for example name@mail.kg",
+      "codeHint": "Platform admins also give the code from the authenticator app."
     }
   },
   "guardian": {
@@ -6163,5 +6206,77 @@
         "redemption": "…{last4} · {batch}"
       }
     }
+  },
+  "person": {
+    "lastLogin": "Last sign-in",
+    "never": "No sign-ins yet",
+    "age": "Age",
+    "ageUnknown": "Not given",
+    "consent": "Consent to data processing",
+    "consentState": {
+      "legacy": "Not given yet (older account)",
+      "ok": "Given",
+      "pending_guardian": "Waiting for a parent's consent",
+      "exempt": "Not needed"
+    },
+    "consentDue": "until {date}",
+    "parents": "Parents",
+    "children": "Children",
+    "linksNone": "None",
+    "linksMore": "and {count} more",
+    "noName": "No name",
+    "pendingEmail": "Email change waiting",
+    "pendingEmailValue": "{email}, link valid until {date}",
+    "pendingByAdmin": "started by an admin",
+    "resetPassword": "Send a password reset link",
+    "resetTitle": "Send a password reset email?",
+    "resetBody": "A link goes to the account's address. The person sets a new password with it; until then the old password still works.",
+    "resetSend": "Send link",
+    "resetDone": "The reset email was sent to {email}",
+    "changeEmail": "Change email",
+    "changeEmailTitle": "Change the email address?",
+    "changeEmailBody": "A confirmation link goes to the new address and is valid for 24 hours. The address changes only when the link is opened. Then every session of the account ends, and the old address gets a notice.",
+    "newEmail": "New email address",
+    "invalidEmail": "Enter the full address, for example name@mail.kg",
+    "changeEmailSend": "Send link",
+    "changeEmailDone": "The confirmation link was sent to {email}",
+    "correctAge": "Correct the age",
+    "correctAgeTitle": "Correct the age group?",
+    "correctAgeBody": "Under 14 needs a parent's consent; the person gets a grace period for it. Correcting upwards never gives consent on the person's behalf: they accept the documents themselves.",
+    "ageNew": "Age group",
+    "ageSave": "Save",
+    "ageDone": "The age group was corrected",
+    "ageSame": "Choose a different age group.",
+    "attempts": {
+      "title": "Test attempts",
+      "hint": "Only the status and how many answers were saved. Answers and scores are never shown here.",
+      "empty": "No attempts.",
+      "course": "Course",
+      "test": "Test",
+      "status": "Status",
+      "started": "Started",
+      "finished": "Submitted or closed",
+      "saved": "Saved answers",
+      "savedValue": "{saved} of {total}",
+      "practice": "Practice",
+      "more": "Show more",
+      "statusValue": {
+        "in_progress": "In progress",
+        "submitted": "Submitted",
+        "needs_review": "Waiting for review",
+        "graded": "Checked",
+        "void": "Voided"
+      },
+      "reason": {
+        "manual": "by the student",
+        "timeout": "time ran out",
+        "sweep": "closed automatically",
+        "closed": "closed"
+      }
+    },
+    "cancelEmail": "Cancel the email change",
+    "cancelEmailTitle": "Cancel the email change?",
+    "cancelEmailBody": "The confirmation link stops working and the account keeps its current address.",
+    "cancelEmailDone": "The email change was cancelled"
   }
 }

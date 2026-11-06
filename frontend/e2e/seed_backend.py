@@ -778,8 +778,34 @@ def seed_access(api: Api, log: Path, tok: str, root: Path) -> dict:
     student["profile"] = profile(api, student["token"])
     api.call("POST", "/courses/join", student["token"], {"code": course["join_code"]})
     return {"course_id": cid, "free_exam": free, "paid_exam": paid, "student": student,
-            "counts": [len(picks[k]) for k in SECTIONS]}
+            "counts": [len(picks[k]) for k in SECTIONS], "join_code": course["join_code"]}
 # --- S3 access end ---
+
+
+# --- S4 person page begin --- (frontend/e2e/person.spec.ts; written after every other row)
+def seed_person(api: Api, log: Path, access: dict) -> dict:
+    """A student with a password in the S3 course who left its free exam open with three saved answers (the attempt
+    lookup shows it in progress); the spec changes this student's email from the admin person page."""
+    student = register(api, log, "e2e-person-student@example.com", "Person Student", keep_password=True)
+    student["profile"] = profile(api, student["token"])
+    tok = student["token"]
+    api.call("POST", "/courses/join", tok, {"code": access["join_code"]})
+    cid, aid = access["course_id"], access["free_exam"]["id"]
+    st = api.call("POST", f"/courses/{cid}/assessments/{aid}/attempts", tok, {"language": "ru"})
+    tid = st["id"]
+    content = api.call("GET", f"/attempts/{tid}/content?section=1", tok)
+    first = sorted((i for i in st["items"] if i["section_pos"] == 1), key=lambda i: i["position"])[:3]
+    answers = []
+    for n, it in enumerate(first):
+        q = content["questions"][it["qv"]]
+        if q["type"] == "comparison":
+            resp = {"choice": "A"}
+        else:
+            resp = {"choice_id": (it.get("choice_order") or [c["id"] for c in q["data"]["choices"]])[0]}
+        answers.append({"position": it["position"], "response": resp, "client_ts": 2000 + n})
+    api.call("PUT", f"/attempts/{tid}/answers", tok, {"answers": answers})
+    return {"student": student, "attempt_id": tid, "saved": len(answers), "items": len(st["items"])}
+# --- S4 person page end ---
 
 
 def main() -> int:
@@ -863,6 +889,7 @@ def main() -> int:
     exam_prep = seed_exam_prep(api, log)  # Exam prep S2 (after every other row)
     freed = free_platform_exams(api, tok)  # S3 access: the other seeds' platform tests stay free, as on production
     access = seed_access(api, log, tok, root)  # S3 access (after every other row)
+    person = seed_person(api, log, access)  # S4 person page (after every other row)
     # S1 admin security: a second platform admin, with a password, for the two-step login walk (admin-mfa.spec.ts)
     mfa_admin = register(api, log, "e2e-mfa-admin@example.com", "MFA Admin", keep_password=True)
     subprocess.run([sys.executable, str(root / "backend" / "make_admin.py"), mfa_admin["email"]], check=True,
@@ -890,6 +917,7 @@ def main() -> int:
         "teacher_signup": teacher_signup,
         "exam_prep": exam_prep,
         "access": access,
+        "person": person,
         "mfa_admin": mfa_admin,
         "gate_admin": extra_admins["gate"], "shots_admin": extra_admins["shots"],
         "api": args.api, "course_id": cid, "bank_id": bank_id, "exam": exam, "staff_exam": staff_exam,

@@ -226,13 +226,41 @@ export interface AdminUserOut {
   disabled_reason: string | null;
   /** S1: two-step login is on. */
   mfa_enabled?: boolean;
+  /** S4: the last full sign-in (password or email code, and the two-step login step); never a token refresh. */
+  last_login_at?: string | null;
 }
+/** S4 person page: the other side of an active parent link (display name only). */
+export interface LinkedAccountOut { id: string; display_name: string | null }
 export interface AdminUserDetailOut extends AdminUserOut {
   owned_courses: CourseCard[];
   active_enrollment_count: number;
   teacher_requests: TeacherRequestAdminOut[];
   /** Who a revoke freezes: the user's personal organization. */
   revoke_impact: { students: number; courses: number };
+  // --- S4 person page ---
+  age_band?: "under_14" | "14_17" | "18_plus" | null;
+  consent_state?: "legacy" | "ok" | "pending_guardian" | "exempt";
+  consent_due_at?: string | null;
+  deleted?: boolean;
+  parent_links?: { parents_count: number; parents: LinkedAccountOut[]; children_count: number; children: LinkedAccountOut[] } | null;
+  pending_email_change?: { new_email: string; expires_at: string; by_admin: boolean } | null;
+}
+/** S4 attempt lookup: where an attempt stands. Never answers, scores or grades. */
+export interface AdminAttemptOut {
+  id: string;
+  course_id: string;
+  course_title: LocalizedText;
+  course_default_language: Lang;
+  assessment_id: string;
+  assessment_title: LocalizedText;
+  status: "in_progress" | "submitted" | "needs_review" | "graded" | "void";
+  is_practice: boolean;
+  language: string;
+  started_at: string;
+  submitted_at: string | null;
+  submit_reason: "manual" | "timeout" | "sweep" | "closed" | null;
+  item_count: number;
+  saved_answers: number;
 }
 export interface AdminCourseOut {
   id: string;
@@ -304,6 +332,10 @@ export const LMS_ERROR_CODES = [
   "access_required", "code_invalid", "code_no_benefit", "grant_no_benefit", "grant_too_long", "grant_date_passed",
   "grant_length_required", "batch_length_required", "batch_date_passed", "batch_already_revoked", "batch_not_found",
   "activation_code_not_found", "code_not_available", "pass_not_found", "pass_already_revoked",
+  // S4 person page: email change, password reset
+  "password_incorrect", "email_taken", "email_same", "email_change_invalid", "email_change_expired",
+  "email_change_conflict", "email_send_failed", "user_deleted", "target_is_platform_admin", "reset_cooldown",
+  "email_change_not_found",
 ] as const;
 export type LmsErrorCode = (typeof LMS_ERROR_CODES)[number];
 

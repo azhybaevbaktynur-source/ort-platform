@@ -65,6 +65,7 @@ run_env=(
   LMS_STORAGE_DRIVER=db
   R2_ACCOUNT_ID= R2_ACCESS_KEY_ID= R2_SECRET_ACCESS_KEY=
   EMAIL_PROVIDER=console
+  EMAIL_CONSOLE_SHOW_PRIVATE=true  # S4: email-change links are private emails; the spec reads them from the log
   RATE_LIMIT_IP_ENFORCE=false
   ADMIN_MFA_REQUIRED=false  # S1: the seeded admins have no two-step login; admin-mfa.spec.ts sets it up for its own
   SECRET_KEY="$SECRET_KEY"

@@ -33,6 +33,7 @@ from app.lms.files.models import Asset
 from app.lms.grading.models import Submission
 from app.lms.guardian.models import GuardianLink, GuardianPairingCode
 from app.lms.mfa.models import MfaRecoveryCode
+from app.lms.email_change.models import EmailChangeRequest  # S4
 from app.lms.access.models import AccessPass, ActivationCode  # S3 access
 from app.lms.organizations.ids import personal_org_id
 from app.lms.organizations.models import Invitation, Organization
@@ -44,7 +45,7 @@ from app.models.user import User
 
 UNUSABLE_PASSWORD_HASH = "!"  # never a bcrypt hash: verify_password() is always False
 DELETED_INVITATION_EMAIL = "deleted@deleted.invalid"
-SCRUBBED_AUDIT_KEYS = ("email", "display_name", "age_band_from", "age_band_to")
+SCRUBBED_AUDIT_KEYS = ("email", "display_name", "age_band_from", "age_band_to", "old_email", "new_email")  # S4
 
 
 def block_code(db: Session, user: User) -> Optional[str]:
@@ -168,6 +169,7 @@ def _scrub_user(user: User, actor_id: str, now) -> None:
     user.token_version = (user.token_version or 0) + 1
     user.consent_state, user.consent_due_at = "exempt", None
     user.mfa_secret_enc = user.mfa_pending_secret_enc = user.mfa_enabled_at = user.mfa_last_step = None  # S1
+    user.last_login_at = None  # S4
 
 
 def anonymize_user(db: Session, user_id: str, *, actor_id: str) -> dict[str, int]:
@@ -205,6 +207,7 @@ def anonymize_user(db: Session, user_id: str, *, actor_id: str) -> dict[str, int
     _scrub_guardians(db, user_id, actor_id, now)
     _scrub_user(user, actor_id, now)
     db.execute(delete(MfaRecoveryCode).where(MfaRecoveryCode.user_id == user_id))  # S1 admin security
+    db.execute(delete(EmailChangeRequest).where(EmailChangeRequest.user_id == user_id))  # S4 email change
     # S3 access (design 7.5): passes stay (revenue record) without the admin's reason; the buyer on a redeemed code goes
     db.execute(update(AccessPass).where(AccessPass.user_id == user_id).values(reason=None)
                .execution_options(synchronize_session=False))

@@ -27,9 +27,16 @@ export default function AdminUsersPage() {
   const q = useDebounced(input);
   const [status, setStatus] = useState<TeacherStatus | "">("");
   const [disabledOnly, setDisabledOnly] = useState(false);
+  // S4 filters: never-confirmed accounts, platform admins, people with exam access now
+  const [unverified, setUnverified] = useState(false);
+  const [adminsOnly, setAdminsOnly] = useState(false);
+  const [withAccess, setWithAccess] = useState(false);
   const fetchPage = useCallback(
-    (cursor: string | null) => listUsers({ q, teacher_status: status, disabled: disabledOnly ? true : undefined, cursor }),
-    [q, status, disabledOnly],
+    (cursor: string | null) => listUsers({
+      q, teacher_status: status, disabled: disabledOnly ? true : undefined, cursor,
+      email_unverified: unverified || undefined, platform_admin: adminsOnly || undefined, has_access: withAccess || undefined,
+    }),
+    [q, status, disabledOnly, unverified, adminsOnly, withAccess],
   );
   const list = useCursorList(fetchPage);
   const state = useTableState(list);
@@ -49,9 +56,9 @@ export default function AdminUsersPage() {
       key: "account", header: t("platformAdmin.users.account"),
       cell: (u) => {
         const system = isSystemAccount(u); // Phase 6 S4 (admin M5)
-        if (!system && !u.is_platform_admin && !u.disabled_at) return <span className="text-slate-500">—</span>;
         return (
           <span className="inline-flex flex-wrap justify-end gap-1 sm:justify-start">
+            {!u.disabled_at && !system && <UserStatusBadge kind="account" status="active" />}
             {system && <SystemAccountBadge />}
             {u.is_platform_admin && <UserStatusBadge kind="account" status="admin" />}
             {u.disabled_at && <UserStatusBadge kind="account" status="disabled" />}
@@ -60,8 +67,9 @@ export default function AdminUsersPage() {
       },
     },
     { key: "created", header: t("platformAdmin.users.created"), nowrap: true, cell: (u) => fmtApiDate(u.created_at, lang) },
+    { key: "login", header: t("platformAdmin.users.lastLogin"), nowrap: true, cell: (u) => u.last_login_at ? fmtApiDate(u.last_login_at, lang) : <span className="text-slate-500">{t("platformAdmin.users.neverLoggedIn")}</span> },
   ];
-  const filtered = !!(q || status || disabledOnly);
+  const filtered = !!(q || status || disabledOnly || unverified || adminsOnly || withAccess);
   return (
     <div>
       <PageHeader title={t("platformAdmin.users.title")} breadcrumbs={crumbs({ label: t("platformAdmin.users.title") })} />
@@ -74,11 +82,14 @@ export default function AdminUsersPage() {
         search={
           <FilterBar
             search={{ value: input, onChange: setInput, label: t("lms.common.search"), placeholder: t("platformAdmin.users.searchPlaceholder") }}
-            canReset={filtered} onReset={() => { setInput(""); setStatus(""); setDisabledOnly(false); }}
+            canReset={filtered} onReset={() => { setInput(""); setStatus(""); setDisabledOnly(false); setUnverified(false); setAdminsOnly(false); setWithAccess(false); }}
           >
             <Select label={t("platformAdmin.users.teacherStatus")} value={status} onChange={(e) => setStatus(e.target.value as TeacherStatus | "")}
               options={STATUSES.map((s) => ({ value: s, label: s ? t(`platformAdmin.teacherStatus.${s}`) : t("platformAdmin.users.anyStatus") }))} />
             <Checkbox label={t("platformAdmin.users.disabledOnly")} checked={disabledOnly} onChange={(e) => setDisabledOnly(e.target.checked)} />
+            <Checkbox label={t("platformAdmin.users.filterUnverified")} checked={unverified} onChange={(e) => setUnverified(e.target.checked)} />
+            <Checkbox label={t("platformAdmin.users.filterAdmins")} checked={adminsOnly} onChange={(e) => setAdminsOnly(e.target.checked)} />
+            <Checkbox label={t("platformAdmin.users.filterAccess")} checked={withAccess} onChange={(e) => setWithAccess(e.target.checked)} />
           </FilterBar>
         }
         empty={<EmptyState title={t("platformAdmin.users.empty")} />}
