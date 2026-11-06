@@ -5118,7 +5118,9 @@
       "durationHours": "{h} саат",
       "durationHoursMin": "{h} саат {m} мүн",
       "aboutTests": "Тесттер",
-      "aboutDuration": "Узактыгы"
+      "aboutDuration": "Узактыгы",
+      "emptyTitle": "Азырынча сабактар жок",
+      "emptyBody": "Сабактар жарыяланганда ушул жерде пайда болот."
     },
     "lesson": {
       "back": "Бардык сабактар",

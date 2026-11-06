@@ -5118,7 +5118,9 @@
       "durationHours": "{h} h",
       "durationHoursMin": "{h} h {m} min",
       "aboutTests": "Tests",
-      "aboutDuration": "Duration"
+      "aboutDuration": "Duration",
+      "emptyTitle": "No lessons yet",
+      "emptyBody": "Lessons will appear here once they are published."
     },
     "lesson": {
       "back": "All lessons",

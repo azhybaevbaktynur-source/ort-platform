@@ -242,8 +242,8 @@ export function LessonView({ moduleId, itemId }: { moduleId: string; itemId: str
   if (error && !data) return <ErrorState message={errorText(error)} onRetry={() => void load()} retrying={loading} />;
   if (!data || forward) return <LoadingState rows={4} />;
 
-  const back = (label: string) => (
-    <Link href={`${base}/modules`} className={cn("inline-flex min-h-11 items-center gap-1 rounded-control text-sm font-medium text-brand-700 hover:underline", focusRing)}>
+  const back = (label: string, href = `${base}/modules`) => (
+    <Link href={href} className={cn("inline-flex min-h-11 items-center gap-1 rounded-control text-sm font-medium text-brand-700 hover:underline", focusRing)}>
       <ChevronLeft aria-hidden="true" className="h-4 w-4 shrink-0" /><span className="min-w-0 break-words">{label}</span>
     </Link>
   );
@@ -369,7 +369,7 @@ export function LessonView({ moduleId, itemId }: { moduleId: string; itemId: str
         <div className="min-w-0">
           <nav aria-label={t("modules.overview.breadcrumbLabel")} className="flex flex-wrap items-center gap-x-1.5 text-sm leading-5 text-slate-600">
             <span className="hidden sm:inline">{back(t("modules.overview.syllabusTitle"))}</span>
-            <span className="sm:hidden">{back(moduleTitle)}</span>
+            <span className="sm:hidden">{back(moduleTitle, `${base}/modules#module-${mod.id}`)}</span>
             <span aria-hidden="true" className="hidden sm:inline">·</span>
             <span className="hidden break-words sm:inline">{moduleTitle}</span>
             <span aria-hidden="true">·</span>

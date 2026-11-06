@@ -25,7 +25,7 @@ import { Checkbox, EmptyState, ErrorState, GoldPill, LinkButton, LoadingState, M
 import { STUDENT_SUBTITLE, STUDENT_TITLE } from "@/components/lms/student/StudentPageHeader";
 import { ExternalIcon, ItemKindIcon, ModuleStateBadge, useItemKindText, useLockReasonText, useModuleErrorText, useRequirementText } from "./moduleUi";
 import {
-  courseProgress, formatDuration, isAccessLocked, isDone, isExempt, isLocked, lessonHref, lessonList, nextOpen, type LessonRef,
+  courseProgress, formatDuration, isAccessLocked, isDone, isExempt, isLocked, lessonHref, lessonList, nextOpen, overviewState, type LessonRef,
 } from "./lessons";
 import { rememberLessonModules } from "./lessonNav";
 import { ProChip } from "./ProLockCard";
@@ -70,6 +70,13 @@ export function KindMeta({ item, locked, className }: { item: ItemStudentOut; lo
   const video = item.kind === "url" && !!item.video;
   const kind = video ? t("modules.syllabus.video") : kindText(item.kind, item.link?.assignment_kind ?? null);
   const duration = formatDuration(item.duration_s, t);
+  // a locked url row carries no `video` (the server strips it), so its kind is unknown: a Pro row (and a locked url
+  // row) shows the duration only, never a guessed "Ссылка"
+  if (isAccessLocked(item) || (locked && item.kind === "url")) {
+    return duration
+      ? <span className={cn("inline-flex shrink-0 whitespace-nowrap text-sm leading-5 tabular-nums text-slate-600", className)}>{duration}</span>
+      : null;
+  }
   const icon = video
     ? <PlayCircle aria-hidden="true" className={cn("h-4 w-4 shrink-0", locked ? "text-slate-400" : "text-brand-600")} />
     : <ItemKindIcon kind={item.kind} assignmentKind={item.link?.assignment_kind ?? null} className={cn("h-4 w-4", locked ? "text-slate-400" : "text-slate-500")} />;
@@ -252,39 +259,44 @@ function Hero({ lessons, data, base, examPrep, track }: {
   const { course } = useCourse();
   const courseTitle = pickLocalized(course.title, lang, course.default_language);
   const { done, total, duration_s } = courseProgress(data, lessons);
-  const next = nextOpen(lessons, data.up_next);
   const started = done > 0;
-  const proLeft = lessons.some((l) => isAccessLocked(l.item) && !isDone(l.item));
-  const lockedLeft = lessons.some((l) => isLocked(l.mod, l.item) && !isDone(l.item));
-  const finished = !next && !lockedLeft && lessons.length > 0;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   const countText = t("modules.syllabus.doneCount", { done, total });
   const duration = formatDuration(duration_s, t);
-  const nextTitle = next ? pickLocalized(next.item.title, lang, course.default_language) || t("modules.untitledItem") : "";
 
+  // one state: its title, at most one line under it (never an empty one) and at most one action
+  const st = overviewState(lessons, data.up_next);
+  let title: string;
   let line: string | null = null;
   let action: React.ReactNode = null;
-  if (next) {
+  if (st.kind === "next") {
+    const nextTitle = pickLocalized(st.next.item.title, lang, course.default_language) || t("modules.untitledItem");
+    title = started ? t("modules.syllabus.continueTitle") : t("modules.syllabus.readyTitle");
     line = t("modules.overview.nextUp", { title: nextTitle });
     action = (
-      <LinkButton href={lessonHref(base, next)} onClick={viewOnOpen(course.id, next, track)} rightIcon={<ArrowRight aria-hidden="true" className="h-4 w-4" />} className="w-full shrink-0 sm:w-auto">
+      <LinkButton href={lessonHref(base, st.next)} onClick={viewOnOpen(course.id, st.next, track)} rightIcon={<ArrowRight aria-hidden="true" className="h-4 w-4" />} className="w-full shrink-0 sm:w-auto">
         {started ? t("modules.syllabus.continue") : t("modules.syllabus.start")}
       </LinkButton>
     );
-  } else if (proLeft) {
-    line = t("modules.overview.proLeft");
+  } else if (st.kind === "pro") {
+    title = t("modules.overview.proLeft");
     action = <GoldPill href={`/${lang}/unlock`} icon={<Lock />} className="w-full justify-center sm:w-auto sm:shrink-0">{t("modules.overview.unlock")}</GoldPill>;
-  } else if (lockedLeft) {
-    line = t("modules.overview.later");
-  } else if (finished) {
+  } else if (st.kind === "later") {
+    title = t("modules.overview.later");
+  } else if (st.kind === "finished") {
+    title = t("modules.overview.completed");
     line = t("modules.syllabus.doneBody");
     action = (
       <LinkButton href={lessonHref(base, lessons[0])} variant="secondary" leftIcon={<RotateCcw aria-hidden="true" className="h-4 w-4" />} className="w-full shrink-0 sm:w-auto">
         {t("modules.overview.restart")}
       </LinkButton>
     );
+  } else {
+    title = t("modules.overview.emptyTitle");
+    line = t("modules.overview.emptyBody");
   }
-  const state = finished ? t("modules.overview.completed") : started ? t("modules.syllabus.continueTitle") : t("modules.syllabus.readyTitle");
+  // exam-prep: the course is the h1, so the state is the line under it (the next lesson while there is one)
+  const examLine = st.kind === "next" ? line : title;
 
   return (
     <section aria-labelledby="course-overview-title" className="overflow-hidden rounded-card border border-slate-200 bg-white">
@@ -295,11 +307,11 @@ function Hero({ lessons, data, base, examPrep, track }: {
             <>
               <p className="text-sm font-medium leading-5 text-brand-700">{t("student.nav.lessons")}</p>
               <h1 id="course-overview-title" className={cn(STUDENT_TITLE, "mt-0.5")}>{courseTitle}</h1>
-              <p className={STUDENT_SUBTITLE}>{finished ? state : line}</p>
+              {examLine && <p className={STUDENT_SUBTITLE}>{examLine}</p>}
             </>
           ) : (
             <>
-              <h2 id="course-overview-title" className="break-words text-lg font-semibold leading-7 text-slate-900">{state}</h2>
+              <h2 id="course-overview-title" className="break-words text-lg font-semibold leading-7 text-slate-900">{title}</h2>
               {line && <p className="mt-1 break-words text-base leading-6 text-slate-600 sm:text-sm sm:leading-5">{line}</p>}
             </>
           )}
