@@ -2,8 +2,9 @@
 
 import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, ChevronDown, GraduationCap, LogOut } from "lucide-react";
+import { Check, ChevronDown, Download, GraduationCap, LogOut } from "lucide-react";
 import { useTranslation, type Language } from "@/lib/i18n/context";
+import { usePwa } from "@/components/pwa/PwaProvider";
 import { SHELL_WIDTH } from "./shellWidth";
 import { Skeleton } from "./Skeleton";
 import { cn, focusRing } from "./utils";
@@ -192,6 +193,7 @@ function AccountMenu({ user, links, onLanguageChange, onLogout, routeKey, nameFr
 }) {
   const { lang, t } = useTranslation();
   const pop = usePopover(routeKey);
+  const pwa = usePwa();
   const panelId = useId();
   const langLabelId = useId();
   const langName: Record<Language, string> = { en: t("common.english"), ky: t("common.kyrgyz"), ru: t("common.russian") };
@@ -223,6 +225,16 @@ function AccountMenu({ user, links, onLanguageChange, onLogout, routeKey, nameFr
               ))}
             </div>
           </div>
+          {/* S5 installable app: only when this browser can install it (components/pwa/PwaProvider.tsx) */}
+          {pwa.installKind && (
+            <div className="border-t border-slate-100 py-2">
+              <button type="button" onClick={() => { pop.setOpen(false); pwa.install(); }}
+                className={cn(ITEM, focusRing, "focus-visible:ring-offset-0 text-slate-800 hover:bg-slate-100")}>
+                <Download aria-hidden="true" className="h-5 w-5 shrink-0 text-slate-600" />
+                {t("pwa.install.menu")}
+              </button>
+            </div>
+          )}
           {links.length > 0 && (
             <ul className="space-y-0.5 border-t border-slate-100 pt-2">
               {links.map((l) => (

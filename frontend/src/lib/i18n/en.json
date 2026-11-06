@@ -6278,5 +6278,26 @@
     "cancelEmailTitle": "Cancel the email change?",
     "cancelEmailBody": "The confirmation link stops working and the account keeps its current address.",
     "cancelEmailDone": "The email change was cancelled"
+  },
+  "pwa": {
+    "update": {
+      "message": "A new version is available",
+      "action": "Update",
+      "dismiss": "Hide"
+    },
+    "install": {
+      "menu": "Install the app",
+      "iosTitle": "Install on iPhone",
+      "iosIntro": "The app appears on your Home Screen and opens like any other app.",
+      "iosStep1": "Tap Share at the bottom of the Safari screen.",
+      "iosStep2": "Choose “Add to Home Screen”.",
+      "iosStep3": "Tap Add.",
+      "iosDone": "Got it"
+    },
+    "offline": {
+      "title": "No internet connection",
+      "body": "Check your Wi-Fi or mobile data and try again.",
+      "retry": "Try again"
+    }
   }
 }
