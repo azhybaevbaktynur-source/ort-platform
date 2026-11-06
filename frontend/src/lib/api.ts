@@ -99,6 +99,17 @@ export function gateOpenPath(rest: string): boolean {
   return GATE_OPEN_PATH.test(rest);
 }
 
+/**
+ * S1 admin security: a platform admin without two-step login (ADMIN_MFA_REQUIRED) is refused everywhere with 403
+ * `mfa_enrollment_required`; the app sends them to the setup page instead of showing errors.
+ */
+export function mfaEnrollmentRedirect(code: string | undefined): void {
+  if (code !== "mfa_enrollment_required" || typeof window === "undefined") return;
+  const m = window.location.pathname.match(/^\/(en|ky|ru)(?=\/|$)/);
+  const target = `/${m ? m[1] : "ru"}/admin/security`;
+  if (window.location.pathname !== target) window.location.assign(target);
+}
+
 /** A refused request (403 `consent_required`) sends the person to `/privacy`; an open attempt is never interrupted. */
 export function consentRequiredRedirect(code: string | undefined): void {
   if (code !== "consent_required" || typeof window === "undefined") return;
@@ -179,6 +190,7 @@ export async function apiClient<T>(endpoint: string, options: RequestOptions = {
       if (contentType.includes("application/json")) {
         const errorJson = await response.json();
         consentRequiredRedirect(errorJson?.error?.code); // Phase 11 S3
+        mfaEnrollmentRedirect(errorJson?.error?.code); // S1
         errorDetail = errorJson.detail || errorDetail;
       } else {
         const text = await response.text();

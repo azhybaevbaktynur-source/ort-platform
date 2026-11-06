@@ -14,3 +14,4 @@
 - Write 5 lines: what happened, when, impact, cause, fix. Add to `docs/PRODUCT_DECISIONS.md` if a rule changes.
 - If personal data may have leaked: tell the owner at once; the legal duty to notify is a legal question (see `LAUNCH_CHECKLIST.md`).
 - Rotating `SECRET_KEY` logs everyone out; use `SECRET_KEY_PREVIOUS` to roll without logging out.
+- Two-step login (S1) keys come from `SECRET_KEY` too. Keep `SECRET_KEY_PREVIOUS` until every platform admin has signed in once with a code (that re-encrypts their secret with the new key), then each admin makes new recovery codes on `/admin/security`: old recovery codes stop working when the previous key is removed. An admin who lost their phone and recovery codes: `python make_admin.py --reset-2fa <email>` (ends their sessions; they set it up again on the next admin visit). A stolen admin session: another admin uses "End sessions" on the user page, or the admin uses "End all my sessions".

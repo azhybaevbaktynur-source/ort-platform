@@ -119,7 +119,7 @@ def user_out(user: User) -> AdminUserOut:
         id=user.id, email=user.email, display_name=user.display_name, created_at=user.created_at,
         email_verified=bool(user.email_verified), is_platform_admin=bool(user.is_platform_admin),
         teacher_status=user.teacher_status, disabled_at=user.disabled_at,
-        disabled_reason=user.disabled_reason,
+        disabled_reason=user.disabled_reason, mfa_enabled=user.mfa_enabled_at is not None,
     )
 
 

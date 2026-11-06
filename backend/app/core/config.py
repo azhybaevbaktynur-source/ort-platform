@@ -214,6 +214,13 @@ class Settings(BaseSettings):
     SENTRY_DSN: str = ""
     LOG_SAMPLE_2XX: float = 0.1
     # --- Phase 11 S1 end ---
+    # --- S1 admin security begin --- (docs/ROADMAP_EXAM_PREP.md S1, docs/DISCUSSION_ADMIN_CENTER.md A2/A3)
+    # A platform admin without two-step login gets 403 `mfa_enrollment_required` on every platform-admin route except
+    # the enrollment ones. The test suite turns it off (tests/conftest.py); the MFA tests turn it back on.
+    ADMIN_MFA_REQUIRED: bool = True
+    MFA_CHALLENGE_TTL_SECONDS: int = 300  # the step between the password and the code
+    MFA_ISSUER: str = "ORT Platform"  # the name the authenticator app shows next to the account
+    # --- S1 admin security end ---
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

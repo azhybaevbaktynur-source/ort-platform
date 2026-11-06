@@ -57,3 +57,4 @@ from app.lms.exam_prep.models import ExamGoal  # noqa: F401,E402  (Exam prep S2)
 from app.lms.privacy.models import ConsentRecord, DataRequest, PolicyVersion  # noqa: F401,E402
 from app.lms.guardian.models import GuardianLink, GuardianPairingCode  # noqa: F401,E402
 # --- Phase 11 S1 end ---
+from app.lms.mfa.models import MfaRecoveryCode  # noqa: F401,E402  (S1 admin security)

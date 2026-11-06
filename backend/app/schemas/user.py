@@ -70,6 +70,12 @@ class ResetPasswordRequest(BaseModel):
     new_password: str = Field(min_length=6, description="New password at least 6 characters")
 
 
+class MfaCompleteRequest(BaseModel):
+    """S1 admin security: the second sign-in step."""
+    challenge: str = Field(max_length=2000)
+    code: str = Field(max_length=40, description="6-digit code from the authenticator app, or a recovery code")
+
+
 class UserLoginRequest(BaseModel):
     email: EmailStr
     password: str

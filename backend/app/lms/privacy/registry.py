@@ -51,6 +51,8 @@ ENTRIES: list[Entry] = [
     Entry("users", "reset_token", "credential", "null"),
     Entry("users", "email_code_hash", "credential", "null"),
     Entry("users", "disabled_reason", "account state", "scrub"),
+    Entry("users", "mfa_secret_enc", "credential (encrypted)", "null"),
+    Entry("users", "mfa_pending_secret_enc", "credential (encrypted)", "null"),
     # enrollment
     Entry("enrollments", "invite_token_hash", "credential", "null"),
     Entry("enrollment_accommodations", "note", "may be medical", "null"),
@@ -146,6 +148,7 @@ ENTRIES: list[Entry] = [
     *_refs("teacher_requests", "user_id", action="keep_tombstone"),
     *_refs("teacher_requests", "decided_by_id"),
     *_refs("translation_groups", "created_by_id"),
+    *_refs("user_mfa_recovery_codes", "user_id", action="delete_row"),
     *_refs("users", "disabled_by_id"),
 ]
 

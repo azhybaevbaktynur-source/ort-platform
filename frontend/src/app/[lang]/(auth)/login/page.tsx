@@ -10,6 +10,7 @@ import { AuthError, useAuth } from "@/lib/auth-context";
 import { safeRedirect } from "@/lib/safeRedirect";
 import { useBackendWarmup, useSlowHint } from "@/lib/useBackendWarmup";
 import { VerifyEmailStep, authErrorMessage } from "@/components/auth/VerifyEmailStep";
+import { MfaStep } from "@/components/auth/MfaStep";
 import { Mail, Lock, ArrowRight, AlertCircle } from "lucide-react";
 
 function LoginForm() {
@@ -28,6 +29,8 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   // Set when the account exists but its email has not been confirmed with the emailed code yet
   const [pendingVerification, setPendingVerification] = useState<{ email: string; resendAfterSeconds: number } | null>(null);
+  // S1: the password was right and the account has two-step login: the challenge for the code step
+  const [mfaChallenge, setMfaChallenge] = useState<string | null>(null);
 
   useBackendWarmup();
   const slow = useSlowHint(loading);
@@ -45,7 +48,9 @@ function LoginForm() {
       await signIn(email, password);
       handleNavigateAfterAuth();
     } catch (err) {
-      if (err instanceof AuthError && err.code === "email_not_verified" && err.details.codeSent === false) {
+      if (err instanceof AuthError && err.code === "mfa_required" && typeof err.details.challenge === "string") {
+        setMfaChallenge(err.details.challenge);
+      } else if (err instanceof AuthError && err.code === "email_not_verified" && err.details.codeSent === false) {
         // Account not verified and the new code could not be emailed: say so instead of waiting for a code
         setError(t("auth.errors.email_send_failed"));
       } else if (err instanceof AuthError && err.code === "email_not_verified") {
@@ -68,7 +73,13 @@ function LoginForm() {
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
         <div className="bg-white py-8 px-6 sm:px-10 shadow-lg border border-slate-200/80 rounded-3xl">
-          {pendingVerification ? (
+          {mfaChallenge ? (
+            <MfaStep
+              challenge={mfaChallenge}
+              onDone={handleNavigateAfterAuth}
+              onRestart={(message) => { setMfaChallenge(null); setPassword(""); setError(message || null); }}
+            />
+          ) : pendingVerification ? (
             <VerifyEmailStep
               email={pendingVerification.email}
               password={password}

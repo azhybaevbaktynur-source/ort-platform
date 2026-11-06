@@ -12,9 +12,11 @@ from app.lms.core.pagination import PageOut, paginate
 from app.lms.files import usage
 from app.lms.platform_admin import users_service as us
 from app.lms.platform_admin.schemas import (
-    AdminUserDetailOut, AdminUserOut, ApproveIn, AuditEntryOut, DisableIn, RejectIn, SummaryOut,
-    TeacherRequestAdminOut, TeacherStatusIn,
+    AdminUserDetailOut, AdminUserOut, ApproveIn, AuditEntryOut, DisableIn, EndSessionsIn, PlatformAdminIn, RejectIn,
+    SummaryOut, TeacherRequestAdminOut, TeacherStatusIn,
 )
+from app.lms.platform_admin import admins
+from app.lms.platform_admin.health import PlatformHealthOut, platform_health
 from app.lms.teachers import purge as teacher_purge
 from app.lms.teachers import service as teacher_service
 from app.lms.teachers.models import TeacherRequest
@@ -90,6 +92,26 @@ def disable_user(user_id: str, body: DisableIn, request: Request,
 def enable_user(user_id: str, request: Request,
                 admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
     return us.user_out(us.enable_user(db, admin, user_id, request))
+
+
+# --- S1 admin security begin ---
+@router.post("/users/{user_id}/platform-admin", response_model=AdminUserOut)
+def set_platform_admin(user_id: str, body: PlatformAdminIn, request: Request,
+                       admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
+    return us.user_out(admins.set_platform_admin(db, admin, user_id, body.platform_admin, body.reason, body.code,
+                                                 request))
+
+
+@router.post("/users/{user_id}/end-sessions", response_model=AdminUserOut)
+def end_sessions(user_id: str, body: EndSessionsIn, request: Request,
+                 admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
+    return us.user_out(admins.end_sessions(db, admin, user_id, body.reason, request))
+
+
+@router.get("/health", response_model=PlatformHealthOut)
+def health(admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
+    return platform_health(db)
+# --- S1 admin security end ---
 
 
 @router.get("/audit-log", response_model=PageOut[AuditEntryOut])

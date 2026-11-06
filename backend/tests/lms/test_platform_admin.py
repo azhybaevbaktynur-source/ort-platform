@@ -25,6 +25,10 @@ ROUTES = [
     ("POST", f"{P}/users/usr_x/disable", {"reason": "x"}),
     ("POST", f"{P}/users/usr_x/enable", None),
     ("GET", f"{P}/audit-log", None),
+    # S1 admin security
+    ("POST", f"{P}/users/usr_x/platform-admin", {"platform_admin": True, "reason": "x", "code": "123456"}),
+    ("POST", f"{P}/users/usr_x/end-sessions", {"reason": "x"}),
+    ("GET", f"{P}/health", None),
 ]
 
 
@@ -142,7 +146,7 @@ async def test_users_list_filters_pagination_and_detail(client, db):
     assert body["items"] == []
     item = (await client.get(f"{P}/users?q={tag}.u0", headers=auth(admin))).json()["items"][0]
     assert set(item) == {"id", "email", "display_name", "created_at", "email_verified", "is_platform_admin",
-                         "teacher_status", "disabled_at", "disabled_reason"}
+                         "teacher_status", "disabled_at", "disabled_reason", "mfa_enabled"}
     assert "password_hash" not in item
 
     d = (await client.get(f"{P}/users/{owner.id}", headers=auth(admin))).json()

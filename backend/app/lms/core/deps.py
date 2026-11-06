@@ -53,6 +53,8 @@ def get_lms_user(authorization: Optional[str] = Header(None), db: Session = Depe
     """P3-27: authenticate with the request's own session (one pool checkout per request). A test student (Student
     view) passes the deny-by-default route allow-list here, so no route can forget it; `request` is FastAPI's."""
     claims = _claims_from_authorization(authorization)
+    if claims.get("typ") is not None:  # S1: access tokens carry no `typ`; a two-step challenge is never a session
+        raise UnauthorizedException("Invalid or expired token")
     user_id = claims.get("sub")
     user = db.get(User, user_id) if user_id else None
     if user is None:
@@ -61,6 +63,11 @@ def get_lms_user(authorization: Optional[str] = Header(None), db: Session = Depe
         raise UnauthorizedException("Account disabled")
     if claims.get("tv", 0) != (user.token_version or 0):  # Phase 11 S4: can only reject; the row is already loaded
         raise UnauthorizedException("Invalid or expired token")
+    if user.is_platform_admin and user.mfa_enabled_at is None:  # S1: loaded columns only, no query
+        from app.lms.mfa import gate as mfa_gate
+
+        if mfa_gate.must_enroll(user):
+            mfa_gate.enforce(request)
     if user.is_test_student:
         from app.lms.student_view.allowlist import enforce
 
@@ -74,9 +81,17 @@ def get_lms_user(authorization: Optional[str] = Header(None), db: Session = Depe
     return user
 
 
-def require_platform_admin(user: User = Depends(get_lms_user)) -> User:
+def require_platform_admin_enrolling(user: User = Depends(get_lms_user)) -> User:
+    """S1: the two-step login setup routes, open to a platform admin who has not set it up yet."""
     if not user.is_platform_admin:
         raise Forbidden("Platform admin required", code="platform_admin_required")
+    return user
+
+
+def require_platform_admin(user: User = Depends(require_platform_admin_enrolling)) -> User:
+    """Every platform-admin route. S1: with ADMIN_MFA_REQUIRED, an admin without two-step login is sent to set it up."""
+    if settings.ADMIN_MFA_REQUIRED and user.mfa_enabled_at is None:
+        raise Forbidden("Set up two-step login first", code="mfa_enrollment_required")
     return user
 
 

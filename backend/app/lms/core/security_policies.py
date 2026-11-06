@@ -9,4 +9,11 @@ SECURITY_POLICIES: dict[tuple[str, str], str] = {
     ("POST", "/api/v1/auth/resend-code"): "public+ratelimit",
     ("POST", "/api/v1/auth/forgot-password"): "public+ratelimit",
     ("POST", "/api/v1/auth/reset-password"): "public+ratelimit",
+    # --- S1 admin security begin --- two-step login, admin actions, health
+    ("POST", "/api/v1/auth/mfa"): "public+ratelimit",  # challenge + code; per challenge and per account
+    ("GET", "/api/v1/platform/security/mfa"): "platform_admin",  # open before two-step login is set up
+    ("POST", "/api/v1/platform/security/mfa/setup"): "platform_admin",  # same; + per-account limit
+    ("POST", "/api/v1/platform/security/mfa/confirm"): "platform_admin",  # same; audited
+    ("POST", "/api/v1/platform/security/mfa/recovery-codes"): "platform_admin",  # needs a current code; audited
+    # --- S1 admin security end --- (the admin user actions and /platform/health: platform_admin/policies.py)
 }

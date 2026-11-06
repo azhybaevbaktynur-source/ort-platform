@@ -289,3 +289,56 @@ def send_password_reset_email(to_email: str, token: str, lang: str = "ky") -> bo
 """, t["footer"])
     return send_email(to_email, t["subject"], text, html, from_name=_auth_from_name(clean_lang))
 # --- Phase 6 UX F3 end ---
+
+
+# --- S1 admin security begin --- a notice to the account when its two-step login changes (security review)
+_SECURITY_TEXTS: dict[str, dict[str, str]] = {
+    "en": {
+        "subject_mfa_enabled": "{app}: two-step login was turned on",
+        "body_mfa_enabled": "Two-step login was turned on for your account. Every sign-in now asks for a code from your authenticator app.",
+        "subject_recovery_codes": "{app}: new recovery codes",
+        "body_recovery_codes": "New recovery codes were made for your account. The old ones no longer work.",
+        "subject_mfa_reset": "{app}: two-step login was reset",
+        "body_mfa_reset": "Two-step login of your account was turned off by a platform administrator, and every session was ended. Set it up again on your next visit to the admin area.",
+        "footer": "If this was not you, contact the platform administrator at once.",
+    },
+    "ru": {
+        "subject_mfa_enabled": "{app}: включён двухэтапный вход",
+        "body_mfa_enabled": "Для вашего аккаунта включён двухэтапный вход. Теперь при каждом входе запрашивается код из приложения-аутентификатора.",
+        "subject_recovery_codes": "{app}: новые резервные коды",
+        "body_recovery_codes": "Для вашего аккаунта выпущены новые резервные коды. Старые больше не работают.",
+        "subject_mfa_reset": "{app}: двухэтапный вход сброшен",
+        "body_mfa_reset": "Администратор платформы выключил двухэтапный вход вашего аккаунта и завершил все сеансы. Настройте его заново при следующем входе в раздел администрирования.",
+        "footer": "Если это были не вы, сразу свяжитесь с администратором платформы.",
+    },
+    "ky": {
+        "subject_mfa_enabled": "{app}: эки баскычтуу кирүү күйгүзүлдү",
+        "body_mfa_enabled": "Аккаунтуңуз үчүн эки баскычтуу кирүү күйгүзүлдү. Эми ар бир кирүүдө аутентификатор колдонмосундагы код суралат.",
+        "subject_recovery_codes": "{app}: жаңы резервдик коддор",
+        "body_recovery_codes": "Аккаунтуңуз үчүн жаңы резервдик коддор түзүлдү. Эскилери мындан ары иштебейт.",
+        "subject_mfa_reset": "{app}: эки баскычтуу кирүү баштапкы абалга келтирилди",
+        "body_mfa_reset": "Платформанын администратору аккаунтуңуздун эки баскычтуу кирүүсүн өчүрүп, бардык сеанстарды аяктады. Администратор бөлүмүнө кийинки киргенде аны кайра орнотуңуз.",
+        "footer": "Эгер бул сиз болбосоңуз, дароо платформанын администраторуна кайрылыңыз.",
+    },
+}
+SECURITY_NOTICES = ("mfa_enabled", "recovery_codes", "mfa_reset")
+
+
+def send_security_notice_email(to_email: str, kind: str, lang: Optional[str] = None) -> bool:
+    """`kind`: one of SECURITY_NOTICES. Never fails the caller; nothing about the recipient reaches the logs."""
+    if kind not in SECURITY_NOTICES:
+        raise ValueError(kind)
+    clean_lang = _auth_lang(lang)
+    texts = _SECURITY_TEXTS[clean_lang]
+    subject = texts[f"subject_{kind}"].format(app=APP_NAME[clean_lang])
+    body = texts[f"body_{kind}"]
+    text = f"{body}\n\n{texts['footer']}\n"
+    html = _wrap_html(subject, f"""
+  <p style="color: #475569; font-size: 14px;">{escape(body)}</p>
+""", texts["footer"])
+    try:
+        return send_email(to_email, subject, text, html, from_name=_auth_from_name(clean_lang), private=True)
+    except Exception:
+        logger.error("security notice email failed (%s)", kind)
+        return False
+# --- S1 admin security end ---
