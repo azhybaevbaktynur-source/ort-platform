@@ -1,13 +1,12 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { getAssessment, listAssessmentVersions } from "@/lib/lms/assessments";
 import { isStaffAssessment, type AssessmentDetailOut, type AssessmentStaffOut, type VersionOut } from "@/lib/lms/assessmentTypes";
 import { isExamPrepStudent } from "@/lib/lms/templates"; // SF-1
-import { ChevronLeft } from "lucide-react";
+import { BackLink } from "@/components/lms/BackLink";
 import { pickLocalized } from "@/lib/lms/localized";
 import { useCourse } from "@/components/lms/CourseContext";
 import { useCanEditContent } from "@/components/lms/content/StaffGate";
@@ -78,14 +77,6 @@ export default function AssessmentPage() {
   }
   // --- Phase 6 S6b end ---
   return <StaffOverview a={data} versions={versions} canEdit={canEdit} onChanged={load} />;
-}
-
-function BackLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <Link href={href} className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-brand-700 hover:underline sm:min-h-0">
-      <ChevronLeft className="h-4 w-4" aria-hidden="true" />{children}
-    </Link>
-  );
 }
 
 /** The staff overview of an assessment (SF-1: the staff breadcrumbs live only here, never on the student lobby). */

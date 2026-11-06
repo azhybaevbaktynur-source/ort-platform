@@ -97,7 +97,7 @@ the server's (ORT scoring untouched).
 ### 2.3 ORT baselines and behaviour guards
 - **Re-approved (look changes)**: every student image in `docs/phases/ORT_BASELINE/`: `lobby`, `comparison`,
   `flagged-palette`, `review-page`, `section-end`, `passage`, `submit`, `result`, `review` × phone/desktop ×
-  ru/ky (32) + `player-loading-phone-ru` (33 files). Teacher images (`teacher-*`) **unchanged** and must still match.
+  ru/ky (36) + `player-loading-phone-ru` (37 files). Teacher images (`teacher-*`) **unchanged** and must still match.
   Before/after pairs go to `docs/phases/STUDENT_UI_FIX_screens/ort-review/`, dated note in `ORT_BASELINE/README.md`.
 - **Behaviour guards (must stay green, unchanged)**: `frontend/e2e/ort.spec.ts` (lobby → result DOM assertions:
   section order and counts, timer, palette states, comparison columns, passage line numbers, result card raw 2/19,
@@ -363,7 +363,7 @@ badges), keys.
 | F2a | Shell rule: lobby/result in StudentShell, player chrome-less; layout clean-up; removal list | Opus | — |
 | F2b | Result page redesign, registry zero-raw `passed`, lobby/attempts restyle, review ids + hash scroll (3) | Opus | F2a |
 | F2c | Delete what F2a listed; keys | Sonnet | F2b |
-| ORT | Re-record 33 student baselines, before/after review, behaviour suites green | orchestrator | F2c |
+| ORT | Re-record 37 student baselines, before/after review, behaviour suites green | orchestrator | F2c |
 | F3 | Link audit e2e (`student-links.spec.ts`), MistakesList anchors | Opus | F2b |
 | F4a | Counting fix, `days` on progress, rated fields, teacher analytics T1–T3, tests | Opus | — |
 | F4b | Colour tokens and sweep, T4/T5 labels | Sonnet | F2c |

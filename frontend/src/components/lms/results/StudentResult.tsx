@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { ChevronDown, ChevronLeft, ListChecks } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, ListChecks } from "lucide-react";
+import { BackLink } from "@/components/lms/BackLink";
 import { useTranslation } from "@/lib/i18n/context";
 import { getAttempt, getAttemptResult, getAttemptReview } from "@/lib/lms/attempts";
 import type { AttemptResultOut, AttemptState, Correctness, ReviewItemOut, ReviewOut } from "@/lib/lms/attemptTypes";
@@ -101,17 +101,25 @@ export function StudentResult({ courseId, attemptId }: { courseId: string; attem
     return () => { live = false; };
   }, [courseId, wantsNext]);
 
-  // Problem 3: a link to `#item-n` (Сохранённые, Ошибки) lands on that card once the review is there
+  // Problem 3: a link to `#item-n` (Сохранённые, Ошибки) lands on that card once it is rendered. Runs after the
+  // render that has the review (and again after the filter changes), so the card exists when it scrolls; a card the
+  // "only mistakes" filter hides turns the filter off first. Once per hash.
+  const scrolledHash = useRef<string | null>(null);
   useEffect(() => {
     if (!review || typeof window === "undefined") return;
-    const m = ITEM_HASH.exec(window.location.hash);
-    if (!m) return;
+    const hash = window.location.hash;
+    const m = ITEM_HASH.exec(hash);
+    if (!m || scrolledHash.current === hash) return;
     const target = review.items.find((it) => it.position === Number(m[1]));
     if (!target) return;
-    if (target.correctness === "correct") setOnlyMistakes(false);
-    const id = window.requestAnimationFrame(() => document.getElementById(`item-${target.position}`)?.scrollIntoView({ block: "start" }));
-    return () => window.cancelAnimationFrame(id);
-  }, [review]);
+    const el = document.getElementById(`item-${target.position}`);
+    if (!el) {
+      if (onlyMistakes) setOnlyMistakes(false); // hidden by the filter: show it, this effect runs again
+      return;
+    }
+    scrolledHash.current = hash;
+    el.scrollIntoView({ block: "start" });
+  }, [review, onlyMistakes]);
 
   const lobby = `/${lang}/courses/${courseId}/assessments${state ? `/${state.assessment_id}` : ""}`;
   // Phase 8b S3 (PHASE_8B_DESIGN 7.2): a validated `?return=` (template preview) replaces the back link. SF-1: an
@@ -207,14 +215,6 @@ export function StudentResult({ courseId, attemptId }: { courseId: string; attem
       )}
       {review && review.items.length === 0 && <p className="text-sm text-slate-600">{t("results.noReview")}</p>}
     </div>
-  );
-}
-
-function BackLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <Link href={href} className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-brand-700 hover:underline sm:min-h-0">
-      <ChevronLeft className="h-4 w-4" aria-hidden="true" />{children}
-    </Link>
   );
 }
 

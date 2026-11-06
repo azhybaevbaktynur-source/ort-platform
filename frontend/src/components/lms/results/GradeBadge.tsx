@@ -51,11 +51,8 @@ export function useGradeListText() {
   };
 }
 
-/**
- * Big grade value, label, percentile, threshold flags and kept/not-released markers. SF-1 (§10 override): `showPass`
- * false hides the pass/fail badge (student exam-prep pages); staff and general schemes keep it. Data never changes.
- */
-export function GradeBadge({ grade, showKept = true, showPass = true }: { grade: AttemptGradeOut; showKept?: boolean; showPass?: boolean }) {
+/** Big grade value, label, percentile, threshold flags and kept/not-released markers. */
+export function GradeBadge({ grade, showKept = true }: { grade: AttemptGradeOut; showKept?: boolean }) {
   const { t } = useTranslation();
   const label = useSchemeLabel();
   const text = useGradeText();
@@ -71,7 +68,7 @@ export function GradeBadge({ grade, showKept = true, showPass = true }: { grade:
       </p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         {pct && <Badge className="border-brand-200 bg-white text-sm text-slate-800">{t("results.grade.percentile", { value: pct })}</Badge>}
-        {showPass && grade.passed !== null && grade.passed !== undefined && grade.scheme_type !== "pass_fail" && (
+        {grade.passed !== null && grade.passed !== undefined && grade.scheme_type !== "pass_fail" && (
           <Badge tone={grade.passed ? "success" : "danger"}>{label(grade.passed ? "pass" : "fail")}</Badge>
         )}
         {flags.map((k) => (
