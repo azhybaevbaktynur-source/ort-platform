@@ -5500,6 +5500,149 @@
       "emptyOpen": "No open mistakes.",
       "emptyFixed": "No fixed mistakes yet.",
       "viewAttempt": "View attempt"
+    },
+    "analytics": {
+      "title": "Analytics",
+      "period": {
+        "label": "Period",
+        "d7": "7 days",
+        "d30": "30 days",
+        "d90": "90 days",
+        "d365": "Year",
+        "in": {
+          "d7": "in the last 7 days",
+          "d30": "in the last 30 days",
+          "d90": "in the last 90 days",
+          "d365": "in the last year"
+        }
+      },
+      "tiles": {
+        "answered": "Questions answered",
+        "accuracy": "Accuracy",
+        "accuracyHint": "{correct} of {total} correct",
+        "saved": "Saved",
+        "savedHint": "flagged questions",
+        "streak": "Streak",
+        "streakValue": "{count} days",
+        "streakValue_one": "{count} day",
+        "streakValue_few": "{count} days",
+        "streakValue_many": "{count} days",
+        "streakValue_other": "{count} days",
+        "streakBest": "Best: {count} days",
+        "streakBest_one": "Best: {count} day",
+        "streakBest_few": "Best: {count} days",
+        "streakBest_many": "Best: {count} days",
+        "streakBest_other": "Best: {count} days"
+      },
+      "answers": "{count} answers",
+      "answers_one": "{count} answer",
+      "answers_few": "{count} answers",
+      "answers_many": "{count} answers",
+      "answers_other": "{count} answers",
+      "empty": {
+        "title": "No data yet",
+        "pageTitle": "Your analytics will appear here",
+        "pageBody": "Take your first test and we will show where you are strong and what to work on.",
+        "pageAction": "Go to tests"
+      },
+      "lock": {
+        "title": "Available with full access",
+        "body": "Open full access to see this analysis.",
+        "action": "Open access"
+      },
+      "legend": {
+        "label": "Legend",
+        "high": "85 % and above: good",
+        "mid": "60–84 %: fair",
+        "low": "below 60 %: weak"
+      },
+      "band": {
+        "low": "Weak",
+        "mid": "Fair",
+        "high": "Good"
+      },
+      "weak": {
+        "title": "{count} weak topics",
+        "title_one": "{count} weak topic",
+        "title_few": "{count} weak topics",
+        "title_many": "{count} weak topics",
+        "title_other": "{count} weak topics",
+        "titleEmpty": "Weak topics",
+        "subtitle": "Start with these: they have the most mistakes",
+        "empty": "Answer a few questions and we will show the topics worth working on.",
+        "practice": "Practice"
+      },
+      "topics": {
+        "math": "Mathematics",
+        "language": "Language",
+        "other": "Other topics",
+        "all": "Accuracy by topic",
+        "subtitle": "Accuracy by topic",
+        "meter": "{topic}: accuracy",
+        "empty": {
+          "math": "Topics appear after your first answers in mathematics.",
+          "language": "Topics appear after your first answers in the language sections.",
+          "other": "Topics appear after your first answers."
+        }
+      },
+      "activity": {
+        "title": "Activity",
+        "byDay": "Answers per day",
+        "byWeek": "Answers per week",
+        "correct": "Correct",
+        "wrong": "Wrong",
+        "summary": "Answers in this period: {answered}; correct {correct}, wrong {wrong}",
+        "bar": "{date}: correct {correct}, wrong {wrong}",
+        "empty": "Answer questions every day and your bars will grow here."
+      },
+      "time": {
+        "title": "Daily study time",
+        "byDay": "Minutes per day by section",
+        "byWeek": "Time per week by section",
+        "other": "Other",
+        "avg": "Average: {value}",
+        "summary": "Study time in this period: {total}; average {avg} on a study day",
+        "empty": "Time spent on tests and practice will appear here."
+      },
+      "hours": {
+        "title": "Most active time",
+        "peak": "You study most often at {from}–{to}",
+        "summary": "Most answers at {from}–{to}: {n}",
+        "bar": "{from}–{to}: {n} answers",
+        "empty": "We will show the hours when you study most."
+      },
+      "sessions": {
+        "title": "Study sessions",
+        "subtitle": "Last 7 days",
+        "correct": "{percent} % correct",
+        "more": "Show all ({count})",
+        "less": "Show fewer",
+        "empty": "No sessions in the last 7 days. A short session today keeps your streak going."
+      },
+      "heat": {
+        "title": "My activity",
+        "streaks": "Streak: {current} · best: {longest}",
+        "label": "Activity calendar: {count} answers in total",
+        "label_one": "Activity calendar: {count} answer in total",
+        "label_few": "Activity calendar: {count} answers in total",
+        "label_many": "Activity calendar: {count} answers in total",
+        "label_other": "Activity calendar: {count} answers in total",
+        "summary": "{count} answers",
+        "summary_one": "{count} answer",
+        "summary_few": "{count} answers",
+        "summary_many": "{count} answers",
+        "summary_other": "{count} answers",
+        "empty": "Every day you answer questions will light up here."
+      },
+      "goal": {
+        "title": "My goal",
+        "subtitle": "Now {current} · goal {goal}",
+        "hint": "Set the percent of correct answers you are aiming for."
+      },
+      "mistakes": {
+        "emptyOpenHint": "When you get a question wrong in a test, it will appear here so you can fix it.",
+        "emptyFixedHint": "Questions you answer right after a mistake move here."
+      }
     }
   },
   "quizStats": {
