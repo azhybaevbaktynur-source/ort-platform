@@ -4995,11 +4995,6 @@
       "doneTitle": "Бардык сабактар өтүлдү",
       "doneBody": "Азаматсыз! Каалаган сабакка кайра кайтсаңыз болот.",
       "progressLabel": "Сиздин жылышыңыз",
-      "progressCount": "{count} сабактын {done} өтүлдү",
-      "progressCount_one": "{count} сабактын {done} өтүлдү",
-      "progressCount_few": "{count} сабактын {done} өтүлдү",
-      "progressCount_many": "{count} сабактын {done} өтүлдү",
-      "progressCount_other": "{count} сабактын {done} өтүлдү",
       "percent": "{percent} %",
       "lessonCount": "{count} сабак",
       "lessonCount_one": "{count} сабак",
@@ -5015,7 +5010,9 @@
         "done": "Сабак өтүлдү",
         "open": "Сабак өтүлө элек",
         "locked": "Сабак азырынча жеткиликсиз"
-      }
+      },
+      "doneCount": "Өтүлдү: {total} ичинен {done}",
+      "doneCountShort": "өтүлдү: {total} ичинен {done}"
     },
     "lesson": {
       "back": "Бардык сабактар",

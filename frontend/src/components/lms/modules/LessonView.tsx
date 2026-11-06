@@ -14,6 +14,7 @@ import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
 import { getModules, recordView, setDone } from "@/lib/lms/modules";
 import { downloadCourseFile } from "@/lib/lms/courseFiles";
+import { templateUi } from "@/lib/lms/templates";
 import { isStaffModules, type ModuleStudentOut, type ModulesStudentOut } from "@/lib/lms/modulesTypes";
 import { useCourse } from "@/components/lms/CourseContext";
 import { Button, EmptyState, ErrorState, LinkButton, LoadingState, buttonClasses, cn, focusRing } from "@/components/ui";
@@ -108,6 +109,7 @@ export function LessonView({ moduleId, itemId }: { moduleId: string; itemId: str
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<unknown>(null);
   const base = `/${lang}/courses/${course.id}`;
+  const examPrep = templateUi(course).studentLayout === "exam_prep";
   const readOnly = course.my_enrollment.role !== "student" || !!course.my_enrollment.read_only || course.status === "concluded";
 
   const lessons = useMemo(() => lessonList(data?.modules ?? []), [data]);
@@ -245,7 +247,10 @@ export function LessonView({ moduleId, itemId }: { moduleId: string; itemId: str
         <p className="break-words text-sm leading-5 text-slate-600">
           {moduleTitle} · {t("modules.lesson.position", { n: position, total: inModule.length })}
         </p>
-        <h2 className="mt-1 break-words text-2xl font-bold leading-8 text-slate-900">{title}</h2>
+        {/* exam-prep courses show no course header here: the lesson title is the page's h1 */}
+        {examPrep
+          ? <h1 className="mt-1 break-words text-2xl font-bold leading-8 text-slate-900 lg:text-[28px] lg:leading-9">{title}</h1>
+          : <h2 className="mt-1 break-words text-2xl font-bold leading-8 text-slate-900">{title}</h2>}
       </div>
       {body}
       {actionError ? <ErrorState variant="inline" message={errorText(actionError)} /> : null}

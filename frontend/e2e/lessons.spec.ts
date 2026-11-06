@@ -96,7 +96,9 @@ test.describe("video lessons (ru)", () => {
       await expect(lessonsLink).toHaveAttribute("aria-current", "page");
       await expect(nav.getByRole("link", { name: M1, exact: true })).toHaveAttribute("href", `${base}/modules#module-${m1.id}`);
 
-      // ---- the syllabus
+      // ---- the syllabus (exam-prep: its own title instead of the course header)
+      await expect(page.getByRole("heading", { level: 1, name: t("student.nav.lessons") })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
       await expect(page.getByRole("heading", { name: t("modules.syllabus.readyTitle") })).toBeVisible();
       await expect(page.getByText(t("modules.syllabus.readyBody", { title: V1 }))).toBeVisible();
       await expect(page.getByRole("progressbar", { name: t("modules.syllabus.progressLabel") })).toHaveAttribute("aria-valuenow", "0");

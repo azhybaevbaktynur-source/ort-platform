@@ -4995,11 +4995,6 @@
       "doneTitle": "All lessons done",
       "doneBody": "Great work! You can go back to any lesson.",
       "progressLabel": "Your progress",
-      "progressCount": "{done} of {count} lessons",
-      "progressCount_one": "{done} of {count} lesson",
-      "progressCount_few": "{done} of {count} lessons",
-      "progressCount_many": "{done} of {count} lessons",
-      "progressCount_other": "{done} of {count} lessons",
       "percent": "{percent}%",
       "lessonCount": "{count} lessons",
       "lessonCount_one": "{count} lesson",
@@ -5015,7 +5010,9 @@
         "done": "Lesson done",
         "open": "Lesson not done yet",
         "locked": "Lesson not available yet"
-      }
+      },
+      "doneCount": "Done: {done} of {total}",
+      "doneCountShort": "done {done} of {total}"
     },
     "lesson": {
       "back": "All lessons",

@@ -4995,11 +4995,6 @@
       "doneTitle": "Все уроки пройдены",
       "doneBody": "Отличная работа! К любому уроку можно вернуться.",
       "progressLabel": "Ваш прогресс",
-      "progressCount": "{done} из {count} уроков",
-      "progressCount_one": "{done} из {count} урока",
-      "progressCount_few": "{done} из {count} уроков",
-      "progressCount_many": "{done} из {count} уроков",
-      "progressCount_other": "{done} из {count} урока",
       "percent": "{percent} %",
       "lessonCount": "{count} уроков",
       "lessonCount_one": "{count} урок",
@@ -5015,7 +5010,9 @@
         "done": "Урок пройден",
         "open": "Урок не пройден",
         "locked": "Урок пока недоступен"
-      }
+      },
+      "doneCount": "Пройдено {done} из {total}",
+      "doneCountShort": "пройдено {done} из {total}"
     },
     "lesson": {
       "back": "Все уроки",

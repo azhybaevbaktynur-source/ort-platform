@@ -183,7 +183,7 @@ function ModuleSection({ mod, lessons, open, onToggle, ctx }: {
         <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 pl-7 sm:min-h-11 sm:pl-0">
           <span className="text-sm leading-6 text-slate-600">
             {t("modules.syllabus.lessonCount", { count })}
-            {withReq.length > 0 && <> · {t("modules.progressCount", { done, total: withReq.length })}</>}
+            {withReq.length > 0 && <> · {t("modules.syllabus.doneCountShort", { done, total: withReq.length })}</>}
           </span>
           {mod.state && (mod.state === "locked" || withReq.length > 0) && <ModuleStateBadge state={mod.state} />}
         </div>
@@ -217,7 +217,7 @@ function StartCard({ lessons, data, base }: { lessons: LessonRef[]; data: Module
   const nextTitle = next ? pickLocalized(next.item.title, lang, course.default_language) || t("modules.untitledItem") : "";
   const finished = total > 0 && done >= total;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-  const countText = t("modules.syllabus.progressCount", { done, count: total });
+  const countText = t("modules.syllabus.doneCount", { done, total });
   return (
     <div className="rounded-card border border-slate-200 bg-white p-4 sm:p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -275,6 +275,18 @@ function AboutCard({ modules, lessons }: { modules: number; lessons: number }) {
           </div>
         ))}
       </dl>
+    </div>
+  );
+}
+
+/** "Видеоуроки" with the course name under it (exam-prep courses, where the course header is not shown). */
+function SyllabusTitle() {
+  const { lang, t } = useTranslation();
+  const { course } = useCourse();
+  return (
+    <div className="min-w-0">
+      <h1 className="break-words text-2xl font-bold leading-8 text-slate-900 lg:text-[28px] lg:leading-9">{t("student.nav.lessons")}</h1>
+      <p className="mt-1 break-words text-sm leading-5 text-slate-600">{pickLocalized(course.title, lang, course.default_language)}</p>
     </div>
   );
 }
@@ -351,14 +363,19 @@ export function StudentSyllabus() {
     },
   };
 
-  if (error && !data) return <ErrorState message={errorText(error)} onRetry={() => void load()} retrying={loading} />;
-  if (!data) return <LoadingState rows={4} />;
-  if (data.modules.length === 0) {
-    return <EmptyState mascot="reading" title={t("modules.emptyStudentTitle")} description={t("modules.emptyStudentBody")} />;
-  }
   const examPrep = templateUi(course).studentLayout === "exam_prep";
+  const early = error && !data
+    ? <ErrorState message={errorText(error)} onRetry={() => void load()} retrying={loading} />
+    : !data
+      ? <LoadingState rows={4} />
+      : data.modules.length === 0
+        ? <EmptyState mascot="reading" title={t("modules.emptyStudentTitle")} description={t("modules.emptyStudentBody")} />
+        : null;
+  // exam-prep courses: the course layout shows no course header here, the page names itself
+  if (early || !data) return <div className="flex w-full flex-col gap-4">{examPrep && <SyllabusTitle />}{early}</div>;
   return (
     <div className="flex w-full flex-col gap-4">
+      {examPrep && <SyllabusTitle />}
       {course.status === "concluded" && (
         <p role="status" className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-base leading-6 text-slate-700 sm:text-sm">{t("courses.home.concludedNotice")}</p>
       )}

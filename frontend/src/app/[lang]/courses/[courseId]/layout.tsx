@@ -121,9 +121,11 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
   // the course sidebar is not shown; the assessment lobby keeps today's frame to the pixel (§2.4) ---
   const lobby = /^\/[^/]+\/courses\/[^/]+\/assessments\/[^/]+$/.test(pathname);
   if (!staffFrame && role === "student" && templateUi(course).studentLayout === "exam_prep" && !lobby) {
+    // Student UI U7: the lesson pages (syllabus and lesson) carry their own title ("Видеоуроки" + course name)
+    const ownTitle = pathname === `${base}/modules` || pathname.startsWith(`${base}/modules/`);
     return (
       <CourseContext.Provider value={ctx}>
-        {header}
+        {!ownTitle && header}
         {hidden ? <AreaUnavailable courseId={course.id} /> : children}
       </CourseContext.Provider>
     );
