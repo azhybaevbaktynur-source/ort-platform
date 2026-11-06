@@ -35,17 +35,18 @@ async function shoot(page: Page, name: string) {
   await page.setViewportSize({ width: 1440, height: 900 });
 }
 
-const PRO_SHOTS = process.env.F6B_SHOTS || "/private/tmp/claude-501/f6b_shots";
+// screenshots only when F6B_SHOTS names a folder (the no-side-scroll check always runs)
+const PRO_SHOTS = process.env.F6B_SHOTS || "";
 
 /** F6b UX check: 375 and 1440 px (ru), no side scroll. */
 async function proShots(page: Page, name: string) {
-  fs.mkdirSync(PRO_SHOTS, { recursive: true });
+  if (PRO_SHOTS) fs.mkdirSync(PRO_SHOTS, { recursive: true });
   for (const width of [375, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await settle(page);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, `horizontal scroll at ${width}px (${name})`).toBeLessThanOrEqual(0);
-    await page.screenshot({ path: path.join(PRO_SHOTS, `${name}-${width}-ru.png`), fullPage: true, animations: "disabled", caret: "hide" });
+    if (PRO_SHOTS) await page.screenshot({ path: path.join(PRO_SHOTS, `${name}-${width}-ru.png`), fullPage: true, animations: "disabled", caret: "hide" });
   }
   await page.setViewportSize({ width: 1440, height: 900 });
 }
@@ -191,7 +192,7 @@ test.describe("free and paid exams (ru)", () => {
       await expect(plansCard()).toContainText(t("access.pro.pay.chosenOnRequest", { plan: t("access.plan.month_1") }));
       await expect(plansCard()).toContainText(t("access.howToPay"));
       await proShots(student, "pro-free");
-      await student.screenshot({ path: path.join(PRO_SHOTS, "fix-pro-unset-1440-ru.png"), fullPage: true, animations: "disabled", caret: "hide" });
+      if (PRO_SHOTS) await student.screenshot({ path: path.join(PRO_SHOTS, "fix-pro-unset-1440-ru.png"), fullPage: true, animations: "disabled", caret: "hide" });
 
       // ---- admin settings: a season end in 60 days and one price; only what changed is sent
       await admin.goto(`/${L}/admin/access/settings`);
@@ -220,7 +221,7 @@ test.describe("free and paid exams (ru)", () => {
       await grant.getByRole("option", { name: new RegExp(name) }).click();
       await expect(grant).toContainText(t("access.admin.pro.preview", { date: "@@" }).split("@@")[0]);
       await expect(grant).toContainText(t("access.admin.pro.grantBodyNew")); // no Pro yet: it starts now
-      await admin.screenshot({ path: path.join(PRO_SHOTS, "fix-grant-dialog-1440-ru.png"), animations: "disabled", caret: "hide" });
+      if (PRO_SHOTS) await admin.screenshot({ path: path.join(PRO_SHOTS, "fix-grant-dialog-1440-ru.png"), animations: "disabled", caret: "hide" });
       await grant.getByLabel(t("ui.reason.required")).fill("E2E: оплата наличными");
       await grant.getByRole("button", { name: t("access.admin.pro.grant") }).click();
       await expect(grant).toBeHidden();
