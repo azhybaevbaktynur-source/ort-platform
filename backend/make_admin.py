@@ -89,6 +89,7 @@ def reset_2fa(email: str) -> bool:
             return False
         mfa.reset(session, user)
         session.commit()
+        mfa.notify(user, "mfa_reset")  # the account learns of it by email
         print(f"Two-step login was reset for '{clean_email}'. Every session of the account ended; "
               "they set it up again on their next visit to the admin area.")
         return True

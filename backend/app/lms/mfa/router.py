@@ -35,6 +35,14 @@ class MfaCodeIn(BaseModel):
     code: str = Field(min_length=1, max_length=40)
 
 
+class MfaPasswordIn(BaseModel):
+    password: str = Field(min_length=1, max_length=200)
+
+
+class MfaConfirmIn(MfaCodeIn):
+    password: str = Field(min_length=1, max_length=200)
+
+
 class MfaRecoveryCodesOut(BaseModel):
     recovery_codes: list[str]
 
@@ -53,15 +61,16 @@ def mfa_status(admin: User = Depends(require_platform_admin_enrolling), db: Sess
 
 
 @router.post("/security/mfa/setup", response_model=MfaSetupOut)
-def mfa_setup(admin: User = Depends(require_platform_admin_enrolling), db: Session = Depends(get_db)):
-    secret, uri = mfa.start_setup(db, admin)
+def mfa_setup(body: MfaPasswordIn, request: Request, admin: User = Depends(require_platform_admin_enrolling),
+              db: Session = Depends(get_db)):
+    secret, uri = mfa.start_setup(db, admin, body.password, request)
     return MfaSetupOut(secret=secret, otpauth_uri=uri)
 
 
 @router.post("/security/mfa/confirm", response_model=MfaEnabledOut)
-def mfa_confirm(body: MfaCodeIn, request: Request, admin: User = Depends(require_platform_admin_enrolling),
+def mfa_confirm(body: MfaConfirmIn, request: Request, admin: User = Depends(require_platform_admin_enrolling),
                 db: Session = Depends(get_db)):
-    codes = mfa.confirm_setup(db, admin, body.code, request)
+    codes = mfa.confirm_setup(db, admin, body.code, body.password, request)
     token = create_access_token({"sub": admin.id, "tv": admin.token_version or 0})
     return MfaEnabledOut(recovery_codes=codes, access_token=token)
 

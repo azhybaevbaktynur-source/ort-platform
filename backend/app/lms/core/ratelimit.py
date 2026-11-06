@@ -153,6 +153,19 @@ PAIR_REDEEM_IP_FAIL_10M = Limit("pair_redeem_ip_fail_10m", 60, 600, is_ip_rule=T
 MFA_CHALLENGE_TRY = Limit("mfa_challenge_try", 5, 900)
 MFA_USER_FAIL_1H = Limit("mfa_user_fail_1h", 10, 3600)
 MFA_SETUP_1H = Limit("mfa_setup_1h", 10, 3600)
+# security review: every /auth/mfa try counts up front (parallel challenges cannot burst past the failure rule)
+MFA_USER_TRY_1H = Limit("mfa_user_try_1h", 30, 3600)
+MFA_IP_TRY_10M = Limit("mfa_ip_try_10m", 120, 600, is_ip_rule=True)
+
+
+def login_failure_rules(clean_email: str, ip_key) -> list[tuple[str, Limit]]:
+    """The failures-only rules of /auth/login; the password checks of the two-step login setup count on the same ones."""
+    rules = [(f"email:{clean_email}:ip:{ip_key or 'none'}", LOGIN_EMAIL_IP_FAIL_10M),
+             (f"email:{clean_email}", LOGIN_EMAIL_FAIL_10M),
+             (f"email:{clean_email}", LOGIN_EMAIL_FAIL_24H)]
+    if ip_key:
+        rules.append((f"ip:{ip_key}", LOGIN_IP_FAIL_10M))
+    return rules
 # --- S1 admin security end ---
 
 _CLEANUP_PROBABILITY = 1 / 200

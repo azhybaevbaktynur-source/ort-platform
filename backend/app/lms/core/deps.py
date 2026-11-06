@@ -63,6 +63,11 @@ def get_lms_user(authorization: Optional[str] = Header(None), db: Session = Depe
         raise UnauthorizedException("Account disabled")
     if claims.get("tv", 0) != (user.token_version or 0):  # Phase 11 S4: can only reject; the row is already loaded
         raise UnauthorizedException("Invalid or expired token")
+    if user.is_platform_admin and user.mfa_enabled_at is None:  # S1: loaded columns only, no query
+        from app.lms.mfa import gate as mfa_gate
+
+        if mfa_gate.must_enroll(user):
+            mfa_gate.enforce(request)
     if user.is_test_student:
         from app.lms.student_view.allowlist import enforce
 

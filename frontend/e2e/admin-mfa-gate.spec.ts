@@ -41,7 +41,9 @@ test("an admin without two-step login is sent to set it up, then reaches the ove
   watchCsp(page);
   await page.goto("/ru/login");
   await passwordStep(page, admin.email, admin.password); // no two-step login yet: the password signs in
-  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
+  // every page refuses the account (403 mfa_enrollment_required), so the first page after the login sends it on
+  await page.waitForURL(/\/ru\/admin\/security$/);
+  await page.waitForLoadState("networkidle");
 
   await page.goto("/ru/admin");
   await page.waitForURL(/\/ru\/admin\/security$/);
@@ -49,7 +51,7 @@ test("an admin without two-step login is sent to set it up, then reaches the ove
   const nav = page.getByRole("navigation", { name: tr("ru", "platformAdmin.nav.label") });
   await expect(nav.getByRole("link", { name: tr("ru", "platformAdmin.nav.overview") })).toHaveCount(0);
 
-  const secret = await startSetup(page);
+  const secret = await startSetup(page, admin.password);
   await confirmSetup(page, secret);
   await closeRecoveryCodes(page);
   await expect(page.getByText(tr("ru", "adminSecurity.badgeOn")).first()).toBeVisible();

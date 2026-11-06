@@ -30,6 +30,8 @@ export default function AdminSecurityPage() {
   const [setup, setSetup] = useState<MfaSetup | null>(null);
   const [qr, setQr] = useState<string | null>(null);
   const [code, setCode] = useState("");
+  // The current password: asked before the setup starts and sent again with the code (security review)
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [codes, setCodes] = useState<string[] | null>(null);
@@ -56,11 +58,12 @@ export default function AdminSecurityPage() {
     return () => { live = false; };
   }, [setup]);
 
-  const begin = async () => {
+  const begin = async (e: React.FormEvent) => {
+    e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      setSetup(await startMfaSetup());
+      setSetup(await startMfaSetup(password));
       setCode("");
     } catch (e) {
       setError(e);
@@ -74,12 +77,13 @@ export default function AdminSecurityPage() {
     setBusy(true);
     setError(null);
     try {
-      const res = await confirmMfa(code);
+      const res = await confirmMfa(code, password);
       // Turning it on ended every session, this one too: continue with the new token
       localStorage.setItem("ort_token", res.access_token);
       setCodes(res.recovery_codes);
       setSetup(null);
       setCode("");
+      setPassword("");
       await load();
       refreshSummary();
     } catch (err) {
@@ -145,10 +149,16 @@ export default function AdminSecurityPage() {
           {!setup ? (
             <>
               <p className="mb-4 text-sm leading-6 text-slate-700">{t("adminSecurity.setup.apps")}</p>
-              {error ? <OrgError error={error} className="mb-4" /> : null}
-              <Button onClick={() => void begin()} loading={busy} leftIcon={<ShieldCheck aria-hidden="true" className="h-4 w-4" />}>
-                {t("adminSecurity.setup.start")}
-              </Button>
+              <form onSubmit={begin} className="space-y-3">
+                <Input label={t("adminSecurity.setup.passwordLabel")} hint={t("adminSecurity.setup.passwordHint")}
+                  type="password" autoComplete="current-password" required value={password}
+                  onChange={(e) => setPassword(e.target.value)} containerClassName="max-w-sm" />
+                {error ? <OrgError error={error} /> : null}
+                <Button type="submit" loading={busy} disabled={!password}
+                  leftIcon={<ShieldCheck aria-hidden="true" className="h-4 w-4" />}>
+                  {t("adminSecurity.setup.start")}
+                </Button>
+              </form>
             </>
           ) : (
             <div className="grid gap-6 lg:grid-cols-[auto_1fr]">

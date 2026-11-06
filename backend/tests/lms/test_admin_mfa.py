@@ -73,10 +73,11 @@ def wrong_code(secret: str) -> str:
 
 async def enroll(db, user: User) -> tuple[str, list[str], str]:
     """Turns two-step login on through the API: (secret, recovery codes, the new access token)."""
-    res = await call("POST", "/platform/security/mfa/setup", token_for(user))
+    res = await call("POST", "/platform/security/mfa/setup", token_for(user), {"password": PASSWORD})
     assert res.status_code == 200, res.text
     secret = res.json()["secret"]
-    res = await call("POST", "/platform/security/mfa/confirm", token_for(user), {"code": code_at(secret)})
+    res = await call("POST", "/platform/security/mfa/confirm", token_for(user),
+                     {"code": code_at(secret), "password": PASSWORD})
     assert res.status_code == 200, res.text
     body = res.json()
     db.expire_all()
@@ -95,6 +96,17 @@ def audit_rows(db, action: str, target_id: str) -> list[AdminAuditLog]:
     db.expire_all()
     return list(db.execute(select(AdminAuditLog).where(AdminAuditLog.action == action,
                                                        AdminAuditLog.target_id == target_id)).scalars())
+
+
+def fill_rule(key: str, rule: ratelimit.Limit) -> None:
+    """Put a bucket at its limit in the current window."""
+    from app.lms.core.ratelimit import RateLimitBucket
+
+    now = ratelimit._now()
+    ws = ratelimit._window(now, rule)
+    with db_session.engine.begin() as conn:
+        conn.execute(RateLimitBucket.__table__.insert().values(
+            key=ratelimit._bucket_key(key, rule), window_start=ws, count=rule.limit, expires_at=ws + rule.window_seconds))
 
 
 @pytest.fixture
@@ -161,16 +173,18 @@ async def test_enrollment_turns_it_on_ends_old_sessions_and_shows_codes_once(db)
     old = token_for(admin)
     res = await call("GET", "/platform/security/mfa", old)
     assert res.json() == {"enabled": False, "enabled_at": None, "required": False, "recovery_codes_left": 0}
-    setup = (await call("POST", "/platform/security/mfa/setup", old)).json()
+    setup = (await call("POST", "/platform/security/mfa/setup", old, {"password": PASSWORD})).json()
     assert setup["otpauth_uri"].startswith("otpauth://totp/") and f"secret={setup['secret']}" in setup["otpauth_uri"]
     db.refresh(admin)
     assert admin.mfa_pending_secret_enc and setup["secret"] not in admin.mfa_pending_secret_enc
     assert admin.mfa_enabled_at is None
 
-    wrong = await call("POST", "/platform/security/mfa/confirm", old, {"code": wrong_code(setup["secret"])})
+    wrong = await call("POST", "/platform/security/mfa/confirm", old,
+                       {"code": wrong_code(setup["secret"]), "password": PASSWORD})
     assert wrong.status_code == 400 and wrong.json()["error"]["code"] == "mfa_invalid_code"
 
-    res = await call("POST", "/platform/security/mfa/confirm", old, {"code": code_at(setup["secret"])})
+    res = await call("POST", "/platform/security/mfa/confirm", old,
+                     {"code": code_at(setup["secret"]), "password": PASSWORD})
     assert res.status_code == 200, res.text
     body = res.json()
     assert len(body["recovery_codes"]) == 10 and len(set(body["recovery_codes"])) == 10
@@ -182,18 +196,18 @@ async def test_enrollment_turns_it_on_ends_old_sessions_and_shows_codes_once(db)
     status = (await call("GET", "/platform/security/mfa", new)).json()
     assert status["enabled"] is True and status["recovery_codes_left"] == 10
     assert "secret" not in status
-    again = await call("POST", "/platform/security/mfa/setup", new)
+    again = await call("POST", "/platform/security/mfa/setup", new, {"password": PASSWORD})
     assert again.status_code == 409 and again.json()["error"]["code"] == "mfa_already_enabled"
     assert len(audit_rows(db, "mfa.enable", admin.id)) == 1
 
 
 async def test_confirm_without_setup_and_non_admins(db):
     admin = admin_account(db)
-    res = await call("POST", "/platform/security/mfa/confirm", token_for(admin), {"code": "123456"})
+    res = await call("POST", "/platform/security/mfa/confirm", token_for(admin), {"code": "123456", "password": PASSWORD})
     assert res.status_code == 409 and res.json()["error"]["code"] == "mfa_setup_missing"
     student = make_user(db)
     for method, path in (("GET", "/platform/security/mfa"), ("POST", "/platform/security/mfa/setup")):
-        res = await call(method, path, token_for(student))
+        res = await call(method, path, token_for(student), {"password": PASSWORD} if method == "POST" else None)
         assert res.status_code == 403 and res.json()["error"]["code"] == "platform_admin_required"
 
 
@@ -207,6 +221,116 @@ async def test_the_enrollment_gate(db, required):
     assert status.status_code == 200 and status.json()["required"] is True
     _, _, new = await enroll(db, admin)
     assert (await call("GET", "/platform/summary", new)).status_code == 200
+
+
+async def test_the_gate_covers_admin_power_outside_platform_routes(db, required):
+    """Security review: admin power is read from is_platform_admin in many services, so the gate is in the auth
+    dependency itself. An organization, a course and a template route; the header's own routes stay open."""
+    from tests.lms.org_support import make_org
+
+    admin = admin_account(db)
+    teacher = make_user(db, teacher_status="approved")
+    org = make_org(db)
+    new_course = {"title": {"en": "Gate"}, "languages": ["en"], "default_language": "en"}
+    gated = [("GET", f"/org/{org.id}", None), ("POST", "/courses", new_course),
+             ("GET", f"/courses/templates?organization_id={org.id}", None), ("GET", "/exam-templates", None)]
+    tok = token_for(admin)
+    for method, path, body in gated:
+        res = await call(method, path, tok, body)
+        assert res.status_code == 403 and res.json()["error"]["code"] == "mfa_enrollment_required", path
+    for method, path in (("GET", "/auth/me"), ("GET", "/me/lms"), ("GET", "/me/organizations"),
+                         ("GET", "/platform/security/mfa")):
+        assert (await call(method, path, tok)).status_code == 200, path
+    assert (await call("POST", "/auth/refresh", tok)).status_code == 200
+    # a non-admin is never gated
+    assert (await call("GET", "/me/home", token_for(teacher))).status_code == 200
+    _, _, new = await enroll(db, admin)
+    for method, path, body in gated:
+        assert (await call(method, path, new, body)).status_code in (200, 201), path
+    db.refresh(admin)
+    assert admin.is_platform_admin is True  # never changed by the gate
+
+
+async def test_setup_and_confirm_need_the_current_password(db, monkeypatch):
+    sent = []
+    monkeypatch.setattr("app.services.email_service.send_security_notice_email",
+                        lambda to, kind, lang=None: sent.append((to, kind)) or True)
+    admin = admin_account(db)
+    tok = token_for(admin)
+    res = await call("POST", "/platform/security/mfa/setup", tok, {"password": "not it"})
+    assert res.status_code == 400 and res.json()["error"]["code"] == "wrong_password"
+    assert (await call("POST", "/platform/security/mfa/setup", tok, {})).status_code == 422
+    secret = (await call("POST", "/platform/security/mfa/setup", tok, {"password": PASSWORD})).json()["secret"]
+    res = await call("POST", "/platform/security/mfa/confirm", tok, {"code": code_at(secret), "password": "not it"})
+    assert res.status_code == 400 and res.json()["error"]["code"] == "wrong_password"
+    db.refresh(admin)
+    assert admin.mfa_enabled_at is None and sent == []
+    # wrong passwords count on the login rules of this email: the login form then refuses too
+    rule = ratelimit.LOGIN_EMAIL_IP_FAIL_10M
+    for _ in range(rule.limit - 2):
+        await call("POST", "/platform/security/mfa/setup", tok, {"password": "not it"})
+    res = await call("POST", "/platform/security/mfa/setup", tok, {"password": PASSWORD})
+    assert res.status_code == 429
+    res = await call("POST", "/auth/login", json={"email": admin.email, "password": PASSWORD})
+    assert res.status_code == 429
+
+
+async def test_the_account_is_emailed_on_enable_and_new_recovery_codes(db, monkeypatch):
+    sent = []
+    monkeypatch.setattr("app.services.email_service.send_security_notice_email",
+                        lambda to, kind, lang=None: sent.append((to, kind)) or True)
+    admin = admin_account(db)
+    secret, _, tok = await enroll(db, admin)
+    assert sent == [(admin.email, "mfa_enabled")]
+    res = await call("POST", "/platform/security/mfa/recovery-codes", tok, {"code": code_at(secret, 1)})
+    assert res.status_code == 200
+    assert sent[-1] == (admin.email, "recovery_codes")
+
+
+def test_the_security_notice_is_trilingual_and_private(monkeypatch):
+    from app.services import email_service
+
+    calls = []
+    monkeypatch.setattr(email_service, "send_email", lambda *a, **kw: calls.append((a, kw)) or True)
+    for lang in ("en", "ru", "ky"):
+        for kind in email_service.SECURITY_NOTICES:
+            assert email_service.send_security_notice_email("a@test.example", kind, lang) is True
+    assert len(calls) == 9 and all(kw["private"] is True for _, kw in calls)
+    assert len({a[1] for a, _ in calls}) == 9  # a subject per language and kind
+
+
+async def test_removal_locks_the_admins_before_the_code_check(db, monkeypatch):
+    """Security review: two admins removing each other must not deadlock (each holding its own row from the code check,
+    then waiting for the other's). The lock on every active admin comes first."""
+    from app.lms.platform_admin import admins
+
+    order = []
+    real_lock, real_code = admins.active_admin_ids, mfa.require_code
+    monkeypatch.setattr(admins, "active_admin_ids", lambda d, lock=False: order.append(("lock", lock)) or real_lock(d, lock=lock))
+    monkeypatch.setattr(mfa, "require_code", lambda *a, **kw: order.append(("code", None)) or real_code(*a, **kw))
+    admin = admin_account(db)
+    other = admin_account(db)
+    secret, _, tok = await enroll(db, admin)
+    res = await call("POST", f"/platform/users/{other.id}/platform-admin", tok,
+                     {"platform_admin": False, "reason": "x", "code": code_at(secret, 1)})
+    assert res.status_code == 200, res.text
+    assert order[0] == ("lock", True) and order[1] == ("code", None)
+
+
+async def test_mfa_tries_are_counted_up_front_per_account_and_per_address(db, monkeypatch):
+    admin = admin_account(db)
+    secret, _, _ = await enroll(db, admin)
+    challenge = await challenge_for(admin)
+    fill_rule(f"user:{admin.id}", ratelimit.MFA_USER_TRY_1H)  # parallel challenges used the hour up
+    res = await call("POST", "/auth/mfa", json={"challenge": challenge, "code": code_at(secret, 1)})
+    assert res.status_code == 429 and res.json()["detail"]["code"] == "rate_limited"
+
+    monkeypatch.setattr(settings, "RATE_LIMIT_IP_ENFORCE", True)
+    from app.lms.core.deps import hash_ip
+
+    fill_rule(f"ip:{hash_ip('203.0.113.50')}", ratelimit.MFA_IP_TRY_10M)
+    res = await call("POST", "/auth/mfa", json={"challenge": "forged", "code": "123456"}, ip="203.0.113.50")
+    assert res.status_code == 429  # counted before the challenge is even read
 
 
 async def test_without_the_requirement_an_unenrolled_admin_works(db):
@@ -445,7 +569,7 @@ async def test_end_sessions_of_any_user(db):
 
 # ----------------------------------------------------------------------------- make_admin.py
 
-def test_make_admin_refuses_the_last_admin_and_resets_two_step_login(db, capsys):
+def test_make_admin_refuses_the_last_admin_and_resets_two_step_login(db, capsys, monkeypatch):
     seed = db.get(User, SEED_ADMIN)
     seed.disabled_at = func.now()
     db.commit()
@@ -468,7 +592,11 @@ def test_make_admin_refuses_the_last_admin_and_resets_two_step_login(db, capsys)
     db.add(MfaRecoveryCode(user_id=admin.id, code_hash="x" * 64))
     db.commit()
     before = admin.token_version or 0
+    sent = []
+    monkeypatch.setattr("app.services.email_service.send_security_notice_email",
+                        lambda to, kind, lang=None: sent.append((to, kind)) or True)
     assert make_admin.reset_2fa(admin.email) is True
+    assert sent == [(admin.email, "mfa_reset")]
     out = capsys.readouterr().out
     assert secret not in out and "reset" in out
     db.expire_all()

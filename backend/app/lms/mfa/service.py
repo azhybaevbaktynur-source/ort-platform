@@ -61,6 +61,11 @@ class InvalidCode(LMSError):
     code = "mfa_invalid_code"
 
 
+class WrongPassword(LMSError):
+    status_code = 400
+    code = "wrong_password"
+
+
 # --- keys and secrets ------------------------------------------------------------------------------------------------
 
 @lru_cache(maxsize=16)
@@ -228,26 +233,56 @@ def recovery_codes_left(db: Session, user_id: str) -> int:
         MfaRecoveryCode.user_id == user_id, MfaRecoveryCode.used_at.is_(None))).scalar_one()
 
 
+# --- the current password (security review: a stolen session alone cannot turn two-step login on) ---------------
+
+def require_password(db: Session, user: User, password: str, request: Optional[Request]) -> None:
+    """bcrypt check of the account's current password; failures count on the /auth/login rules of this email (and the
+    caller's address), so the setup cannot be used to guess the password faster than the login form."""
+    from app.core.security import verify_password
+    from app.lms.core.deps import client_ip_hash
+
+    rules = ratelimit.login_failure_rules(user.email.strip().lower(), client_ip_hash(request) if request else None)
+    allowed, retry = ratelimit.peek_all(rules)
+    if not allowed:
+        raise RateLimited("Too many attempts", code="rate_limited", details={"retry_after_seconds": retry})
+    if not user.password_hash or not verify_password(password or "", user.password_hash):
+        db.rollback()
+        ratelimit.record_failures(rules)
+        raise WrongPassword("Wrong password")
+
+
+def notify(user: User, kind: str) -> None:
+    """Email the account about a change of its two-step login (after the commit; never fails the caller)."""
+    from app.services.email_service import send_security_notice_email
+
+    try:
+        send_security_notice_email(user.email, kind, user.locale)
+    except Exception:  # the change is already saved; the notice is best effort
+        logger.error("two-step login notice not sent (%s)", kind)
+
+
 # --- enrollment ----------------------------------------------------------------------------------------------------
 
-def start_setup(db: Session, user: User) -> tuple[str, str]:
-    """A new pending secret (replacing an unconfirmed one): (secret, otpauth URI)."""
+def start_setup(db: Session, user: User, password: str, request: Optional[Request]) -> tuple[str, str]:
+    """A new pending secret (replacing an unconfirmed one): (secret, otpauth URI). Needs the current password."""
     if is_enabled(user):
         raise Conflict("Two-step login is already on", code="mfa_already_enabled")
     ratelimit.enforce(f"user:{user.id}", ratelimit.MFA_SETUP_1H)
+    require_password(db, user, password, request)
     secret = totp.new_secret()
     user.mfa_pending_secret_enc = encrypt_secret(secret, user.id)
     db.commit()
     return secret, otpauth_uri(secret, user.email)
 
 
-def confirm_setup(db: Session, user: User, raw: str, request: Optional[Request]) -> list[str]:
-    """Turns two-step login on with a code from the pending secret. Every session of the account ends (token_version);
-    the caller issues a new token. Returns the recovery codes."""
+def confirm_setup(db: Session, user: User, raw: str, password: str, request: Optional[Request]) -> list[str]:
+    """Turns two-step login on with the current password and a code from the pending secret. Every session of the account
+    ends (token_version); the caller issues a new token. The account gets an email. Returns the recovery codes."""
     if is_enabled(user):
         raise Conflict("Two-step login is already on", code="mfa_already_enabled")
     if not user.mfa_pending_secret_enc:
         raise Conflict("Start the setup again", code="mfa_setup_missing")
+    require_password(db, user, password, request)
     check_user_failures(user.id)
     code = normalize_code(raw)
     secret = decrypt_secret(user.mfa_pending_secret_enc, user.id)
@@ -265,6 +300,7 @@ def confirm_setup(db: Session, user: User, raw: str, request: Optional[Request])
     codes = new_recovery_codes(db, user)
     audit.record(db, actor=user, action="mfa.enable", target_type="user", target_id=user.id, request=request)
     db.commit()
+    notify(user, "mfa_enabled")
     return codes
 
 
@@ -274,6 +310,7 @@ def regenerate_recovery_codes(db: Session, user: User, raw: str, request: Option
     audit.record(db, actor=user, action="mfa.recovery_codes.regenerate", target_type="user", target_id=user.id,
                  request=request)
     db.commit()
+    notify(user, "recovery_codes")
     return codes
 
 

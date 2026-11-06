@@ -297,7 +297,7 @@ export const LMS_ERROR_CODES = [
   "reapply_wait", "teacher_age_required", "age_confirmation_required", "personal_org_no_members",
   // S1 admin security: two-step login, platform admins
   "mfa_enrollment_required", "mfa_invalid_code", "mfa_already_enabled", "mfa_setup_missing", "last_platform_admin",
-  "already_platform_admin", "not_platform_admin", "target_email_not_verified", "target_disabled",
+  "already_platform_admin", "not_platform_admin", "target_email_not_verified", "target_disabled", "wrong_password",
 ] as const;
 export type LmsErrorCode = (typeof LMS_ERROR_CODES)[number];
 

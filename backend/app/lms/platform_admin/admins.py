@@ -81,6 +81,10 @@ def set_platform_admin(db: Session, admin: User, user_id: str, make_admin: bool,
             raise Conflict("This account is disabled", code="target_disabled")
     elif not target.is_platform_admin:
         raise Conflict("Not a platform admin", code="not_platform_admin")
+    else:
+        # Security review: lock every active admin row first (ordered by id), before the code check writes the acting
+        # admin's own row; two admins removing each other at once then wait in turn instead of deadlocking.
+        active_admin_ids(db, lock=True)
     mfa.require_code(db, admin, code)
     if make_admin:
         grant(db, target)

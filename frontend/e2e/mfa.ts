@@ -31,8 +31,9 @@ export async function passwordStep(page: Page, email: string, password: string):
   await page.getByRole("button", { name: tr("ru", "auth.signInButton") }).click();
 }
 
-/** On /admin/security: start the setup, read the key. */
-export async function startSetup(page: Page): Promise<string> {
+/** On /admin/security: the current password, start the setup, read the key. */
+export async function startSetup(page: Page, password: string): Promise<string> {
+  await page.getByLabel(tr("ru", "adminSecurity.setup.passwordLabel")).fill(password);
   await page.getByRole("button", { name: tr("ru", "adminSecurity.setup.start") }).click();
   const secret = (await page.getByTestId("mfa-secret").innerText()).replace(/\s/g, "");
   expect(secret).toMatch(/^[A-Z2-7]{32}$/);

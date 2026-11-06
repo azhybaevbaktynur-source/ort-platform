@@ -325,10 +325,7 @@ def login_user(
     """
     clean_email = req.email.strip().lower()
     ip_key = client_ip_hash(request) if request is not None else None
-    rules = [(f"email:{clean_email}:ip:{ip_key or 'none'}", ratelimit.LOGIN_EMAIL_IP_FAIL_10M),
-             (f"email:{clean_email}", ratelimit.LOGIN_EMAIL_FAIL_10M),
-             (f"email:{clean_email}", ratelimit.LOGIN_EMAIL_FAIL_24H),
-             *_ip_rule(request, ratelimit.LOGIN_IP_FAIL_10M)]
+    rules = ratelimit.login_failure_rules(clean_email, ip_key)
     _check_failures(rules)
 
     user = db.query(User).filter(User.email == clean_email).first()
@@ -365,11 +362,13 @@ def login_user(
 def complete_mfa(req: MfaCompleteRequest, db: Session = Depends(get_db), request: Request = None):
     """Second step of sign-in: the challenge from /auth/login (or /auth/verify-email) and a code from the authenticator
     app or an unused recovery code. Every try on one challenge counts; wrong codes also count per account."""
+    _count_all(_ip_rule(request, ratelimit.MFA_IP_TRY_10M))  # every try counts, a forged challenge too
     claims = mfa.read_challenge(req.challenge)
     if claims is None:
         raise _error(401, "mfa_challenge_invalid", "This sign-in step has expired. Sign in again.")
     uid = str(claims["uid"])
-    _count_all([(f"challenge:{claims['jti']}", ratelimit.MFA_CHALLENGE_TRY)])
+    # every try on a real challenge, before the code is checked: parallel challenges cannot burst past the failure rule
+    _count_all([(f"challenge:{claims['jti']}", ratelimit.MFA_CHALLENGE_TRY), (f"user:{uid}", ratelimit.MFA_USER_TRY_1H)])
     _check_failures(mfa.user_failure_rules(uid))
     user = db.get(User, uid)
     if (user is None or user.deleted_at is not None or claims.get("tv", 0) != (user.token_version or 0)

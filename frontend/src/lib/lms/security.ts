@@ -23,8 +23,10 @@ export interface MfaEnabled {
 }
 
 export const getMfaStatus = () => lmsFetch<MfaStatus>("/platform/security/mfa");
-export const startMfaSetup = () => post<MfaSetup>("/platform/security/mfa/setup");
-export const confirmMfa = (code: string) => post<MfaEnabled>("/platform/security/mfa/confirm", { code });
+/** Both need the account's current password (a stolen session alone cannot turn two-step login on). */
+export const startMfaSetup = (password: string) => post<MfaSetup>("/platform/security/mfa/setup", { password });
+export const confirmMfa = (code: string, password: string) =>
+  post<MfaEnabled>("/platform/security/mfa/confirm", { code, password });
 export const regenerateRecoveryCodes = (code: string) =>
   post<{ recovery_codes: string[] }>("/platform/security/mfa/recovery-codes", { code });
 /** Every session of the signed-in account, this one included. */

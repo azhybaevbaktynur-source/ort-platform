@@ -12,7 +12,7 @@ test("an admin sets up two-step login, ends every session and signs in with a co
   await page.waitForURL(/\/ru\/admin\/security/);
   await expect(page.getByText(tr("ru", "adminSecurity.badgeOff"))).toBeVisible();
 
-  const secret = await startSetup(page);
+  const secret = await startSetup(page, admin.password);
   const setupStep = await confirmSetup(page, secret);
   const codes = page.getByTestId("recovery-codes").locator("li");
   await expect(codes.first()).toHaveText(/^[a-z2-9]{5}-[a-z2-9]{5}$/);

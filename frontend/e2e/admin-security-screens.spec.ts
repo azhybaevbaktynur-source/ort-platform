@@ -34,7 +34,7 @@ test("S1 screens (ru, 375 / 1440 / 1920)", async ({ page }) => {
   await passwordStep(page, admin.email, admin.password);
   await page.waitForURL(/\/ru\/admin\/security/);
 
-  const secret = await startSetup(page);
+  const secret = await startSetup(page, admin.password);
   await shots(page, "01-security-setup-qr");
   await confirmSetup(page, secret);
   await shots(page, "02-recovery-codes");

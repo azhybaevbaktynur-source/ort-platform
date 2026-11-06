@@ -284,7 +284,8 @@
       "already_platform_admin": "This person is already a platform admin.",
       "not_platform_admin": "This person is not a platform admin.",
       "target_email_not_verified": "This person has not confirmed their email yet.",
-      "target_disabled": "This account is disabled."
+      "target_disabled": "This account is disabled.",
+      "wrong_password": "Wrong password."
     }
   },
   "courses": {
@@ -5807,7 +5808,9 @@
       "step2": "Enter the 6-digit code the app shows.",
       "secretLabel": "Key for typing in by hand",
       "codeLabel": "Code from the app",
-      "confirm": "Turn on two-step login"
+      "confirm": "Turn on two-step login",
+      "passwordLabel": "Your current password",
+      "passwordHint": "Confirms that it is you. It is asked again when you turn it on."
     },
     "enabled": {
       "title": "Two-step login is on",
