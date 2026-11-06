@@ -53,10 +53,14 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
 
   // Phase 11 S3 (invariant 1): the gate refuses the course but never an open attempt; the player needs no course frame
   if ((error as { code?: string } | null)?.code === "consent_required" && /\/attempts\/[^/]+$/.test(pathname)) return <>{children}</>;
+  // SF-1 (STUDENT_UI_FIX_PLAN §2.1): the player route has no frame (LmsShell gives it no chrome); its loading and error
+  // states get a plain padded column
+  const playerPage = /^\/[^/]+\/courses\/[^/]+\/attempts\/[^/]+$/.test(pathname);
+  const bare = (node: React.ReactNode) => (playerPage ? <div className="mx-auto w-full max-w-3xl px-4 py-6">{node}</div> : node);
 
   const missing = (error as { status?: number } | null)?.status === 404;
   if (missing && !course) {
-    return (
+    return bare(
       <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
         <h1 className="text-xl font-bold text-slate-900">{t("courses.notFound.title")}</h1>
         <p className="mt-2 text-sm text-slate-600">{t("courses.notFound.body")}</p>
@@ -70,7 +74,7 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
     );
   }
   if (error && !course) {
-    return (
+    return bare(
       <div className="space-y-4">
         <ErrorMessage error={error} onRetry={reload} />
         <Link href={`/${lang}/courses`} className="text-sm font-medium text-brand-700 hover:underline">{t("courses.home.backToList")}</Link>
@@ -78,7 +82,7 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
     );
   }
   // --- Phase 6 S6b begin --- (UX S16: skeleton in the page layout instead of a loading line)
-  if (!course) return <CourseLoadingSkeleton />;
+  if (!course) return bare(<CourseLoadingSkeleton />);
   // --- Phase 6 S6b end ---
 
   const base = `/${lang}/courses/${course.id}`;
@@ -91,10 +95,32 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
   if (staff && course.sandbox_for_template_id) {
     return <CourseContext.Provider value={ctx}>{children}</CourseContext.Provider>;
   }
-  // --- Phase 8c S1 begin --- (PHASE_8C_DESIGN §2.1, P8C-8: player, result and review pages under /attempts/** keep
-  // today's full-width column without the sidebar, so the ORT result and review stay pixel-identical) ---
+  // SF-1: the player has no course frame for anyone (it is a full-screen overlay)
+  if (playerPage) return <CourseContext.Provider value={ctx}>{children}</CourseContext.Provider>;
+  // --- Phase 8c S1 begin --- (PHASE_8C_DESIGN §2.1, P8C-8: result and review pages under /attempts/** keep
+  // today's full-width column without the sidebar, except for exam-prep students, SF-1 below) ---
   const attemptsPage = pathname === `${base}/attempts` || pathname.startsWith(`${base}/attempts/`);
   const staffFrame = staff && (role === "teacher" || role === "assistant") && !course.my_enrollment.read_only;
+  // students (and org admins reading the course) opening an area whose link is hidden get the "not available" page
+  const hidden = hiddenAreaFor(course, courseNavRole(course), pathname);
+  // --- Student UI U2 (STUDENT_UI_DESIGN §2.2): inside an exam-prep course the student shell's sidebar navigates, so
+  // the course sidebar is not shown. SF-1 (STUDENT_UI_FIX_PLAN §2.1): the lobby, the result and the review are
+  // here too, in a reading column without course header or breadcrumbs ---
+  if (!staffFrame && role === "student" && templateUi(course).studentLayout === "exam_prep") {
+    const examPage = attemptsPage || /^\/[^/]+\/courses\/[^/]+\/assessments\/[^/]+$/.test(pathname);
+    // Student UI U4 (§3.2) / U6 (§3.3) / U7 (§3.5): Тесты, Аналитика and the lesson pages have their own title (course
+    // name as subtitle); the course page only redirects there
+    const ownTitle = examPage || pathname === base || pathname === `${base}/tests` || pathname === `${base}/progress`
+      || pathname === `${base}/modules` || pathname.startsWith(`${base}/modules/`)
+      || pathname === `${base}/saved` || pathname === `${base}/practice`; // U8: Сохранённые, Практика
+    const body = hidden ? <AreaUnavailable courseId={course.id} /> : children;
+    return (
+      <CourseContext.Provider value={ctx}>
+        {ownTitle ? null : <StudentCourseHeader course={course} breadcrumbs={false} />}
+        {examPage ? <div className="mx-auto w-full max-w-[880px]">{body}</div> : body}
+      </CourseContext.Provider>
+    );
+  }
   const header = staffFrame
     ? <StaffCourseBar course={course} titleAsHeading={pathname === base} studentViewButton />
     : role === "student"
@@ -112,24 +138,6 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
       <CourseContext.Provider value={ctx}>
         {header}
         {children}
-      </CourseContext.Provider>
-    );
-  }
-  // students (and org admins reading the course) opening an area whose link is hidden get the "not available" page
-  const hidden = hiddenAreaFor(course, courseNavRole(course), pathname);
-  // --- Student UI U2 (STUDENT_UI_DESIGN §2.2): inside an exam-prep course the student shell's sidebar navigates, so
-  // the course sidebar is not shown; the assessment lobby keeps today's frame to the pixel (§2.4) ---
-  const lobby = /^\/[^/]+\/courses\/[^/]+\/assessments\/[^/]+$/.test(pathname);
-  if (!staffFrame && role === "student" && templateUi(course).studentLayout === "exam_prep" && !lobby) {
-    // Student UI U4 (§3.2) / U6 (§3.3) / U7 (§3.5): Тесты, Аналитика and the lesson pages have their own title (course
-    // name as subtitle); the course page only redirects there
-    const ownTitle = pathname === base || pathname === `${base}/tests` || pathname === `${base}/progress`
-      || pathname === `${base}/modules` || pathname.startsWith(`${base}/modules/`)
-      || pathname === `${base}/saved` || pathname === `${base}/practice`; // U8: Сохранённые, Практика
-    return (
-      <CourseContext.Provider value={ctx}>
-        {ownTitle ? null : <StudentCourseHeader course={course} breadcrumbs={false} />}
-        {hidden ? <AreaUnavailable courseId={course.id} /> : children}
       </CourseContext.Provider>
     );
   }

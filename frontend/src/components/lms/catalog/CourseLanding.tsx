@@ -13,6 +13,7 @@ import { listMyApplications, withdrawApplication } from "@/lib/lms/applications"
 import { pickLocalized } from "@/lib/lms/localized";
 import type { ApplicationOwnOut } from "@/lib/lms/types";
 import { Button, ConfirmDialog, ErrorState, LinkButton, LoadingState, PageHeader, toast } from "@/components/ui";
+import { BackLink } from "@/components/lms/BackLink"; // SF-1 F3
 import { CatalogModeBadge } from "./CatalogModeBadge";
 import { ApplicationStatusBadge } from "./ApplicationStatus";
 import { useApplicationErrorText } from "./useApplicationErrorText";
@@ -79,14 +80,16 @@ export function CourseLanding({ courseId }: { courseId: string }) {
   useEffect(() => { void load(); }, [load]);
 
   const catalogHref = `/${lang}/courses/catalog`;
-  const crumbs = (title?: string) => [{ label: t("catalog.title"), href: catalogHref }, ...(title ? [{ label: title }] : [])];
+  // SF-1 F3: the student frame has no breadcrumbs; one back link to the catalog instead
+  const back = <BackLink href={catalogHref}>{t("catalog.landing.backToCatalog")}</BackLink>;
 
   if (loading && !course) return <div className="w-full max-w-3xl"><LoadingState rows={4} /></div>;
   if (error || !course) {
     const notFound = (error as { status?: number } | null)?.status === 404;
     return (
       <div className="w-full max-w-3xl">
-        <PageHeader title={t("catalog.title")} breadcrumbs={crumbs()} />
+        {back}
+        <PageHeader title={t("catalog.title")} />
         <ErrorState title={notFound ? t("catalog.landing.notFoundTitle") : undefined}
           message={notFound ? t("catalog.landing.notFoundBody") : errorText(error)}
           onRetry={notFound ? undefined : () => void load()} retrying={loading}
@@ -148,7 +151,8 @@ export function CourseLanding({ courseId }: { courseId: string }) {
 
   return (
     <div className="w-full max-w-3xl space-y-6">
-      <PageHeader title={title} breadcrumbs={crumbs(title)} badge={<CatalogModeBadge mode={course.enrollment_mode} />}
+      {back}
+      <PageHeader title={title} badge={<CatalogModeBadge mode={course.enrollment_mode} />}
         description={course.organization_display_name || undefined} />
 
       {/* The student's application (pending, or decided with the teacher's note). Phase 9 S5: an approved

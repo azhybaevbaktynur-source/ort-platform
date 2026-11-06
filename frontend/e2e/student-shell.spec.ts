@@ -36,12 +36,13 @@ test.describe("student shell (ru)", () => {
     await page.waitForURL(new RegExp(`/${L}/courses/${s.course_id}/tests$`));
     await expect(nav.getByRole("link", { name: t("student.nav.tests") })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("navigation", { name: t("courses.home.tabsLabel") })).toHaveCount(0);
-    // the lobby: the AppHeader frame, no student navigation
+    // the lobby (SF-1, STUDENT_UI_FIX_PLAN §2.1): inside the student shell, its navigation, no course sidebar
     await page.goto(`/${L}/courses/${s.course_id}/assessments/${s.exam.id}`);
     // the lobby's own heading (not "Start": another spec may have used this student's one attempt)
     await expect(page.getByRole("heading", { name: "ОРТ E2E", exact: true })).toBeVisible();
-    await expect(page.getByRole("navigation", { name: t("student.nav.label") })).toHaveCount(0);
-    await expect(page.getByRole("navigation", { name: t("student.nav.tabBar") })).toHaveCount(0);
+    await expect(nav).toBeVisible();
+    await expect(page.locator(".student-theme").getByRole("heading", { name: "ОРТ E2E", exact: true })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: t("courses.home.tabsLabel") })).toHaveCount(0);
   });
 
   test("desktop sidebar: equal vertical rhythm between links (1440, 1920)", async ({ page }) => {

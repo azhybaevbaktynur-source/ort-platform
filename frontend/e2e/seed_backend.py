@@ -45,6 +45,10 @@ STUDENTS = [
     "analytics-empty-ru", "analytics-data-ru",
     # Student UI U8: Сохранённые (one student without flags, one the spec gives flagged answers), getting started
     "saved-empty-ru", "saved-data-ru",
+    # SF-1 (STUDENT_UI_FIX_PLAN §2.2): result page walks (an empty attempt, one with correct answers)
+    "result-zero-ru", "result-data-ru",
+    # SF-1 F3 (STUDENT_UI_FIX_PLAN §3): the link audit of the student pages
+    "links-ru",
 ]
 
 

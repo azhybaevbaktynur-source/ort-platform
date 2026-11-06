@@ -1968,6 +1968,18 @@
     },
     "structured": {
       "blankN": "Blank {n}"
+    },
+    "backToTests": "To tests",
+    "hero": {
+      "scaledLabel": "Your score",
+      "scale": "out of {max} · scale {min}–{max}",
+      "outOf": "out of {max}",
+      "percentile": "Higher than {value}% of participants (scale model)",
+      "zeroRaw": "No correct answers, so the score is 0. The scale starts at {min}: with your first correct answer the score will be at least {min}."
+    },
+    "actions": {
+      "reviewMistakes": "Review mistakes",
+      "nextTest": "Next test"
     }
   },
   "schemes": {
@@ -6047,7 +6059,8 @@
     },
     "result": {
       "proud": "Great result, well done!",
-      "encourage": "Keep going. Every try helps you learn."
+      "encourage": "Keep going. Every try helps you learn.",
+      "good": "Good result. Review your mistakes to go higher."
     }
   },
   "teacherApply": {

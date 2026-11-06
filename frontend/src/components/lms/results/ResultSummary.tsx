@@ -7,8 +7,10 @@ import { pickLocalized } from "@/lib/lms/localized";
 import type { AttemptGradeOut } from "@/lib/lms/gradingTypes";
 import { fmtDateTime, fmtPoints } from "@/components/lms/assessments/format";
 import { useTemplateUi } from "@/lib/lms/templates";
+import { Award } from "lucide-react";
+import { useSchemeLabel } from "@/components/lms/grading/schemes/labels";
 import { GradeBadge } from "./GradeBadge";
-import { OrtResultView } from "./OrtResultView";
+import { SectionBreakdown } from "./SectionBreakdown"; // SF-1: replaces OrtResultView's table
 
 /**
  * One name per result section, shared by the summary table and the answer review (Phase 8b UX): the label of a
@@ -27,14 +29,23 @@ export function useResultSectionName(sections: AttemptResultOut["sections"]) {
   }, [sections, lang, t]);
 }
 
+/**
+ * Phase 8b S3 (PHASE_8B_DESIGN 8.2): the result payload names the view (the server falls back to the course template,
+ * so ORT is "ort"); a payload without the field keeps the course template's choice. Scaled = that view with
+ * per-section scaled values.
+ */
+export function isScaledResult(result: AttemptResultOut, grade: AttemptGradeOut | null, templateView: string): boolean {
+  return (result.result_view ?? templateView) === "ort" && !!grade && !!grade.sections && grade.sections.length > 0;
+}
+
 export function ResultSummary({ result, grade: gradeProp }: { result: AttemptResultOut; grade?: AttemptGradeOut | null }) {
   const { lang, t } = useTranslation();
   const ui = useTemplateUi();
   const sectionName = useResultSectionName(result.sections);
+  const label = useSchemeLabel();
   const grade = gradeProp ?? result.grade ?? null;
-  // Phase 8b S3 (PHASE_8B_DESIGN 8.2): the result payload names the view (the server falls back to the course
-  // template, so ORT is "ort"); a payload without the field keeps the course template's choice.
-  const scaled = (result.result_view ?? ui.resultView) === "ort" && !!grade && !!grade.sections && grade.sections.length > 0;
+  const scaled = isScaledResult(result, grade, ui.resultView);
+  const flags = Object.entries(grade?.thresholds ?? {}).filter(([, on]) => on).map(([k]) => k);
   const pending = result.pending_review > 0 ? (
     <p role="status" className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
       {t("results.pendingReview", { n: result.pending_review })}
@@ -49,13 +60,19 @@ export function ResultSummary({ result, grade: gradeProp }: { result: AttemptRes
             <p className="text-base font-semibold text-slate-900">{t("results.finishedIntro")}</p>
             {result.submitted_at && <p className="text-xs text-slate-600">{t("results.submittedAt", { date: fmtDateTime(result.submitted_at, lang) })}</p>}
           </div>
-          <OrtResultView grade={grade} sections={result.sections}>
-            <p className="flex flex-wrap items-baseline gap-x-2 text-sm text-slate-700">
-              <span>{t("results.rawScore")}</span>
-              <span className="font-semibold tabular-nums text-slate-900">{fmtPoints(result.raw_score)} / {fmtPoints(result.points_possible)}</span>
-            </p>
-            {pending}
-          </OrtResultView>
+          {flags.length > 0 && (
+            <div role="status" className="flex items-center gap-2 rounded-xl border border-gold-300 bg-gold-50 px-4 py-3 text-sm font-semibold text-gold-900">
+              <Award className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
+              <span>{flags.map((k) => label(k, grade.labels)).join(", ")}</span>
+            </div>
+          )}
+          <GradeBadge grade={grade} />
+          <p className="flex flex-wrap items-baseline gap-x-2 text-sm text-slate-700">
+            <span>{t("results.rawScore")}</span>
+            <span className="font-semibold tabular-nums text-slate-900">{fmtPoints(result.raw_score)} / {fmtPoints(result.points_possible)}</span>
+          </p>
+          {pending}
+          <SectionBreakdown result={result} grade={grade} />
         </>
       ) : (
         <>
