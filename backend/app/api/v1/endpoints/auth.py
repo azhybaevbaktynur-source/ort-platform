@@ -22,7 +22,9 @@ from app.db.session import get_db
 from app.lms.core import ratelimit
 from app.lms.core.deps import client_ip_hash
 from app.lms.core.errors import ValidationFailed
+from app.lms.audit import service as audit
 from app.lms.guardian.links import has_active_link
+from app.lms.mfa import service as mfa
 from app.lms.privacy import service as privacy
 from app.models.user import User
 from app.schemas.user import (
@@ -35,6 +37,7 @@ from app.schemas.user import (
     TokenResponse,
     ForgotPasswordRequest,
     ResetPasswordRequest,
+    MfaCompleteRequest,
 )
 from app.services.email_service import send_password_reset_email, send_verification_code_email
 
@@ -147,8 +150,19 @@ def _profile(user: User) -> UserProfile:
 
 
 def _token_response(user: User) -> TokenResponse:
+    """Only for a session already past two-step login: /auth/mfa, /auth/refresh (turning two-step login on bumps
+    token_version, so every surviving token was issued after it), and `_sign_in` for accounts without it."""
     token = create_access_token({"sub": user.id, "tv": user.token_version or 0})  # tv can only reject (design 5.2)
     return TokenResponse(access_token=token, token_type="bearer", user=_profile(user))
+
+
+def _sign_in(user: User) -> TokenResponse:
+    """S1 admin security: every sign-in by password (login, email-code verify) ends here. With two-step login on, the
+    answer is a short-lived challenge (403 `mfa_required`) instead of a token; POST /auth/mfa trades it for one."""
+    if mfa.is_enabled(user):
+        raise _error(403, "mfa_required", "Enter the code from your authenticator app.",
+                     challenge=mfa.issue_challenge(user), expiresInSeconds=settings.MFA_CHALLENGE_TTL_SECONDS)
+    return _token_response(user)
 
 
 @router.get("/ping")
@@ -248,7 +262,7 @@ def verify_email(
         raise _error(403, "account_disabled", "This account is disabled.")
 
     if user.email_verified:
-        return _token_response(user)
+        return _sign_in(user)
 
     if not user.email_code_hash:
         raise _error(400, "code_expired", "This code is no longer valid. Request a new one.")
@@ -273,7 +287,7 @@ def verify_email(
     user.email_code_expires = None
     user.email_code_attempts = 0
     db.commit()
-    return _token_response(user)
+    return _sign_in(user)
 
 
 @router.post("/resend-code")
@@ -311,10 +325,7 @@ def login_user(
     """
     clean_email = req.email.strip().lower()
     ip_key = client_ip_hash(request) if request is not None else None
-    rules = [(f"email:{clean_email}:ip:{ip_key or 'none'}", ratelimit.LOGIN_EMAIL_IP_FAIL_10M),
-             (f"email:{clean_email}", ratelimit.LOGIN_EMAIL_FAIL_10M),
-             (f"email:{clean_email}", ratelimit.LOGIN_EMAIL_FAIL_24H),
-             *_ip_rule(request, ratelimit.LOGIN_IP_FAIL_10M)]
+    rules = ratelimit.login_failure_rules(clean_email, ip_key)
     _check_failures(rules)
 
     user = db.query(User).filter(User.email == clean_email).first()
@@ -343,7 +354,39 @@ def login_user(
         raise _error(403, "email_not_verified", "Email is not verified yet. Enter the code we emailed you.",
                      email=user.email, codeSent=sent, resendAfterSeconds=resend_after)
 
+    return _sign_in(user)
+
+
+# --- S1 admin security begin --- (app/lms/mfa/service.py has the design)
+@router.post("/mfa", response_model=TokenResponse)
+def complete_mfa(req: MfaCompleteRequest, db: Session = Depends(get_db), request: Request = None):
+    """Second step of sign-in: the challenge from /auth/login (or /auth/verify-email) and a code from the authenticator
+    app or an unused recovery code. Every try on one challenge counts; wrong codes also count per account."""
+    _count_all(_ip_rule(request, ratelimit.MFA_IP_TRY_10M))  # every try counts, a forged challenge too
+    claims = mfa.read_challenge(req.challenge)
+    if claims is None:
+        raise _error(401, "mfa_challenge_invalid", "This sign-in step has expired. Sign in again.")
+    uid = str(claims["uid"])
+    # every try on a real challenge, before the code is checked: parallel challenges cannot burst past the failure rule
+    _count_all([(f"challenge:{claims['jti']}", ratelimit.MFA_CHALLENGE_TRY), (f"user:{uid}", ratelimit.MFA_USER_TRY_1H)])
+    _check_failures(mfa.user_failure_rules(uid))
+    user = db.get(User, uid)
+    if (user is None or user.deleted_at is not None or claims.get("tv", 0) != (user.token_version or 0)
+            or not mfa.is_enabled(user)):
+        raise _error(401, "mfa_challenge_invalid", "This sign-in step has expired. Sign in again.")
+    if user.disabled_at is not None:
+        raise _error(403, "account_disabled", "This account is disabled.")
+    kind = mfa.check_code(db, user, req.code, allow_recovery=True)
+    if kind is None:
+        db.rollback()
+        ratelimit.record_failures(mfa.user_failure_rules(uid))
+        raise _error(400, "mfa_invalid_code", "Wrong code.")
+    if kind == "recovery":
+        audit.record(db, actor=user, action="mfa.recovery_code.used", target_type="user", target_id=user.id,
+                     details={"left": mfa.recovery_codes_left(db, user.id)}, request=request)
+    db.commit()
     return _token_response(user)
+# --- S1 admin security end ---
 
 
 # --- Phase 11 S4 begin --- (PHASE_11_DESIGN 5.2)

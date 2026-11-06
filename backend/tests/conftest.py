@@ -11,6 +11,8 @@ os.environ["LMS_STORAGE_DRIVER"] = "db"
 # Test clients send `X-Forwarded-For: <client>, <proxy>` and each test sets the enforcement switch it needs
 os.environ["RATE_LIMIT_PROXY_HOPS"] = "2"
 os.environ["RATE_LIMIT_IP_ENFORCE"] = "false"
+# S1 admin security: the seeded admin has no two-step login; tests/lms/test_admin_mfa.py turns the requirement on
+os.environ["ADMIN_MFA_REQUIRED"] = "false"
 for _r2_var in ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_PUBLIC_BASE_URL", "R2_PRIVATE_BUCKET"):
     os.environ[_r2_var] = ""
 

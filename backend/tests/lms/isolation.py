@@ -49,7 +49,12 @@ def reset_lms_state() -> None:
         for model in (ConsentRecord, DataRequest, GuardianLink, GuardianPairingCode, PolicyVersion):
             conn.execute(delete(model.__table__))
         conn.execute(update(User.__table__).where(User.id.in_(SEED_USER_IDS)).values(
-            consent_state="legacy", consent_due_at=None, age_band=None, deleted_at=None, token_version=0))
+            consent_state="legacy", consent_due_at=None, age_band=None, deleted_at=None, token_version=0,
+            mfa_secret_enc=None, mfa_pending_secret_enc=None, mfa_enabled_at=None, mfa_last_step=None))
+        # --- S1 admin security --- recovery codes reference users (CASCADE, but SQLite may not enforce it)
+        from app.lms.mfa.models import MfaRecoveryCode
+
+        conn.execute(delete(MfaRecoveryCode.__table__))
         # --- Phase 11 S1 end ---
         # --- Phase 7a S1 begin --- hand-ins, rubric scores, overrides, accommodations before the submissions
         from app.lms.accommodations.models import EnrollmentAccommodation

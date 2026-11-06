@@ -93,7 +93,10 @@
       "resend_cooldown": "Please wait {retryAfterSeconds} s before resending.",
       "email_send_failed": "Could not send the email. Please try again a bit later.",
       "network": "The server is not responding. It may be waking up, so try again in a few seconds.",
-      "rate_limited": "Too many attempts. Please wait a bit and try again."
+      "rate_limited": "Too many attempts. Please wait a bit and try again.",
+      "mfa_required": "Enter the code from your authenticator app.",
+      "mfa_invalid_code": "Wrong code. Check the code in the app and try again.",
+      "mfa_challenge_invalid": "This sign-in step has expired. Enter your password again."
     },
     "wakingServer": "The server is waking up after being idle, so the first login may take up to a minute...",
     "resetInvalidToken": "Invalid link or token not found",
@@ -103,7 +106,18 @@
     "passwordUpdated": "Password updated!",
     "resetFailed": "Could not reset the password. Try again.",
     "resetLinkSentTitle": "Link sent!",
-    "forgotFailed": "Could not send the reset link. Try again."
+    "forgotFailed": "Could not send the reset link. Try again.",
+    "mfa": {
+      "title": "Two-step login",
+      "subtitle": "Enter the 6-digit code from your authenticator app.",
+      "recoverySubtitle": "Enter one of your recovery codes. Each code works only once.",
+      "codeLabel": "Code from the app",
+      "recoveryLabel": "Recovery code",
+      "button": "Sign in",
+      "useRecovery": "Use a recovery code",
+      "useApp": "Use the code from the app",
+      "back": "Back to sign in"
+    }
   },
   "lms": {
     "nav": {
@@ -265,7 +279,17 @@
       "exam_date_invalid": "Choose a date between 2020 and 2100.",
       "exam_date_not_supported": "This course has no exam date.",
       "goal_out_of_range": "This score is outside the exam's scale.",
-      "exam_prep_not_available": "This page is not available in this course."
+      "exam_prep_not_available": "This page is not available in this course.",
+      "mfa_enrollment_required": "Set up two-step login first.",
+      "mfa_invalid_code": "Wrong code. Check the code in the app and try again.",
+      "mfa_already_enabled": "Two-step login is already on.",
+      "mfa_setup_missing": "The setup has expired. Start it again.",
+      "last_platform_admin": "This is the last active platform admin. Make another admin first.",
+      "already_platform_admin": "This person is already a platform admin.",
+      "not_platform_admin": "This person is not a platform admin.",
+      "target_email_not_verified": "This person has not confirmed their email yet.",
+      "target_disabled": "This account is disabled.",
+      "wrong_password": "Wrong password."
     }
   },
   "courses": {
@@ -607,7 +631,13 @@
       "course_unlist": "Unlisted course",
       "course_relist": "Relisted course",
       "course_transfer_ownership": "Transferred course ownership",
-      "course_roster_view": "Viewed course roster"
+      "course_roster_view": "Viewed course roster",
+      "mfa_enable": "Two-step login turned on",
+      "mfa_recovery_codes_regenerate": "New recovery codes made",
+      "mfa_recovery_code_used": "Signed in with a recovery code",
+      "user_platform_admin_grant": "Made platform admin",
+      "user_platform_admin_revoke": "Platform admin rights removed",
+      "user_end_sessions": "Sessions ended"
     },
     "toast": {
       "approved": "Request approved: {name} can now teach.",
@@ -5854,5 +5884,94 @@
       "bestPercent": "Best result",
       "pending": "Your result appears once it is released."
     }
+  },
+  "adminSecurity": {
+    "nav": "Security",
+    "title": "Security",
+    "description": "Two-step login for your admin account, and your sessions.",
+    "on": "On",
+    "off": "Off",
+    "badgeOn": "Two-step login on",
+    "badgeOff": "Two-step login off",
+    "setup": {
+      "title": "Set up two-step login",
+      "required": "Platform admins must use two-step login. Set it up to continue to the admin area.",
+      "optional": "After your password, signing in will also ask for a code from your phone.",
+      "apps": "You need an authenticator app on your phone, for example Google Authenticator, Microsoft Authenticator or 2FAS. No SMS is used.",
+      "start": "Start setup",
+      "qrAlt": "QR code for the authenticator app",
+      "step1": "In the app, add an account and scan this QR code, or type in the key below.",
+      "step2": "Enter the 6-digit code the app shows.",
+      "secretLabel": "Key for typing in by hand",
+      "codeLabel": "Code from the app",
+      "confirm": "Turn on two-step login",
+      "passwordLabel": "Your current password",
+      "passwordHint": "Confirms that it is you. It is asked again when you turn it on."
+    },
+    "enabled": {
+      "title": "Two-step login is on",
+      "since": "On since {date}. Every sign-in asks for a code from your app.",
+      "codesLeft": "Unused recovery codes: {n}.",
+      "regenLabel": "Code from the app",
+      "regenHint": "New codes replace all the old ones.",
+      "regen": "Get new recovery codes"
+    },
+    "codes": {
+      "title": "Your recovery codes",
+      "body": "If you lose your phone, sign in with one of these codes. Each works once. They are shown only now: print them or write them down, and keep them offline.",
+      "copy": "Copy",
+      "copied": "Codes copied",
+      "saved": "I have saved these codes",
+      "done": "Done"
+    },
+    "sessions": {
+      "title": "Sessions",
+      "body": "Signs your account out on every device, this one too.",
+      "button": "End all my sessions",
+      "confirmTitle": "End all your sessions?",
+      "confirmBody": "You are signed out everywhere, here too, and sign in again with your password and code."
+    },
+    "confirmCode": {
+      "label": "Your code from the authenticator app",
+      "hint": "Confirms that it is you.",
+      "missing": "Enter the 6-digit code."
+    },
+    "user": {
+      "mfa": "Two-step login",
+      "endSessions": "End sessions",
+      "endSessionsTitle": "End this person's sessions?",
+      "endSessionsBody": "They are signed out on every device and sign in again with their password. The account stays active.",
+      "makeAdmin": "Make platform admin",
+      "makeAdminTitle": "Make this person a platform admin?",
+      "makeAdminBody": "They get full control of the platform. On their first visit to the admin area they must set up two-step login. They do not become a teacher.",
+      "removeAdmin": "Remove platform admin",
+      "removeAdminTitle": "Remove platform admin rights?",
+      "removeAdminBody": "They lose access to the admin area. The last active platform admin can't be removed."
+    },
+    "toast": {
+      "sessionsEnded": "{name} is signed out everywhere",
+      "adminGranted": "{name} is now a platform admin",
+      "adminRemoved": "{name} is no longer a platform admin"
+    }
+  },
+  "adminHealth": {
+    "title": "System health",
+    "description": "Checked now: the database, migrations, and the email and file storage settings. No email is sent.",
+    "ok": "working",
+    "problem": "problem",
+    "allOk": "All working",
+    "needsAttention": "Needs attention",
+    "check": "Check again",
+    "database": "Database",
+    "databaseOk": "Answered in {ms} ms ({dialect})",
+    "databaseDown": "Does not answer",
+    "migrations": "Database migrations",
+    "migrationsDetail": "Database: {current}. The code expects: {expected}",
+    "email": "Email",
+    "emailDetail": "Provider: {provider}. Configured: {configured}",
+    "storage": "File storage",
+    "storageDetail": "Driver: {driver}. R2 configured: {r2}",
+    "commit": "Deployed version: {commit}",
+    "migrationsUntracked": "The database has no version table (built without migrations). The code expects: {expected}"
   }
 }

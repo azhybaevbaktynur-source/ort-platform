@@ -43,6 +43,8 @@ Erased data stays in the database provider's history until its restore window pa
 | `users` | `email` | contact | Replaced | Yes |
 | `users` | `email_code_hash` | credential | Emptied | No |
 | `users` | `locale` | preference | Emptied | Yes |
+| `users` | `mfa_pending_secret_enc` | credential (encrypted) | Emptied | No |
+| `users` | `mfa_secret_enc` | credential (encrypted) | Emptied | No |
 | `users` | `password_hash` | credential | Replaced | No |
 | `users` | `phone` | contact | Emptied | Yes |
 | `users` | `reset_token` | credential | Emptied | No |
@@ -98,6 +100,7 @@ These point at the tombstone row, which holds nothing personal after deletion.
 | `submissions` | `graded_by_id`, `override_by_id`, `user_id` |
 | `teacher_requests` | `decided_by_id`, `user_id` |
 | `translation_groups` | `created_by_id` |
+| `user_mfa_recovery_codes` | `user_id` |
 | `users` | `disabled_by_id` |
 
 ## Matched by the name scan, not personal

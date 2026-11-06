@@ -21,9 +21,9 @@ def test_promote_and_revoke_sets_the_admin_flag():
     finally:
         db.close()
     assert make_admin.promote_user(email) is True
-    assert _fresh(uid) == ("approved", True)
+    assert _fresh(uid) == ("none", True)  # S1: an admin is not made a teacher
     assert make_admin.promote_user(email, revoke=True) is True
-    assert _fresh(uid) == ("approved", False)
+    assert _fresh(uid) == ("none", False)
 
 
 def test_unknown_email_does_not_list_users(capsys):

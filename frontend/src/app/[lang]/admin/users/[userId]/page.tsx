@@ -16,8 +16,11 @@ import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
 import { LoadError, OrgError, SystemAccountBadge } from "@/components/lms/org/OrgUi";
 import { OutlineMenu } from "@/components/lms/modules/OutlineMenu";
 import { UserOrganizationsSection } from "@/components/lms/org/admin/UserOrganizationsSection"; // Phase 6 S4b
+import { CodeReasonDialog } from "@/components/lms/admin/CodeReasonDialog";
+import { endUserSessions, setPlatformAdmin } from "@/lib/lms/security";
 
-type Action = "disable" | "revoke" | "grant";
+type Action = "disable" | "revoke" | "grant" | "endSessions";
+type AdminAction = "makeAdmin" | "removeAdmin";
 
 export default function AdminUserDetailPage() {
   const { userId } = useParams<{ userId: string }>();
@@ -30,6 +33,7 @@ export default function AdminUserDetailPage() {
   const [busy, setBusy] = useState(false);
   const [enabling, setEnabling] = useState(false);
   const [dialogError, setDialogError] = useState<unknown>(null);
+  const [adminAction, setAdminAction] = useState<AdminAction | null>(null); // S1
 
   const load = useCallback(async () => {
     setError(null);
@@ -48,9 +52,25 @@ export default function AdminUserDetailPage() {
     setDialogError(null);
     try {
       if (action === "disable") await disableUser(user.id, reason);
+      else if (action === "endSessions") await endUserSessions(user.id, reason);
       else await setTeacherStatus(user.id, action === "grant" ? "approved" : "revoked", reason || undefined);
-      toast.success(t(action === "disable" ? "platformAdmin.toast.disabled" : action === "grant" ? "platformAdmin.toast.granted" : "platformAdmin.toast.revoked", { name: userName }));
+      toast.success(t(action === "disable" ? "platformAdmin.toast.disabled" : action === "endSessions" ? "adminSecurity.toast.sessionsEnded" : action === "grant" ? "platformAdmin.toast.granted" : "platformAdmin.toast.revoked", { name: userName }));
       setAction(null);
+      await load();
+    } catch (e) {
+      setDialogError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const runAdmin = async (reason: string, code: string) => {
+    if (!user || !adminAction) return;
+    setBusy(true);
+    setDialogError(null);
+    try {
+      await setPlatformAdmin(user.id, adminAction === "makeAdmin", reason, code);
+      toast.success(t(adminAction === "makeAdmin" ? "adminSecurity.toast.adminGranted" : "adminSecurity.toast.adminRemoved", { name: userName }));
+      setAdminAction(null);
       await load();
     } catch (e) {
       setDialogError(e);
@@ -101,16 +121,23 @@ export default function AdminUserDetailPage() {
       ) : (
         <Button variant="secondary" onClick={() => { setDialogError(null); setAction("grant"); }}>{t("platformAdmin.users.grantTeacher")}</Button>
       )}
-      {canDisable && (
-        <OutlineMenu label={t("coursePage.moreActions")} disabled={enabling}
-          groups={[{ id: "account", items: [user.disabled_at
+      <OutlineMenu label={t("coursePage.moreActions")} disabled={enabling}
+        groups={[
+          { id: "sessions", items: [{ id: "endSessions", label: t("adminSecurity.user.endSessions") }] },
+          // S1: platform admins, confirmed with the acting admin's code
+          { id: "admin", items: [user.is_platform_admin
+            ? { id: "removeAdmin", label: t("adminSecurity.user.removeAdmin"), danger: true }
+            : { id: "makeAdmin", label: t("adminSecurity.user.makeAdmin") }] },
+          ...(canDisable ? [{ id: "account", items: [user.disabled_at
             ? { id: "enable", label: t("platformAdmin.users.enable") }
-            : { id: "disable", label: t("platformAdmin.users.disable"), danger: true }] }]}
-          onSelect={(id) => {
-            if (id === "enable") void enable();
-            else { setDialogError(null); setAction("disable"); }
-          }} />
-      )}
+            : { id: "disable", label: t("platformAdmin.users.disable"), danger: true }] }] : []),
+        ]}
+        onSelect={(id) => {
+          setDialogError(null);
+          if (id === "enable") void enable();
+          else if (id === "makeAdmin" || id === "removeAdmin") setAdminAction(id);
+          else if (id === "endSessions" || id === "disable") setAction(id);
+        }} />
     </>
   ) : undefined;
 
@@ -131,6 +158,7 @@ export default function AdminUserDetailPage() {
           { key: "id", term: t("organizations.adminUser.userId"), description: <span className="break-all font-mono text-sm">{user.id}</span> },
           { key: "created", term: t("platformAdmin.users.created"), description: fmtApiDateTimeShort(user.created_at, lang) },
           { key: "verified", term: t("platformAdmin.users.emailVerified"), description: user.email_verified ? t("platformAdmin.yes") : t("platformAdmin.no") },
+          ...(user.is_platform_admin ? [{ key: "mfa", term: t("adminSecurity.user.mfa"), description: user.mfa_enabled ? t("adminSecurity.on") : t("adminSecurity.off") }] : []),
           { key: "enrollments", term: t("platformAdmin.users.activeEnrollments"), description: user.active_enrollment_count },
           ...(user.disabled_at ? [{ key: "reason", term: t("platformAdmin.users.disabledReason"), description: user.disabled_reason || "—" }] : []),
         ]} />
@@ -172,13 +200,23 @@ export default function AdminUserDetailPage() {
 
       <ReasonDialog
         open={!!action}
-        title={action === "disable" ? t("platformAdmin.users.disableTitle") : action === "revoke" ? t("platformAdmin.users.revokeTitle") : t("platformAdmin.users.grantTitle")}
+        title={action === "disable" ? t("platformAdmin.users.disableTitle") : action === "endSessions" ? t("adminSecurity.user.endSessionsTitle") : action === "revoke" ? t("platformAdmin.users.revokeTitle") : t("platformAdmin.users.grantTitle")}
         object={user.display_name ? `${user.display_name} · ${user.email}` : user.email}
-        effect={action === "disable" ? t("platformAdmin.users.disableBody") : action === "revoke" ? t("platformAdmin.users.revokeImpact", { students: user.revoke_impact.students, courses: user.revoke_impact.courses }) : t("organizations.adminUser.grantBody")}
-        confirmLabel={action === "disable" ? t("platformAdmin.users.disable") : action === "revoke" ? t("platformAdmin.requests.revoke") : t("platformAdmin.users.grantTeacher")}
+        effect={action === "disable" ? t("platformAdmin.users.disableBody") : action === "endSessions" ? t("adminSecurity.user.endSessionsBody") : action === "revoke" ? t("platformAdmin.users.revokeImpact", { students: user.revoke_impact.students, courses: user.revoke_impact.courses }) : t("organizations.adminUser.grantBody")}
+        confirmLabel={action === "disable" ? t("platformAdmin.users.disable") : action === "endSessions" ? t("adminSecurity.user.endSessions") : action === "revoke" ? t("platformAdmin.requests.revoke") : t("platformAdmin.users.grantTeacher")}
         tone={action === "grant" ? "primary" : "danger"} optional={action === "grant"} busy={busy}
         error={dialogError ? <OrgError error={dialogError} /> : undefined}
         onConfirm={(r) => void run(r)} onCancel={() => setAction(null)}
+      />
+      <CodeReasonDialog
+        open={!!adminAction}
+        title={adminAction === "makeAdmin" ? t("adminSecurity.user.makeAdminTitle") : t("adminSecurity.user.removeAdminTitle")}
+        object={user.display_name ? `${user.display_name} · ${user.email}` : user.email}
+        effect={adminAction === "makeAdmin" ? t("adminSecurity.user.makeAdminBody") : t("adminSecurity.user.removeAdminBody")}
+        confirmLabel={adminAction === "makeAdmin" ? t("adminSecurity.user.makeAdmin") : t("adminSecurity.user.removeAdmin")}
+        tone={adminAction === "makeAdmin" ? "primary" : "danger"} busy={busy}
+        error={dialogError ? <OrgError error={dialogError} /> : undefined}
+        onConfirm={(r, c) => void runAdmin(r, c)} onCancel={() => setAdminAction(null)}
       />
     </div>
   );

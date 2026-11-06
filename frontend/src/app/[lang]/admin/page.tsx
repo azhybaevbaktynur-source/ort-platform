@@ -6,6 +6,7 @@ import { HardDrive, UserCheck } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useAdminSummary } from "@/components/lms/admin/AdminShell";
 import { StorageLevelBanner } from "@/components/lms/admin/StorageLevelBanner";
+import { HealthCard } from "@/components/lms/admin/HealthCard";
 import { lmsErrorKey } from "@/components/lms/ErrorMessage";
 import { ErrorState, PageHeader, Skeleton, StatTile, cn, focusRing } from "@/components/ui";
 
@@ -29,6 +30,7 @@ export default function AdminOverviewPage() {
               value={storageLevel ? t(`storage.level.${storageLevel}`) : waiting} />
           </div>
         )}
+      {!error && <HealthCard />}
     </div>
   );
 }
