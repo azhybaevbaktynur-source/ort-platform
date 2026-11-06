@@ -16,7 +16,7 @@ import colors from "tailwindcss/colors";
  * `:root` in styles/globals.css.
  */
 
-/** The system font stack every frame used before Student UI U1 (the teacher, admin, lobby and attempt frames still do). */
+/** The system font stack every frame used before Student UI U1 (the teacher and admin frames still do). */
 const SYSTEM_STACK = [
   "system-ui",
   "-apple-system",

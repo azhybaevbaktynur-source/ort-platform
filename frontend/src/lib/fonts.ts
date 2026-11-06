@@ -5,8 +5,9 @@ import { Inter } from "next/font/google";
  * time (served from /_next/static, CSP `font-src 'self'`). `cyrillic-ext` carries the Kyrgyz letters ң ө ү.
  *
  * `inter.variable` defines `--font-inter`; the shell puts it next to `font-sans` (tailwind.config.ts), so only the
- * shell's subtree switches font. Never put it on <html>, <body> or the AppHeader frame: the teacher, admin, lobby and
- * attempt frames keep the system font (ORT baseline screenshots). `preload: false`: the files are fetched only where
+ * shell's subtree switches font (lobby, result and review pages live inside the shell; the full-screen player carries
+ * the same student font and tokens). Never put it on <html>, <body> or the AppHeader frame: the teacher and admin
+ * frames keep the system font. `preload: false`: the files are fetched only where
  * the font is used, so the exam routes never download them.
  */
 export const inter = Inter({
