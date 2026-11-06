@@ -126,6 +126,12 @@ class CourseCard(BaseModel):
     starts_at: Optional[datetime] = None
     ends_at: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
+    # --- F7a begin --- (STUDENT_UI_FIX_PLAN 7.1-7.2: one card everywhere; `cover.card_extras`, one statement a page)
+    cover_url: Optional[str] = None       # null: the client draws the generated default cover
+    tests_count: int = 0                  # published live tests (practice included)
+    lessons_count: int = 0                # lessons of published modules (F5a L2)
+    is_platform_course: bool = False      # the platform organization's tree: no teacher or organization line
+    # --- F7a end ---
 
 
 class CourseStudentOut(BaseModel):
@@ -153,6 +159,7 @@ class CourseStudentOut(BaseModel):
     features: CourseFeaturesOut = Field(default_factory=CourseFeaturesOut)
     # --- Phase 8a S1 end ---
     exam_date: Optional[date] = None  # Exam prep S2: set only on exam-prep courses (course template)
+    cover_url: Optional[str] = None  # F7a: the course page banner; null = generated default cover
 
 
 class CourseStaffOut(CourseStudentOut):
@@ -218,13 +225,18 @@ def card_organization_name(kind: Optional[str], name: Optional[str]) -> Optional
 
 
 def course_card(course, my_role: Optional[str], owner_display_name: Optional[str], *, org_kind: Optional[str] = None,
-                org_name: Optional[str] = None) -> CourseCard:
+                org_name: Optional[str] = None, extras=None) -> CourseCard:
+    """`extras`: the course's `cover.CardExtras` (read for the whole page at once by the caller)."""
+    from app.lms.courses.cover import NO_EXTRAS
+
+    x = extras or NO_EXTRAS
     return CourseCard(
         id=course.id, title=course.title, description=course.description,
         organization_display_name=card_organization_name(org_kind, org_name), languages=list(course.languages),
         default_language=course.default_language, status=course.status, my_role=my_role,
         owner_display_name=owner_display_name or "—", starts_at=course.starts_at, ends_at=course.ends_at,
-        deleted_at=course.deleted_at,
+        deleted_at=course.deleted_at, cover_url=x.cover_url, tests_count=x.tests_count,
+        lessons_count=x.lessons_count, is_platform_course=x.is_platform_course,
     )
 
 
@@ -242,7 +254,19 @@ def course_student_out(course, enrollment, owner, organization_name: str = "") -
         # --- Phase 8a S1 end ---
         features=_course_features(course),  # --- Phase 8a S3 --- (one line)
         exam_date=_exam_date(course),  # Exam prep S2
+        cover_url=_cover_url(course),  # F7a
     )
+
+
+def _cover_url(course) -> Optional[str]:
+    from sqlalchemy.orm import object_session
+
+    db = object_session(course)
+    if db is None:
+        return None
+    from app.lms.courses.cover import cover_url
+
+    return cover_url(db, course)
 
 
 def _exam_date(course):
@@ -393,15 +417,24 @@ class CatalogCourseOut(BaseModel):
     enrollment_mode: str
     student_count: int
     my_enrollment: Optional[CatalogEnrollmentOut] = None
+    # --- F7a --- (STUDENT_UI_FIX_PLAN 7.2: cover and the card's meta line; public course facts only)
+    cover_url: Optional[str] = None
+    tests_count: int = 0
+    lessons_count: int = 0
 
 
 CATALOG_COURSE_KEYS = frozenset(CatalogCourseOut.model_fields)
 
 
-def catalog_course_out(course, my_role: Optional[str], my_state: Optional[str], student_count: int) -> CatalogCourseOut:
+def catalog_course_out(course, my_role: Optional[str], my_state: Optional[str], student_count: int,
+                       extras=None) -> CatalogCourseOut:
+    from app.lms.courses.cover import NO_EXTRAS
+
+    x = extras or NO_EXTRAS
     return CatalogCourseOut(
         id=course.id, title=course.title, description=course.description, languages=list(course.languages),
         default_language=course.default_language, enrollment_mode=course.enrollment_mode,
         student_count=student_count,
         my_enrollment=CatalogEnrollmentOut(role=my_role, state=my_state) if my_role is not None else None,
+        cover_url=x.cover_url, tests_count=x.tests_count, lessons_count=x.lessons_count,
     )

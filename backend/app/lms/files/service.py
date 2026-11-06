@@ -7,7 +7,7 @@ import os
 import threading
 import time
 import uuid
-from typing import Iterable, Optional
+from typing import Callable, Iterable, Optional
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -43,6 +43,12 @@ class ImageTooLarge(LMSError):
     code = "image_too_large"
 
 
+class ImageTypeUnsupported(LMSError):
+    """F7a: a course cover must be a JPEG, PNG or WebP image (by content)."""
+    status_code = 422
+    code = "image_type_unsupported"
+
+
 class FileInvalid(LMSError):
     status_code = 400
     code = "file_invalid"
@@ -59,6 +65,8 @@ def raise_for_encode_error(exc: ValueError) -> None:
         raise ImageTooManyPixels("Image has too many pixels")
     if token in ("too_large", "too_large_after_encode"):
         raise ImageTooLarge("Image is too large")
+    if token == "unsupported_type":  # F7a (covers)
+        raise ImageTypeUnsupported("Only JPEG, PNG and WebP images are accepted")
     raise ImageInvalid("Not a valid PNG, JPEG, GIF or WEBP image")
 
 
@@ -248,13 +256,16 @@ def _find(db: Session, owner_id: str, source_sha: str, visibility: str) -> Optio
 def ingest_image(db: Session, actor: User, raw: bytes, *, course_id, visibility: str = "public",
                  filename: Optional[str] = None, max_bytes: Optional[int] = None,
                  encoded: Optional[EncodedImage] = None, precheck_done: bool = False,
-                 course_scoped: bool = False) -> tuple[Asset, bool]:
+                 course_scoped: bool = False, encoder: Optional[Callable[..., EncodedImage]] = None,
+                 dedup_salt: Optional[str] = None) -> tuple[Asset, bool]:
     """Returns (asset, deduplicated). Does NOT commit.
 
     The blob is written (own connection) before the first session write. When `encoded` is given the
     caller has already stored the blob. `precheck_done`: the caller already checked quota / caps for a whole
     batch and knows no asset exists for this source (importer); skips the per-image queries. `course_scoped`
-    (private only): dedup per (owner, course), `course_dedup_key`."""
+    (private only): dedup per (owner, course), `course_dedup_key`. F7a: `encoder` replaces `encode_image` (same
+    signature and error tokens; course covers crop) and `dedup_salt` keeps such derived images apart from a plain
+    upload of the same bytes (and from each other: the salt names the crop)."""
     if visibility not in ("public", "private"):
         raise ValidationFailed("visibility must be public or private")
     if max_bytes is None:
@@ -264,6 +275,8 @@ def ingest_image(db: Session, actor: User, raw: bytes, *, course_id, visibility:
         if visibility != "private":
             raise ValidationFailed("course_scoped is for private uploads")
         source_sha = course_dedup_key(source_sha, course_id)
+    if dedup_salt:
+        source_sha = hashlib.sha256(f"{dedup_salt}:{source_sha}".encode()).hexdigest()
 
     if not precheck_done:
         maybe_sweep_orphans(db)
@@ -281,7 +294,7 @@ def ingest_image(db: Session, actor: User, raw: bytes, *, course_id, visibility:
     caller_stored = encoded is not None
     if encoded is None:
         try:
-            encoded = encode_image(raw, max_bytes=max_bytes)
+            encoded = (encoder or encode_image)(raw, max_bytes=max_bytes)
         except ValueError as e:
             raise_for_encode_error(e)
     key = blob_key(encoded.sha256, visibility)

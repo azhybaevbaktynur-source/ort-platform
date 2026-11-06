@@ -624,7 +624,7 @@ async def test_the_admin_health_check(db):
     assert body["email"] == {"ok": False, "provider": "console", "configured": False}
     assert body["storage"] == {"ok": True, "driver": "db", "r2_configured": False}
     assert body["ok"] is False  # console email reaches no one
-    assert "0025_pro" in body["migrations"]["expected"]
+    assert "0026_course_cover" in body["migrations"]["expected"]
     student = make_user(db)
     assert (await call("GET", "/platform/health", token_for(student))).status_code == 403
 

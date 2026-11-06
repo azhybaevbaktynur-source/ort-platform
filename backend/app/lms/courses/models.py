@@ -85,6 +85,14 @@ class Course(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
         """The hidden preview course of an exam template (never published, listed or joinable)."""
         return self.sandbox_for_template_id is not None
     # --- Phase 8b S1 end ---
+    # --- F7a begin --- (STUDENT_UI_FIX_PLAN 7.1: the cover image, a public WebP asset; null = generated default cover.
+    # use_alter: courses and assets reference each other; migration 0026)
+    cover_asset_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("assets.id", ondelete="SET NULL", use_alter=True, name="fk_courses_cover_asset_id_assets"),
+        nullable=True,
+    )
+    # --- F7a end ---
 
     __table_args__ = (
         CheckConstraint("grading_total_mode IN ('points','weighted')", name="grading_total_mode_valid"),
@@ -116,6 +124,7 @@ class Course(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
         # --- Phase 8b S1 begin ---
         UniqueConstraint("sandbox_for_template_id", name="uq_courses_sandbox_for_template_id"),
         # --- Phase 8b S1 end ---
+        Index("ix_courses_cover_asset_id", "cover_asset_id"),  # F7a
     )
 
 

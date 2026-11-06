@@ -15,6 +15,7 @@ from app.core.authz import AuthzContext, get_authz
 from app.lms.core.errors import NotFound
 from app.lms.core.pagination import PageOut
 from app.lms.courses import scopes
+from app.lms.courses.cover import card_extras
 from app.lms.courses.models import Course
 from app.lms.courses.schemas import CatalogCourseOut, card_organization_name, catalog_course_out
 from app.lms.courses.service import paginate_rows
@@ -50,9 +51,10 @@ class CourseLandingOut(CatalogCardOut):
     form: Optional[dict] = None           # PublicFormOut of the active form, form modes only (fields, no answers)
 
 
-def _card(row, count: int) -> CatalogCardOut:
+def _card(row, extras) -> CatalogCardOut:
+    """`extras`: the course's `cover.CardExtras` with the student count (F7a: cover, tests and lessons)."""
     c, role, state, root_id, root_name, has_form, app_id, app_status, root_kind, owner_name = row
-    base = catalog_course_out(c, role, state, count)
+    base = catalog_course_out(c, role, state, extras.student_count if extras else 0, extras)
     return CatalogCardOut(
         **base.model_dump(), organization_id=root_id, organization_name=root_name or "",
         organization_display_name=card_organization_name(root_kind, root_name),
@@ -66,15 +68,14 @@ def _card(row, count: int) -> CatalogCardOut:
 def catalog_page(db: Session, user_id: str, *, cursor: Optional[str] = None, limit: Optional[int] = None,
                  q: Optional[str] = None, language: Optional[str] = None, mode: Optional[str] = None,
                  organization_id=None) -> PageOut[CatalogCardOut]:
-    """Two statements per page whatever its size: the page itself and one grouped student count."""
+    """Two statements per page whatever its size: the page itself and one statement of card extras (student count,
+    cover, tests and lessons; F7a)."""
     rows, nxt = paginate_rows(
         db, scopes.catalog_cards(user_id, q=q, language=language, mode=mode, organization_id=organization_id),
         sort_col=Course.published_at, id_col=Course.id, entity_of=lambda r: r[0], cursor=cursor, limit=limit,
     )
-    counts: dict = {}
-    if rows:
-        counts = dict(db.execute(scopes.active_student_counts(r[0].id for r in rows)).all())
-    return PageOut[CatalogCardOut](items=[_card(r, counts.get(r[0].id, 0)) for r in rows], next_cursor=nxt)
+    extras = card_extras(db, (r[0].id for r in rows), students=True)
+    return PageOut[CatalogCardOut](items=[_card(r, extras.get(r[0].id)) for r in rows], next_cursor=nxt)
 
 
 @router.get("/courses", response_model=PageOut[CatalogCardOut])
@@ -106,8 +107,7 @@ def landing(db: Session, user_id: str, course_id: uuid.UUID) -> CourseLandingOut
     if row is None:
         raise NotFound("Course not found", code="course_not_found")
     course = row[0]
-    count = dict(db.execute(scopes.active_student_counts([course.id])).all()).get(course.id, 0)
-    card = _card(row, count)
+    card = _card(row, card_extras(db, [course.id], students=True).get(course.id))
     form = None
     if course.enrollment_mode in ("form_auto", "form_review") and course.template_key != "ort":
         from app.lms.enrollment_forms.service import active_form, public_form_out
