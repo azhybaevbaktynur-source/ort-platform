@@ -29,8 +29,8 @@ import { GettingStartedSheet, ProgressRing, useGettingStarted, type GettingStart
  * - from 1024 px: a 264 px navy sidebar (brand, exam switcher, links, access pill, install, other areas, account);
  * - below: a 56 px top bar (brand, current exam, account) and a bottom tab bar (Главная · Тесты · Практика ·
  *   Аналитика · Ещё; without an exam course Главная · Каталог · Ещё) with a "More" sheet.
- * `LmsShell` keeps one tree for both frames (the chrome sits in a fixed slot, <main> never remounts) and never uses
- * this frame on the ORT lobby and attempt routes (§2.4). Inter applies inside `STUDENT_FRAME` only.
+ * `LmsShell` keeps one tree for both frames (the chrome sits in a fixed slot, <main> never remounts) and uses this
+ * frame for the lobby, result and review pages; only the player is full-screen (STUDENT_UI_FIX_PLAN §2.1). Inter applies inside `STUDENT_FRAME` only.
  */
 
 /** Classes of the frame's root: Inter (scoped here), the "Sky and teal" palette (§1.1: `.student-theme` re-points the

@@ -21,8 +21,7 @@ Fonts: **Inter** (variable, 400–700) through `next/font/google` with subsets `
 (Kyrgyz ң ө ү are U+04A2/04E8/04AE, in `cyrillic-ext`; without that subset they fall back). Self-hosted at build by
 Next, served from `/_next/static` (CSP `font-src 'self'` already allows it), `display: "swap"`, about 2 × 45 kB woff2.
 DM Sans was checked and rejected: Google serves it with `latin` and `latin-ext` only. The font is applied by a class on
-the student shell only, **never on `<html>` and never on the `AppHeader` frame**: teacher/admin areas and the lobby and
-attempt routes keep the system stack (§2.4), so the ORT baseline screenshots stay identical.
+the student shell only, **never on `<html>` and never on the `AppHeader` frame**: teacher/admin areas keep the system stack. Replaced by STUDENT_UI_FIX_PLAN.md §2.1 (owner 2026-11-07).
 
 | Token (Tailwind / CSS var) | Value | Use |
 |---|---|---|
@@ -76,8 +75,7 @@ group labels white 80 % (4.5:1 at the gradient's light end). Teacher/admin/ORT f
 
 ### 2.1 Where it applies
 `LmsShell` picks the frame from `activeArea`: `learning` → the new `StudentShell`; every other area → the current
-`AppHeader` frame. A teacher's `/courses?view=learning` is therefore the student shell too. Exception (§2.4): the ORT
-lobby and attempt routes render the current frame regardless.
+`AppHeader` frame. A teacher's `/courses?view=learning` is therefore the student shell too. Replaced by STUDENT_UI_FIX_PLAN.md §2.1 (owner 2026-11-07).
 
 ### 2.2 Desktop (≥ 1024 px): sidebar, ru labels
 ```
@@ -125,10 +123,8 @@ targets, `aria-current`). "Ещё" opens a bottom sheet with the rest of §2.2 (
 работы, Открыть все экзамены, Установить, other areas, language, Выйти). `<main>` gets `padding-bottom: 80px +
 safe-area`. Without an exam-prep course the bar shows Главная · Каталог · Ещё.
 
-### 2.4 ORT frames (must not change)
-`/courses/{id}/assessments/{aid}` (lobby) and `/courses/{id}/attempts/**` (player, result, review) render exactly the
-current frame: `AppHeader`, course frame, `EXAM_COLUMN_*`, system font, no sidebar and no bottom bar. `LmsShell`
-decides by path before the area rule. The baseline suite (`docs/phases/ORT_BASELINE/`) is the proof.
+### 2.4 ORT frames
+Replaced by STUDENT_UI_FIX_PLAN.md §2.1 (owner 2026-11-07).
 
 ## 3. Pages
 
