@@ -416,7 +416,7 @@ async def test_student_layout_exam_prep_for_ort_general_for_teacher_course(db, a
 
 async def test_exam_prep_course_carries_menu_features(db, api):
     """Student UI U9 (review item 5): the shell's menu reads `features` from the course list, exam-prep courses only."""
-    from tests.lms.modules_support import make_module
+    from tests.lms.modules_support import make_item, make_module
 
     ensure_platform_org(db.connection())
     db.commit()
@@ -430,7 +430,10 @@ async def test_exam_prep_course_carries_menu_features(db, api):
     rows = {x["id"]: x for x in (await home(api, s))["courses"]}
     assert rows[str(ort.id)]["features"] == {"modules": False, "practice": False}
     assert rows[str(own.id)]["features"] is None
-    make_module(db, ort, t)
+    m = make_module(db, ort, t)
+    make_item(db, m)  # F5a: a header is not a lesson
+    assert {x["id"]: x["features"] for x in (await home(api, s))["courses"]}[str(ort.id)]["modules"] is False
+    make_item(db, m, "https://example.com/lesson")
     make_module(db, ort, t, published=False)
     assessment(db, ort, t, is_practice=True)
     r = await api.call(s, "GET", "/me/home/courses")
@@ -632,7 +635,9 @@ async def test_modules_next_reads_caches_only(db, api):
     from app.lms.core.models import utcnow
     from app.lms.home.schemas import MODULES_NEXT_KEYS
     from app.lms.modules.models import ItemRequirementStatus, ModuleProgress
-    from tests.lms.modules_support import make_course_file, make_item, make_module, make_page, structure_world
+    from tests.lms.modules_support import (
+        make_course_file, make_item, make_module, make_page, record_fact, structure_world,
+    )
 
     w = structure_world(db)
     now = utcnow()
@@ -646,17 +651,22 @@ async def test_modules_next_reads_caches_only(db, api):
     open_ = make_module(db, w.course, w.O, title={"en": "Week 2"})
     page = make_page(db, w.course, w.O, title="Read me")
     hidden = make_page(db, w.course, w.O, published=False)
-    make_item(db, done, page, requirement=("view",))
+    d_item = make_item(db, done, page, requirement=("view",))
     make_item(db, open_)  # header: never "next"
     make_item(db, open_, hidden, requirement=("view",))  # target unpublished: invisible
     met = make_item(db, open_, page, requirement=("view",))
     nxt = make_item(db, open_, make_course_file(db, w.course, w.O, title="Notes.pdf"), requirement=("view",))
-    make_item(db, open_, page)  # no requirement
+    lesson = make_item(db, open_, page)  # no requirement: next once unviewed (F5a)
     # nothing stored yet: nothing to show (the strip never evaluates)
     assert (await home(api, w.S))["modules_next"] == []
     progress(done, "completed")
     progress(open_, "started")
     db.add(ItemRequirementStatus(enrollment_id=w.enr.id, item_id=met.id, met=True, met_at=now))
+    db.commit()
+    # F5a: a completed module counts too; its unmet item would be next
+    rows = (await home(api, w.S))["modules_next"]
+    assert [r["item_id"] for r in rows] == [str(d_item.id)]
+    db.add(ItemRequirementStatus(enrollment_id=w.enr.id, item_id=d_item.id, met=True, met_at=now))
     db.commit()
     rows = (await home(api, w.S))["modules_next"]
     assert len(rows) == 1 and set(rows[0]) == MODULES_NEXT_KEYS
@@ -664,6 +674,14 @@ async def test_modules_next_reads_caches_only(db, api):
     assert (r["module_id"], r["item_id"], r["kind"], r["state"]) == (str(open_.id), str(nxt.id), "file", "started")
     assert r["title"] == {"en": "Notes.pdf"} and r["module_title"] == {"en": "Week 2"}
     assert r["course_title"] == w.course.title and r["link"]["file_id"] == str(nxt.file_id)
+    # F5a: then the lesson without a requirement until it is viewed
+    db.add(ItemRequirementStatus(enrollment_id=w.enr.id, item_id=nxt.id, met=True, met_at=now))
+    db.commit()
+    assert [r["item_id"] for r in (await home(api, w.S))["modules_next"]] == [str(lesson.id)]
+    record_fact(db, w.enr, lesson)
+    assert (await home(api, w.S))["modules_next"] == []
+    db.query(ItemRequirementStatus).filter(ItemRequirementStatus.item_id == nxt.id).delete()
+    db.commit()
     # the other student's caches are not mine; staff get nothing
     assert (await home(api, w.S2))["modules_next"] == []
     assert (await home(api, w.O))["modules_next"] == []

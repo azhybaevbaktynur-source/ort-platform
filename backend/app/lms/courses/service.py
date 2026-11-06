@@ -387,12 +387,11 @@ def course_features(db: Session, course: Course):
     from app.lms.assessments.models import Assessment
     from app.lms.course_files.models import CourseFile
     from app.lms.courses.schemas import CourseFeaturesOut
-    from app.lms.modules.models import CourseModule
+    from app.lms.modules.service import lesson_exists
 
     now = utcnow()
     row = db.execute(select(
-        exists().where(CourseModule.course_id == course.id, CourseModule.deleted_at.is_(None),
-                       CourseModule.published.is_(True)),
+        lesson_exists(course.id),  # F5a: `modules` = at least one lesson (COURSE_LESSONS_DESIGN 3, L7)
         exists().where(CourseFile.course_id == course.id, CourseFile.deleted_at.is_(None),
                        CourseFile.published.is_(True)),
         exists().where(Announcement.course_id == course.id, Announcement.deleted_at.is_(None),

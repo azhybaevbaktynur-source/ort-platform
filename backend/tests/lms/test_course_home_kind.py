@@ -15,7 +15,7 @@ from app.lms.pages.models import Page
 from tests.lms.assignment_support import api, clean_rate_limits, db, fresh_storage  # noqa: F401
 from tests.lms.factories import make_course
 from tests.lms.modules_support import (
-    C, make_announcement, make_course_file, make_module, make_page, structure_world,
+    C, make_announcement, make_course_file, make_item, make_module, make_page, structure_world,
 )
 from tests.lms.org_support import add_member, grant, make_org
 from tests.lms.s3_support import teacher
@@ -156,7 +156,11 @@ async def test_features_follow_published_rows(api, db):
     gone.soft_delete(w.O.id)
     db.commit()
     assert await features(w.S) == none
-    make_module(db, w.course, w.O)
+    m = make_module(db, w.course, w.O)
+    make_item(db, m)  # F5a: `modules` = at least one lesson; a header is not one
+    make_item(db, m, "https://example.com/x", published=False)
+    assert await features(w.S) == none
+    make_item(db, m, "https://example.com/y")
     assert await features(w.S) == {"modules": True, "files": False, "announcements": False, "practice": False}
     make_course_file(db, w.course, w.O)
     make_announcement(db, w.course, w.O)
