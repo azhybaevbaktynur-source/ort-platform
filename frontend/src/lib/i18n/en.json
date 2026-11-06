@@ -5977,6 +5977,17 @@
       "best": "Best score",
       "bestPercent": "Best result",
       "pending": "Your result appears once it is released."
+    },
+    "tests": {
+      "heading": "Tests · {count}",
+      "statusFilter": "Status",
+      "allStatuses": "Any status",
+      "noScore": "No result yet",
+      "emptyStatus": "No tests with this status.",
+      "start": "Start",
+      "resume": "Continue",
+      "result": "Result",
+      "unlock": "Unlock"
     }
   },
   "adminSecurity": {

@@ -31,9 +31,9 @@ test.describe("student shell (ru)", () => {
       }
       await page.setViewportSize(VIEWPORTS.desktop);
     }
-    // the course page: "Тесты" is current (U4 gives it its own page); no course sidebar inside an exam-prep course
+    // the Тесты page (U4): "Тесты" is current; no course sidebar inside an exam-prep course
     await nav.getByRole("link", { name: t("student.nav.tests") }).click();
-    await page.waitForURL(new RegExp(`/${L}/courses/${s.course_id}$`));
+    await page.waitForURL(new RegExp(`/${L}/courses/${s.course_id}/tests$`));
     await expect(nav.getByRole("link", { name: t("student.nav.tests") })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("navigation", { name: t("courses.home.tabsLabel") })).toHaveCount(0);
     // the lobby: the AppHeader frame, no student navigation
@@ -48,6 +48,7 @@ test.describe("student shell (ru)", () => {
     await page.setViewportSize(VIEWPORTS.phone);
     await signIn(page, s.students["vis-phone-ru"]);
     await page.goto(`/${L}/courses/${s.course_id}`);
+    await page.waitForURL(new RegExp(`/${L}/courses/${s.course_id}/tests$`)); // U4: the course page redirects
     const bar = page.getByRole("navigation", { name: t("student.nav.tabBar") });
     await expect(bar).toBeVisible();
     await expect(bar.getByRole("link", { name: t("student.nav.tests") })).toHaveAttribute("aria-current", "page");

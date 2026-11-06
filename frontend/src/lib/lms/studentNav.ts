@@ -3,7 +3,6 @@
  * course, with the active one for the current path. Dependency-free (structural types only).
  *
  * Pages that do not exist yet point to existing routes (TODO):
- * - Тесты: the course page for now (TODO U4: `/courses/{c}/tests`);
  * - Сохранённые: the mistakes tab of progress for now (TODO U8: `/courses/{c}/saved`);
  * - Видеоуроки: the course's modules list (TODO U7: lesson sub-links and the lesson page).
  */
@@ -61,8 +60,8 @@ export function studentNavLinks({ lang, rest, tab, courseId, features }: Student
     lessons: features?.modules
       ? { key: "lessons", href: `${base}${c}/modules`, active: under(rest, `${c}/modules`) || under(rest, `${c}/pages`) }
       : null,
-    // TODO U4: `/courses/{c}/tests`
-    tests: { key: "tests", href: `${base}${c}`, active: rest === c },
+    // U4: the Тесты page (the course page redirects there for exam-prep students)
+    tests: { key: "tests", href: `${base}${c}/tests`, active: rest === c || under(rest, `${c}/tests`) },
     practice: { key: "practice", href: `${base}${c}/practice`, active: under(rest, `${c}/practice`) },
     mistakes: { key: "mistakes", href: `${base}${c}/progress?tab=mistakes`, active: mistakesTab },
   };
