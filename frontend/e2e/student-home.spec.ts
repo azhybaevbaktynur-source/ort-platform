@@ -5,7 +5,7 @@ import { seed, settle, signIn, tr } from "./helpers";
 
 /**
  * Student UI U3 (docs/phases/STUDENT_UI_DESIGN.md §3.1): the home. A student of an exam-prep course without results
- * (the S3 access student: a free and a paid exam, no pass) gets the greeting, the Next card with the page's only
+ * (`access.home_student` of the S3 course: a free and a paid exam, no pass, never takes a test) gets the greeting, the Next card with the page's only
  * primary button, the score tiles, the streak strip, the gold unlock card, the section card's empty state and the
  * courses row; a student of a general course only keeps the dashboard ("Панель"), whose course cards stay at least
  * 16rem wide at 1920 px. Read-only. Screens at 375 / 1440 / 1920 (ru) go to $U3_SHOTS when set.
@@ -32,7 +32,7 @@ test.describe("student home (ru)", () => {
   test("exam-prep home without results: greeting, Next, scores, streak, unlock card, courses", async ({ page }) => {
     const s = seed();
     await page.setViewportSize({ width: 1440, height: 900 });
-    await signIn(page, s.access!.student);
+    await signIn(page, s.access!.home_student); // own user: access.spec.ts gives `access.student` results first
     await page.goto(`/${L}/courses`);
     const greeting = page.getByRole("heading", { level: 1 });
     await expect(greeting).toContainText("Access"); // the first word of the display name

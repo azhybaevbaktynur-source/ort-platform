@@ -779,7 +779,11 @@ def seed_access(api: Api, log: Path, tok: str, root: Path) -> dict:
     student = register(api, log, "e2e-access-student@example.com", "Access Student")
     student["profile"] = profile(api, student["token"])
     api.call("POST", "/courses/join", student["token"], {"code": course["join_code"]})
-    return {"course_id": cid, "free_exam": free, "paid_exam": paid, "student": student,
+    # Student UI U3 (student-home.spec.ts): the same course, never takes a test (access.spec.ts gives `student` results)
+    home_student = register(api, log, "e2e-access-home@example.com", "Access Home")
+    home_student["profile"] = profile(api, home_student["token"])
+    api.call("POST", "/courses/join", home_student["token"], {"code": course["join_code"]})
+    return {"course_id": cid, "free_exam": free, "paid_exam": paid, "student": student, "home_student": home_student,
             "counts": [len(picks[k]) for k in SECTIONS], "join_code": course["join_code"]}
 # --- S3 access end ---
 
