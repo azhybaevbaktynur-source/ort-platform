@@ -12,11 +12,13 @@ export interface InlineValues {
   title: string;
   url: string;
   assignmentKind: AssignmentKind;
+  /** F5c: the optional minutes field of a link ("" when empty). */
+  minutes: string;
 }
 
 const field = (invalid: boolean) => cn(fieldBase, fieldBorder(invalid), "min-h-11 py-1 sm:min-h-9");
 
-export function InlineForm({ label, initial = "", submitLabel, busy, error, url, assignmentKinds, onSubmit, onCancel, className }: {
+export function InlineForm({ label, initial = "", submitLabel, busy, error, url, minutes, assignmentKinds, onSubmit, onCancel, className }: {
   /** Accessible name and placeholder of the title field. */
   label: string;
   initial?: string;
@@ -25,6 +27,8 @@ export function InlineForm({ label, initial = "", submitLabel, busy, error, url,
   error: string | null;
   /** A link also asks for its web address. */
   url?: { label: string };
+  /** F5c (COURSE_LESSONS_DESIGN §6): a link also takes its duration in minutes (optional). */
+  minutes?: { label: string };
   /** An assignment also asks for its kind (fixed once created). */
   assignmentKinds?: { label: string; options: { value: AssignmentKind; label: string }[] };
   onSubmit: (v: InlineValues) => void;
@@ -34,6 +38,7 @@ export function InlineForm({ label, initial = "", submitLabel, busy, error, url,
   const { t } = useTranslation();
   const [title, setTitle] = useState(initial);
   const [address, setAddress] = useState("");
+  const [mins, setMins] = useState("");
   const [assignmentKind, setAssignmentKind] = useState<AssignmentKind>(assignmentKinds?.options[0]?.value ?? "text");
   const titleRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -43,13 +48,17 @@ export function InlineForm({ label, initial = "", submitLabel, busy, error, url,
 
   return (
     <form noValidate className={cn("flex flex-wrap items-center gap-2", className)}
-      onSubmit={(e) => { e.preventDefault(); if (!busy) onSubmit({ title: title.trim(), url: address.trim(), assignmentKind }); }}
+      onSubmit={(e) => { e.preventDefault(); if (!busy) onSubmit({ title: title.trim(), url: address.trim(), assignmentKind, minutes: mins.trim() }); }}
       onKeyDown={(e) => { if (e.key === "Escape" && !busy) { e.preventDefault(); e.stopPropagation(); onCancel(); } }}>
       <input ref={titleRef} type="text" aria-label={label} placeholder={label} title={label} value={title} maxLength={200} disabled={busy}
         aria-invalid={error ? true : undefined} onChange={(e) => setTitle(e.target.value)} className={cn(field(!!error), "min-w-0 flex-1 basis-48")} />
       {url && (
         <input type="url" inputMode="url" aria-label={url.label} placeholder="https://" title={url.label} value={address} disabled={busy}
           onChange={(e) => setAddress(e.target.value)} className={cn(field(!!error), "min-w-0 flex-1 basis-48")} />
+      )}
+      {minutes && (
+        <input type="number" inputMode="numeric" min={1} max={600} step={1} aria-label={minutes.label} placeholder={minutes.label} title={minutes.label}
+          value={mins} disabled={busy} onChange={(e) => setMins(e.target.value)} className={cn(field(false), "w-full sm:w-40")} />
       )}
       {assignmentKinds && (
         <select aria-label={assignmentKinds.label} title={assignmentKinds.label} value={assignmentKind} disabled={busy}

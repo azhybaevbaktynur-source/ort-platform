@@ -242,8 +242,13 @@ async def test_pro_switch_only_on_platform_courses(db, api):
     assert r.status_code == 201 and r.json()["access_tier"] == "free", r.text
     r = await api.call(own.O, "PATCH", f"{base}/{own.free.id}", json={"access_tier": "paid"})
     assert r.status_code == 422, r.text
+    # F5c: the staff outline tells the editor whether to show the Pro switch
+    r = await api.call(own.O, "GET", base)
+    assert r.status_code == 200 and r.json()["is_platform_course"] is False, r.text
     plat = tier_world(db)
     base = f"/courses/{plat.cid}/modules"
+    r = await api.call(plat.O, "GET", base)
+    assert r.status_code == 200 and r.json()["is_platform_course"] is True, r.text
     r = await api.call(plat.O, "POST", base, json={"title": {"en": "Y"}, "access_tier": "paid"})
     assert r.status_code == 201 and r.json()["access_tier"] == "paid", r.text
     r = await api.call(plat.O, "POST", base, json={"title": {"en": "Z"}})

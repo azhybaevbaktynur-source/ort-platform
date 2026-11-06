@@ -20,12 +20,14 @@ import type { ItemIn, ItemStaffOut, ModuleStaffOut, RequirementType } from "@/li
 import { withFrom } from "@/lib/lms/nav";
 import type { CourseFileStaffOut } from "@/lib/lms/pagesTypes";
 import type { Lang, LocalizedText } from "@/lib/lms/types";
-import { Badge, Button, Dialog, LinkButton, Pagination, Select, Skeleton, Switch } from "@/components/ui";
+import { parseVideo } from "@/lib/lms/video";
+import { Badge, Button, Dialog, Input, LinkButton, Pagination, Select, Skeleton, Switch } from "@/components/ui";
 import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
 import { AssignmentEditorDialog } from "@/components/lms/assignments/AssignmentEditorDialog";
 import { UploadFileDialog } from "@/components/lms/courseFiles/UploadFileDialog";
 import { ItemKindIcon, useItemKindText, useModuleErrorText } from "./moduleUi";
 import { RequirementFields, requirementBody, type CourseLangs } from "./OutlineDialogs";
+import { parseMinutes } from "./EditorParts";
 
 export type AddKind = "page" | "file" | "assignment";
 const ADD_KINDS: AddKind[] = ["page", "file", "assignment"];
@@ -381,6 +383,88 @@ export function PlaceInModuleDialog({ open, target, modules, courseId, defaultLa
         )}
         {error ? <p role="alert" className="rounded-xl border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-800">{errorText(error)}</p> : null}
       </div>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------- F5c: "+ Видео" (COURSE_LESSONS_DESIGN §6)
+
+const PROVIDER_NAME = { youtube: "YouTube", vimeo: "Vimeo" } as const;
+
+/** A video lesson is a `url` item: address, optional title (in the language the teacher works in) and minutes. The hint
+ * under the address is a client-side guess (`parseVideo`); the server decides whether students get the player. */
+export function VideoDialog({ open, module, courseId, editLang, defaultLang, onAdded, onClose }: {
+  open: boolean;
+  module: ModuleStaffOut;
+  courseId: string;
+  editLang: Lang;
+  defaultLang: Lang;
+  onAdded: () => void;
+  onClose: () => void;
+}) {
+  const { lang, t } = useTranslation();
+  const errorText = useModuleErrorText();
+  const formId = useId();
+  const [url, setUrl] = useState("");
+  const [title, setTitle] = useState("");
+  const [minutes, setMinutes] = useState("");
+  const [touched, setTouched] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const moduleName = pickLocalized(module.title, lang, defaultLang) || t("modules.untitledModule");
+
+  const address = url.trim();
+  const urlOk = /^https?:\/\/\S+$/i.test(address);
+  const video = parseVideo(address);
+  const seconds = parseMinutes(minutes);
+  const urlError = touched && !urlOk ? t("modules.errors.url_invalid") : undefined;
+  const minutesError = touched && seconds === undefined ? t("modules.editor.durationInvalid") : undefined;
+  const hint = !address || !urlOk
+    ? t("modules.editor.video.urlHint")
+    : video ? t("modules.editor.video.detected", { provider: PROVIDER_NAME[video.provider] }) : t("modules.editor.video.notDetected");
+
+  const submit = async (ev: React.FormEvent) => {
+    ev.preventDefault();
+    setTouched(true);
+    if (!urlOk || seconds === undefined) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const body: ItemIn = { kind: "url", url: address, published: true };
+      if (title.trim()) body.title_override = { [editLang]: title.trim() } as LocalizedText;
+      if (seconds !== null) body.duration_s = seconds;
+      await addItem(courseId, module.id, body);
+      onAdded();
+    } catch (e) {
+      setError(e);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} busy={busy} size="md" title={t("modules.editor.video.title")} description={moduleName}
+      footer={(
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>{t("lms.common.cancel")}</Button>
+          <Button type="submit" form={formId} loading={busy}>{t("modules.add.submit")}</Button>
+        </>
+      )}>
+      <form id={formId} onSubmit={(e) => void submit(e)} noValidate className="space-y-4">
+        <div>
+          <Input type="url" inputMode="url" label={t("modules.editor.video.url")} placeholder="https://" value={url} disabled={busy}
+            autoFocus error={urlError} onChange={(e) => setUrl(e.target.value)} />
+          {!urlError && (
+            <p aria-live="polite" data-video-hint={video ? video.provider : "none"}
+              className={video ? "mt-1 text-sm leading-5 text-success-700" : "mt-1 text-sm leading-5 text-slate-600"}>{hint}</p>
+          )}
+        </div>
+        <Input label={t("modules.editor.video.name")} hint={t("modules.editor.video.nameHint")} value={title} maxLength={200} disabled={busy}
+          onChange={(e) => setTitle(e.target.value)} />
+        <Input type="number" inputMode="numeric" min={1} max={600} step={1} containerClassName="sm:w-48"
+          label={t("modules.editor.video.minutes")} hint={t("modules.editor.video.minutesHint")} value={minutes} disabled={busy}
+          error={minutesError} onChange={(e) => setMinutes(e.target.value)} />
+        {error ? <p role="alert" className="rounded-xl border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-800">{errorText(error)}</p> : null}
+      </form>
     </Dialog>
   );
 }
