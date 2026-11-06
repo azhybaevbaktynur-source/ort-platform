@@ -46,12 +46,14 @@ NO_EXTRAS = CardExtras()
 
 
 def _tests_count():
-    """Published, live tests of the course (practice quizzes included): what a student can open."""
+    """Published, live exams of the course, counted as the Tests page lists them: practice quizzes are not tests, and
+    a test needs a published version."""
     from app.lms.assessments.models import Assessment
 
     return (select(func.count(Assessment.id))
             .where(Assessment.course_id == Course.id, Assessment.deleted_at.is_(None),
-                   Assessment.status == "published")
+                   Assessment.status == "published", Assessment.is_practice.is_(False),
+                   Assessment.published_version_id.isnot(None))
             .correlate(Course).scalar_subquery())
 
 

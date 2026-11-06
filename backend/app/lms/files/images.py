@@ -113,6 +113,7 @@ def encode_image(raw: bytes, *, max_bytes: int) -> EncodedImage:
 # --- F7a begin --- (STUDENT_UI_FIX_PLAN 7.1: course cover, centre crop to 16:9 before encoding; used only by covers)
 COVER_FORMATS = ("JPEG", "PNG", "WEBP")
 COVER_MAX_WIDTH, COVER_MAX_HEIGHT = 1280, 720
+COVER_MIN_WIDTH, COVER_MIN_HEIGHT = 320, 180  # a smaller source would be blurred up on every card
 
 
 def cover_crop_box(width: int, height: int, focus_x: float = 0.5, focus_y: float = 0.5) -> tuple[int, int, int, int]:
@@ -131,8 +132,8 @@ def encode_cover(raw: bytes, *, max_bytes: int, focus_x: float = 0.5, focus_y: f
     """A JPEG, PNG or WebP upload, oriented, cropped to 16:9 around the focus, scaled down to at most 1280 x 720 and
     re-encoded as a lossy, metadata-free WebP.
 
-    Raises ValueError with one of: "unsupported_type" (not a JPEG, PNG or WebP image), "too_large", "too_many_pixels",
-    "too_large_after_encode", "invalid_image"."""
+    Raises ValueError with one of: "unsupported_type" (not a JPEG, PNG or WebP image), "too_small" (below 320 x 180
+    once oriented), "too_large", "too_many_pixels", "too_large_after_encode", "invalid_image"."""
     if not raw:
         raise ValueError("invalid_image")
     if len(raw) > max_bytes:
@@ -170,6 +171,8 @@ def encode_cover(raw: bytes, *, max_bytes: int, focus_x: float = 0.5, focus_y: f
                 op = _ORIENTATION_OPS.get(orientation)
                 if op is not None:  # orient first: the crop box is chosen on the image as the viewer sees it
                     img = img.transpose(op)
+                if img.width < COVER_MIN_WIDTH or img.height < COVER_MIN_HEIGHT:
+                    raise ValueError("too_small")
                 img = img.crop(cover_crop_box(img.width, img.height, focus_x, focus_y))
                 if img.width > COVER_MAX_WIDTH:
                     img = img.resize((COVER_MAX_WIDTH, COVER_MAX_HEIGHT), Image.LANCZOS, reducing_gap=3.0)

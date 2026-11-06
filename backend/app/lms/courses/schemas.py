@@ -128,7 +128,7 @@ class CourseCard(BaseModel):
     deleted_at: Optional[datetime] = None
     # --- F7a begin --- (STUDENT_UI_FIX_PLAN 7.1-7.2: one card everywhere; `cover.card_extras`, one statement a page)
     cover_url: Optional[str] = None       # null: the client draws the generated default cover
-    tests_count: int = 0                  # published live tests (practice included)
+    tests_count: int = 0                  # published live exams with a published version (no practice quizzes)
     lessons_count: int = 0                # lessons of published modules (F5a L2)
     is_platform_course: bool = False      # the platform organization's tree: no teacher or organization line
     # --- F7a end ---

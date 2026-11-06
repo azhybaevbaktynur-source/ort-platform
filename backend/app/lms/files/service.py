@@ -49,6 +49,12 @@ class ImageTypeUnsupported(LMSError):
     code = "image_type_unsupported"
 
 
+class ImageTooSmall(LMSError):
+    """F7a: a course cover needs at least 320 x 180 source pixels."""
+    status_code = 422
+    code = "image_too_small"
+
+
 class FileInvalid(LMSError):
     status_code = 400
     code = "file_invalid"
@@ -67,6 +73,8 @@ def raise_for_encode_error(exc: ValueError) -> None:
         raise ImageTooLarge("Image is too large")
     if token == "unsupported_type":  # F7a (covers)
         raise ImageTypeUnsupported("Only JPEG, PNG and WebP images are accepted")
+    if token == "too_small":  # F7a (covers)
+        raise ImageTooSmall("The image must be at least 320 x 180 pixels", details={"min_width": 320, "min_height": 180})
     raise ImageInvalid("Not a valid PNG, JPEG, GIF or WEBP image")
 
 

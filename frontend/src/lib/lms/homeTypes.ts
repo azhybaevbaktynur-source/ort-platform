@@ -71,7 +71,7 @@ export interface HomeCourseOut {
   features?: { modules: boolean; practice: boolean } | null;
   /** F7a: public WebP cover (16:9, at most 1280 x 720); null: draw the generated default cover. Absent: older backend. */
   cover_url?: string | null;
-  /** F7a: published live tests (practice included) */
+  /** F7a: published exams with a published version, as the Tests page lists them (no practice quizzes) */
   tests_count?: number;
   /** F7a: lessons (page, file, link) of published modules */
   lessons_count?: number;
@@ -126,7 +126,7 @@ export interface HomePlatformCourseOut {
   is_platform_course: boolean;
   /** F7a: public WebP cover (16:9, at most 1280 x 720); null: draw the generated default cover. Absent: older backend. */
   cover_url?: string | null;
-  /** F7a: published live tests (practice included) */
+  /** F7a: published exams with a published version, as the Tests page lists them (no practice quizzes) */
   tests_count?: number;
   /** F7a: lessons (page, file, link) of published modules */
   lessons_count?: number;

@@ -30,7 +30,7 @@ from app.lms.organizations.defaults import ensure_platform_org
 from app.lms.organizations.ids import platform_org_id
 from httpx import ASGITransport, AsyncClient
 from app.main import app
-from tests.lms.factories import auth, jpeg_with_exif, make_assessment
+from tests.lms.factories import auth, jpeg_with_exif, make_assessment, make_assessment_version
 from tests.lms.files_support import (  # noqa: F401
     api, clean_rate_limits, db, db_storage, enroll, local_storage, make_course, make_user, teacher, upload,
 )
@@ -121,7 +121,8 @@ def test_crop_box_follows_the_focus_and_refuses_tiny_images():
 
 
 @pytest.mark.parametrize("size, out", [((2000, 2000), (1280, 720)), ((3000, 1000), (1280, 720)),
-                                       ((400, 300), (400, 225)), ((1601, 500), (880, 495))])
+                                       ((400, 300), (400, 225)), ((1601, 500), (880, 495)),
+                                       ((320, 180), (320, 180))])
 def test_encode_cover_crops_and_bounds_the_size(size, out):
     enc = encode_cover(photo(*size), max_bytes=settings.ASSET_MAX_UPLOAD_BYTES)
     assert (enc.width, enc.height) == out
@@ -134,8 +135,23 @@ def test_encode_cover_focus_picks_the_side_and_orientation_comes_first():
     left = Image.open(io.BytesIO(encode_cover(raw, max_bytes=10**7, focus_x=0.0).data)).convert("RGB")
     right = Image.open(io.BytesIO(encode_cover(raw, max_bytes=10**7, focus_x=1.0).data)).convert("RGB")
     assert left.getpixel((10, 10))[0] > 150 and right.getpixel((10, 10))[2] > 150
-    rotated = encode_cover(jpeg_with_exif(320, 160, 6), max_bytes=10**6)  # 160 x 320 once oriented
-    assert (rotated.width, rotated.height) == (160, 90)
+    rotated = encode_cover(jpeg_with_exif(640, 360, 6), max_bytes=10**6)  # 360 x 640 once oriented
+    assert (rotated.width, rotated.height) == (352, 198)
+
+
+@pytest.mark.parametrize("raw", [photo(319, 180), photo(320, 179), photo(64, 36, "PNG"),
+                                 jpeg_with_exif(400, 200, 6)])  # 200 x 400 once oriented: too narrow
+def test_encode_cover_refuses_small_sources(raw):
+    with pytest.raises(ValueError, match="too_small"):
+        encode_cover(raw, max_bytes=10**6)
+
+
+async def test_small_cover_is_422_image_too_small(db, local_storage):
+    t = teacher(db)
+    c = make_course(db, t)
+    r = await put_cover(t, c.id, photo(300, 200))
+    assert r.status_code == 422 and r.json()["error"]["code"] == "image_too_small", r.text
+    assert db.scalar(select(func.count()).select_from(Asset)) == 0
 
 
 @pytest.mark.parametrize("raw", [
@@ -305,14 +321,23 @@ async def test_platform_course_only_platform_admins(db, local_storage, api):
 
 # ---------------------------------------------------------------- card extras
 
+def published(db, c, t, **kw):
+    """An assessment with a published version (what the Tests page lists)."""
+    a = make_assessment(db, c, t, **kw)
+    make_assessment_version(db, a, t)
+    return a
+
+
 def _content(db, c, t):
-    """2 published live tests (one practice), a draft and a deleted one; lessons: a published page, a url and a
+    """2 published exams (one with a version, one without), a published practice quiz, a draft and a deleted exam:
+    one test (the Tests page's rule); lessons: a published page, a url and a
     published file in a published module (3); not lessons: a header, an unpublished page target, an unpublished item,
     a deleted item, anything in an unpublished module."""
-    make_assessment(db, c, t, status="published", published_at=utcnow())
-    make_assessment(db, c, t, status="published", published_at=utcnow(), is_practice=True)
+    published(db, c, t)
+    make_assessment(db, c, t, status="published", published_at=utcnow())  # no published version
+    published(db, c, t, is_practice=True)
     make_assessment(db, c, t)
-    make_assessment(db, c, t, status="published", deleted_at=utcnow())
+    published(db, c, t, deleted_at=utcnow())
     db.commit()
     m = make_module(db, c, t)
     make_item(db, m, make_page(db, c, t))
@@ -333,13 +358,13 @@ async def test_counts_on_every_card(db, api):
     _content(db, c, t)
     enroll(db, c, s)
     x = card_extras(db, [c.id])[c.id]
-    assert (x.tests_count, x.lessons_count, x.cover_url, x.is_platform_course) == (2, 3, None, False)
+    assert (x.tests_count, x.lessons_count, x.cover_url, x.is_platform_course) == (1, 3, None, False)
     mine = (await api.call(t, "GET", "/courses")).json()["items"][0]
-    assert (mine["tests_count"], mine["lessons_count"], mine["is_platform_course"]) == (2, 3, False)
+    assert (mine["tests_count"], mine["lessons_count"], mine["is_platform_course"]) == (1, 3, False)
     cat = [i for i in (await api.call(s, "GET", "/catalog/courses")).json()["items"] if i["id"] == str(c.id)][0]
-    assert (cat["tests_count"], cat["lessons_count"], cat["student_count"]) == (2, 3, 1)
+    assert (cat["tests_count"], cat["lessons_count"], cat["student_count"]) == (1, 3, 1)
     home = [i for i in (await api.call(s, "GET", "/me/home")).json()["courses"] if i["id"] == str(c.id)][0]
-    assert (home["tests_count"], home["lessons_count"]) == (2, 3)
+    assert (home["tests_count"], home["lessons_count"]) == (1, 3)
 
 
 async def test_platform_flag_and_erased_cover(db, local_storage, api):
@@ -361,7 +386,7 @@ def test_catalog_page_of_24_is_still_two_statements(db):
     courses = [make_course(db, t, status="published", visibility="catalog", enrollment_mode="open",
                            published_at=utcnow() - timedelta(minutes=100 - i)) for i in range(24)]
     for i, c in enumerate(courses[:6]):
-        make_assessment(db, c, t, status="published", published_at=utcnow())
+        published(db, c, t)
         if i % 2:
             make_item(db, make_module(db, c, t), "https://example.com/x")
         enroll(db, c, make_user(db))
@@ -387,7 +412,7 @@ async def test_my_courses_page_statement_count_does_not_grow(db):
     for i in range(24):
         c = make_course(db, t)
         if i < 3:
-            make_assessment(db, c, t, status="published", published_at=utcnow())
+            published(db, c, t)
     db.commit()
     counts = {}
     for limit in (3, 24):
