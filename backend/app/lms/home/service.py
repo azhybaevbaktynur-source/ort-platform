@@ -147,6 +147,18 @@ def _listable(user_id: str, now: datetime, used):
     )
 
 
+def _pro_locked(user_id: str, now: datetime):
+    """F5a (COURSE_LESSONS_DESIGN 5): an assignment that only Pro modules hold, in a platform course, for a caller
+    without an active pass who is not a test student (the S3 Gate); preset (ORT) exams of a template-locked course keep
+    their own tier. Over `_assignments_of_mine` rows."""
+    from app.lms.access.service import active_pass_clause, platform_path_clause
+    from app.lms.modules.service import pro_only_assignment
+
+    preset_exempt = and_(Course.template_locked.is_(True), func.coalesce(Assessment.preset, "none") != "none")
+    return and_(platform_path_clause(Organization.path), Enrollment.is_test_student.is_(False),
+                ~active_pass_clause(user_id, now), ~preset_exempt, pro_only_assignment(Assignment.id))
+
+
 def _course_rows(uid: str):
     """The caller's student courses with everything a course card shows in one statement: rows of (Course, owner,
     in_progress, org_name, org_kind)."""
@@ -298,7 +310,7 @@ def _listable_rows(db: Session, uid: str, now: datetime) -> list:
             select(Assignment.id, Assignment.kind, Assignment.assessment_id, Assignment.course_id, Course.title,
                    Assignment.title, due.label("due"), until.label("until"), allowed.label("allowed"),
                    used.label("used")))
-        .where(_mine(uid), _listable(uid, now, used))
+        .where(_mine(uid), _listable(uid, now, used), ~_pro_locked(uid, now))
         .order_by(due.is_(None), due, until.is_(None), until, Assignment.id)
         .limit(sch.TODO_MAX)
     ).all()
@@ -489,12 +501,16 @@ def _modules_next(db: Session, uid: str) -> list[sch.HomeModuleNextOut]:
         and_(ItemCompletionRequirement.item_id.is_(None), ModuleItem.kind == "assignment", ~submitted),
     )
     first: dict = {}
-    for it in db.execute(
+    # F5a review: only the first not-done item per module leaves the database (row_number per module), so the rows
+    # read are bounded by the module scan (<= MODULES_SCAN_MAX), not by the items of those modules
+    rank = func.row_number().over(partition_by=ModuleItem.module_id,
+                                  order_by=(ModuleItem.position, ModuleItem.id)).label("rn")
+    ranked = (
         select(ModuleItem.module_id, ModuleItem.position, ModuleItem.id, ModuleItem.kind, ModuleItem.title_override,
                ModuleItem.page_id, ModuleItem.file_id, ModuleItem.assignment_id, ModuleItem.url,
                Page.title.label("page_title"), Page.language.label("page_lang"),
                CourseFile.title.label("file_title"), Assignment.title.label("assignment_title"),
-               Assignment.kind.label("assignment_kind"), Assignment.assessment_id)
+               Assignment.kind.label("assignment_kind"), Assignment.assessment_id, rank)
         .select_from(ModuleItem)
         .outerjoin(ItemCompletionRequirement, ItemCompletionRequirement.item_id == ModuleItem.id)
         .outerjoin(ItemRequirementStatus, met)
@@ -503,8 +519,8 @@ def _modules_next(db: Session, uid: str) -> list[sch.HomeModuleNextOut]:
         .outerjoin(Assignment, Assignment.id == ModuleItem.assignment_id)
         .where(ModuleItem.module_id.in_({m.module_id for m in mods}), ModuleItem.deleted_at.is_(None),
                ModuleItem.published.is_(True), ModuleItem.kind != "header", target_ok, not_done)
-        .order_by(ModuleItem.module_id, ModuleItem.position, ModuleItem.id)
-    ).all():
+    ).subquery()
+    for it in db.execute(select(ranked).where(ranked.c.rn == 1).order_by(ranked.c.module_id)).all():
         first.setdefault(it.module_id, it)
     chosen: dict = {}
     for m in mods:  # course, then module position order

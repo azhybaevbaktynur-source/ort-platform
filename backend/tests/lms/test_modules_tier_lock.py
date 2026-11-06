@@ -20,6 +20,7 @@ from app.lms.organizations.ids import platform_org_id
 from tests.lms.access_support import give_pass
 from tests.lms.attempt_support import T0, frozen_clock, make_quiz  # noqa: F401
 from tests.lms.factories import enroll, make_user
+from tests.lms.gradebook_support import no_scored_hooks  # noqa: F401
 from tests.lms.modules_support import make_course_file, make_item, make_module, make_page
 from tests.lms.s3_support import api, clean_rate_limits, db  # noqa: F401
 
@@ -258,3 +259,82 @@ async def test_pro_switch_only_on_platform_courses(db, api):
     # the student cannot set it
     r = await api.call(plat.S, "PATCH", f"{base}/{plat.paid.id}", json={"access_tier": "free"})
     assert r.status_code in (403, 404)
+
+
+# ------------------------------------------------------------------ F5a review: mixed references and next-test lists
+
+async def test_pro_and_rules_locked_free_reference_stays_locked(db, api, frozen_clock):
+    """A target held by an open Pro module and by a free module locked by its rules is open through neither for a
+    gated student: page, file and quiz answer `access_required` (a pass would open the Pro reference)."""
+    w = tier_world(db)
+    later = make_module(db, w.course, w.O, title={"en": "Later"}, unlock_at=T0 + timedelta(days=3))
+    for target in (w.page, w.file, w.assignment):
+        make_item(db, later, target)
+    pages, files = f"/courses/{w.cid}/pages/{w.page.id}", f"/courses/{w.cid}/course-files/{w.file.id}/download"
+    for path in (pages, files):
+        r = await api.call(w.S, "GET", path)
+        assert r.status_code == 403 and code(r) == "access_required", (path, r.text)
+        assert "Hello" not in r.text
+    lobby = (await api.call(w.S, "GET", f"/courses/{w.cid}/assessments/{w.q.assessment.id}")).json()
+    assert lobby["locked"] is True and lobby["can_start"] is False and lobby["reason"] == "access_required"
+    r = await api.call(w.S, "POST", f"/courses/{w.cid}/assessments/{w.q.assessment.id}/attempts", json={})
+    assert r.status_code == 403 and code(r) == "access_required", r.text
+    # the Pro module rules-locked too: nothing a pass would open -> 423
+    w.paid.unlock_at = T0 + timedelta(days=3)
+    db.commit()
+    r = await api.call(w.S, "GET", pages)
+    assert r.status_code == 423 and code(r) == "module_locked", r.text
+    w.paid.unlock_at = None
+    db.commit()
+    # with a pass the Pro reference opens them
+    give_pass(db, w.S)
+    assert (await api.call(w.S, "GET", pages)).status_code == 200
+    assert (await api.call(w.S, "GET", files)).status_code == 200
+    r = await api.call(w.S, "POST", f"/courses/{w.cid}/assessments/{w.q.assessment.id}/attempts", json={})
+    assert r.status_code == 201, r.text
+
+
+async def test_next_test_and_todo_skip_tests_only_pro_modules_hold(db, api, no_scored_hooks):
+    """The exam-prep "next" step and the home to-do / next up skip a test that only Pro modules hold for a gated
+    student; an ORT preset exam in the same Pro module keeps its own (free) tier; a pass brings the test back."""
+    from app.lms.assignments.models import Assignment
+    from app.lms.core.models import utcnow
+    from app.lms.grading.seeds import ORT_MAIN_V1_ID
+    from tests.lms.factories import make_course
+    from tests.lms.gradebook_support import graded_assessment
+
+    ensure_platform_org(db.connection())
+    db.commit()
+    t = make_user(db, teacher_status="approved")
+    course = make_course(db, t, languages=["ru"], default_language="ru", status="published",
+                         organization_id=platform_org_id(), template_key="ort", template_version=1,
+                         template_locked=True, published_at=utcnow())
+    s = make_user(db)
+    enroll(db, course, s)
+
+    def quiz(title, preset):
+        a, _v = graded_assessment(db, course, t, points=10, scheme_version_id=ORT_MAIN_V1_ID, preset=preset,
+                                  title={"ru": title}, allowed_attempts=-1)
+        return a, db.execute(select(Assignment).where(Assignment.assessment_id == a.id)).scalar_one()
+
+    pro_a, pro_asg = quiz("Pro", "none")
+    ort_a, ort_asg = quiz("Ort", "ort_main")
+    _free_a, free_asg = quiz("Free", "none")
+    pro = make_module(db, course, t, title={"ru": "Pro"}, access_tier="paid")
+    make_item(db, pro, pro_asg)
+    make_item(db, pro, ort_asg)
+
+    async def state():
+        page = await api.call(s, "GET", f"/courses/{course.id}/exam-prep")
+        assert page.status_code == 200, page.text
+        home = await api.call(s, "GET", "/me/home")
+        assert home.status_code == 200, home.text
+        return (page.json()["next"]["assessment_id"], {r["assignment_id"] for r in home.json()["todo"]},
+                {r["assignment_id"] for r in home.json()["next_up"]})
+
+    nxt, todo, next_up = await state()
+    assert nxt == str(ort_a.id)  # the Pro-only test is skipped; the ORT preset exam is not
+    assert str(pro_asg.id) not in todo | next_up and {str(ort_asg.id), str(free_asg.id)} <= todo
+    give_pass(db, s)
+    nxt, todo, next_up = await state()
+    assert nxt == str(pro_a.id) and str(pro_asg.id) in todo

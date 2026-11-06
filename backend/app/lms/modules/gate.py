@@ -136,13 +136,15 @@ def require_access(db: Session, ctx: Any, course: Any, *, page: Optional[Any] = 
         return  # content outside modules is ungated, as today
     if assignment is not None and preset is None and _ort_exempt(course, _preset_of(db, assignment, targets[0])):
         return
-    # F5a (COURSE_LESSONS_DESIGN 5): referenced only by Pro modules and the caller has no pass here -> 403
-    # `access_required` (S3 Gate: platform course, no active pass, not a test student); a free module referencing the
-    # target too keeps it open ("any open reference", as the module gate)
-    if tiers == {"paid"}:
+    # F5a (COURSE_LESSONS_DESIGN 5): a Pro (`paid`) reference is locked for a caller gated by the S3 access `Gate`
+    # (platform course, no active pass, not a test student). Referenced only by Pro modules -> 403 `access_required`
+    # before the module evaluation; otherwise a Pro reference counts as locked below ("any open reference").
+    gated = False
+    if "paid" in tiers:
         from app.lms.access import service as access
 
-        if access.course_gate(db, course, ctx.user.id).gated:
+        gated = access.course_gate(db, course, ctx.user.id).gated
+        if gated and tiers == {"paid"}:
             raise access.access_required()
     from app.lms.courses import service as course_svc
 
@@ -153,8 +155,19 @@ def require_access(db: Session, ctx: Any, course: Any, *, page: Optional[Any] = 
     attr = {"page_id": "page_id", "file_id": "file_id", "assignment_id": "assignment_id"}[column.key]
     wanted = set(targets)
     refs = [(me, ie) for me in ev.modules.values() for ie in me.items if getattr(ie.row.item, attr) in wanted]
-    if not refs or any(not ie.locked for _me, ie in refs):
-        return  # not visible (the route answers 404 itself) or open through at least one module
+    if not refs:
+        return  # not visible: the route answers 404 itself
+
+    def tier_locked(m_eval) -> bool:
+        return gated and m_eval.module.access_tier == "paid"
+
+    if any(not ie.locked and not tier_locked(me) for me, ie in refs):
+        return  # open through at least one module
+    if any(not ie.locked for _me, ie in refs):
+        # every reference the module rules leave open is a Pro one: a pass would open it
+        from app.lms.access.service import access_required
+
+        raise access_required()
     me, ie = refs[0]
     raise ModuleLocked("This item is locked until the module requirements are met",
                        details=lock_details(structure, me, ie))

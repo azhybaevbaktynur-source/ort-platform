@@ -242,6 +242,30 @@ def lesson_exists(course_id_expr):
                        and_(ModuleItem.kind == "file", CourseFile.published.is_(True),
                             CourseFile.deleted_at.is_(None))))
             .exists())
+
+
+def _assignment_ref(assignment_id_expr, tier_cond):
+    return (select(ModuleItem.id).join(CourseModule, CourseModule.id == ModuleItem.module_id)
+            .where(ModuleItem.assignment_id == assignment_id_expr, ModuleItem.deleted_at.is_(None),
+                   ModuleItem.published.is_(True), CourseModule.deleted_at.is_(None),
+                   CourseModule.published.is_(True), tier_cond)
+            .exists())
+
+
+def pro_only_assignment(assignment_id_expr):
+    """SQL: the assignment is referenced by a live, published item of a live, published Pro (`paid`) module and by
+    no such item of a free module (the `require_access` rule before the module evaluation). Correlates with the
+    caller's `assignment_id_expr` (a column or a scalar subquery)."""
+    return and_(_assignment_ref(assignment_id_expr, CourseModule.access_tier == "paid"),
+                ~_assignment_ref(assignment_id_expr, CourseModule.access_tier != "paid"))
+
+
+def pro_only_assessment(model):
+    """`pro_only_assignment` for a quiz: through its mirrored assignment (`Assignment.assessment_id`)."""
+    from app.lms.assignments.models import Assignment
+
+    return pro_only_assignment(select(Assignment.id).where(Assignment.assessment_id == model.id)
+                               .limit(1).scalar_subquery())
 # --- F5a end ---
 
 

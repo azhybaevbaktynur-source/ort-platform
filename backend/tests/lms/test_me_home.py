@@ -691,6 +691,35 @@ async def test_modules_next_reads_caches_only(db, api):
     assert (await home(api, w.S))["modules_next"] == []
 
 
+async def test_modules_next_first_not_done_item_per_module(db, api):
+    """F5a review: one row per module leaves the database (row_number); the pick is still the first not-done item of
+    the first open module that has one, however many done items come before it."""
+    from app.lms.core.models import utcnow
+    from app.lms.modules.models import ModuleProgress
+    from tests.lms.modules_support import make_item, make_module, make_page, record_fact, structure_world
+
+    w = structure_world(db)
+    now = utcnow()
+    done_mod = make_module(db, w.course, w.O, title={"en": "All seen"})
+    busy = make_module(db, w.course, w.O, title={"en": "Busy"})
+    page = make_page(db, w.course, w.O, title="P")
+    for m in (done_mod, busy):
+        db.add(ModuleProgress(enrollment_id=w.enr.id, module_id=m.id, state="completed", evaluated_rules_version=1,
+                              evaluated_at=now))
+    db.commit()
+    record_fact(db, w.enr, make_item(db, done_mod, page))
+    seen = [make_item(db, busy, page) for _ in range(25)]
+    for it in seen:
+        record_fact(db, w.enr, it)
+    target = make_item(db, busy, "https://example.com/next")
+    make_item(db, busy, "https://example.com/after")
+    rows = (await home(api, w.S))["modules_next"]
+    assert [(r["module_id"], r["item_id"]) for r in rows] == [(str(busy.id), str(target.id))]
+    record_fact(db, w.enr, target)
+    rows = (await home(api, w.S))["modules_next"]
+    assert [r["item_id"] for r in rows] != [str(target.id)] and len(rows) == 1
+
+
 # ------------------------------------------------------------------ todo (UX_REWORK_DESIGN C)
 
 async def test_todo_order_overdue_and_links(db, api):

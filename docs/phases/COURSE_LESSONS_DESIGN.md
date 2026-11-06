@@ -59,7 +59,12 @@ Student shape (`GET /courses/{c}/modules`, the facts routes, `progress/{eid}`), 
   false, `reason = access_required`).
 - Facts `POST …/view` and `…/done`: 403 `access_required` on a tier-locked item (checked in `facts._open_item`
   next to the 423).
-Error order in one request: 404 (not visible) → 403 `access_required` → 423 `module_locked`. One statement
+Error order in one request: 404 (not visible) → 403 `access_required` → 423 `module_locked`. Exception (F5a, as
+built): the facts routes check the module rules first (423 `module_locked`) and the tier after (403), so a Pro module
+that is also rules-locked answers 423, matching the outline's `locked_reason = module`. In `require_access` a target
+referenced by a Pro and a free module is open only through a reference that neither the rules nor the tier lock;
+when the only rule-open references are Pro ones the answer is 403, otherwise 423. Lists that pick a next test (the
+exam-prep "next" step and the home to-do / next up) skip a test only Pro modules hold for a gated student. One statement
 (`access.service.course_gate`) per request, only when the course has a `paid` module (skip otherwise).
 
 ## 4. Progress rules (server is the source of truth)
