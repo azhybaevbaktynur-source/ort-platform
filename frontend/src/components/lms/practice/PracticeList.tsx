@@ -12,6 +12,8 @@ import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { Button, ConfirmDialog, Dialog, EmptyState, Input, LinkButton, LoadingState, MenuButton, PageHeader, Pagination, toast } from "@/components/ui";
 import { startAttempt } from "@/lib/lms/attempts";
 import { pickLocalized } from "@/lib/lms/localized";
+import { templateUi } from "@/lib/lms/templates";
+import { StudentPageHeader } from "@/components/lms/student/StudentPageHeader";
 import { deletePractice, listPractice, updatePractice, type PracticeSetOut } from "@/lib/lms/practice";
 import { PracticeDialog } from "./PracticeDialog";
 
@@ -77,9 +79,17 @@ export function PracticeList() {
     <Button onClick={() => setDialog(true)} leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}>{t("practice.new")}</Button>
   ) : undefined;
 
+  // §5.1 e (students): one primary button, on the set to continue (else the first open one); the rest secondary
+  const startable = items.filter((s) => s.status === "published" && !s.locked);
+  const primaryId = (startable.find((s) => s.open_attempt_id) ?? startable[0])?.id ?? null;
+
   return (
     <div>
-      <PageHeader title={t("practice.title")} primaryAction={newButton} />
+      {canEdit ?<PageHeader title={t("practice.title")} primaryAction={newButton} /> : (
+        // Student UI coherence (§5.1 d): the student header; the course name under the title in exam-prep courses
+        <StudentPageHeader title={t("practice.title")} className="mb-6"
+          subtitle={templateUi(course).studentLayout === "exam_prep" ? pickLocalized(course.title, lang, course.default_language) : undefined} />
+      )}
       <ErrorMessage error={actionError} className="mb-4" />
       {loading ? <LoadingState /> : error ? <ErrorMessage error={error} onRetry={() => void load()} /> : items.length === 0 ? (
         <EmptyState mascot={canEdit ? "working" : "reading"} title={t(canEdit ? "practice.emptyStaff" : "practice.empty")} icon={<Dumbbell className="h-6 w-6" aria-hidden="true" />} action={newButton} />
@@ -104,7 +114,7 @@ export function PracticeList() {
                     <LinkButton variant="secondary" href={`/${lang}/unlock`}>{t("practice.unlock")}</LinkButton>
                   </span>
                 ) : (
-                  <Button loading={busyId === s.id} onClick={() => void start(s)}>
+                  <Button loading={busyId === s.id} onClick={() => void start(s)} variant={canEdit || s.id === primaryId ? "primary" : "secondary"}>
                     {t(s.open_attempt_id ? "practice.continue" : "practice.start")}<span className="sr-only">: {name(s)}</span>
                   </Button>
                 ))}

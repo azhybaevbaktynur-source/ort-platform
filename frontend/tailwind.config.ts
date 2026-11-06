@@ -40,19 +40,12 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        brand: {
-          50: "#eff6ff",
-          100: "#dbeafe",
-          200: colors.blue[200],
-          300: colors.blue[300],
-          400: colors.blue[400],
-          500: "#3b82f6",
-          600: "#2563eb",
-          700: "#1d4ed8",
-          800: "#1e40af",
-          900: "#1e3a8a",
-          950: colors.blue[950],
-        },
+        // Student UI colour (STUDENT_UI_DESIGN §1.1): `brand` reads CSS variables (space-separated RGB channels, so
+        // opacity modifiers keep working). `:root` in styles/globals.css holds exactly the blue used since Phase 1
+        // (Tailwind blue); the student frame (`.student-theme`) overrides the variables with the owner's sky blue.
+        brand: Object.fromEntries(
+          [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950].map((k) => [k, `rgb(var(--brand-${k}) / <alpha-value>)`]),
+        ),
         slate: {
           850: "#152033",
           950: "#0b1120",
@@ -74,7 +67,10 @@ const config: Config = {
         },
         // --- Student UI U1 ---
         // the student sidebar, the phone top bar's brand mark and the "More" sheet header
-        navy: { 800: "#1b2a4a", 900: "#13203a" },
+        // (Student UI colour: CSS variables like `brand`; `.student-theme` turns them into the owner's teal)
+        navy: { 800: "rgb(var(--navy-800) / <alpha-value>)", 900: "rgb(var(--navy-900) / <alpha-value>)" },
+        // Student UI colour (§1.1): the violet accent, only for the one main call to action of a student screen
+        accent: { 50: "#f5f3ff", 100: "#ede9fe", 600: "#7c3aed", 700: "#6d28d9", 800: "#5b21b6" },
         // ORT section pills: `bg-tag-<key>` with `text-tag-<key>-fg`
         tag: {
           math1: { DEFAULT: "#e0f2fe", fg: "#075985" },

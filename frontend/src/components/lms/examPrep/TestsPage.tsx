@@ -10,7 +10,7 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Clock, ListChecks, Lock } from "lucide-react";
+import { ChevronRight, Clock, ListChecks, Lock, Target, TrendingUp, Trophy } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
 import { templateUi } from "@/lib/lms/templates";
@@ -20,8 +20,9 @@ import {
 } from "@/lib/lms/examPrep";
 import { useCourse } from "@/components/lms/CourseContext";
 import {
-  Badge, EmptyState, ErrorState, GoldPill, LinkButton, LockOverlay, Pagination, Skeleton, cn, focusRing, type BadgeTone,
+  Badge, EmptyState, ErrorState, GoldPill, LinkButton, LockOverlay, Pagination, Skeleton, StatTile, cn, focusRing, type BadgeTone,
 } from "@/components/ui";
+import { StudentPageHeader } from "@/components/lms/student/StudentPageHeader";
 import { fmtDuration } from "@/components/lms/home/format";
 import { useErrorText } from "@/components/lms/home/useErrorText";
 import { LeaveCourseLink } from "@/components/lms/home/LeaveCourseLink";
@@ -83,7 +84,27 @@ function ScoreArea({ card }: { card: LibraryCardOut }) {
   );
 }
 
-function TestCard({ card, lobby }: { card: LibraryCardOut; lobby: string }) {
+/** Student UI colour (§1.1): the score summary as tiles with coloured icon chips; only once there is a result. */
+function TestsStats({ prep }: { prep: ExamPrepOut }) {
+  const { t } = useTranslation();
+  if (prep.history.length === 0) return null;
+  const max = wholeNumber(prep.goal.scale_max);
+  const outOf = max !== null ? t("examPrep.goal.outOf", { max }) : undefined;
+  const values = prep.history.map((p) => wholeNumber(p.value)).filter((v): v is number => v !== null);
+  const latest = wholeNumber(prep.latest?.value);
+  const best = values.length > 0 ? Math.max(...values) : null;
+  const target = prep.goal.target_score;
+  const n = (v: number | null) => <span className="tabular-nums">{v ?? "—"}</span>;
+  return (
+    <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
+      <StatTile icon={<TrendingUp />} iconTone="blue" label={t("examPrep.goal.latestLabel")} value={n(latest)} hint={latest !== null ? outOf : undefined} className="rounded-card shadow-none" />
+      <StatTile icon={<Trophy />} iconTone="green" label={t("examPrep.library.best")} value={n(best)} hint={best !== null ? outOf : undefined} className="rounded-card shadow-none" />
+      <StatTile icon={<Target />} iconTone="orange" label={t("examPrep.goal.targetLabel")} value={n(target)} className="rounded-card shadow-none" />
+    </div>
+  );
+}
+
+function TestCard({ card, lobby, primary }: { card: LibraryCardOut; lobby: string; primary: boolean }) {
   const { lang, t } = useTranslation();
   const titleId = useId();
   const title = pickLocalized(card.title, lang) || t("assessments.untitled");
@@ -95,7 +116,7 @@ function TestCard({ card, lobby }: { card: LibraryCardOut; lobby: string }) {
     action = <LinkButton href={lobby} variant="secondary" fullWidth aria-describedby={titleId}>{t("examPrep.tests.result")}</LinkButton>;
   } else {
     action = (
-      <LinkButton href={lobby} variant="primary" fullWidth aria-describedby={titleId}>
+      <LinkButton href={lobby} variant={primary ? "primary" : "secondary"} fullWidth aria-describedby={titleId}>
         {card.status === "in_progress" ? t("examPrep.tests.resume") : t("examPrep.tests.start")}
       </LinkButton>
     );
@@ -191,17 +212,18 @@ function TestsLibrary() {
 
   const sources = meta?.sources ?? [];
   const shown = status ? items.filter((c) => c.status === status) : items;
+  // §5.1 e: one primary button per screen, on the test to continue (else the first not started); the rest secondary
+  const open = shown.filter((c) => !c.locked);
+  const primaryId = (open.find((c) => c.status === "in_progress") ?? open.find((c) => c.status === "not_started"))?.id ?? null;
   const title = meta ? t("examPrep.tests.heading", { count: meta.library_total }) : t("examPrep.library.title");
 
   return (
     <div className="space-y-6">
       <section aria-labelledby={headingId} className="min-w-0 space-y-5">
-        <header>
-          <h1 id={headingId} className="break-words text-2xl font-bold leading-8 text-slate-900 lg:text-[28px] lg:leading-9">{title}</h1>
-          <p className="mt-1 break-words text-sm leading-5 text-slate-600">{courseTitle}</p>
-        </header>
+        <StudentPageHeader id={headingId} title={title} subtitle={courseTitle} />
 
         {metaError && !meta ? <ErrorState variant="inline" message={errorText(metaError)} onRetry={() => void loadMeta()} /> : null}
+        {meta && <TestsStats prep={meta} />}
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {sources.length > 1 && (
@@ -241,7 +263,7 @@ function TestsLibrary() {
         )}
         {shown.length > 0 && (
           <ul className={GRID} aria-busy={loading || undefined}>
-            {shown.map((c) => <TestCard key={c.id} card={c} lobby={`${base}/assessments/${c.id}`} />)}
+            {shown.map((c) => <TestCard key={c.id} card={c} lobby={`${base}/assessments/${c.id}`} primary={c.id === primaryId} />)}
           </ul>
         )}
         {error && items.length > 0 ? <ErrorState variant="inline" message={errorText(error)} onRetry={() => void load(cursor)} /> : null}

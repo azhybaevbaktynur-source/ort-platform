@@ -68,6 +68,10 @@ The owner found the grey look dull and chose this palette. It applies **only ins
 | stat tile icons | on pastel: blue `#DBEAFE/#1D4ED8`, green `#DCFCE7/#15803D`, violet `#EDE9FE/#6D28D9`, orange `#FFEDD5/#C2410C` |
 | correct / wrong | `#16A34A` / `#EF4444` |
 
+Built (2026-11-07): `.student-theme` in `globals.css` on the `StudentShell` root; `brand-600` is `#1A70D8` (the owner's
+`#1E7BEA` gives white button text only 4.1:1, so it became `brand-500`); `navy-800` is `#0E4A6B` inside the frame;
+group labels white 80 % (4.5:1 at the gradient's light end). Teacher/admin/ORT frames keep `:root` = the old blue.
+
 ## 2. Shell
 
 ### 2.1 Where it applies

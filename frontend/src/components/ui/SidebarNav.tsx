@@ -46,7 +46,7 @@ function itemClass(tone: "navy" | "light", active: boolean, sub: boolean): strin
     "flex min-h-11 w-full items-center gap-3 rounded-control px-3 text-left text-sm leading-5 transition-colors",
     sub ? "pl-10 font-medium" : "font-semibold",
     tone === "navy"
-      ? cn(RING_NAVY, active ? "bg-white text-navy-800" : "text-white/90 hover:bg-white/[0.08] hover:text-white")
+      ? cn(RING_NAVY, active ? "bg-white text-navy-800" : "text-white/90 hover:bg-white/10 hover:text-white")
       : cn(RING_LIGHT, active ? "bg-brand-50 text-brand-800" : "text-slate-800 hover:bg-slate-100"),
   );
 }
@@ -93,7 +93,7 @@ export function SidebarNav({ label, groups, tone = "navy", onNavigate, className
         <div key={g.key}>
           {g.label && (
             <p className={cn("mb-1 px-3 text-[11px] font-semibold uppercase leading-4 tracking-[0.08em]",
-              tone === "navy" ? "text-white/[0.62]" : "text-slate-500")}>
+              tone === "navy" ? "text-white/80" : "text-slate-500")}>
               {g.label}
             </p>
           )}

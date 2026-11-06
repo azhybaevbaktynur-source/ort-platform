@@ -13,11 +13,24 @@ export interface StatTileProps {
   href?: string;
   /** `gold` only for achievements. */
   tone?: "default" | "gold";
+  /** Student UI colour (STUDENT_UI_DESIGN §1.1): the icon chip on a pastel; default `brand`. */
+  iconTone?: StatIconTone;
   className?: string;
 }
 
+export type StatIconTone = "brand" | "blue" | "green" | "violet" | "orange";
+/** The student frame's pastel icon chips (§1.1: blue #dbeafe/#1d4ed8, green #dcfce7/#15803d, violet #ede9fe/#6d28d9,
+ * orange #ffedd5/#c2410c). */
+export const STAT_ICON_TONE: Record<StatIconTone, string> = {
+  brand: "bg-brand-50 text-brand-700",
+  blue: "bg-blue-100 text-blue-700",
+  green: "bg-green-100 text-green-700",
+  violet: "bg-violet-100 text-violet-700",
+  orange: "bg-orange-100 text-orange-700",
+};
+
 /** A number with its label; optionally a link to the list behind it. */
-export function StatTile({ label, value, hint, icon, href, tone = "default", className }: StatTileProps) {
+export function StatTile({ label, value, hint, icon, href, tone = "default", iconTone = "brand", className }: StatTileProps) {
   const box = cn(
     "flex min-h-[5.5rem] items-start gap-3 rounded-2xl border p-4 shadow-sm",
     tone === "gold" ? "border-gold-300 bg-gold-50" : "border-slate-200 bg-white",
@@ -28,7 +41,7 @@ export function StatTile({ label, value, hint, icon, href, tone = "default", cla
     <>
       {icon && (
         <span aria-hidden="true" className={cn("inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl [&>svg]:h-5 [&>svg]:w-5",
-          tone === "gold" ? "bg-gold-100 text-gold-800" : "bg-brand-50 text-brand-700")}>
+          tone === "gold" ? "bg-gold-100 text-gold-800" : STAT_ICON_TONE[iconTone])}>
           {icon}
         </span>
       )}
