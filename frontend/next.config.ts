@@ -35,6 +35,8 @@ const CSP = [
   "form-action 'self'",
   "frame-ancestors 'none'",
   "frame-src 'self' blob:",
+  "worker-src 'self'", // S5: the service worker (/service-worker.js loads public/sw.js)
+  "manifest-src 'self'", // S5: /manifest.webmanifest
 ].join("; ");
 
 const SECURITY_HEADERS = [
@@ -54,11 +56,21 @@ function mascotSvgPoses(): string {
   }
 }
 
+// S5 installable app: one build id for the service worker loader (src/app/service-worker.js) and the page that
+// registers it. Kept on process.env so the build's worker processes, which load this file again, see the same value.
+process.env.NEXT_PUBLIC_SW_VERSION ||= (process.env.VERCEL_GIT_COMMIT_SHA || "").slice(0, 12) || Date.now().toString(36);
+const NO_CACHE = [{ key: "Cache-Control", value: "no-cache" }];
+
 const nextConfig: NextConfig = {
-  env: { NEXT_PUBLIC_MASCOT_SVG: mascotSvgPoses() },
+  env: { NEXT_PUBLIC_MASCOT_SVG: mascotSvgPoses(), NEXT_PUBLIC_SW_VERSION: process.env.NEXT_PUBLIC_SW_VERSION },
   async headers() {
     // Not on the /api rewrite: the API sets its own (a download's CSP must not be replaced by a page's).
-    return [{ source: "/((?!api/).*)", headers: SECURITY_HEADERS }];
+    return [
+      { source: "/((?!api/).*)", headers: SECURITY_HEADERS },
+      // S5: the browser must always fetch the newest worker files (the loader's bytes carry the build)
+      { source: "/service-worker.js", headers: NO_CACHE },
+      { source: "/sw.js", headers: NO_CACHE },
+    ];
   },
   async rewrites() {
     return [
