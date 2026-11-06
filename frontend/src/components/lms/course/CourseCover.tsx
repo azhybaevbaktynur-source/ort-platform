@@ -15,7 +15,16 @@ export function courseMark(title: string): string {
   return first.length <= 4 ? first.toUpperCase() : first[0].toUpperCase();
 }
 
-export function CourseCover({ title, className }: { title: string; className?: string }) {
+export function CourseCover({ title, coverUrl, className }: { title: string; coverUrl?: string | null; className?: string }) {
+  // F7b: the uploaded cover (a 16:9 WebP); a wider banner shows its middle band
+  if (coverUrl) {
+    return (
+      <div aria-hidden="true" className={cn("relative overflow-hidden bg-slate-100", className)}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- a public R2/media URL, sized by the box */}
+        <img src={coverUrl} alt="" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
+      </div>
+    );
+  }
   const mark = courseMark(title);
   return (
     <div aria-hidden="true"

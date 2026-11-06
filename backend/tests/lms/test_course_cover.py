@@ -381,6 +381,20 @@ async def test_platform_flag_and_erased_cover(db, local_storage, api):
     assert (await api.call(owner, "GET", f"/courses/{c.id}")).json()["cover_url"] is None
 
 
+
+async def test_admin_course_detail_carries_cover_and_platform_flag(db, local_storage, api):
+    """F7b: the admin course page shows the cover section only for platform courses."""
+    owner = teacher(db)
+    c, other = platform_course(db, owner), make_course(db, owner)
+    admin = make_user(db, platform_admin=True)
+    out = (await api.call(admin, "GET", f"/platform/courses/{c.id}")).json()
+    assert out["is_platform_course"] is True and out["cover_url"] is None
+    body = (await put_cover(admin, c.id, photo(640, 360))).json()
+    assert (await api.call(admin, "GET", f"/platform/courses/{c.id}")).json()["cover_url"] == body["cover_url"]
+    assert (await api.call(admin, "GET", f"/platform/courses/{other.id}")).json()["is_platform_course"] is False
+    listed = (await api.call(admin, "GET", "/platform/courses")).json()["items"]
+    assert listed and all(i["is_platform_course"] is None for i in listed)  # the list stays as it was
+
 def test_catalog_page_of_24_is_still_two_statements(db):
     t, viewer = teacher(db), make_user(db)
     courses = [make_course(db, t, status="published", visibility="catalog", enrollment_mode="open",

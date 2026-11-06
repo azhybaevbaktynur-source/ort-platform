@@ -300,7 +300,7 @@ function Hero({ lessons, data, base, examPrep, track }: {
 
   return (
     <section aria-labelledby="course-overview-title" className="overflow-hidden rounded-card border border-slate-200 bg-white">
-      <CourseCover title={courseTitle} className="aspect-[16/9] sm:aspect-[3/1] lg:aspect-[5/1]" />
+      <CourseCover title={courseTitle} coverUrl={course.cover_url} className="aspect-[16/9] sm:aspect-[3/1] lg:aspect-[5/1]" />
       <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div className="min-w-0">
           {examPrep ? (

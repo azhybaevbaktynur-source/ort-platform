@@ -293,6 +293,9 @@ export interface AdminCourseOut {
   created_at: string;
   deleted_at: string | null;
   deleted_by_id: string | null;
+  /** F7b: the detail only (absent or null in the list) */
+  cover_url?: string | null;
+  is_platform_course?: boolean | null;
 }
 export interface AuditEntryOut {
   id: string;

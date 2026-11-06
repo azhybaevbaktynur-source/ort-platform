@@ -499,6 +499,39 @@
       "choosePage": "Choose a page",
       "pageHint": "Publish the page so students can see it.",
       "noPages": "No pages yet. Create one in the Pages tab."
+    },
+    "cover": {
+      "title": "Course cover",
+      "hint": "Shown on the course card and at the top of the course page. Students see a 16:9 picture.",
+      "current": "Current cover",
+      "default": "Default cover (no image uploaded)",
+      "preview": "Preview: what students will see",
+      "previewAlt": "Preview of the new cover",
+      "choose": "Choose an image",
+      "replace": "Replace the image",
+      "save": "Save cover",
+      "remove": "Remove cover",
+      "removeTitle": "Remove the cover?",
+      "removeBody": "The course will show the default cover again. You can upload a new image at any time.",
+      "savedMsg": "Cover saved",
+      "removedMsg": "Cover removed",
+      "limits": "JPG, PNG or WebP, up to 2 MB, at least 320 × 180 pixels.",
+      "focusHint": "Choose the part to keep: drag the frame, click the picture or use the arrow keys.",
+      "alreadyWide": "The image is already 16:9 and will be kept whole.",
+      "focusLabel": "Cover frame position",
+      "focusValueX": "{pct}% from the left",
+      "focusValueY": "{pct}% from the top",
+      "errors": {
+        "image_type_unsupported": "This file type is not supported. Choose a JPG, PNG or WebP image.",
+        "image_too_small": "The image is too small. It must be at least 320 × 180 pixels.",
+        "image_too_large": "The file is larger than 2 MB. Choose a smaller image.",
+        "payload_too_large": "The file is larger than 2 MB. Choose a smaller image.",
+        "image_invalid": "This file could not be read as an image. Choose another file.",
+        "image_too_many_pixels": "The image has too many pixels. Reduce its size and try again.",
+        "platform_course_admin_only": "Only platform administrators can change the cover of a platform course.",
+        "storage_full": "The image storage is full. Try again later or write to support.",
+        "storage_quota_exceeded": "Your storage limit is reached. Delete unused images and try again."
+      }
     }
   },
   "teacherRequest": {

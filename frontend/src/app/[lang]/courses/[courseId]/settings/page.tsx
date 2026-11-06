@@ -28,6 +28,7 @@ import { templateUi } from "@/lib/lms/templates";
 import { ErrorState, Select, Switch } from "@/components/ui";
 import { useApplicationErrorText } from "@/components/lms/catalog/useApplicationErrorText";
 import { ExamDateSection } from "@/components/lms/examPrep/ExamDateSection"; // Exam prep S2
+import { CourseCoverSection } from "@/components/lms/course/CourseCoverSection"; // F7b
 
 const SETTINGS_MODES: EnrollmentMode[] = ["invite_code", "open", "form_review", "form_auto", "closed"];
 // --- Phase 9 S4 end ---
@@ -172,6 +173,10 @@ function Settings({ course }: { course: CourseStaffOut }) {
           {savedFor("general")}
         </div>
       </form>
+
+      {/* F7b: the cover (platform courses: platform admins only, 403 platform_course_admin_only otherwise) */}
+      <CourseCoverSection courseId={course.id} title={courseName} coverUrl={course.cover_url}
+        onChanged={(url) => apply({ ...course, cover_url: url })} />
 
       {/* --- Phase 8a S4a: course home (locked on ORT with the template note) --- */}
       <CourseHomeSection course={course} />
