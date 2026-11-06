@@ -441,18 +441,18 @@ def activity(db: Session, course: Course, user_id: str, *, days: int, now: datet
               .group_by(per.c.day, per.c.section))
     by_hour = (select(literal_column("'h'"), nd, ns, per.c.hour, n, func.sum(per.c.is_c), func.sum(per.c.is_w),
                       func.sum(per.c.is_p), func.sum(per.c.gap), nt, nt).group_by(per.c.hour))
-    s1 = (select(per.c.at, per.c.aid, per.c.is_c,
+    s1 = (select(per.c.at, per.c.aid, per.c.is_c, per.c.is_w,
                  func.lag(per.c.at).over(order_by=(per.c.at, per.c.aid)).label("p"))
           .where(per.c.at >= start7).subquery("s1"))
     new = case((or_(s1.c.p.is_(None), seconds_between(dialect, s1.c.at, s1.c.p) > SESSION_GAP_S), 1), else_=0)
-    s2 = select(s1.c.at, s1.c.is_c, func.sum(new).over(order_by=(s1.c.at, s1.c.aid), rows=(None, 0)).label("sid")
+    s2 = select(s1.c.at, s1.c.is_c, s1.c.is_w, func.sum(new).over(order_by=(s1.c.at, s1.c.aid), rows=(None, 0)).label("sid")
                 ).subquery("s2")
     t0 = func.min(s2.c.at)
     s3 = (select(t0.label("t0"), func.max(s2.c.at).label("t1"), func.count().label("n"),
-                 func.sum(s2.c.is_c).label("c"))
+                 func.sum(s2.c.is_c).label("c"), func.sum(s2.c.is_c + s2.c.is_w).label("g"))
           .group_by(s2.c.sid).order_by(t0.desc()).limit(MAX_SESSIONS).subquery("s3"))
     zero = literal_column("0")
-    sessions = select(literal_column("'s'"), nd, ns, nh, s3.c.n, s3.c.c, zero, zero, zero, s3.c.t0, s3.c.t1)
+    sessions = select(literal_column("'s'"), nd, ns, nh, s3.c.n, s3.c.c, s3.c.g, zero, zero, s3.c.t0, s3.c.t1)
     yday, _ = _local(dialect, i.answered_at)
     y1 = (select(yday.label("day"), func.count().label("n")).select_from(a).join(i, i.attempt_id == a.c.id)
           .where(*mine).group_by(yday).order_by(yday.desc()).limit(STREAK_SCAN_DAYS).subquery("y1"))
@@ -483,7 +483,7 @@ def activity(db: Session, course: Course, user_id: str, *, days: int, now: datet
             out.by_hour[int(h)] = int(cnt)
         elif k == "s":
             out.sessions.append(ActivitySession(started_at=_as_utc(t_0), ended_at=_as_utc(t_1), answered=int(cnt),
-                                                correct=int(c or 0)))
+                                                correct=int(c or 0), graded=int(w or 0)))
         else:
             active.append((_as_date(d), int(cnt)))
     for dd, e in by_date.items():

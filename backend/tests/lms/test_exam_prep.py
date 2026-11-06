@@ -67,13 +67,15 @@ def exam(db, w, title="Exam", **kw):
     return a, v
 
 
-def result(db, w, a, v, raw, value, *, user=None, enr=None, minutes=0, released=True, sub=None, attempt_no=1):
+def result(db, w, a, v, raw, value, *, user=None, enr=None, minutes=0, released=True, sub=None, attempt_no=1,
+           answered=5):
     """A released (or not) graded ORT attempt; section results as `attempts.grading.result_json` stores them."""
     user, enr = user or w.s, enr or w.enr
     att, sub = grade_row(db, a, v, enr, user, raw, display_value=Decimal(value), scheme_version_id=ORT_MAIN_V1_ID,
                          released=released, sub=sub, attempt_no=attempt_no,
                          submitted_at=clock.now() - timedelta(days=10) + timedelta(minutes=minutes))
-    att.result = {"sections": [{"pos": i + 1, "key": k, "raw": str(i + raw % 2), "possible": "5", "answered": 5,
+    att.result = {"sections": [{"pos": i + 1, "key": k, "raw": str(i + raw % 2), "possible": "5",
+                                "answered": answered[i] if isinstance(answered, tuple) else answered,
                                 "correct": i} for i, k in enumerate(SECTIONS)], "pending_review": 0}
     db.commit()
     return att, sub
@@ -167,6 +169,19 @@ async def test_page_shape_history_latest_and_sections(db, api):
     assert Decimal(body["goal"]["scale_min"]) == 60 and Decimal(body["goal"]["scale_max"]) == 245
     assert body["exam_date"] is None and body["library_total"] == 2
     assert body["sources"] == []  # no modules: no chips
+
+
+async def test_section_rated_from_graded_answers_server_threshold(db, api):
+    """STUDENT_UI_FIX_PLAN 4.3: a section bar is rated from its graded (non-blank) answers, at progress.service's
+    SECTION_MIN_GRADED; points possible alone (blank items) never rate a section."""
+    from app.lms.progress.service import SECTION_MIN_GRADED
+    w = ort_world(db)
+    a, v = exam(db, w, "One")
+    n = SECTION_MIN_GRADED
+    result(db, w, a, v, 4, "120", answered=(0, n - 1, n, n + 5, 1))
+    body = await page(api, w.s, w)
+    assert [s["rated"] for s in body["sections"]] == [False, False, True, True, False]
+    assert all(Decimal(s["possible"]) == 5 for s in body["sections"])  # not a proxy for answers
 
 
 async def test_unreleased_and_hidden_results_carry_no_score(db, api):

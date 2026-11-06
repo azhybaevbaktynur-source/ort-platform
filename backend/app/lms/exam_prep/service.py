@@ -40,6 +40,7 @@ from app.lms.exam_prep.layout import exam_date_of, is_exam_prep, template_of
 from app.lms.exam_prep.models import ExamGoal
 from app.lms.grading.models import AttemptGrade, Submission
 from app.lms.modules.models import CourseModule, ModuleItem
+from app.lms.progress.service import SECTION_MIN_GRADED
 
 FINAL = ("graded", "needs_review")
 OTHER = "other"
@@ -169,7 +170,8 @@ def _released_results(db: Session, course: Course, user_id: str, preset: Optiona
 
 
 def _sections(result: Optional[dict], keys: tuple[str, ...]) -> list[sch.SectionBar]:
-    """Section bars from what the attempt's result already stores (`attempts.grading.result_json`)."""
+    """Section bars from what the attempt's result already stores (`attempts.grading.result_json`). The graded answers
+    of a section are its `answered` items (blank ones never count; exam-prep sections are auto-graded)."""
     stored = {s.get("key"): s for s in (result or {}).get("sections", []) if isinstance(s, dict)}
     out = []
     for key in keys:
@@ -180,7 +182,9 @@ def _sections(result: Optional[dict], keys: tuple[str, ...]) -> list[sch.Section
             raw, possible = Decimal(str(s.get("raw") or 0)), Decimal(str(s.get("possible") or 0))
         except (ArithmeticError, ValueError):
             continue
-        out.append(sch.SectionBar(key=key, raw=raw, possible=possible, correct=int(s.get("correct") or 0)))
+        graded = int(s.get("answered") or 0)
+        out.append(sch.SectionBar(key=key, raw=raw, possible=possible, correct=int(s.get("correct") or 0),
+                                  rated=graded >= SECTION_MIN_GRADED))
     return out
 
 

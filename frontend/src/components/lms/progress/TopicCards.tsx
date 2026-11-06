@@ -6,7 +6,7 @@ import { ArrowRight } from "lucide-react";
 import { Meter, SectionTag, accuracyBand, cn, focusRing, type AccuracyBand } from "@/components/ui";
 import { useTranslation } from "@/lib/i18n/context";
 import { AnalyticsCard, BandLegend, CardEmpty, NotEnoughData } from "./AnalyticsCard";
-import { isGraded, toPercent, topicGroup, twoDigits, weakestTopics, type NamedTopic, type TopicGroup } from "./analyticsData";
+import { TOPIC_MIN_GRADED, isGraded, toPercent, topicGroup, twoDigits, weakestTopics, type NamedTopic, type TopicGroup } from "./analyticsData";
 
 /*
  * Student UI U6 (STUDENT_UI_DESIGN §3.3): "5 слабых тем" and accuracy by topic (math vs language). Both take `locked`
@@ -110,7 +110,7 @@ function TopicRows({ topics }: { topics: NamedTopic[] }) {
           ) : (
             <div className="flex items-center gap-3">
               <span aria-hidden="true" className="h-2 flex-1 rounded-full bg-slate-100" />
-              <span className="shrink-0 whitespace-nowrap text-right text-xs font-medium leading-4 text-slate-500">{t("progress.analytics.lowData")}</span>
+              <span className="shrink-0 whitespace-nowrap text-right text-xs font-medium leading-4 text-slate-500">{t("progress.analytics.lowDataCount", { graded: tp.graded, min: TOPIC_MIN_GRADED })}</span>
             </div>
           )}
         </li>
@@ -120,7 +120,7 @@ function TopicRows({ topics }: { topics: NamedTopic[] }) {
 }
 
 /** Accuracy by topic: a math card and a language card on ORT-like courses, one card on general courses. */
-export function TopicAccuracy({ topics, split, testsHref, locked = false }: { topics: NamedTopic[]; split: boolean; testsHref: string; locked?: boolean }) {
+export function TopicAccuracy({ topics, split, locked = false }: { topics: NamedTopic[]; split: boolean; locked?: boolean }) {
   const { t } = useTranslation();
   const by: Record<TopicGroup, NamedTopic[]> = { math: [], language: [], other: [] };
   for (const tp of topics) by[topicGroup(tp.section)].push(tp);
@@ -134,8 +134,9 @@ export function TopicAccuracy({ topics, split, testsHref, locked = false }: { to
         <AnalyticsCard key={g} locked={locked} className={g === "other" && groups.length === 3 ? "lg:col-span-2" : undefined}
           title={t(useSplit ? `progress.analytics.topics.${g}` : "progress.analytics.topics.all")}
           subtitle={t("progress.analytics.topics.subtitle")}>
-          {by[g].length === 0 || !by[g].some(isGraded) ? (
-            <NotEnoughData compact body={t("progress.analytics.notEnough.topicsBody")} href={testsHref} />
+          {/* no answers in this group: one quiet line (the mascot and the action live in the weak-topics card) */}
+          {by[g].every((x) => x.total === 0) ? (
+            <p className="text-sm leading-5 text-slate-600">{t("progress.analytics.notEnough.topicsBody")}</p>
           ) : (
             <>
               <TopicRows topics={by[g]} />

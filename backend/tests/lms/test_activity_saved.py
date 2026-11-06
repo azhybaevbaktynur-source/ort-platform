@@ -105,7 +105,7 @@ def test_study_seconds_cap_gaps_at_ten_minutes(db, client, at_now):
     assert body["totals"] == {"answered": 4, "correct": 2, "graded": 4, "accuracy": 0.5}
     assert len(body["sessions"]) == 1
     s = body["sessions"][0]
-    assert s["answered"] == 4 and s["correct"] == 2
+    assert s["answered"] == 4 and s["correct"] == 2 and s["graded"] == 4
     assert s["started_at"].startswith("2026-03-10T04:00") and s["ended_at"].startswith("2026-03-10T04:28")
 
 

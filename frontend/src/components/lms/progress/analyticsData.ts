@@ -24,10 +24,10 @@ export const SECTION_FILL: Record<string, string> = {
 };
 export const OTHER_FILL = "#94a3b8"; // slate-400
 
-/** Correct answers: brand blue; wrong ones: neutral grey, hatched so colour is never the only difference (4.1). */
-export const CORRECT_FILL = "rgb(var(--brand-600))";
+/** Correct answers: `acc.high`; wrong ones: `acc.low`, hatched so colour is never the only difference (4.1). */
+export const CORRECT_FILL = "var(--c-acc-high)";
 export const WRONG_STYLE: CSSProperties = {
-  backgroundImage: "repeating-linear-gradient(135deg, #64748b 0 3px, #cbd5e1 3px 5px)",
+  backgroundImage: "repeating-linear-gradient(135deg, var(--c-acc-low) 0 3px, #fecdd3 3px 5px)",
 };
 
 /** One bar of a time chart: a day, or a week (Monday first) for the one-year period. */
@@ -111,6 +111,8 @@ export const namedTopics = (topics: TopicStat[]): NamedTopic[] => topics.filter(
 
 /** STUDENT_UI_FIX_PLAN 4.3: a topic shows a percent and a band only when the server rates it (5 graded answers). */
 export const isGraded = (t: TopicStat) => t.rated;
+/** The server's `TOPIC_MIN_GRADED` (progress/service.py), for "2 из 5 ответов" and the session band; the server decides `rated`. */
+export const TOPIC_MIN_GRADED = 5;
 
 /**
  * The five weakest topics: lowest accuracy first, more answers first on a tie, rated topics only. Null until the server

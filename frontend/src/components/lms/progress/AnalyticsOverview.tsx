@@ -100,7 +100,8 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
   const topics = namedTopics(progress.by_topic);
   // correct counts a partial answer as half: one decimal at most
   const correctText = Number.isInteger(activity.totals.correct) ? String(activity.totals.correct) : activity.totals.correct.toFixed(1);
-  const nothingYet = progress.attempts_total === 0 && answered === 0 && activity.heatmap.length === 0;
+  // zero answers ever (the heatmap is all time): only the hero below
+  const nothingYet = answered === 0 && activity.heatmap.length === 0;
   const history = activity.days.filter((d) => d.answered > 0).length >= HISTORY_DAYS;
   // U9 (review 11): the calendar only after a week of active days
   const calendar = activity.heatmap.filter((d) => d.answered > 0).length >= HEATMAP_MIN_DAYS;
@@ -134,10 +135,11 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
         </section>
       )}
 
-      <WeakTopics topics={topics} ready={progress.weak_topics_ready} practiceHref={practiceHref} testsHref={`/${lang}/courses/${courseId}`} locked={LOCK_ANALYTICS} />
+      {/* zero answers: the hero above is the whole story; "Пока мало данных" only once there is some data (one mascot, one action) */}
+      {!nothingYet && <WeakTopics topics={topics} ready={progress.weak_topics_ready} practiceHref={practiceHref} testsHref={`/${lang}/courses/${courseId}`} locked={LOCK_ANALYTICS} />}
       {/* U9 (review 11): the answers chart too needs history (a chart of one bar says nothing) */}
       {history && <ActivityBars data={activity} period={period} />}
-      <TopicAccuracy topics={topics} split={split} testsHref={`/${lang}/courses/${courseId}`} locked={LOCK_ANALYTICS} />
+      {!nothingYet && <TopicAccuracy topics={topics} split={split} locked={LOCK_ANALYTICS} />}
       {/* U8 (§5.1 c): study time, active hours and sessions need history; before that they are not drawn at all */}
       {history && <StudyTime data={activity} period={period} />}
       {history && (

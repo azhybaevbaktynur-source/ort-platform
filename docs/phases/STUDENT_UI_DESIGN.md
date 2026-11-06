@@ -31,15 +31,11 @@ the student shell only, **never on `<html>` and never on the `AppHeader` frame**
 | `ink` text | 900 `#0f172a`, 700 `#334155`, 500 `#64748b` | title, body, meta (unchanged slate) |
 | `brand` | 50 `#eff6ff`, 100 `#dbeafe`, 200 `#bfdbfe`, 600 `#2563eb`, 700 `#1d4ed8`, 800 `#1e40af` | primary button, links, focus ring, the Next card tint (unchanged) |
 | `navy` (sidebar) | 800 `#1b2a4a`, 900 `#13203a`; hover `rgba(255,255,255,.08)`; group label `rgba(255,255,255,.62)`; icon `rgba(255,255,255,.72)`; active pill `#ffffff` with text `#1b2a4a` | the student sidebar, the phone top bar's brand mark, the "More" sheet header. Our own deep navy (the mascot's outline), not the reference's teal |
-| `tag.math1` | bg `#e0f2fe` fg `#075985` | section pill "Математика I" |
-| `tag.math2` | bg `#e0e7ff` fg `#3730a3` | "Математика II" |
-| `tag.analogies` | bg `#ede9fe` fg `#5b21b6` | "Аналогии" |
-| `tag.reading` | bg `#ccfbf1` fg `#115e59` | "Чтение" |
-| `tag.grammar` | bg `#ffedd5` fg `#9a3412` | "Грамматика" |
-| `acc.low` / `mid` / `high` | `#f43f5e` / `#f59e0b` / `#10b981`; text `#be123c` / `#b45309` / `#047857` | accuracy bands < 60 %, 60–84 %, ≥ 85 % (always with the number, colour is never the only signal) |
+| section tag (`SectionTag`) | bg `#eef2f7`, text `#334155`, no border; the page's current section brand-50 / brand-800 | every section pill; one neutral tone, no per-section hues (FIX_PLAN 4.1; the `tag.*` tokens are removed) |
+| `acc.low` / `mid` / `high` | `#f43f5e` / `#f59e0b` / `#10b981`; text `#be123c` / `#b45309` / `#047857` | the only meaning colour: accuracy bands < 60 %, 60–84 %, ≥ 85 % on meters, rings and the percent, always next to the number and the band word; a band only from 5 graded answers (topic, session) or 10 (section), else neutral slate "Мало данных" |
 | `heat.0…4` | `#eef2f7`, `#c7d7fb`, `#8fb0f6`, `#4f82ee`, `#1d4ed8` | activity heatmap (0, 1–4, 5–14, 15–29, 30+ answers a day) |
-| `chart.1…5` | `#2563eb`, `#10b981`, `#f97316`, `#8b5cf6`, `#f59e0b` | bars and lines; correct = chart.2, wrong = `acc.low` |
-| `gold` | pill bg gradient `#fef3c7 → #fde68a`, border `#fcd34d`, text `#78350f` | "Открыть все экзамены" pill, paid badges, achievements (existing `gold-*` scale) |
+| charts | correct = `acc.high`, wrong = `acc.low` hatched (legend "Верно" / "Неверно" in words); every other bar and line brand; study time by section = brand ramp 800/600/400/300/200 (math_1 … grammar), other slate-400 | the `chart.*` tokens are removed |
+| `gold` | pill bg gradient `#fef3c7 → #fde68a`, border `#fcd34d`, text `#78350f` | money only: `GoldPill` (unlock, "Доступ до"), the "Платный"/"Pro" chip, the golden-certificate badge (existing `gold-*` scale) |
 | `success` / `warning` / `danger` | emerald / amber / red 600 and 700 (unchanged) | states |
 | radius | `sm` 8 px, `control` 12 px (buttons, inputs, sidebar pills), `card` 16 px, `pill` 9999 | |
 | spacing | 4 px scale; card padding 16 px (phone) / 20 px; section gap 24 px; sidebar 264 px; phone top bar 56 px; bottom tab bar 64 px + `env(safe-area-inset-bottom)`; content max 1200 px | |
@@ -47,7 +43,7 @@ the student shell only, **never on `<html>` and never on the `AppHeader` frame**
 | type | title 24/32 bold (28/36 from `lg`), section 18/28 semibold, body 16/24 (15/22 from `lg` optional), small 14/20, meta 12/16, stat number 32/36 bold `tabular-nums` | |
 | lock overlay | `backdrop-filter: blur(6px)`, white at 72 %, centred icon + title + one line + gold pill | locked analytics or lessons |
 
-Tailwind: add `navy`, `tag`, `acc`, `heat`, `chart` under `theme.extend.colors`, `fontFamily.sans = ["var(--font-inter)", ...system stack]`
+Tailwind: add `navy`, `acc`, `heat` under `theme.extend.colors`, `fontFamily.sans = ["var(--font-inter)", ...system stack]`
 and `fontFamily.system = [system stack]`; the same values as `:root` CSS variables in `globals.css` so the service worker's
 offline page and the sanitizer-rendered pages use them too. No dark mode.
 
@@ -64,8 +60,11 @@ The owner found the grey look dull and chose this palette. It applies **only ins
 | primary (`brand` in the student frame) | 600 `#1E7BEA`, 700 `#1764C4`, 50 `#EAF4FE`, 100 `#D4E9FD` |
 | accent | none; one blue primary, gold is the only accent (owner 2026-11-07: harmony) |
 | unlock | gold `#FDE68A` / `#F59E0B` (unchanged) |
-| stat tile icons | on pastel: blue `#DBEAFE/#1D4ED8`, green `#DCFCE7/#15803D`, violet `#EDE9FE/#6D28D9`, orange `#FFEDD5/#C2410C` |
-| correct / wrong | `#16A34A` / `#EF4444` |
+| stat tile icons | one tone: brand-50 / brand-700 (no blue/green/violet/orange pastels) |
+| status pills | `Badge` tones: "В процессе" info (brand), "Не начат" neutral, "Пройден" success; grades "Освобождён" slate-200 / slate-700 |
+| explanation box (review) | brand-50 bg, brand-100 border, brand-800 label |
+| correct / wrong | `acc.high` `#10b981` / `acc.low` `#f43f5e` (hatched in charts), always with the words |
+| removed hues | violet, teal, orange; danger red only for errors, deadlines and the low band (FIX_PLAN 4.1, built 2026-11-07) |
 
 Built (2026-11-07): `.student-theme` in `globals.css` on the `StudentShell` root; `brand-600` is `#1A70D8` (the owner's
 `#1E7BEA` gives white button text only 4.1:1, so it became `brand-500`); `navy-800` is `#0E4A6B` inside the frame;

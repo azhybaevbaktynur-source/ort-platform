@@ -5735,6 +5735,7 @@
         "emptyFixedHint": "Questions you answer right after a mistake move here."
       },
       "lowData": "Not enough data",
+      "lowDataCount": "Not enough data · {graded} of {min} answers",
       "notEnough": {
         "title": "Not enough data yet",
         "weakBody": "Answer a few more questions and your weak topics will appear here.",

@@ -206,9 +206,6 @@ function UnlockCard() {
   );
 }
 
-/** Same rule as the server's `SectionStat.rated` (10 graded answers); the stored result keeps points, one per item. */
-const SECTION_MIN_RATED = 10;
-
 function SectionRows({ prep, className }: { prep: ExamPrepOut; className?: string }) {
   const { t } = useTranslation();
   return (
@@ -227,7 +224,7 @@ function SectionRows({ prep, className }: { prep: ExamPrepOut; className?: strin
               const name = t(`sections.${s.key}`);
               const score = t("examPrep.sections.score", { raw: plain(raw), possible: plain(possible) });
               // STUDENT_UI_FIX_PLAN 4.3: too few questions in the section: the raw "n из m", no band colour, no percent
-              const rated = possible >= SECTION_MIN_RATED;
+              const rated = s.rated; // the server's rule (progress SECTION_MIN_GRADED graded answers)
               return (
                 <li key={s.key} className="grid grid-cols-1 gap-1.5 sm:grid-cols-[12.5rem_minmax(0,1fr)_5rem] sm:items-center sm:gap-3">
                   <span className="min-w-0"><SectionTag section={s.key} /></span>
