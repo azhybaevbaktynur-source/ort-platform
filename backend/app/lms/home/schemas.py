@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel
 
@@ -90,6 +90,8 @@ class HomeCourseOut(BaseModel):
     next_due_at: Optional[datetime] = None
     in_progress: bool
     progress: Optional[HomeProgressOut] = None  # null: no module item with a requirement, so no bar
+    # Student UI U2 (STUDENT_UI_DESIGN §4.1): `exam_prep` courses are listed in the student shell's exam switcher
+    student_layout: Literal["exam_prep", "general"] = "general"
 
 
 # --- Phase 8a S3 begin --- (PHASE_8A_DESIGN 5.4, 6.7, 8.1: "continue in course" strip and announcements)

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCourse } from "@/components/lms/CourseContext";
 import { MistakesList } from "@/components/lms/progress/MistakesList";
@@ -14,7 +14,10 @@ function ProgressTabs() {
   const { t } = useTranslation();
   const { course } = useCourse();
   const params = useSearchParams();
-  const [tab, setTab] = useState<Tab>(params.get("tab") === "mistakes" ? "mistakes" : "overview");
+  const fromUrl: Tab = params.get("tab") === "mistakes" ? "mistakes" : "overview";
+  const [tab, setTab] = useState<Tab>(fromUrl);
+  // Student UI U2: the shell's "Аналитика" and "Мои ошибки" links change only `?tab=` on this same page
+  useEffect(() => { setTab(fromUrl); }, [fromUrl]);
   const id = "progress-tabs";
   return (
     <div className="space-y-4">

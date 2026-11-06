@@ -37,6 +37,7 @@ from app.lms.accommodations.effective import MAX_ALLOWED_ATTEMPTS
 from app.lms.accommodations.models import EnrollmentAccommodation
 from app.lms.assessments.models import Assessment
 from app.lms.assignments.models import Assignment, AssignmentOverride, AssignmentSubmission
+from app.lms.exam_prep.layout import is_exam_prep  # Student UI U2
 from app.lms.attempts.models import Attempt
 from app.lms.core import clock
 from app.lms.core.pagination import PageOut
@@ -228,7 +229,8 @@ def _course_cards(db: Session, uid: str, rows: list, now: datetime) -> list[sch.
             organization_display_name=card_organization_name(r.org_kind, r.org_name),
             is_platform_course=c.organization_id == platform, next_due_at=due.get(c.id),
             in_progress=bool(r.in_progress),
-            progress=sch.HomeProgressOut(done=done_total[0], total=done_total[1]) if done_total else None))
+            progress=sch.HomeProgressOut(done=done_total[0], total=done_total[1]) if done_total else None,
+            student_layout="exam_prep" if is_exam_prep(c) else "general"))
     return out
 
 
