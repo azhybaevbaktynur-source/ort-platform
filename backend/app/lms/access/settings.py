@@ -83,8 +83,10 @@ def get_pro(db: Session) -> ProSettings:
     return _parse(_load(db))
 
 
-def validate(*, season_end: Optional[date], prices: dict, how_to_pay: dict, today: date) -> ProSettings:
-    if season_end is not None and not (today <= season_end <= today + timedelta(days=SEASON_MAX_DAYS)):
+def validate(*, season_end: Optional[date], prices: dict, how_to_pay: dict, today: date,
+             check_season: bool = True) -> ProSettings:
+    if check_season and season_end is not None and not (
+            today <= season_end <= today + timedelta(days=SEASON_MAX_DAYS)):
         raise _invalid("The season end must be between today and 400 days from now", field="season_end")
     unknown = set(prices) - set(PLAN_IDS)
     if unknown:
@@ -119,14 +121,25 @@ def _upsert(db: Session, key: str, value: dict, admin_id: str, now) -> None:
                                           set_={"value": value, "updated_at": now, "updated_by_id": admin_id}))
 
 
-def put_pro(db: Session, admin: User, *, season_end: Optional[date], prices: dict, how_to_pay: dict,
-            request: Optional[Request] = None) -> ProSettings:
-    """Validates, upserts the three rows in one transaction and audits old/new (only when something changed)."""
+def put_pro(db: Session, admin: User, patch: dict, request: Optional[Request] = None) -> ProSettings:
+    """`patch`: only the keys the admin sent (`season_end`, `prices.<plan>`, `how_to_pay.<lang>`); a missing key keeps
+    the stored value, an explicit null clears it. Validates the merged result (the season end only when sent, so a
+    stored end that has passed does not block saving a price), upserts the three rows in one transaction and audits
+    old/new (only when something changed)."""
     from app.lms.access.service import bishkek_today
 
     now = clock.now()
-    new = validate(season_end=season_end, prices=prices, how_to_pay=how_to_pay, today=bishkek_today(now))
     old = _parse(_load(db, for_update=True))
+    if set(patch) - {"season_end", "prices", "how_to_pay"}:
+        raise _invalid("Unknown setting")
+    prices = {**old.prices, **(patch.get("prices") or {})}
+    texts = {**old.how_to_pay, **(patch.get("how_to_pay") or {})}
+    try:
+        new = validate(season_end=patch["season_end"] if "season_end" in patch else old.season_end, prices=prices,
+                       how_to_pay=texts, today=bishkek_today(now), check_season="season_end" in patch)
+    except ValidationFailed:
+        db.rollback()
+        raise
     if old.as_json() == new.as_json():
         db.rollback()
         return new

@@ -166,8 +166,7 @@ def get_settings(admin: User = Depends(require_platform_admin), db: Session = De
 @admin_router.put(f"{_A}/settings", response_model=sch.ProSettingsOut)
 def put_settings(body: sch.ProSettingsIn, request: Request, admin: User = Depends(require_platform_admin),
                  db: Session = Depends(get_db)):
-    cfg = pro_settings.put_pro(db, admin, season_end=body.season_end, prices=body.prices.model_dump(),
-                               how_to_pay=body.how_to_pay.model_dump(), request=request)
+    cfg = pro_settings.put_pro(db, admin, body.patch(), request=request)
     return _settings_out(cfg)
 
 

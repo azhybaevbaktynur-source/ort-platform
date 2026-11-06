@@ -265,6 +265,50 @@ def test_pro_list_groups_by_person_filters_and_pages(client, db, frozen_clock):
     assert summary == {"active": 2, "expiring": 1, "expired": 1}
 
 
+def test_revoking_a_month_before_a_season_pass_keeps_the_season_end(client, db, frozen_clock):
+    """Refund of a month bought before the season plan: the season pass starts earlier, its end (the promise) stays;
+    a pass after the season pass stays where it is."""
+    admin, s = admin_user(db), make_user(db)
+    put_settings(client, admin, season_end=SEASON_END.isoformat())
+    grant(client, admin, s, plan="month_1")
+    grant(client, admin, s, plan="season")
+    grant(client, admin, s, duration_days=5)
+    month, season, extra = passes_of(db, s)
+    season_end, extra_span = as_utc(season.ends_at), (as_utc(extra.starts_at), as_utc(extra.ends_at))
+    assert season_end == bishkek_end_of_day(SEASON_END) == extra_span[0]
+    res = client.post(f"{ADMIN}/passes/{month.id}/revoke", json={"reason": "refund"}, headers=auth(admin))
+    assert res.status_code == 200, res.text
+    by_id = {p.id: p for p in passes_of(db, s)}  # the season pass now starts with the month: order by id
+    month, season, extra = by_id[month.id], by_id[season.id], by_id[extra.id]
+    assert month.revoked_at is not None
+    assert as_utc(season.starts_at) == T0 and as_utc(season.ends_at) == season_end
+    assert (as_utc(extra.starts_at), as_utc(extra.ends_at)) == extra_span
+    assert audit_rows(db, "access.pass_revoke")[-1].details["shifted_passes"] == [str(season.id)]
+    # month plans after a revoked pass still move back by its unused time
+    other = make_user(db)
+    grant(client, admin, other, plan="month_1")
+    grant(client, admin, other, plan="month_3")
+    first, second = passes_of(db, other)
+    client.post(f"{ADMIN}/passes/{first.id}/revoke", json={"reason": "refund"}, headers=auth(admin))
+    second = next(p for p in passes_of(db, other) if p.id == second.id)
+    assert as_utc(second.starts_at) == T0 and as_utc(second.ends_at) == T0 + timedelta(days=90)
+
+
+def test_pro_list_and_summary_leave_out_deleted_accounts_and_start_at_the_current_run(client, db, frozen_clock):
+    admin, s, gone = admin_user(db), make_user(db), make_user(db)
+    give_pass(db, s, ends_in=-timedelta(days=30), starts_ago=timedelta(days=60))  # an older, finished run
+    grant(client, admin, s, plan="month_1")
+    grant(client, admin, s, plan="month_1")
+    give_pass(db, gone, days=30)
+    gone.deleted_at = T0
+    db.commit()
+    rows = client.get(f"{ADMIN}/pro", headers=auth(admin)).json()["items"]
+    assert [r["user_id"] for r in rows] == [s.id]
+    assert rows[0]["started_at"].startswith("2026-10-22T12:00") and rows[0]["ends_at"].startswith("2026-12-21")
+    assert client.get(f"{ADMIN}/pro/summary", headers=auth(admin)).json() == {"active": 1, "expiring": 0,
+                                                                                "expired": 0}
+
+
 def test_non_revoked_passes_stay_one_unbroken_chain(client, db, frozen_clock):
     """The list's max(ends_at) relies on it: grant, grant, revoke the middle → one contiguous run."""
     admin, s = admin_user(db), make_user(db)
@@ -306,15 +350,29 @@ def test_settings_validate_upsert_and_audit(client, db, frozen_clock):
     assert put_settings(client, admin, season_end=(today + timedelta(days=400)).isoformat(),
                         prices={"month_1": 990, "month_3": 2490},
                         how_to_pay={"ru": "Текст", "en": "Text"}).status_code == 200  # no change: no audit
-    assert put_settings(client, admin, prices={"month_1": 1000}).status_code == 200  # full replace
+    # a patch: keys left out keep their value
+    assert put_settings(client, admin, prices={"month_1": 1000}).status_code == 200
     db.expire_all()
     assert len(db.execute(select(PlatformSetting)).scalars().all()) == 3
     got = client.get(f"{ADMIN}/settings", headers=auth(admin)).json()
-    assert got["season_end"] is None and got["prices"]["month_1"] == 1000 and got["how_to_pay"]["ru"] == ""
+    assert got == {"season_end": (today + timedelta(days=400)).isoformat(),
+                   "prices": {"month_1": 1000, "month_3": 2490, "season": None},
+                   "how_to_pay": {"ru": "Текст", "ky": "", "en": "Text"}}
+    # an explicit null clears; a stored season end that has passed does not block saving something else
+    assert put_settings(client, admin, season_end=None, prices={"month_3": None},
+                        how_to_pay={"en": None}).status_code == 200
+    got = client.get(f"{ADMIN}/settings", headers=auth(admin)).json()
+    assert got == {"season_end": None, "prices": {"month_1": 1000, "month_3": None, "season": None},
+                   "how_to_pay": {"ru": "Текст", "ky": "", "en": ""}}
+    assert put_settings(client, admin, season_end=(today + timedelta(days=3)).isoformat()).status_code == 200
+    frozen_clock.advance(10 * 86400)
+    assert put_settings(client, admin, prices={"season": 500}).status_code == 200
+    assert client.get(f"{ADMIN}/settings", headers=auth(admin)).json()["prices"]["season"] == 500
     events = audit_rows(db, "access.settings_update")
-    assert len(events) == 2 and events[0].target_type == "platform_setting"
+    assert len(events) == 5 and events[0].target_type == "platform_setting"
     assert events[0].details["old"]["season_end"] is None and events[0].details["new"]["prices"]["month_1"] == 990
     assert events[1].details["old"]["prices"]["month_1"] == 990 and events[1].details["new"]["prices"]["month_1"] == 1000
+    assert events[1].details["new"]["how_to_pay"]["ru"] == "Текст"
 
 
 # ------------------------------------------------------------------ authz

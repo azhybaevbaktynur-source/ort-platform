@@ -424,8 +424,15 @@ def revoke_pass(db: Session, admin: User, pass_id: uuid.UUID, *, reason: str,
     if remaining > timedelta(0):
         later = db.execute(select(AccessPass).where(
             AccessPass.user_id == p.user_id, AccessPass.revoked_at.is_(None), AccessPass.id != p.id,
-            AccessPass.starts_at >= p.ends_at).with_for_update().execution_options(populate_existing=True)).scalars()
+            AccessPass.starts_at >= p.ends_at).order_by(AccessPass.starts_at, AccessPass.id)
+            .with_for_update().execution_options(populate_existing=True)).scalars().all()
         for q in later:
+            if q.plan == "season":
+                # F6a: a season pass keeps its promised end (the season end); it only starts earlier, and the passes
+                # after it (which start at that end) stay where they are
+                q.starts_at = as_utc(q.starts_at) - remaining
+                shifted.append(str(q.id))
+                break
             q.starts_at, q.ends_at = as_utc(q.starts_at) - remaining, as_utc(q.ends_at) - remaining
             shifted.append(str(q.id))
     audit.record(db, actor=admin, action=AUDIT_PASS_REVOKE, target_type="access_pass", target_id=str(p.id),

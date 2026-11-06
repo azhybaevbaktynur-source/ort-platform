@@ -298,12 +298,39 @@ PRO_STATUSES = ("active", "expiring", "expired")
 
 
 def _pro_chains():
-    """One row per person with a non-revoked pass: the chain end (`max(ends_at)`; a person's non-revoked passes form
-    one unbroken run, because `extend` starts at the latest end and `revoke_pass` shifts later passes back) and the
-    first start. Grouped in SQL; never loads the passes of all users."""
-    return (select(AccessPass.user_id.label("user_id"), func.max(AccessPass.ends_at).label("ends_at"),
-                   func.min(AccessPass.starts_at).label("started_at"))
+    """One row per person with a non-revoked pass: the chain end, `max(ends_at)` (the latest run of passes is
+    unbroken, because `extend` starts at the latest end and `revoke_pass` shifts later passes back). Grouped in SQL;
+    never loads the passes of all users."""
+    return (select(AccessPass.user_id.label("user_id"), func.max(AccessPass.ends_at).label("ends_at"))
             .where(AccessPass.revoked_at.is_(None)).group_by(AccessPass.user_id).subquery("pro_chain"))
+
+
+def _run_starts(db: Session, ends: dict) -> dict:
+    """{user id: start of the unbroken run of non-revoked passes that ends at that person's chain end}, for one page of
+    people only (bounded: at most PASS_SCAN_MAX passes per person on the page)."""
+    from app.lms.access.service import PASS_SCAN_MAX
+
+    if not ends:
+        return {}
+    rows = db.execute(
+        select(AccessPass.user_id, AccessPass.starts_at, AccessPass.ends_at)
+        .where(AccessPass.user_id.in_(list(ends)), AccessPass.revoked_at.is_(None))
+        .order_by(AccessPass.user_id, AccessPass.ends_at.desc()).limit(PASS_SCAN_MAX * len(ends))
+    ).all()
+    by_user: dict = {}
+    for uid, st, en in rows:
+        by_user.setdefault(uid, []).append((as_utc(st), as_utc(en)))
+    out = {}
+    for uid, end in ends.items():
+        start = None
+        for st, en in by_user.get(uid, []):  # newest end first: walk back while a pass reaches the run's start
+            if start is None:
+                if en == end:
+                    start = st
+            elif st < start <= en:
+                start = st
+        out[uid] = start
+    return out
 
 
 def _status_filter(ch, status: Optional[str], now: datetime):
@@ -331,9 +358,9 @@ def list_pro(db: Session, *, status: Optional[str], q: Optional[str], cursor: Op
                                   last.c.ends_at == ch.c.ends_at)
                 .order_by(last.c.id).limit(1).correlate(ch).scalar_subquery())
 
-    stmt = (select(ch.c.user_id, ch.c.ends_at, ch.c.started_at, User.display_name, User.email,
+    stmt = (select(ch.c.user_id, ch.c.ends_at, User.display_name, User.email,
                    _of_last(last.c.plan).label("plan"), _of_last(last.c.source).label("source"))
-            .join(User, User.id == ch.c.user_id))
+            .join(User, User.id == ch.c.user_id).where(User.deleted_at.is_(None)))
     cond = _status_filter(ch, status, now)
     if cond is not None:
         stmt = stmt.where(cond)
@@ -343,16 +370,18 @@ def list_pro(db: Session, *, status: Optional[str], q: Optional[str], cursor: Op
                               func.lower(User.display_name).contains(term, autoescape=True)))
     rows, nxt = paginate_rows(db, stmt, sort_col=ch.c.ends_at, id_col=ch.c.user_id, entity_of=lambda r: r,
                               cursor=cursor, limit=limit, descending=(status == "expired"))
+    starts = _run_starts(db, {r[0]: as_utc(r[1]) for r in rows})
     out = []
-    for uid, ends_at, started_at, name, email, plan, source in rows:
+    for uid, ends_at, name, email, plan, source in rows:
         end = as_utc(ends_at)
-        out.append(dict(user_id=uid, name=name, email=email, ends_at=end, started_at=as_utc(started_at),
+        out.append(dict(user_id=uid, name=name, email=email, ends_at=end, started_at=starts.get(uid) or end,
                         days_left=days_left(end, now), active=end > now, plan=plan, source=source))
     return out, nxt
 
 
 def pro_summary(db: Session, *, now: datetime) -> dict:
-    """Counts: active, expiring within 14 days, expired in the last 90 days (one statement over the grouped chains)."""
+    """Counts: active, expiring within 14 days, expired in the last 90 days (one statement over the grouped chains);
+    deleted accounts are not counted."""
     ch = _pro_chains()
 
     def _n(cond):
@@ -360,7 +389,8 @@ def pro_summary(db: Session, *, now: datetime) -> dict:
 
     active, expiring, expired = db.execute(select(
         _n(_status_filter(ch, "active", now)), _n(_status_filter(ch, "expiring", now)),
-        _n(_status_filter(ch, "expired", now)))).one()
+        _n(_status_filter(ch, "expired", now))).select_from(ch).join(User, User.id == ch.c.user_id)
+        .where(User.deleted_at.is_(None))).one()
     return {"active": int(active), "expiring": int(expiring), "expired": int(expired)}
 
 

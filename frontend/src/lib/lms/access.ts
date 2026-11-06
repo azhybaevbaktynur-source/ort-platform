@@ -193,10 +193,11 @@ export interface ProRowOut {
 export interface ProSummaryOut { active: number; expiring: number; expired: number }
 export interface ProPrices { month_1: number | null; month_3: number | null; season: number | null }
 export interface ProSettingsOut { season_end: string | null; prices: ProPrices; how_to_pay: HowToPay }
+/** A patch: a key left out keeps the stored value, an explicit null clears it. */
 export interface ProSettingsIn {
-  season_end: string | null;
-  prices: Partial<ProPrices>;
-  how_to_pay: Partial<HowToPay>;
+  season_end?: string | null;
+  prices?: Partial<ProPrices>;
+  how_to_pay?: Partial<{ [K in keyof HowToPay]: string | null }>;
 }
 
 export const listPro = (p: { status?: ProStatus | ""; q?: string; cursor?: string | null; limit?: number } = {}) =>

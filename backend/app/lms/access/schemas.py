@@ -229,7 +229,7 @@ class ProRowOut(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
     ends_at: datetime        # the chain end
-    started_at: datetime     # the first start of the person's non-revoked passes
+    started_at: datetime     # the start of the unbroken run of passes that ends at `ends_at`
     days_left: int
     active: bool
     plan: Optional[PlanId] = None     # of the chain-ending pass; null: legacy, voucher or custom length
@@ -255,9 +255,21 @@ class HowToPayIn(_In):
 
 
 class ProSettingsIn(_In):
+    """A patch: a key left out keeps the stored value, an explicit null clears it (`patch()`)."""
     season_end: Optional[date] = None
-    prices: ProPricesIn = Field(default_factory=ProPricesIn)
-    how_to_pay: HowToPayIn = Field(default_factory=HowToPayIn)
+    prices: Optional[ProPricesIn] = None
+    how_to_pay: Optional[HowToPayIn] = None
+
+    def patch(self) -> dict:
+        out: dict = {}
+        if "season_end" in self.model_fields_set:
+            out["season_end"] = self.season_end
+        for name in ("prices", "how_to_pay"):
+            if name in self.model_fields_set:
+                sub = getattr(self, name)
+                out[name] = sub.model_dump(exclude_unset=True) if sub is not None else {
+                    k: None for k in (ProPricesIn if name == "prices" else HowToPayIn).model_fields}
+        return out
 
 
 class ProPricesOut(BaseModel):
