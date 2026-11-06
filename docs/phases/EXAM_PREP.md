@@ -27,3 +27,9 @@
 - Security review (Fable) findings fixed before deploy; trigram index for user search deferred (tiny table; comment in `users_service.py`).
 - CI: the Postgres suite now reports failing tests as annotations (an intermittent failure was seen twice and passed on rerun).
 - Tests at deploy: SQLite 4281, PG 4371, CI green.
+
+## S5 installable app (web): deployed 2026-11-06 (`main` 41a53ac, frontend only)
+- Manifest (name = `common.appName`), icons from the header's graduation cap (not the mascot), iOS meta tags; "Установить приложение" in the account menu (Chrome prompt, iPhone steps sheet), hidden when installed.
+- Service worker (`public/sw.js` via the generated `/service-worker.js` carrying the build id): caches only the app shell and `/_next/static`; pages network-first with a trilingual offline page; never API responses or pages (privacy on shared phones, exam integrity). Update toast never shown on lobby, player, result or practice routes. Switch-off: `docs/runbooks/SERVICE_WORKER.md`.
+- Performance (4x CPU, Slow 4G, LCP): student home 3.17 → 2.37 s, exam-prep page 3.81 → 2.98 s, exam lobby 3.51 → 2.88 s; first-load JS 422 → 275 kB gzip (each page loads only its language's dictionary).
+- Not done: Google Play app (D6: owner's Google Play account, $25) and push notifications (need keys).

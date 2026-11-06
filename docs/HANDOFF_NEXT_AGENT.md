@@ -36,7 +36,7 @@
 | UX rework part 2 (items 7–12) | **Deployed 2026-11-03** (`main` 06c7d4e, no migration) | `UX_REWORK_2.md` |
 | Accounts and teacher sign-up | **Deployed 2026-11-03** (`main` 061bf6a, migration 0019) | `ACCOUNTS.md`, `DISCUSSION_ACCOUNTS.md` |
 | Admin control center review | Written 2026-11-03, revised 2026-11-06 for the new direction (A1–A11) | `DISCUSSION_ADMIN_CENTER.md` |
-| **Exam-prep roadmap** (owner 2026-11-06) | S2 deployed (`main` d13fde2, migration 0020), S1 deployed (`main` 3846718, migration 0021); S3 deployed (`main` 7dbe770, migration 0022); S4 deployed (`main` e48715d, migration 0023); S5 installable app in progress | `ROADMAP_EXAM_PREP.md`, `phases/EXAM_PREP.md`, `phases/S3_ACCESS_DESIGN.md` |
+| **Exam-prep roadmap** (owner 2026-11-06) | S2 deployed (`main` d13fde2, migration 0020), S1 deployed (`main` 3846718, migration 0021); S3 deployed (`main` 7dbe770, migration 0022); S4 deployed (`main` e48715d, migration 0023); S5 deployed (`main` 41a53ac, frontend only). **Stopped: S6 AI chat waits for the owner's D5** | `ROADMAP_EXAM_PREP.md`, `phases/EXAM_PREP.md`, `phases/S3_ACCESS_DESIGN.md` |
 
 Production: Vercel https://ort-platform-nu.vercel.app + Render https://ort-platform-w77q.onrender.com (`/health` shows `commit`; Render deploys only when backend files change) + Neon project `noisy-sound-20763725` (production branch `br-cool-firefly-b227gbuy`, Alembic head `0018_phase11_indexes`) + Cloudflare R2. Production data is small: 6 users, 3 courses (2 ORT + the owner's draft), 299 question versions, ~4 attempts, 1 submission; one organization "Platform".
 
