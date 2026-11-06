@@ -100,7 +100,10 @@ async function walk(browser: Browser, user: SeedUser, name: string, check: (page
     await noSideScroll(page, `${name} at ${w}px`);
     if (OUT) await page.screenshot({ path: path.join(OUT, `${name}-${w}.jpg`), type: "jpeg", quality: 70, fullPage: true, animations: "disabled" });
     if (name === "analytics-data") {
+      // U8: the notebook moved to Сохранённые; the old link still lands there
       await page.goto(`${url}?tab=mistakes`);
+      await page.waitForURL(new RegExp(`/courses/${seed().course_id}/saved\\?tab=mistakes$`));
+      await expect(page.getByRole("tab", { name: tr("ru", "student.saved.tabs.mistakes") })).toHaveAttribute("aria-selected", "true");
       await settle(page);
       await noSideScroll(page, `mistakes at ${w}px`);
       if (OUT) await page.screenshot({ path: path.join(OUT, `analytics-mistakes-${w}.jpg`), type: "jpeg", quality: 70, fullPage: true, animations: "disabled" });

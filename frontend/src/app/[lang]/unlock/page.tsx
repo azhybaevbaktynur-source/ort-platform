@@ -6,8 +6,9 @@ import React, { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, KeyRound } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { fmtPassEnd, getMyAccess, redeemCode, type MyAccessOut } from "@/lib/lms/access";
-import { Badge, Button, Card, ErrorState, Input, LinkButton, PageHeader, Skeleton, toast } from "@/components/ui";
+import { Badge, Button, Card, ErrorState, Input, LinkButton, Skeleton, toast } from "@/components/ui";
 import { useErrorText } from "@/components/lms/home/useErrorText";
+import { StudentPageHeader } from "@/components/lms/student/StudentPageHeader";
 
 function Included({ practice }: { practice: boolean }) {
   const { t } = useTranslation();
@@ -61,8 +62,9 @@ export default function UnlockPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[60rem]">
-      <PageHeader title={t("access.unlock.title")} description={t("access.unlock.intro")} />
+    <div className="w-full max-w-[60rem]">
+      {/* Student UI U8 (§3.6, §5.1 d): inside the student shell, with the student pages' header */}
+      <div className="mb-6"><StudentPageHeader title={t("access.unlock.title")} subtitle={t("access.unlock.intro")} /></div>
       {loadError && !access ? <ErrorState message={errorText(loadError)} onRetry={() => void load()} className="mb-6" /> : null}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
         <div className="space-y-6">

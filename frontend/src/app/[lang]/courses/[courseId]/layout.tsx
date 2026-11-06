@@ -124,7 +124,8 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
     // Student UI U4 (§3.2) / U6 (§3.3) / U7 (§3.5): Тесты, Аналитика and the lesson pages have their own title (course
     // name as subtitle); the course page only redirects there
     const ownTitle = pathname === base || pathname === `${base}/tests` || pathname === `${base}/progress`
-      || pathname === `${base}/modules` || pathname.startsWith(`${base}/modules/`);
+      || pathname === `${base}/modules` || pathname.startsWith(`${base}/modules/`)
+      || pathname === `${base}/saved` || pathname === `${base}/practice`; // U8: Сохранённые, Практика
     return (
       <CourseContext.Provider value={ctx}>
         {ownTitle ? null : header}

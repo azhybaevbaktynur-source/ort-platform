@@ -59,7 +59,9 @@ test.describe("student shell (ru)", () => {
     await more.click();
     const sheet = page.getByRole("dialog", { name: t("student.nav.more") });
     await expect(sheet).toBeVisible();
-    await expect(sheet.getByRole("link", { name: t("student.nav.mistakes") })).toBeVisible();
+    // U8: mistakes live on Сохранённые (no separate "Мои ошибки" link)
+    await expect(sheet.getByRole("link", { name: t("student.nav.saved") })).toHaveAttribute("href", `/${L}/courses/${s.course_id}/saved`);
+    await expect(sheet.getByRole("link", { name: t("student.nav.mistakes") })).toHaveCount(0);
     await expect(sheet.getByRole("button", { name: t("common.logout") })).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(sheet).toBeHidden();
