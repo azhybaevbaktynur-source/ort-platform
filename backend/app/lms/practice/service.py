@@ -138,7 +138,7 @@ def _mine(db: Session, user_id: str, course_id: uuid.UUID, ids: list[uuid.UUID])
 
 
 def _set_out(a: Assessment, item_count: Optional[int], blocks: list[sch.PracticeBlockOut], *, staff: bool,
-             final: Optional[dict] = None, open_: Optional[dict] = None) -> sch.PracticeSetOut:
+             final: Optional[dict] = None, open_: Optional[dict] = None, gate=None) -> sch.PracticeSetOut:
     fields: dict = {}
     if not staff:
         row = (final or {}).get(a.id)
@@ -147,6 +147,8 @@ def _set_out(a: Assessment, item_count: Optional[int], blocks: list[sch.Practice
             my_best_percent=round(float(row[2]), 2) if row and row[2] is not None else None,
             my_last_at=timing.as_utc(row[3]) if row else None,
             open_attempt_id=(open_ or {}).get(a.id),
+            # S3 access: practice of a platform course needs a pass unless the course made it free (sets are untimed)
+            locked=bool(gate is not None and gate.locked(is_practice=True, access_tier=a.access_tier)),
         )
     return sch.PracticeSetOut(
         id=a.id, title=dict(a.title or {}), status=a.status, languages=list(a.languages or []),
@@ -167,7 +169,8 @@ def list_sets(db: Session, ctx: AuthzContext, course: Course, *, cursor: Optiona
     ids = [r[0].id for r in rows]
     blocks = _blocks_by_set(db, ids)
     final, open_ = ({}, {}) if staff else _mine(db, ctx.user.id, course.id, ids)
-    return [_set_out(a, n, blocks[a.id], staff=staff, final=final, open_=open_) for a, n in rows], nxt
+    gate = None if staff else builder.student_gate(db, ctx, course, [r[0] for r in rows])  # S3 access
+    return [_set_out(a, n, blocks[a.id], staff=staff, final=final, open_=open_, gate=gate) for a, n in rows], nxt
 
 
 def _out_after_write(db: Session, a: Assessment) -> sch.PracticeSetOut:

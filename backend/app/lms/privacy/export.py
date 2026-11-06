@@ -18,6 +18,7 @@ from typing import Callable, Iterator, Optional
 from sqlalchemy import select
 
 from app.db import session as db_session
+from app.lms.access.models import AccessPass
 from app.lms.assignments.models import AssignmentSubmission
 from app.lms.attempts.models import Attempt, AttemptItem
 from app.lms.core import clock
@@ -73,6 +74,9 @@ def sections() -> list[Section]:
                 lambda uid: DataRequest.user_id == uid, DataRequest.id),
         Section("teacher_requests", _cols(TeacherRequest, "id", "status", "created_at", "decided_at"),
                 lambda uid: TeacherRequest.user_id == uid, TeacherRequest.id),
+        # S3 access: own passes; never the buyer's name on a sold code (design 7.5) nor an admin's reason
+        Section("access_passes", _cols(AccessPass, "id", "scope", "source", "revoked_at", "created_at"),
+                lambda uid: AccessPass.user_id == uid, AccessPass.id),
     ]
 
 

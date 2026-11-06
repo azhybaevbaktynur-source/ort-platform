@@ -90,6 +90,18 @@ def fill(db):
     db.flush()
     db.add(CourseGoal(enrollment_id=enr.id, target_percent=80))
     db.add(ExamGoal(user_id=u.id, course_id=w.course.id, target_score=200))  # Exam prep S2
+    # S3 access: a sold code with the buyer's name, redeemed by the person; a pass with an admin's reason
+    from app.lms.access.models import AccessPass, ActivationCode, ActivationCodeBatch
+
+    batch = ActivationCodeBatch(label="b", duration_days=30, count=1, created_at=utcnow())
+    db.add(batch)
+    db.flush()
+    code = ActivationCode(batch_id=batch.id, position=1, code_hmac="h" * 64, code_enc="v1.x", last4="ABCD",
+                          given_at=utcnow(), given_note=S, redeemed_by_id=u.id, redeemed_at=utcnow())
+    db.add(code)
+    db.flush()
+    db.add(AccessPass(user_id=u.id, starts_at=utcnow(), ends_at=utcnow() + timedelta(days=30), source="code",
+                      code_id=code.id, reason=S, created_at=utcnow()))
     db.add(EnrollmentAccommodation(enrollment_id=enr.id, course_id=w.course.id, note=S))
     a = make_assignment(db, w.course, db.get(User, teacher), kind="file")
     t = make_assignment(db, w.course, db.get(User, teacher), kind="text")

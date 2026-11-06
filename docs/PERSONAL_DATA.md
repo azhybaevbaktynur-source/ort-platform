@@ -7,6 +7,10 @@ Erased data stays in the database provider's history until its restore window pa
 
 | Table | Column | What it is | On deletion | In the export |
 |---|---|---|---|---|
+| `access_passes` | `ends_at` | own pass | Kept: holds no personal data once the account is a tombstone | Yes |
+| `access_passes` | `reason` | about the person (an admin's grant reason) | Emptied | No |
+| `access_passes` | `starts_at` | own pass | Kept: holds no personal data once the account is a tombstone | Yes |
+| `activation_codes` | `given_note` | the buyer (maybe a third person) | Emptied | No |
 | `admin_audit_log` | `details` | keys email, display_name, age band | Replaced | No |
 | `admin_audit_log` | `ip_hash` | network | Emptied | No |
 | `admin_audit_log` | `reason` | about the person | Emptied | No |
@@ -55,6 +59,9 @@ These point at the tombstone row, which holds nothing personal after deletion.
 
 | Table | Columns |
 |---|---|
+| `access_passes` | `granted_by_id`, `revoked_by_id`, `user_id` |
+| `activation_code_batches` | `created_by_id` |
+| `activation_codes` | `redeemed_by_id` |
 | `admin_audit_log` | `actor_id` |
 | `announcements` | `author_id`, `deleted_by_id` |
 | `assessment_versions` | `created_by_id` |
@@ -107,6 +114,7 @@ These point at the tombstone row, which holds nothing personal after deletion.
 
 | Table | Column | Why |
 |---|---|---|
+| `activation_code_batches` | `note` | the admin's own note about a batch (e.g. the price) |
 | `announcements` | `body_html` | course content written by staff |
 | `announcements` | `body_md` | course content written by staff |
 | `attempt_sections` | `close_reason` | a fixed code |

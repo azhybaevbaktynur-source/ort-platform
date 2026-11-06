@@ -61,6 +61,11 @@ ENTRIES: list[Entry] = [
     Entry("enrollment_applications", "decision_note", "about the person", "null"),
     Entry("course_goals", "target_percent", "own goal", "delete_row"),
     Entry("exam_goals", "target_score", "own goal", "delete_row"),  # Exam prep S2
+    # S3 access: passes stay as tombstones (revenue record); the buyer's name on a sold code is emptied
+    Entry("access_passes", "starts_at", "own pass", "none", True),
+    Entry("access_passes", "ends_at", "own pass", "none", True),
+    Entry("access_passes", "reason", "about the person (an admin's grant reason)", "null"),
+    Entry("activation_codes", "given_note", "the buyer (maybe a third person)", "null"),
     # hand-ins and grades
     Entry("assignment_submissions", "body_text", "own work", "scrub", True),
     Entry("assets", "original_filename", "own work (hand-in and feedback files)", "erase_file", True),
@@ -117,6 +122,10 @@ ENTRIES: list[Entry] = [
     *_refs("enrollments", "user_id", action="keep_tombstone"),
     *_refs("enrollments", "removed_by_id"),
     *_refs("exam_goals", "user_id", action="delete_row"),  # Exam prep S2
+    *_refs("access_passes", "user_id", action="keep_tombstone"),  # S3 access
+    *_refs("access_passes", "granted_by_id", "revoked_by_id"),
+    *_refs("activation_code_batches", "created_by_id"),
+    *_refs("activation_codes", "redeemed_by_id", action="keep_tombstone"),
     *_refs("exam_template_versions", "published_by_id"),
     *_refs("exam_templates", "owner_user_id", action="keep_tombstone"),
     *_refs("exam_templates", "created_by_id", "deleted_by_id"),
@@ -170,6 +179,7 @@ NOT_PERSONAL: dict[tuple[str, str], str] = {
     ("question_drafts", "payload"): "question content written by staff",
     ("enrollment_events", "details"): "ids and fixed reasons only",
     ("attempts", "submit_reason"): "a fixed code",
+    ("activation_code_batches", "note"): "the admin's own note about a batch (e.g. the price)",
     ("attempt_sections", "close_reason"): "a fixed code",
     ("policy_versions", "body_en"): "policy text",
     ("policy_versions", "body_ky"): "policy text",

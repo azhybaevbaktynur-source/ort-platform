@@ -159,9 +159,11 @@ async def test_tenant_isolation(db, api):
 LOBBY_KEYS = {"id", "title", "description", "languages", "sections", "time_limit_s", "navigation",
               "allowed_attempts", "attempts_used", "available_from", "available_until", "in_progress_attempt_id",
               "can_start", "reason", "due_at", "scheme",
-              "requires_access_code"}  # Phase 7a S4 (PHASE_7A_DESIGN 3.8)
+              "requires_access_code",  # Phase 7a S4 (PHASE_7A_DESIGN 3.8)
+              "access_tier", "locked"}  # S3 access
 SUMMARY_KEYS = {"id", "title", "languages", "time_limit_s", "item_count", "available_from", "available_until",
-                "allowed_attempts", "attempts_used", "in_progress_attempt_id", "last_result", "due_at", "scheme"}
+                "allowed_attempts", "attempts_used", "in_progress_attempt_id", "last_result", "due_at", "scheme",
+                "access_tier", "locked"}  # S3 access
 LOBBY_SECTION_KEYS = {"pos", "key", "title", "time_limit_s", "item_count"}
 
 

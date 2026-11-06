@@ -478,7 +478,7 @@ def _ensure_assessment(db: Session, ctx: AuthzContext, course: Course, row: Lega
     if a is None:
         a = builder.create_assessment(db, ctx, course, asch.AssessmentCreateIn(
             title=title, description=_localized(row.description, lang, 5000), preset=preset, languages=[lang],
-            subject_key=subject_key))
+            subject_key=subject_key), access_tier="free")  # S3: seeded ORT exams stay free
         _save(db, exam_set_id, {"assessment_id": str(a.id)})
     aid = a.id
     if a.status == "published" and a.published_version_id is not None:
@@ -551,7 +551,7 @@ def _seed_samples(db: Session, ctx: AuthzContext, course: Course, lang: str) -> 
     questions = list(db.execute(select(BankQuestion).where(BankQuestion.bank_id == bank_id)
                                 .order_by(BankQuestion.position, BankQuestion.id)).scalars())
     a = builder.create_assessment(db, ctx, course, asch.AssessmentCreateIn(
-        title=dict(SAMPLE_TITLE), preset="ort_main", languages=[lang]))
+        title=dict(SAMPLE_TITLE), preset="ort_main", languages=[lang]), access_tier="free")  # S3: stays free
     for s in arepo.load_sections(db, a.id):
         ids = [q.id for q in questions if q.section == s.key]
         if ids:

@@ -27,6 +27,7 @@ from tests.lms.factories import enroll, make_assessment, make_attempt, make_bank
     make_user
 from tests.lms.gradebook_support import grade_row, graded_assessment, no_scored_hooks, publish  # noqa: F401
 from tests.lms.modules_support import make_item as make_module_item, make_module
+from tests.lms.access_support import give_pass
 from tests.lms.org_support import make_org
 from tests.lms.s3_support import api, clean_rate_limits, db  # noqa: F401
 
@@ -234,6 +235,7 @@ async def test_goal_crud_and_range(db, api):
 
 async def test_next_resume_then_start_then_practice_then_retake(db, api):
     w = ort_world(db)
+    give_pass(db, w.s)  # S3: practice of a platform course needs a pass (test_access.py covers the student without)
     a1, v1 = exam(db, w, "First")
     a2, v2 = exam(db, w, "Second", allowed_attempts=-1)
     a1.allowed_attempts = -1
