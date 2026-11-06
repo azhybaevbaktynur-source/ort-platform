@@ -807,6 +807,14 @@ def main() -> int:
     subprocess.run([sys.executable, str(root / "backend" / "make_admin.py"), mfa_admin["email"]], check=True,
                    env=os.environ.copy(), stdout=subprocess.DEVNULL)
     mfa_admin["profile"] = profile(api, mfa_admin["token"])
+    # and two more: the enrollment gate walk (admin-mfa-gate.spec.ts) and the S1 screenshots (admin-security-screens)
+    extra_admins = {}
+    for key in ("gate", "shots"):
+        extra = register(api, log, f"e2e-{key}-admin@example.com", f"{key.title()} Admin", keep_password=True)
+        subprocess.run([sys.executable, str(root / "backend" / "make_admin.py"), extra["email"]], check=True,
+                       env=os.environ.copy(), stdout=subprocess.DEVNULL)
+        extra["profile"] = profile(api, extra["token"])
+        extra_admins[key] = extra
 
     seed = {
         "quiz_editor": quiz_editor,
@@ -820,6 +828,7 @@ def main() -> int:
         "landing": landing,
         "teacher_signup": teacher_signup,
         "mfa_admin": mfa_admin,
+        "gate_admin": extra_admins["gate"], "shots_admin": extra_admins["shots"],
         "api": args.api, "course_id": cid, "bank_id": bank_id, "exam": exam, "staff_exam": staff_exam,
         "picks": picks, "keys": keys, "comparison_question_id": comparison_qid, "passage_id": passage_id,
         "staff_attempt_id": staff_attempt, "admin": admin, "students": students,

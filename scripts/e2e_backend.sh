@@ -12,7 +12,16 @@
 #   E2E_API_PORT    backend port                        (default 8765)
 #   E2E_WEB_ORIGIN  frontend origin allowed by CORS     (default http://127.0.0.1:3765)
 #   E2E_PYTHON      python with backend requirements    (default backend/venv/bin/python, else python3)
+#
+# S1 admin security: `e2e_backend.sh --mfa-required <port>` starts a second server on the same scratch database and
+# signing key with ADMIN_MFA_REQUIRED=true, in the foreground, without wiping or seeding anything. Only
+# frontend/e2e/admin-mfa-gate.spec.ts uses it (it sends its own page's API calls there); every other spec keeps the main
+# server, where the requirement is off.
 set -euo pipefail
+MFA_REQUIRED_PORT=""
+if [[ "${1:-}" == "--mfa-required" ]]; then
+  MFA_REQUIRED_PORT="${2:?port}"
+fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 E2E_DIR="${E2E_DIR:-/tmp/ort_e2e}"
@@ -34,11 +43,15 @@ case "$E2E_DIR" in
   /tmp/?*|/private/tmp/?*|"${RUNNER_TEMP:-/nonexistent}"/?*) ;;
   *) echo "e2e_backend: E2E_DIR must be under /tmp (got $E2E_DIR)" >&2; exit 2 ;;
 esac
-/bin/rm -rf "$E2E_DIR"
-mkdir -p "$E2E_DIR/up" "$E2E_DIR/cwd"
-
-# A throwaway signing key per run (never a real secret, never written to the repo)
-SECRET_KEY="e2e-$("$PY" -c 'import secrets; print(secrets.token_hex(24))')"
+if [[ -n "$MFA_REQUIRED_PORT" ]]; then
+  SECRET_KEY="$(cat "$E2E_DIR/cwd/secret_key")"  # the main server's throwaway key: the same tokens work on both
+else
+  /bin/rm -rf "$E2E_DIR"
+  mkdir -p "$E2E_DIR/up" "$E2E_DIR/cwd"
+  # A throwaway signing key per run (never a real secret, never written to the repo; kept in the scratch dir only)
+  SECRET_KEY="e2e-$("$PY" -c 'import secrets; print(secrets.token_hex(24))')"
+  (umask 077; printf '%s' "$SECRET_KEY" > "$E2E_DIR/cwd/secret_key")
+fi
 
 run_env=(
   env -i
@@ -62,6 +75,10 @@ run_env=(
 )
 
 cd "$E2E_DIR/cwd"   # no .env here: settings read only the variables above
+if [[ -n "$MFA_REQUIRED_PORT" ]]; then
+  exec "${run_env[@]}" ADMIN_MFA_REQUIRED=true "$PY" -m uvicorn app.main:app --host 127.0.0.1 --port "$MFA_REQUIRED_PORT" \
+    --log-level warning >>"$E2E_DIR/backend_mfa_required.log" 2>&1
+fi
 "${run_env[@]}" "$PY" -m uvicorn app.main:app --host 127.0.0.1 --port "$PORT" --log-level warning \
   >"$E2E_DIR/backend.log" 2>&1 &
 API_PID=$!

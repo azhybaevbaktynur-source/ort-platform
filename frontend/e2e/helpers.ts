@@ -102,6 +102,8 @@ export interface Seed {
   };
   /** S1 admin security: a platform admin without two-step login, with a password (admin-mfa.spec.ts). */
   mfa_admin: SeedUser & { password: string };
+  gate_admin: SeedUser & { password: string };
+  shots_admin: SeedUser & { password: string };
   /** Phase 8b S3: the scrolling-player course (its published quizzes serve the Student view "Start" check). */
   scrolling: {
     course_id: string;
