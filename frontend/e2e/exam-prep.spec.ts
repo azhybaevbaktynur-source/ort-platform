@@ -1,16 +1,17 @@
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { sectionCounts, seed, settle, signIn, tr, type SeedUser } from "./helpers";
+import { sectionCounts, seed, settle, signIn, tr } from "./helpers";
 import { OrtExam } from "./ort-exam";
 
 /**
- * Exam prep S2 (docs/ROADMAP_EXAM_PREP.md S2): a newcomer finds ORT (Russian) under "From the platform" on the home,
- * joins it with one tap, lands on the exam-prep page (countdown, target, Next, library), sets a target, takes the
- * seeded test from the Next card, and back on the page sees the score, the history, five section bars and the next
- * step. The exam player and the result page are the ORT ones, unchanged (OrtExam asserts them).
+ * Exam prep S2 (docs/ROADMAP_EXAM_PREP.md S2), Student UI U4 (docs/phases/STUDENT_UI_DESIGN.md §3.2): a newcomer finds
+ * ORT (Russian) under "From the platform" on the home, joins it with one tap, lands on the course's Тесты page (title
+ * with the count, status chips, cards), starts the seeded test from its card, and back on the course sees it done with
+ * the best score and "Результат" (the lobby). The exam player and the result page are the ORT ones, unchanged (OrtExam
+ * asserts them). The countdown, target, Next card, history and section bars move to the home (U3, tested there).
  *
- * Data: `seed.exam_prep.newcomer` (registered, in no course); the exam date is set by the admin and cleared after.
+ * Data: `seed.exam_prep.newcomer` (registered, in no course).
  * Screens of the page at 375 / 1440 / 1920 (ru) go to $S2_SHOTS (default /tmp/s2_shots).
  */
 
@@ -18,16 +19,6 @@ const L = "ru" as const;
 const t = (key: string, vars: Record<string, string | number> = {}) => tr(L, key, vars);
 const SHOTS = process.env.S2_SHOTS || "/tmp/s2_shots";
 const WIDTHS = [375, 1440, 1920] as const;
-
-async function api(user: SeedUser, method: string, p: string, body?: unknown) {
-  const r = await fetch(`${seed().api}/api/v1${p}`, {
-    method,
-    headers: { Authorization: `Bearer ${user.token}`, "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  expect(r.status, `${method} ${p}`).toBeLessThan(300);
-  return r.status === 204 ? null : r.json();
-}
 
 async function shoot(page: Page, name: string) {
   fs.mkdirSync(SHOTS, { recursive: true });
@@ -41,21 +32,14 @@ async function shoot(page: Page, name: string) {
   await page.setViewportSize({ width: 1440, height: 900 });
 }
 
-function isoInDays(days: number): string {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
 test.describe("exam-prep page (ru)", () => {
   test.describe.configure({ mode: "serial" });
 
-  test("home -> join ORT -> exam-prep page -> take the test -> score, sections, next", async ({ browser }) => {
+  test("home -> join ORT -> Тесты page -> take the test -> done with the best score", async ({ browser }) => {
     test.setTimeout(300_000);
     const s = seed();
     const cid = s.course_id;
     const newcomer = s.exam_prep!.newcomer;
-    await api(s.admin, "PATCH", `/courses/${cid}`, { exam_date: isoInDays(30) });
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: "ru-RU", timezoneId: "UTC", colorScheme: "light" });
     const page = await ctx.newPage();
     try {
@@ -69,34 +53,26 @@ test.describe("exam-prep page (ru)", () => {
       await expect(card).toHaveCount(1);
       await shoot(page, "home-platform");
       await card.getByRole("button", { name: t("catalog.join"), exact: true }).click();
-      await page.waitForURL(new RegExp(`/${L}/courses/${cid}$`));
+      // Student UI U4: the course page of an exam-prep course is its Тесты page for students
+      await page.waitForURL(new RegExp(`/${L}/courses/${cid}/tests$`));
 
-      // ---- the exam-prep page: countdown, no score yet, Next = the first test of the library
-      await expect(page.getByText(t("examPrep.goal.daysLabel"), { exact: true })).toBeVisible();
-      await expect(page.getByText("30", { exact: true })).toBeVisible();
-      await expect(page.getByText(t("examPrep.goal.noScore"))).toBeVisible();
-      const next = page.getByRole("region", { name: t("examPrep.next.title") });
-      await expect(next).toContainText("ОРТ E2E");
-      await expect(next).toContainText(t("examPrep.next.reason.start"));
+      // ---- the Тесты page: title with the count, status chips, one card per test, nothing done yet
       const library = page.getByRole("region", { name: t("examPrep.library.title") });
-      await expect(library.getByRole("link", { name: "ОРТ E2E", exact: true })).toBeVisible();
-      await expect(library.getByRole("link", { name: "ОРТ E2E staff", exact: true })).toBeVisible();
-      await expect(library.getByText(t("examPrep.library.status.not_started")).first()).toBeVisible();
-      await shoot(page, "exam-prep-new");
+      await expect(library.getByRole("heading", { level: 1 })).toHaveText(new RegExp(`^${t("examPrep.library.title")} · \\d+$`));
+      const first = library.locator("li").filter({ has: page.getByRole("heading", { name: "ОРТ E2E", exact: true }) });
+      await expect(first).toHaveCount(1);
+      await expect(library.getByRole("heading", { name: "ОРТ E2E staff", exact: true })).toBeVisible();
+      await expect(first).toContainText(t("examPrep.library.status.not_started"));
+      await expect(first).toContainText(t("examPrep.tests.noScore"));
+      const statuses = page.getByRole("group", { name: t("examPrep.tests.statusFilter") });
+      await statuses.getByRole("button", { name: t("examPrep.library.status.done"), exact: true }).click();
+      await expect(library.getByText(t("examPrep.tests.emptyStatus"))).toBeVisible();
+      await statuses.getByRole("button", { name: t("examPrep.tests.allStatuses"), exact: true }).click();
+      await expect(page.getByRole("button", { name: t("courses.home.leave") })).toBeVisible();
+      await shoot(page, "tests-new");
 
-      // ---- the target, inline: out of range is refused, 200 is kept
-      await page.getByRole("button", { name: t("examPrep.goal.setTarget") }).click();
-      const input = page.getByLabel(t("examPrep.goal.inputLabel", { min: 60, max: 245 }));
-      await input.fill("300");
-      await page.getByRole("button", { name: t("examPrep.goal.save"), exact: true }).click();
-      await expect(page.getByText(t("examPrep.goal.invalid", { min: 60, max: 245 }))).toBeVisible();
-      await input.fill("200");
-      await page.getByRole("button", { name: t("examPrep.goal.save"), exact: true }).click();
-      await expect(page.getByText("200", { exact: true })).toBeVisible();
-      await expect(page.getByRole("button", { name: t("examPrep.goal.edit") })).toBeVisible();
-
-      // ---- Next -> the lobby -> the ORT player -> the ORT result (both unchanged)
-      await next.getByRole("link", { name: t("examPrep.next.action.start") }).click();
+      // ---- "Начать" -> the lobby -> the ORT player -> the ORT result (all unchanged)
+      await first.getByRole("link", { name: t("examPrep.tests.start"), exact: true }).click();
       await page.waitForURL(new RegExp(`/courses/${cid}/assessments/${s.exam.id}$`));
       const exam = new OrtExam(page, L);
       await exam.assertLobby();
@@ -113,30 +89,25 @@ test.describe("exam-prep page (ru)", () => {
       await exam.confirmSubmit();
       await exam.assertResult(1, total);
 
-      // ---- back on the page: latest score, history, five section bars, the next test
+      // ---- back on the course: the test is done with its best score and a "Результат" button; the "done" chip finds it
       await page.goto(`/${L}/courses/${cid}`);
-      await expect(page.getByText(t("examPrep.goal.latestLabel"), { exact: true })).toBeVisible();
-      await expect(page.getByText(t("examPrep.goal.outOf", { max: 245 })).first()).toBeVisible();
-      await expect(page.getByRole("img", { name: t("examPrep.history.chart") })).toBeVisible();
-      const sections = page.getByRole("region", { name: t("examPrep.sections.title") });
-      await expect(sections.getByRole("progressbar")).toHaveCount(5);
-      for (const key of ["math_1", "math_2", "analogies", "reading", "grammar"]) {
-        await expect(sections).toContainText(t(`sections.${key}`));
-      }
-      await expect(sections).toContainText(t("examPrep.sections.score", { raw: 1, possible: counts[0] }));
-      await expect(next).toContainText("ОРТ E2E staff");
-      await expect(next).toContainText(t("examPrep.next.reason.start"));
-      const done = library.locator("li").filter({ has: page.getByRole("link", { name: "ОРТ E2E", exact: true }) });
-      await expect(done).toContainText(t("examPrep.library.status.done"));
-      await expect(done).toContainText(t("examPrep.library.best"));
-      await shoot(page, "exam-prep-after");
+      await page.waitForURL(new RegExp(`/${L}/courses/${cid}/tests$`));
+      await expect(first).toContainText(t("examPrep.library.status.done"));
+      await expect(first).toContainText(t("examPrep.library.best"));
+      await expect(first.getByRole("link", { name: t("examPrep.tests.result"), exact: true })).toBeVisible();
+      await statuses.getByRole("button", { name: t("examPrep.library.status.done"), exact: true }).click();
+      await expect(library.locator("li")).toHaveCount(1);
+      await expect(first).toBeVisible();
+      await statuses.getByRole("button", { name: t("examPrep.tests.allStatuses"), exact: true }).click();
+      await shoot(page, "tests-after");
+      await first.getByRole("link", { name: t("examPrep.tests.result"), exact: true }).click();
+      await page.waitForURL(new RegExp(`/courses/${cid}/assessments/${s.exam.id}$`));
 
       // ---- the home: ORT (Russian) is one of the student's courses now, no longer under "From the platform"
       await page.goto(`/${L}/courses`);
       await expect(page.getByRole("region", { name: t("home.courses.title") }).locator(`a[href="/${L}/courses/${cid}"]`)).toHaveCount(1);
       await expect(page.locator(`a[href="/${L}/courses/catalog/${cid}"]`)).toHaveCount(0);
     } finally {
-      await api(s.admin, "PATCH", `/courses/${cid}`, { exam_date: null });
       await ctx.close();
     }
   });

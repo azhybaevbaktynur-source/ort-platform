@@ -430,7 +430,8 @@ test.describe("modules walk (ru)", () => {
       // before: the ORT student's sidebar has no Files / Announcements (auto-hide), the home lists the exams
       const sp = await open(browser, ortStudent);
       await sp.goto(base);
-      await expect(sp.getByRole("link", { name: "ОРТ E2E", exact: true }).first()).toBeVisible();
+      await sp.waitForURL(`${base}/tests`); // Student UI U4: the course page redirects to the Тесты page
+      await expect(sp.getByRole("heading", { name: "ОРТ E2E", exact: true }).first()).toBeVisible();
       await expect(tabs(sp).getByRole("link", { name: t("courses.home.tab"), exact: true })).toBeVisible();
       await expect(tabs(sp).getByRole("link", { name: t("announcements.title"), exact: true })).toHaveCount(0);
       await expect(tabs(sp).getByRole("link", { name: t("courseFiles.title"), exact: true })).toHaveCount(0);
@@ -478,8 +479,10 @@ test.describe("modules walk (ru)", () => {
       const lib = sp.getByRole("region", { name: t("examPrep.library.title") });
       await lib.getByRole("button", { name: "Пробный ОРТ", exact: true }).click();
       await expect(lib.getByRole("button", { name: "Пробный ОРТ", exact: true })).toHaveAttribute("aria-pressed", "true");
-      await expect(lib.getByRole("link", { name: "ОРТ E2E", exact: true })).toHaveAttribute("href", `${base}/assessments/${s.exam.id}`);
-      await expect(lib.getByRole("link", { name: "ОРТ E2E staff", exact: true })).toHaveCount(0);
+      // Student UI U4: the Тесты page; each card's action opens the same lobby
+      const examCard = lib.locator("li").filter({ has: sp.getByRole("heading", { name: "ОРТ E2E", exact: true }) });
+      await expect(examCard.getByRole("link", { name: t("examPrep.tests.start"), exact: true })).toHaveAttribute("href", `${base}/assessments/${s.exam.id}`);
+      await expect(lib.getByRole("heading", { name: "ОРТ E2E staff", exact: true })).toHaveCount(0);
       await review(sp, "ort-student-course-home-with-structure");
       await sp.goto(`${base}/modules`);
       await expect(badge(sp, "Пробный ОРТ", "locked")).toBeVisible();
