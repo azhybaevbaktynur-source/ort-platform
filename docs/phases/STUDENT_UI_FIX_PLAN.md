@@ -409,5 +409,5 @@ All seven problems built in order, each with tests, a Fable review and an ORT ch
 | 4 | b625ac0 | — | one counting definition and period; rated topics (≥5) and sections (≥10); teacher analytics T1–T3; calm colours; not-enough-data states |
 | 5 | 13a2dfc | 0024_course_lessons | course overview, syllabus, lesson page, Pro modules (server lock, leak fixed in review), teacher editor |
 | 6 | 68dc6cd | 0025_pro | /pro, plans, admin grant/renew/cancel, vouchers, settings (prices/season/how-to-pay empty until the owner sets them) |
-| 7 | see PRODUCT_DECISIONS | 0026_course_cover | cover upload (16:9, WebP, public R2), one CourseCard, default cover, student catalog, Pro badge |
+| 7 | fe4a1e8 | 0026_course_cover | cover upload (16:9, WebP, public R2), one CourseCard, default cover, student catalog, Pro badge |
 LATER: teacher analytics T4+, cancelled-Pro filter in the admin list, payments provider (design only in SUBSCRIPTION_DESIGN.md).

@@ -584,3 +584,4 @@ Agent 2026-11-07 (problem 6): a "until end of season" Pro pass keeps its season 
 Agent 2026-11-07 (problem 7): the course card's "N тестов" counts exams only (same as the Тесты page; practice quizzes are separate); covers below 320×180 px are refused; replaced covers stay in R2 (≈150 kB each, within the free tier).
 2026-11-07: problem 6 deployed (main 68dc6cd, migration 0025_pro; Neon backup `backup-2026-11-07-before-pro-0025`). Prices, season end and how-to-pay text are empty until the owner sets them in Админ-панель → Доступ → Настройки; plans then show «уточняйте».
 2026-11-07: deleted Neon backup `backup-2026-11-01-before-phase10` (oldest; owner OK of 2026-11-07) to make room for the backup before migration 0026.
+2026-11-07: problem 7 deployed (main fe4a1e8, migration 0026_course_cover; Neon backup `backup-2026-11-07-before-covers-0026`). All seven owner problems of 2026-11-07 are deployed.
