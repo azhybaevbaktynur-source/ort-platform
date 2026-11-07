@@ -12,6 +12,7 @@ from app.db.session import get_db
 from app.lms.access import admin as adm
 from app.lms.access import schemas as sch
 from app.lms.access import service
+from app.lms.access import settings as pro_settings
 from app.lms.core import clock
 from app.lms.core.deps import client_ip_hash, get_lms_user, require_platform_admin
 from app.lms.core.pagination import PageOut
@@ -26,8 +27,8 @@ _A = "/access"
 
 def _my_access(db: Session, user: User) -> sch.MyAccessOut:
     st = service.status(db, user.id, now=clock.now())
-    return sch.MyAccessOut(active=st["active"], ends_at=st["ends_at"],
-                           practice_free=service.platform_practice_free(db))
+    return sch.MyAccessOut(active=st["active"], ends_at=st["ends_at"], plan=st["plan"], days_left=st["days_left"],
+                           source=st["source"], practice_free=service.platform_practice_free(db))
 
 
 @me_router.get(_A, response_model=sch.MyAccessOut)
@@ -35,10 +36,17 @@ def my_access(user: User = Depends(get_lms_user), db: Session = Depends(get_db))
     return _my_access(db, user)
 
 
+@me_router.get(f"{_A}/offer", response_model=sch.OfferOut)
+def my_offer(user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
+    """F6a: the Pro plans for the caller (only their own passes are read)."""
+    return service.offer(db, user.id, now=clock.now())
+
+
 @me_router.post(f"{_A}/redeem", response_model=sch.RedeemOut)
 def redeem(body: sch.RedeemIn, request: Request, user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
     out = service.redeem(db, user, body.code, ip_hash=client_ip_hash(request), request=request)
     return sch.RedeemOut(active=out["active"], ends_at=out["ends_at"], pass_ends_at=out["pass_ends_at"],
+                         plan=out["plan"], days_left=out["days_left"], source=out["source"],
                          practice_free=service.platform_practice_free(db))
 
 
@@ -116,9 +124,50 @@ def user_access(user_id: str, admin: User = Depends(require_platform_admin), db:
 @admin_router.post("/users/{user_id}/access/grant", status_code=201, response_model=sch.UserAccessOut)
 def grant(user_id: str, body: sch.GrantIn, request: Request, admin: User = Depends(require_platform_admin),
           db: Session = Depends(get_db)):
-    service.grant(db, admin, user_id, days=body.duration_days, ends_on=body.ends_on, reason=body.reason,
-                  request=request)
+    service.grant(db, admin, user_id, plan=body.plan, days=body.duration_days, ends_on=body.ends_on,
+                  reason=body.reason, request=request)
     return adm.user_access(db, user_id)
+
+
+@admin_router.post("/users/{user_id}/access/cancel", response_model=sch.UserAccessOut)
+def cancel_pro(user_id: str, body: sch.ReasonIn, request: Request, admin: User = Depends(require_platform_admin),
+               db: Session = Depends(get_db)):
+    """F6a: revokes every open pass of the person (one audit event with the reason)."""
+    service.cancel_pro(db, admin, user_id, reason=body.reason, request=request)
+    return adm.user_access(db, user_id)
+
+
+# ------------------------------------------------------------------ admin: F6a Pro list and settings
+
+@admin_router.get(f"{_A}/pro", response_model=PageOut[sch.ProRowOut])
+def list_pro(status: Optional[Literal["active", "expiring", "expired"]] = None,
+             q: Optional[str] = Query(None, max_length=200), cursor: Optional[str] = None,
+             limit: Optional[int] = Query(None), admin: User = Depends(require_platform_admin),
+             db: Session = Depends(get_db)):
+    items, nxt = adm.list_pro(db, status=status, q=q, cursor=cursor, limit=limit, now=clock.now())
+    return PageOut[sch.ProRowOut](items=items, next_cursor=nxt)
+
+
+@admin_router.get(f"{_A}/pro/summary", response_model=sch.ProSummaryOut)
+def pro_summary(admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
+    return adm.pro_summary(db, now=clock.now())
+
+
+def _settings_out(cfg: pro_settings.ProSettings) -> sch.ProSettingsOut:
+    return sch.ProSettingsOut(season_end=cfg.season_end, prices=sch.ProPricesOut(**cfg.prices),
+                              how_to_pay=sch.HowToPayOut(**cfg.how_to_pay))
+
+
+@admin_router.get(f"{_A}/settings", response_model=sch.ProSettingsOut)
+def get_settings(admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
+    return _settings_out(pro_settings.get_pro(db))
+
+
+@admin_router.put(f"{_A}/settings", response_model=sch.ProSettingsOut)
+def put_settings(body: sch.ProSettingsIn, request: Request, admin: User = Depends(require_platform_admin),
+                 db: Session = Depends(get_db)):
+    cfg = pro_settings.put_pro(db, admin, body.patch(), request=request)
+    return _settings_out(cfg)
 
 
 @admin_router.post(f"{_A}/passes/{{pass_id}}/revoke", response_model=sch.UserAccessOut)

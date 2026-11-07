@@ -153,7 +153,7 @@ export function GoalStrip({ data, courseId, onGoal, className }: {
         <p className={cn("col-span-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm leading-5 text-slate-600", showDays && "sm:col-span-3")}>
           <Lock aria-hidden="true" className="h-4 w-4 shrink-0" />
           <span>{t("access.needsPass")}</span>
-          <Link href={`/${lang}/unlock`} className={cn("inline-flex min-h-11 items-center font-medium text-brand-700 underline-offset-2 hover:underline sm:min-h-0", focusRing)}>
+          <Link href={`/${lang}/pro`} className={cn("inline-flex min-h-11 items-center font-medium text-brand-700 underline-offset-2 hover:underline sm:min-h-0", focusRing)}>
             {t("access.needsPassLink")}
           </Link>
         </p>

@@ -235,7 +235,7 @@ function ModuleSection({ mod, number, lessons, open, onToggle, ctx }: {
       {pro && (
         <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <p className="text-sm leading-5 text-slate-700">{t("modules.overview.proModuleBody")}</p>
-          <GoldPill href={`/${lang}/unlock`} icon={<Lock />} className="justify-center sm:shrink-0">{t("modules.overview.unlock")}</GoldPill>
+          <GoldPill href={`/${lang}/pro`} icon={<Lock />} className="justify-center sm:shrink-0">{t("modules.overview.unlock")}</GoldPill>
         </div>
       )}
       <div id={listId} hidden={!open}>
@@ -280,7 +280,7 @@ function Hero({ lessons, data, base, examPrep, track }: {
     );
   } else if (st.kind === "pro") {
     title = t("modules.overview.proLeft");
-    action = <GoldPill href={`/${lang}/unlock`} icon={<Lock />} className="w-full justify-center sm:w-auto sm:shrink-0">{t("modules.overview.unlock")}</GoldPill>;
+    action = <GoldPill href={`/${lang}/pro`} icon={<Lock />} className="w-full justify-center sm:w-auto sm:shrink-0">{t("modules.overview.unlock")}</GoldPill>;
   } else if (st.kind === "later") {
     title = t("modules.overview.later");
   } else if (st.kind === "finished") {

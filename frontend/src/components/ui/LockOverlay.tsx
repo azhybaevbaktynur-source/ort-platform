@@ -14,7 +14,7 @@ export interface LockOverlayProps {
   /** Optional (U9: a test card shows the blur and the icon only; its "Платный" chip says it). */
   title?: React.ReactNode;
   body?: React.ReactNode;
-  /** The way to unlock (a GoldPill to /unlock). */
+  /** The way to unlock (a GoldPill to /pro). */
   action?: React.ReactNode;
   children: React.ReactNode;
   className?: string;

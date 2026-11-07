@@ -111,14 +111,14 @@ function useCourseTitle() {
   return (c: HomeCourseOut) => pickLocalized(c.title, lang, c.default_language) || t("courses.list.untitled");
 }
 
-/** The access pill: "Открыть все экзамены" (gold) or, with a pass, "Доступ до …" (quiet). */
+/** The access pill: "Открыть все экзамены" (gold) or, with Pro, "Pro до …" (quiet); both open /pro. */
 function AccessPill({ data, onNavigate }: { data: StudentShellData; onNavigate?: () => void }) {
   const { lang, t } = useTranslation();
   if (!data.current) return null;
-  const href = `/${lang}/unlock`;
+  const href = `/${lang}/pro`;
   if (data.access?.active) {
     const until = fmtPassEnd(data.access.ends_at, lang, false);
-    return <GoldPill href={href} block variant="secondary" onClick={onNavigate}>{until ? t("student.access.until", { date: until }) : t("student.access.open")}</GoldPill>;
+    return <GoldPill href={href} block variant="secondary" onClick={onNavigate}>{until ? t("access.pill.until", { date: until }) : t("access.pill.active")}</GoldPill>;
   }
   return <GoldPill href={href} block onClick={onNavigate}>{t("access.menu")}</GoldPill>;
 }

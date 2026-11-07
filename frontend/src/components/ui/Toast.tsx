@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import Link from "next/link";
 import { CircleAlert, CircleCheck, Info, LoaderCircle, X } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { cn, focusRing } from "./utils";
@@ -12,6 +13,8 @@ import { cn, focusRing } from "./utils";
  */
 
 export type ToastType = "success" | "error" | "info" | "loading";
+/** An optional link under the message (for example to the object the action changed). */
+export interface ToastLink { href: string; label: string }
 
 export interface ToastMessage {
   id: string;
@@ -19,13 +22,14 @@ export interface ToastMessage {
   title?: string;
   message: string;
   duration?: number;
+  link?: ToastLink;
 }
 
 interface ToastContextValue {
-  showToast: (message: string, type?: ToastType, title?: string, duration?: number) => string;
+  showToast: (message: string, type?: ToastType, title?: string, duration?: number, link?: ToastLink) => string;
   dismissToast: (id: string) => void;
   toast: {
-    success: (message: string, title?: string) => string;
+    success: (message: string, title?: string, link?: ToastLink) => string;
     error: (message: string, title?: string) => string;
     info: (message: string, title?: string) => string;
     loading: (message: string, title?: string) => string;
@@ -36,12 +40,12 @@ interface ToastContextValue {
 const ToastContext = createContext<ToastContextValue | null>(null);
 
 // Global fallback emitter so toast can be called anywhere if needed
-let globalToastHandler: ((msg: string, type: ToastType, title?: string, duration?: number) => string) | null = null;
+let globalToastHandler: ((msg: string, type: ToastType, title?: string, duration?: number, link?: ToastLink) => string) | null = null;
 let globalDismissHandler: ((id: string) => void) | null = null;
 
 export const toast = {
-  success: (message: string, title?: string) => {
-    if (globalToastHandler) return globalToastHandler(message, "success", title, 4000);
+  success: (message: string, title?: string, link?: ToastLink) => {
+    if (globalToastHandler) return globalToastHandler(message, "success", title, link ? 8000 : 4000, link);
     return "";
   },
   error: (message: string, title?: string) => {
@@ -77,6 +81,12 @@ function ToastItem({ item, onDismiss }: { item: ToastMessage; onDismiss: (id: st
       <div className="min-w-0 flex-1 py-2">
         {item.title && <p className="text-sm font-semibold leading-5 text-slate-900">{item.title}</p>}
         <p className="break-words text-sm leading-5 text-slate-700">{item.message}</p>
+        {item.link && (
+          <Link href={item.link.href} onClick={() => onDismiss(item.id)}
+            className={cn("mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-brand-700 hover:underline sm:min-h-0", focusRing)}>
+            {item.link.label}
+          </Link>
+        )}
       </div>
       <button
         type="button"
@@ -99,9 +109,9 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const showToast = useCallback(
-    (message: string, type: ToastType = "info", title?: string, duration = 4000): string => {
+    (message: string, type: ToastType = "info", title?: string, duration = 4000, link?: ToastLink): string => {
       const id = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const newToast: ToastMessage = { id, type, title, message, duration };
+      const newToast: ToastMessage = { id, type, title, message, duration, link };
 
       setToasts((prev) => [...prev, newToast]);
 
@@ -117,7 +127,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 
   useEffect(() => {
-    globalToastHandler = (msg, type, title, duration) => showToast(msg, type, title, duration);
+    globalToastHandler = (msg, type, title, duration, link) => showToast(msg, type, title, duration, link);
     globalDismissHandler = (id) => dismissToast(id);
     return () => {
       globalToastHandler = null;
@@ -129,7 +139,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     showToast,
     dismissToast,
     toast: {
-      success: (msg: string, title?: string) => showToast(msg, "success", title, 4000),
+      success: (msg: string, title?: string, link?: ToastLink) => showToast(msg, "success", title, link ? 8000 : 4000, link),
       error: (msg: string, title?: string) => showToast(msg, "error", title, 6000),
       info: (msg: string, title?: string) => showToast(msg, "info", title, 4000),
       loading: (msg: string, title?: string) => showToast(msg, "loading", title, 0),

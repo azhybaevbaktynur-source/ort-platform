@@ -16,9 +16,11 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
 from app.lms.core.models import UUIDPKMixin, utcnow
+from app.lms.core.types import JSONType
 
 SCOPES = ("all",)
 SOURCES = ("code", "admin", "payment")
+PLANS = ("month_1", "month_3", "season")  # F6a: the length a pass was granted or bought with (access/plans.py)
 
 
 def _user_fk(ondelete: str = "SET NULL", nullable: bool = True) -> Mapped[Optional[str]]:
@@ -85,12 +87,26 @@ class AccessPass(UUIDPKMixin, Base):
     revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     revoked_by_id: Mapped[Optional[str]] = _user_fk()
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    # F6a (migration 0025): null for legacy, code-redeemed and custom-length passes; set only by a grant by plan
+    plan: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
 
     __table_args__ = (
         CheckConstraint("scope IN ('all')", name="scope_valid"),
+        CheckConstraint("plan IS NULL OR plan IN ('month_1','month_3','season')", name="plan_valid"),
         CheckConstraint("source IN ('code','admin','payment')", name="source_valid"),
         CheckConstraint("ends_at > starts_at", name="period_valid"),
         CheckConstraint("source <> 'code' OR code_id IS NOT NULL", name="code_source_has_code"),
         Index("ix_access_passes_user_id_ends_at", "user_id", "ends_at"),
         Index("ix_access_passes_code_id", "code_id"),
     )
+
+
+class PlatformSetting(Base):
+    """F6a (migration 0025, SUBSCRIPTION_DESIGN 2): the owner's platform-wide settings, one row per key (keys of Pro:
+    `access/settings.py`). No personal data."""
+    __tablename__ = "platform_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[dict] = mapped_column(JSONType, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_by_id: Mapped[Optional[str]] = _user_fk()

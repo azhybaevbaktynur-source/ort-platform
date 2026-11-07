@@ -16,6 +16,7 @@ Redeem and admin grant lock the user's row (`SELECT ... FOR UPDATE` on `users`) 
 and inserts the pass, so they never overlap or lose days (design 7.2)."""
 from __future__ import annotations
 
+import math
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
@@ -45,6 +46,7 @@ REDEEM_IP_1H = ratelimit.Limit("access_redeem_ip_1h", 30, 3600)
 AUDIT_REDEEM = "access.redeem"
 AUDIT_GRANT = "access.grant"
 AUDIT_PASS_REVOKE = "access.pass_revoke"
+AUDIT_PRO_CANCEL = "access.pro_cancel"  # F6a
 
 
 class CodeInvalid(LMSError):
@@ -225,13 +227,22 @@ def check_resume(db: Session, attempt, assessment, *, organization_id, course_se
 
 # ------------------------------------------------------------------ passes
 
-def _open_passes(db: Session, user_id: str, now: datetime) -> list[tuple[datetime, datetime]]:
+def _open_pass_rows(db: Session, user_id: str, now: datetime) -> list[tuple[datetime, datetime, Optional[str], str]]:
+    """(starts_at, ends_at, plan, source) of the person's passes not revoked and not ended; one bounded statement."""
     rows = db.execute(
-        select(AccessPass.starts_at, AccessPass.ends_at)
+        select(AccessPass.starts_at, AccessPass.ends_at, AccessPass.plan, AccessPass.source)
         .where(AccessPass.user_id == user_id, AccessPass.revoked_at.is_(None), AccessPass.ends_at > now)
         .order_by(AccessPass.starts_at, AccessPass.id).limit(PASS_SCAN_MAX)
     ).all()
-    return [(as_utc(s), as_utc(e)) for s, e in rows]
+    return [(as_utc(s), as_utc(e), plan, source) for s, e, plan, source in rows]
+
+
+def _spans(rows) -> list[tuple[datetime, datetime]]:
+    return [(r[0], r[1]) for r in rows]
+
+
+def _open_passes(db: Session, user_id: str, now: datetime) -> list[tuple[datetime, datetime]]:
+    return _spans(_open_pass_rows(db, user_id, now))
 
 
 def latest_end(passes: list[tuple[datetime, datetime]]) -> Optional[datetime]:
@@ -271,9 +282,23 @@ def _lock_user(db: Session, user_id: str) -> Optional[User]:
                       .execution_options(populate_existing=True)).scalar_one_or_none()
 
 
+def days_left(ends_at: Optional[datetime], now: datetime) -> int:
+    """Whole days left, rounded up (0 when inactive)."""
+    if ends_at is None or ends_at <= now:
+        return 0
+    return math.ceil((ends_at - now).total_seconds() / 86400)
+
+
+def status_of(rows, now: datetime) -> dict:
+    """F6a: from `_open_pass_rows`: active, chain end, and the plan and source of the pass that ends the chain."""
+    active, ends_at = chain(_spans(rows), now)
+    last = next((r for r in sorted(rows, key=lambda r: (r[1], r[0]), reverse=True) if r[1] == ends_at), None)
+    return {"active": active, "ends_at": ends_at, "plan": last[2] if last and active else None,
+            "source": last[3] if last and active else None, "days_left": days_left(ends_at, now)}
+
+
 def status(db: Session, user_id: str, *, now: datetime) -> dict:
-    active, ends_at = chain(_open_passes(db, user_id, now), now)
-    return {"active": active, "ends_at": ends_at}
+    return status_of(_open_pass_rows(db, user_id, now), now)
 
 
 # ------------------------------------------------------------------ redeem
@@ -336,11 +361,20 @@ def redeem(db: Session, user: User, raw: str, *, ip_hash: Optional[str], request
 
 # ------------------------------------------------------------------ admin: grant and revoke
 
-def grant(db: Session, admin: User, user_id: str, *, days: Optional[int], ends_on: Optional[date], reason: str,
-          request: Optional[Request] = None) -> AccessPass:
-    if (days is None) == (ends_on is None):
-        raise ValidationFailed("Give the number of days or the end date", code="grant_length_required")
+def grant(db: Session, admin: User, user_id: str, *, days: Optional[int] = None, ends_on: Optional[date] = None,
+          reason: str, plan: Optional[str] = None, request: Optional[Request] = None) -> AccessPass:
+    """Exactly one of `plan`, `days`, `ends_on`. F6a: a plan resolves to days or the season end and then the same path
+    runs (user row lock, extension from the chain end, no-benefit refusal, 400-day cap); the new pass stores `plan`.
+    "Renew" is this call: an active chain is extended from its end, an expired one starts now."""
+    if sum(x is not None for x in (plan, days, ends_on)) != 1:
+        raise ValidationFailed("Give a plan, the number of days or the end date", code="grant_length_required")
     now = clock.now()
+    if plan is not None:
+        from app.lms.access import plans as pro_plans
+        from app.lms.access import settings as pro_settings
+
+        length = pro_plans.resolve(plan, pro_settings.get_pro(db).season_end, now)
+        days, ends_on = length.days, length.ends_on
     if days is not None and not (1 <= days <= MAX_GRANT_DAYS):
         raise ValidationFailed("At most 400 days", code="grant_too_long")
     if ends_on is not None:
@@ -359,11 +393,12 @@ def grant(db: Session, admin: User, user_id: str, *, days: Optional[int], ends_o
         db.rollback()
         raise Conflict("The person's pass already lasts longer", code="grant_no_benefit")
     p = AccessPass(id=uuid.uuid4(), user_id=user_id, scope="all", starts_at=period.starts_at,
-                   ends_at=period.ends_at, source="admin", granted_by_id=admin.id, reason=reason, created_at=now)
+                   ends_at=period.ends_at, source="admin", granted_by_id=admin.id, reason=reason, created_at=now,
+                   plan=plan)
     db.add(p)
     audit.record(db, actor=admin, action=AUDIT_GRANT, target_type="user", target_id=user_id, reason=reason,
                  details={"pass_id": str(p.id), "days": days, "ends_on": ends_on.isoformat() if ends_on else None,
-                          "ends_at": period.ends_at.isoformat()}, request=request)
+                          "ends_at": period.ends_at.isoformat(), "plan": plan}, request=request)
     db.commit()
     db.refresh(p)
     return p
@@ -389,8 +424,15 @@ def revoke_pass(db: Session, admin: User, pass_id: uuid.UUID, *, reason: str,
     if remaining > timedelta(0):
         later = db.execute(select(AccessPass).where(
             AccessPass.user_id == p.user_id, AccessPass.revoked_at.is_(None), AccessPass.id != p.id,
-            AccessPass.starts_at >= p.ends_at).with_for_update().execution_options(populate_existing=True)).scalars()
+            AccessPass.starts_at >= p.ends_at).order_by(AccessPass.starts_at, AccessPass.id)
+            .with_for_update().execution_options(populate_existing=True)).scalars().all()
         for q in later:
+            if q.plan == "season":
+                # F6a: a season pass keeps its promised end (the season end); it only starts earlier, and the passes
+                # after it (which start at that end) stay where they are
+                q.starts_at = as_utc(q.starts_at) - remaining
+                shifted.append(str(q.id))
+                break
             q.starts_at, q.ends_at = as_utc(q.starts_at) - remaining, as_utc(q.ends_at) - remaining
             shifted.append(str(q.id))
     audit.record(db, actor=admin, action=AUDIT_PASS_REVOKE, target_type="access_pass", target_id=str(p.id),
@@ -399,6 +441,64 @@ def revoke_pass(db: Session, admin: User, pass_id: uuid.UUID, *, reason: str,
     db.commit()
     db.refresh(p)
     return p
+
+
+def cancel_pro(db: Session, admin: User, user_id: str, *, reason: str, request: Optional[Request] = None) -> int:
+    """F6a: ends Pro now. Under the user row lock (the same order as redeem and grant), every pass of the person that
+    is not revoked and not ended is revoked; one audit event with the pass ids and the unused time. Nothing is shifted
+    (nothing remains). No open pass → `pro_not_active`. Returns the number of passes revoked."""
+    target = _lock_user(db, user_id)
+    if target is None:
+        raise NotFound("User not found", code="user_not_found")
+    now = clock.now()
+    rows = db.execute(select(AccessPass).where(
+        AccessPass.user_id == user_id, AccessPass.revoked_at.is_(None), AccessPass.ends_at > now)
+        .order_by(AccessPass.starts_at, AccessPass.id).limit(PASS_SCAN_MAX)
+        .with_for_update().execution_options(populate_existing=True)).scalars().all()
+    if not rows:
+        db.rollback()
+        raise Conflict("The person has no Pro to cancel", code="pro_not_active")
+    unused = timedelta(0)
+    for p in rows:
+        unused += as_utc(p.ends_at) - max(now, as_utc(p.starts_at))
+        p.revoked_at, p.revoked_by_id = now, admin.id
+    audit.record(db, actor=admin, action=AUDIT_PRO_CANCEL, target_type="user", target_id=user_id, reason=reason,
+                 details={"pass_ids": [str(p.id) for p in rows], "unused_seconds": int(unused.total_seconds())},
+                 request=request)
+    db.commit()
+    return len(rows)
+
+
+def offer(db: Session, user_id: str, *, now: datetime) -> dict:
+    """F6a `/me/access/offer`: the plans with their price (null when the owner set none) and the chain end after buying
+    each; the season plan only when a season end is set, not passed, and later than the current end. Texts fall back
+    ky/en → ru (empty → the page's placeholder). Three bounded statements: settings, own open passes, practice rule."""
+    from app.lms.access import plans as pro_plans
+    from app.lms.access import settings as pro_settings
+
+    cfg = pro_settings.get_pro(db)
+    rows = _open_pass_rows(db, user_id, now)
+    spans = _spans(rows)
+    plans = []
+    for pid in pro_plans.PLAN_IDS:
+        if pid == pro_plans.SEASON:
+            if not pro_plans.season_available(cfg.season_end, now):
+                continue
+            period = extend(spans, now, ends_on=cfg.season_end)
+            if period is None:
+                continue
+            plans.append({"id": pid, "days": None, "season_end": cfg.season_end, "price_kgs": cfg.prices.get(pid),
+                          "new_ends_at": period.ends_at})
+        else:
+            days = pro_plans.PLAN_DAYS[pid]
+            period = extend(spans, now, days=days)
+            plans.append({"id": pid, "days": days, "season_end": None, "price_kgs": cfg.prices.get(pid),
+                          "new_ends_at": period.ends_at})
+    free_practice = platform_practice_free(db)
+    includes = ["tests"] + ([] if free_practice else ["practice"]) + ["lessons"]
+    season_end = cfg.season_end if pro_plans.season_available(cfg.season_end, now) else None
+    return {"plans": plans, "includes": includes, "practice_free": free_practice,
+            "how_to_pay": cfg.how_to_pay_with_fallback(), "season_end": season_end, "status": status_of(rows, now)}
 
 
 def platform_practice_free(db: Session) -> bool:

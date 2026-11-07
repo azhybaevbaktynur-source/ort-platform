@@ -105,6 +105,7 @@ These point at the tombstone row, which holds nothing personal after deletion.
 | `pages` | `created_by_id`, `deleted_by_id`, `updated_by_id` |
 | `passage_versions` | `created_by_id` |
 | `passages` | `deleted_by_id` |
+| `platform_settings` | `updated_by_id` |
 | `question_banks` | `deleted_by_id`, `owner_id`, `shared_by_id` |
 | `question_drafts` | `created_by_id`, `updated_by_id` |
 | `question_versions` | `created_by_id` |

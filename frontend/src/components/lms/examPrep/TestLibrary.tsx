@@ -110,7 +110,7 @@ export function TestLibrary({ courseId, sources, total, className }: {
   useEffect(() => { void load(); }, [load]);
 
   // the lobby: start, continue or see the results; S3: a locked test opens the unlock page
-  const href = (c: LibraryCardOut) => (c.locked ? `/${lang}/unlock` : `${base}/assessments/${c.id}`);
+  const href = (c: LibraryCardOut) => (c.locked ? `/${lang}/pro` : `${base}/assessments/${c.id}`);
 
   return (
     <section aria-labelledby="exam-library" className={cn("min-w-0", className)}>

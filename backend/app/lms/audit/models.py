@@ -29,7 +29,7 @@ class AdminAuditLog(UUIDPKMixin, Base):
             # Phase 6: 'organization' (S1: CRUD, suspend/resume, template grants), 'invitation' (S3)
             # --- Phase 7b S1 --- 'exam_template' (publish/archive/lock/unlock/promote), 'assessment' (structure_unlock)
             "target_type IN ('user','course','teacher_request','enrollment','organization','invitation',"
-            "'exam_template','assessment','access_batch','access_code','access_pass')",  # S3 access
+            "'exam_template','assessment','access_batch','access_code','access_pass','platform_setting')",  # S3 access, F6a
             name="target_type_valid"
         ),
         Index("ix_admin_audit_log_created_at", "created_at", "id"),

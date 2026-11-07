@@ -580,3 +580,5 @@ Agent 2026-11-07 (problem 2, owner decision replacing STUDENT_UI_DESIGN §2.4): 
 Agent 2026-11-07 (problem 4 counting): one definition for every analytics number (answered, not blank, in final non-preview attempts with visible results; partial = 0.5); in-progress answers count after submission (timed attempts are finalised by the sweep; an abandoned untimed attempt does not count).
 2026-11-07: deleted Neon backup `backup-2026-11-01-before-ux-rework` (oldest; owner OK of 2026-11-07) to make room for the backup before migration 0024.
 Agent 2026-11-07 (problem 6): a "until end of season" Pro pass keeps its season end date even when an earlier pass is refunded and the chain shifts (the promise is the date, not a number of days).
+2026-11-07: problem 5 deployed (main 13a2dfc, migration 0024_course_lessons; Neon backup `backup-2026-11-07-before-lessons-0024`). All existing modules are `free`.
+Agent 2026-11-07 (problem 7): the course card's "N тестов" counts exams only (same as the Тесты page; practice quizzes are separate); covers below 320×180 px are refused; replaced covers stay in R2 (≈150 kB each, within the free tier).

@@ -31,7 +31,7 @@ export function AnalyticsCard({ title, subtitle, aside, children, className, loc
         {aside && <div className="min-w-0 text-sm leading-5 text-slate-700">{aside}</div>}
       </header>
       <LockOverlay locked={locked} title={t("progress.analytics.lock.title")} body={t("progress.analytics.lock.body")}
-        action={<GoldPill href={`/${lang}/unlock`}>{t("progress.analytics.lock.action")}</GoldPill>}>
+        action={<GoldPill href={`/${lang}/pro`}>{t("progress.analytics.lock.action")}</GoldPill>}>
         {children}
       </LockOverlay>
     </section>

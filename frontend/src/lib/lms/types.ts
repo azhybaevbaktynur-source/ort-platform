@@ -332,6 +332,8 @@ export const LMS_ERROR_CODES = [
   "access_required", "code_invalid", "code_no_benefit", "grant_no_benefit", "grant_too_long", "grant_date_passed",
   "grant_length_required", "batch_length_required", "batch_date_passed", "batch_already_revoked", "batch_not_found",
   "activation_code_not_found", "code_not_available", "pass_not_found", "pass_already_revoked",
+  // F6 Pro: plans, cancel, settings
+  "season_not_set", "season_ended", "pro_not_active", "settings_invalid", "plan_invalid",
   // S4 person page: email change, password reset
   "password_incorrect", "email_taken", "email_same", "email_change_invalid", "email_change_expired",
   "email_change_conflict", "email_send_failed", "user_deleted", "target_is_platform_admin", "reset_cooldown",

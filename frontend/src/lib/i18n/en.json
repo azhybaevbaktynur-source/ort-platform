@@ -323,7 +323,12 @@
       "user_deleted": "This account was deleted.",
       "target_is_platform_admin": "A platform admin changes their own address on their account page.",
       "reset_cooldown": "An email was just sent. Wait a little before sending another.",
-      "email_change_not_found": "No email change is waiting."
+      "email_change_not_found": "No email change is waiting.",
+      "season_not_set": "No season end is set yet. Set it in the Pro settings.",
+      "season_ended": "The season has already ended.",
+      "pro_not_active": "This person has no active Pro.",
+      "settings_invalid": "Check the settings: the season end from today to 400 days ahead, prices as whole numbers from 0 to 1,000,000, texts up to 2000 characters.",
+      "plan_invalid": "There is no such plan."
     }
   },
   "courses": {
@@ -6402,35 +6407,24 @@
     "needsPassLink": "Unlock all exams",
     "howToPay": "Payment details will appear here soon. Until then, ask the platform team for a code.",
     "unlock": {
-      "title": "Unlock all exams",
-      "intro": "Some exams are free. A pass opens every paid exam on the platform.",
-      "includedTitle": "What the pass includes",
-      "includedExams": "Every paid exam on the platform, with as many attempts as each exam allows",
-      "includedPractice": "Practice sets in the platform's courses",
-      "includedResults": "Your results and reviews stay with you after the pass ends",
-      "payTitle": "How to pay",
-      "codeTitle": "Enter your code",
-      "codeLabel": "Activation code",
       "codeHint": "12 characters, for example ABCD-EFGH-JKMN. Spaces and dashes do not matter.",
       "redeem": "Activate",
-      "success": "Done! Exams are open until {date}.",
-      "statusTitle": "Your access",
-      "statusActive": "Open until {date}",
-      "statusNone": "No pass yet. Free exams are open to you.",
       "back": "Back to my courses"
     },
     "lobby": {
-      "title": "This exam needs a pass",
-      "body": "A pass opens every paid exam on the platform. Results you already have stay with you.",
+      "title": "This exam is part of Pro",
+      "body": "Pro opens every paid test and the Pro lessons. Results you already have stay with you.",
       "action": "Unlock all exams"
     },
     "admin": {
       "nav": "Access",
-      "title": "Free and paid exams",
-      "description": "Activation codes, passes and which exams are paid.",
+      "title": "Access and Pro",
+      "description": "Students' Pro, gift vouchers, paid exams and prices.",
       "tabs": {
-        "batches": "Code batches",
-        "exams": "Paid exams"
+        "exams": "Exams",
+        "pro": "Pro",
+        "vouchers": "Vouchers",
+        "settings": "Settings"
       },
       "recent": {
         "title": "Exams published in the last 14 days",
@@ -6478,7 +6472,8 @@
         "revokedToast": "The batch is revoked.",
         "export": "Download unused codes (CSV)",
         "exported": "The file is downloaded. The download is recorded in the audit log.",
-        "open": "Codes"
+        "open": "Codes",
+        "planOption": "{plan} · {length}"
       },
       "codes": {
         "title": "Codes",
@@ -6537,10 +6532,6 @@
         "title": "Exam access",
         "active": "Open until {date}",
         "none": "No active pass",
-        "grant": "Give access",
-        "grantTitle": "Give exam access",
-        "grantBody": "The new pass starts when the current one ends. At most 400 days.",
-        "grantDone": "Access given.",
         "revoke": "Revoke",
         "revokeTitle": "Revoke this pass?",
         "revokeBody": "The person loses this access. Later passes of this person move earlier by the unused time. To move access to another account, revoke it here and give access there.",
@@ -6558,7 +6549,134 @@
         "statusEnded": "Ended",
         "statusFuture": "Not started yet",
         "redemptions": "Codes used",
-        "redemption": "…{last4} · {batch}"
+        "redemption": "…{last4} · {batch}",
+        "cancel": "Cancel Pro"
+      },
+      "more": "More",
+      "pro": {
+        "grant": "Give Pro",
+        "summary": {
+          "active": "Active",
+          "expiring": "Ending within 14 days",
+          "expired": "Ended in the last 90 days"
+        },
+        "filter": {
+          "label": "Show",
+          "active": "Active",
+          "expiring": "Ending soon",
+          "expired": "Ended"
+        },
+        "search": "Name or email",
+        "caption": "Students with Pro",
+        "columns": {
+          "person": "Student",
+          "ends": "Pro until",
+          "left": "Left",
+          "plan": "Plan",
+          "source": "Source"
+        },
+        "ended": "Ended",
+        "renew": "Renew",
+        "cancel": "Cancel Pro",
+        "empty": {
+          "active": "Nobody has an active Pro.",
+          "expiring": "Nobody's Pro ends in the next 14 days.",
+          "expired": "Nobody's Pro ended in the last 90 days.",
+          "search": "Nobody found."
+        },
+        "grantTitle": "Give Pro",
+        "renewTitle": "Renew Pro",
+        "grantBody": "The new period starts when the current Pro ends. At most 400 days ahead.",
+        "person": "Student",
+        "personHint": "Name or email, 2 characters or more",
+        "pickPerson": "Choose a student.",
+        "length": "Length",
+        "preview": "Pro until {date}",
+        "previewNoBenefit": "The current Pro already lasts longer.",
+        "granted": "Pro given until {date}",
+        "cancelTitle": "Cancel Pro?",
+        "cancelBody": "Every open pass of this person ends now. Timed exams already started can still be finished. The platform does not refund money automatically.",
+        "cancelled": "Pro cancelled.",
+        "grantBodyNew": "Pro starts now. At most 400 days ahead.",
+        "openPerson": "Open the page of {name}"
+      },
+      "settings": {
+        "title": "Pro settings",
+        "seasonTitle": "Season",
+        "seasonEnd": "Season end",
+        "seasonHint": "Once a date is set, students see the plan \"Until the end of the season\". Pro lasts until the end of that day, Bishkek time. At most 400 days ahead.",
+        "seasonNone": "Not set: the plan \"Until the end of the season\" is hidden.",
+        "seasonClear": "Clear the date",
+        "pricesTitle": "Prices",
+        "pricesHint": "In som, a whole number. Empty: the Pro page shows \"ask us\" instead of a price.",
+        "priceLabel": "{plan}, som",
+        "payTitle": "How to pay",
+        "payHint": "The text on the Pro page. An empty Kyrgyz or English text shows the Russian one. If all are empty, a standard text is shown.",
+        "save": "Save",
+        "saved": "Settings saved.",
+        "unchanged": "Nothing changed.",
+        "priceInvalid": "A price is a whole number from 0 to 1,000,000."
+      }
+    },
+    "plan": {
+      "month_1": "1 month",
+      "month_3": "3 months",
+      "season": "Until the end of the season",
+      "custom": "Custom length"
+    },
+    "source": {
+      "code": "Voucher",
+      "admin": "Manual",
+      "payment": "Payment"
+    },
+    "pill": {
+      "until": "Pro until {date}",
+      "active": "Pro"
+    },
+    "pro": {
+      "title": "Pro",
+      "menu": "Pro",
+      "intro": "Pro opens every paid test and the Pro lessons. Free tests and analytics are open to everyone.",
+      "status": {
+        "title": "Your plan",
+        "active": "Pro until {date}",
+        "free": "Free plan",
+        "freeHint": "Free tests and analytics are open. Pro opens the rest.",
+        "daysLeft": "{count} days left",
+        "daysLeft_one": "{count} day left",
+        "daysLeft_few": "{count} days left",
+        "daysLeft_many": "{count} days left",
+        "daysLeft_other": "{count} days left"
+      },
+      "compare": {
+        "title": "What you get",
+        "free": "Free",
+        "pro": "Pro",
+        "freeTests": "Free tests",
+        "analytics": "Analytics by topic",
+        "results": "Results and reviews of your attempts",
+        "practiceFree": "Practice",
+        "everythingFree": "Everything in Free",
+        "tests": "Every paid test",
+        "practice": "Practice in the platform's courses",
+        "lessons": "Pro lessons",
+        "keep": "Your results stay with you after Pro ends"
+      },
+      "plans": {
+        "title": "Choose a plan",
+        "price": "{price} som",
+        "newEnd": "Pro until {date}",
+        "priceOnRequest": "ask us"
+      },
+      "pay": {
+        "title": "How to pay",
+        "chosenPrice": "Plan: {plan}, {price} som",
+        "chosenOnRequest": "Plan: {plan}, ask us for the price"
+      },
+      "voucher": {
+        "toggle": "Have a gift code?",
+        "label": "Gift code",
+        "success": "Done! Pro until {date}"
       }
     }
   },
@@ -6677,10 +6795,6 @@
       "label": "My exams",
       "add": "Add an exam",
       "open": "Exam: {name}. Change"
-    },
-    "access": {
-      "until": "Access until {date}",
-      "open": "Access is open"
     },
     "account": {
       "title": "Account"

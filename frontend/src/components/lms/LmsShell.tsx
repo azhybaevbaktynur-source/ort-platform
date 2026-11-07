@@ -255,7 +255,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const name = testStudent ? t("studentView.testStudentName") : me?.display_name || userProfile?.displayName || user.email || "";
   const email = testStudent ? name : me?.email || user.email || ""; // the header hides an email equal to the name
   const accountLinks = testStudent ? [] : [
-    { href: `/${lang}/unlock`, label: t("access.menu"), icon: <KeyRound />, active: rest === "/unlock" }, // S3 access
+    { href: `/${lang}/pro`, label: t("access.pro.menu"), icon: <KeyRound />, active: rest === "/pro" }, // F6b Pro
     { href: `/${lang}/privacy`, label: t("privacy.title"), icon: <Lock />, active: rest === "/privacy" }, // Phase 11 S3
   ];
 

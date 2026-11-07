@@ -13,7 +13,7 @@ export function ProLockCard() {
   const { lang, t } = useTranslation();
   return (
     <LockOverlay locked title={t("modules.overview.proLockTitle")} body={t("modules.overview.proLockBody")}
-      action={<GoldPill href={`/${lang}/unlock`} icon={<Lock />}>{t("modules.overview.unlock")}</GoldPill>}>
+      action={<GoldPill href={`/${lang}/pro`} icon={<Lock />}>{t("modules.overview.unlock")}</GoldPill>}>
       <div className="aspect-video min-h-[16rem] w-full rounded-card bg-gradient-to-br from-navy-800 to-[#13698f]" />
     </LockOverlay>
   );

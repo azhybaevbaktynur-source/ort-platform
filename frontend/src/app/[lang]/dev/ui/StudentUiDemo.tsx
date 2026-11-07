@@ -69,7 +69,7 @@ export function StudentUiDemo() {
           <Countdown target={examDay} label={d("countdown")} />
           <div className="mt-4 flex flex-wrap gap-2">
             <GoldPill href={`${base}#student`}>{t("access.menu")}</GoldPill>
-            <GoldPill href={`${base}#student`} variant="secondary">{t("student.access.until", { date: "31.05.2027" })}</GoldPill>
+            <GoldPill href={`${base}#student`} variant="secondary">{t("access.pill.until", { date: "31.05.2027" })}</GoldPill>
           </div>
         </Card>
       </div>
