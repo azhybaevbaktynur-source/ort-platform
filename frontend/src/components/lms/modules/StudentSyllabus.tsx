@@ -1,8 +1,8 @@
 "use client";
 
 // Student UI U7 (docs/phases/STUDENT_UI_DESIGN.md §3.5) + F5b (COURSE_LESSONS_DESIGN L1, 7.1): `/courses/{c}/modules`
-// for a student is the **course overview**, exam-prep and teacher courses alike: the cover banner (`CourseCover` until
-// problem 7 stores a real cover) with the one primary action ("Начать курс" / "Продолжить курс" from the server's
+// for a student is the **course overview**, exam-prep and teacher courses alike: the cover banner (the teacher's cover or
+// the same generated default as the course cards, `CourseCardCover`) with the one primary action ("Начать курс" / "Продолжить курс" from the server's
 // `up_next`; "Открыть доступ" in gold when only Pro lessons remain; "Повторить с начала" when everything is done),
 // "Пройдено N из M" with the total duration, the syllabus by modules (`details`-like groups, the current one open;
 // rows: done ✓ / open ○ / next ● / locked 🔒, kind icon and duration or "тест") and the About card (description,
@@ -18,7 +18,7 @@ import { getModules, recordView, setDone } from "@/lib/lms/modules";
 import { templateUi } from "@/lib/lms/templates";
 import { isStaffModules, type ItemStudentOut, type ModuleStudentOut, type ModulesStudentOut } from "@/lib/lms/modulesTypes";
 import { useCourse } from "@/components/lms/CourseContext";
-import { CourseCover } from "@/components/lms/course/CourseCover";
+import { CourseCardCover } from "@/components/lms/course/CourseCardCover";
 import { fmtDayMonthTime } from "@/components/lms/home/format";
 import { LeaveCourseLink } from "@/components/lms/home/LeaveCourseLink";
 import { Checkbox, EmptyState, ErrorState, GoldPill, LinkButton, LoadingState, Mascot, cn, focusRing } from "@/components/ui";
@@ -300,7 +300,7 @@ function Hero({ lessons, data, base, examPrep, track }: {
 
   return (
     <section aria-labelledby="course-overview-title" className="overflow-hidden rounded-card border border-slate-200 bg-white">
-      <CourseCover title={courseTitle} coverUrl={course.cover_url} className="aspect-[16/9] sm:aspect-[3/1] lg:aspect-[5/1]" />
+      <CourseCardCover courseId={course.id} platform={course.is_platform_course} coverUrl={course.cover_url} className="aspect-[16/9] sm:aspect-[3/1] lg:aspect-[5/1]" />
       <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div className="min-w-0">
           {examPrep ? (

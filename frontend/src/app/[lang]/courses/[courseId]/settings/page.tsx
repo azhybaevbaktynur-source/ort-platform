@@ -9,6 +9,7 @@ import {
 } from "@/lib/lms/courses";
 import { cleanLocalized } from "@/lib/lms/localized";
 import { isStaffCourse, type CourseStaffOut, type Lang, type LocalizedText, type RosterEntryOut } from "@/lib/lms/types";
+import { useAuth } from "@/lib/auth-context";
 import { useCourse } from "@/components/lms/CourseContext";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { JoinCodeDisplay } from "@/components/lms/JoinCodeDisplay";
@@ -44,6 +45,7 @@ function Settings({ course }: { course: CourseStaffOut }) {
   const { lang, t } = useTranslation();
   const router = useRouter();
   const { setCourse } = useCourse();
+  const { userProfile } = useAuth();
   const isOwner = course.is_owner;
 
   const [languages, setLanguages] = useState<Lang[]>(course.languages);
@@ -174,9 +176,12 @@ function Settings({ course }: { course: CourseStaffOut }) {
         </div>
       </form>
 
-      {/* F7b: the cover (platform courses: platform admins only, 403 platform_course_admin_only otherwise) */}
-      <CourseCoverSection courseId={course.id} title={courseName} coverUrl={course.cover_url}
-        onChanged={(url) => apply({ ...course, cover_url: url })} />
+      {/* F7b: the cover; a platform course's cover belongs to platform admins (the server refuses others: 403
+          platform_course_admin_only), so its other staff do not see the section */}
+      {(!course.is_platform_course || userProfile?.is_platform_admin) && (
+        <CourseCoverSection courseId={course.id} title={courseName} platform={!!course.is_platform_course}
+          coverUrl={course.cover_url} onChanged={(url) => apply({ ...course, cover_url: url })} />
+      )}
 
       {/* --- Phase 8a S4a: course home (locked on ORT with the template note) --- */}
       <CourseHomeSection course={course} />

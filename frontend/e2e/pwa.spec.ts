@@ -9,23 +9,23 @@ import { seed, settle, signIn, tr, type SeedUser } from "./helpers";
  * "Install the app" entry (Chrome prompt, iOS sheet, hidden in the installed app); since the student shell (Student UI
  * U2) the entry sits in the student sidebar (desktop) and the "More" sheet (phone), no longer in the account menu.
  *
- * Screens (ru, 375 / 1440 / 1920) go to $S5_SHOTS (default /tmp/s5_shots).
+ * Screens (ru, 375 / 1440 / 1920) go to $S5_SHOTS only when set.
  */
 
 const L = "ru" as const;
 const t = (key: string, vars: Record<string, string | number> = {}) => tr(L, key, vars);
-const SHOTS = process.env.S5_SHOTS || "/tmp/s5_shots";
+const SHOTS = process.env.S5_SHOTS || ""; // screenshots only when S5_SHOTS names a folder
 const WIDTHS = [375, 1440, 1920] as const;
 const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 /** What the worker may keep: build files, icons, the manifest, mascot images and the three offline pages. */
 const CACHEABLE = /^\/(?:_next\/static\/|icons\/|mascot\/|manifest\.webmanifest$|(?:ru|ky|en)\/offline$)/;
 
 async function shoot(page: Page, name: string, widths: readonly number[] = WIDTHS, fullPage = false) {
-  fs.mkdirSync(SHOTS, { recursive: true });
+  if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
   for (const width of widths) {
     await page.setViewportSize({ width, height: 900 });
     await settle(page, false);
-    await page.screenshot({ path: path.join(SHOTS, `${name}-${width}-ru.png`), fullPage, animations: "disabled", caret: "hide" });
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `${name}-${width}-ru.png`), fullPage, animations: "disabled", caret: "hide" });
   }
   await page.setViewportSize({ width: 1440, height: 900 });
 }
@@ -257,8 +257,8 @@ test.describe("installable app (ru)", () => {
       await expect(sheet).toBeVisible();
       for (const k of ["iosStep1", "iosStep2", "iosStep3"]) await expect(sheet).toContainText(t(`pwa.install.${k}`));
       await settle(page, false);
-      fs.mkdirSync(SHOTS, { recursive: true });
-      await page.screenshot({ path: path.join(SHOTS, "ios-sheet-375-ru.png"), animations: "disabled", caret: "hide" });
+      if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
+      if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "ios-sheet-375-ru.png"), animations: "disabled", caret: "hide" });
       await sheet.getByRole("button", { name: t("pwa.install.iosDone") }).click();
       await expect(sheet).toHaveCount(0);
       const again = await openMore(page);

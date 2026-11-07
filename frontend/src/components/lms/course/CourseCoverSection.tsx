@@ -16,7 +16,7 @@ import {
 } from "@/lib/lms/courseCover";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { Button, Card, ConfirmDialog, ErrorState, cn, focusRing } from "@/components/ui";
-import { CourseCover } from "./CourseCover";
+import { CourseCardCover } from "./CourseCardCover";
 
 /** Error codes with a cover-specific text (`courses.cover.errors.<code>`); anything else: the general LMS text. */
 const COVER_ERRORS = new Set([
@@ -125,10 +125,12 @@ function FocusPicker({ pending, fx, fy, onChange }: {
   );
 }
 
-export function CourseCoverSection({ courseId, title, coverUrl, onChanged, className }: {
+export function CourseCoverSection({ courseId, title, platform = false, coverUrl, onChanged, className }: {
   courseId: string;
-  /** the course title in the viewer's language: the default cover's mark */
+  /** the course title in the viewer's language (the remove dialog names it) */
   title: string;
+  /** a platform course: the default cover draws the platform mark, as on its cards */
+  platform?: boolean;
   coverUrl: string | null | undefined;
   onChanged: (coverUrl: string | null) => void;
   className?: string;
@@ -216,7 +218,7 @@ export function CourseCoverSection({ courseId, title, coverUrl, onChanged, class
             </div>
           ) : (
             <div data-testid="cover-current" data-cover-url={coverUrl ?? ""}>
-              <CourseCover title={title} coverUrl={coverUrl} className="aspect-video rounded-xl border border-slate-200" />
+              <CourseCardCover courseId={courseId} platform={platform} coverUrl={coverUrl} className="rounded-xl border border-slate-200" />
             </div>
           )}
         </div>

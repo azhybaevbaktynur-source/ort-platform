@@ -395,6 +395,18 @@ async def test_admin_course_detail_carries_cover_and_platform_flag(db, local_sto
     listed = (await api.call(admin, "GET", "/platform/courses")).json()["items"]
     assert listed and all(i["is_platform_course"] is None for i in listed)  # the list stays as it was
 
+async def test_course_out_carries_platform_flag(db, api):
+    """F7: the course page (staff and student) says whether it is a platform course: the settings page hides the
+    cover section from non-admin staff of a platform course, and the default cover draws the platform mark."""
+    owner, s = teacher(db), make_user(db)
+    c, other = platform_course(db, owner), make_course(db, owner)
+    enroll(db, c, s)
+    staff = (await api.call(owner, "GET", f"/courses/{c.id}")).json()
+    assert "join_code" in staff and staff["is_platform_course"] is True
+    assert (await api.call(s, "GET", f"/courses/{c.id}")).json()["is_platform_course"] is True
+    assert (await api.call(owner, "GET", f"/courses/{other.id}")).json()["is_platform_course"] is False
+
+
 def test_catalog_page_of_24_is_still_two_statements(db):
     t, viewer = teacher(db), make_user(db)
     courses = [make_course(db, t, status="published", visibility="catalog", enrollment_mode="open",

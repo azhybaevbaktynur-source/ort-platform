@@ -160,6 +160,7 @@ class CourseStudentOut(BaseModel):
     # --- Phase 8a S1 end ---
     exam_date: Optional[date] = None  # Exam prep S2: set only on exam-prep courses (course template)
     cover_url: Optional[str] = None  # F7a: the course page banner; null = generated default cover
+    is_platform_course: bool = False  # F7: platform courses: default cover mark; cover editing for platform admins only
 
 
 class CourseStaffOut(CourseStudentOut):
@@ -259,7 +260,19 @@ def course_student_out(course, enrollment, owner, organization_name: str = "") -
         features=_course_features(course),  # --- Phase 8a S3 --- (one line)
         exam_date=_exam_date(course),  # Exam prep S2
         cover_url=_cover_url(course),  # F7a
+        is_platform_course=_is_platform_course(course),  # F7
     )
+
+
+def _is_platform_course(course) -> bool:
+    from sqlalchemy.orm import object_session
+
+    db = object_session(course)
+    if db is None:
+        return False
+    from app.lms.modules.service import is_platform_course
+
+    return is_platform_course(db, course)
 
 
 def _cover_url(course) -> Optional[str]:

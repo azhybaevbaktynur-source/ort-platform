@@ -127,6 +127,8 @@ export interface CourseStudentOut {
   my_enrollment: MyEnrollmentOut;
   /** F7a: the course page banner; null: generated default cover (absent: older backend) */
   cover_url?: string | null;
+  /** F7: the platform organization's course (cover: platform admins only; default cover: the platform mark) */
+  is_platform_course?: boolean;
 }
 
 export interface CourseStaffOut extends CourseStudentOut {

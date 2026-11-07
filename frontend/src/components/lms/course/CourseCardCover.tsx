@@ -1,6 +1,6 @@
 "use client";
 
-// F7c: the 16:9 cover of a course card (the overview banner keeps CourseCover). The teacher's picture (`cover_url`, already 1280 x 720 WebP) or a generated
+// F7c: the cover of a course: cards (16:9), the overview banner and the settings preview. The teacher's picture (`cover_url`, already 1280 x 720 WebP) or a generated
 // default: a soft gradient of the brand tints, a pale shape and one quiet subject icon, picked from the course id, so a
 // course looks the same everywhere. Never a dark or saturated colour (STUDENT_UI_FIX_PLAN 4.1, 7.1).
 import React from "react";
