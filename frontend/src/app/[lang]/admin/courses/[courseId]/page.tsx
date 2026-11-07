@@ -19,6 +19,7 @@ import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
 import { Disclosure } from "@/components/lms/admin/Disclosure";
 import { OutlineMenu } from "@/components/lms/modules/OutlineMenu";
 import { CourseStatusBadge, LoadError, OrgError, SystemAccountBadge } from "@/components/lms/org/OrgUi";
+import { CourseCoverSection } from "@/components/lms/course/CourseCoverSection"; // F7b
 
 type Action = "delete" | "restore" | "unlist" | "relist" | "transfer";
 
@@ -174,6 +175,12 @@ export default function AdminCourseDetailPage() {
           ...(course.deleted_at ? [{ key: "deleted", term: t("platformAdmin.courses.deleted"), description: fmtApiDateTimeShort(course.deleted_at, lang) }] : []),
         ]} />
       </Card>
+
+      {/* F7b: platform courses take their cover from a platform admin */}
+      {!isDeleted && course.is_platform_course && (
+        <CourseCoverSection className="mb-6" courseId={course.id} title={courseTitle} coverUrl={course.cover_url}
+          onChanged={(url) => setCourse((c) => (c ? { ...c, cover_url: url } : c))} />
+      )}
 
       {!isDeleted && (
         <Disclosure className="mb-6" title={t("platformAdmin.courses.transferHeading")}>

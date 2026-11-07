@@ -203,6 +203,10 @@ class AdminCourseOut(BaseModel):
     created_at: datetime
     deleted_at: Optional[datetime] = None
     deleted_by_id: Optional[str] = None
+    # --- F7b begin --- (the course detail only, null in the list: the admin cover section of a platform course)
+    cover_url: Optional[str] = None
+    is_platform_course: Optional[bool] = None
+    # --- F7b end ---
 
 
 # --- Phase 6 S2b begin --- (course template, PHASE_6_DESIGN 5.3)

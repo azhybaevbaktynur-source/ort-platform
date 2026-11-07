@@ -31,7 +31,14 @@ def _one(db: Session, course_id: uuid.UUID) -> AdminCourseOut:
     row = db.execute(svc.admin_courses_query().where(Course.id == course_id)).first()
     if row is None:
         raise svc.not_found_course()
-    return admin_course_out(row[0], row[1], row[2])
+    out = admin_course_out(row[0], row[1], row[2])
+    # F7b: the detail carries the cover and the platform flag (platform admins set the cover of platform courses)
+    from app.lms.courses.cover import cover_url
+    from app.lms.modules.service import is_platform_course
+
+    out.cover_url = cover_url(db, row[0])
+    out.is_platform_course = is_platform_course(db, row[0])
+    return out
 
 
 @router.get("/courses", response_model=PageOut[AdminCourseOut])
