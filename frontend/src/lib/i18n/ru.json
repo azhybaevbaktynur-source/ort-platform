@@ -532,6 +532,20 @@
         "storage_full": "Хранилище изображений заполнено. Попробуйте позже или напишите в поддержку.",
         "storage_quota_exceeded": "Ваш лимит хранилища исчерпан. Удалите ненужные изображения и попробуйте снова."
       }
+    },
+    "card": {
+      "byCode": "По коду",
+      "byApplication": "Заявка",
+      "tests": "{count} тестов",
+      "tests_one": "{count} тест",
+      "tests_few": "{count} теста",
+      "tests_many": "{count} тестов",
+      "tests_other": "{count} тестов",
+      "lessons": "{count} уроков",
+      "lessons_one": "{count} урок",
+      "lessons_few": "{count} урока",
+      "lessons_many": "{count} уроков",
+      "lessons_other": "{count} уроков"
     }
   },
   "teacherRequest": {
@@ -2365,7 +2379,6 @@
   "catalog": {
     "title": "Каталог курсов",
     "subtitle": "Курсы, открытые для всех учеников платформы.",
-    "students": "Учеников: {count}",
     "join": "Записаться",
     "joining": "Запись…",
     "open": "Открыть",
@@ -2384,8 +2397,8 @@
       "anyOrganization": "Любая организация",
       "mode": "Как записаться",
       "anyMode": "Любой способ",
-      "toggle": "Фильтры",
-      "toggleCount": "Фильтры ({count})"
+      "more": "Ещё фильтры",
+      "moreCount": "Ещё фильтры ({count})"
     },
     "modes": {
       "open": "Открыт для всех",

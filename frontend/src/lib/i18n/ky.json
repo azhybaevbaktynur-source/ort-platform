@@ -532,6 +532,20 @@
         "storage_full": "Сүрөттөр сактагычы толгон. Кийинчерээк аракет кылыңыз же колдоо кызматына жазыңыз.",
         "storage_quota_exceeded": "Сиздин сактагыч чегиңиз толду. Колдонулбаган сүрөттөрдү өчүрүп, кайра аракет кылыңыз."
       }
+    },
+    "card": {
+      "byCode": "Код боюнча",
+      "byApplication": "Өтүнмө",
+      "tests": "{count} тест",
+      "tests_one": "{count} тест",
+      "tests_few": "{count} тест",
+      "tests_many": "{count} тест",
+      "tests_other": "{count} тест",
+      "lessons": "{count} сабак",
+      "lessons_one": "{count} сабак",
+      "lessons_few": "{count} сабак",
+      "lessons_many": "{count} сабак",
+      "lessons_other": "{count} сабак"
     }
   },
   "teacherRequest": {
@@ -2365,7 +2379,6 @@
   "catalog": {
     "title": "Курстардын каталогу",
     "subtitle": "Платформадагы бардык окуучуларга ачык курстар.",
-    "students": "Окуучулар: {count}",
     "join": "Жазылуу",
     "joining": "Жазылууда…",
     "open": "Ачуу",
@@ -2384,8 +2397,8 @@
       "anyOrganization": "Каалаган уюм",
       "mode": "Кантип жазылуу",
       "anyMode": "Каалаган жол",
-      "toggle": "Чыпкалар",
-      "toggleCount": "Чыпкалар ({count})"
+      "more": "Дагы чыпкалар",
+      "moreCount": "Дагы чыпкалар ({count})"
     },
     "modes": {
       "open": "Баарына ачык",

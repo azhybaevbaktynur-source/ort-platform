@@ -532,6 +532,20 @@
         "storage_full": "The image storage is full. Try again later or write to support.",
         "storage_quota_exceeded": "Your storage limit is reached. Delete unused images and try again."
       }
+    },
+    "card": {
+      "byCode": "By code",
+      "byApplication": "Application",
+      "tests": "{count} tests",
+      "tests_one": "{count} test",
+      "tests_few": "{count} tests",
+      "tests_many": "{count} tests",
+      "tests_other": "{count} tests",
+      "lessons": "{count} lessons",
+      "lessons_one": "{count} lesson",
+      "lessons_few": "{count} lessons",
+      "lessons_many": "{count} lessons",
+      "lessons_other": "{count} lessons"
     }
   },
   "teacherRequest": {
@@ -2365,7 +2379,6 @@
   "catalog": {
     "title": "Course catalog",
     "subtitle": "Courses open to every student on the platform.",
-    "students": "Students: {count}",
     "join": "Join",
     "joining": "Joining…",
     "open": "Open",
@@ -2384,8 +2397,8 @@
       "anyOrganization": "Any organization",
       "mode": "How to join",
       "anyMode": "Any way",
-      "toggle": "Filters",
-      "toggleCount": "Filters ({count})"
+      "more": "More filters",
+      "moreCount": "More filters ({count})"
     },
     "modes": {
       "open": "Open to all",

@@ -24,6 +24,7 @@ import { STUDENT_TITLE } from "@/components/lms/student/StudentPageHeader";
 import { NextCard } from "@/components/lms/examPrep/NextCard";
 import { GoalEditor, fmtExamDate } from "@/components/lms/examPrep/GoalStrip";
 import { noteExamPrep } from "@/components/lms/student/gettingStarted"; // Student UI U8
+import { CourseCard } from "@/components/lms/course/CourseCard";
 import { PlatformCourses } from "./PlatformCourses";
 import { HOME_CARD, StreakCard, StreakCardSkeleton } from "./StreakCard";
 import { useErrorText } from "./useErrorText";
@@ -255,7 +256,7 @@ function PrepSkeleton() {
   );
 }
 
-/** U9 (review 1): the student's courses outside the exam switcher (teacher-made courses) as one compact list. */
+/** The student's courses outside the exam switcher (teacher-made courses) as course cards. */
 function OtherCourses({ home }: { home: HomeOut }) {
   const { lang, t } = useTranslation();
   const other = home.courses.filter((c) => c.student_layout !== "exam_prep");
@@ -263,15 +264,9 @@ function OtherCourses({ home }: { home: HomeOut }) {
   return (
     <section aria-labelledby="home-other-courses" className="min-w-0">
       <h2 id="home-other-courses" className="mb-2 text-lg font-semibold leading-7 text-slate-900">{t("home.prep.otherCourses")}</h2>
-      <ul className="divide-y divide-slate-100 rounded-card border border-slate-200 bg-white">
+      <ul className={HOME_CARD_GRID}>
         {other.map((c) => (
-          <li key={c.id}>
-            <Link href={`/${lang}/courses/${c.id}`}
-              className={cn("flex min-h-12 items-center gap-3 rounded-card px-4 py-2 text-base font-medium leading-6 text-slate-900 hover:bg-slate-50 sm:text-sm sm:leading-5", focusRing, "focus-visible:ring-offset-0")}>
-              <span className="min-w-0 flex-1 break-words">{pickLocalized(c.title, lang, c.default_language) || t("courses.list.untitled")}</span>
-              <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-slate-400" />
-            </Link>
-          </li>
+          <CourseCard key={c.id} course={c} href={`/${lang}/courses/${c.id}`} progress={c.progress} nextDue={c.next_due_at} />
         ))}
       </ul>
     </section>
@@ -367,7 +362,7 @@ export function ExamPrepHome({ courseId, courseTitle, home, homeError, side, emb
       )}
       {home ? (
         <>
-          <PlatformCourses courses={home.platform_courses ?? []} compact />
+          <PlatformCourses courses={home.platform_courses ?? []} grid={HOME_CARD_GRID} joinVariant="secondary" />
           <OtherCourses home={home} />
         </>
       ) : homeError}

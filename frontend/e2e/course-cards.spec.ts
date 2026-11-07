@@ -139,7 +139,8 @@ test.describe("course cards", () => {
     const main = card(page, WITH_ALL);
     await expect(main).toContainText(teacher().name);
     await expect(main).toContainText(t("courses.languages.ru"));
-    await expect(main).toContainText(DESCRIPTION.slice(0, 30));
+    await expect(main).not.toContainText(DESCRIPTION.slice(0, 30)); // F7c: the bar replaces the description of a joined course
+    await expect(card(page, LONG)).toContainText("Короткое описание."); // nothing to finish: the description stays
     await expect(main.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "1");
     await expect(main.getByRole("progressbar")).toHaveAttribute("aria-valuemax", "2");
     await expect(main).toContainText(t("modules.progressCount", { done: 1, total: 2 }));
@@ -151,10 +152,11 @@ test.describe("course cards", () => {
     const row = (await api(student, "GET", "/me/home")).courses.find((c: { title: { ru?: string } }) => c.title.ru === WITH_ALL);
     expect(row.organization_display_name).toBeNull();
 
-    // the platform course names the platform in the UI language (Exam prep S2 UX review; the stored name is English)
+    // the platform course carries no teacher or organization line (F7c; the stored organization name is English)
     const ort = page.getByRole("region", { name: t("home.platform.title") })
       .locator("li", { has: page.locator(`a[href="/ru/courses/catalog/${seed().course_id}"]`) });
-    await expect(ort).toContainText(t("common.appName"));
+    await expect(ort).not.toContainText(t("common.appName"));
+    await expect(ort).not.toContainText("Platform");
 
     // a zero has its maximum
     await expect(grades(page).getByText("0 / 10", { exact: true })).toBeVisible();
