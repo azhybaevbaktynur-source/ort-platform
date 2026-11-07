@@ -1,6 +1,7 @@
+import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { E2E_DIR, seed, settle, signIn, tr, uxShots, VIEWPORTS, type SeedUser } from "./helpers";
+import { seed, settle, signIn, tr, uxShots, VIEWPORTS, type SeedUser } from "./helpers";
 
 /**
  * Phase 9 S4 walk (PHASE_9_DESIGN 8.1, 11, 12): enrollment form builder → Settings → Enrollment (form mode + catalog)
@@ -10,7 +11,7 @@ import { E2E_DIR, seed, settle, signIn, tr, uxShots, VIEWPORTS, type SeedUser } 
  *
  * Data: `seed_backend.py` (`seed_catalog_apply`, written after every other row): a published private course of an
  * approved teacher without a form, one applicant in no course and three more applicants (S5). Screens of each step
- * are written to `$E2E_DIR/phase9-s4/` (ru, 375 px and 1440 px) and the UX-gate set to `$E2E_DIR/phase9-s5/` (staff
+ * are written to `$UX_SCREENS_DIR/phase9-s4/` only when UX_SCREENS_DIR is set (ru, 375 px and 1440 px) and the UX-gate set to `$E2E_DIR/phase9-s5/` (staff
  * ru + en, student ru + ky + en); they are not compared against baselines.
  *
  * Run (same harness as the ORT specs, docs/phases/ORT_BASELINE/README.md "Run"):
@@ -25,7 +26,8 @@ const NOTE = "Добро пожаловать в группу";
 const REJECT_NOTE = "Группа уже набрана, подайте заявку в следующем месяце";
 
 const data = () => seed().catalog_apply;
-const shots = path.join(E2E_DIR, "phase9-s4");
+// step screenshots only when UX_SCREENS_DIR names a folder
+const shots = process.env.UX_SCREENS_DIR ? path.join(path.resolve(process.env.UX_SCREENS_DIR), "phase9-s4") : null;
 const UX = "phase9-s5";
 const STAFF: ("ru" | "en")[] = ["ru", "en"];
 const STUDENT: ("ru" | "ky" | "en")[] = ["ru", "ky", "en"];
@@ -34,7 +36,10 @@ async function shot(page: Page, name: string) {
   for (const [vp, size] of [["375", VIEWPORTS.phone], ["1440", VIEWPORTS.desktop]] as const) {
     await page.setViewportSize(size);
     await settle(page, false);
-    await page.screenshot({ path: path.join(shots, `${name}-${vp}.png`), fullPage: true });
+    if (shots) {
+      fs.mkdirSync(shots, { recursive: true });
+      await page.screenshot({ path: path.join(shots, `${name}-${vp}.png`), fullPage: true });
+    }
   }
   await page.setViewportSize(VIEWPORTS.desktop);
 }

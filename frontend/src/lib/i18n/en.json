@@ -506,6 +506,8 @@
       "current": "Current cover",
       "default": "Default cover (no image uploaded)",
       "preview": "Preview: what students will see",
+      "previewCard": "Card",
+      "previewBanner": "Banner on the course page",
       "previewAlt": "Preview of the new cover",
       "choose": "Choose an image",
       "replace": "Replace the image",
@@ -535,6 +537,8 @@
     },
     "card": {
       "byCode": "By code",
+      "pro": "Pro",
+      "proHint": "has paid tests",
       "byApplication": "Application",
       "tests": "{count} tests",
       "tests_one": "{count} test",

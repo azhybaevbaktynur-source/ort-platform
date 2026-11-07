@@ -438,6 +438,7 @@ class CatalogCourseOut(BaseModel):
     cover_url: Optional[str] = None
     tests_count: int = 0
     lessons_count: int = 0
+    has_paid_tests: bool = False  # F7: a platform course with a published paid test (the card's "Pro" mark)
 
 
 CATALOG_COURSE_KEYS = frozenset(CatalogCourseOut.model_fields)
@@ -454,4 +455,5 @@ def catalog_course_out(course, my_role: Optional[str], my_state: Optional[str], 
         student_count=student_count,
         my_enrollment=CatalogEnrollmentOut(role=my_role, state=my_state) if my_role is not None else None,
         cover_url=x.cover_url, tests_count=x.tests_count, lessons_count=x.lessons_count,
+        has_paid_tests=x.has_paid_tests,
     )

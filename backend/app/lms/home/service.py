@@ -621,7 +621,8 @@ def _platform_courses(db: Session, user: User) -> list[sch.HomePlatformCourseOut
         default_language=r[0].default_language, owner_display_name=r.owner or "—",
         organization_display_name=card_organization_name("platform", r.root_name),
         cover_url=extras.get(r[0].id, NO_EXTRAS).cover_url, tests_count=extras.get(r[0].id, NO_EXTRAS).tests_count,
-        lessons_count=extras.get(r[0].id, NO_EXTRAS).lessons_count) for r in rows]
+        lessons_count=extras.get(r[0].id, NO_EXTRAS).lessons_count,
+        has_paid_tests=extras.get(r[0].id, NO_EXTRAS).has_paid_tests) for r in rows]
 # --- Exam prep S2 end ---
 
 

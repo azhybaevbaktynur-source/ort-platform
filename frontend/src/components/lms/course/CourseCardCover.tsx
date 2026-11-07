@@ -1,10 +1,10 @@
 "use client";
 
 // F7c: the cover of a course: cards (16:9), the overview banner and the settings preview. The teacher's picture (`cover_url`, already 1280 x 720 WebP) or a generated
-// default: a soft gradient of the brand tints, a pale shape and one quiet subject icon, picked from the course id, so a
+// default: a soft gradient of the brand tints, a pale shape and one quiet mark (a book; a graduation cap for platform courses), the tint picked from the course id, so a
 // course looks the same everywhere. Never a dark or saturated colour (STUDENT_UI_FIX_PLAN 4.1, 7.1).
 import React from "react";
-import { BookOpen, Calculator, FlaskConical, GraduationCap, Globe2, Languages, type LucideIcon } from "lucide-react";
+import { BookOpen, GraduationCap } from "lucide-react";
 import { cn } from "@/components/ui";
 
 const TINTS = [
@@ -13,7 +13,6 @@ const TINTS = [
   "from-brand-50 to-brand-100",
   "from-brand-100 via-brand-50 to-brand-100",
 ];
-const ICONS: LucideIcon[] = [BookOpen, Calculator, Languages, FlaskConical, Globe2];
 
 function hash(s: string): number {
   let h = 0;
@@ -29,7 +28,7 @@ export function CourseCardCover({ courseId, coverUrl, platform = false, classNam
   className?: string;
 }) {
   const h = hash(courseId);
-  const Icon = platform ? GraduationCap : ICONS[h % ICONS.length];
+  const Icon = platform ? GraduationCap : BookOpen; // one neutral mark; platform (exam preparation) courses their own
   return (
     <div className={cn("relative aspect-video w-full overflow-hidden bg-brand-50", className)}>
       {coverUrl

@@ -130,6 +130,8 @@ export interface HomePlatformCourseOut {
   tests_count?: number;
   /** F7a: lessons (page, file, link) of published modules */
   lessons_count?: number;
+  /** F7: a platform course with a published paid test (the card's "Pro" mark) */
+  has_paid_tests?: boolean;
 }
 
 export interface HomeTeacherApplicationOut {

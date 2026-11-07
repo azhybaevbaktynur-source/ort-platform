@@ -206,22 +206,35 @@ export function CourseCoverSection({ courseId, title, platform = false, coverUrl
   return (
     <Card title={t("courses.cover.title")} description={t("courses.cover.hint")} className={className}>
       <div className="space-y-4" data-testid="course-cover-section">
-        <div className="max-w-md">
-          <p className="mb-2 text-sm font-medium text-slate-700">
-            {pending ? t("courses.cover.preview") : coverUrl ? t("courses.cover.current") : t("courses.cover.default")}
-          </p>
-          {pending ? (
-            <div className="relative aspect-video overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
-              {/* eslint-disable-next-line @next/next/no-img-element -- a local object URL; object-position = the server's crop */}
-              <img src={pending.url} alt={t("courses.cover.previewAlt")} data-testid="cover-preview"
-                className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: `${fx * 100}% ${fy * 100}%` }} />
+        {pending ? (
+          // two previews of the chosen frame: the 16:9 card and the course page banner (StudentSyllabus' aspect classes)
+          <div className="space-y-4">
+            <p className="text-sm font-medium text-slate-700">{t("courses.cover.preview")}</p>
+            <div className="max-w-md">
+              <p className="mb-2 text-sm text-slate-600">{t("courses.cover.previewCard")}</p>
+              <div className="relative aspect-video overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+                {/* eslint-disable-next-line @next/next/no-img-element -- a local object URL; object-position = the server's crop */}
+                <img src={pending.url} alt={t("courses.cover.previewAlt")} data-testid="cover-preview"
+                  className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: `${fx * 100}% ${fy * 100}%` }} />
+              </div>
             </div>
-          ) : (
+            <div className="max-w-3xl">
+              <p className="mb-2 text-sm text-slate-600">{t("courses.cover.previewBanner")}</p>
+              <div className="relative aspect-[16/9] overflow-hidden rounded-xl border border-slate-200 bg-slate-100 sm:aspect-[3/1] lg:aspect-[5/1]">
+                {/* eslint-disable-next-line @next/next/no-img-element -- the same object URL, framed like the banner */}
+                <img src={pending.url} alt="" data-testid="cover-preview-banner"
+                  className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: `${fx * 100}% ${fy * 100}%` }} />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="max-w-md">
+            <p className="mb-2 text-sm font-medium text-slate-700">{coverUrl ? t("courses.cover.current") : t("courses.cover.default")}</p>
             <div data-testid="cover-current" data-cover-url={coverUrl ?? ""}>
               <CourseCardCover courseId={courseId} platform={platform} coverUrl={coverUrl} className="rounded-xl border border-slate-200" />
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {pending && <FocusPicker pending={pending} fx={fx} fy={fy} onChange={(x, y) => { setFx(x); setFy(y); }} />}
 

@@ -40,6 +40,7 @@ class CardExtras:
     lessons_count: int = 0
     is_platform_course: bool = False
     student_count: int = 0
+    has_paid_tests: bool = False  # a platform course with a published paid test (the card's quiet "Pro" mark)
 
 
 NO_EXTRAS = CardExtras()
@@ -55,6 +56,17 @@ def _tests_count():
                    Assessment.status == "published", Assessment.is_practice.is_(False),
                    Assessment.published_version_id.isnot(None))
             .correlate(Course).scalar_subquery())
+
+
+def _has_paid_tests():
+    """A test of the Tests page (`_tests_count`'s rule) that needs a pass (S3 access: `paid`, platform courses only)."""
+    from app.lms.assessments.models import Assessment
+
+    return (select(Assessment.id)
+            .where(Assessment.course_id == Course.id, Assessment.deleted_at.is_(None),
+                   Assessment.status == "published", Assessment.is_practice.is_(False),
+                   Assessment.published_version_id.isnot(None), Assessment.access_tier == "paid")
+            .correlate(Course).exists())
 
 
 def _lessons_count():
@@ -97,7 +109,7 @@ def card_extras(db: Session, course_ids: Iterable, *, students: bool = False) ->
     ids = list(dict.fromkeys(course_ids))
     if not ids:
         return {}
-    cols = [Course.id, Asset.sha256, _tests_count(), _lessons_count(), Organization.path]
+    cols = [Course.id, Asset.sha256, _tests_count(), _lessons_count(), Organization.path, _has_paid_tests()]
     if students:
         cols.append(_student_count())
     rows = db.execute(
@@ -108,7 +120,8 @@ def card_extras(db: Session, course_ids: Iterable, *, students: bool = False) ->
     ).all()
     return {r[0]: CardExtras(cover_url=media_url(r[1]) if r[1] else None, tests_count=int(r[2] or 0),
                              lessons_count=int(r[3] or 0), is_platform_course=is_platform_path(r[4]),
-                             student_count=int(r[5] or 0) if students else 0) for r in rows}
+                             has_paid_tests=bool(r[5]) and is_platform_path(r[4]),
+                             student_count=int(r[6] or 0) if students else 0) for r in rows}
 
 
 def cover_url(db: Session, course: Course) -> Optional[str]:

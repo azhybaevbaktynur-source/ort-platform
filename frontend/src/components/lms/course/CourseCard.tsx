@@ -47,6 +47,8 @@ export interface CourseCardData {
   cover_url?: string | null;
   tests_count?: number;
   lessons_count?: number;
+  /** F7: a platform course with a published paid test: a quiet gold "Pro" mark */
+  has_paid_tests?: boolean;
 }
 
 function Progress({ done, total }: { done: number; total: number }) {
@@ -92,7 +94,17 @@ export function CourseCard({ course, href, headingLevel = 3, badges, progress, n
     <li className="group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
       <CourseCardCover courseId={course.id} coverUrl={course.cover_url} platform={course.is_platform_course} />
       <div className="flex flex-1 flex-col gap-2 px-4 py-3">
-        {badges && <div className="flex flex-wrap items-center gap-2">{badges}</div>}
+        {(badges || course.has_paid_tests) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {course.has_paid_tests && (
+              <span title={t("courses.card.proHint")} data-testid="course-card-pro"
+                className="inline-flex items-center rounded-full border border-gold-200 bg-gold-50 px-2 py-0.5 text-xs font-semibold leading-5 text-gold-800">
+                {t("courses.card.pro")}<span className="sr-only">{` (${t("courses.card.proHint")})`}</span>
+              </span>
+            )}
+            {badges}
+          </div>
+        )}
         <Heading title={title} className="line-clamp-2 min-w-0 break-words text-base font-semibold leading-6 text-slate-900">
           {href
             ? (

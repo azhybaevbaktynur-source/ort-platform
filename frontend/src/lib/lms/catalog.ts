@@ -25,6 +25,8 @@ export interface CatalogCourseOut {
   tests_count?: number;
   /** F7a: lessons (page, file, link) of published modules */
   lessons_count?: number;
+  /** F7: a platform course with a published paid test (the card's "Pro" mark) */
+  has_paid_tests?: boolean;
   // --- Phase 9 S4 ---
   /** Root organization of the course's tree. */
   organization_id: string;

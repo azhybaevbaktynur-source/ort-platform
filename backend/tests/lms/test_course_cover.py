@@ -407,6 +407,25 @@ async def test_course_out_carries_platform_flag(db, api):
     assert (await api.call(owner, "GET", f"/courses/{other.id}")).json()["is_platform_course"] is False
 
 
+async def test_has_paid_tests_only_for_published_paid_tests_of_platform_courses(db, api):
+    """F7: the quiet "Pro" mark of a platform course card: a published (versioned, live, not practice) paid test."""
+    owner = teacher(db)
+    paid = platform_course(db, owner, visibility="catalog", enrollment_mode="open", published_at=utcnow())
+    free = platform_course(db, owner, visibility="catalog", enrollment_mode="open", published_at=utcnow())
+    published(db, paid, owner, access_tier="paid")
+    published(db, free, owner)                                            # free
+    published(db, free, owner, access_tier="paid", is_practice=True)      # practice is not a test
+    published(db, free, owner, access_tier="paid", deleted_at=utcnow())   # deleted
+    make_assessment(db, free, owner, access_tier="paid")                  # draft
+    db.commit()
+    x = card_extras(db, [paid.id, free.id])
+    assert x[paid.id].has_paid_tests is True and x[free.id].has_paid_tests is False
+    listed = {c["id"]: c for c in (await api.call(make_user(db), "GET", "/me/home")).json()["platform_courses"]}
+    assert listed[str(paid.id)]["has_paid_tests"] is True and listed[str(free.id)]["has_paid_tests"] is False
+    cat = {c["id"]: c for c in (await api.call(make_user(db), "GET", "/catalog/courses")).json()["items"]}
+    assert cat[str(paid.id)]["has_paid_tests"] is True and cat[str(free.id)]["has_paid_tests"] is False
+
+
 def test_catalog_page_of_24_is_still_two_statements(db):
     t, viewer = teacher(db), make_user(db)
     courses = [make_course(db, t, status="published", visibility="catalog", enrollment_mode="open",
@@ -417,6 +436,7 @@ def test_catalog_page_of_24_is_still_two_statements(db):
             make_item(db, make_module(db, c, t), "https://example.com/x")
         enroll(db, c, make_user(db))
     a = make_assessment(db, courses[0], t)  # a draft does not count
+    published(db, courses[7], t, access_tier="paid")  # paid outside the platform: no "Pro" mark
     db.commit()
     viewer_id = viewer.id
     db.rollback()
@@ -428,9 +448,10 @@ def test_catalog_page_of_24_is_still_two_statements(db):
     assert a.course_id == courses[0].id
     for i, c in enumerate(courses):
         card = by_id[str(c.id)]
-        assert card.tests_count == (1 if i < 6 else 0)
+        assert card.tests_count == (1 if i < 6 or i == 7 else 0)
         assert card.lessons_count == (1 if i < 6 and i % 2 else 0)
         assert card.student_count == (1 if i < 6 else 0)
+        assert card.has_paid_tests is False
 
 
 async def test_my_courses_page_statement_count_does_not_grow(db):

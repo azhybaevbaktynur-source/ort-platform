@@ -173,6 +173,7 @@ class HomePlatformCourseOut(BaseModel):
     cover_url: Optional[str] = None
     tests_count: int = 0
     lessons_count: int = 0
+    has_paid_tests: bool = False  # F7: a published paid test (the card's quiet "Pro" mark)
 # --- Exam prep S2 end ---
 
 
