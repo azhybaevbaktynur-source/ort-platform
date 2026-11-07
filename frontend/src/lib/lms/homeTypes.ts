@@ -69,6 +69,12 @@ export interface HomeCourseOut {
   student_layout?: "exam_prep" | "general";
   /** Student UI U9: what an exam-prep course has for the shell's menu (null for other courses; absent: older backend). */
   features?: { modules: boolean; practice: boolean } | null;
+  /** F7a: public WebP cover (16:9, at most 1280 x 720); null: draw the generated default cover. Absent: older backend. */
+  cover_url?: string | null;
+  /** F7a: published exams with a published version, as the Tests page lists them (no practice quizzes) */
+  tests_count?: number;
+  /** F7a: lessons (page, file, link) of published modules */
+  lessons_count?: number;
 }
 
 /** UX rework: one "To do" row of the dashboard. `attempt_id`: an attempt in progress. Dates are the caller's own. */
@@ -118,6 +124,14 @@ export interface HomePlatformCourseOut {
   owner_display_name: string;
   organization_display_name: string | null;
   is_platform_course: boolean;
+  /** F7a: public WebP cover (16:9, at most 1280 x 720); null: draw the generated default cover. Absent: older backend. */
+  cover_url?: string | null;
+  /** F7a: published exams with a published version, as the Tests page lists them (no practice quizzes) */
+  tests_count?: number;
+  /** F7a: lessons (page, file, link) of published modules */
+  lessons_count?: number;
+  /** F7: a platform course with a published paid test (the card's "Pro" mark) */
+  has_paid_tests?: boolean;
 }
 
 export interface HomeTeacherApplicationOut {
