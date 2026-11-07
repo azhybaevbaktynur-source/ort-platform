@@ -12,6 +12,7 @@ from app.db.session import get_db
 from app.lms.core.deps import client_ip_hash
 from app.lms.core.pagination import PageOut
 from app.lms.courses import scopes
+from app.lms.courses.cover import card_extras
 from app.lms.courses import service as svc
 from app.lms.courses.models import Course
 from app.lms.courses.schemas import (
@@ -79,8 +80,9 @@ def list_my_courses(as_: Literal["teaching", "learning", "all"] = Query("all", a
         ctx.db, scopes.my_courses(ctx.user.id, as_=as_), sort_col=Course.created_at, id_col=Course.id,
         entity_of=lambda r: r[0], cursor=cursor, limit=limit,
     )
-    return PageOut[CourseCard](items=[course_card(r[0], r[1], r[2], org_kind=r.org_kind, org_name=r.org_name)
-                                         for r in rows], next_cursor=nxt)
+    extras = card_extras(ctx.db, (r[0].id for r in rows))  # F7a: one statement for the page
+    return PageOut[CourseCard](items=[course_card(r[0], r[1], r[2], org_kind=r.org_kind, org_name=r.org_name,
+                                                  extras=extras.get(r[0].id)) for r in rows], next_cursor=nxt)
 
 
 @router.get("/trash", response_model=PageOut[CourseCard])
@@ -89,8 +91,9 @@ def list_trash(cursor: Optional[str] = None, limit: int = 25, ctx: AuthzContext 
         ctx.db, scopes.my_deleted_courses(ctx.user.id), sort_col=Course.deleted_at, id_col=Course.id,
         entity_of=lambda r: r[0], cursor=cursor, limit=limit,
     )
-    return PageOut[CourseCard](items=[course_card(r[0], "teacher", r[1], org_kind=r.org_kind, org_name=r.org_name)
-                                         for r in rows], next_cursor=nxt)
+    extras = card_extras(ctx.db, (r[0].id for r in rows))  # F7a
+    return PageOut[CourseCard](items=[course_card(r[0], "teacher", r[1], org_kind=r.org_kind, org_name=r.org_name,
+                                                  extras=extras.get(r[0].id)) for r in rows], next_cursor=nxt)
 
 
 @router.post("", status_code=201, response_model=CourseStaffOut)
@@ -104,7 +107,8 @@ def join(data: JoinIn, request: Request, ctx: AuthzContext = Depends(get_authz))
     enr, course, already = enr_svc.join_by_code(ctx.db, ctx.user, data.code, client_ip_hash(request))
     owner = ctx.db.get(User, course.owner_id)
     return JoinOut(
-        course=course_card(course, enr.role, public_display_name(owner)),
+        course=course_card(course, enr.role, public_display_name(owner),
+                           extras=card_extras(ctx.db, [course.id]).get(course.id)),
         enrollment=MyEnrollmentOut.model_validate(enr), already_enrolled=already,
     )
 
@@ -175,7 +179,8 @@ def join_open(course_id: uuid.UUID, request: Request, ctx: AuthzContext = Depend
     enr, course, already = enr_svc.join_open(ctx.db, ctx.user, course_id, client_ip_hash(request))
     owner = ctx.db.get(User, course.owner_id)
     return JoinOut(
-        course=course_card(course, enr.role, public_display_name(owner)),
+        course=course_card(course, enr.role, public_display_name(owner),
+                           extras=card_extras(ctx.db, [course.id]).get(course.id)),
         enrollment=MyEnrollmentOut.model_validate(enr), already_enrolled=already,
     )
 

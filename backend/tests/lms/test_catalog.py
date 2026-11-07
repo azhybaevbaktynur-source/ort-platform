@@ -171,7 +171,7 @@ async def test_catalog_payload_is_an_allow_list(db, api):
     enroll(db, c, make_user(db))
     assert set(CatalogCourseOut.model_fields) == CATALOG_COURSE_KEYS == {
         "id", "title", "description", "languages", "default_language", "enrollment_mode", "student_count",
-        "my_enrollment"}
+        "my_enrollment", "cover_url", "tests_count", "lessons_count"}  # F7a: cover and the card's meta line
     # Phase 9 S4: cards add the root organization, the active-form flag and the caller's own application
     assert CATALOG_CARD_KEYS == CATALOG_COURSE_KEYS | {
         "organization_id", "organization_name", "organization_display_name", "owner_display_name",

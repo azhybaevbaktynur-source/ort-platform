@@ -18,8 +18,8 @@ from app.lms.core.errors import LMSError, ValidationFailed
 from app.lms.core.pagination import PageOut
 from app.lms.courses import service as course_svc
 from app.lms.files import service as svc
-from app.lms.files.schemas import AssetOut, asset_out
-from app.lms.files.storage import get_blob_storage
+from app.lms.files.schemas import AssetOut, CourseCoverOut, asset_out
+from app.lms.files.storage import get_blob_storage, media_url
 from app.lms.core.deps import get_lms_user
 from app.models.user import User
 
@@ -100,6 +100,99 @@ async def upload_asset(course_id: uuid.UUID, request: Request, response: Respons
     if dup:
         response.status_code = 200
     return out
+
+
+# --- F7a begin --- (STUDENT_UI_FIX_PLAN 7.1: course cover; the same streaming guard as the image upload above)
+_COVER_FORM_OPENAPI = {
+    "requestBody": {"content": {"multipart/form-data": {"schema": {
+        "type": "object", "required": ["file"],
+        "properties": {"file": {"type": "string", "format": "binary"},
+                       "focus_x": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.5},
+                       "focus_y": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.5}},
+    }}}}
+}
+
+
+def _focus(form, name: str) -> float:
+    raw = form.get(name)
+    if raw is None or raw == "":
+        return 0.5
+    try:
+        value = float(str(raw))
+    except ValueError:
+        value = -1.0
+    if not 0.0 <= value <= 1.0:  # also refuses NaN
+        raise ValidationFailed(f"{name} must be a number from 0 to 1",
+                               details=[{"loc": [name], "msg": "0..1"}])
+    return value
+
+
+def _prepare_cover(ctx: AuthzContext, course_id: uuid.UUID):
+    from app.lms.courses import cover
+
+    course = course_svc.load_course(ctx.db, course_id)
+    cover.require_cover_edit(ctx.db, ctx, course)
+    ratelimit.enforce(f"asset:{ctx.user.id}", upload_limit())
+    return course
+
+
+def _set_cover(ctx: AuthzContext, course, raw: bytes, filename: Optional[str], fx: float, fy: float,
+               request: Request) -> CourseCoverOut:
+    from app.lms.courses import cover
+
+    asset, dup = cover.set_cover(ctx.db, ctx, course, raw, filename=filename, focus_x=fx, focus_y=fy,
+                                 request=request)
+    return CourseCoverOut(cover_url=media_url(asset.sha256), asset_id=asset.id, width=asset.width or 0,
+                          height=asset.height or 0, deduplicated=dup)
+
+
+@router.post("/courses/{course_id}/cover", response_model=CourseCoverOut, openapi_extra=_COVER_FORM_OPENAPI)
+async def upload_cover(course_id: uuid.UUID, request: Request, ctx: AuthzContext = Depends(get_authz)):
+    """Course cover: JPEG/PNG/WebP up to ASSET_MAX_UPLOAD_BYTES, cropped to 16:9 around (focus_x, focus_y), stored as a
+    public WebP of at most 1280 x 720. Replaces the previous cover."""
+    cap = settings.ASSET_MAX_UPLOAD_BYTES
+    cl = request.headers.get("content-length")
+    if not cl or not cl.isdigit():
+        raise LengthRequired("Content-Length is required")
+    if int(cl) > cap + 64 * 1024:
+        raise _too_large()
+    course = await run_in_threadpool(_prepare_cover, ctx, course_id)
+    form = await request.form(max_files=1, max_fields=4, max_part_size=1024)
+    try:
+        file = form.get("file")
+        if not isinstance(file, UploadFile):
+            raise ValidationFailed("file is required")
+        fx, fy = _focus(form, "focus_x"), _focus(form, "focus_y")
+        chunks, total = [], 0
+        while True:
+            chunk = await file.read(64 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > cap:
+                raise _too_large()
+            chunks.append(chunk)
+        raw = b"".join(chunks)
+        if not raw:
+            raise svc.ImageInvalid("Empty file")
+        return await run_in_threadpool(_set_cover, ctx, course, raw, file.filename, fx, fy, request)
+    finally:
+        await form.close()
+
+
+def _clear_cover(ctx: AuthzContext, course_id: uuid.UUID, request: Request) -> None:
+    from app.lms.courses import cover
+
+    course = course_svc.load_course(ctx.db, course_id)
+    cover.require_cover_edit(ctx.db, ctx, course)
+    cover.clear_cover(ctx.db, ctx, course, request=request)
+
+
+@router.delete("/courses/{course_id}/cover", status_code=204, response_class=Response)
+def delete_cover(course_id: uuid.UUID, request: Request, ctx: AuthzContext = Depends(get_authz)):
+    _clear_cover(ctx, course_id, request)
+    return Response(status_code=204)
+# --- F7a end ---
 
 
 _FILE_FORM_OPENAPI = {

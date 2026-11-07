@@ -31,3 +31,12 @@ def asset_out(a: Asset, deduplicated: bool = False) -> AssetOut:
         mime=a.mime, bytes=a.bytes, width=a.width, height=a.height, sha256=a.sha256,
         original_filename=a.original_filename, created_at=a.created_at, deduplicated=deduplicated,
     )
+
+
+class CourseCoverOut(BaseModel):
+    """F7a: the course's new cover (a public WebP, 16:9, at most 1280 x 720)."""
+    cover_url: str
+    asset_id: uuid.UUID
+    width: int
+    height: int
+    deduplicated: bool = False
