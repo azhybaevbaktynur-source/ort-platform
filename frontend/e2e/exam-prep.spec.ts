@@ -13,12 +13,12 @@ import { OrtExam } from "./ort-exam";
  * before and after the test (U9: before it, score and target are one slim line; the sections only after).
  *
  * Data: `seed.exam_prep.newcomer` (registered, in no course); the exam date is set by the admin and cleared after.
- * Screens of the page at 375 / 1440 / 1920 (ru) go to $S2_SHOTS (default /tmp/s2_shots).
+ * Screens of the page at 375 / 1440 / 1920 (ru) go to $S2_SHOTS only when set.
  */
 
 const L = "ru" as const;
 const t = (key: string, vars: Record<string, string | number> = {}) => tr(L, key, vars);
-const SHOTS = process.env.S2_SHOTS || "/tmp/s2_shots";
+const SHOTS = process.env.S2_SHOTS || ""; // screenshots only when S2_SHOTS names a folder
 const WIDTHS = [375, 1440, 1920] as const;
 
 async function api(user: SeedUser, method: string, p: string, body?: unknown) {
@@ -38,13 +38,13 @@ function isoInDays(days: number): string {
 }
 
 async function shoot(page: Page, name: string) {
-  fs.mkdirSync(SHOTS, { recursive: true });
+  if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
   for (const width of WIDTHS) {
     await page.setViewportSize({ width, height: 900 });
     await settle(page);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, `horizontal scroll at ${width}px (${name})`).toBeLessThanOrEqual(0);
-    await page.screenshot({ path: path.join(SHOTS, `${name}-${width}-ru.png`), fullPage: true, animations: "disabled", caret: "hide" });
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `${name}-${width}-ru.png`), fullPage: true, animations: "disabled", caret: "hide" });
   }
   await page.setViewportSize({ width: 1440, height: 900 });
 }

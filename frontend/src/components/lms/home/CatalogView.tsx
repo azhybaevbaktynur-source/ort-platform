@@ -1,22 +1,19 @@
 "use client";
 
 // Phase 6b S6b: the course catalog on its own page (/courses/catalog; was a block above "My courses", UX S3).
-// UX S11: the student count only from 10 up (an empty course does not look dead); language names, not codes.
+// F7c: the shared CourseCard (cover, one meta line, one action); search and language chips, the rest under "More filters".
 // Phase 9 S4: search and filters, the organization and a mode badge on each card, the title opens the course landing,
 // form-mode courses offer "Apply" (or show the student's application status).
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { KeyRound, LayoutGrid, SearchX, Users } from "lucide-react";
+import { KeyRound } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { isActiveMember, isFormMode, joinOpenCourse, listCatalog, type CatalogCourseOut, type CatalogFilters as Filters } from "@/lib/lms/catalog";
-import { Button, EmptyState, ErrorState, LinkButton, PageHeader, Pagination, Skeleton } from "@/components/ui";
+import { Badge, Button, EmptyState, ErrorState, LinkButton, PageHeader, Pagination, Skeleton } from "@/components/ui";
 import { COURSE_GRID, CourseCard } from "@/components/lms/course/CourseCard";
 import { CatalogFilters } from "@/components/lms/catalog/CatalogFilters";
-import { CatalogModeBadge } from "@/components/lms/catalog/CatalogModeBadge";
 import { ApplicationStatusBadge } from "@/components/lms/catalog/ApplicationStatus";
 import { useErrorText } from "./useErrorText";
-
-const SHOW_COUNT_FROM = 10;
 
 function CatalogSkeleton() {
   const { t } = useTranslation();
@@ -26,7 +23,7 @@ function CatalogSkeleton() {
       <div aria-hidden="true" className={COURSE_GRID}>
         {Array.from({ length: 3 }, (_, i) => (
           <div key={i} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <Skeleton className="h-24 w-full rounded-none" />
+            <Skeleton className="aspect-video w-full rounded-none" />
             <div className="p-4">
               <Skeleton className="mb-2 h-4 w-2/3" />
               <Skeleton className="mb-4 h-4 w-1/2" />
@@ -94,15 +91,23 @@ export function CatalogView() {
     }
   };
 
+  /** a badge only when it matters: a code or an application is needed to get in */
+  const modeBadge = (c: CatalogCourseOut) => {
+    if (isActiveMember(c) || c.my_application) return undefined;
+    if (c.enrollment_mode === "invite_code") return <Badge tone="neutral">{t("courses.card.byCode")}</Badge>;
+    if (isFormMode(c.enrollment_mode)) return <Badge tone="info">{t("courses.card.byApplication")}</Badge>;
+    return undefined;
+  };
+
   const landing = (c: CatalogCourseOut) => `/${lang}/courses/catalog/${c.id}`;
 
   const action = (c: CatalogCourseOut) => {
     if (isActiveMember(c)) {
-      return <LinkButton variant="secondary" fullWidth href={`/${lang}/courses/${c.id}`}>{t("catalog.open")}</LinkButton>;
+      return <LinkButton fullWidth href={`/${lang}/courses/${c.id}`}>{t("catalog.open")}</LinkButton>;
     }
     if (c.enrollment_mode === "open") {
       return (
-        <Button variant="secondary" fullWidth loading={joining === c.id} disabled={joining !== null && joining !== c.id} onClick={() => void join(c)}>
+        <Button fullWidth loading={joining === c.id} disabled={joining !== null && joining !== c.id} onClick={() => void join(c)}>
           {t("catalog.join")}
         </Button>
       );
@@ -117,7 +122,7 @@ export function CatalogView() {
       );
     }
     if (isFormMode(c.enrollment_mode) && c.has_active_form) {
-      return <LinkButton variant="secondary" fullWidth href={`${landing(c)}/apply`}>{t("catalog.apply")}</LinkButton>;
+      return <LinkButton fullWidth href={`${landing(c)}/apply`}>{t("catalog.apply")}</LinkButton>;
     }
     // --- Phase 9 S4 end ---
     return (
@@ -145,23 +150,17 @@ export function CatalogView() {
       {error && items.length > 0 ? <ErrorState variant="inline" message={errorText(error)} onRetry={() => void load(cursor)} className="mb-4" /> : null}
       {loading && items.length === 0 && !error && <CatalogSkeleton />}
       {!loading && !error && items.length === 0 && (filtered ? (
-        <EmptyState icon={<SearchX />} title={t("catalog.noResults.title")} description={t("catalog.noResults.body")}
+        <EmptyState mascot="thinking" title={t("catalog.noResults.title")} description={t("catalog.noResults.body")}
           action={<Button variant="secondary" onClick={() => setFilters({})}>{t("ui.resetFilters")}</Button>} />
       ) : (
-        <EmptyState icon={<LayoutGrid />} title={t("home.catalogEmpty.title")} description={t("home.catalogEmpty.body")}
+        <EmptyState mascot="thinking" title={t("home.catalogEmpty.title")} description={t("home.catalogEmpty.body")}
           action={<LinkButton href={`/${lang}/courses/join`}>{t("home.primary.join")}</LinkButton>} />
       ))}
       {items.length > 0 && (
         <ul className={COURSE_GRID} aria-busy={loading || undefined}>
           {items.map((c) => (
             <CourseCard key={c.id} course={c} href={landing(c)} headingLevel={2}
-              badges={<CatalogModeBadge mode={c.enrollment_mode} />}
-              meta={c.student_count >= SHOW_COUNT_FROM ? (
-                <span className="inline-flex items-center gap-1">
-                  <Users className="h-4 w-4" aria-hidden="true" />
-                  {t("catalog.students", { count: c.student_count })}
-                </span>
-              ) : undefined}
+              badges={modeBadge(c)}
               action={(
                 <>
                   {action(c)}

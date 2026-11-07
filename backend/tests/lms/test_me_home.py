@@ -481,7 +481,8 @@ async def test_statement_count_is_fixed(db, api):
         # one course card: module progress of the page's courses, one grouped statement;
         # Accounts: the caller's latest teacher request, one indexed statement;
         # Exam prep S2: the platform's open courses ("From the platform"), one statement
-        assert counts[name] <= 15, "\n".join(st[:120] for st in c.statements)
+        # F7a: the course cards' cover, tests and lessons, one statement for the page
+        assert counts[name] <= 16, "\n".join(st[:120] for st in c.statements)
     assert counts["small"] == counts["big"], counts
 
 

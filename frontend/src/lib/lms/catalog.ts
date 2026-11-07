@@ -19,6 +19,14 @@ export interface CatalogCourseOut {
   enrollment_mode: EnrollmentMode;
   student_count: number;
   my_enrollment: CatalogEnrollmentOut | null;
+  /** F7a: public WebP cover (16:9, at most 1280 x 720); null: draw the generated default cover. Absent: older backend. */
+  cover_url?: string | null;
+  /** F7a: published exams with a published version, as the Tests page lists them (no practice quizzes) */
+  tests_count?: number;
+  /** F7a: lessons (page, file, link) of published modules */
+  lessons_count?: number;
+  /** F7: a platform course with a published paid test (the card's "Pro" mark) */
+  has_paid_tests?: boolean;
   // --- Phase 9 S4 ---
   /** Root organization of the course's tree. */
   organization_id: string;

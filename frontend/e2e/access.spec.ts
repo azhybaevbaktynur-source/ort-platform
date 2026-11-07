@@ -14,23 +14,23 @@ import { OrtExam } from "./ort-exam";
  * pill and page say "Pro до …"; "Отменить Pro" -> Free again. Pro screens at 375 / 1440 (ru) go to $F6B_SHOTS.
  *
  * Data: `seed.access` (a private platform ORT course with a free and a paid exam, a student without a pass).
- * Screens at 375 / 1440 / 1920 (ru) go to $S3_SHOTS (default /tmp/s3_shots).
+ * Screens at 375 / 1440 / 1920 (ru) go to $S3_SHOTS only when set.
  */
 
 const L = "ru" as const;
 const t = (key: string, vars: Record<string, string | number> = {}) => tr(L, key, vars);
-const SHOTS = process.env.S3_SHOTS || "/tmp/s3_shots";
+const SHOTS = process.env.S3_SHOTS || ""; // screenshots only when S3_SHOTS names a folder
 const WIDTHS = [375, 1440, 1920] as const;
 const CODE = /[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}/;
 
 async function shoot(page: Page, name: string) {
-  fs.mkdirSync(SHOTS, { recursive: true });
+  if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
   for (const width of WIDTHS) {
     await page.setViewportSize({ width, height: 900 });
     await settle(page);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, `horizontal scroll at ${width}px (${name})`).toBeLessThanOrEqual(0);
-    await page.screenshot({ path: path.join(SHOTS, `${name}-${width}-ru.png`), fullPage: true, animations: "disabled", caret: "hide" });
+    if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `${name}-${width}-ru.png`), fullPage: true, animations: "disabled", caret: "hide" });
   }
   await page.setViewportSize({ width: 1440, height: 900 });
 }

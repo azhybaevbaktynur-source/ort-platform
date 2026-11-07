@@ -9,6 +9,7 @@ import {
 } from "@/lib/lms/courses";
 import { cleanLocalized } from "@/lib/lms/localized";
 import { isStaffCourse, type CourseStaffOut, type Lang, type LocalizedText, type RosterEntryOut } from "@/lib/lms/types";
+import { useAuth } from "@/lib/auth-context";
 import { useCourse } from "@/components/lms/CourseContext";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { JoinCodeDisplay } from "@/components/lms/JoinCodeDisplay";
@@ -28,6 +29,7 @@ import { templateUi } from "@/lib/lms/templates";
 import { ErrorState, Select, Switch } from "@/components/ui";
 import { useApplicationErrorText } from "@/components/lms/catalog/useApplicationErrorText";
 import { ExamDateSection } from "@/components/lms/examPrep/ExamDateSection"; // Exam prep S2
+import { CourseCoverSection } from "@/components/lms/course/CourseCoverSection"; // F7b
 
 const SETTINGS_MODES: EnrollmentMode[] = ["invite_code", "open", "form_review", "form_auto", "closed"];
 // --- Phase 9 S4 end ---
@@ -43,6 +45,7 @@ function Settings({ course }: { course: CourseStaffOut }) {
   const { lang, t } = useTranslation();
   const router = useRouter();
   const { setCourse } = useCourse();
+  const { userProfile } = useAuth();
   const isOwner = course.is_owner;
 
   const [languages, setLanguages] = useState<Lang[]>(course.languages);
@@ -172,6 +175,13 @@ function Settings({ course }: { course: CourseStaffOut }) {
           {savedFor("general")}
         </div>
       </form>
+
+      {/* F7b: the cover; a platform course's cover belongs to platform admins (the server refuses others: 403
+          platform_course_admin_only), so its other staff do not see the section */}
+      {(!course.is_platform_course || userProfile?.is_platform_admin) && (
+        <CourseCoverSection courseId={course.id} title={courseName} platform={!!course.is_platform_course}
+          coverUrl={course.cover_url} onChanged={(url) => apply({ ...course, cover_url: url })} />
+      )}
 
       {/* --- Phase 8a S4a: course home (locked on ORT with the template note) --- */}
       <CourseHomeSection course={course} />
