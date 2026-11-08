@@ -15,7 +15,7 @@ const t = (key: string, vars: Record<string, string | number> = {}) => tr(L, key
 const SIZES = [{ width: 375, height: 667 }, { width: 390, height: 664 }, { width: 412, height: 915 }];
 const SHORT = SIZES[1];
 
-const accountName = (u: SeedUser) => u.profile.displayName || u.name;
+const accountName = (u: SeedUser): string => String(u.profile.displayName || u.name);
 
 async function inView(page: Page, loc: Locator, what: string) {
   await expect(loc, what).toBeVisible();
