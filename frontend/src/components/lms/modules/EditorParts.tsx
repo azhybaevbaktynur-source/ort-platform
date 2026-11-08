@@ -1,10 +1,10 @@
 "use client";
 
 // F5c (COURSE_LESSONS_DESIGN §6, §7.3): small pieces of the teacher's module editor: the minutes chip of a lesson row
-// (click -> an inline minutes field; Enter saves, Esc cancels, empty clears), the module's Pro switch (platform courses
-// only; gold when on), the ↑ ↓ buttons of a row and the duration text ("6 мин", "1 ч 20 мин").
+// (click -> an inline minutes field; Enter saves, Esc cancels, empty clears), the ↑ ↓ buttons of a row and the duration
+// text ("6 мин", "1 ч 20 мин"). FB8 S2: the module's Pro control is the shared `LockToggle` now (ProSwitch removed).
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Clock, Plus, Star } from "lucide-react";
+import { ArrowDown, ArrowUp, Clock, Plus } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { DURATION_S_MAX, DURATION_S_MIN } from "@/lib/lms/modulesTypes";
 import { cn, focusRing, toast } from "@/components/ui";
@@ -111,30 +111,6 @@ export function DurationChip({ seconds, name, disabled, onSave }: {
           : "border-dashed border-slate-300 text-slate-500 group-hover/chip:border-slate-400 group-hover/chip:text-slate-700")}>
         {seconds ? <Clock aria-hidden="true" className="h-3.5 w-3.5" /> : <Plus aria-hidden="true" className="h-3.5 w-3.5" />}
         {seconds ? fmt(seconds) : t("modules.editor.durationUnset")}
-      </span>
-    </button>
-  );
-}
-
-/** The module's Pro switch (shown only on platform courses; the server refuses `paid` elsewhere). Gold when on. */
-export function ProSwitch({ on, name, busy, disabled, onToggle }: {
-  on: boolean; name: string; busy: boolean; disabled?: boolean; onToggle: () => void;
-}) {
-  const { t } = useTranslation();
-  const hint = on ? t("modules.editor.proHintOn") : t("modules.editor.proHintOff");
-  return (
-    <button type="button" role="switch" aria-checked={on} aria-label={t("modules.editor.proSwitch", { title: name })} title={hint}
-      aria-busy={busy || undefined} disabled={disabled || busy} onClick={onToggle}
-      className={cn("group/pro inline-flex h-11 shrink-0 items-center rounded-xl px-0.5 disabled:cursor-not-allowed disabled:opacity-60", focusRing)}>
-      <span className={cn("inline-flex h-7 items-center gap-1.5 rounded-full border pl-2 pr-1 text-xs font-semibold leading-4 transition-colors",
-        on
-          ? "border-gold-300 bg-gradient-to-r from-gold-100 to-gold-200 text-gold-900"
-          : "border-slate-300 bg-white text-slate-600 group-hover/pro:border-slate-400")}>
-        <Star aria-hidden="true" className={cn("h-3.5 w-3.5", on ? "fill-current text-gold-700" : "text-slate-400")} />
-        {t("modules.editor.pro")}
-        <span aria-hidden="true" className={cn("relative inline-flex h-4 w-7 shrink-0 rounded-full transition-colors", on ? "bg-gold-600" : "bg-slate-300")}>
-          <span className={cn("absolute top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-all", on ? "left-3.5" : "left-0.5")} />
-        </span>
       </span>
     </button>
   );
