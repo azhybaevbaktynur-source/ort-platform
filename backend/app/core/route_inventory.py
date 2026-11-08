@@ -215,3 +215,8 @@ from app.lms.email_change.policies import EMAIL_CHANGE_POLICIES  # noqa: E402
 
 ROUTE_POLICIES.update(EMAIL_CHANGE_POLICIES)
 # --- S4 person page end ---
+# --- I5a infrastructure panel begin --- (INFRA_PANEL_DESIGN 5)
+from app.lms.infra.policies import INFRA_POLICIES  # noqa: E402
+
+ROUTE_POLICIES.update(INFRA_POLICIES)
+# --- I5a infrastructure panel end ---

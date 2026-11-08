@@ -224,6 +224,20 @@ class Settings(BaseSettings):
     MFA_CHALLENGE_TTL_SECONDS: int = 300  # the step between the password and the code
     MFA_ISSUER: str = "ORT Platform"  # the name the authenticator app shows next to the account
     # --- S1 admin security end ---
+    # --- I5a infrastructure panel begin --- (docs/phases/INFRA_PANEL_DESIGN.md 2, 5). Backend only; empty = the card
+    # says "not connected" and no call is made. Email reuses RESEND_API_KEY / BREVO_API_KEY and EMAIL_PROVIDER.
+    NEON_API_KEY: str = ""
+    NEON_PROJECT_ID: str = "noisy-sound-20763725"
+    RENDER_API_KEY: str = ""
+    RENDER_SERVICE_ID: str = ""
+    VERCEL_TOKEN: str = ""
+    VERCEL_PROJECT_ID: str = ""
+    VERCEL_TEAM_ID: str = ""  # empty for a personal Hobby account
+    CLOUDFLARE_API_TOKEN: str = ""  # Account Analytics Read only
+    CLOUDFLARE_ACCOUNT_ID: str = ""  # empty: R2_ACCOUNT_ID
+    INFRA_TTL_SECONDS: int = 1200  # snapshots older than this are refreshed on GET /platform/infra
+    INFRA_REFRESH_RATE_PER_HOUR: int = 6  # manual refreshes per admin (infra_refresh_1h)
+    # --- I5a infrastructure panel end ---
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

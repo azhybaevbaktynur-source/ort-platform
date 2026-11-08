@@ -15,6 +15,10 @@ os.environ["RATE_LIMIT_IP_ENFORCE"] = "false"
 os.environ["ADMIN_MFA_REQUIRED"] = "false"
 for _r2_var in ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_PUBLIC_BASE_URL", "R2_PRIVATE_BUCKET"):
     os.environ[_r2_var] = ""
+# I5a infrastructure panel: no provider token from backend/.env reaches a test (every card is "not connected" unless a
+# test sets a fake key and a mock transport)
+for _infra_var in ("NEON_API_KEY", "RENDER_API_KEY", "VERCEL_TOKEN", "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"):
+    os.environ[_infra_var] = ""
 
 from app.core.config import settings as _settings
 from tests.dev_data_guard import check_or_exit
