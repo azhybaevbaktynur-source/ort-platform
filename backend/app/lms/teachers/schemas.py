@@ -26,6 +26,8 @@ class MeOut(BaseModel):
     # UX rework 2: the header's areas come from this one answer, so the menu is the same on every page (UI, not permissions)
     admin_organizations: list[MeAdminOrganizationOut] = []
     is_guardian: bool = False
+    # Owner feedback 2026-11-08 (item 2): an active student enrollment (Student view's test enrollments do not count)
+    has_student_enrollments: bool = False
 
 
 class MePatchIn(BaseModel):

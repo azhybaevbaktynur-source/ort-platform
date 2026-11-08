@@ -34,6 +34,7 @@ export interface MeOut {
   /** UX rework 2: the header's areas come from this one answer. */
   admin_organizations: { id: string; name: string }[];
   is_guardian: boolean;
+  has_student_enrollments?: boolean; // Owner feedback 2026-11-08 (item 2): shows Learning to people who also teach
 }
 export interface MePatchIn {
   locale: Lang;

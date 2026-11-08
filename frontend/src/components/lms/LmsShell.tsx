@@ -160,6 +160,9 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const canCreate = me ? me.can_create_courses : teacherStatus === "approved";
   const isTeacher = me ? me.is_teacher : teacherStatus === "approved";
   const hasTeaching = isTeacher || canCreate;
+  // Owner feedback 2026-11-08 (item 2): people who teach see Learning only once they learn somewhere (MeOut decides;
+  // until it loads, and for an older answer without the field, Learning stays). Student view is another user.
+  const hideLearning = !!me && hasTeaching && me.has_student_enrollments === false;
 
   // UX rework 2: the areas come from one answer, kept across pages (`useLmsMeLoader`), so the menu is the same everywhere.
   const orgs = me?.admin_organizations ?? [];
@@ -169,7 +172,8 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const rest = pathname.replace(/^\/(en|ky|ru)(?=\/|$)/, "") || "/";
   // Same default as the /courses page: its Teaching tab opens first for teachers and course creators.
   const coursesDefault: AreaKey = me && (me.is_teacher || me.is_platform_admin) && (me.is_teacher || me.can_create_courses) ? "teaching" : "learning";
-  const urlArea = areaFromUrl(rest, view, coursesDefault);
+  // Without Learning, `/courses?view=learning` is Teaching (the page replaces the URL); other student URLs still open
+  const urlArea = hideLearning && rest === "/courses" ? "teaching" : areaFromUrl(rest, view, coursesDefault);
   // A page's own declaration wins only where the URL does not decide (course pages).
   const activeArea: AreaKey = urlArea === "learning" && declared ? declared : urlArea;
   // Phase 8c S1: inside a course (declared area with hidden sections) no area shows its sub-menu
@@ -177,7 +181,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
 
   const areas = useMemo<AppHeaderArea[]>(() => {
     const base = `/${lang}`;
-    const list: AppHeaderArea[] = [
+    const list: AppHeaderArea[] = hideLearning ? [] : [
       { key: "learning", label: t("shell.areas.learning"), href: hasTeaching ? `${base}/courses?view=learning` : `${base}/courses`, icon: <BookOpen /> },
     ];
     if (hasTeaching || isAdmin) {
@@ -198,7 +202,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
     if (isGuardian) list.push({ key: "parent", label: t("privacy.nav.parent"), href: `${base}/parent`, icon: <Users /> }); // Phase 11
     if (isAdmin) list.push({ key: "platform", label: t("shell.areas.platform"), href: `${base}/admin`, icon: <ShieldCheck /> });
     return hideSections ? list.map((a) => ({ ...a, sections: undefined })) : list;
-  }, [lang, t, hasTeaching, isAdmin, canCreate, isGuardian, me, rest, urlArea, hideSections]); // `orgs` comes from `me`
+  }, [lang, t, hasTeaching, hideLearning, isAdmin, canCreate, isGuardian, me, rest, urlArea, hideSections]); // `orgs` comes from `me`
 
   // --- Student UI U2 begin --- (STUDENT_UI_DESIGN §2.1; SF-1): the Learning area gets the student shell, except the
   // player route (no chrome). A course page of someone who teaches waits for the course's own declaration (a

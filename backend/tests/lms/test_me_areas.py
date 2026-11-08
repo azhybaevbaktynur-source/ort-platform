@@ -2,7 +2,7 @@
 from app.lms.core.models import utcnow
 from app.lms.guardian.models import GuardianLink
 from tests.lms.org_support import add_member, make_org
-from tests.lms.s3_support import api, clean_rate_limits, db, make_user  # noqa: F401
+from tests.lms.s3_support import api, clean_rate_limits, db, enroll, make_course, make_user, teacher  # noqa: F401
 
 
 async def test_me_lists_only_the_organizations_the_person_administers(db, api):
@@ -32,3 +32,48 @@ async def test_me_says_whether_the_person_is_a_parent(db, api):
 async def test_a_student_has_no_extra_areas(db, api):
     me = (await api.call(make_user(db), "GET", "/me/lms")).json()
     assert me["admin_organizations"] == [] and me["is_guardian"] is False
+
+
+# --- Owner feedback 2026-11-08 (item 2): the Learning area only for people who learn somewhere ---
+
+async def _learns(api, user) -> bool:
+    res = await api.call(user, "GET", "/me/lms")
+    assert res.status_code == 200
+    return res.json()["has_student_enrollments"]
+
+
+async def test_a_teacher_without_student_enrollments_does_not_learn(db, api):
+    t = teacher(db)
+    make_course(db, t)  # owning a course is a teacher enrollment, not a student one
+    assert await _learns(api, t) is False
+
+
+async def test_an_active_student_enrollment_counts(db, api):
+    t, other = teacher(db), teacher(db)
+    course = make_course(db, other)
+    assert await _learns(api, t) is False
+    enroll(db, course, t)
+    assert await _learns(api, t) is True
+
+
+async def test_only_active_student_enrollments_in_live_courses_count(db, api):
+    owner = teacher(db)
+    invited, requested, removed, assistant, deleted = (make_user(db) for _ in range(5))
+    course, gone = make_course(db, owner), make_course(db, owner)
+    enroll(db, course, invited, state="invited", source="invite")
+    enroll(db, course, requested, state="requested", source="form")
+    enroll(db, course, removed, state="removed")
+    enroll(db, course, assistant, role="assistant", source="staff_add")
+    enroll(db, gone, deleted)
+    gone.deleted_at = utcnow()
+    db.commit()
+    for u in (invited, requested, removed, assistant, deleted):
+        assert await _learns(api, u) is False
+
+
+async def test_student_view_does_not_make_the_teacher_a_learner(db, api):
+    t = teacher(db)
+    course = make_course(db, t)
+    res = await api.call(t, "POST", f"/courses/{course.id}/student-view")
+    assert res.status_code in (200, 201), res.text
+    assert await _learns(api, t) is False

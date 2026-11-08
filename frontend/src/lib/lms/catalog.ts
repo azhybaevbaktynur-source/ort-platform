@@ -1,6 +1,7 @@
 // Phase 5 S3: course catalog and one-click open join (docs/phases/PHASE_5_DESIGN.md section 5).
 // Phase 9 S4: search and filters, card extras, the course landing (docs/phases/PHASE_9_DESIGN.md §4.6).
 import { lmsFetch } from "./client";
+import { thenMeStale } from "./meStale";
 import type {
   ApplicationStatus, CourseRole, EnrollmentMode, EnrollmentState, JoinOut, Lang, LocalizedText, PageOut, PublicFormOut,
 } from "./types";
@@ -68,7 +69,7 @@ export const getCourseLanding = (courseId: string) => lmsFetch<CourseLandingOut>
 
 /** Open-mode courses only; any other course answers the same 404 as a bad join code. */
 export const joinOpenCourse = (courseId: string) =>
-  lmsFetch<JoinOut>(`/courses/${enc(courseId)}/join`, { method: "POST" });
+  thenMeStale(lmsFetch<JoinOut>(`/courses/${enc(courseId)}/join`, { method: "POST" }));
 
 export const isActiveMember = (c: Pick<CatalogCourseOut, "my_enrollment">) => c.my_enrollment?.state === "active";
 

@@ -1,6 +1,7 @@
 // Phase 9 S4: enrollment applications (docs/phases/PHASE_9_DESIGN.md §4.7, §4.9, §5, §6).
 // Answers are PII of possible minors: never log them, never keep them in browser storage.
 import { lmsFetch, isLmsApiError } from "./client";
+import { thenMeStale } from "./meStale";
 import type {
   AnswerValue, ApplicationOut, ApplicationOwnOut, ApplicationStaffOut, ApplicationStatus, DecisionIn, PageOut,
 } from "./types";
@@ -9,7 +10,7 @@ const enc = encodeURIComponent;
 const base = (courseId: string) => `/courses/${enc(courseId)}/applications`;
 
 export const submitApplication = (courseId: string, formId: string, answers: Record<string, AnswerValue>) =>
-  lmsFetch<ApplicationOwnOut>(base(courseId), { method: "POST", body: { form_id: formId, answers } });
+  thenMeStale(lmsFetch<ApplicationOwnOut>(base(courseId), { method: "POST", body: { form_id: formId, answers } }));
 
 export const listApplications = (
   courseId: string,

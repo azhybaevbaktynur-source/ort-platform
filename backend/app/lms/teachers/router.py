@@ -17,6 +17,7 @@ def _me(user: User) -> MeOut:
         is_platform_admin=bool(user.is_platform_admin), teacher_status=user.teacher_status,
         can_create_courses=service.can_create_courses(user), is_teacher=service.is_teacher(user),
         admin_organizations=service.admin_organizations(user), is_guardian=has_active_link(user),
+        has_student_enrollments=service.has_student_enrollments(user),
     )
 
 

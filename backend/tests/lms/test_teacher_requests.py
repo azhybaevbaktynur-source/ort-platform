@@ -45,7 +45,7 @@ async def test_me_and_locale(client, db):
     assert r.status_code == 200
     body = r.json()
     assert set(body) == {"id", "email", "display_name", "locale", "is_platform_admin", "teacher_status",
-                         "can_create_courses", "is_teacher", "admin_organizations", "is_guardian"}
+                         "can_create_courses", "is_teacher", "admin_organizations", "is_guardian", "has_student_enrollments"}
     assert body["can_create_courses"] is False and body["is_teacher"] is False
     r = await client.patch(f"{P}/me/lms", json={"locale": "ky"}, headers=auth(u))
     assert r.status_code == 200 and r.json()["locale"] == "ky"
