@@ -3,7 +3,7 @@
 // Phase 6b S5c: shared pieces of the staff course screens on the design system (course bar, badges, crumbs).
 import React from "react";
 import Link from "next/link";
-import { ChevronRight, Lock } from "lucide-react";
+import { ChevronRight, EyeOff, Lock } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
 import { templateTitle, templateUi } from "@/lib/lms/templates";
@@ -35,6 +35,21 @@ export function TemplateLockBadge({ course }: { course: Pick<CourseOut, "templat
     <Badge tone="neutral" icon={<Lock aria-hidden="true" />} title={t("templates.lockedHint")}>
       {t("teaching.templateBadge", { name })}
     </Badge>
+  );
+}
+
+/**
+ * FB8-5 S1 (STAFF_UX_AUDIT §2, D-FB8-5-2): "Hidden" on the page header of a course area students do not see yet
+ * (Announcements, Files, Practice with nothing published), for staff only; `hidden` is the area's `features` flag
+ * negated. The tooltip says why.
+ */
+export function HiddenAreaBadge({ course, area }: { course: CourseOut; area: "announcements" | "files" | "practice" }) {
+  const { t } = useTranslation();
+  const role = course.my_enrollment.role;
+  if ((role !== "teacher" && role !== "assistant") || course.my_enrollment.read_only) return null;
+  if (!course.features || course.features[area]) return null;
+  return (
+    <Badge tone="neutral" icon={<EyeOff aria-hidden="true" />} title={t("courseNav.hiddenFromStudents")}>{t("ui.hidden")}</Badge>
   );
 }
 

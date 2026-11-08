@@ -1302,7 +1302,13 @@
       "counts": "{items} суроо, {points} балл",
       "attempts": "{inProgress} жүрүп жатат, {submitted} тапшырылган",
       "from": "Ачылат: {date}",
-      "until": "Жабылат: {date}"
+      "until": "Жабылат: {date}",
+      "colTitle": "Аталышы",
+      "colStatus": "Абалы",
+      "colAttempts": "Аракеттер",
+      "colAvailable": "Жеткиликтүү",
+      "actionsFor": "Аракеттер: {title}",
+      "always": "Дайыма"
     },
     "student": {
       "title": "Тесттер",
@@ -5252,6 +5258,15 @@
       "title": "Азырынча жеткиликсиз",
       "body": "Мугалимиңиз бул жерде азырынча эч нерсе жарыялай элек.",
       "back": "Курска кайтуу"
+    },
+    "content": "Мазмун",
+    "students": "Окуучулар",
+    "more": "Дагы",
+    "tabs": {
+      "label": "Курстун мазмуну",
+      "structure": "Түзүмү",
+      "assignments": "Тапшырмалар",
+      "exams": "Сынактар"
     }
   },
   "studentView": {

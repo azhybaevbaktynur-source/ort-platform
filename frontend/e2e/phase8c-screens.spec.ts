@@ -158,7 +158,8 @@ test.describe("phase 8c screens", () => {
     test(`ORT course page ${vp}`, async ({ browser }) => {
       const { ctx, page } = await ctxPage(browser, seed().admin, vp, "ru");
       await page.goto(`/ru/courses/${seed().course_id}`);
-      await expect(page.getByText("ОРТ E2E", { exact: true }).first()).toBeVisible();
+      // FB8-5 S1: the exam table renders a stacked-card copy for phones (hidden from `sm`): take the visible one
+      await expect(page.getByText("ОРТ E2E", { exact: true }).filter({ visible: true }).first()).toBeVisible();
       await shoot(page, "teacher-ort-course", vp, "ru");
       await shoot(page, "teacher-ort-course-full", vp, "ru", true);
       await ctx.close();

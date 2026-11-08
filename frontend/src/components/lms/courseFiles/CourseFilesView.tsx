@@ -10,6 +10,7 @@ import { deleteCourseFile, downloadCourseFile, listCourseFiles } from "@/lib/lms
 import type { CourseFileStaffOut, CourseFileStudentOut, CourseFilesQuotaOut } from "@/lib/lms/pagesTypes";
 import { useCourse } from "@/components/lms/CourseContext";
 import { useCanEditContent } from "@/components/lms/content/StaffGate";
+import { HiddenAreaBadge } from "@/components/lms/course/StaffCourseUi";
 import { fmtShortDateTime } from "@/components/lms/home/format";
 import { ContentError, LockedState, isModuleLocked } from "@/components/lms/pages/ApiError";
 import { Badge, Button, ConfirmDialog, EmptyState, LoadingState, MenuButton, PageHeader, Pagination } from "@/components/ui";
@@ -76,6 +77,7 @@ export function CourseFilesView() {
     <div>
       <PageHeader
         title={t("courseFiles.title")}
+        badge={<HiddenAreaBadge course={course} area="files" />} /* FB8-5 S1 (D-FB8-5-2) */
         description={isStaff ? undefined : t("courseFiles.descriptionStudent")}
         primaryAction={canEdit ? <Button leftIcon={<Upload className="h-4 w-4" aria-hidden="true" />} onClick={() => setUpload(true)}>{t("courseFiles.upload")}</Button> : undefined}
       />

@@ -11,9 +11,10 @@ import { withFrom } from "@/lib/lms/nav"; // Phase 8c S2
 import { useCourse } from "@/components/lms/CourseContext";
 import { Pager } from "@/components/lms/Pager";
 import { useCanEditContent } from "@/components/lms/content/StaffGate";
-import { btnSmall } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { AssessmentStatusBadge, useListCount } from "@/components/lms/course/StaffCourseUi";
-import { Badge, Button, ConfirmDialog, EmptyState, LoadingState, PageHeader } from "@/components/ui";
+import {
+  Badge, Button, ConfirmDialog, EmptyState, LoadingState, OverflowMenu, PageHeader, Table, type MenuGroup, type TableColumn,
+} from "@/components/ui";
 import { AssessmentError } from "./AssessmentError";
 import { CreateAssessmentDialog } from "./CreateAssessmentDialog";
 import { IssueList } from "./IssueList";
@@ -29,6 +30,9 @@ import { KeyRound } from "lucide-react"; // Phase 7a S5
 // Phase 8c S2 (PHASE_8C_DESIGN §3.7, P8C-7): the Tests list is gone; this list lives on the ORT teacher Course page
 // (`embedded`: the course title is the page `<h1>`, so the list title is an `<h2>`; `?new=1` is cleared on the page
 // itself instead of the old `/assessments` route, which is now a redirect stub). The list content is unchanged.
+// FB8-5 S1 (STAFF_UX_AUDIT §2, D-FB8-5-7): a compact `Table` (Title with a second line of counts / version / badges,
+// Status, Attempts, Available, "⋯" per row: Edit, Publish or Unpublish, Delete last and red; Restore in the trash).
+// The header keeps one primary ("New assessment"); Show / Hide trash moved into its "⋯".
 export function StaffAssessmentList({ embedded = false }: { embedded?: boolean } = {}) {
   const { lang, t } = useTranslation();
   const { course } = useCourse();
@@ -101,25 +105,89 @@ export function StaffAssessmentList({ embedded = false }: { embedded?: boolean }
 
   const titleOf = (a: AssessmentStaffSummaryOut) => pickLocalized(a.title, lang, course.default_language) || t("assessments.untitled");
   const create = canEdit && !trash ? <Button onClick={() => setCreating(true)}>{t("assessments.list.create")}</Button> : undefined;
+  const trashLabel = trash ? t("assessments.list.hideTrash") : t("assessments.list.showTrash");
+  const headerMenu: MenuGroup[] = [{ id: "view", items: [{ id: "trash", label: trashLabel }] }];
+  const onHeaderMenu = (id: string) => { if (id === "trash") setTrash((s) => !s); };
+
+  const rowMenu = (a: AssessmentStaffSummaryOut): MenuGroup[] => (a.deleted_at
+    ? [{ id: "row", items: [{ id: "restore", label: t("assessments.list.restore") }] }]
+    : [{ id: "row", items: [
+      { id: "edit", label: t("assessments.list.edit") },
+      a.status === "published"
+        ? { id: "unpublish", label: t("assessments.publish.unpublish"), disabled: flow.busyId === a.id }
+        : { id: "publish", label: t("assessments.publish.publish"), disabled: flow.busyId === a.id },
+      { id: "delete", label: t("assessments.list.delete"), danger: true },
+    ] }]);
+  const onRowMenu = (a: AssessmentStaffSummaryOut, id: string) => {
+    if (id === "restore") void restore(a);
+    else if (id === "edit") router.push(editHref(a.id));
+    else if (id === "unpublish") flow.requestUnpublish(a.id, titleOf(a), a.attempt_counts);
+    else if (id === "publish") void flow.publish(a.id);
+    else if (id === "delete") { setActionError(null); setToDelete(a); }
+  };
+
+  const available = (a: AssessmentStaffSummaryOut) => {
+    if (a.available_from && a.available_until) return `${fmtDateTime(a.available_from)} – ${fmtDateTime(a.available_until)}`;
+    if (a.available_from) return t("assessments.list.from", { date: fmtDateTime(a.available_from) });
+    if (a.available_until) return t("assessments.list.until", { date: fmtDateTime(a.available_until) });
+    return t("assessments.list.always");
+  };
+
+  const columns: TableColumn<AssessmentStaffSummaryOut>[] = [
+    {
+      key: "title", header: t("assessments.list.colTitle"), primary: true,
+      cell: (a) => {
+        const title = titleOf(a);
+        const changes = a.has_unpublished_changes && a.status === "published";
+        return (
+          <div className="min-w-0">
+            {a.deleted_at ? <span className="break-words font-semibold text-slate-900">{title}</span>
+              : <Link href={`${base}/${a.id}`} className="break-words font-semibold text-slate-900 hover:text-brand-700">{title}</Link>}
+            <p className="mt-0.5 text-xs font-normal leading-5 text-slate-600">
+              {t("assessments.list.counts", { items: a.item_count, points: fmtPoints(a.points_possible) })}
+              {a.languages.length > 0 && <>{" · "}{a.languages.map((l) => l.toUpperCase()).join(", ")}</>}
+              {a.current_version_no !== null && <>{" · "}{t("assessments.list.version", { n: a.current_version_no })}</>}
+            </p>
+            {(changes || a.has_access_code) && (
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {changes && <Badge tone="warning">{t("assessments.list.unpublishedChanges")}</Badge>}
+                {a.has_access_code && <Badge tone="info" icon={<KeyRound aria-hidden="true" />}>{t("accommodations.accessCode.badge")}</Badge> /* Phase 7a S5 */}
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    { key: "status", header: t("assessments.list.colStatus"), nowrap: true, cell: (a) => <AssessmentStatusBadge status={a.status} /> },
+    {
+      key: "attempts", header: t("assessments.list.colAttempts"), nowrap: true,
+      cell: (a) => t("assessments.list.attempts", { inProgress: a.attempt_counts.in_progress, submitted: a.attempt_counts.submitted }),
+    },
+    { key: "available", header: t("assessments.list.colAvailable"), nowrap: true, hideOnMobile: true, cell: available },
+    ...(canEdit ? [{
+      key: "actions", header: "", actions: true, align: "right" as const,
+      cell: (a: AssessmentStaffSummaryOut) => (
+        <OverflowMenu label={t("assessments.list.actionsFor", { title: titleOf(a) })} groups={rowMenu(a)} onSelect={(id) => onRowMenu(a, id)} />
+      ),
+    }] : []),
+  ];
 
   return (
     <div className="space-y-4">
       {embedded ? (
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="text-xl font-semibold leading-7 text-slate-900">{t("assessments.list.title")}</h2>
-            {!loading && !error && items.length > 0 && <p className="mt-1 text-sm leading-6 text-slate-600">{countText(items.length, !!cursor)}</p>}
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-            <Button variant="secondary" onClick={() => setTrash((s) => !s)}>{trash ? t("assessments.list.hideTrash") : t("assessments.list.showTrash")}</Button>
-            {canEdit && <Button onClick={() => setCreating(true)}>{t("assessments.list.create")}</Button>}
+          <div className="flex items-center gap-2">
+            {canEdit && !trash && <Button onClick={() => setCreating(true)}>{t("assessments.list.create")}</Button>}
+            <OverflowMenu groups={headerMenu} onSelect={onHeaderMenu} />
           </div>
         </div>
       ) : (
         <PageHeader title={t("assessments.list.title")} className="mb-2"
-          description={!loading && !error && items.length > 0 ? countText(items.length, !!cursor) : undefined}
-          secondaryActions={<Button variant="secondary" onClick={() => setTrash((s) => !s)}>{trash ? t("assessments.list.hideTrash") : t("assessments.list.showTrash")}</Button>}
-          primaryAction={canEdit ? <Button onClick={() => setCreating(true)}>{t("assessments.list.create")}</Button> : undefined} />
+          primaryAction={canEdit && !trash ? <Button onClick={() => setCreating(true)}>{t("assessments.list.create")}</Button> : undefined}
+          overflow={headerMenu} onOverflow={onHeaderMenu} />
       )}
       <AssessmentError error={error} onRetry={error ? () => load() : undefined} />
       {!toDelete && <AssessmentError error={actionError} />}
@@ -130,59 +198,10 @@ export function StaffAssessmentList({ embedded = false }: { embedded?: boolean }
         <EmptyState mascot="working" title={trash ? t("assessments.list.emptyTrash") : t("assessments.list.empty")}
           description={trash ? undefined : t("teaching.assessmentsEmptyHint")} action={create} />
       )}
-      <ul className="space-y-3">
-        {items.map((a) => {
-          const title = titleOf(a);
-          return (
-            <li key={a.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0 flex-1 basis-full sm:basis-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {a.deleted_at ? <h2 className="break-words font-semibold text-slate-900">{title}</h2>
-                      : <Link href={`${base}/${a.id}`} className="break-words font-semibold text-slate-900 hover:text-brand-700">{title}</Link>}
-                    <AssessmentStatusBadge status={a.status} />
-                    {a.current_version_no !== null && <Badge tone="neutral">{t("assessments.list.version", { n: a.current_version_no })}</Badge>}
-                    {a.has_access_code && <Badge tone="info" icon={<KeyRound aria-hidden="true" />}>{t("accommodations.accessCode.badge")}</Badge> /* Phase 7a S5 */}
-                    {a.has_unpublished_changes && a.status === "published" && (
-                      <Badge tone="warning">{t("assessments.list.unpublishedChanges")}</Badge>
-                    )}
-                  </div>
-                  <p className="mt-1 text-sm text-slate-600">
-                    {t("assessments.list.counts", { items: a.item_count, points: fmtPoints(a.points_possible) })}
-                    {" · "}{a.languages.map((l) => l.toUpperCase()).join(", ")}
-                    {" · "}{t("assessments.list.attempts", { inProgress: a.attempt_counts.in_progress, submitted: a.attempt_counts.submitted })}
-                  </p>
-                  {(a.available_from || a.available_until) && (
-                    <p className="text-sm text-slate-600">
-                      {a.available_from ? t("assessments.list.from", { date: fmtDateTime(a.available_from) }) : ""}
-                      {a.available_from && a.available_until ? " · " : ""}
-                      {a.available_until ? t("assessments.list.until", { date: fmtDateTime(a.available_until) }) : ""}
-                    </p>
-                  )}
-                </div>
-                {canEdit && (
-                  <div className="flex w-full flex-wrap gap-2 sm:w-auto">
-                    {a.deleted_at ? (
-                      <button type="button" className={btnSmall} onClick={() => void restore(a)}>{t("assessments.list.restore")}</button>
-                    ) : (
-                      <>
-                        <Link href={editHref(a.id)} className={btnSmall}>{t("assessments.list.edit")}</Link>
-                        {a.status === "published" ? (
-                          <button type="button" className={btnSmall} disabled={flow.busyId === a.id}
-                            onClick={() => flow.requestUnpublish(a.id, title, a.attempt_counts)}>{t("assessments.publish.unpublish")}</button>
-                        ) : (
-                          <button type="button" className={btnSmall} disabled={flow.busyId === a.id} onClick={() => void flow.publish(a.id)}>{t("assessments.publish.publish")}</button>
-                        )}
-                        <button type="button" className={btnSmall} onClick={() => { setActionError(null); setToDelete(a); }}>{t("assessments.list.delete")}</button>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+      {items.length > 0 && (
+        <Table caption={t("assessments.list.title")} density="compact"
+          columns={columns} rows={items} rowKey={(a) => a.id} countText={countText(items.length, !!cursor)} />
+      )}
       <Pager nextCursor={cursor} loading={loading} onMore={() => load(cursor)} />
       <CreateAssessmentDialog open={creating} courseId={course.id} courseLanguages={course.languages} defaultLanguage={course.default_language}
         onCreated={(a) => { setCreating(false); router.push(editHref(a.id)); }} onCancel={() => setCreating(false)} />

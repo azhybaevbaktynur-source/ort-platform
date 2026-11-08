@@ -1302,7 +1302,13 @@
       "counts": "Вопросов: {items}, баллов: {points}",
       "attempts": "в процессе: {inProgress}, сдано: {submitted}",
       "from": "Открывается: {date}",
-      "until": "Закрывается: {date}"
+      "until": "Закрывается: {date}",
+      "colTitle": "Название",
+      "colStatus": "Статус",
+      "colAttempts": "Попытки",
+      "colAvailable": "Доступно",
+      "actionsFor": "Действия: {title}",
+      "always": "Всегда"
     },
     "student": {
       "title": "Тесты",
@@ -5252,6 +5258,15 @@
       "title": "Пока недоступно",
       "body": "Преподаватель ещё ничего здесь не опубликовал.",
       "back": "Назад к курсу"
+    },
+    "content": "Содержание",
+    "students": "Ученики",
+    "more": "Ещё",
+    "tabs": {
+      "label": "Содержание курса",
+      "structure": "Структура",
+      "assignments": "Задания",
+      "exams": "Экзамены"
     }
   },
   "studentView": {
