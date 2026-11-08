@@ -102,6 +102,7 @@ export function PracticeList() {
         <StudentPageHeader title={t("practice.title")}
           subtitle={examPrep ? pickLocalized(course.title, lang, course.default_language) : undefined} />
       )}
+      {canEdit && <p className="-mt-2 mb-4 max-w-2xl text-sm leading-5 text-slate-600">{t("practice.staffHint")}</p>}
       <ErrorMessage error={actionError} className="mb-4" />
       {loading ? <LoadingState /> : error ? <ErrorMessage error={error} onRetry={() => void load()} /> : items.length === 0 ? (
         <EmptyState mascot={canEdit ? "working" : "reading"} title={t(canEdit ? "practice.emptyStaff" : "practice.empty")} icon={<Dumbbell className="h-6 w-6" aria-hidden="true" />} action={newButton} />

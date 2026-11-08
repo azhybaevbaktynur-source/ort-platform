@@ -5122,7 +5122,7 @@
       "addVideo": "Video",
       "addMore": "More",
       "addMenu": "Add",
-      "emptyModule": "Nothing in this module yet. Add a video, page, file or quiz.",
+      "emptyModule": "Nothing in this module yet. Add a video, page, file or quiz. Students open pages and files only as lessons in a module.",
       "emptyBody": "A module is a section of the course. Create the first one and add lessons to it: videos, pages, files and quizzes.",
       "durationSet": "Set the duration: {title}",
       "durationEdit": "Duration of “{title}”: {value}. Change",
@@ -5780,6 +5780,7 @@
   },
   "practice": {
     "nav": "Practice",
+    "staffHint": "Practice sets appear for students only under Practice. To put a test in a module, add a quiz instead.",
     "title": "Practice",
     "empty": "No practice sets yet.",
     "emptyStaff": "No practice sets yet. Create one from a question bank.",
