@@ -7106,5 +7106,119 @@
       "emptyTitle": "No lesson courses yet",
       "emptyBody": "Courses with lessons for this exam will appear here."
     }
+  },
+  "infra": {
+    "nav": "Services",
+    "title": "Services",
+    "subtitle": "Plans, usage against limits and costs of the services the platform runs on. Keys stay on the server.",
+    "updated": "Updated {when}",
+    "never": "not loaded yet",
+    "refresh": "Refresh",
+    "refreshing": "Refreshing...",
+    "rateLimited": "Too many manual refreshes. Try again in a while.",
+    "plan": "Plan {plan}",
+    "of": "{value} of {limit}",
+    "noLimit": "limit is not published",
+    "flags": "Notes",
+    "setOnServer": "set on the server:",
+    "unavailable": "Statistics are not available for this email provider.",
+    "errorLine": "Could not get data: {reason}",
+    "previous": "Showing the previous figures from {when}.",
+    "fetchedAt": "Data from {when}",
+    "openDashboard": "Open dashboard",
+    "openStorage": "Storage page",
+    "deploy": "Last deploy: {status}, commit {commit}",
+    "units": {
+      "cuHours": "{n} CU-h",
+      "hours": "{n} h"
+    },
+    "level": {
+      "ok": "normal",
+      "warning": "over 80%",
+      "critical": "over 95%"
+    },
+    "status": {
+      "ok": "OK",
+      "warning": "Warning",
+      "error": "Error",
+      "not_connected": "Not connected",
+      "unavailable": "Unavailable",
+      "refreshing": "Refreshing..."
+    },
+    "provider": {
+      "neon": {
+        "name": "Neon",
+        "role": "Database"
+      },
+      "render": {
+        "name": "Render",
+        "role": "Backend hosting"
+      },
+      "vercel": {
+        "name": "Vercel",
+        "role": "Frontend hosting"
+      },
+      "r2": {
+        "name": "Cloudflare R2",
+        "role": "Image and file storage"
+      },
+      "email": {
+        "name": "Email",
+        "role": "Sign-up codes and password reset"
+      }
+    },
+    "metric": {
+      "storage": "Storage",
+      "compute": "Compute",
+      "branches": "Branches",
+      "data_transfer": "Data transfer",
+      "class_a": "Class A operations",
+      "class_b": "Class B operations",
+      "sent_today": "Sent today",
+      "sent_month": "Sent this month",
+      "credits": "Credits left"
+    },
+    "source": {
+      "cloudflare": "by Cloudflare",
+      "counter": "by our counter"
+    },
+    "flag": {
+      "sleeps": "Sleeps when idle",
+      "suspended": "Suspended",
+      "deploy_failed": "Last deploy failed",
+      "commit_mismatch": "Running commit differs from the last deploy",
+      "counter_drift": "Our counter differs from Cloudflare"
+    },
+    "error": {
+      "timeout": "timeout",
+      "network": "network error",
+      "unauthorized": "key rejected",
+      "not_found": "not found",
+      "rate_limited": "provider rate limit",
+      "http_error": "provider error",
+      "bad_response": "unexpected answer",
+      "graphql_error": "query rejected",
+      "unknown": "unknown error"
+    },
+    "capacity": {
+      "fits": "Full exams of {students} students that still fit in the database",
+      "estimated": "estimate",
+      "perExam": "One exam is about {size}.",
+      "used": "Used {used} of {limit}",
+      "history": "Restore window: {hours} h.",
+      "launch": "On the Neon Launch plan the limit is lifted.",
+      "source": {
+        "neon": "per Neon",
+        "database": "per database size"
+      }
+    },
+    "costs": {
+      "title": "Estimated cost per month",
+      "incomplete": "Some prices are not known.",
+      "source": "Source: {source}, as of {date}.",
+      "unknown": "unknown",
+      "next": "next plan: {plan}",
+      "unverified": "unverified"
+    }
   }
 }
