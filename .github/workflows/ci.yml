@@ -201,7 +201,7 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: http://127.0.0.1:8765
         run: npx next build
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium webkit
         working-directory: frontend
       - name: ORT e2e (DOM assertions; Linux screenshots recorded, not compared)
         working-directory: frontend
