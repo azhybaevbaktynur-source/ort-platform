@@ -7,7 +7,7 @@ import { useErrorText } from "@/components/lms/home/useErrorText";
 import { useCourse } from "@/components/lms/CourseContext";
 import { useTranslation } from "@/lib/i18n/context";
 import { listSaved, type ActivityDays, type ActivityOut, type ProgressOut } from "@/lib/lms/progress";
-import { forgetAnalytics, loadAnalytics } from "@/lib/lms/pageData"; // PERFORMANCE_AUDIT S3
+import { loadAnalytics } from "@/lib/lms/pageData"; // PERFORMANCE_AUDIT S3
 import { ActiveHours, ActivityBars, AllTimeHeatmap, Sessions, StudyTime } from "./ActivityCards";
 import { AnalyticsCard } from "./AnalyticsCard";
 import { GoalInput } from "./GoalInput";
@@ -85,7 +85,7 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
   const loadActivity = useCallback(async (signal?: AbortSignal) => {
     setBusy(true);
     try {
-      // PERFORMANCE_AUDIT S3: an answer the shell link's hover/focus asked moments ago is used (or its request shared)
+      // PERFORMANCE_AUDIT S3: an answer the shell link's hover/focus asked moments ago is used (or its request shared); otherwise asked again
       const [p, a] = await loadAnalytics(courseId, period);
       if (!signal?.aborted) { setProgress(p); setActivity(a); }
     } catch (e) {
@@ -170,7 +170,7 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
         subtitle={progress.current_percent === null && progress.goal_percent === null
           ? t("progress.analytics.goal.hint")
           : t("progress.analytics.goal.subtitle", { current: pct(progress.current_percent), goal: pct(progress.goal_percent) })}>
-        <GoalInput courseId={courseId} value={progress.goal_percent} onChange={(v) => { forgetAnalytics(courseId); setProgress({ ...progress, goal_percent: v }); }} />
+        <GoalInput courseId={courseId} value={progress.goal_percent} onChange={(v) => setProgress({ ...progress, goal_percent: v })} />
       </AnalyticsCard>}
     </div>
   );
