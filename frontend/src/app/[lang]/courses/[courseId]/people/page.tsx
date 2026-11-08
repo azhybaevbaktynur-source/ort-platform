@@ -282,7 +282,7 @@ export default function PeoplePage() {
     <div className={`space-y-6 w-full ${STAFF_WIDTH.list}`}>
       {/* Phase 6b S5c: PageHeader, add-staff card with design-system fields, roster Table with phone cards (UX T2). */}
       {/* Phase 9 S3: "Invite students" is the page's primary action; the content sits in tabs. */}
-      <PageHeader title={t("courses.people.tab")} className="mb-2"
+      <PageHeader title={t("courseNav.students")} className="mb-2"
         primaryAction={canManage && course.status !== "concluded" ? inviteButton : undefined}
         overflow={course.can_import_roster ? [{ id: "more", items: [{ id: "rosterImport", label: t("rosterImport.title"), icon: <FileUp aria-hidden="true" className="h-4 w-4" /> }] }] : undefined}
         onOverflow={(id) => { if (id === "rosterImport") router.push(`/${lang}/courses/${course.id}/people/roster-import`); }} />
