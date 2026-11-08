@@ -15,10 +15,13 @@
 // switch (gold when on; turning it on asks first). Rows get a minutes chip (pages, files, links), a requirement chip
 // and ↑ ↓ buttons (keyboard path; drag stays on desktop pointers). Under each module an "add" row: Видео (a dialog with
 // a YouTube / Vimeo hint), Страница, Файл, Тест, Ссылка (the existing flows) and "Ещё" with the full grouped menu.
+// FB8 S2 (STAFF_UX_AUDIT §3): one "+ Добавить" menu per module instead of the add row (groups: lesson content, checks,
+// more); publish is a small `Switch` (`role="switch"`), Pro a `LockToggle` (platform courses only); the drag handle is
+// always visible at `lg` and sits at the row's end (↑ ↓ and the "⋯" Move entries stay the keyboard / phone path).
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ChevronRight, CircleCheck, CircleDashed, Flag, GripVertical, Info, Plus, PlayCircle } from "lucide-react";
+import { AlertTriangle, ChevronRight, Flag, GripVertical, Info, Plus, PlayCircle } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { createAssignment } from "@/lib/lms/assignments";
 import type { AssignmentKind } from "@/lib/lms/assignmentTypes";
@@ -37,14 +40,14 @@ import { templateUi } from "@/lib/lms/templates";
 import { duplicateModule } from "@/lib/lms/unsorted";
 import { useCourse } from "@/components/lms/CourseContext";
 import {
-  Badge, Button, ConfirmDialog, EmptyState, ErrorState, LoadingState, cn, focusRing, toast,
+  Badge, Button, ConfirmDialog, EmptyState, ErrorState, LoadingState, LockToggle, Switch, cn, focusRing, toast,
 } from "@/components/ui";
 import { fmtShortDateTime } from "@/components/lms/home/format";
 import { CreateAssessmentDialog } from "@/components/lms/assessments/CreateAssessmentDialog";
 import { ItemKindIcon, useItemKindText, useModuleErrorText, useRequirementText } from "./moduleUi";
 import { ItemEditDialog, ModuleSettingsDialog, MoveItemDialog, PrerequisiteDialog, RequirementDialog, type ModuleSettingsValue } from "./OutlineDialogs";
 import { AddItemDialog, VideoDialog, moduleAnchor, type AddKind } from "./AddItemDialog";
-import { DurationChip, MoveButtons, ProSwitch, parseMinutes, useDurationText } from "./EditorParts";
+import { DurationChip, MoveButtons, parseMinutes, useDurationText } from "./EditorParts";
 import { InlineForm, type InlineValues } from "./InlineForm";
 import { OutlineMenu, type MenuGroup } from "./OutlineMenu";
 import { ProgressDrawer } from "./ProgressDrawer";
@@ -101,35 +104,28 @@ function Warnings({ warnings }: { warnings: ModuleWarningOut[] }) {
   );
 }
 
-/** Phase 8c S2 (§3.6): published = filled green check, draft = dashed circle (shape differs, not only color). */
-function PublishToggle({ published, name, busy, disabled, onToggle }: {
-  published: boolean; name: string; busy: boolean; disabled?: boolean; onToggle: () => void;
+/** FB8 S2 (§3): published or draft as a small switch (`role="switch"`, label "Опубликовано: {title}" for screen readers);
+ * the tooltip says the state and what a click does. The row also says "Черновик" in text. */
+function PublishSwitch({ published, name, busy, onToggle }: {
+  published: boolean; name: string; busy: boolean; onToggle: () => void;
 }) {
   const { t } = useTranslation();
-  const tip = published ? t("modules.editor.publishedIcon") : t("modules.editor.draftIcon");
   return (
-    <button type="button" aria-pressed={published} aria-label={t("modules.editor.publishToggle", { title: name })} title={tip}
-      aria-busy={busy || undefined} disabled={disabled || busy} onClick={onToggle}
-      className={cn(
-        "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60",
-        focusRing,
-      )}>
-      {published
-        ? <CircleCheck aria-hidden="true" className="h-6 w-6 fill-success-600 text-white" />
-        : <CircleDashed aria-hidden="true" className="h-6 w-6 text-slate-500" />}
-    </button>
+    <span title={published ? t("modules.editor.publishedIcon") : t("modules.editor.draftIcon")} className="inline-flex shrink-0">
+      <Switch size="sm" hideLabel label={t("modules.editor.publishToggle", { title: name })} checked={published} busy={busy}
+        onChange={() => onToggle()} />
+    </span>
   );
 }
 
-/** Drag handle for pointer devices (≥ lg). Hidden from assistive tech: the "⋯" menu's Move entries do the same.
- * Phase 8c UX M1: shown only while its module header (`group/mod`) or item row (`group/row`) is hovered or holds focus. */
-function DragHandle({ label, onStart, onEnd, scope }: {
-  label: string; onStart: (e: React.DragEvent) => void; onEnd: () => void; scope: "mod" | "row";
+/** Drag handle for pointer devices (≥ lg), at the end of a module header or item row. Hidden from assistive tech: the
+ * "⋯" menu's Move entries (and ↑ ↓ on rows) do the same. FB8 S2: always visible at `lg` (no action only on hover). */
+function DragHandle({ label, onStart, onEnd }: {
+  label: string; onStart: (e: React.DragEvent) => void; onEnd: () => void;
 }) {
   return (
     <span draggable aria-hidden="true" title={label} onDragStart={onStart} onDragEnd={onEnd}
-      className={cn("hidden h-11 w-6 shrink-0 cursor-grab items-center justify-center text-slate-400 hover:text-slate-700 active:cursor-grabbing lg:inline-flex lg:opacity-0 lg:transition-opacity",
-        scope === "mod" ? "lg:group-hover/mod:opacity-100 lg:group-focus-within/mod:opacity-100" : "lg:group-hover/row:opacity-100 lg:group-focus-within/row:opacity-100")}>
+      className="hidden h-11 w-6 shrink-0 cursor-grab items-center justify-center text-slate-300 transition-colors hover:text-slate-600 active:cursor-grabbing lg:inline-flex">
       <GripVertical className="h-5 w-5" />
     </span>
   );
@@ -519,6 +515,7 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
     } else setDialog({ kind: "addItem", module: m, initialKind: id as AddKind });
   };
 
+  /** FB8 S2: the one "+ Добавить" menu of a module: lesson content, checks, then the header and an existing object. */
   const addGroups: MenuGroup[] = [
     {
       id: "content", heading: t("coursePage.addGroups.content"), items: [
@@ -526,7 +523,6 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
         { id: "page", label: t("coursePage.addItems.page"), icon: <ItemKindIcon kind="page" /> },
         { id: "file", label: t("coursePage.addItems.file"), icon: <ItemKindIcon kind="file" /> },
         { id: "url", label: t("coursePage.addItems.link"), icon: <ItemKindIcon kind="url" /> },
-        { id: "header", label: t("coursePage.addItems.header"), icon: <ItemKindIcon kind="header" /> },
       ],
     },
     {
@@ -537,19 +533,12 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
         { id: "assignment", label: t("coursePage.addItems.assignment"), icon: <ItemKindIcon kind="assignment" assignmentKind="text" /> },
       ],
     },
-    { id: "existing", separated: true, items: [{ id: "existing", label: t("coursePage.addExisting") }] },
-  ];
-
-  const kindIcon = (node: React.ReactNode) => <span aria-hidden="true" className="inline-flex text-slate-500 [&>svg]:h-4 [&>svg]:w-4">{node}</span>;
-  /** F5c (§6): the five buttons of a module's add row (the full grouped menu stays behind "Ещё"). */
-  const quickAdds: { id: string; label: string; icon: React.ReactNode }[] = [
-    { id: "video", label: t("modules.editor.addVideo"), icon: kindIcon(<PlayCircle />) },
-    { id: "page", label: t("coursePage.addItems.page"), icon: kindIcon(<ItemKindIcon kind="page" />) },
-    { id: "file", label: t("coursePage.addItems.file"), icon: kindIcon(<ItemKindIcon kind="file" />) },
-    ortCourse
-      ? { id: "ortExam", label: t("coursePage.addItems.ortExam"), icon: kindIcon(<ItemKindIcon kind="assignment" assignmentKind="quiz" />) }
-      : { id: "quiz", label: t("coursePage.addItems.quiz"), icon: kindIcon(<ItemKindIcon kind="assignment" assignmentKind="quiz" />) },
-    { id: "url", label: t("coursePage.addItems.link"), icon: kindIcon(<ItemKindIcon kind="url" />) },
+    {
+      id: "more", heading: t("modules.editor.addMore"), items: [
+        { id: "header", label: t("coursePage.addItems.header"), icon: <ItemKindIcon kind="header" /> },
+        { id: "existing", label: t("coursePage.addExisting") },
+      ],
+    },
   ];
 
   const allCollapsed = live.length > 0 && live.every((m) => collapsed.includes(m.id));
@@ -638,10 +627,6 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
                 drag?.type === "module" && drag.id === m.id && "opacity-60")}>
               <header className="group/mod rounded-t-xl bg-slate-50 px-1 sm:px-2">
                 <div className="flex min-h-12 items-center gap-0.5">
-                  {canEdit && (
-                    <DragHandle scope="mod" label={t("modules.editor.dragHandle", { title: name })} onEnd={endDrag}
-                      onStart={startDrag({ type: "module", id: m.id }, `m-${m.id}`)} />
-                  )}
                   <button type="button" aria-expanded={!isCollapsed} aria-controls={itemsId} onClick={() => toggleCollapsed(m.id)}
                     aria-label={t("coursePage.toggleModule", { title: name })} title={t("coursePage.toggleModule", { title: name })}
                     className={cn("inline-flex h-11 w-9 shrink-0 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100", focusRing)}>
@@ -671,9 +656,11 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
                         <div className="flex shrink-0 items-center">
                           {/* F5c: only where the server accepts it (platform courses) */}
                           {isPlatform && (
-                            <ProSwitch on={m.access_tier === "paid"} name={name} busy={busy === `pro-${m.id}`} onToggle={() => toggleModulePro(m)} />
+                            <LockToggle locked={m.access_tier === "paid"} label={t("modules.editor.proSwitch", { title: name })}
+                              lockedHint={t("modules.editor.proHintOn")} unlockedHint={t("modules.editor.proHintOff")}
+                              busy={busy === `pro-${m.id}`} onToggle={() => toggleModulePro(m)} />
                           )}
-                          <PublishToggle published={m.published} name={name} busy={busy === `pub-${m.id}`}
+                          <PublishSwitch published={m.published} name={name} busy={busy === `pub-${m.id}`}
                             onToggle={() => toggleModulePublished(m)} />
                           <OutlineMenu label={t("modules.editor.actions")} sheetTitle={t("modules.editor.actionsFor", { title: name })}
                             onSelect={(id) => onModuleMenu(m, mi, id)} groups={[{
@@ -691,6 +678,8 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
                               { id: "delete", label: t("modules.editor.delete"), danger: true },
                             ],
                           }]} />
+                          <DragHandle label={t("modules.editor.dragHandle", { title: name })} onEnd={endDrag}
+                            onStart={startDrag({ type: "module", id: m.id }, `m-${m.id}`)} />
                         </div>
                       )}
                     </>
@@ -734,10 +723,6 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
                           className={cn("group/row flex min-h-11 items-center gap-1 px-1 sm:px-2", pad,
                             over === `i:${it.id}` && "shadow-[inset_0_2px_0_0_theme(colors.brand.500)]",
                             drag?.type === "item" && drag.id === it.id && "opacity-60")}>
-                          {canEdit && (
-                            <DragHandle scope="row" label={t("modules.editor.dragHandle", { title: iname })} onEnd={endDrag}
-                              onStart={startDrag({ type: "item", id: it.id, moduleId: m.id }, `mi-${it.id}`)} />
-                          )}
                           {isVideo
                             ? <PlayCircle aria-hidden="true" className="ml-1 h-4 w-4 shrink-0 text-slate-500" />
                             : <ItemKindIcon kind={it.kind} assignmentKind={it.target?.assignment_kind} className="ml-1 h-4 w-4 text-slate-500" />}
@@ -779,7 +764,7 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
                               {canEdit && (
                                 <div className="flex shrink-0 items-center">
                                   <MoveButtons name={iname} first={ii === 0} last={ii === items.length - 1} onMove={(dir) => moveItemBy(m, ii, dir)} />
-                                  <PublishToggle published={it.published} name={iname} busy={busy === `ip-${it.id}`}
+                                  <PublishSwitch published={it.published} name={iname} busy={busy === `ip-${it.id}`}
                                     onToggle={() => toggleItemPublished(m, it)} />
                                   <OutlineMenu label={t("modules.editor.actionsFor", { title: iname })} onSelect={(id) => onItemMenu(m, it, ii, id)} groups={[{
                                     id: "item", items: [
@@ -795,6 +780,8 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
                                       { id: "delete", label: t("modules.editor.removeItem"), danger: true },
                                     ],
                                   }]} />
+                                  <DragHandle label={t("modules.editor.dragHandle", { title: iname })} onEnd={endDrag}
+                                    onStart={startDrag({ type: "item", id: it.id, moduleId: m.id }, `mi-${it.id}`)} />
                                 </div>
                               )}
                             </>
@@ -818,20 +805,9 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
                 ) : canEdit && (
                   <div className={cn("px-2 py-2 sm:px-3", items.length > 0 && "border-t border-slate-100")}>
                     {items.length === 0 && <p className="px-1 pb-1.5 text-sm leading-5 text-slate-600">{t("modules.editor.emptyModule")}</p>}
-                    {/* F5c: one tap per lesson kind from `sm`; phones get the same choices in one "Добавить" sheet */}
-                    <div role="group" aria-label={addLabel} className="flex flex-wrap items-center gap-1">
-                      {quickAdds.map((q) => (
-                        <button key={q.id} type="button" onClick={() => onAdd(m, q.id)}
-                          className={cn("hidden min-h-9 items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-brand-400 hover:bg-brand-50 hover:text-brand-800 sm:inline-flex", focusRing)}>
-                          <Plus aria-hidden="true" className="h-3.5 w-3.5 text-slate-500" />
-                          {q.icon}
-                          {q.label}
-                        </button>
-                      ))}
-                      <OutlineMenu trigger="button" variant="link" chevron label={addLabel} groups={addGroups} onSelect={(id) => onAdd(m, id)}
-                        leftIcon={<Plus aria-hidden="true" className="h-4 w-4 sm:hidden" />}
-                        text={<><span className="sm:hidden">{t("modules.editor.addMenu")}</span><span className="hidden sm:inline">{t("modules.editor.addMore")}</span></>} />
-                    </div>
+                    {/* FB8 S2: one "+ Добавить" menu (a bottom sheet on phones) instead of a button per kind */}
+                    <OutlineMenu trigger="button" variant="secondary" chevron label={addLabel} groups={addGroups} onSelect={(id) => onAdd(m, id)}
+                      leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />} text={t("modules.editor.addMenu")} />
                   </div>
                 )}
               </div>
