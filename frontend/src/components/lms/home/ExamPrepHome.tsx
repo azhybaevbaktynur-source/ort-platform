@@ -6,12 +6,15 @@
 // and no result exists, the sections of the latest result, then the platform courses to join and the student's other
 // courses. U9 (STUDENT_UI_REVIEW): no course grids; switching, the catalog, the code and leaving live in the shell's
 // exam sheet. Three reads in parallel (`/me/home` by the caller, the exam-prep page and the last 7 days of activity).
-import React, { useCallback, useEffect, useState } from "react";
+// PERFORMANCE_AUDIT S3: the exam-prep page through the SWR cache (`pageData.ts`; drawn at once on a repeat visit); while
+// it loads the page's frames are drawn with skeletons only where its numbers go.
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronRight, Pencil, Target, TrendingUp, Trophy } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
-import { getExamPrep, wholeNumber, type ExamGoalOut, type ExamPrepOut } from "@/lib/lms/examPrep";
+import { wholeNumber, type ExamGoalOut, type ExamPrepOut } from "@/lib/lms/examPrep";
+import { putExamPrep, useExamPrep } from "@/lib/lms/pageData"; // PERFORMANCE_AUDIT S3
 import { getActivity, type ActivityOut } from "@/lib/lms/progress";
 import type { HomeOut } from "@/lib/lms/homeTypes";
 import type { LocalizedText } from "@/lib/lms/types";
@@ -248,13 +251,30 @@ function SectionRows({ prep, className }: { prep: ExamPrepOut; className?: strin
   );
 }
 
-function PrepSkeleton() {
+/** PERFORMANCE_AUDIT S3: the "Next" card's frame while the exam-prep page loads (its heading, skeleton text). */
+function NextCardFrame() {
+  const { t } = useTranslation();
   return (
-    <div aria-hidden="true" className="space-y-4 sm:space-y-6">
-      <Skeleton className="h-32 w-full rounded-card sm:h-24" />
-      <Skeleton className="h-14 w-full rounded-card" />
-      <StreakCardSkeleton />
-    </div>
+    <section aria-busy="true" className="rounded-card border border-slate-200 bg-white p-4 sm:p-5">
+      <h2 className="text-sm font-semibold uppercase leading-5 tracking-wide text-brand-800">{t("examPrep.next.title")}</h2>
+      <Skeleton className="mt-2 h-7 w-2/3 max-w-sm" />
+      <Skeleton className="mt-2 h-5 w-1/2 max-w-xs" />
+    </section>
+  );
+}
+
+/** PERFORMANCE_AUDIT S3: the score line's frame while the exam-prep page loads (labels, skeleton numbers). */
+function ScoreLineFrame() {
+  const { t } = useTranslation();
+  const part = "inline-flex items-center gap-1.5 whitespace-nowrap";
+  return (
+    <section aria-busy="true" className={cn(HOME_CARD, "py-3 sm:py-3")}>
+      <div className="flex flex-wrap items-center gap-x-2 text-sm leading-5 text-slate-700 sm:gap-x-3">
+        <span className={part}>{t("examPrep.goal.latestLabel")}: <span aria-hidden="true" className="inline-block h-4 w-8 animate-pulse rounded-lg bg-slate-200 motion-reduce:animate-none" /></span>
+        <span aria-hidden="true" className="text-slate-400">·</span>
+        <span className={part}>{t("examPrep.goal.targetLabel")}: <span aria-hidden="true" className="inline-block h-4 w-8 animate-pulse rounded-lg bg-slate-200 motion-reduce:animate-none" /></span>
+      </div>
+    </section>
   );
 }
 
@@ -288,37 +308,22 @@ export function ExamPrepHome({ courseId, courseTitle, home, homeError, side, emb
   embedded?: boolean;
 }) {
   const errorText = useErrorText();
-  const [prep, setPrep] = useState<ExamPrepOut | null>(null);
-  const [prepError, setPrepError] = useState<unknown>(null);
-  const [prepLoading, setPrepLoading] = useState(true);
+  const { data: prep, error: prepError, refresh: refreshPrep } = useExamPrep(courseId);
+  const [retrying, setRetrying] = useState(false);
+  const retryPrep = () => { setRetrying(true); void refreshPrep().finally(() => setRetrying(false)); };
   const [activity, setActivity] = useState<ActivityOut | null>(null);
   const [activityState, setActivityState] = useState<"loading" | "ok" | "failed">("loading");
 
-  const loadPrep = useCallback(async (signal?: AbortSignal) => {
-    setPrepLoading(true);
-    setPrepError(null);
-    try {
-      const out = await getExamPrep(courseId, signal);
-      if (!signal?.aborted) setPrep(out);
-    } catch (e) {
-      if (!signal?.aborted) setPrepError(e);
-    } finally {
-      if (!signal?.aborted) setPrepLoading(false);
-    }
-  }, [courseId]);
-
   useEffect(() => {
     const ctl = new AbortController();
-    setPrep(null);
     setActivity(null);
     setActivityState("loading");
-    void loadPrep(ctl.signal);
     getActivity(courseId, 7, ctl.signal).then(
       (a) => { if (!ctl.signal.aborted) { setActivity(a); setActivityState("ok"); } },
       () => { if (!ctl.signal.aborted) setActivityState("failed"); },
     );
     return () => ctl.abort();
-  }, [courseId, loadPrep]);
+  }, [courseId]);
 
   // U8: the "Начало работы" checklist (sidebar pill and sheet) reads the goal and results from this page's answer
   useEffect(() => { if (prep) noteExamPrep(courseId, prep); }, [courseId, prep]);
@@ -327,7 +332,7 @@ export function ExamPrepHome({ courseId, courseTitle, home, homeError, side, emb
   const best = !!home?.latest_results.find((r) => r.course_id === courseId)?.is_personal_best;
   const hasResult = (prep?.history.length ?? 0) > 0 || (home?.latest_results.length ?? 0) > 0;
   const scored = (prep?.history.length ?? 0) > 0 || !!prep?.latest; // this course has a result
-  const setGoal = (goal: ExamGoalOut) => { if (prep) setPrep({ ...prep, goal }); };
+  const setGoal = (goal: ExamGoalOut) => { if (prep) putExamPrep(courseId, { ...prep, goal }); };
   const sections = !!prep && prep.history.length > 0; // U9 (review 4): the sections card only after a result
   // TEACHER_TO_STUDENT_MAP S3: the exam's lesson courses ("Уроки", once each on the page) and the "continue" strip of
   // this exam and its lesson courses; the platform courses wait for the rows, so a lesson course never shows twice
@@ -342,9 +347,16 @@ export function ExamPrepHome({ courseId, courseTitle, home, homeError, side, emb
     <div className="w-full space-y-6">
       <Hero title={courseTitle} prep={prep} best={best} embedded={embedded} />
       {prepError && !prep ? (
-        <ErrorState message={errorText(prepError)} onRetry={() => void loadPrep()} retrying={prepLoading} />
+        <ErrorState message={errorText(prepError)} onRetry={retryPrep} retrying={retrying} />
       ) : !prep ? (
-        <PrepSkeleton />
+        <>
+          <NextCardFrame />
+          <ContinueLessons rows={continueRows} />
+          <ScoreLineFrame />
+          {activityState === "loading" && <StreakCardSkeleton />}
+          {activity && <StreakCard activity={activity} />}
+          {side && <div className="min-w-0 space-y-6 lg:grid lg:grid-cols-2 lg:gap-6 lg:space-y-0">{side}</div>}
+        </>
       ) : (
         <>
           <NextCard next={prep.next} courseId={courseId} className="rounded-card shadow-none" />

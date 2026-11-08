@@ -6,7 +6,8 @@ import { ErrorState, LinkButton, Mascot, Skeleton, StatTile, cn } from "@/compon
 import { useErrorText } from "@/components/lms/home/useErrorText";
 import { useCourse } from "@/components/lms/CourseContext";
 import { useTranslation } from "@/lib/i18n/context";
-import { getActivity, getProgress, listSaved, type ActivityDays, type ActivityOut, type ProgressOut } from "@/lib/lms/progress";
+import { listSaved, type ActivityDays, type ActivityOut, type ProgressOut } from "@/lib/lms/progress";
+import { loadAnalytics } from "@/lib/lms/pageData"; // PERFORMANCE_AUDIT S3
 import { ActiveHours, ActivityBars, AllTimeHeatmap, Sessions, StudyTime } from "./ActivityCards";
 import { AnalyticsCard } from "./AnalyticsCard";
 import { GoalInput } from "./GoalInput";
@@ -39,10 +40,24 @@ export function PeriodPicker({ value, onChange }: { value: ActivityDays; onChang
   );
 }
 
-function Loading() {
+/** A number's place while it loads (inline: it sits inside the tile's text). */
+const NumberSkeleton = () => (
+  <span aria-hidden="true" className="inline-block h-6 w-14 animate-pulse rounded-lg bg-slate-200 align-middle motion-reduce:animate-none" />
+);
+
+/** PERFORMANCE_AUDIT S3: the tiles' frames (icons and labels) at once, skeletons only for the numbers and the charts. */
+function Loading({ period, saved }: { period: ActivityDays; saved: string | null }) {
+  const { t } = useTranslation();
+  const inPeriod = t(`progress.analytics.period.in.d${period}`);
   return (
-    <div className="space-y-4" aria-busy="true">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full rounded-card" />)}</div>
+    <div className="space-y-4 sm:space-y-6" aria-busy="true">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile icon={<ListChecks />} label={t("progress.analytics.tiles.answered")} value={<NumberSkeleton />} hint={inPeriod} />
+        <StatTile icon={<Target />} label={t("progress.analytics.tiles.accuracy")} value={<NumberSkeleton />} hint={inPeriod} />
+        <StatTile icon={<Bookmark />} label={t("progress.analytics.tiles.saved")}
+          value={saved === null ? <NumberSkeleton /> : <span className="tabular-nums">{saved}</span>} hint={t("progress.analytics.tiles.savedHint")} />
+        <StatTile icon={<Flame />} label={t("progress.analytics.tiles.streak")} value={<NumberSkeleton />} />
+      </div>
       <Skeleton className="h-56 w-full rounded-card" />
       <Skeleton className="h-56 w-full rounded-card" />
     </div>
@@ -70,7 +85,8 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
   const loadActivity = useCallback(async (signal?: AbortSignal) => {
     setBusy(true);
     try {
-      const [p, a] = await Promise.all([getProgress(courseId, { signal, days: period }), getActivity(courseId, period, signal)]);
+      // PERFORMANCE_AUDIT S3: an answer the shell link's hover/focus asked moments ago is used (or its request shared); otherwise asked again
+      const [p, a] = await loadAnalytics(courseId, period);
       if (!signal?.aborted) { setProgress(p); setActivity(a); }
     } catch (e) {
       if (!signal?.aborted) setError(e);
@@ -93,7 +109,7 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
   const retry = () => { setError(null); loadBase(); void loadActivity(); };
 
   if (error) return <ErrorState message={errorText(error)} onRetry={retry} />;
-  if (!progress || !activity) return <Loading />;
+  if (!progress || !activity) return <Loading period={period} saved={saved} />;
 
   const answered = activity.totals.answered;
   const graded = activity.totals.graded;
