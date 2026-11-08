@@ -104,6 +104,8 @@ class HomeCourseOut(BaseModel):
     cover_url: Optional[str] = None
     tests_count: int = 0
     lessons_count: int = 0
+    # TEACHER_TO_STUDENT_MAP 2.3: the exam a lesson course belongs to (the shell keeps that exam's switcher chip)
+    exam_course_id: Optional[uuid.UUID] = None
 
 
 # --- Phase 8a S3 begin --- (PHASE_8A_DESIGN 5.4, 6.7, 8.1: "continue in course" strip and announcements)

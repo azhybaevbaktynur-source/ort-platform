@@ -93,6 +93,12 @@ class Course(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
         nullable=True,
     )
     # --- F7a end ---
+    # TEACHER_TO_STUDENT_MAP 2.2 (migration 0027): a platform lesson course attached to an exam-prep course; the
+    # exam's students see it in the sidebar. Rules in `courses.service.update_course`; null for every other course.
+    exam_course_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("courses.id", ondelete="SET NULL", name="fk_courses_exam_course_id_courses"),
+        nullable=True,
+    )
 
     __table_args__ = (
         CheckConstraint("grading_total_mode IN ('points','weighted')", name="grading_total_mode_valid"),
@@ -125,6 +131,8 @@ class Course(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
         UniqueConstraint("sandbox_for_template_id", name="uq_courses_sandbox_for_template_id"),
         # --- Phase 8b S1 end ---
         Index("ix_courses_cover_asset_id", "cover_asset_id"),  # F7a
+        Index("ix_courses_exam_course_id", "exam_course_id"),  # 0027
+        CheckConstraint("exam_course_id IS NULL OR exam_course_id <> id", name="exam_course_not_self"),  # 0027
     )
 
 

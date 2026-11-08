@@ -288,6 +288,7 @@ def update_course(db: Session, ctx: AuthzContext, course: Course, data: CourseUp
     if starts and ends and ends <= starts:
         raise ValidationFailed("ends_at must be after starts_at")
 
+    exam_link = _check_exam_link(db, ctx, course, fields)  # TEACHER_TO_STUDENT_MAP 2.2 (validates only)
     _apply_home(db, course, fields)  # --- Phase 8a S3 --- (one line; validates before any field is set)
     # --- Exam prep S2 begin --- (the exam date of an exam-prep course; validated before any field is set)
     if "exam_date" in fields:
@@ -306,8 +307,40 @@ def update_course(db: Session, ctx: AuthzContext, course: Course, data: CourseUp
     for key in _ENROLLMENT_FIELDS:
         if key in fields:
             setattr(course, key, fields[key])
+    if exam_link is not _NO_LINK_CHANGE:
+        course.exam_course_id = exam_link
     db.commit()
     return course
+
+
+# --- TEACHER_TO_STUDENT_MAP 2.2 begin --- (a platform lesson course attached to a platform exam-prep course)
+_NO_LINK_CHANGE = object()
+
+
+def _check_exam_link(db: Session, ctx: AuthzContext, course: Course, fields: dict):
+    """The new `exam_course_id` (None clears) or `_NO_LINK_CHANGE`. 422 unless: the caller is a platform admin
+    (`exam_link_forbidden`); the course is a platform course without a course template and not a sandbox
+    (`exam_link_not_allowed`; an exam course is never linked); the target is a live platform exam-prep course other
+    than this one (`exam_link_target_invalid`). Sending the current value is a no-op (no check)."""
+    if "exam_course_id" not in fields or fields["exam_course_id"] == course.exam_course_id:
+        return _NO_LINK_CHANGE
+    from app.lms.exam_prep.layout import is_exam_prep
+    from app.lms.modules.service import is_platform_course
+
+    target_id = fields["exam_course_id"]
+    if not getattr(ctx.user, "is_platform_admin", False):
+        raise ValidationFailed("Only a platform administrator links a course to an exam", code="exam_link_forbidden")
+    if target_id is None:
+        return None
+    if (course.template_key is not None or course.sandbox_for_template_id is not None
+            or not is_platform_course(db, course)):
+        raise ValidationFailed("This course cannot be linked to an exam", code="exam_link_not_allowed")
+    target = db.get(Course, target_id) if target_id != course.id else None
+    if (target is None or target.deleted_at is not None or not is_exam_prep(target)
+            or not is_platform_course(db, target)):
+        raise ValidationFailed("The exam course is not valid", code="exam_link_target_invalid")
+    return target_id
+# --- TEACHER_TO_STUDENT_MAP 2.2 end ---
 
 
 # --- Phase 9 S1 begin --- (PHASE_9_DESIGN 4.6, invariant 9: enrollment mode rules)

@@ -39,6 +39,7 @@ TEST_STUDENT_ROUTES: frozenset[tuple[str, str]] = frozenset({
     ("GET", f"{_C}/exam-prep/library"),
     ("PUT", f"{_C}/exam-prep/goal"),
     ("DELETE", f"{_C}/exam-prep/goal"),
+    ("GET", f"{_C}/lesson-courses"),  # TEACHER_TO_STUDENT_MAP 2.3: the exam's lesson courses (sidebar)
     # the app frame and the student home
     ("GET", f"{_V}/auth/me"),
     ("GET", f"{_V}/me/lms"),

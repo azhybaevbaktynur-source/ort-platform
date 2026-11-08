@@ -264,7 +264,8 @@ def _course_cards(db: Session, uid: str, rows: list, now: datetime) -> list[sch.
             student_layout="exam_prep" if is_exam_prep(c) else "general",
             features=sch.HomeCourseFeaturesOut(modules=features[c.id][0], practice=features[c.id][1])
             if c.id in features else None,
-            cover_url=x.cover_url, tests_count=x.tests_count, lessons_count=x.lessons_count))
+            cover_url=x.cover_url, tests_count=x.tests_count, lessons_count=x.lessons_count,
+            exam_course_id=c.exam_course_id))
     return out
 
 
@@ -448,7 +449,8 @@ def _pending_invitations(db: Session, user: User, now: datetime) -> int:
 MODULES_SCAN_MAX = 100
 
 
-def _modules_next(db: Session, uid: str) -> list[sch.HomeModuleNextOut]:
+def _modules_next(db: Session, uid: str, course_ids: Optional[list] = None,
+                  max_out: int = sch.MODULES_NEXT_MAX) -> list[sch.HomeModuleNextOut]:
     """Caches only, never evaluates (design 6.7). 1) the published live modules of the caller's published student
     courses whose STORED state is open (`unlocked`, `started` or, F5a, `completed`: a module without requirements is
     completed once open and may still hold unviewed lessons), minus Pro modules the caller has no pass for (F5a,
@@ -456,7 +458,7 @@ def _modules_next(db: Session, uid: str) -> list[sch.HomeModuleNextOut]:
     (F5a, the outline's `up_next` rule): a requirement without a `met` status row of the caller, a lesson without a
     requirement and without a `viewed` fact, a test without a requirement and without a submitted submission. Per
     course: the first such item of the first module that has one; courses with a started module first, then the most
-    recently evaluated."""
+    recently evaluated. `course_ids` (TEACHER_TO_STUDENT_MAP 2.3, the lesson course list): only those courses."""
     from app.lms.access.service import has_active_pass, is_platform_path
     from app.lms.course_files.models import CourseFile
     from app.lms.modules import ids as mids
@@ -478,7 +480,8 @@ def _modules_next(db: Session, uid: str) -> list[sch.HomeModuleNextOut]:
         .join(CourseModule, CourseModule.id == ModuleProgress.module_id)
         .where(_mine(uid), _open_course(), CourseModule.course_id == Course.id,
                CourseModule.deleted_at.is_(None), CourseModule.published.is_(True),
-               ModuleProgress.state.in_(("unlocked", "started", "completed")))
+               ModuleProgress.state.in_(("unlocked", "started", "completed")),
+               *([Course.id.in_(course_ids)] if course_ids is not None else []))
         .order_by(Course.id, CourseModule.position, CourseModule.id).limit(MODULES_SCAN_MAX)
     ).all()
     # F5a: Pro modules of platform courses need a pass (S3 Gate; test students never locked); one statement, only
@@ -534,7 +537,7 @@ def _modules_next(db: Session, uid: str) -> list[sch.HomeModuleNextOut]:
                                                    -(p[0].evaluated_at.timestamp() if p[0].evaluated_at else 0),
                                                    str(p[0].module_id)))
     out = []
-    for m, it in picks[:sch.MODULES_NEXT_MAX]:
+    for m, it in picks[:max_out]:
         title = it.title_override
         if not title:
             if it.kind == "page":
