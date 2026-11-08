@@ -29,3 +29,16 @@ Owner feedback round, 2026-11-08. Same rules: improve the existing architecture,
    Check every changed page at 1440 and 1920 and on a phone.
 
 When all is deployed, give me one short review list (URLs and what to try) for 0–5.
+
+## Results (agent, 2026-11-08)
+
+| Item | What was built | Docs | Deployed |
+|---|---|---|---|
+| 0 | Neon: kept production + 2 newest backups; 7 old backups deleted (names in `PRODUCT_DECISIONS.md`) | — | done |
+| 1 | One course grid: 1/2/3/4 columns at <768/768/1200/1600 px, cards ≤360 px, 150 px cover; the home grid follows its own column (256–360 px) | — | bc4e090 |
+| 2 | Learning area, Teaching/Learning tabs and «Войти по коду» only for users with a student enrollment (`/me/lms has_student_enrollments`) | — | bc4e090 |
+| 3 | Lesson courses are separate platform courses linked to an exam (`courses.exam_course_id`, migration 0027); УРОКИ group in the student sidebar, lessons in the exam shell, home «Уроки» + «Продолжить урок», exam link in course settings; e2e `teacher-to-student.spec.ts` with screenshot pairs | `TEACHER_TO_STUDENT_MAP.md` | c9ca5f1, 989054d |
+| 4 | Admin → Организации table (type, status, teachers, courses, students, storage), detail page (students, settings, suspend with counts, platform org protected), «Открыть как администратор организации» with `acting_as` audit and strip, header organization switcher | `ADMIN_ORGS_DESIGN.md` | c9ca5f1 |
+| 5 | Staff primitives; course menu Содержание/Ученики/Оценки/Аналитика/Настройки + «Ещё»; compact assessments table; module editor «+ Добавить»; create course with live card; settings sections; admin overview + /admin/health; grouped admin menu; density sweep | `STAFF_UX_AUDIT.md` | c9ca5f1, 989054d |
+
+Screens: `STAFF_FEEDBACK_screens/item1..5/`. Neon: 4/10 branches (backup before 0027 kept).
