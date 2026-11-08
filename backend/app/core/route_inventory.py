@@ -79,6 +79,7 @@ ROUTE_POLICIES.update(INVITATION_POLICIES)
 ROUTE_POLICIES.update({
     ("GET", "/api/v1/me/home"): "authenticated",  # the caller's own enrollments, attempts, grades, invitations
     ("GET", "/api/v1/me/home/courses"): "authenticated",  # the caller's own student courses: pages of the same cards
+    ("GET", "/api/v1/me/bootstrap"): "authenticated",  # PERFORMANCE_AUDIT S2: the shell's parts of the caller's own data
 })
 # --- Phase 6 S6a end ---
 # --- Phase 7a S1 begin --- (assignments, hand-ins, grades: S2/S3 fill ASSIGNMENT_POLICIES; accommodations: S4)
