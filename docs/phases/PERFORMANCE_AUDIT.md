@@ -769,3 +769,74 @@ bootstrap after the application was approved; the frame is now recomputed once m
 load arrives (`useLmsMeLoader().confirmed`, sticky per shell), so a changed role shows on reload; later background refreshes
 still wait for the next navigation. (5) `header-areas.spec.ts` "first visit" delayed only `/me/lms`; it now delays
 `/me/bootstrap` too (the shell's request since S2). Every frames-seen cell of both runs reads swap `no`.
+
+
+## 9. Final before/after (owner round 2026-11-09)
+
+Before = commit 989054d (production before this round), after = lms d0ae28d (deployed as main 09741b3; Render `/health`
+showed 09741b3 before the production runs). Each frontend was built and served against its own commit's backend
+(scratch SQLite, own seed), `PERF_RUNS=3`, median of 3 per cell, method of §7. Cells read before → after. "API req" counts
+`/api/v1` requests of the load; "swap" = the shell changed (student frame → header) during the load in at least 2 of 3 runs.
+Phone = Slow 4G + CPU throttle profile of §7; local backend, so server time is small and the phone numbers are dominated by
+the 1.0 MB first-load JS and the dictionary chunk.
+
+| page | profile | mode | API req | API depth | first content ms | settled ms | JS kB | shell swap |
+|---|---|---|---|---|---|---|---|---|
+| login | laptop | cold | 1 → 2 | 1 → 1 | 33 → 53 | 237 → 217 | 981 → 803 | no → no |
+| login | laptop | warm | 1 → 2 | 1 → 1 | 34 → 25 | 157 → 124 | 981 → 803 | no → no |
+| login | phone | cold | 1 → 2 | 1 → 1 | 1327 → 1298 | 7838 → 7711 | 981 → 803 | no → no |
+| login | phone | warm | 1 → 2 | 1 → 1 | 48 → 70 | 808 → 884 | 981 → 803 | no → no |
+| student-home | laptop | cold | 10 → 5 | 2 → 2 | 340 → 226 | 368 → 250 | 1124 → 932 | no → no |
+| student-home | laptop | warm | 10 → 4 | 1 → 1 | 191 → 156 | 209 → 169 | 1093 → 932 | no → no |
+| student-home | phone | cold | 10 → 5 | 2 → 2 | 11114 → 8913 | 11887 → 11079 | 1124 → 932 | no → no |
+| student-home | phone | warm | 10 → 4 | 1 → 1 | 1164 → 681 | 1525 → 1004 | 1093 → 932 | no → no |
+| student-tests | laptop | cold | 10 → 5 | 2 → 2 | 267 → 202 | 284 → 230 | 1183 → 999 | no → no |
+| student-tests | laptop | warm | 10 → 4 | 2 → 1 | 182 → 135 | 200 → 154 | 1152 → 999 | no → no |
+| student-tests | phone | cold | 10 → 5 | 2 → 2 | 10723 → 8622 | 11201 → 10203 | 1158 → 974 | no → no |
+| student-tests | phone | warm | 10 → 4 | 2 → 1 | 1299 → 681 | 1779 → 1153 | 1128 → 974 | no → no |
+| student-analytics | laptop | cold | 11 → 7 | 2 → 3 | 275 → 212 | 287 → 250 | 1205 → 1021 | no → no |
+| student-analytics | laptop | warm | 11 → 6 | 2 → 1 | 188 → 196 | 204 → 208 | 1174 → 1021 | no → no |
+| student-analytics | phone | cold | 11 → 7 | 2 → 2 | 11254 → 8809 | 11703 → 10326 | 1180 → 997 | no → no |
+| student-analytics | phone | warm | 11 → 6 | 2 → 1 | 1262 → 767 | 1705 → 1209 | 1150 → 997 | no → no |
+| teacher-courses | laptop | cold | 7 → 3 | 2 → 1 | 219 → 180 | 248 → 236 | 1259 → 1271 | yes → no |
+| teacher-courses | laptop | warm | 5 → 2 | 1 → 1 | 116 → 132 | 138 → 142 | 1236 → 1271 | yes → no |
+| teacher-courses | phone | cold | 7 → 3 | 2 → 1 | 10492 → 8448 | 11199 → 9662 | 1187 → 1195 | yes → no |
+| teacher-courses | phone | warm | 5 → 2 | 1 → 1 | 811 → 681 | 1250 → 1122 | 1165 → 1195 | yes → no |
+| admin-overview | laptop | cold | 7 → 6 | 3 → 2 | 231 → 242 | 278 → 299 | 1425 → 1471 | no → no |
+| admin-overview | laptop | warm | 7 → 5 | 2 → 1 | 157 → 158 | 175 → 208 | 1425 → 1471 | no → no |
+| admin-overview | phone | cold | 7 → 6 | 3 → 2 | 9935 → 9296 | 10648 → 10538 | 1229 → 1260 | no → no |
+| admin-overview | phone | warm | 7 → 5 | 2 → 1 | 1328 → 812 | 1686 → 1661 | 1229 → 1260 | no → no |
+| teacher-course | laptop | cold | 7 → 6 | 3 → 2 | 256 → 235 | 265 → 252 | 1341 → 1366 | yes → no |
+| teacher-course | laptop | warm | 7 → 5 | 2 → 1 | 188 → 157 | 219 → 167 | 1341 → 1366 | yes → no |
+| teacher-course | phone | cold | 7 → 6 | 2 → 2 | 12820 → 11710 | 13296 → 11792 | 1341 → 1366 | yes → no |
+| teacher-course | phone | warm | 7 → 5 | 2 → 1 | 1274 → 829 | 1368 → 973 | 1341 → 1366 | yes → no |
+
+Production public pages (https://ort-platform-nu.vercel.app, 3 runs, median; Render at 09741b3):
+
+| page | profile | mode | API req | first content ms | settled ms | JS kB |
+|---|---|---|---|---|---|---|
+| landing /ru | laptop | cold | 0 | 169 | 450 | 804 |
+| landing /ru | laptop | warm | 0 | 52 | 180 | 804 |
+| landing /ru | phone | cold | 0 | 1703 | 12753 | 804 |
+| landing /ru | phone | warm | 0 | 79 | 697 | 804 |
+| login | laptop | cold | 2 | 119 | 1007 | 803 |
+| login | laptop | warm | 2 | 50 | 484 | 803 |
+| login | phone | cold | 2 | 1390 | 7749 | 803 |
+| login | phone | warm | 2 | 58 | 689 | 803 |
+
+Server-Timing, 5 warm calls each against https://ort-platform-w77q.onrender.com: `/health` `total` 1.5 to 2.2 ms (db 0, n=0),
+wall time 0.30 to 0.90 s (median 0.35 s); `/api/v1/auth/providers` `total` 1.0 to 1.9 ms, wall 0.28 to 0.38 s (median 0.33 s).
+
+Notes:
+- Machine load: a MacBook Air with other agent sessions running (load average about 2), Chrome headless, both backends and
+  both frontends up at the same time but measured one after the other; differences under about 30 ms on the laptop are noise.
+  Medians of 3 runs, so single cells can still wobble (for example admin-overview and analytics laptop warm are flat).
+- Gains are in the API round count (student pages 10 → 4 to 5 warm/cold requests, teacher pages 5 to 7 → 2 to 6, sequential depth
+  mostly 1), the removed student-frame to header swap on every teacher page (yes → no), and about 190 kB less first-load JS on
+  student pages and login. Phone cold first content on student pages improves about 2 s (about 11 s → 8.6 to 8.9 s); phone cold
+  settled is still 10 to 11.8 s because the CPU-throttled Slow 4G profile is bound by the JS and dictionary download. Login makes
+  one more API request than before (`/auth/providers` for the Google button), which does not delay first content.
+- What stays slow in production is the server, not the page: every API call crosses the Vercel rewrite and Render Free (0.1 CPU),
+  about 0.3 s wall for a call whose app time is 1 to 2 ms, and Render Free sleeps after 15 minutes idle with a cold start of tens
+  of seconds; Neon also scales to zero after 5 minutes. Removing those costs about $7/month (Render Starter) and about $20/month
+  (Neon Launch, scale-to-zero off), see §3.5.
