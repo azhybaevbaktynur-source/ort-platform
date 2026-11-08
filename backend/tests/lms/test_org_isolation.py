@@ -105,3 +105,22 @@ async def test_org_analytics_isolation(db, api):
     assert (await api.call(oa_a, "GET", f"/org/{a.id}/analytics/courses")).json()["items"] == []
     seen = (await api.call(oa_b, "GET", f"/org/{b.id}/analytics/courses")).json()["items"]
     assert [x["course_id"] for x in seen] == [str(cb.id)]
+
+
+async def test_org_students_isolation(db, api):
+    """Admin orgs (item 4, S3): the students page is platform-admin only; an org admin reads no student list of
+    their own or another organization through /platform, and /org has no student route."""
+    a, b = make_org(db, "A"), make_org(db, "B")
+    oa_a, tb, s = make_user(db), make_user(db), make_user(db)
+    add_member(db, a, oa_a, "org_admin")
+    add_member(db, b, tb, "teacher")
+    cb = make_course(db, tb, organization_id=b.id, status="published")
+    enroll(db, cb, s)
+    for org in (a, b):
+        r = await api.call(oa_a, "GET", f"/platform/organizations/{org.id}/students")
+        assert r.status_code == 403, r.text
+        assert (await api.call(oa_a, "GET", f"/org/{org.id}/students")).status_code in (404, 405)
+    admin = make_user(db, platform_admin=True)
+    seen = (await api.call(admin, "GET", f"/platform/organizations/{b.id}/students")).json()["items"]
+    assert [i["user"]["id"] for i in seen] == [s.id]
+    assert (await api.call(admin, "GET", f"/platform/organizations/{a.id}/students")).json()["items"] == []

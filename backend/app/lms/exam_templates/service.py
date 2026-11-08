@@ -102,6 +102,16 @@ def create(ctx: AuthzContext, data: sch.ExamTemplateCreateIn, *, request: Option
     return t
 
 
+def _org_acting(ctx: AuthzContext, t: ExamTemplate) -> dict:
+    """Admin orgs (item 4): `acting_as` of a write on an organization template, from DB memberships (ancestor-aware
+    `ctx.org_admin_for`) and the user row's flag; nothing for teacher and platform templates."""
+    if t.organization_id is None or t.owner_scope != "organization":
+        return {}
+    if ctx.org_admin_for(t.organization_id):
+        return {"acting_as": "org_admin"}
+    return {"acting_as": "platform_admin"} if scopes.is_platform_admin(ctx) else {}
+
+
 def patch(ctx: AuthzContext, template_id: uuid.UUID, data: sch.ExamTemplatePatchIn, *,
           request: Optional[Request] = None) -> ExamTemplate:
     db = ctx.db
@@ -166,7 +176,8 @@ def publish(ctx: AuthzContext, template_id: uuid.UUID, *, request: Optional[Requ
     t.draft_rev += 1
     t.updated_at = utcnow()
     audit.record(db, actor=ctx.user, action=ids.AUDIT_PUBLISH, target_type=ids.AUDIT_TARGET_EXAM_TEMPLATE,
-                 target_id=str(t.id), details={"version_no": v.version_no, "version_id": str(v.id)}, request=request)
+                 target_id=str(t.id), details={"version_no": v.version_no, "version_id": str(v.id),
+                                               **_org_acting(ctx, t)}, request=request)
     db.commit()
     return t, v, False
 
@@ -182,7 +193,8 @@ def archive(ctx: AuthzContext, template_id: uuid.UUID, *, reason: Optional[str] 
     t.status = "archived"
     t.updated_at = utcnow()
     audit.record(db, actor=ctx.user, action=ids.AUDIT_ARCHIVE, target_type=ids.AUDIT_TARGET_EXAM_TEMPLATE,
-                 target_id=str(t.id), reason=reason, details={"from": before}, request=request)
+                 target_id=str(t.id), reason=reason, details={"from": before, **_org_acting(ctx, t)},
+                 request=request)
     db.commit()
     return t
 
@@ -204,7 +216,7 @@ def set_locked(ctx: AuthzContext, template_id: uuid.UUID, locked: bool, *, reaso
     t.updated_at = utcnow()
     audit.record(db, actor=ctx.user, action=ids.AUDIT_LOCK if locked else ids.AUDIT_UNLOCK,
                  target_type=ids.AUDIT_TARGET_EXAM_TEMPLATE, target_id=str(t.id), reason=reason,
-                 details={"from": not locked, "to": locked}, request=request)
+                 details={"from": not locked, "to": locked, **_org_acting(ctx, t)}, request=request)
     db.commit()
     return t
 
@@ -237,7 +249,7 @@ def promote(ctx: AuthzContext, template_id: uuid.UUID, *, reason: Optional[str] 
     audit.record(db, actor=ctx.user, action=ids.AUDIT_PROMOTE, target_type=ids.AUDIT_TARGET_EXAM_TEMPLATE,
                  target_id=str(t.id), reason=reason,
                  details={"from": "teacher", "to": "organization", "former_owner_user_id": former,
-                          "organization_id": str(t.organization_id)}, request=request)
+                          "organization_id": str(t.organization_id), **_org_acting(ctx, t)}, request=request)
     # --- Phase 8b S2 begin --- (PHASE_8B_DESIGN 5.1: sandbox staff follow the manager set; same transaction)
     from app.lms.exam_templates import sandbox as _sandbox
 

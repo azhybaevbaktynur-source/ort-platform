@@ -33,15 +33,19 @@ me_router = APIRouter()
 class OrgOverviewOut(OrganizationOut):
     usage: UsageOut
     my_role: Optional[str] = None
+    # Admin orgs (item 4): `org_admin` (a membership on the ancestor path) or `platform_admin` (no membership,
+    # the platform admin flag); derived from the database on every request, the UI only displays it
+    acting_as: Literal["org_admin", "platform_admin"] = "org_admin"
 
 
 @router.get("/{organization_id}", response_model=OrgOverviewOut)
 def get_org(organization_id: uuid.UUID, user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
-    org = svc.load_org_for_admin(db, user, organization_id)
-    role = "org_admin" if svc.is_org_admin(db, org.id, user.id) else None
+    org, acting = svc.load_org_as_admin(db, user, organization_id)
+    role = "org_admin" if acting == "org_admin" else None
     tree_usage = org_usage.tree_usage(db, org)  # Phase 9 S2: the overview tiles count the whole subtree
     base = {k: v for k, v in tree_usage.items() if k in UsageOut.model_fields}
-    return OrgOverviewOut(**organization_out(org).model_dump(), usage=UsageOut(**base), my_role=role)
+    return OrgOverviewOut(**organization_out(org).model_dump(), usage=UsageOut(**base), my_role=role,
+                          acting_as=acting)
 
 
 @router.get("/{organization_id}/members", response_model=PageOut[MemberOut])
@@ -59,8 +63,8 @@ def list_members(organization_id: uuid.UUID, role: Optional[Literal["org_admin",
 def remove_member(organization_id: uuid.UUID, user_id: str, request: Request,
                   reason: Optional[str] = Query(None, max_length=500),
                   user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
-    org = svc.load_org_for_admin(db, user, organization_id, write=True)
-    svc.remove_member(db, user, org, user_id, reason, request)
+    org, acting = svc.load_org_as_admin(db, user, organization_id, write=True)
+    svc.remove_member(db, user, org, user_id, reason, request, acting_as=acting)
     return Response(status_code=204)
 
 
@@ -78,8 +82,8 @@ def list_courses(organization_id: uuid.UUID, cursor: Optional[str] = None, limit
 def create_course(organization_id: uuid.UUID, data: CourseCreateIn, request: Request,
                   user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
     """Same service as POST /courses; the org admin may assign the owner (owner_id)."""
-    org = svc.load_org_for_admin(db, user, organization_id, write=True)
-    course = course_svc.create_course(db, user, data, organization_id=org.id, request=request)
+    org, acting = svc.load_org_as_admin(db, user, organization_id, write=True)
+    course = course_svc.create_course(db, user, data, organization_id=org.id, request=request, acting_as=acting)
     row = db.execute(course_svc.admin_courses_query().where(Course.id == course.id)).one()
     return org_course_out(row[0], row[1], row[2])
 
@@ -87,8 +91,8 @@ def create_course(organization_id: uuid.UUID, data: CourseCreateIn, request: Req
 @router.post("/{organization_id}/courses/{course_id}/join-as-teacher", response_model=RosterEntryOut)
 def join_as_teacher(organization_id: uuid.UUID, course_id: uuid.UUID, request: Request,
                     user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
-    org = svc.load_org_for_admin(db, user, organization_id, write=True)
-    course, enr = svc.join_as_teacher(db, user, org, course_id, request)
+    org, acting = svc.load_org_as_admin(db, user, organization_id, write=True)
+    course, enr = svc.join_as_teacher(db, user, org, course_id, request, acting_as=acting)
     return roster_entry(enr, db.get(User, enr.user_id), course.owner_id)
 
 
@@ -140,8 +144,8 @@ def get_settings(organization_id: uuid.UUID, user: User = Depends(get_lms_user),
 @router.patch("/{organization_id}/settings", response_model=OrgSettingsViewOut)
 def patch_settings(organization_id: uuid.UUID, body: OrganizationSettingsIn, request: Request,
                    user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
-    org = svc.load_org_for_admin(db, user, organization_id, write=True)
-    svc.patch_settings(db, user, org, body, request)
+    org, acting = svc.load_org_as_admin(db, user, organization_id, write=True)
+    svc.patch_settings(db, user, org, body, request, acting_as=acting)
     return OrgSettingsViewOut(**svc.settings_view(db, svc.load_org(db, org.id)))
 
 
@@ -164,32 +168,32 @@ def _department_out(db: Session, org: Organization, dept_id: uuid.UUID) -> Depar
 @router.post("/{organization_id}/departments", status_code=201, response_model=DepartmentOut)
 def create_department(organization_id: uuid.UUID, body: DepartmentCreateIn, request: Request,
                       user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
-    org = svc.load_org_for_admin(db, user, organization_id, write=True)
-    dept = svc.create_department(db, user, org, body, request)
+    org, acting = svc.load_org_as_admin(db, user, organization_id, write=True)
+    dept = svc.create_department(db, user, org, body, request, acting_as=acting)
     return _department_out(db, org, dept.id)
 
 
 @router.patch("/{organization_id}/departments/{department_id}", response_model=DepartmentOut)
 def update_department(organization_id: uuid.UUID, department_id: uuid.UUID, body: DepartmentUpdateIn,
                       request: Request, user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
-    org = svc.load_org_for_admin(db, user, organization_id, write=True)
-    dept = svc.update_department(db, user, org, department_id, body, request)
+    org, acting = svc.load_org_as_admin(db, user, organization_id, write=True)
+    dept = svc.update_department(db, user, org, department_id, body, request, acting_as=acting)
     return _department_out(db, org, dept.id)
 
 
 @router.delete("/{organization_id}/departments/{department_id}", status_code=204, response_class=Response)
 def delete_department(organization_id: uuid.UUID, department_id: uuid.UUID, request: Request,
                       user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
-    org = svc.load_org_for_admin(db, user, organization_id, write=True)
-    svc.delete_department(db, user, org, department_id, request)
+    org, acting = svc.load_org_as_admin(db, user, organization_id, write=True)
+    svc.delete_department(db, user, org, department_id, request, acting_as=acting)
     return Response(status_code=204)
 
 
 @router.patch("/{organization_id}/courses/{course_id}", response_model=OrgCourseOut)
 def move_course(organization_id: uuid.UUID, course_id: uuid.UUID, body: OrgCourseMoveIn, request: Request,
                 user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
-    org = svc.load_org_for_admin(db, user, organization_id, write=True)
-    course = svc.move_course(db, user, org, course_id, body.organization_id, request)
+    org, acting = svc.load_org_as_admin(db, user, organization_id, write=True)
+    course = svc.move_course(db, user, org, course_id, body.organization_id, request, acting_as=acting)
     row = db.execute(course_svc.admin_courses_query().where(Course.id == course.id)).one()
     return org_course_out(row[0], row[1], row[2])
 # --- Phase 9 S2 end ---

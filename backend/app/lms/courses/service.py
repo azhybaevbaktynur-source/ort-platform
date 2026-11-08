@@ -190,7 +190,7 @@ def _resolve_creation(db: Session, actor: User, data: CourseCreateIn, organizati
 # ---------------------------------------------------------------- create
 
 def create_course(db: Session, actor: User, data: CourseCreateIn, *, organization_id=None,
-                  request: Optional[Request] = None) -> Course:
+                  request: Optional[Request] = None, acting_as: Optional[str] = None) -> Course:
     org_id, owner, template = _resolve_creation(db, actor, data, organization_id)  # Phase 6 S1
     # Phase 9 S1: a new course is private and has no form yet, so a form mode is always refused here
     _check_enrollment_mode(db, None, data.enrollment_mode, "private", template.get("template_key"))
@@ -231,7 +231,9 @@ def create_course(db: Session, actor: User, data: CourseCreateIn, *, organizatio
         audit.record(db, actor=actor, action="organization.course.create", target_type="course",
                      target_id=str(course.id),
                      details={"organization_id": str(org_id), "owner_id": owner_id,
-                              "template_key": template.get("template_key")}, request=request)
+                              "template_key": template.get("template_key"),
+                              # item 4: the capacity derived by `load_org_as_admin` on /org routes
+                              **({"acting_as": acting_as} if acting_as else {})}, request=request)
     # --- Phase 6 S1 end ---
     db.commit()
     return course
