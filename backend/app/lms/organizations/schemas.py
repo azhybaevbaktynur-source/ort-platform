@@ -45,6 +45,9 @@ class MyOrganizationOut(BaseModel):
     status: str
     role: str
     can_create_courses: bool
+    # FB8-5 S3: templates granted to the organization (active grants the registry knows, registry order); only on
+    # rows where the caller may create courses (as GET /courses/templates), else empty
+    template_keys: list[str] = []
 
 
 class MemberOut(BaseModel):

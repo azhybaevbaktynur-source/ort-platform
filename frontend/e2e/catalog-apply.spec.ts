@@ -107,7 +107,7 @@ test("teacher builds and activates the enrollment form", async ({ browser }) => 
 
 test("teacher turns on the application mode and the catalog", async ({ browser }) => {
   const page = await as(browser, data().teacher);
-  await page.goto(`/ru/courses/${data().course_id}/settings`);
+  await page.goto(`/ru/courses/${data().course_id}/settings?section=enrollment`);
   await expect(page.getByText(t("enrollmentForm.settings.active", { n: 1 }))).toBeVisible();
   await page.locator("#s-mode").selectOption("form_review");
   await page.getByRole("switch", { name: t("enrollmentForm.settings.catalog") }).click();
@@ -115,7 +115,7 @@ test("teacher turns on the application mode and the catalog", async ({ browser }
   await form.getByRole("button", { name: t("lms.common.save") }).click();
   await expect(form.getByText(t("courses.settings.saved"))).toBeVisible();
   await shot(page, "settings-enrollment");
-  await page.goto(`/ru/courses/${data().course_id}/settings`);
+  await page.goto(`/ru/courses/${data().course_id}/settings?section=enrollment`);
   await expect(page.locator("#s-mode")).toHaveValue("form_review");
   await page.locator("#s-mode").scrollIntoViewIfNeeded();
   await uxShots(page, UX, "course-settings-enrollment", STAFF);
@@ -267,7 +267,7 @@ test("teacher makes a new form version and switches to automatic approval; the n
   await expect(tp.getByRole("heading", { name: t("enrollmentForm.versions.title") })).toBeVisible();
   await uxShots(tp, UX, "course-form-builder-versions", STAFF);
 
-  await tp.goto(`/ru/courses/${data().course_id}/settings`);
+  await tp.goto(`/ru/courses/${data().course_id}/settings?section=enrollment`);
   await tp.locator("#s-mode").selectOption("form_auto");
   const form = tp.locator("form", { has: tp.locator("#s-mode") });
   await form.getByRole("button", { name: t("lms.common.save") }).click();

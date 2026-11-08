@@ -104,7 +104,7 @@ test("teacher uploads a cover with a chosen focus, the overview shows it, then r
 
   for (const width of [375, 1440]) {
     const page = await open(browser, c.teacher, width);
-    await page.goto(`/ru/courses/${c.id}/settings`);
+    await page.goto(`/ru/courses/${c.id}/settings?section=cover`);
     await expect(page.getByRole("heading", { name: t("courses.cover.title") })).toBeVisible();
     await expect(section(page).getByText(t("courses.cover.default"))).toBeVisible();
     await look(page, `cover-default-${width}`);
@@ -112,7 +112,7 @@ test("teacher uploads a cover with a chosen focus, the overview shows it, then r
   }
 
   const page = await open(browser, c.teacher, 1440);
-  await page.goto(`/ru/courses/${c.id}/settings`);
+  await page.goto(`/ru/courses/${c.id}/settings?section=cover`);
   const file = section(page).getByTestId("cover-file");
 
   // client checks: wrong type, too small (nothing is sent)
@@ -131,7 +131,8 @@ test("teacher uploads a cover with a chosen focus, the overview shows it, then r
   await expect(frame).toHaveAttribute("aria-valuenow", "45");
   await page.keyboard.press("End");
   await expect(frame).toHaveAttribute("aria-valuenow", "100");
-  await expect(section(page).getByTestId("cover-preview")).toHaveCSS("object-position", "100% 50%");
+  // FB8-5 S3: the course card beside the section previews the chosen frame
+  await expect(page.getByTestId("course-preview").locator("img")).toHaveCSS("object-position", "100% 50%");
   // a click on the left part centres the frame there (clamped to the left edge)
   const area = section(page).getByTestId("cover-focus-area");
   const box = (await area.boundingBox())!;
@@ -147,7 +148,7 @@ test("teacher uploads a cover with a chosen focus, the overview shows it, then r
   expect(saved.cover_url).toMatch(/\.webp$/);
   const current = section(page).getByTestId("cover-current");
   await expect(current).toHaveAttribute("data-cover-url", saved.cover_url);
-  const img = current.locator("img");
+  const img = page.getByTestId("course-preview").locator("img"); // FB8-5 S3: the card preview shows the saved cover
   await expect(img).toHaveAttribute("src", saved.cover_url);
   // the server kept 528 x 297 (the largest 16:9 box of 960 x 300, a multiple of 16 x 9)
   await expect.poll(() => img.evaluate((el: HTMLImageElement) => [el.naturalWidth, el.naturalHeight])).toEqual([528, 297]);
@@ -163,7 +164,7 @@ test("teacher uploads a cover with a chosen focus, the overview shows it, then r
 
   // the phone picker
   const phone = await open(browser, c.teacher, 375);
-  await phone.goto(`/ru/courses/${c.id}/settings`);
+  await phone.goto(`/ru/courses/${c.id}/settings?section=cover`);
   await section(phone).getByTestId("cover-file").setInputFiles({ name: "tall.png", mimeType: "image/png", buffer: png(400, 600) });
   await expect(section(phone).getByRole("slider", { name: t("courses.cover.focusLabel") })).toHaveAttribute("aria-orientation", "vertical");
   await look(phone, "cover-pick-375");

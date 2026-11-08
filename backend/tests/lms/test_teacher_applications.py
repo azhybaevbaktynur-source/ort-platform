@@ -761,7 +761,8 @@ async def test_me_organizations_carry_the_kind(db, api):
     add_member(db, make_org(db, "School"), user, "teacher")
     items = (await api.call(user, "GET", "/me/organizations")).json()["items"]
     assert {o["kind"] for o in items} == {"personal", "school"}
-    assert set(items[0]) == {"id", "slug", "name", "kind", "status", "role", "can_create_courses"}
+    assert set(items[0]) == {"id", "slug", "name", "kind", "status", "role", "can_create_courses",
+                             "template_keys"}  # FB8-5 S3
 
 
 # ------------------------------------------------------------------ /me/home

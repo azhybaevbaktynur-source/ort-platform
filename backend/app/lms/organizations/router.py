@@ -19,11 +19,12 @@ from app.lms.courses.schemas import CourseCreateIn
 from app.lms.enrollments.schemas import RosterEntryOut, roster_entry
 from app.lms.organizations import service as svc
 from app.lms.organizations import usage as org_usage  # Phase 9 S2
-from app.lms.organizations.models import Organization, OrganizationMember
+from app.lms.organizations.models import Organization, OrganizationMember, OrganizationTemplateGrant
 from app.lms.organizations.schemas import (
     MemberOut, MyOrganizationOut, OrganizationOut, OrgCourseOut, UsageOut, member_out, org_course_out,
     organization_out,
 )
+from app.lms.templates import registry  # FB8-5 S3
 from app.models.user import User
 
 router = APIRouter()
@@ -94,6 +95,19 @@ def join_as_teacher(organization_id: uuid.UUID, course_id: uuid.UUID, request: R
 
 # ------------------------------------------------------------------------------------------- /me/organizations
 
+def _granted_keys(db: Session, org_ids: list[uuid.UUID]) -> dict[uuid.UUID, list[str]]:
+    """FB8-5 S3: active template grants per organization, keys the registry knows, in registry order."""
+    if not org_ids:
+        return {}
+    found: dict[uuid.UUID, set[str]] = {}
+    for oid, key in db.execute(select(OrganizationTemplateGrant.organization_id, OrganizationTemplateGrant.template_key)
+                               .where(OrganizationTemplateGrant.organization_id.in_(org_ids),
+                                      OrganizationTemplateGrant.revoked_at.is_(None))):
+        found.setdefault(oid, set()).add(key)
+    order = [t.key for t in registry.all()]
+    return {oid: [k for k in order if k in keys] for oid, keys in found.items()}
+
+
 @me_router.get("/organizations", response_model=PageOut[MyOrganizationOut])
 def my_organizations(cursor: Optional[str] = None, limit: int = 25, user: User = Depends(get_lms_user),
                      db: Session = Depends(get_db)):
@@ -106,10 +120,11 @@ def my_organizations(cursor: Optional[str] = None, limit: int = 25, user: User =
                                          limit=limit, descending=False)
     items = []
     creator_ids = set(svc.creator_organizations(db, user.id))  # Phase 9 S2: root settings and status (one SQL)
+    granted = _granted_keys(db, [org.id for org, _ in rows if org.id in creator_ids])  # FB8-5 S3 (one SQL)
     for org, m in rows:
         creates = org.id in creator_ids
         items.append(MyOrganizationOut(id=org.id, slug=org.slug, name=org.name, kind=org.kind, status=org.status, role=m.role,
-                                       can_create_courses=creates))
+                                       can_create_courses=creates, template_keys=granted.get(org.id, [])))
     return PageOut[MyOrganizationOut](items=items, next_cursor=nxt)
 
 
