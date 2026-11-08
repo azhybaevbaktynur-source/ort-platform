@@ -81,6 +81,39 @@ def is_teacher(user: User) -> bool:
     return bool(db.execute(select(or_(member, staff))).scalar())
 
 
+def has_student_enrollments(user: User) -> bool:
+    """Owner feedback 2026-11-08 (item 2): the person learns somewhere (shows the Learning area to people who also
+    teach; not a permission). An active student enrollment in a course that is not deleted; Student view's test
+    enrollments belong to separate test users and never count (one EXISTS on ix_enrollments_user_id_state)."""
+    from sqlalchemy import exists
+    from sqlalchemy.orm import object_session
+
+    from app.lms.courses.models import Course
+    from app.lms.enrollments.models import Enrollment
+
+    db = object_session(user)
+    if db is None:
+        return False
+    learns = exists().where(
+        Enrollment.user_id == user.id, Enrollment.state == "active", Enrollment.role == "student",
+        Enrollment.is_test_student.is_(False), Course.id == Enrollment.course_id, Course.deleted_at.is_(None))
+    return bool(db.execute(select(learns)).scalar())
+
+
+def approved_notice(user: User):
+    """Owner feedback 2026-11-08 (item 2): the home's "application approved" line for an approved teacher, from the same
+    rule (`home.service._teacher_application`), so it also reaches a teacher whose /courses has no Learning tab."""
+    from sqlalchemy.orm import object_session
+
+    from app.lms.core import clock
+    from app.lms.home.service import _teacher_application
+
+    db = object_session(user)
+    if db is None or user.teacher_status != "approved":
+        return None
+    return _teacher_application(db, user, clock.now())
+
+
 def set_locale(db: Session, user: User, locale: str) -> User:
     user.locale = locale
     db.commit()

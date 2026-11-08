@@ -8,6 +8,8 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 
+from app.lms.home.schemas import HomeTeacherApplicationOut
+
 
 class MeAdminOrganizationOut(BaseModel):
     id: uuid.UUID
@@ -26,6 +28,11 @@ class MeOut(BaseModel):
     # UX rework 2: the header's areas come from this one answer, so the menu is the same on every page (UI, not permissions)
     admin_organizations: list[MeAdminOrganizationOut] = []
     is_guardian: bool = False
+    # Owner feedback 2026-11-08 (item 2): an active student enrollment (Student view's test enrollments do not count)
+    has_student_enrollments: bool = False
+    # The same line as /me/home.teacher_application, only for an approved teacher without Learning (the Teaching view
+    # shows it there; anyone else reads it on the student home). Same expiry: TEACHER_DECISION_SHOWN_DAYS.
+    teacher_application: Optional[HomeTeacherApplicationOut] = None
 
 
 class MePatchIn(BaseModel):

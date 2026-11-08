@@ -261,9 +261,12 @@ test("the admin reads the application and approves it; the header changes", asyn
   await expect(card).toHaveCount(0);
 
   await student.reload();
-  await expect.poll(() => areas(student)).toEqual([t("shell.areas.learning"), t("shell.areas.teaching")]);
+  // owner feedback 2026-11-08 (item 2): a new teacher who learns nowhere has Teaching only; Learning's link opens it
+  await expect.poll(() => areas(student)).toEqual([t("shell.areas.teaching")]);
   await student.goto("/ru/courses?view=learning");
+  await expect(student).toHaveURL(/\/ru\/courses\?view=teaching$/);
   const line = student.getByRole("status").filter({ hasText: t("home.teacherApplication.approved") });
+  await expect(line).toHaveCount(1); // shown once, on the Teaching view
   await expect(line.getByRole("link", { name: t("home.teacherApplication.approvedLink") })).toHaveAttribute("href", "/ru/courses?view=teaching");
 
   await student.goto(APPLY);
@@ -355,7 +358,7 @@ test("an independent teacher: no Organization tab, /org redirects, the personal 
   const d = data();
   const page = await as(browser, d.independent);
   await page.goto("/ru/courses");
-  await expect.poll(() => areas(page)).toEqual([t("shell.areas.learning"), t("shell.areas.teaching")]);
+  await expect.poll(() => areas(page)).toEqual([t("shell.areas.teaching")]); // owner feedback 2026-11-08 (item 2)
 
   await page.goto(`/ru/org/${d.personal_org_id}`);
   await expect(page).toHaveURL(/\/ru\/courses\?view=teaching$/);

@@ -12,11 +12,13 @@ router = APIRouter()
 
 
 def _me(user: User) -> MeOut:
+    learns = service.has_student_enrollments(user)
     return MeOut(
         id=user.id, email=user.email, display_name=user.display_name, locale=user.locale,
         is_platform_admin=bool(user.is_platform_admin), teacher_status=user.teacher_status,
         can_create_courses=service.can_create_courses(user), is_teacher=service.is_teacher(user),
         admin_organizations=service.admin_organizations(user), is_guardian=has_active_link(user),
+        has_student_enrollments=learns, teacher_application=None if learns else service.approved_notice(user),
     )
 
 

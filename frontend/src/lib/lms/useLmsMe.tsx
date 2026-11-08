@@ -3,6 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { getStudentView } from "@/lib/api";
 import { getMe } from "./courses";
+import { LMS_ME_STALE_EVENT } from "./meStale";
 import type { LmsApiError } from "./client";
 import type { MeOut } from "./types";
 
@@ -77,6 +78,14 @@ export function useLmsMeLoader(enabled: boolean): LmsMeState {
 
   useEffect(() => {
     if (enabled) void reload();
+  }, [enabled, reload]);
+
+  // Owner feedback 2026-11-08 (item 2): a join or leave changes the areas, so the answer is asked again
+  useEffect(() => {
+    if (!enabled) return;
+    const stale = () => { void reload(); };
+    window.addEventListener(LMS_ME_STALE_EVENT, stale);
+    return () => window.removeEventListener(LMS_ME_STALE_EVENT, stale);
   }, [enabled, reload]);
 
   return { me, loading, error, reload };
