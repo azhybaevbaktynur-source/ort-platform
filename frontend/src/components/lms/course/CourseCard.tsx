@@ -1,7 +1,7 @@
 "use client";
 
-// The one course card: student dashboard, catalog, Teaching list and trash (F7c, STUDENT_UI_FIX_PLAN 7.2). A 16:9
-// cover on top, the title (two lines), one meta line "Russian · 12 tests · 8 lessons" (zero parts left out), the teacher
+// The one course card: student dashboard, catalog, Teaching list and trash (F7c, STUDENT_UI_FIX_PLAN 7.2). A low
+// cover (150 px) on top, the title (two lines), one meta line "Russian · 12 tests · 8 lessons" (zero parts left out), the teacher
 // and organization only for a course that is not the platform's, then a two-line description, or for a joined course
 // the progress bar. One action. The title is the link and stretches over the card, so the action slot can hold its own
 // controls (a link inside a link is invalid). The action sits at the bottom, so cards in a grid align.
@@ -30,8 +30,9 @@ export function StatusBadge({ status }: { status: string }) {
   );
 }
 
-/** Grid of cards for a full-width page (3 / 2 / 1 columns); the dashboard has a narrower column and its own breakpoints. */
-export const COURSE_GRID = "grid gap-4 sm:grid-cols-2 lg:grid-cols-3";
+/** The one grid of course cards (FB8-1): 1 column below 768 px, 2 from 768, 3 from 1200, 4 from 1600 (viewport widths); cards are at most 360 px wide and stay left-aligned. */
+export const COURSE_GRID =
+  "grid grid-cols-1 gap-4 min-[768px]:grid-cols-[repeat(2,minmax(0,360px))] min-[1200px]:grid-cols-[repeat(3,minmax(0,360px))] min-[1600px]:grid-cols-[repeat(4,minmax(0,360px))]";
 
 export interface CourseCardData {
   id: string;
@@ -92,7 +93,7 @@ export function CourseCard({ course, href, headingLevel = 3, badges, progress, n
   const Heading = headingLevel === 2 ? "h2" : "h3";
   return (
     <li className="group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
-      <CourseCardCover courseId={course.id} coverUrl={course.cover_url} platform={course.is_platform_course} />
+      <CourseCardCover card courseId={course.id} coverUrl={course.cover_url} platform={course.is_platform_course} />
       <div className="flex flex-1 flex-col gap-2 px-4 py-3">
         {(badges || course.has_paid_tests) && (
           <div className="flex flex-wrap items-center gap-2">

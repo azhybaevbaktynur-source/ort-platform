@@ -20,17 +20,19 @@ function hash(s: string): number {
   return h;
 }
 
-export function CourseCardCover({ courseId, coverUrl, platform = false, className }: {
+export function CourseCardCover({ courseId, coverUrl, platform = false, card = false, className }: {
   courseId: string;
   coverUrl?: string | null;
   /** a platform (exam preparation) course gets the graduation mark */
   platform?: boolean;
+  /** the course card: a fixed 150 px strip instead of 16:9 (banner and settings keep 16:9) */
+  card?: boolean;
   className?: string;
 }) {
   const h = hash(courseId);
   const Icon = platform ? GraduationCap : BookOpen; // one neutral mark; platform (exam preparation) courses their own
   return (
-    <div className={cn("relative aspect-video w-full overflow-hidden bg-brand-50", className)}>
+    <div className={cn("relative w-full overflow-hidden bg-brand-50", card ? "h-[150px]" : "aspect-video", className)}>
       {coverUrl
         // eslint-disable-next-line @next/next/no-img-element
         ? <img src={coverUrl} alt="" loading="lazy" decoding="async" draggable={false} className="h-full w-full object-cover" />
