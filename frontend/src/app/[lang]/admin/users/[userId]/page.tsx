@@ -206,6 +206,12 @@ export default function AdminUserDetailPage() {
               )}
             </span>
           ) }] : []),
+          // item 3: the password and the linked Google / Apple accounts
+          ...(user.sign_in_methods ? [{ key: "signIn", term: t("person.signInMethods"), description: user.sign_in_methods.length
+            ? user.sign_in_methods.map((m) => m.linked_at
+              ? t(`person.signInMethod.${m.method}Linked`, { date: fmtApiDate(m.linked_at, lang) })
+              : t(`person.signInMethod.${m.method}`)).join(" · ")
+            : t("person.linksNone") }] : []),
           ...(user.is_platform_admin ? [{ key: "mfa", term: t("adminSecurity.user.mfa"), description: user.mfa_enabled ? t("adminSecurity.on") : t("adminSecurity.off") }] : []),
           { key: "enrollments", term: t("platformAdmin.users.activeEnrollments"), description: user.active_enrollment_count },
           ...(user.disabled_at ? [{ key: "reason", term: t("platformAdmin.users.disabledReason"), description: user.disabled_reason || "—" }] : []),

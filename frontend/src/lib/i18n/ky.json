@@ -7035,7 +7035,15 @@
     "cancelEmail": "Дарек алмашууну жокко чыгаруу",
     "cancelEmailTitle": "Почта дарегин алмаштырууну жокко чыгарасызбы?",
     "cancelEmailBody": "Ырастоо шилтемеси иштебей калат, аккаунтта учурдагы дарек калат.",
-    "cancelEmailDone": "Даректи алмаштыруу жокко чыгарылды"
+    "cancelEmailDone": "Даректи алмаштыруу жокко чыгарылды",
+    "signInMethods": "Кирүү жолдору",
+    "signInMethod": {
+      "password": "Сырсөз",
+      "google": "Google",
+      "googleLinked": "Google ({date} байланган)",
+      "apple": "Apple",
+      "appleLinked": "Apple ({date} байланган)"
+    }
   },
   "pwa": {
     "update": {

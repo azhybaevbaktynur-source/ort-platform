@@ -62,6 +62,8 @@ export default defineConfig({
         E2E_API_PORT: String(API_PORT),
         E2E_WEB_ORIGIN: WEB_ORIGIN,
         ...(process.env.E2E_PYTHON ? { E2E_PYTHON: process.env.E2E_PYTHON } : {}),
+        // the Google sign-in stub (default E2E_API_PORT+2; +1 is admin-mfa-gate's second server): oauth-google.spec.ts
+        ...(process.env.E2E_OAUTH_STUB_PORT ? { E2E_OAUTH_STUB_PORT: process.env.E2E_OAUTH_STUB_PORT } : {}),
       },
     },
     {

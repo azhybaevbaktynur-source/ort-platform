@@ -117,6 +117,8 @@ export interface Seed {
   /** S1 admin security: a platform admin without two-step login, with a password (admin-mfa.spec.ts). */
   mfa_admin: SeedUser & { password: string };
   gate_admin: SeedUser & { password: string };
+  /** Item 3 social sign-in (oauth-google.spec.ts): a password student, a disabled student, a platform admin. */
+  oauth: { linked: SeedUser & { password: string }; disabled: SeedUser; admin: SeedUser & { password: string } };
   shots_admin: SeedUser & { password: string };
   /** TEACHER_TO_STUDENT_MAP S5: the lesson course "Мастеркласс E2E" (platform organization, draft, open enrollment in
    * the catalog, not linked yet) and a student of ORT (Russian) only (teacher-to-student.spec.ts). */
