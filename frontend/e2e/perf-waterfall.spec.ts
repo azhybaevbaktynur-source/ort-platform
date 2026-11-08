@@ -44,7 +44,7 @@ interface Load {
   firstContent: number;
   /** ms until the network went idle (all requests of the load done) */
   settled: number;
-  /** The frames seen, in order (`student-skeleton`, `student`, `header-skeleton`, `header`, `none`). */
+  /** The frames seen, in order (`student-skeleton`, `student`, `header-skeleton`, `header`, `neutral`, `none`). */
   shells: ShellEvent[];
   /** A student frame followed by a header frame or the reverse. */
   swap: boolean;
@@ -74,10 +74,13 @@ function observer() {
     const student = !!document.querySelector("aside.fixed.inset-y-0.left-0");
     const studentSkeleton = !student && !!document.querySelector('div[aria-hidden="true"].fixed.inset-y-0.left-0');
     const headerSkeleton = !!document.querySelector('[data-testid="areas-loading"]');
-    // the app header (teacher/admin frame); the student frame's phone header carries `lg:hidden`
+    // PERFORMANCE_AUDIT S1: the neutral loading frame (`LmsShell`), under which a cold page renders hidden
+    const neutral = !!document.querySelector('[data-testid="shell-neutral"]');
+    // the app header (teacher/admin frame); the student frame's phone header carries `lg:hidden`; S1: a page's own
+    // <header> rendered hidden (display: none) under the neutral frame is not a frame
     const header = !headerSkeleton && !student
-      && [...document.querySelectorAll("header")].some((h) => !h.className.includes("lg:hidden") && !h.closest("aside"));
-    const state = student ? "student" : studentSkeleton ? "student-skeleton" : header ? "header" : headerSkeleton ? "header-skeleton" : "none";
+      && [...document.querySelectorAll("header")].some((h) => !h.className.includes("lg:hidden") && !h.closest("aside") && h.getClientRects().length > 0);
+    const state = student ? "student" : studentSkeleton ? "student-skeleton" : header ? "header" : headerSkeleton ? "header-skeleton" : neutral ? "neutral" : "none";
     if (state !== last) {
       last = state;
       w.__shell.push({ t: Math.round(performance.now()), state });
