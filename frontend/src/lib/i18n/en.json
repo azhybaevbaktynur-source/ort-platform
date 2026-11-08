@@ -7027,7 +7027,15 @@
     "cancelEmail": "Cancel the email change",
     "cancelEmailTitle": "Cancel the email change?",
     "cancelEmailBody": "The confirmation link stops working and the account keeps its current address.",
-    "cancelEmailDone": "The email change was cancelled"
+    "cancelEmailDone": "The email change was cancelled",
+    "signInMethods": "Sign-in methods",
+    "signInMethod": {
+      "password": "Password",
+      "google": "Google",
+      "googleLinked": "Google (linked {date})",
+      "apple": "Apple",
+      "appleLinked": "Apple (linked {date})"
+    }
   },
   "pwa": {
     "update": {

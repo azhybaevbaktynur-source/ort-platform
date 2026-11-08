@@ -7027,7 +7027,15 @@
     "cancelEmail": "Отменить смену адреса",
     "cancelEmailTitle": "Отменить смену адреса почты?",
     "cancelEmailBody": "Ссылка для подтверждения перестанет работать, у аккаунта останется текущий адрес.",
-    "cancelEmailDone": "Смена адреса отменена"
+    "cancelEmailDone": "Смена адреса отменена",
+    "signInMethods": "Способы входа",
+    "signInMethod": {
+      "password": "Пароль",
+      "google": "Google",
+      "googleLinked": "Google (привязан {date})",
+      "apple": "Apple",
+      "appleLinked": "Apple (привязан {date})"
+    }
   },
   "pwa": {
     "update": {

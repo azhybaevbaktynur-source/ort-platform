@@ -75,6 +75,12 @@ class PendingEmailOut(BaseModel):
     by_admin: bool
 
 
+class SignInMethodOut(BaseModel):
+    """Item 3 (AUTH_SOCIAL_DESIGN 10, slice C): one way this person can sign in. Never the provider's email or subject."""
+    method: Literal["password", "google", "apple"]
+    linked_at: Optional[datetime] = None  # providers only
+
+
 class AdminUserDetailOut(AdminUserOut):
     owned_courses: list[OwnedCourseBrief]
     active_enrollment_count: int
@@ -87,6 +93,7 @@ class AdminUserDetailOut(AdminUserOut):
     deleted: bool = False
     parent_links: Optional[ParentLinksOut] = None
     pending_email_change: Optional[PendingEmailOut] = None
+    sign_in_methods: list[SignInMethodOut] = []  # item 3: password and linked Google / Apple accounts
 
 
 class AdminAttemptOut(BaseModel):

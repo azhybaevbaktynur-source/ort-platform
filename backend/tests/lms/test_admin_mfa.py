@@ -624,7 +624,15 @@ async def test_the_admin_health_check(db):
     assert body["email"] == {"ok": False, "provider": "console", "configured": False}
     assert body["storage"] == {"ok": True, "driver": "db", "r2_configured": False}
     assert body["ok"] is False  # console email reaches no one
-    assert "0029_user_identities" in body["migrations"]["expected"]
+    # the head(s) of the migration files themselves, so a new migration never needs this test edited
+    from pathlib import Path
+
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    cfg = Config()
+    cfg.set_main_option("script_location", str(Path(__file__).resolve().parents[2] / "alembic"))
+    assert body["migrations"]["expected"] == sorted(ScriptDirectory.from_config(cfg).get_heads())
     student = make_user(db)
     assert (await call("GET", "/platform/health", token_for(student))).status_code == 403
 

@@ -827,6 +827,22 @@ def seed_person(api: Api, log: Path, access: dict) -> dict:
 
 # --- TEACHER_TO_STUDENT_MAP S5 begin --- (frontend/e2e/teacher-to-student.spec.ts; written after every ORT row and
 # every other row, so they are exactly as before)
+# --- Item 3 social sign-in begin --- (frontend/e2e/oauth-google.spec.ts; Google itself is scripts/e2e_oauth_stub.py)
+def seed_oauth(api: Api, log: Path, admin_tok: str, root: Path) -> dict:
+    """A password student Google links to, a disabled student, and a platform admin (the spec turns on two-step login)."""
+    linked = register(api, log, "e2e-oauth-linked@example.com", "Google Linked", keep_password=True)
+    linked["profile"] = profile(api, linked["token"])
+    disabled = register(api, log, "e2e-oauth-disabled@example.com", "Google Disabled")
+    disabled["profile"] = profile(api, disabled["token"])
+    api.call("POST", f"/platform/users/{disabled['profile']['id']}/disable", admin_tok, {"reason": "e2e: Google refusal"})
+    admin = register(api, log, "e2e-oauth-admin@example.com", "Google Admin", keep_password=True)
+    subprocess.run([sys.executable, str(root / "backend" / "make_admin.py"), admin["email"]], check=True,
+                   env=os.environ.copy(), stdout=subprocess.DEVNULL)
+    admin["profile"] = profile(api, admin["token"])
+    return {"linked": linked, "disabled": disabled, "admin": admin}
+# --- Item 3 social sign-in end ---
+
+
 def seed_item3(api: Api, log: Path, admin_tok: str, ort_course_id: str) -> dict:
     """The lesson course "Мастеркласс E2E" of the platform organization (the ORT (Russian) course's organization), a
     draft with open enrollment in the catalog and no link yet (the spec publishes it and links it to the exam in the
@@ -940,6 +956,7 @@ def main() -> int:
         extra["profile"] = profile(api, extra["token"])
         extra_admins[key] = extra
     item3 = seed_item3(api, log, tok, cid)  # TEACHER_TO_STUDENT_MAP S5 (after every ORT and every other row)
+    oauth = seed_oauth(api, log, tok, root)  # item 3 social sign-in (people only, no courses)
 
     seed = {
         "quiz_editor": quiz_editor,
@@ -956,6 +973,7 @@ def main() -> int:
         "access": access,
         "person": person,
         "item3": item3,
+        "oauth": oauth,
         "mfa_admin": mfa_admin,
         "gate_admin": extra_admins["gate"], "shots_admin": extra_admins["shots"],
         "api": args.api, "course_id": cid, "bank_id": bank_id, "exam": exam, "staff_exam": staff_exam,
