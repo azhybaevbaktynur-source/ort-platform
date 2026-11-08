@@ -825,6 +825,25 @@ def seed_person(api: Api, log: Path, access: dict) -> dict:
 # --- S4 person page end ---
 
 
+# --- TEACHER_TO_STUDENT_MAP S5 begin --- (frontend/e2e/teacher-to-student.spec.ts; written after every ORT row and
+# every other row, so they are exactly as before)
+def seed_item3(api: Api, log: Path, admin_tok: str, ort_course_id: str) -> dict:
+    """The lesson course "Мастеркласс E2E" of the platform organization (the ORT (Russian) course's organization), a
+    draft with open enrollment in the catalog and no link yet (the spec publishes it and links it to the exam in the
+    settings, so no other spec ever sees it), and one student who joined ORT (Russian) only."""
+    ort = api.call("GET", f"/courses/{ort_course_id}", admin_tok)
+    course = api.call("POST", "/courses", admin_tok, {
+        "title": {"ru": "Мастеркласс E2E"}, "languages": ["ru"], "default_language": "ru",
+        "organization_id": ort["organization_id"]})
+    cid = course["id"]
+    api.call("PATCH", f"/courses/{cid}", admin_tok, {"enrollment_mode": "open", "visibility": "catalog"})
+    student = register(api, log, "e2e-item3-student@example.com", "Item3 Student")
+    student["profile"] = profile(api, student["token"])
+    api.call("POST", f"/courses/{ort_course_id}/join", student["token"], {})
+    return {"lesson_course_id": cid, "exam_course_id": ort_course_id, "student": student}
+# --- TEACHER_TO_STUDENT_MAP S5 end ---
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--api", required=True)
@@ -920,6 +939,7 @@ def main() -> int:
                        env=os.environ.copy(), stdout=subprocess.DEVNULL)
         extra["profile"] = profile(api, extra["token"])
         extra_admins[key] = extra
+    item3 = seed_item3(api, log, tok, cid)  # TEACHER_TO_STUDENT_MAP S5 (after every ORT and every other row)
 
     seed = {
         "quiz_editor": quiz_editor,
@@ -935,6 +955,7 @@ def main() -> int:
         "exam_prep": exam_prep,
         "access": access,
         "person": person,
+        "item3": item3,
         "mfa_admin": mfa_admin,
         "gate_admin": extra_admins["gate"], "shots_admin": extra_admins["shots"],
         "api": args.api, "course_id": cid, "bank_id": bank_id, "exam": exam, "staff_exam": staff_exam,

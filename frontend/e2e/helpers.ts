@@ -118,6 +118,9 @@ export interface Seed {
   mfa_admin: SeedUser & { password: string };
   gate_admin: SeedUser & { password: string };
   shots_admin: SeedUser & { password: string };
+  /** TEACHER_TO_STUDENT_MAP S5: the lesson course "Мастеркласс E2E" (platform organization, draft, open enrollment in
+   * the catalog, not linked yet) and a student of ORT (Russian) only (teacher-to-student.spec.ts). */
+  item3: { lesson_course_id: string; exam_course_id: string; student: SeedUser };
   /** Phase 8b S3: the scrolling-player course (its published quizzes serve the Student view "Start" check). */
   scrolling: {
     course_id: string;
@@ -140,6 +143,18 @@ export function seed(): Seed {
 /** ORT section order (AGENTS.md section 4) and the item counts the seed builds. */
 export const ORT_SECTIONS = ["math_1", "math_2", "analogies", "reading", "grammar"] as const;
 export const sectionCounts = () => ORT_SECTIONS.map((k) => seed().picks[k].length);
+
+/** The scratch API as `user` (JSON in and out); a status outside `ok` fails the test. */
+export async function api(user: SeedUser, method: string, p: string, body?: unknown, ok = [200, 201, 204]) {
+  const r = await fetch(`${seed().api}/api/v1${p}`, {
+    method,
+    headers: { Authorization: `Bearer ${user.token}`, ...(body !== undefined ? { "Content-Type": "application/json" } : {}) },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  const text = await r.text();
+  expect(ok, `${method} ${p} -> ${r.status} ${text.slice(0, 300)}`).toContain(r.status);
+  return text ? JSON.parse(text) : null;
+}
 
 // ----------------------------------------------------------------------------- i18n (the app's own strings)
 
