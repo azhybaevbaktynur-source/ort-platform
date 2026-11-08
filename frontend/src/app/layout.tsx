@@ -1,5 +1,5 @@
 import React from "react";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import ruDict from "@/lib/i18n/ru.json";
 import "@/styles/globals.css";
 
@@ -17,6 +17,9 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: ruDict.common.appName, statusBarStyle: "default" },
   formatDetection: { telephone: false },
 };
+
+// Item 4 (phone sheets): the page extends under the browser bars; sheets and the tab bar pad with env(safe-area-inset-*)
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 // S5: Chrome fires `beforeinstallprompt` once, often before React hydrates; keep it for the "Install the app" menu entry
 // (components/pwa/PwaProvider.tsx). Inline scripts are allowed by the CSP (next.config.ts).

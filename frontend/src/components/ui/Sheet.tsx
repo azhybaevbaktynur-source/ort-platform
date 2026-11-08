@@ -16,6 +16,8 @@ export interface SheetProps {
   onClose: () => void;
   title: React.ReactNode;
   children: React.ReactNode;
+  /** Pinned below the scrolling body (sign out, primary action): always visible, padded by the safe-area inset. */
+  footer?: React.ReactNode;
   /** id of the <dialog> (for `aria-controls` on the button that opens it). */
   id?: string;
   tone?: "navy" | "light";
@@ -29,7 +31,7 @@ function focusables(root: HTMLElement): HTMLElement[] {
   return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => el.getClientRects().length > 0);
 }
 
-export function Sheet({ open, onClose, title, children, id, tone = "light", className }: SheetProps) {
+export function Sheet({ open, onClose, title, children, footer, id, tone = "light", className }: SheetProps) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDialogElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -84,8 +86,8 @@ export function Sheet({ open, onClose, title, children, id, tone = "light", clas
       onKeyDown={onKeyDown}
       onClick={(e) => { if (e.target === ref.current) onCloseRef.current(); }}
       className={cn(
-        "max-h-[calc(100dvh-3rem)] w-full max-w-full overflow-hidden bg-white p-0 text-slate-900 shadow-lg",
-        "mb-0 mt-auto rounded-t-2xl sm:m-auto sm:max-h-[calc(100dvh-4rem)] sm:w-[calc(100%-2rem)] sm:max-w-md sm:rounded-2xl",
+        "max-h-[calc(100vh-3rem)] max-h-[calc(100dvh-3rem)] w-full max-w-full overflow-hidden bg-white p-0 text-slate-900 shadow-lg",
+        "mb-0 mt-auto rounded-t-2xl sm:m-auto sm:max-h-[calc(100vh-4rem)] sm:max-h-[calc(100dvh-4rem)] sm:w-[calc(100%-2rem)] sm:max-w-md sm:rounded-2xl",
         "backdrop:bg-slate-900/50 focus:outline-none open:flex open:flex-col",
         className,
       )}
@@ -100,9 +102,10 @@ export function Sheet({ open, onClose, title, children, id, tone = "light", clas
               <X aria-hidden="true" className="h-5 w-5" />
             </button>
           </div>
-          <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
+          <div ref={bodyRef} className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pt-3", footer ? "pb-3" : "pb-[calc(1rem+env(safe-area-inset-bottom))]")}>
             {children}
           </div>
+          {footer && <div className="shrink-0 border-t border-slate-100 bg-white px-3 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2">{footer}</div>}
         </>
       )}
     </dialog>

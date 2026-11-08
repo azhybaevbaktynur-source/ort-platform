@@ -126,7 +126,7 @@ function AreaMenu({ areas, activeArea, routeKey, className }: { areas: AppHeader
         <ChevronDown aria-hidden="true" className={cn("h-4 w-4 shrink-0 text-slate-600 transition-transform", pop.open && "rotate-180")} />
       </button>
       {pop.open && (
-        <nav id={panelId} aria-label={t("shell.areas.label")} className={cn(PANEL, "left-4 right-4 max-h-[calc(100dvh-5rem)] overflow-y-auto")}>
+        <nav id={panelId} aria-label={t("shell.areas.label")} className={cn(PANEL, "left-4 right-4 max-h-[calc(100vh-5rem)] max-h-[calc(100dvh-5rem)] overflow-y-auto overscroll-contain")}>
           <ul className="space-y-0.5">
             {areas.map((a) => (
               <li key={a.key}>
@@ -213,7 +213,9 @@ function AccountMenu({ user, links, onLanguageChange, onLogout, routeKey, nameFr
         <ChevronDown aria-hidden="true" className={cn("hidden h-4 w-4 shrink-0 text-slate-600 transition-transform lg:block", pop.open && "rotate-180")} />
       </button>
       {pop.open && (
-        <div id={panelId} className={cn(PANEL, "left-4 right-4 sm:left-auto sm:right-6 sm:w-80 lg:right-8")}>
+        <div id={panelId} className={cn(PANEL, "left-4 right-4 flex max-h-[calc(100vh-5rem)] max-h-[calc(100dvh-5rem)] flex-col sm:left-auto sm:right-6 sm:w-80 lg:right-8")}>
+          {/* phones: the list scrolls, the sign-out footer below it always stays visible */}
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="px-3 pb-3 pt-2">
             <p className="text-xs font-medium uppercase tracking-wide text-slate-600">{t("shell.account.signedInAs")}</p>
             <p className="mt-1 break-words text-base font-semibold leading-6 text-slate-900">{user.name}</p>
@@ -254,7 +256,8 @@ function AccountMenu({ user, links, onLanguageChange, onLogout, routeKey, nameFr
               ))}
             </ul>
           )}
-          <div className="mt-2 border-t border-slate-100 pt-2">
+          </div>
+          <div className="mt-2 shrink-0 border-t border-slate-100 pt-2 pb-[env(safe-area-inset-bottom)]">
             <button type="button" onClick={() => { pop.setOpen(false); onLogout(); }}
               className={cn(ITEM, focusRing, "focus-visible:ring-offset-0 text-slate-800 hover:bg-slate-100")}>
               <LogOut aria-hidden="true" className="h-5 w-5 shrink-0 text-slate-600" />

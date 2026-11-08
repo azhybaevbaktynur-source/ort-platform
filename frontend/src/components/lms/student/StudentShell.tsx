@@ -156,6 +156,17 @@ function AccessPill({ data, onNavigate }: { data: StudentShellData; onNavigate?:
 }
 
 /** Name, language, account links and log out: the account sheet and the bottom of "More". */
+function LogoutButton({ props, onNavigate }: { props: StudentShellProps; onNavigate: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <button type="button" onClick={() => { onNavigate(); props.onLogout(); }} className={SHEET_ROW}>
+      <LogOut aria-hidden="true" className="h-5 w-5 shrink-0 text-slate-600" />
+      {t("common.logout")}
+    </button>
+  );
+}
+
+/** Item 4 (phone): the sign-out row is the sheet's pinned footer, so the panel itself ends with the links. */
 function AccountPanel({ props, onNavigate }: { props: StudentShellProps; onNavigate: () => void }) {
   const { lang, t } = useTranslation();
   const langLabelId = useId();
@@ -194,12 +205,6 @@ function AccountPanel({ props, onNavigate }: { props: StudentShellProps; onNavig
           ))}
         </ul>
       )}
-      <div className="border-t border-slate-100 pt-2">
-        <button type="button" onClick={() => { onNavigate(); props.onLogout(); }} className={row}>
-          <LogOut aria-hidden="true" className="h-5 w-5 shrink-0 text-slate-600" />
-          {t("common.logout")}
-        </button>
-      </div>
     </div>
   );
 }
@@ -416,7 +421,8 @@ export function StudentChrome(props: StudentShellProps) {
         </div>
       </header>
 
-      <Sheet id={accountId} open={sheet === "account"} onClose={close} title={t("student.account.title")}>
+      <Sheet id={accountId} open={sheet === "account"} onClose={close} title={t("student.account.title")}
+        footer={<LogoutButton props={props} onNavigate={close} />}>
         <AccountPanel props={props} onNavigate={close} />
       </Sheet>
       <Sheet id={examId} open={sheet === "exam"} onClose={close} title={t("student.switcher.label")}>
@@ -457,7 +463,8 @@ export function StudentTabBar(props: StudentShellProps) {
   return (
     <>
       <TabBar label={t("student.nav.tabBar")} items={items} />
-      <Sheet id={moreId} open={more} onClose={close} title={t("student.nav.more")} tone="navy">
+      <Sheet id={moreId} open={more} onClose={close} title={t("student.nav.more")} tone="navy"
+        footer={<LogoutButton props={props} onNavigate={close} />}>
         <div className="space-y-4">
           {moreGroups.some((g) => g.items.length > 0) && <SidebarNav label={t("student.nav.label")} tone="light" onNavigate={close} groups={moreGroups} />}
           {/* U8: the checklist sheet opens after "More" closed (one modal at a time) */}
