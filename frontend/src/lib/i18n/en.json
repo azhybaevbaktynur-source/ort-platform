@@ -3287,6 +3287,13 @@
       "hours": "hrs",
       "minutes": "min",
       "today": "Today"
+    },
+    "overflow": "More actions",
+    "hidden": "Hidden",
+    "pro": {
+      "label": "Pro",
+      "locked": "Pro: only for students with access. Click to open it to everyone.",
+      "unlocked": "Open to everyone. Click to make it Pro."
     }
   },
   "teaching": {

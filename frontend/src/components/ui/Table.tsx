@@ -69,6 +69,8 @@ export interface TableProps<T> {
   pagination?: PaginationProps;
   /** Under 640 px: `cards` (default) turns each row into a card; `scroll` keeps the table and scrolls it inside its box. */
   mobile?: "cards" | "scroll";
+  /** Row height: `default` (`py-3`) or `compact` (`px-3 py-2`, tighter lines; STAFF_UX_AUDIT §0, all staff lists). */
+  density?: "default" | "compact";
   rowClassName?: (row: T) => string | undefined;
   className?: string;
 }
@@ -82,11 +84,13 @@ function plainLabel<T>(c: TableColumn<T>): string {
 /**
  * Data table with a count line, search slot, sortable headers, cursor pagination and a
  * stacked-card layout on phones (each row becomes a card with label/value pairs, key columns first).
+ * Use it for every list of records (staff lists pass `density="compact"`), not a `<ul>` of cards.
  */
 export function Table<T>({
   caption, showCaption = false, columns, rows, rowKey, sort, onSortChange, count, countText, search, toolbar,
-  loading = false, error, empty, pagination, mobile = "cards", rowClassName, className,
+  loading = false, error, empty, pagination, mobile = "cards", density = "default", rowClassName, className,
 }: TableProps<T>) {
+  const compact = density === "compact";
   const { t } = useTranslation();
   const sortId = useId();
   const countLine = countText ?? (count !== undefined ? t("ui.table.count", { count }) : null);
@@ -207,7 +211,7 @@ export function Table<T>({
                   const Icon = active ? (sort!.direction === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
                   return (
                     <th key={c.key} scope="col" aria-sort={ariaSort}
-                      className={cn("px-4 py-3 font-semibold leading-5 text-slate-700", ALIGN[c.align ?? "left"], c.headerClassName)}>
+                      className={cn(compact ? "px-3 py-2" : "px-4 py-3", "font-semibold leading-5 text-slate-700", ALIGN[c.align ?? "left"], c.headerClassName)}>
                       {c.actions && !c.header ? <span className="sr-only">{t("ui.table.actions")}</span>
                         : c.sortable && onSortChange ? (
                           <button type="button" onClick={() => toggleSort(c.key)}
@@ -225,7 +229,7 @@ export function Table<T>({
               {rows.map((row, ri) => (
                 <tr key={rowKey(row)} className={cn("hover:bg-slate-50/60", rowClassName?.(row))}>
                   {columns.map((c) => {
-                    const cls = cn("px-4 py-3 align-middle leading-6 text-slate-800", ALIGN[c.align ?? "left"], c.nowrap && "whitespace-nowrap", c.actions && "whitespace-nowrap", c.className);
+                    const cls = cn(compact ? "px-3 py-2 leading-5" : "px-4 py-3 leading-6", "align-middle text-slate-800", ALIGN[c.align ?? "left"], c.nowrap && "whitespace-nowrap", c.actions && "whitespace-nowrap", c.className);
                     return c.primary
                       ? <th key={c.key} scope="row" className={cn(cls, "font-medium text-slate-900")}>{c.cell(row, ri)}</th>
                       : <td key={c.key} className={cls}>{c.cell(row, ri)}</td>;
