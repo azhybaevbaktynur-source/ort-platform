@@ -6,6 +6,8 @@ import { ChevronDown, Menu } from "lucide-react";
 import { TabsNav } from "./Tabs";
 import { Dialog } from "./Dialog";
 import { cn, focusRing } from "./utils";
+import { LoadingState } from "./Skeleton";
+import { useStaffDictionary, useTranslation } from "@/lib/i18n/context"; // performance audit S4
 
 /*
  * Area frame (Phase 6b S5b, PHASE_6_DESIGN.md §3 and §8.3): the sections of one area (Platform admin,
@@ -146,6 +148,10 @@ function PhoneDrawer({ label, menuLabel, items, heading, navFooter }: {
  * a drawer on phones. Give items a `group` to split a long menu into labelled sections.
  */
 export function AreaShell({ label, items, heading, banner, children, className, phone = "tabs", menuLabel, navFooter }: AreaShellProps) {
+  // S4: staff strings live in their own dictionary part; neutral loading state until it is here (never raw keys)
+  const staffReady = useStaffDictionary();
+  const { t } = useTranslation();
+  if (!staffReady) return <LoadingState label={t("lms.common.loading")} />;
   return (
     <div className={className}>
       {banner}
