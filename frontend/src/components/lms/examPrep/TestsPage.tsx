@@ -16,9 +16,9 @@ import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
 import { templateUi } from "@/lib/lms/templates";
 import {
-  SOURCE_OTHER, getExamPrep, listExamLibrary, wholeNumber,
-  type ExamPrepOut, type LibraryCardOut, type LibraryStatus,
+  SOURCE_OTHER, listExamLibrary, wholeNumber, type LibraryCardOut, type LibraryStatus,
 } from "@/lib/lms/examPrep";
+import { useExamPrep } from "@/lib/lms/pageData"; // PERFORMANCE_AUDIT S3
 import { useCourse } from "@/components/lms/CourseContext";
 import {
   Badge, EmptyState, ErrorState, GoldPill, LinkButton, LockOverlay, Pagination, Skeleton, cn, focusRing, type BadgeTone,
@@ -146,22 +146,9 @@ function TestsLibrary() {
   const base = `/${lang}/courses/${course.id}`;
   const courseTitle = pickLocalized(course.title, lang, course.default_language) || t("courses.list.untitled");
 
-  // the exam-prep page: sources and total
-  const [meta, setMeta] = useState<ExamPrepOut | null>(null);
-  const [metaError, setMetaError] = useState<unknown>(null);
-  const [metaLoading, setMetaLoading] = useState(true);
-  const loadMeta = useCallback(async () => {
-    setMetaLoading(true);
-    setMetaError(null);
-    try {
-      setMeta(await getExamPrep(course.id));
-    } catch (e) {
-      setMetaError(e);
-    } finally {
-      setMetaLoading(false);
-    }
-  }, [course.id]);
-  useEffect(() => { void loadMeta(); }, [loadMeta]);
+  // the exam-prep page: sources and total. PERFORMANCE_AUDIT S3: through the SWR cache, so the "Начало работы"
+  // checklist reading the same answer sends no second request
+  const { data: meta, error: metaError, refresh: refreshMeta } = useExamPrep(course.id);
 
   // the library, paginated; the source filter is the server's, the status filter applies to the loaded cards
   const [source, setSource] = useState<string | null>(null);
@@ -188,8 +175,8 @@ function TestsLibrary() {
   }, [course.id, source]);
   useEffect(() => { void load(); }, [load]);
 
-  if (!meta && metaLoading && items.length === 0) return <TestsSkeleton />;
-
+  // PERFORMANCE_AUDIT S3: no page skeleton: the header and the status chips are drawn at once, the cards' place
+  // holds skeletons until the library answers ("Тесты" becomes "Тесты · N" with the exam-prep answer)
   const sources = meta?.sources ?? [];
   const shown = status ? items.filter((c) => c.status === status) : items;
   // §5.1 e: one primary button per screen, on the test to continue (else the first not started); the rest secondary
@@ -202,7 +189,7 @@ function TestsLibrary() {
       <section aria-labelledby={headingId} className="min-w-0 space-y-5">
         <StudentPageHeader id={headingId} title={title} subtitle={courseTitle} />
 
-        {metaError && !meta ? <ErrorState variant="inline" message={errorText(metaError)} onRetry={() => void loadMeta()} /> : null}
+        {metaError && !meta ? <ErrorState variant="inline" message={errorText(metaError)} onRetry={() => void refreshMeta()} /> : null}
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {sources.length > 1 && (

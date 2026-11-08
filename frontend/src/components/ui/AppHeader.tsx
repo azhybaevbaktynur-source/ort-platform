@@ -25,6 +25,8 @@ export interface AppHeaderLink {
   active?: boolean;
   /** Item 4: a line above this link in a dropdown (the platform admin's "All organizations"). */
   separated?: boolean;
+  /** PERFORMANCE_AUDIT S3: asks the target page's cheap reads on hover or focus, before the click (sections only). */
+  prefetch?: () => void;
 }
 
 export interface AppHeaderArea {
@@ -98,9 +100,9 @@ function usePopover(routeKey?: string) {
 const PANEL = "absolute top-full z-40 mt-1 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg";
 const ITEM = "flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium leading-5";
 
-function MenuLink({ href, active, children, onNavigate, indent = false }: { href: string; active?: boolean; children: React.ReactNode; onNavigate: () => void; indent?: boolean }) {
+function MenuLink({ href, active, children, onNavigate, indent = false, prefetch }: { href: string; active?: boolean; children: React.ReactNode; onNavigate: () => void; indent?: boolean; prefetch?: () => void }) {
   return (
-    <Link href={href} aria-current={active ? "page" : undefined} onClick={onNavigate}
+    <Link href={href} aria-current={active ? "page" : undefined} onClick={onNavigate} onPointerEnter={prefetch} onFocus={prefetch} onTouchStart={prefetch}
       className={cn(ITEM, focusRing, "focus-visible:ring-offset-0", indent && "pl-10",
         active ? "bg-brand-50 text-brand-800" : "text-slate-800 hover:bg-slate-100")}>
       <span className="min-w-0 flex-1 break-words">{children}</span>
@@ -141,7 +143,7 @@ function AreaMenu({ areas, activeArea, routeKey, className }: { areas: AppHeader
                   <ul className="mt-0.5 space-y-0.5">
                     {[...(a.choices ?? []), ...(a.sections ?? [])].map((s) => (
                       <li key={s.href} className={s.separated ? "mt-1 border-t border-slate-100 pt-1" : undefined}>
-                        <MenuLink href={s.href} active={s.active} onNavigate={close} indent>{s.label}</MenuLink>
+                        <MenuLink href={s.href} active={s.active} onNavigate={close} indent prefetch={s.prefetch}>{s.label}</MenuLink>
                       </li>
                     ))}
                   </ul>
@@ -325,7 +327,7 @@ export function AppHeader({ brandHref, areas, areasLoading = false, activeArea, 
             <ul className="-mx-3 flex h-12 items-center gap-1">
               {sections.map((s) => (
                 <li key={s.href}>
-                  <Link href={s.href} aria-current={s.active ? "page" : undefined}
+                  <Link href={s.href} aria-current={s.active ? "page" : undefined} onPointerEnter={s.prefetch} onFocus={s.prefetch}
                     className={cn(PILL, "font-medium", focusRing, s.active ? "text-brand-800 underline decoration-2 underline-offset-8" : PILL_OFF)}>
                     {s.label}
                   </Link>

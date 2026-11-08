@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
+import { useCachedMe } from "@/lib/lms/meCache"; // PERFORMANCE_AUDIT S3
 import { getPlatformSummary } from "@/lib/lms/admin";
 import type { LmsApiError } from "@/lib/lms/client";
 import type { StorageLevel } from "@/lib/lms/storage";
@@ -31,7 +32,9 @@ export function useAdminCrumbs() {
 /** Platform admin area: section nav (`AreaShell`) + client-side guard (the server is authoritative). */
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const { lang, t } = useTranslation();
-  const { me, loading } = useLmsMe();
+  const { me: fresh, loading } = useLmsMe();
+  const cachedMe = useCachedMe(); // PERFORMANCE_AUDIT S3: the cached answer draws the area at once (no spinner)
+  const me = fresh ?? cachedMe;
   const pathname = usePathname();
   const router = useRouter();
   const [pending, setPending] = useState<number | null>(null);
