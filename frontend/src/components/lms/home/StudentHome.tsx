@@ -25,7 +25,7 @@ import { fmtDayMonthTime } from "./format";
 import { SideRow, SideSection, TodoRows } from "./TodoList";
 import { useErrorText } from "./useErrorText";
 
-// Student UI U3: as many 16rem columns as fit, so cards stay readable at 1920 px inside the student shell
+// FB8-1: the one shared card grid (same breakpoints as the catalog and "my courses")
 const CARD_GRID = HOME_CARD_GRID;
 
 /** Small celebration: gold is for achievements only (UX §5). */

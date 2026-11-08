@@ -23,7 +23,7 @@ function CatalogSkeleton() {
       <div aria-hidden="true" className={COURSE_GRID}>
         {Array.from({ length: 3 }, (_, i) => (
           <div key={i} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <Skeleton className="aspect-video w-full rounded-none" />
+            <Skeleton className="h-[150px] w-full rounded-none" />
             <div className="p-4">
               <Skeleton className="mb-2 h-4 w-2/3" />
               <Skeleton className="mb-4 h-4 w-1/2" />
