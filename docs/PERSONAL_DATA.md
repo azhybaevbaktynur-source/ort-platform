@@ -130,6 +130,7 @@ These point at the tombstone row, which holds nothing personal after deletion.
 | `bank_questions` | `search_text` | question text |
 | `enrollment_events` | `details` | ids and fixed reasons only |
 | `guardian_pairing_codes` | `code_hash` | keyed hash of a short-lived code, revoked with the account |
+| `infra_snapshots` | `payload` | allow-listed provider usage figures (I5a): no personal data, no keys |
 | `invitations` | `token_hash` | hash of a random token |
 | `legacy_ort_export` | `payload` | old ORT questions and sources exported in migration 0006: no user data |
 | `organization_roster_imports` | `file_name` | an admin's file name |
