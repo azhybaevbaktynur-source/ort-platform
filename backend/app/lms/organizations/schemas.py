@@ -31,10 +31,38 @@ class OrganizationOut(BaseModel):
 
 
 class OrganizationAdminRowOut(OrganizationOut):
-    """Platform list row: counts come from one grouped query per page."""
+    """Platform list row: subtree roll-ups (a school's departments count into the school), five grouped statements
+    per page (ADMIN_ORGS_DESIGN 2.1)."""
     org_admins: int = 0
     teachers: int = 0
     courses: int = 0
+    # --- Admin orgs (item 4) begin ---
+    students: int = 0
+    storage_bytes: int = 0   # owner-based: assets of the tree's active members (as `tree_usage`)
+    departments: int = 0
+    is_protected: bool = False  # the platform organization: never suspended, slug fixed
+    # --- Admin orgs (item 4) end ---
+
+
+# --- Admin orgs (item 4) begin --- (ADMIN_ORGS_DESIGN 2.2)
+class SuspendAffectedOut(BaseModel):
+    courses: int = 0
+    students: int = 0
+    departments: int = 0
+
+
+class OrganizationSuspendOut(OrganizationOut):
+    """`POST /platform/organizations/{id}/suspend|resume`: the organization and what the change touches."""
+    affected: SuspendAffectedOut = Field(default_factory=SuspendAffectedOut)
+
+
+class OrgStudentOut(BaseModel):
+    """`GET /platform/organizations/{id}/students`: name, email and counts only (D-ORG-4)."""
+    user: UserBrief
+    courses: int
+    first_enrolled_at: Optional[datetime] = None
+    last_active_enrollment_at: Optional[datetime] = None
+# --- Admin orgs (item 4) end ---
 
 
 class MyOrganizationOut(BaseModel):
@@ -45,6 +73,9 @@ class MyOrganizationOut(BaseModel):
     status: str
     role: str
     can_create_courses: bool
+    # FB8-5 S3: templates granted to the organization (active grants the registry knows, registry order); only on
+    # rows where the caller may create courses (as GET /courses/templates), else empty
+    template_keys: list[str] = []
 
 
 class MemberOut(BaseModel):

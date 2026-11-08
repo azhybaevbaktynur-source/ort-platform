@@ -149,18 +149,64 @@ def load_org(db: Session, organization_id: uuid.UUID, *, for_update: bool = Fals
 
 
 def load_org_for_admin(db: Session, user: User, organization_id: uuid.UUID, *, write: bool = False) -> Organization:
-    """Policy `org_admin`: active org admin of the organization, or the platform admin. Anyone else gets the
-    same 404 as a missing organization. A suspended organization is read-only except for the platform admin."""
+    """Policy `org_admin`: active org admin of the organization or of one of its ancestors (fb8 review fix 1: a
+    school admin reaches every tab of a department, not only its overview), or the platform admin. A department
+    admin never reaches the parent school. Anyone else gets the same 404 as a missing organization. A suspended
+    organization (or a suspended ancestor) is read-only except for the platform admin."""
+    return load_org_as_admin(db, user, organization_id, write=write)[0]
+
+
+# --- Admin orgs (item 4) begin --- (ADMIN_ORGS_DESIGN 2.2-2.4)
+E_PLATFORM_ORG_PROTECTED = "platform_org_protected"  # 409: the platform organization is never suspended (D-ORG-1)
+E_OWNER_NOT_ELIGIBLE = "owner_not_eligible"          # 409: resume of a revoked/disabled teacher's personal org (D-ORG-5)
+
+
+def acting_as(db: Session, user: User, org: Optional[Organization]) -> Optional[str]:
+    """`org_admin` / `platform_admin` / None from DB memberships (`tree.acting_as`); never from the client."""
+    from app.lms.organizations import tree
+
+    return tree.acting_as(db, user, org)
+
+
+def _acting(db: Session, actor: User, org: Optional[Organization], given: Optional[str]) -> Optional[str]:
+    """The capacity a service records: the caller's value when the route already derived it from the database
+    (`load_org_as_admin`, or the fixed `platform_admin` of the /platform routes), else derived here."""
+    return given if given is not None else acting_as(db, actor, org)
+
+
+def _details(details: dict, acting: Optional[str]) -> dict:
+    from app.lms.organizations.tree import with_acting
+
+    return with_acting(details, acting)
+
+
+def load_org_as_admin(db: Session, user: User, organization_id: uuid.UUID, *,
+                      write: bool = False) -> tuple[Organization, str]:
+    """`load_org_for_admin` plus the capacity of the caller (D-ORG-2): `org_admin` when an active org-admin
+    membership on the ancestor path exists, else `platform_admin` (the user row's flag, loaded on this request).
+    Same 404 for everybody else; a suspended organization is read-only except for the platform admin."""
+    from app.lms.organizations import tree
+
     org = db.execute(select(Organization).where(
         Organization.id == organization_id, Organization.deleted_at.is_(None))).scalar_one_or_none()
-    if org is None or not (user.is_platform_admin or is_org_admin(db, org.id, user.id)):
+    if org is None:
         raise org_not_found()
-    if write and not user.is_platform_admin:
-        from app.lms.organizations.tree import suspended_on_path
+    acting = tree.acting_as(db, user, org)
+    if acting is None:
+        raise org_not_found()
+    if write and not user.is_platform_admin and tree.suspended_on_path(db, org):
+        raise org_suspended_error()
+    return org, acting
 
-        if suspended_on_path(db, org):  # Phase 9 fix 2 (M1): a suspended ancestor makes the department read-only
-            raise org_suspended_error()
-    return org
+
+def _personal_owner(db: Session, org: Organization) -> Optional[User]:
+    """The user whose personal organization this is (its id is derived from the user id; one SQL)."""
+    for uid in db.execute(select(OrganizationMember.user_id).where(
+            OrganizationMember.organization_id == org.id)).scalars():
+        if personal_org_id(uid) == org.id:
+            return db.get(User, uid)
+    return None
+# --- Admin orgs (item 4) end ---
 
 
 # ------------------------------------------------------------------------------------------------ personal orgs
@@ -205,14 +251,16 @@ def _check_slug(db: Session, slug: str, exclude: Optional[uuid.UUID] = None) -> 
     return slug
 
 
-def create_org(db: Session, admin: User, data, request: Optional[Request]) -> Organization:
+def create_org(db: Session, admin: User, data, request: Optional[Request], *,
+               acting_as: Optional[str] = None) -> Organization:
     slug = _check_slug(db, data.slug)
     org = Organization(slug=slug, name=data.name.strip(), status="active", created_by_id=admin.id,
                        settings=data.settings_dict())
     db.add(org)
     db.flush()
     audit.record(db, actor=admin, action="organization.create", target_type="organization", target_id=str(org.id),
-                 details={"organization_id": str(org.id), "slug": slug}, request=request)
+                 details=_details({"organization_id": str(org.id), "slug": slug},
+                                  _acting(db, admin, None, acting_as)), request=request)
     try:
         db.commit()
     except IntegrityError:
@@ -221,8 +269,11 @@ def create_org(db: Session, admin: User, data, request: Optional[Request]) -> Or
     return org
 
 
-def update_org(db: Session, admin: User, org: Organization, data, request: Optional[Request]) -> Organization:
+def update_org(db: Session, admin: User, org: Organization, data, request: Optional[Request], *,
+               acting_as: Optional[str] = None) -> Organization:
     fields = {k: getattr(data, k) for k in data.model_fields_set}
+    if org.kind == "platform" and "slug" in fields and (fields["slug"] or "").strip().lower() != org.slug:
+        raise Conflict("The platform organization's slug is fixed", code=E_PLATFORM_ORG_PROTECTED)
     changes: dict = {}
     if "name" in fields:
         if not fields["name"] or not fields["name"].strip():
@@ -242,7 +293,8 @@ def update_org(db: Session, admin: User, org: Organization, data, request: Optio
         changes["settings"] = [org.settings, new]
         org.settings = new
     audit.record(db, actor=admin, action="organization.update", target_type="organization", target_id=str(org.id),
-                 details={"organization_id": str(org.id), "changes": changes}, request=request)
+                 details=_details({"organization_id": str(org.id), "changes": changes},
+                                  _acting(db, admin, org, acting_as)), request=request)
     try:
         db.commit()
     except IntegrityError:
@@ -252,17 +304,29 @@ def update_org(db: Session, admin: User, org: Organization, data, request: Optio
 
 
 def set_suspended(db: Session, admin: User, org: Organization, *, suspended: bool, reason: str,
-                  request: Optional[Request]) -> Organization:
+                  request: Optional[Request], acting_as: Optional[str] = None) -> Organization:
     org = load_org(db, org.id, for_update=True)
+    if suspended and org.kind == "platform":  # D-ORG-1: ORT and every platform exam live there (rule 6.9)
+        raise Conflict("The platform organization cannot be suspended", code=E_PLATFORM_ORG_PROTECTED)
+    if suspended and org.parent_id is not None:  # fb8 review fix 2: nor a department of the platform tree
+        from app.lms.organizations import tree
+
+        if tree.load_root(db, org).kind == "platform":
+            raise Conflict("The platform organization cannot be suspended", code=E_PLATFORM_ORG_PROTECTED)
     if suspended == (org.status == "suspended"):
         raise Conflict("Invalid status transition", code="invalid_transition")
+    if not suspended and org.kind == "personal":  # D-ORG-5: re-enable a revoked teacher only via "grant teacher"
+        owner = _personal_owner(db, org)
+        if owner is None or owner.disabled_at is not None or owner.teacher_status == "revoked":
+            raise Conflict("The owner is not an eligible teacher", code=E_OWNER_NOT_ELIGIBLE)
     if suspended:
         org.status, org.suspended_at, org.suspended_reason = "suspended", utcnow(), reason
     else:
         org.status, org.suspended_at, org.suspended_reason = "active", None, None
     audit.record(db, actor=admin, action="organization.suspend" if suspended else "organization.resume",
                  target_type="organization", target_id=str(org.id), reason=reason,
-                 details={"organization_id": str(org.id)}, request=request)
+                 details=_details({"organization_id": str(org.id)}, _acting(db, admin, org, acting_as)),
+                 request=request)
     db.commit()
     return org
 
@@ -279,7 +343,7 @@ def members_query(organization_id: uuid.UUID, *, role: Optional[str] = None, sta
 
 
 def add_member(db: Session, actor: User, org: Organization, user_id: str, role: str,
-               request: Optional[Request]) -> tuple[OrganizationMember, User]:
+               request: Optional[Request], *, acting_as: Optional[str] = None) -> tuple[OrganizationMember, User]:
     target = db.get(User, user_id)
     if target is None or target.disabled_at is not None or target.id == defaults.DEMO_TEACHER_ID:
         raise NotFound("User not found", code="user_not_found")
@@ -299,7 +363,8 @@ def add_member(db: Session, actor: User, org: Organization, user_id: str, role: 
         m.updated_at = now
     db.flush()
     audit.record(db, actor=actor, action="organization.member.add", target_type="user", target_id=target.id,
-                 details={"organization_id": str(org.id), "role": role, "before": before}, request=request)
+                 details=_details({"organization_id": str(org.id), "role": role, "before": before},
+                                  _acting(db, actor, org, acting_as)), request=request)
     try:
         db.commit()
     except IntegrityError:
@@ -309,7 +374,8 @@ def add_member(db: Session, actor: User, org: Organization, user_id: str, role: 
 
 
 def remove_member(db: Session, actor: User, org: Organization, user_id: str, reason: Optional[str],
-                  request: Optional[Request]) -> None:
+                  request: Optional[Request], *, acting_as: Optional[str] = None) -> None:
+    acting = _acting(db, actor, org, acting_as)  # before the change: the actor may remove their own membership
     m = db.execute(select(OrganizationMember).where(
         OrganizationMember.organization_id == org.id, OrganizationMember.user_id == user_id,
         OrganizationMember.state == "active").with_for_update()).scalar_one_or_none()
@@ -319,7 +385,8 @@ def remove_member(db: Session, actor: User, org: Organization, user_id: str, rea
         raise Conflict("You cannot remove yourself", code="cannot_remove_self")
     m.state, m.removed_at, m.removed_by_id = "removed", utcnow(), actor.id
     audit.record(db, actor=actor, action="organization.member.remove", target_type="user", target_id=user_id,
-                 reason=reason, details={"organization_id": str(org.id), "role": m.role}, request=request)
+                 reason=reason, details=_details({"organization_id": str(org.id), "role": m.role}, acting),
+                 request=request)
     db.commit()
 
 
@@ -399,7 +466,7 @@ def _check_template_key(template_key: str) -> None:
 
 
 def grant_template(db: Session, admin: User, org: Organization, template_key: str,
-                   request: Optional[Request]) -> None:
+                   request: Optional[Request], *, acting_as: Optional[str] = None) -> None:
     _check_template_key(template_key)
     g = db.execute(select(OrganizationTemplateGrant).where(
         OrganizationTemplateGrant.organization_id == org.id,
@@ -413,8 +480,9 @@ def grant_template(db: Session, admin: User, org: Organization, template_key: st
     else:
         g.revoked_at, g.revoked_by_id, g.granted_at, g.granted_by_id = None, None, now, admin.id
     audit.record(db, actor=admin, action="organization.template.grant", target_type="organization",
-                 target_id=str(org.id), details={"organization_id": str(org.id), "template_key": template_key},
-                 request=request)
+                 target_id=str(org.id),
+                 details=_details({"organization_id": str(org.id), "template_key": template_key},
+                                  _acting(db, admin, org, acting_as)), request=request)
     try:
         db.commit()
     except IntegrityError:
@@ -422,7 +490,8 @@ def grant_template(db: Session, admin: User, org: Organization, template_key: st
 
 
 def revoke_template(db: Session, admin: User, org: Organization, template_key: str,
-                    request: Optional[Request], reason: Optional[str] = None) -> None:
+                    request: Optional[Request], reason: Optional[str] = None, *,
+                    acting_as: Optional[str] = None) -> None:
     """Revoking blocks new courses with the template only; existing courses keep working (design 5.5)."""
     _check_template_key(template_key)
     g = db.execute(select(OrganizationTemplateGrant).where(
@@ -432,15 +501,16 @@ def revoke_template(db: Session, admin: User, org: Organization, template_key: s
         return
     g.revoked_at, g.revoked_by_id = utcnow(), admin.id
     audit.record(db, actor=admin, action="organization.template.revoke", target_type="organization",
-                 target_id=str(org.id), reason=(reason or "").strip() or None, details={"organization_id": str(org.id), "template_key": template_key},
-                 request=request)
+                 target_id=str(org.id), reason=(reason or "").strip() or None,
+                 details=_details({"organization_id": str(org.id), "template_key": template_key},
+                                  _acting(db, admin, org, acting_as)), request=request)
     db.commit()
 
 
 # ------------------------------------------------------------------------------------------------ join as teacher
 
 def join_as_teacher(db: Session, actor: User, org: Organization, course_id: uuid.UUID,
-                    request: Optional[Request]):
+                    request: Optional[Request], *, acting_as: Optional[str] = None):
     """A13: the org admin adds themselves as a teacher (source org_admin_self), visible in the roster and the
     organization log. An org admin who already has an active teacher enrollment gets 409 already_enrolled."""
     from app.lms.courses import service as course_svc
@@ -472,7 +542,8 @@ def join_as_teacher(db: Session, actor: User, org: Organization, course_id: uuid
         course_svc.add_event(db, enr, "staff_added", actor.id, from_role=before[0], to_role="teacher",
                              from_state=before[1], to_state="active", details=details)
     audit.record(db, actor=actor, action="org_admin_joined_course", target_type="course", target_id=str(course.id),
-                 details={"organization_id": str(org.id), "course_id": str(course.id)}, request=request)
+                 details=_details({"organization_id": str(org.id), "course_id": str(course.id)},
+                                  _acting(db, actor, org, acting_as)), request=request)
     db.commit()
     return course, enr
 
@@ -549,7 +620,8 @@ def list_departments(db: Session, org: Organization) -> list[dict]:
             for o in ordered]
 
 
-def create_department(db: Session, actor: User, org: Organization, data, request: Optional[Request]) -> Organization:
+def create_department(db: Session, actor: User, org: Organization, data, request: Optional[Request], *,
+                      acting_as: Optional[str] = None) -> Organization:
     """Design 4.1: parent = `data.parent_id` (inside the route organization's subtree) or the route organization;
     never a personal organization; depth <= 2; <= 200 organizations per root. Tree writes serialize on the root row
     (`FOR UPDATE`). The department starts active and stores `{}` settings. Audited."""
@@ -577,8 +649,9 @@ def create_department(db: Session, actor: User, org: Organization, data, request
     db.add(dept)
     db.flush()
     audit.record(db, actor=actor, action="org.department_created", target_type="organization", target_id=str(oid),
-                 details={"organization_id": str(root.id), "department_id": str(oid),
-                          "parent_id": str(parent.id)}, request=request)
+                 details=_details({"organization_id": str(root.id), "department_id": str(oid),
+                                   "parent_id": str(parent.id)}, _acting(db, actor, org, acting_as)),
+                 request=request)
     try:
         db.commit()
     except IntegrityError:
@@ -588,7 +661,7 @@ def create_department(db: Session, actor: User, org: Organization, data, request
 
 
 def update_department(db: Session, actor: User, org: Organization, department_id: uuid.UUID, data,
-                      request: Optional[Request]) -> Organization:
+                      request: Optional[Request], *, acting_as: Optional[str] = None) -> Organization:
     """Rename and/or move (design 4.1). A move locks the root, refuses cycles (`department_cycle`) and a deepest
     descendant deeper than 2 (`department_depth`), then rewrites `path`/`depth` of the subtree (<= 200 rows).
     The new parent must be inside the route organization's subtree (a department admin moves inside their own)."""
@@ -627,15 +700,17 @@ def update_department(db: Session, actor: User, org: Organization, department_id
             dept.name = name
     if changes:
         audit.record(db, actor=actor, action="org.department_updated", target_type="organization",
-                     target_id=str(dept.id), details={"organization_id": str(tree.root_id(dept.path)),
-                                                      "department_id": str(dept.id), "changes": changes},
+                     target_id=str(dept.id),
+                     details=_details({"organization_id": str(tree.root_id(dept.path)),
+                                       "department_id": str(dept.id), "changes": changes},
+                                      _acting(db, actor, org, acting_as)),
                      request=request)
     db.commit()
     return dept
 
 
 def delete_department(db: Session, actor: User, org: Organization, department_id: uuid.UUID,
-                      request: Optional[Request]) -> None:
+                      request: Optional[Request], *, acting_as: Optional[str] = None) -> None:
     """Soft delete of an **empty** department (S1 open item 4). Status and deletion are read from the root only
     (`AuthzContext._org`), so a deleted middle department must never leave live children behind: the delete is
     refused (409 `department_not_empty`) while the department has live sub-departments, courses (sandboxes too),
@@ -647,6 +722,7 @@ def delete_department(db: Session, actor: User, org: Organization, department_id
     from app.lms.organizations import tree
     from app.lms.organizations.models import Invitation
 
+    acting = _acting(db, actor, org, acting_as)  # before the change: the actor's membership may be removed below
     dept = subtree_org(db, org, department_id)
     if dept.kind != "department":
         raise org_not_found()
@@ -676,9 +752,11 @@ def delete_department(db: Session, actor: User, org: Organization, department_id
         inv.revoked_at, inv.revoked_by_id = now, actor.id
     dept.deleted_at = now
     audit.record(db, actor=actor, action="org.department_deleted", target_type="organization",
-                 target_id=str(dept.id), details={"organization_id": str(tree.root_id(dept.path)),
-                                                  "department_id": str(dept.id), "removed_members": len(members),
-                                                  "revoked_invitations": len(open_invitations)}, request=request)
+                 target_id=str(dept.id),
+                 details=_details({"organization_id": str(tree.root_id(dept.path)), "department_id": str(dept.id),
+                                   "removed_members": len(members), "revoked_invitations": len(open_invitations)},
+                                  acting),
+                 request=request)
     db.commit()
 
 
@@ -693,7 +771,8 @@ def settings_view(db: Session, org: Organization) -> dict:
                 editable=org.id == root.id, settings=effective_settings(root.settings, root.kind))
 
 
-def patch_settings(db: Session, actor: User, org: Organization, patch, request: Optional[Request]) -> None:
+def patch_settings(db: Session, actor: User, org: Organization, patch, request: Optional[Request], *,
+                   acting_as: Optional[str] = None) -> None:
     """PATCH /org/{org}/settings: root only (409 `settings_on_root`), personal sharing refused (422
     `sharing_disabled`), audited with before/after (settings hold no PII)."""
     from app.lms.organizations.settings import validate_settings_write
@@ -704,13 +783,15 @@ def patch_settings(db: Session, actor: User, org: Organization, patch, request: 
     if after != before:
         org.settings = after
         audit.record(db, actor=actor, action="organization.settings_update", target_type="organization",
-                     target_id=str(org.id), details={"organization_id": str(org.id), "before": before,
-                                                     "after": after}, request=request)
+                     target_id=str(org.id),
+                     details=_details({"organization_id": str(org.id), "before": before, "after": after},
+                                      _acting(db, actor, org, acting_as)),
+                     request=request)
     db.commit()
 
 
 def move_course(db: Session, actor: User, org: Organization, course_id: uuid.UUID, target_id: uuid.UUID,
-                request: Optional[Request]):
+                request: Optional[Request], *, acting_as: Optional[str] = None):
     """PATCH /org/{org}/courses/{course_id} {organization_id} (design 4.1): an org admin of the route
     organization moves one of its subtree's courses to another organization of that subtree (both administered by
     the caller). The course's banks follow (a bank carries its course's organization); roster untouched. Audited."""
@@ -733,8 +814,9 @@ def move_course(db: Session, actor: User, org: Organization, course_id: uuid.UUI
     db.execute(QuestionBank.__table__.update().where(QuestionBank.course_id == course.id)
                .values(organization_id=target.id))
     audit.record(db, actor=actor, action="org.course_moved", target_type="course", target_id=str(course.id),
-                 details={"organization_id": str(tree.root_id(target.path)), "course_id": str(course.id),
-                          "from": str(before), "to": str(target.id)}, request=request)
+                 details=_details({"organization_id": str(tree.root_id(target.path)), "course_id": str(course.id),
+                                   "from": str(before), "to": str(target.id)}, _acting(db, actor, org, acting_as)),
+                 request=request)
     db.commit()
     return course
 # --- Phase 9 S2 end ---

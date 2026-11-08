@@ -4,7 +4,7 @@ import { seed, settle, signIn, tr, VIEWPORTS, type SeedUser } from "./helpers";
 /**
  * Phase 8c navigation walk (PHASE_8C_DESIGN 12, S4a): the course sidebar and everything built on it.
  *
- *  1. sidebar links, order and active states for a teacher (staff-only links, "hidden from students" marks)
+ *  1. sidebar links, order and active states for a teacher (FB8-5 S1: five sections + "More", "Hidden" badges, Content tabs)
  *  2. phone drawer ("Course menu" button + sheet) for a student at 375 px
  *  3. auto-hide for students (Announcements and Files appear with published content; the "not available" page)
  *  4. redirects of the old URLs (section 4.2), query strings kept
@@ -86,6 +86,19 @@ const LINKS = {
   analytics: "analytics.nav", // Phase 10
 } as const;
 
+/** FB8-5 S1 (D-FB8-5-1): the staff sidebar: five sections, then the "More" group. */
+const STAFF_LINKS = {
+  content: "courseNav.content",
+  people: "courseNav.students",
+  grades: "gradebook.tab",
+  analytics: "analytics.nav",
+  settings: "courses.settings.tab",
+  announcements: "announcements.title",
+  files: "courseFiles.title",
+  practice: "practice.nav",
+  bank: "bank.tab",
+} as const;
+
 async function createTextAssignment(title: string, published = true): Promise<string> {
   const a = await api(nav().teacher, "POST", `/courses/${nav().course_id}/assignments`, { kind: "text", title: { ru: title }, points_possible: 10 });
   if (published) await api(nav().teacher, "PATCH", `/courses/${nav().course_id}/assignments/${a.id}`, { published: true });
@@ -116,39 +129,50 @@ test.describe("course navigation (ru)", () => {
   });
 
   // ---------------------------------------------------------------- 1. sidebar, teacher
-  test("teacher: sidebar links, order, hidden marks, active states, no Teaching sub-menu", async ({ browser }) => {
+  test("teacher: sidebar sections and More group, hidden badges, Content tabs, active states, no Teaching sub-menu", async ({ browser }) => {
     const tp = await open(browser, nav().teacher);
     await tp.goto(base());
     await expect(sidebar(tp)).toBeVisible();
-    // eight links in the design order; staff see them all (2.2)
-    expect(await linkNames(tp)).toEqual(Object.values(LINKS).map((k) => t(k)));
-    await expect(link(tp, LINKS.course)).toHaveAttribute("aria-current", "page");
-    // Announcements and Files have nothing published: marked "hidden from students" (2.3); the mark carries its own tooltip
-    for (const k of [LINKS.announcements, LINKS.files]) {
-      await expect(mark(link(tp, k))).toHaveAttribute("aria-label", t("courseNav.hiddenFromStudents"));
-    }
-    await expect(mark(link(tp, LINKS.assignments))).toHaveCount(0);
+    // FB8-5 S1 (D-FB8-5-1): five sections, then the "More" group; no crossed-eye marks (D-FB8-5-2)
+    expect(await linkNames(tp)).toEqual(Object.values(STAFF_LINKS).map((k) => t(k)));
+    await expect(sidebar(tp).getByText(t("courseNav.more"), { exact: true })).toBeVisible();
+    await expect(sidebar(tp).locator('[role="img"]')).toHaveCount(0);
+    await expect(link(tp, STAFF_LINKS.content)).toHaveAttribute("aria-current", "page");
+    // the Content tab row (Structure active) under the course bar
+    const tabs = tp.getByRole("navigation", { name: t("courseNav.tabs.label") });
+    await expect(tabs.getByRole("link", { name: t("courseNav.tabs.structure"), exact: true })).toHaveAttribute("aria-current", "page");
     // the Teaching sub-menu (Courses / Create / Grading schemes / Exam templates) is gone inside a course (2.5)
     await expect(tp.getByRole("link", { name: t("lms.nav.gradingSchemes"), exact: true })).toHaveCount(0);
     // Student view button in the course bar (2.4)
     await expect(tp.getByRole("button", { name: t("studentView.button") })).toBeVisible();
+    // the Assignments tab: /assignments, same tab row, Content stays active
+    await tabs.getByRole("link", { name: t("courseNav.tabs.assignments"), exact: true }).click();
+    await tp.waitForURL(new RegExp(`/courses/${nav().course_id}/assignments$`));
+    await expect(tabs.getByRole("link", { name: t("courseNav.tabs.assignments"), exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(link(tp, STAFF_LINKS.content)).toHaveAttribute("aria-current", "page");
 
     // clicking a link navigates and moves the active state
-    for (const [k, path] of [["announcements", "announcements"], ["assignments", "assignments"], ["grades", "grades"], ["people", "people"],
-      ["bank", "bank"], ["settings", "settings"], ["files", "files"]] as const) {
-      await link(tp, LINKS[k]).click();
+    for (const [k, path] of [["people", "people"], ["grades", "grades"], ["analytics", "analytics"], ["settings", "settings"],
+      ["announcements", "announcements"], ["files", "files"], ["practice", "practice"], ["bank", "bank"]] as const) {
+      await link(tp, STAFF_LINKS[k]).click();
       await tp.waitForURL(new RegExp(`/courses/${nav().course_id}/${path}(\\?.*)?$`));
-      await expect(link(tp, LINKS[k])).toHaveAttribute("aria-current", "page");
+      await expect(link(tp, STAFF_LINKS[k])).toHaveAttribute("aria-current", "page");
       await expect(sidebar(tp).locator('[aria-current="page"]')).toHaveCount(1);
+      // nothing published in Announcements, Files and Practice yet: "Hidden" on the page itself, with its reason as tooltip
+      if (k === "announcements" || k === "files" || k === "practice") {
+        const badge = tp.locator(`[title="${t("courseNav.hiddenFromStudents")}"]`);
+        await expect(badge).toHaveCount(1);
+        await expect(badge).toHaveText(t("ui.hidden"));
+      }
     }
-    // Assignments stays active on the quiz builder, the quiz lobby / attempts list (/assessments/**) and the objects
+    // Content stays active on the quiz builder, the quiz lobby / attempts list (/assessments/**) and the objects
     for (const path of [`assessments/${quizAssessment}/edit`, `assessments/${quizAssessment}`, `assessments/${quizAssessment}/attempts`, `assignments/${quizAssignment}`]) {
       await tp.goto(`${base()}/${path}`);
-      await expect(link(tp, LINKS.assignments)).toHaveAttribute("aria-current", "page");
+      await expect(link(tp, STAFF_LINKS.content)).toHaveAttribute("aria-current", "page");
     }
-    // a page belongs to the Course link (pages are reached from the course page)
+    // a page belongs to Content too (pages are reached from the course page)
     await tp.goto(`${base()}/pages/${pageId}`);
-    await expect(link(tp, LINKS.course)).toHaveAttribute("aria-current", "page");
+    await expect(link(tp, STAFF_LINKS.content)).toHaveAttribute("aria-current", "page");
     await tp.context().close();
   });
 
@@ -217,11 +241,13 @@ test.describe("course navigation (ru)", () => {
     await expect(mark(link(sp, LINKS.files))).toHaveCount(0); // students get no "hidden" mark
     await link(sp, LINKS.files).click();
     await expect(sp.getByText(FILE_TITLE, { exact: true })).toBeVisible();
-    // staff now see both links without the hidden mark
+    // staff now see both pages without the "Hidden" badge (FB8-5 S1, D-FB8-5-2)
     const tp = await open(browser, nav().teacher);
-    await tp.goto(base());
-    await expect(mark(link(tp, LINKS.announcements))).toHaveCount(0);
-    await expect(mark(link(tp, LINKS.files))).toHaveCount(0);
+    for (const area of ["announcements", "files"]) {
+      await tp.goto(`${base()}/${area}`);
+      await expect(tp.getByRole("heading", { level: 1 })).toBeVisible();
+      await expect(tp.locator(`[title="${t("courseNav.hiddenFromStudents")}"]`)).toHaveCount(0);
+    }
     await tp.context().close();
     await sp.context().close();
   });
@@ -405,8 +431,8 @@ test.describe("course navigation (ru)", () => {
     expect(new URL(tp.url()).searchParams.get("filter")).toBe("to_grade");
     await expect(tp.getByRole("tab", { name: t("assignments.page.tabs.submissions") })).toHaveAttribute("aria-selected", "true");
     await expect(tp.locator("button:visible", { hasText: "Nav handin" }).first()).toBeVisible();
-    // the sidebar keeps Assignments active, not Grades
-    await expect(link(tp, LINKS.assignments)).toHaveAttribute("aria-current", "page");
+    // the sidebar keeps Content active (Assignments is its tab), not Grades
+    await expect(link(tp, STAFF_LINKS.content)).toHaveAttribute("aria-current", "page");
     await tp.context().close();
   });
 
@@ -468,7 +494,7 @@ test.describe("course navigation (ru)", () => {
     const from = new URL(tp.url()).searchParams.get("from");
     expect(from).toBe(`${base()}#m-${mod.id}`);
     await expect(tp.getByText(t("quizEditor.section.emptyQuizTitle"))).toBeVisible();
-    await expect(link(tp, LINKS.assignments)).toHaveAttribute("aria-current", "page");
+    await expect(link(tp, STAFF_LINKS.content)).toHaveAttribute("aria-current", "page");
     // Back / Close returns to the Course page at the module, which now lists the quiz
     await tp.locator(`a[href="${base()}#m-${mod.id}"]`).first().click();
     await tp.waitForURL(new RegExp(`${base()}#m-${mod.id}$`));

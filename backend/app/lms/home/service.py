@@ -264,7 +264,8 @@ def _course_cards(db: Session, uid: str, rows: list, now: datetime) -> list[sch.
             student_layout="exam_prep" if is_exam_prep(c) else "general",
             features=sch.HomeCourseFeaturesOut(modules=features[c.id][0], practice=features[c.id][1])
             if c.id in features else None,
-            cover_url=x.cover_url, tests_count=x.tests_count, lessons_count=x.lessons_count))
+            cover_url=x.cover_url, tests_count=x.tests_count, lessons_count=x.lessons_count,
+            exam_course_id=c.exam_course_id))
     return out
 
 
@@ -444,11 +445,13 @@ def _pending_invitations(db: Session, user: User, now: datetime) -> int:
 # --- Phase 8a S3 begin --- (PHASE_8A_DESIGN 5.4, 6.7: two more statements for the modules strip, one for news)
 # Open modules read for the strip (bounded; at most MODULES_NEXT_MAX rows are returned). Known limit (design 6.7):
 # ordered by course id, so a student with more than 100 open modules across courses may see no strip entry for the
-# courses past the bound; accepted (the course's own Modules page is always complete).
+# courses past the bound; accepted (the course's own Modules page is always complete). With `course_ids` (the
+# lesson course list) the bound applies per course (fb8 review fix 5).
 MODULES_SCAN_MAX = 100
 
 
-def _modules_next(db: Session, uid: str) -> list[sch.HomeModuleNextOut]:
+def _modules_next(db: Session, uid: str, course_ids: Optional[list] = None,
+                  max_out: int = sch.MODULES_NEXT_MAX) -> list[sch.HomeModuleNextOut]:
     """Caches only, never evaluates (design 6.7). 1) the published live modules of the caller's published student
     courses whose STORED state is open (`unlocked`, `started` or, F5a, `completed`: a module without requirements is
     completed once open and may still hold unviewed lessons), minus Pro modules the caller has no pass for (F5a,
@@ -456,7 +459,7 @@ def _modules_next(db: Session, uid: str) -> list[sch.HomeModuleNextOut]:
     (F5a, the outline's `up_next` rule): a requirement without a `met` status row of the caller, a lesson without a
     requirement and without a `viewed` fact, a test without a requirement and without a submitted submission. Per
     course: the first such item of the first module that has one; courses with a started module first, then the most
-    recently evaluated."""
+    recently evaluated. `course_ids` (TEACHER_TO_STUDENT_MAP 2.3, the lesson course list): only those courses."""
     from app.lms.access.service import has_active_pass, is_platform_path
     from app.lms.course_files.models import CourseFile
     from app.lms.modules import ids as mids
@@ -467,20 +470,32 @@ def _modules_next(db: Session, uid: str) -> list[sch.HomeModuleNextOut]:
     from app.lms.pages.models import Page
 
     org_path = select(Organization.path).where(Organization.id == Course.organization_id).scalar_subquery()
-    mods = db.execute(
-        select(Course.id.label("course_id"), Course.title.label("course_title"), Course.default_language.label("lang"),
-               Enrollment.id.label("enrollment_id"), CourseModule.id.label("module_id"),
-               CourseModule.title.label("module_title"), ModuleProgress.state.label("state"),
-               ModuleProgress.evaluated_at.label("evaluated_at"), CourseModule.access_tier.label("tier"),
-               Enrollment.is_test_student.label("is_test"), org_path.label("org_path"))
+    cols = (Course.id.label("course_id"), Course.title.label("course_title"), Course.default_language.label("lang"),
+            Enrollment.id.label("enrollment_id"), CourseModule.id.label("module_id"),
+            CourseModule.title.label("module_title"), ModuleProgress.state.label("state"),
+            ModuleProgress.evaluated_at.label("evaluated_at"), CourseModule.access_tier.label("tier"),
+            Enrollment.is_test_student.label("is_test"), org_path.label("org_path"),
+            CourseModule.position.label("position"))
+    scan = (
+        select(*cols)
         .select_from(Enrollment).join(Course, Course.id == Enrollment.course_id)
         .join(ModuleProgress, ModuleProgress.enrollment_id == Enrollment.id)
         .join(CourseModule, CourseModule.id == ModuleProgress.module_id)
         .where(_mine(uid), _open_course(), CourseModule.course_id == Course.id,
                CourseModule.deleted_at.is_(None), CourseModule.published.is_(True),
-               ModuleProgress.state.in_(("unlocked", "started", "completed")))
-        .order_by(Course.id, CourseModule.position, CourseModule.id).limit(MODULES_SCAN_MAX)
-    ).all()
+               ModuleProgress.state.in_(("unlocked", "started", "completed")),
+               *([Course.id.in_(course_ids)] if course_ids is not None else []))
+    )
+    if course_ids is None:
+        mods = db.execute(scan.order_by(Course.id, CourseModule.position, CourseModule.id)
+                          .limit(MODULES_SCAN_MAX)).all()
+    else:
+        # fb8 review fix 5: the lesson course list scans per course (row_number per course, still one statement),
+        # so one course with many open modules never pushes the others past a global bound
+        per = scan.add_columns(func.row_number().over(
+            partition_by=Course.id, order_by=(CourseModule.position, CourseModule.id)).label("scan_rn")).subquery()
+        mods = db.execute(select(*(per.c[c.key] for c in cols)).where(per.c.scan_rn <= MODULES_SCAN_MAX)
+                          .order_by(per.c.course_id, per.c.position, per.c.module_id)).all()
     # F5a: Pro modules of platform courses need a pass (S3 Gate; test students never locked); one statement, only
     # when such a module is among the rows
     tiered = [m for m in mods if m.tier == "paid" and not m.is_test and is_platform_path(m.org_path)]
@@ -534,7 +549,7 @@ def _modules_next(db: Session, uid: str) -> list[sch.HomeModuleNextOut]:
                                                    -(p[0].evaluated_at.timestamp() if p[0].evaluated_at else 0),
                                                    str(p[0].module_id)))
     out = []
-    for m, it in picks[:sch.MODULES_NEXT_MAX]:
+    for m, it in picks[:max_out]:
         title = it.title_override
         if not title:
             if it.kind == "page":

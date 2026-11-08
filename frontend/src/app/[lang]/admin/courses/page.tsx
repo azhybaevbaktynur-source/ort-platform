@@ -7,7 +7,7 @@ import { listAdminCourses } from "@/lib/lms/admin";
 import type { AdminCourseOut } from "@/lib/lms/types";
 import { pickLocalized } from "@/lib/lms/localized";
 import { isSystemAccount } from "@/lib/lms/organizations";
-import { Badge, Checkbox, EmptyState, FilterBar, PageHeader, Table, type TableColumn } from "@/components/ui";
+import { Badge, Checkbox, EmptyState, FilterBar, PageHeader, STAFF_WIDTH, Table, type TableColumn } from "@/components/ui";
 import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
 import { useCursorList, useDebounced } from "@/components/lms/admin/useCursorList";
 import { MoreError, useTableState } from "@/components/lms/admin/ListParts";
@@ -51,10 +51,11 @@ export default function AdminCoursesPage() {
   ];
   const filtered = !!(q || deleted);
   return (
-    <div>
-      <PageHeader title={t("platformAdmin.courses.title")} breadcrumbs={crumbs({ label: t("platformAdmin.courses.title") })} />
+    <div className={`w-full ${STAFF_WIDTH.list}`}>
+      <PageHeader title={t("platformAdmin.courses.title")} description={t("platformAdmin.courses.subtitle")} breadcrumbs={crumbs({ label: t("platformAdmin.courses.title") })} />
       <Table
         caption={t("platformAdmin.courses.title")}
+        density="compact"
         columns={columns}
         rows={list.items}
         rowKey={(c) => c.id}

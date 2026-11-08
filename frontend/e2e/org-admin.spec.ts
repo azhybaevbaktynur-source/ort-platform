@@ -313,6 +313,98 @@ test("platform admin: the organization's Departments tab and settings", async ({
   await page.context().close();
 });
 
+// ---------------------------------------------------------------- item 4 (ADMIN_ORGS_DESIGN §2.4-2.6, slices C + D)
+/** UX check screens (ru, 375 / 1440 / 1920) only with UX_SCREENS_DIR set. */
+const ITEM4_OUT = process.env.UX_SCREENS_DIR ? path.resolve(process.env.UX_SCREENS_DIR) : null;
+async function item4Shots(page: Page, name: string) {
+  if (!ITEM4_OUT) return;
+  fs.mkdirSync(ITEM4_OUT, { recursive: true });
+  const size = page.viewportSize() ?? VIEWPORTS.desktop;
+  for (const width of [375, 1440, 1920]) {
+    await page.setViewportSize({ width, height: width === 375 ? 812 : 1000 });
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: path.join(ITEM4_OUT, `${name}-ru-${width}.png`), fullPage: true });
+  }
+  await page.setViewportSize(size);
+}
+
+test("platform admin: opens a school as org admin, sees the strip, one audited action has the badge in Log", async ({ browser }) => {
+  const d = data();
+  const page = await as(browser, seed().admin);
+  // Admin → Organizations: type badge and the subtree counts, the Type filter
+  await page.goto("/ru/admin/organizations");
+  const row = page.getByRole("row").filter({ has: page.getByRole("link", { name: "Лицей 61 E2E" }) });
+  await expect(row).toBeVisible();
+  await expect(row.getByText(t("organizations.kind.school"), { exact: true })).toBeVisible();
+  await page.getByLabel(t("organizations.admin.kind")).selectOption("platform");
+  await expect(page.getByRole("link", { name: "Лицей 61 E2E" })).toHaveCount(0);
+  await expect(page.getByRole("row").filter({ hasText: t("organizations.kind.platform") }).first()).toBeVisible();
+  await page.getByLabel(t("organizations.admin.kind")).selectOption("");
+  await expect(page.getByRole("link", { name: "Лицей 61 E2E" })).toBeVisible();
+  await item4Shots(page, "admin-orgs-list");
+
+  // the platform organization is protected: a note, no Suspend in "⋯"
+  const platformOrgs = await api(seed().admin, "GET", "/platform/organizations?kind=platform");
+  await page.goto(`/ru/admin/organizations/${platformOrgs.items[0].id}`);
+  await expect(page.getByText(t("organizations.admin.protectedNote"))).toBeVisible();
+  await page.getByRole("button", { name: t("coursePage.moreActions") }).click();
+  await expect(page.getByRole("menuitem", { name: t("organizations.admin.edit") })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: t("organizations.admin.suspend") })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+
+  // the school: Students tab, the suspend dialog names the affected counts (cancelled), then "Open as org admin"
+  await page.goto(`/ru/admin/organizations/${d.organization_id}`);
+  await expect(page.getByRole("heading", { level: 1, name: "Лицей 61 E2E" })).toBeVisible();
+  await item4Shots(page, "admin-org-detail");
+  await page.getByRole("tab", { name: t("organizations.admin.tabs.students") }).click();
+  await expect(page.getByText(t("organizations.admin.students.note"))).toBeVisible();
+  await page.getByRole("button", { name: t("coursePage.moreActions") }).click();
+  await page.getByRole("menuitem", { name: t("organizations.admin.suspend") }).click();
+  const school = await api(seed().admin, "GET", `/platform/organizations/${d.organization_id}`);
+  await expect(page.getByRole("alertdialog")).toContainText(t("organizations.admin.affected",
+    { courses: school.courses, students: school.students, departments: school.departments }));
+  await page.getByRole("alertdialog").getByRole("button", { name: t("ui.cancel") }).click();
+  await page.getByRole("link", { name: t("organizations.admin.openAsOrgAdmin") }).click();
+  await expect(page).toHaveURL(new RegExp(`/ru/org/${d.organization_id}$`));
+
+  // the org area as platform admin: the strip, the label, no Shared banks, the header's active foreign choice
+  const strip = page.getByTestId("acting-as-platform-admin");
+  await expect(strip).toContainText(t("organizations.org.actingAsPlatformAdmin", { org: "Лицей 61 E2E" }));
+  await expect(page.getByText(t("organizations.org.areaPlatformAdmin")).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: t("sharedBanks.nav") })).toHaveCount(0);
+  await expect(page).toHaveTitle(new RegExp(t("organizations.org.titleSuffix")));
+  await item4Shots(page, "org-as-platform-admin");
+  const header = page.getByRole("navigation", { name: t("shell.areas.label") });
+  await header.getByRole("button", { name: t("shell.areas.organization") }).click();
+  const foreign = page.getByRole("link", { name: t("shell.areas.asPlatformAdmin", { name: "Лицей 61 E2E" }) });
+  await expect(foreign).toBeVisible();
+  await expect(foreign).toHaveAttribute("aria-current", /page|true/);
+  await expect(page.getByRole("link", { name: t("shell.areas.allOrganizations") })).toHaveAttribute("href", "/ru/admin/organizations");
+  await page.keyboard.press("Escape");
+
+  // one audited action: a setting saved from the org area is recorded as the platform admin
+  const before = await api(d.org_admin, "GET", `/org/${d.organization_id}/settings`);
+  await page.goto(`${orgBase()}/settings`);
+  await page.getByRole("switch", { name: t("orgSettings.teachersCanCreate") }).click();
+  await page.getByRole("button", { name: t("orgSettings.save") }).click();
+  await expect(page.getByText(t("orgSettings.saved")).first()).toBeVisible();
+  const logged = await api(seed().admin, "GET",
+    `/platform/audit-log?acting_as=platform_admin&target_type=organization&target_id=${d.organization_id}&action=organization.settings_update`);
+  expect(logged.items.length).toBeGreaterThan(0);
+  expect(logged.items[0].details.acting_as).toBe("platform_admin");
+
+  // the badge in the organization's Log tab
+  await page.getByRole("link", { name: t("organizations.org.actingAsPlatformAdminBack") }).click();
+  await expect(page).toHaveURL(new RegExp(`/ru/admin/organizations/${d.organization_id}$`));
+  await page.getByRole("tab", { name: t("organizations.admin.tabs.log") }).click();
+  await expect(page.getByRole("table").getByText(t("platformAdmin.audit.actingAs")).first()).toBeVisible();
+  // the header no longer shows the foreign organization once the org area is left
+  await page.getByRole("navigation", { name: t("shell.areas.label") }).getByRole("button", { name: t("shell.areas.organization") }).click();
+  await expect(page.getByRole("link", { name: t("shell.areas.asPlatformAdmin", { name: "Лицей 61 E2E" }) })).toHaveCount(0);
+  await page.context().close();
+  await api(d.org_admin, "PATCH", `/org/${d.organization_id}/settings`, { teachers_can_create_courses: before.settings.teachers_can_create_courses });
+});
+
 // ---------------------------------------------------------------- ORT course (design 9): read-only checks
 test("ORT course: People tabs, no form modes, no share entry on the bank", async ({ browser }) => {
   const cid = seed().course_id;
@@ -322,7 +414,7 @@ test("ORT course: People tabs, no form modes, no share entry on the bank", async
   await expect(page.getByRole("tab", { name: t("studentInvite.tabs.invitations") })).toBeVisible();
   await expect(page.getByRole("tab", { name: t("studentInvite.tabs.applications") })).toHaveCount(0);
   await uxShots(page, SHOTS, "ort-people-tabs", ["ru"]);
-  await page.goto(`/ru/courses/${cid}/settings`);
+  await page.goto(`/ru/courses/${cid}/settings?section=enrollment`); // FB8-5 S3: the Enrollment section
   // form modes are listed but cannot be chosen (with the template lock note); the server refuses them too
   await expect(page.getByText(t("enrollmentForm.settings.ortNote"))).toBeVisible(); // the settings form is loaded
   const formModes = await page.locator("#s-mode option").evaluateAll((os) => (os as HTMLOptionElement[])

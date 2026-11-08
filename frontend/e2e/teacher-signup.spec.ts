@@ -247,15 +247,22 @@ test("the admin reads the application and approves it; the header changes", asyn
 
   const admin = await as(browser, seed().admin);
   await admin.goto("/ru/admin/teacher-requests");
-  const card = admin.getByRole("listitem").filter({ hasText: user.email });
-  await expect(card.getByRole("link", { name: user.name })).toBeVisible();
-  for (const text of [user.email, "Лицей 7", "Математика", "+996 700 111 222", "Преподаю пять лет."]) await expect(card.getByText(text)).toBeVisible();
-  await expect(card.getByText(t("platformAdmin.requests.teachesAt"))).toHaveCount(0);
+  // FB8-5 S6: a compact table; the row shows name, school and subject, the rest opens in a sheet
+  const card = admin.getByRole("row").filter({ hasText: user.email });
+  await expect(card.getByRole("button", { name: user.name })).toBeVisible();
+  for (const text of [user.email, "Лицей 7", "Математика"]) await expect(card.getByText(text)).toBeVisible();
+  await card.getByRole("button", { name: user.name }).click();
+  const sheet = admin.getByRole("dialog");
+  for (const text of ["+996 700 111 222", "Преподаю пять лет."]) await expect(sheet.getByText(text)).toBeVisible();
+  await expect(sheet.getByText(t("platformAdmin.requests.teachesAt"))).toHaveCount(0);
+  await sheet.getByRole("button", { name: t("ui.close") }).click();
 
   // a school teacher who applies: the queue says where they teach, and nothing was cancelled
-  const school = admin.getByRole("listitem").filter({ hasText: d.school_teacher.email });
-  await expect(school.getByText(t("platformAdmin.requests.teachesAt"))).toBeVisible();
-  await expect(school.getByText(d.school_name)).toBeVisible();
+  const school = admin.getByRole("row").filter({ hasText: d.school_teacher.email });
+  await school.getByRole("button", { name: d.school_teacher.name }).click();
+  await expect(sheet.getByText(t("platformAdmin.requests.teachesAt"))).toBeVisible();
+  await expect(sheet.getByText(d.school_name)).toBeVisible();
+  await sheet.getByRole("button", { name: t("ui.close") }).click();
 
   await card.getByRole("button", { name: t("platformAdmin.requests.approve") }).click();
   await expect(card).toHaveCount(0);
@@ -323,7 +330,8 @@ test("roster import from People, for this course and its students; only where it
   const d = data();
   const page = await as(browser, d.independent);
   await page.goto(`/ru/courses/${d.independent_course_id}/people`);
-  await page.getByRole("link", { name: t("rosterImport.title") }).click();
+  await page.getByRole("button", { name: t("coursePage.moreActions") }).click();
+  await page.getByRole("menuitem", { name: t("rosterImport.title") }).click();
   await expect(page).toHaveURL(new RegExp(`/courses/${d.independent_course_id}/people/roster-import$`));
   await expect(page.getByRole("heading", { level: 1, name: t("rosterImport.title") })).toBeVisible();
   await expect(page.getByText(t("rosterImport.courseIntro", { course: "Мой курс E2E" }))).toBeVisible();
@@ -345,12 +353,12 @@ test("roster import from People, for this course and its students; only where it
   const teacher = await as(browser, school.maths);
   await teacher.goto(`/ru/courses/${school.maths_course_id}/people`);
   await expect(teacher.getByRole("tab", { name: t("studentInvite.tabs.roster") })).toBeVisible();
-  await expect(teacher.getByRole("link", { name: t("rosterImport.title") })).toHaveCount(0);
+  await expect(teacher.getByRole("button", { name: t("coursePage.moreActions") })).toHaveCount(0);
   await teacher.context().close();
   const admin = await as(browser, seed().admin);
   await admin.goto(`/ru/courses/${seed().course_id}/people`);
   await expect(admin.getByRole("tab", { name: t("studentInvite.tabs.roster") })).toBeVisible();
-  await expect(admin.getByRole("link", { name: t("rosterImport.title") })).toHaveCount(0);
+  await expect(admin.getByRole("button", { name: t("coursePage.moreActions") })).toHaveCount(0);
   await admin.context().close();
 });
 

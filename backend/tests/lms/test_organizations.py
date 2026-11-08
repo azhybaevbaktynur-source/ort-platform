@@ -58,7 +58,7 @@ async def test_org_crud_suspend_resume_audited(db, api):
     r = await api.call(admin, "POST", f"/platform/organizations/{oid}/suspend", json={"reason": "unpaid"})
     assert r.status_code == 200 and r.json()["status"] == "suspended" and r.json()["suspended_reason"] == "unpaid"
     a = _audit(db, "organization.suspend")
-    assert a.reason == "unpaid" and a.details == {"organization_id": oid}
+    assert a.reason == "unpaid" and a.details == {"organization_id": oid, "acting_as": "platform_admin"}
     assert (await api.call(admin, "POST", f"/platform/organizations/{oid}/suspend",
                            json={"reason": "again"})).status_code == 409
     assert (await api.call(admin, "POST", f"/platform/organizations/{oid}/suspend", json={})).status_code == 422
@@ -127,7 +127,8 @@ async def test_template_grant_revoke(db, api):
     r = await api.call(admin, "PUT", f"/platform/organizations/{org.id}/templates/ort")
     assert r.status_code == 200 and r.json()["granted"] is True
     assert _audit(db, "organization.template.grant").details == {"organization_id": str(org.id),
-                                                                  "template_key": "ort"}
+                                                                  "template_key": "ort",
+                                                                  "acting_as": "platform_admin"}
     assert (await api.call(admin, "PUT", f"/platform/organizations/{org.id}/templates/ort")).status_code == 200
     assert (await api.call(admin, "PUT", f"/platform/organizations/{org.id}/templates/nope")).json()["error"][
         "code"] == "unknown_template"
@@ -207,7 +208,7 @@ async def test_me_organizations(db, api):
     add_member(db, a, u, "teacher")
     items = (await api.call(u, "GET", "/me/organizations")).json()["items"]
     assert items == [{"id": str(a.id), "slug": a.slug, "name": "A", "kind": "school", "status": "active", "role": "teacher",
-                      "can_create_courses": False}]
+                      "can_create_courses": False, "template_keys": []}]  # FB8-5 S3: template_keys
     me = (await api.call(u, "GET", "/me/lms")).json()
     assert me["can_create_courses"] is False
     assert me["is_teacher"] is True  # Phase 6 S8: an org teacher sees the Teaching area without creating

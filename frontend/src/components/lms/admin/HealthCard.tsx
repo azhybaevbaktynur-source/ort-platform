@@ -24,8 +24,8 @@ function Row({ ok, label, detail }: { ok: boolean; label: string; detail: string
   );
 }
 
-/** S1: the real health check (database, migrations, email, storage), for the admin overview. */
-export function HealthCard() {
+/** S1: the real health check (database, migrations, email, storage); FB8-5 S4: on its own page, /admin/health. */
+export function HealthCard({ className, heading = true }: { className?: string; heading?: boolean }) {
   const { t } = useTranslation();
   const [health, setHealth] = useState<PlatformHealth | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -45,7 +45,8 @@ export function HealthCard() {
 
   const yesNo = (v: boolean) => (v ? t("platformAdmin.yes") : t("platformAdmin.no"));
   return (
-    <Card className="mt-6" title={t("adminHealth.title")} description={t("adminHealth.description")}
+    <Card className={className} title={heading ? t("adminHealth.title") : undefined}
+      description={heading ? t("adminHealth.description") : undefined}
       actions={
         <span className="flex items-center gap-2">
           {health && <Badge tone={health.ok ? "success" : "warning"}>{health.ok ? t("adminHealth.allOk") : t("adminHealth.needsAttention")}</Badge>}

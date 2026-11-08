@@ -131,6 +131,19 @@ class SummaryOut(BaseModel):
     storage_level: str  # UX rework 2: the overview's two cards come from one answer
 
 
+class OverviewOut(BaseModel):
+    """FB8-5 S4: the admin overview's metrics and attention items (cached 60 s; D-FB8-5-4)."""
+    users_total: int
+    active_students_7d: int
+    pro_active: int
+    attempts_submitted_7d: int
+    pending_teacher_requests: int
+    storage_level: str
+    reveals_last_hour: int
+    reveal_alert: bool
+    computed_at: datetime
+
+
 class ApproveIn(BaseModel):
     note: Optional[str] = Field(default=None, max_length=500)
 

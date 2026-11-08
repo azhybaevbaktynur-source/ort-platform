@@ -115,7 +115,8 @@ async def test_join_as_teacher_audited_and_in_roster(db, api):
     ev = db.execute(select(EnrollmentEvent).where(EnrollmentEvent.enrollment_id == enr.id)).scalar_one()
     assert ev.event == "staff_added" and ev.details["organization_id"] == str(org.id)
     log = db.execute(select(AdminAuditLog).where(AdminAuditLog.action == "org_admin_joined_course")).scalar_one()
-    assert log.details == {"organization_id": str(org.id), "course_id": str(course.id)} and log.actor_id == oa.id
+    assert log.details == {"organization_id": str(org.id), "course_id": str(course.id),
+                           "acting_as": "org_admin"} and log.actor_id == oa.id
     people = (await api.call(owner, "GET", f"/courses/{course.id}/people")).json()["items"]
     assert any(x["user"]["id"] == oa.id and x["source"] == "org_admin_self" for x in people)
     # full teacher powers now

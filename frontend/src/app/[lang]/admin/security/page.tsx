@@ -11,7 +11,7 @@ import { fmtApiDateTimeShort } from "@/lib/format";
 import {
   confirmMfa, getMfaStatus, logoutEverywhere, regenerateRecoveryCodes, startMfaSetup, type MfaSetup, type MfaStatus,
 } from "@/lib/lms/security";
-import { Badge, Button, Card, ConfirmDialog, Input, LoadingState, PageHeader } from "@/components/ui";
+import { Badge, Button, Card, ConfirmDialog, Input, LoadingState, PageHeader, STAFF_WIDTH } from "@/components/ui";
 import { useAdminCrumbs, useAdminSummary } from "@/components/lms/admin/AdminShell";
 import { RecoveryCodes } from "@/components/lms/admin/RecoveryCodes";
 import { LoadError, OrgError } from "@/components/lms/org/OrgUi";
@@ -135,7 +135,7 @@ export default function AdminSecurityPage() {
   if (!status) return <LoadingState label={t("lms.common.loading")} />;
 
   return (
-    <div>
+    <div className={`w-full ${STAFF_WIDTH.list}`}>
       <PageHeader title={title} description={t("adminSecurity.description")} breadcrumbs={crumbs({ label: title })}
         badge={status.enabled
           ? <Badge tone="success">{t("adminSecurity.badgeOn")}</Badge>

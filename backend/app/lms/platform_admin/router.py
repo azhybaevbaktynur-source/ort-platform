@@ -21,6 +21,8 @@ from app.lms.platform_admin.schemas import AdminAttemptOut, PasswordResetSentOut
 from app.lms.email_change import service as email_change  # S4
 from app.lms.email_change.schemas import AdminEmailChangeIn  # S4
 from app.lms.platform_admin.health import PlatformHealthOut, platform_health
+from app.lms.platform_admin import overview as overview_service  # FB8-5 S4
+from app.lms.platform_admin.schemas import OverviewOut  # FB8-5 S4
 from app.lms.teachers import purge as teacher_purge
 from app.lms.teachers import service as teacher_service
 from app.lms.teachers.models import TeacherRequest
@@ -33,6 +35,12 @@ router = APIRouter()
 def summary(admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
     return SummaryOut(pending_teacher_requests=us.pending_request_count(db),
                       storage_level=usage.level(usage.stored_totals(db)[0]))
+
+
+@router.get("/overview", response_model=OverviewOut)
+def overview(admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
+    """FB8-5 S4: the overview page's numbers; 60 s per-process cache (`platform_admin/overview.py`)."""
+    return overview_service.overview(db)
 
 
 @router.get("/teacher-requests", response_model=PageOut[TeacherRequestAdminOut])
@@ -150,8 +158,9 @@ def health(admin: User = Depends(require_platform_admin), db: Session = Depends(
 def audit_log(
     actor_id: Optional[str] = None, action: Optional[str] = None, target_type: Optional[str] = None,
     target_id: Optional[str] = None, cursor: Optional[str] = None, limit: Optional[int] = Query(None),
+    acting_as: Optional[Literal["org_admin", "platform_admin"]] = None,  # item 4: details.acting_as
     admin: User = Depends(require_platform_admin), db: Session = Depends(get_db),
 ):
-    page = paginate(us.audit_stmt(actor_id, action, target_type, target_id), db,
+    page = paginate(us.audit_stmt(actor_id, action, target_type, target_id, acting_as), db,
                     sort_col=AdminAuditLog.created_at, id_col=AdminAuditLog.id, cursor=cursor, limit=limit)
     return PageOut(items=[us.audit_out(db, r) for r in page.items], next_cursor=page.next_cursor)

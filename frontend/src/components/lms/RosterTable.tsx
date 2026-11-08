@@ -4,8 +4,7 @@ import React from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import type { CourseRole, RosterEntryOut } from "@/lib/lms/types";
 import { fmtApiDate } from "@/lib/format";
-import { Badge, type BadgeTone, type PaginationProps, Table, cn } from "@/components/ui";
-import { fieldBase } from "@/components/ui/utils";
+import { Badge, type BadgeTone, type PaginationProps, Table } from "@/components/ui";
 import { OutlineMenu } from "@/components/lms/modules/OutlineMenu";
 
 const ROLE_TONE: Record<string, BadgeTone> = { teacher: "info", assistant: "neutral", student: "neutral" };
@@ -46,6 +45,7 @@ export function RosterTable({
       rowKey={(e) => e.enrollment_id}
       countText={countText}
       pagination={pagination}
+      density="compact"
       columns={[
         {
           key: "name", header: t("courses.people.name"), primary: true,
@@ -59,17 +59,7 @@ export function RosterTable({
         { key: "email", header: t("courses.people.email"), cell: (e) => <span className="break-all text-slate-700">{e.user.email}</span>, mobilePriority: 0 },
         {
           key: "role", header: t("courses.people.role"), mobilePriority: 1,
-          cell: (e) => canChangeRole(e) ? (
-            <select aria-label={`${t("courses.people.changeRole")}: ${name(e)}`} value={e.role} disabled={busyId === e.enrollment_id}
-              onChange={(ev) => onChangeRole(e, ev.target.value as CourseRole)}
-              className={cn(fieldBase, "min-h-11 w-auto border-slate-300 py-1.5 pr-8 sm:min-h-9")}>
-              {roleOptions(e).map((r) => (
-                <option key={r} value={r}>{t(`courses.roles.${r}`)}</option>
-              ))}
-            </select>
-          ) : (
-            <Badge tone={ROLE_TONE[e.role] ?? "neutral"}>{t(`courses.roles.${e.role}`)}</Badge>
-          ),
+          cell: (e) => <Badge tone={ROLE_TONE[e.role] ?? "neutral"}>{t(`courses.roles.${e.role}`)}</Badge>,
         },
         {
           key: "state", header: t("courses.people.state"), mobilePriority: 2,
@@ -79,13 +69,23 @@ export function RosterTable({
         },
         { key: "since", header: t("courses.people.since"), nowrap: true, mobilePriority: 3, cell: (e) => fmt(e.state === "removed" ? e.removed_at : e.activated_at) },
         // The actions column only when some row can be removed (no empty action rows in the phone cards).
-        ...(entries.some(canRemove) ? [{
+        ...(entries.some((e) => canRemove(e) || canChangeRole(e)) ? [{
           key: "actions", header: "", actions: true, align: "right" as const,
-          cell: (e: RosterEntryOut) => canRemove(e) ? (
-            <OutlineMenu label={t("modules.editor.actionsFor", { title: name(e) })} disabled={busyId === e.enrollment_id}
-              groups={[{ id: "person", items: [{ id: "remove", label: t("courses.people.remove"), danger: true }] }]}
-              onSelect={() => onRemove(e)} />
-          ) : null,
+          cell: (e: RosterEntryOut) => {
+            const roleItems = canChangeRole(e)
+              ? roleOptions(e).filter((r) => r !== e.role).map((r) => ({ id: `role:${r}`, label: `${t("courses.people.changeRole")}: ${t(`courses.roles.${r}`)}` }))
+              : [];
+            const groups = [
+              ...(roleItems.length ? [{ id: "role", items: roleItems }] : []),
+              ...(canRemove(e) ? [{ id: "person", items: [{ id: "remove", label: t("courses.people.remove"), danger: true }] }] : []),
+            ];
+            if (!groups.length) return null;
+            return (
+              <OutlineMenu className="sm:-my-2" label={t("modules.editor.actionsFor", { title: name(e) })} disabled={busyId === e.enrollment_id}
+                groups={groups}
+                onSelect={(id) => (id === "remove" ? onRemove(e) : onChangeRole(e, id.slice(5) as CourseRole))} />
+            );
+          },
         }] : []),
       ]}
     />

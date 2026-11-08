@@ -15,7 +15,7 @@ import { ArrowRight, CheckCircle2, ChevronDown, Circle, CircleDot, Lock, PartyPo
 import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
 import { getModules, recordView, setDone } from "@/lib/lms/modules";
-import { templateUi } from "@/lib/lms/templates";
+import { isExamShellCourse } from "@/lib/lms/templates";
 import { isStaffModules, type ItemStudentOut, type ModuleStudentOut, type ModulesStudentOut } from "@/lib/lms/modulesTypes";
 import { useCourse } from "@/components/lms/CourseContext";
 import { CourseCardCover } from "@/components/lms/course/CourseCardCover";
@@ -74,14 +74,14 @@ export function KindMeta({ item, locked, className }: { item: ItemStudentOut; lo
   // row) shows the duration only, never a guessed "Ссылка"
   if (isAccessLocked(item) || (locked && item.kind === "url")) {
     return duration
-      ? <span className={cn("inline-flex shrink-0 whitespace-nowrap text-sm leading-5 tabular-nums text-slate-600", className)}>{duration}</span>
+      ? <span className={cn("inline-flex shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-0.5 text-sm leading-5 tabular-nums text-slate-600", className)}>{duration}</span>
       : null;
   }
   const icon = video
     ? <PlayCircle aria-hidden="true" className={cn("h-4 w-4 shrink-0", locked ? "text-slate-400" : "text-brand-600")} />
     : <ItemKindIcon kind={item.kind} assignmentKind={item.link?.assignment_kind ?? null} className={cn("h-4 w-4", locked ? "text-slate-400" : "text-slate-500")} />;
   return (
-    <span className={cn("inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm leading-5 text-slate-600", className)}>
+    <span className={cn("inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-0.5 text-sm leading-5 text-slate-600", className)}>
       {icon}
       {duration ? <><span className="sr-only">{kind}, </span><span className="tabular-nums">{duration}</span></> : <span>{kind}</span>}
     </span>
@@ -205,7 +205,7 @@ function ModuleSection({ mod, number, lessons, open, onToggle, ctx }: {
   const headingId = `module-${mod.id}-title`;
   return (
     <section id={`module-${mod.id}`} aria-labelledby={headingId} className="scroll-mt-20 overflow-hidden rounded-card border border-slate-200 bg-white">
-      <header className="flex flex-wrap items-start gap-x-3 gap-y-1 px-4 py-3 sm:px-5">
+      <header className="flex flex-wrap items-start gap-x-3 gap-y-1 px-4 py-3.5 sm:px-5">
         <h3 id={headingId} className="min-w-0 flex-1 basis-48">
           <button type="button" onClick={onToggle} aria-expanded={open} aria-controls={listId}
             className={cn("flex min-h-11 w-full items-center gap-2 rounded-control text-left text-base font-semibold leading-6 text-slate-900", focusRing, "focus-visible:ring-offset-0")}>
@@ -217,9 +217,12 @@ function ModuleSection({ mod, number, lessons, open, onToggle, ctx }: {
         <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 pl-14 sm:min-h-11 sm:pl-0">
           {pro && <ProChip />}
           {total > 0 && (
-            <span className="text-sm leading-6 text-slate-600">
-              <span className="tabular-nums">{t("modules.overview.moduleDone", { done, total })}</span>
-              {duration && <> · <span className="tabular-nums">{duration}</span></>}
+            <span className="flex flex-wrap items-center gap-2 text-sm leading-5 text-slate-600">
+              <span className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 tabular-nums", done === total ? "bg-success-50 text-success-800" : "bg-slate-100")}>
+                {done === total && <CheckCircle2 aria-hidden="true" className="h-4 w-4 shrink-0" />}
+                {t("modules.overview.moduleDone", { done, total })}
+              </span>
+              {duration && <span className="rounded-full bg-slate-100 px-2.5 py-0.5 tabular-nums">{duration}</span>}
             </span>
           )}
           {mod.state && (mod.state === "locked" || hasReq) && <ModuleStateBadge state={mod.state} />}
@@ -448,24 +451,33 @@ export function StudentSyllabus() {
     },
   };
 
-  const examPrep = templateUi(course).studentLayout === "exam_prep";
+  const examPrep = isExamShellCourse(course); // TEACHER_TO_STUDENT_MAP §2.5: attached lesson courses too
+  // TEACHER_TO_STUDENT_MAP §2.5: a lesson course attached to an exam is named by its own title (the overview's empty state)
+  const lessonCourse = course.exam_course_id != null;
   const early = error && !data
     ? <ErrorState message={errorText(error)} onRetry={() => void load()} retrying={loading} />
     : !data
       ? <LoadingState rows={4} />
       : data.modules.length === 0
-        ? <EmptyState mascot="reading" title={t("modules.emptyStudentTitle")} description={t("modules.emptyStudentBody")} />
+        ? lessonCourse
+          ? <EmptyState mascot="reading" title={t("modules.overview.emptyTitle")} description={t("modules.overview.emptyBody")} />
+          : <EmptyState mascot="reading" title={t("modules.emptyStudentTitle")} description={t("modules.emptyStudentBody")} />
         : null;
   // exam-prep courses: the course layout shows no course header here, the banner names the page
   if (early || !data) {
     return (
       <div className="flex w-full flex-col gap-4">
-        {examPrep && (
+        {examPrep && (lessonCourse ? (
+          <header>
+            <p className="text-sm font-medium leading-5 text-brand-700">{t("student.nav.lessons")}</p>
+            <h1 className={cn(STUDENT_TITLE, "mt-0.5")}>{pickLocalized(course.title, lang, course.default_language) || t("courses.list.untitled")}</h1>
+          </header>
+        ) : (
           <header>
             <h1 className={STUDENT_TITLE}>{t("student.nav.lessons")}</h1>
             <p className={STUDENT_SUBTITLE}>{pickLocalized(course.title, lang, course.default_language)}</p>
           </header>
-        )}
+        ))}
         {early}
       </div>
     );

@@ -11,7 +11,7 @@ import {
 import { StorageLevelBanner } from "@/components/lms/admin/StorageLevelBanner";
 import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
 import { LoadError, OrgError } from "@/components/lms/org/OrgUi";
-import { Button, Card, LoadingState, PageHeader } from "@/components/ui";
+import { Button, Card, LoadingState, PageHeader, STAFF_WIDTH } from "@/components/ui";
 
 function Check({ ok, label }: { ok: boolean; label: string }) {
   const { t } = useTranslation();
@@ -73,8 +73,8 @@ export default function AdminStoragePage() {
   const pct = summary ? Math.min(100, Math.round((summary.stored_bytes / summary.hard_bytes) * 100)) : 0;
 
   return (
-    <div>
-      <PageHeader title={t("storage.title")} breadcrumbs={crumbs({ label: t("storage.nav") })} />
+    <div className={`w-full ${STAFF_WIDTH.list}`}>
+      <PageHeader title={t("storage.title")} description={t("storage.subtitle")} breadcrumbs={crumbs({ label: t("storage.nav") })} />
       {error && !summary ? <LoadError error={error} onRetry={() => void load()} /> : null}
       {error && summary ? <OrgError error={error} onRetry={() => void load()} className="mb-4" /> : null}
       {!summary && !error ? <LoadingState label={t("lms.common.loading")} /> : null}

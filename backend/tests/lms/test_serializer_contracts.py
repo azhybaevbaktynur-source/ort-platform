@@ -30,7 +30,8 @@ def test_declared_key_sets():
                                                   "home_kind", "home_page_id", "features",  # Phase 8a (5.5, 8.2)
                                                   "exam_date",  # Exam prep S2: exam-prep courses only
                                                   "cover_url",  # F7a: the course page banner
-                                                  "is_platform_course"}  # F7: a public course fact (as on the card)
+                                                  "is_platform_course",  # F7: a public course fact (as on the card)
+                                                  "exam_course_id"}  # TEACHER_TO_STUDENT_MAP 2.3: the lesson's exam
     assert set(CourseStaffOut.model_fields) == set(CourseStudentOut.model_fields) | {
         "join_code", "enrollment_mode", "enrollment_limit", "visibility", "unlisted_by_admin",
         "active_student_count", "owner", "is_owner", "created_at", "updated_at", "published_at", "concluded_at",

@@ -7,7 +7,7 @@ import { listUsers } from "@/lib/lms/admin";
 import type { AdminUserOut, TeacherStatus } from "@/lib/lms/types";
 import { isSystemAccount } from "@/lib/lms/organizations";
 import { fmtApiDate } from "@/lib/format";
-import { Checkbox, EmptyState, FilterBar, PageHeader, Select, Table, type TableColumn } from "@/components/ui";
+import { Checkbox, EmptyState, FilterBar, PageHeader, STAFF_WIDTH, Select, Table, type TableColumn } from "@/components/ui";
 import { UserStatusBadge } from "@/components/lms/admin/UserStatusBadge";
 import { SystemAccountBadge } from "@/components/lms/org/OrgUi";
 import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
@@ -71,10 +71,11 @@ export default function AdminUsersPage() {
   ];
   const filtered = !!(q || status || disabledOnly || unverified || adminsOnly || withAccess);
   return (
-    <div>
-      <PageHeader title={t("platformAdmin.users.title")} breadcrumbs={crumbs({ label: t("platformAdmin.users.title") })} />
+    <div className={`w-full ${STAFF_WIDTH.list}`}>
+      <PageHeader title={t("platformAdmin.users.title")} description={t("platformAdmin.users.subtitle")} breadcrumbs={crumbs({ label: t("platformAdmin.users.title") })} />
       <Table
         caption={t("platformAdmin.users.title")}
+        density="compact"
         columns={columns}
         rows={list.items}
         rowKey={(u) => u.id}

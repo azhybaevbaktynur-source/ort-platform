@@ -236,7 +236,7 @@ export function FormBuilder({ course }: { course: CourseStaffOut }) {
   const base = `/${lang}/courses/${course.id}`;
   const header = (
     <PageHeader title={t("enrollmentForm.title")} className="mb-4"
-      breadcrumbs={[{ label: t("courses.settings.tab"), href: `${base}/settings` }, { label: t("enrollmentForm.title") }]}
+      breadcrumbs={[{ label: t("courses.settings.tab"), href: `${base}/settings?section=enrollment` }, { label: t("enrollmentForm.title") }]}
       badge={form ? <Badge tone={statusTone(form.status)}>{t(`enrollmentForm.status.${form.status}`)}</Badge> : undefined}
       description={form ? t("enrollmentForm.versionN", { n: form.version }) : undefined}
       // Phase 9 UX: "Delete draft" moved here from the sticky bar (8c pattern: a "More actions" menu in the header)

@@ -14,7 +14,7 @@ import { Pager } from "@/components/lms/Pager";
 import { RosterTable } from "@/components/lms/RosterTable";
 // --- Phase 6b S5c: staff people tab on the design system ---
 import { useListCount } from "@/components/lms/course/StaffCourseUi";
-import { Button, ConfirmDialog, EmptyState, Input, LinkButton, LoadingState, PageHeader, SearchInput, Select } from "@/components/ui";
+import { Button, ConfirmDialog, EmptyState, Input, LinkButton, LoadingState, PageHeader, STAFF_WIDTH, SearchInput, Select } from "@/components/ui";
 // --- Phase 6b S5c end ---
 // --- Phase 6 S4b: invite staff without an account ---
 import { createCourseStaffInvitation } from "@/lib/lms/invitations";
@@ -24,6 +24,7 @@ import { OrgError } from "@/components/lms/org/OrgUi";
 import { AccommodationsSection } from "@/components/lms/accommodations/AccommodationsSection"; // Phase 7a S5
 // --- Phase 9 S3: People tabs (Roster · Invitations · Applications), invite students by email ---
 import { FileUp, UserPlus } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { pickLocalized } from "@/lib/lms/localized";
 import { PeopleTabs, type PeopleTab } from "@/components/lms/people/PeopleTabs";
 import { InviteStudentsDialog } from "@/components/lms/people/InviteStudentsDialog";
@@ -76,6 +77,7 @@ function StaffList({ courseId }: { courseId: string }) {
 
 export default function PeoplePage() {
   const { lang, t } = useTranslation();
+  const router = useRouter();
   const { course } = useCourse();
   const { me } = useLmsMe();
   const staff = isStaffCourse(course);
@@ -277,23 +279,20 @@ export default function PeoplePage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 w-full ${STAFF_WIDTH.list}`}>
       {/* Phase 6b S5c: PageHeader, add-staff card with design-system fields, roster Table with phone cards (UX T2). */}
       {/* Phase 9 S3: "Invite students" is the page's primary action; the content sits in tabs. */}
-      <PageHeader title={t("courses.people.tab")} className="mb-2"
+      <PageHeader title={t("courseNav.students")} className="mb-2"
         primaryAction={canManage && course.status !== "concluded" ? inviteButton : undefined}
-        secondaryActions={course.can_import_roster ? (
-          <LinkButton variant="secondary" href={`/${lang}/courses/${course.id}/people/roster-import`} leftIcon={<FileUp aria-hidden="true" className="h-4 w-4" />}>
-            {t("rosterImport.title")}
-          </LinkButton>
-        ) : undefined} />
+        overflow={course.can_import_roster ? [{ id: "more", items: [{ id: "rosterImport", label: t("rosterImport.title"), icon: <FileUp aria-hidden="true" className="h-4 w-4" /> }] }] : undefined}
+        onOverflow={(id) => { if (id === "rosterImport") router.push(`/${lang}/courses/${course.id}/people/roster-import`); }} />
       {/* UX rework D: the join code (it was in the Course page's To do panel). Teachers and assistants; settings for teachers. */}
       {(isTeacher || myRole === "assistant") && !course.my_enrollment.read_only && course.join_code && (
         <section aria-labelledby="people-join-code" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-slate-200 bg-white px-4 py-3">
           <h2 id="people-join-code" className="text-sm font-semibold text-slate-800">{t("courses.settings.joinCode")}</h2>
           <JoinCodeDisplay code={course.join_code} />
           {isTeacher && (
-            <Link href={`/${lang}/courses/${course.id}/settings`} className="inline-flex min-h-11 items-center rounded text-sm font-medium text-brand-700 underline-offset-2 hover:underline sm:min-h-0">
+            <Link href={`/${lang}/courses/${course.id}/settings?section=enrollment`} className="inline-flex min-h-11 items-center rounded text-sm font-medium text-brand-700 underline-offset-2 hover:underline sm:min-h-0">
               {t("teaching.manageEnrollment")}
             </Link>
           )}

@@ -3,7 +3,7 @@
 import React, { useCallback, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { fmtApiDate } from "@/lib/format";
-import { Badge, Button, ConfirmDialog, EmptyState, PageHeader, Select, TabPanel, Table, Tabs, toast, type TableColumn } from "@/components/ui";
+import { Badge, Button, ConfirmDialog, EmptyState, PageHeader, STAFF_WIDTH, Select, TabPanel, Table, Tabs, toast, type TableColumn } from "@/components/ui";
 import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
 import { useCursorList } from "@/components/lms/admin/useCursorList";
 import { MoreError, useTableState } from "@/components/lms/admin/ListParts";
@@ -75,12 +75,12 @@ export default function AdminPrivacyPage() {
 
   const tabsId = "privacy-requests";
   return (
-    <div>
-      <PageHeader title={t("privacy.admin.title")} breadcrumbs={crumbs({ label: t("privacy.admin.title") })} />
+    <div className={`w-full ${STAFF_WIDTH.list}`}>
+      <PageHeader title={t("privacy.admin.title")} description={t("privacy.admin.subtitle")} breadcrumbs={crumbs({ label: t("privacy.admin.title") })} />
       <Tabs id={tabsId} label={t("privacy.admin.filter")} value={filter} onChange={(v) => setFilter(v as (typeof FILTERS)[number])}
         items={FILTERS.map((f) => ({ id: f, label: t(`privacy.admin.filters.${f}`) }))} />
       <TabPanel tabsId={tabsId} value={filter}>
-        <Table caption={t("privacy.admin.title")} columns={columns} rows={list.items} rowKey={(r) => r.id} {...state}
+        <Table caption={t("privacy.admin.title")} density="compact" columns={columns} rows={list.items} rowKey={(r) => r.id} {...state}
           empty={<EmptyState variant="plain" title={t("privacy.admin.empty")} />} />
         <MoreError list={list} />
       </TabPanel>

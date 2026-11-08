@@ -12,7 +12,6 @@ import {
 import { Badge, Card, EmptyState, ErrorState, PageHeader, Select, Skeleton, Switch, Table, toast, type TableColumn } from "@/components/ui";
 import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
 import { useErrorText } from "@/components/lms/home/useErrorText";
-import { AccessTabs } from "@/components/lms/access/AdminAccessUi";
 
 export default function AdminPaidExamsPage() {
   const { lang, t } = useTranslation();
@@ -76,9 +75,8 @@ export default function AdminPaidExamsPage() {
     ...(courses ?? []).map((c) => ({ value: c.id, label: pickLocalized(c.title, lang) }))];
   return (
     <div>
-      <PageHeader title={t("access.admin.title")} description={t("access.admin.description")}
-        breadcrumbs={crumbs({ label: t("access.admin.nav"), href: `/${lang}/admin/access` }, { label: t("access.admin.tabs.exams") })} />
-      <AccessTabs />
+      <PageHeader title={t("access.admin.pages.exams")} description={t("access.admin.subtitles.exams")}
+        breadcrumbs={crumbs({ label: t("access.admin.pages.exams") })} />
       <p className="mb-4 max-w-3xl text-sm leading-5 text-slate-700">{t("access.admin.exams.hint")}</p>
       <Table caption={t("access.admin.exams.title")} columns={columns} rows={items} rowKey={(e) => e.id}
         search={

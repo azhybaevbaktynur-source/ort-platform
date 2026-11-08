@@ -366,6 +366,8 @@ export const LMS_ERROR_CODES = [
   "password_incorrect", "email_taken", "email_same", "email_change_invalid", "email_change_expired",
   "email_change_conflict", "email_send_failed", "user_deleted", "target_is_platform_admin", "reset_cooldown",
   "email_change_not_found",
+  // TEACHER_TO_STUDENT_MAP §2.2: the exam link of a lesson course
+  "exam_link_forbidden", "exam_link_not_allowed", "exam_link_target_invalid",
 ] as const;
 export type LmsErrorCode = (typeof LMS_ERROR_CODES)[number];
 
@@ -432,6 +434,16 @@ export interface CourseUpdateIn {
 /** Exam prep S2: the course's exam date (ISO date), only on exam-prep courses. */
 export interface CourseStudentOut {
   exam_date?: string | null;
+}
+
+// TEACHER_TO_STUDENT_MAP §2.2, §2.3: a lesson course attached to an exam-prep course (platform courses only; set by a
+// platform admin). Optional: an older backend has no link.
+export interface CourseStudentOut {
+  exam_course_id?: string | null;
+}
+export interface CourseUpdateIn {
+  /** Platform admin, platform lesson course; null clears it. */
+  exam_course_id?: string | null;
 }
 // --- Phase 8a S4a end ---
 

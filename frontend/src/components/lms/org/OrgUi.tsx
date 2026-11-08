@@ -72,7 +72,15 @@ export function OrgBadge({ tone, labelKey }: { tone: string; labelKey: string })
   return <Badge tone={TONE[tone] ?? "neutral"}>{t(labelKey)}</Badge>;
 }
 
-const COURSE_TONE: Record<string, BadgeTone> = { draft: "warning", published: "success", concluded: "neutral" };
+const KIND_TONE: Record<string, BadgeTone> = { school: "info", personal: "neutral", platform: "system", department: "neutral" };
+
+/** Item 4: the organization's type (School / Personal / Platform / Department) as a text badge. */
+export function OrgKindBadge({ kind }: { kind: string }) {
+  const { t } = useTranslation();
+  return <Badge tone={KIND_TONE[kind] ?? "neutral"}>{t(`organizations.kind.${kind}`)}</Badge>;
+}
+
+const COURSE_TONE: Record<string, BadgeTone> ={ draft: "warning", published: "success", concluded: "neutral" };
 
 /** Course status (draft / published / concluded) on the design-system `Badge`. */
 export function CourseStatusBadge({ status }: { status: string }) {

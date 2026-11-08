@@ -299,3 +299,47 @@ async def test_usage_by_department(db, api):
     r = await api.call(w.aD, "GET", f"/org/{w.D.id}/usage")
     assert r.json()["courses"] == 1 and [d["name"] for d in r.json()["by_department"]] == ["S"]
     assert (await api.call(w.aR, "GET", f"/org/{w.R.id}")).json()["usage"]["courses"] == 2
+
+
+# ------------------------------------------------------------------ fb8 review fix 1: every tab is tree-aware
+
+def _org_admin_get_paths():
+    from app.core.route_inventory import ROUTE_POLICIES
+
+    prefix = "/api/v1/org/{organization_id}"
+    paths = sorted(p.replace("/api/v1", "", 1) for (m, p), pol in ROUTE_POLICIES.items()
+                   if m == "GET" and pol.startswith("org_admin") and p.startswith(prefix) and p.count("{") == 1)
+    assert {"/org/{organization_id}/members", "/org/{organization_id}/analytics/overview"} <= set(paths), paths
+    return paths
+
+
+async def test_ancestor_admin_reads_every_department_tab_not_the_other_way(db, api):
+    w = world(db)
+    paths = _org_admin_get_paths()
+    for org in (w.D, w.S):
+        for p in paths:
+            r = await api.call(w.aR, "GET", p.replace("{organization_id}", str(org.id)))
+            assert r.status_code == 200, (org.name, p, r.text)
+    for user, org in ((w.aD, w.R), (w.aD, w.D2), (w.aX, w.D), (w.tD, w.D)):
+        for p in paths:
+            r = await api.call(user, "GET", p.replace("{organization_id}", str(org.id)))
+            assert r.status_code in (403, 404), (org.name, p, r.status_code)  # invitations: 403 (own policy)
+
+
+async def test_ancestor_admin_assigns_an_owner_with_org_admin_audit(db, api):
+    w = world(db)
+    body = {"title": {"en": "In S"}, "languages": ["en"], "default_language": "en"}
+    tS = make_user(db)
+    add_member(db, w.S, tS, "teacher")
+    r = await api.call(w.aR, "POST", f"/org/{w.S.id}/courses", json={**body, "owner_id": tS.id})
+    assert r.status_code == 201, r.text
+    row = next(a for a in _audit(db, "organization.course.create") if a.target_id == r.json()["id"])
+    assert row.details["acting_as"] == "org_admin" and row.details["owner_id"] == tS.id
+    # the same through POST /courses with organization_id (the `_resolve_creation` check itself)
+    r = await api.call(w.aR, "POST", "/courses", json={**body, "organization_id": str(w.S.id), "owner_id": tS.id})
+    assert r.status_code == 201, r.text
+    # the department admin can neither create in nor assign an owner in the parent school
+    r = await api.call(w.aD, "POST", f"/org/{w.R.id}/courses", json=body)
+    assert r.status_code == 404, r.text
+    r = await api.call(w.aD, "POST", "/courses", json={**body, "organization_id": str(w.R.id), "owner_id": w.aR.id})
+    assert r.status_code in (403, 404), r.text

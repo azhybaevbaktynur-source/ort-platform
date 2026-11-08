@@ -10,6 +10,8 @@ from fastapi import APIRouter, Depends, Query, Response
 from app.core.authz import A, AuthzContext, get_authz
 from app.lms.core import clock
 from app.lms.core.pagination import PageOut
+from app.lms.courses import lesson_courses as lessons
+from app.lms.courses.lesson_courses import LessonCourseOut
 from app.lms.courses.service import load_course, require_course
 from app.lms.exam_prep import schemas as sch
 from app.lms.exam_prep import service
@@ -52,3 +54,13 @@ def delete_exam_goal(course_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz
     course = _course(ctx, course_id)
     service.clear_goal(ctx.db, course, ctx.user.id)
     return Response(status_code=204)
+
+
+# --- TEACHER_TO_STUDENT_MAP 2.3 begin --- (lesson courses attached to the exam: enrolled or staff of the exam course)
+@router.get("/courses/{course_id}/lesson-courses", response_model=list[LessonCourseOut])
+def exam_lesson_courses(course_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
+    course = load_course(ctx.db, course_id)
+    lessons.require_member(ctx, course)  # 403 `not_enrolled` first: a stranger never learns the course's kind
+    service.require_exam_prep(course)  # 404 for any other course (readers only)
+    return lessons.lesson_courses(ctx.db, course, ctx.user.id)
+# --- TEACHER_TO_STUDENT_MAP 2.3 end ---

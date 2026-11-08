@@ -328,7 +328,10 @@
       "season_ended": "The season has already ended.",
       "pro_not_active": "This person has no active Pro.",
       "settings_invalid": "Check the settings: the season end from today to 400 days ahead, prices as whole numbers from 0 to 1,000,000, texts up to 2000 characters.",
-      "plan_invalid": "There is no such plan."
+      "plan_invalid": "There is no such plan.",
+      "exam_link_forbidden": "Only a platform administrator links a course to an exam.",
+      "exam_link_not_allowed": "This course cannot be linked to an exam.",
+      "exam_link_target_invalid": "Choose a published exam course of the platform."
     }
   },
   "courses": {
@@ -358,7 +361,27 @@
       "modeClosed": "Closed (nobody can join)",
       "limit": "Student limit (optional)",
       "limitPlaceholder": "No limit",
-      "submit": "Create course"
+      "submit": "Create course",
+      "pageTitle": "New course",
+      "subtitle": "You can change the title and language later.",
+      "basics": "About the course",
+      "mainLanguage": "Main language",
+      "mainLanguageHint": "The language the course is taught in. Students see it on the course card.",
+      "addTranslations": "Add translations",
+      "translationsHint": "The title and description get a tab for each chosen language. Students see the text in their interface language.",
+      "mainNote": "main",
+      "fallbackHint": "An empty translation shows the text of the main language.",
+      "coverChosen": "The image is uploaded right after the course is created.",
+      "coverDefault": "No image: the course gets the default cover. You can add one later in the settings.",
+      "coverUseDefault": "Use the default cover",
+      "previewLabel": "Course card preview",
+      "previewTitle": "Students will see the card like this",
+      "previewHint": "The numbers of tests and lessons appear once you add them.",
+      "modeHintInviteCode": "Students join with the course code. The code appears after the course is created.",
+      "catalogHint": "Students find the course in the catalog. A draft is not shown until you publish it.",
+      "catalogFailed": "The course is created, but the catalog setting was not saved. Turn it on in the settings.",
+      "coverFailed": "The course is created, but the cover was not uploaded. Try again in the settings.",
+      "modeLabel": "How students join"
     },
     "join": {
       "title": "Join with code",
@@ -454,6 +477,34 @@
         "label": "Exam date",
         "hint": "Students see how many days are left. Leave it empty to hide the countdown.",
         "clear": "Clear the date"
+      },
+      "pageTitle": "Course settings",
+      "sectionsLabel": "Settings sections",
+      "joinCodeMenu": "Code actions",
+      "codeRegenerated": "New code created",
+      "statusMenu": "Change status",
+      "sections": {
+        "general": "General",
+        "cover": "Cover",
+        "enrollment": "Enrollment",
+        "access": "Access and Pro",
+        "grading": "Grading",
+        "danger": "Danger zone"
+      },
+      "access": {
+        "title": "Pro",
+        "platformPro": "Tests of this course can be free or for Pro only. The platform administrator marks paid tests in Admin → Pro → Paid exams.",
+        "practiceFree": "Practice is always free.",
+        "paidExamsLink": "Paid exams",
+        "proLink": "Pro section",
+        "adminOnly": "Only the platform administrator changes these settings.",
+        "notPlatform": "Pro is available on platform courses. All tests of this course are open to its students."
+      },
+      "examLink": {
+        "label": "Exam of this course",
+        "none": "Not linked",
+        "help": "The course appears under Lessons for the students of this exam.",
+        "loadFailed": "Could not load the exams. Try again later."
       }
     },
     "status": {
@@ -569,7 +620,18 @@
       "teacherRequests": "Teacher requests",
       "users": "Users",
       "courses": "Courses",
-      "auditLog": "Audit log"
+      "auditLog": "Audit log",
+      "groups": {
+        "people": "People",
+        "content": "Content",
+        "pro": "Pro",
+        "system": "System"
+      },
+      "proUsers": "Pro users",
+      "plans": "Plans and settings",
+      "gifts": "Gift codes",
+      "paidExams": "Paid exams",
+      "health": "Health"
     },
     "notAuthorized": {
       "title": "Not authorized",
@@ -577,8 +639,34 @@
       "back": "Back to my courses"
     },
     "overview": {
-      "title": "Platform administration",
-      "pendingRequests": "Teacher requests waiting for review"
+      "title": "Overview",
+      "pendingRequests": "Teacher requests waiting for review",
+      "metrics": {
+        "users": "Users",
+        "activeStudents": "Active students (7 days)",
+        "pro": "Pro subscribers",
+        "tests": "Tests this week"
+      },
+      "attention": {
+        "title": "Needs attention",
+        "storage": {
+          "warn": "Storage: nearly full",
+          "full": "Storage: full"
+        },
+        "reveals": "Code reveals in the last hour",
+        "health": "Health checks failing",
+        "none": "All good, nothing needs attention"
+      },
+      "quick": {
+        "title": "Quick actions",
+        "newCourse": "New platform course",
+        "grantPro": "Grant Pro",
+        "codes": "Create codes"
+      },
+      "menu": {
+        "health": "Check system health",
+        "auditLog": "Open audit log"
+      }
     },
     "reasonRequired": "Reason (required)",
     "reasonOptional": "Reason (optional)",
@@ -619,7 +707,16 @@
       "subject": "Subject",
       "phone": "Phone",
       "teachesAt": "Already teaches at",
-      "message": "Message"
+      "message": "Message",
+      "subtitle": "Applications from people who want to create courses. Approve or reject each one.",
+      "applicant": "Applicant",
+      "status": "Status",
+      "submitted": "Submitted",
+      "actions": "Actions",
+      "details": "Details",
+      "openUser": "Open user",
+      "email": "Email",
+      "decided": "Decision"
     },
     "users": {
       "title": "Users",
@@ -651,7 +748,8 @@
       "filterAdmins": "Platform admins",
       "filterAccess": "Has exam access",
       "lastLogin": "Last sign-in",
-      "neverLoggedIn": "Never"
+      "neverLoggedIn": "Never",
+      "subtitle": "Everyone with an account: find a person, open their page, manage teacher access."
     },
     "courses": {
       "title": "Courses",
@@ -688,7 +786,8 @@
       "rosterAudited": "Viewing the roster is recorded in the audit log.",
       "showRoster": "Show roster",
       "role": "Role",
-      "ownerTag": "owner"
+      "ownerTag": "owner",
+      "subtitle": "Every course on the platform, with its owner and number of students."
     },
     "audit": {
       "title": "Audit log",
@@ -712,7 +811,15 @@
         "assessment": "Assessment"
       },
       "apply": "Apply filters",
-      "empty": "No entries."
+      "empty": "No entries.",
+      "actingAs": "as platform admin",
+      "actingAsFilter": "Acted as",
+      "actingAsAny": "Anyone",
+      "actingAsOptions": {
+        "org_admin": "Org admin",
+        "platform_admin": "Platform admin"
+      },
+      "subtitle": "Who did what: the append-only log of administrative actions."
     },
     "auditActions": {
       "student_view_enter": "Entered student view",
@@ -1265,7 +1372,13 @@
       "counts": "{items} questions, {points} points",
       "attempts": "{inProgress} in progress, {submitted} submitted",
       "from": "Opens {date}",
-      "until": "Closes {date}"
+      "until": "Closes {date}",
+      "colTitle": "Title",
+      "colStatus": "Status",
+      "colAttempts": "Attempts",
+      "colAvailable": "Available",
+      "actionsFor": "Actions: {title}",
+      "always": "Always"
     },
     "student": {
       "title": "Quizzes",
@@ -2511,7 +2624,8 @@
       "error": "Details",
       "notR2": "The server does not use R2 storage (LMS_STORAGE_DRIVER is not r2), so there is nothing to check.",
       "rateLimited": "The check was run too often. Wait a while and try again."
-    }
+    },
+    "subtitle": "Used space, monthly operations and a storage smoke test."
   },
   "files": {
     "errors": {
@@ -2604,7 +2718,9 @@
       "department_not_empty": "Move or delete the department's courses and sub-departments first.",
       "department_self": "Delete this department from the organization above it.",
       "course_move_invalid": "This course cannot be moved.",
-      "language_not_in_course": "The bank has questions in a language this course does not use. Add the language to the course first."
+      "language_not_in_course": "The bank has questions in a language this course does not use. Add the language to the course first.",
+      "platform_org_protected": "The platform organization cannot be suspended and its short name is fixed.",
+      "owner_not_eligible": "The owner is no longer an active teacher. Grant teacher rights on the person's page instead."
     },
     "admin": {
       "title": "Organizations",
@@ -2640,11 +2756,37 @@
         "courses": "Courses",
         "departments": "Departments",
         "templates": "Templates",
-        "log": "Log"
+        "log": "Log",
+        "students": "Students",
+        "settings": "Settings"
       },
       "logAll": "Open the full audit log",
       "systemAccount": "System account",
-      "systemAccountHint": "The platform needs this account (for example the ORT system teacher). It cannot be edited, blocked or given other rights."
+      "systemAccountHint": "The platform needs this account (for example the ORT system teacher). It cannot be edited, blocked or given other rights.",
+      "kind": "Type",
+      "anyKind": "Any",
+      "sort": "Sort",
+      "sortCreated": "Newest first",
+      "sortName": "By name",
+      "departmentsCount": "Departments: {n}",
+      "openAsOrgAdmin": "Open as org admin",
+      "openAsOrgAdminDisabled": "The owner's account is disabled: there is nothing to manage.",
+      "protectedNote": "Platform organization: it holds the ORT courses and every platform exam, so it cannot be suspended.",
+      "affected": "This affects: courses {courses}, students {students}, departments {departments}.",
+      "students": {
+        "searchPlaceholder": "Name or email",
+        "person": "Student",
+        "courses": "Courses",
+        "firstEnrolled": "First enrolled",
+        "lastEnrolled": "Latest enrollment",
+        "empty": "No students in this organization's courses yet.",
+        "emptySearch": "No students match this search.",
+        "note": "Only name, email and course counts. Everything else is on the person's page."
+      },
+      "courses": {
+        "searchPlaceholder": "Course title",
+        "anyStatus": "Any"
+      }
     },
     "adminCourse": {
       "deleteBody": "The course «{course}» ({n} students) goes to the trash; students lose access. You can restore it later.",
@@ -2769,7 +2911,17 @@
       "suspendedBanner": "This organization is suspended: its courses are read-only and changes are disabled. Contact the platform administrator.",
       "pickTitle": "Your organizations",
       "pickEmpty": "You do not administer any organization.",
-      "rosterImport": "Roster import"
+      "rosterImport": "Roster import",
+      "areaPlatformAdmin": "Organization · platform admin",
+      "actingAsPlatformAdmin": "You are viewing {org} as platform admin. Your actions are recorded as platform admin.",
+      "actingAsPlatformAdminBack": "Back to Admin → Organizations",
+      "titleSuffix": "platform admin"
+    },
+    "kind": {
+      "school": "School",
+      "personal": "Personal",
+      "platform": "Platform",
+      "department": "Department"
     }
   },
   "invitations": {
@@ -3459,7 +3611,9 @@
       "teaching": "Teaching",
       "organization": "Organization",
       "organizations": "Organizations",
-      "platform": "Admin"
+      "platform": "Admin",
+      "allOrganizations": "All organizations",
+      "asPlatformAdmin": "{name} · platform admin"
     },
     "teaching": {
       "courses": "Courses I teach"
@@ -4990,7 +5144,7 @@
       "addVideo": "Video",
       "addMore": "More",
       "addMenu": "Add",
-      "emptyModule": "Nothing in this module yet. Add a video, page, file or quiz.",
+      "emptyModule": "Nothing in this module yet. Add a video, page, file or quiz. Students open pages and files only as lessons in a module.",
       "emptyBody": "A module is a section of the course. Create the first one and add lessons to it: videos, pages, files and quizzes.",
       "durationSet": "Set the duration: {title}",
       "durationEdit": "Duration of “{title}”: {value}. Change",
@@ -5215,6 +5369,15 @@
       "title": "Not available yet",
       "body": "Your teacher has not published anything here.",
       "back": "Back to course"
+    },
+    "content": "Content",
+    "students": "Students",
+    "more": "More",
+    "tabs": {
+      "label": "Course content",
+      "structure": "Structure",
+      "assignments": "Assignments",
+      "exams": "Exams"
     }
   },
   "studentView": {
@@ -5639,6 +5802,7 @@
   },
   "practice": {
     "nav": "Practice",
+    "staffHint": "Practice sets appear for students only under Practice. To put a test in a module, add a quiz instead.",
     "title": "Practice",
     "empty": "No practice sets yet.",
     "emptyStaff": "No practice sets yet. Create one from a question bank.",
@@ -5951,7 +6115,8 @@
       "course": "Course",
       "department": "Department",
       "submittedCount": "Submitted"
-    }
+    },
+    "subtitle": "How students progress through the course, per module, assignment and quiz."
   },
   "privacy": {
     "nav": {
@@ -6056,7 +6221,8 @@
         "duplicate": "Duplicate request"
       },
       "ranToast": "Account deleted",
-      "rejectedToast": "Request rejected"
+      "rejectedToast": "Request rejected",
+      "subtitle": "Requests to export or delete personal data."
     },
     "errors": {
       "consent_required": "A parent must confirm first",
@@ -6453,7 +6619,17 @@
     "storage": "File storage",
     "storageDetail": "Driver: {driver}. R2 configured: {r2}",
     "commit": "Deployed version: {commit}",
-    "migrationsUntracked": "The database has no version table (built without migrations). The code expects: {expected}"
+    "migrationsUntracked": "The database has no version table (built without migrations). The code expects: {expected}",
+    "unavailable": "Could not check",
+    "line": {
+      "ok": "System is fine",
+      "problems": "Problems: {count}",
+      "commit": "commit {commit}",
+      "details": "Details"
+    },
+    "page": {
+      "title": "System health"
+    }
   },
   "access": {
     "menu": "Unlock exams",
@@ -6673,6 +6849,18 @@
         "saved": "Settings saved.",
         "unchanged": "Nothing changed.",
         "priceInvalid": "A price is a whole number from 0 to 1,000,000."
+      },
+      "pages": {
+        "pro": "Pro users",
+        "vouchers": "Gift codes",
+        "exams": "Paid exams",
+        "settings": "Plans and settings"
+      },
+      "subtitles": {
+        "pro": "People with Pro access: who has it, until when, and why.",
+        "vouchers": "Gift code batches: create, give out and track codes.",
+        "exams": "Which exams are free and which are paid.",
+        "settings": "Prices, plans and the text students see when they pay."
       }
     },
     "plan": {
@@ -6846,7 +7034,8 @@
       "otherAreas": "Other areas",
       "catalog": "Catalog",
       "more": "More",
-      "tabBar": "Main sections"
+      "tabBar": "Main sections",
+      "allLessons": "All lessons"
     },
     "switcher": {
       "label": "My exams",
@@ -6880,6 +7069,10 @@
         "practice": "Do a practice set",
         "install": "Install the app"
       }
+    },
+    "lessonCourses": {
+      "emptyTitle": "No lesson courses yet",
+      "emptyBody": "Courses with lessons for this exam will appear here."
     }
   }
 }

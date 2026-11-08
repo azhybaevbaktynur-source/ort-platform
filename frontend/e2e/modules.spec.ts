@@ -458,10 +458,10 @@ test.describe("modules walk (ru)", () => {
       // the home kind is locked on ORT courses
       await api(admin, "PATCH", `/courses/${cid}`, { home_kind: "modules" }, [409]);
 
-      // staff see every sidebar link in the ORT course (owner Q5 default; Files and Announcements marked as hidden)
+      // staff see every sidebar link in the ORT course (owner Q5 default; FB8-5 S1: Content holds Assignments as a tab)
       const ap = await open(browser, admin);
       await ap.goto(base);
-      for (const name of [t("courses.home.tab"), t("assignments.tab"), t("courseFiles.title"), t("announcements.title")]) {
+      for (const name of [t("courseNav.content"), t("courseFiles.title"), t("announcements.title")]) {
         await expect(tabs(ap).getByRole("link", { name: new RegExp(`^${name}(\\s|$)`) })).toBeVisible(); // staff links may carry the "hidden from students" mark text
       }
       await review(ap, "ort-teacher-course-home-after");

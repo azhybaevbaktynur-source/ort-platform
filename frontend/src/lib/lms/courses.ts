@@ -2,8 +2,9 @@ import { lmsFetch } from "./client";
 import { thenMeStale } from "./meStale";
 import type {
   AddStaffIn, CourseCard, CourseCreateIn, CourseOut, CourseStaffOut, CourseUpdateIn, JoinCodeOut, JoinOut,
-  Lang, MeOut, PageOut, RosterEntryOut, StaffPublicOut,
+  Lang, LocalizedText, MeOut, PageOut, RosterEntryOut, StaffPublicOut,
 } from "./types";
+import type { ItemLinkOut } from "./modulesTypes";
 
 const enc = encodeURIComponent;
 
@@ -74,3 +75,25 @@ export function formatJoinCode(code: string): string {
   const c = normalizeJoinCode(code);
   return c.length > 4 ? `${c.slice(0, 4)}-${c.slice(4, 8)}` : c;
 }
+
+// --- TEACHER_TO_STUDENT_MAP §2.3 begin --- (the lesson courses attached to an exam-prep course: the student sidebar)
+/** One lesson course of an exam (`GET /courses/{exam}/lesson-courses`, at most 20, oldest published first). */
+export interface LessonCourseOut {
+  id: string;
+  title: LocalizedText;
+  cover_url: string | null;
+  is_platform_course: boolean;
+  lessons_count: number;
+  duration_s: number;
+  enrolled: boolean;
+  /** enrolled only; null: nothing to finish */
+  progress: { done: number; total: number } | null;
+  has_paid_modules: boolean;
+  /** enrolled only: the first item not done */
+  next_item: ItemLinkOut | null;
+  /** optional (a later backend may add it) */
+  is_staff?: boolean;
+}
+export const listLessonCourses = (examCourseId: string, signal?: AbortSignal) =>
+  lmsFetch<LessonCourseOut[]>(`/courses/${enc(examCourseId)}/lesson-courses`, { signal });
+// --- TEACHER_TO_STUDENT_MAP §2.3 end ---

@@ -90,6 +90,9 @@ class CourseUpdateIn(BaseModel):
     # --- Phase 8a S1 end ---
     # Exam prep S2: exam-prep courses only (422 `exam_date_not_supported` otherwise); null clears it
     exam_date: Optional[date] = None
+    # TEACHER_TO_STUDENT_MAP 2.2: platform admins only; a platform lesson course -> a platform exam-prep course;
+    # null clears it (422 `exam_link_forbidden` / `exam_link_not_allowed` / `exam_link_target_invalid`)
+    exam_course_id: Optional[uuid.UUID] = None
 
 
 class TransferIn(BaseModel):
@@ -161,6 +164,7 @@ class CourseStudentOut(BaseModel):
     exam_date: Optional[date] = None  # Exam prep S2: set only on exam-prep courses (course template)
     cover_url: Optional[str] = None  # F7a: the course page banner; null = generated default cover
     is_platform_course: bool = False  # F7: platform courses: default cover mark; cover editing for platform admins only
+    exam_course_id: Optional[uuid.UUID] = None  # TEACHER_TO_STUDENT_MAP 2.3: the exam this lesson course belongs to
 
 
 class CourseStaffOut(CourseStudentOut):
@@ -261,6 +265,7 @@ def course_student_out(course, enrollment, owner, organization_name: str = "") -
         exam_date=_exam_date(course),  # Exam prep S2
         cover_url=_cover_url(course),  # F7a
         is_platform_course=_is_platform_course(course),  # F7
+        exam_course_id=getattr(course, "exam_course_id", None),  # TEACHER_TO_STUDENT_MAP 2.3
     )
 
 

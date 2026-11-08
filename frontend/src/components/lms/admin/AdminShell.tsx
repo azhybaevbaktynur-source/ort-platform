@@ -81,23 +81,29 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   const base = `/${lang}/admin`;
-  const nav = [
+  const g = (k: string) => t(`platformAdmin.nav.groups.${k}`);
+  const nav: { href: string; label: string; exact?: boolean; count?: number | null; group?: string; alsoUnder?: string }[] = [
     { href: base, label: t("platformAdmin.nav.overview"), exact: true },
-    { href: `${base}/organizations`, label: t("organizations.nav.organizations") },
-    { href: `${base}/teacher-requests`, label: t("platformAdmin.nav.teacherRequests"), count: pending },
-    { href: `${base}/users`, label: t("platformAdmin.nav.users") },
-    { href: `${base}/courses`, label: t("platformAdmin.nav.courses") },
-    { href: `${base}/exam-templates`, label: t("examTemplates.nav.title") }, // Phase 7b S4
-    { href: `${base}/access`, label: t("access.admin.nav") }, // S3 access: codes, passes, paid exams
-    { href: `${base}/audit-log`, label: t("platformAdmin.nav.auditLog") },
-    { href: `${base}/storage`, label: t("storage.nav") },
-    { href: `${base}/privacy`, label: t("privacy.admin.title") }, // Phase 11 S3
-    { href: `${base}/security`, label: t("adminSecurity.nav") }, // S1 admin security
+    { href: `${base}/users`, label: t("platformAdmin.nav.users"), group: g("people") },
+    { href: `${base}/teacher-requests`, label: t("platformAdmin.nav.teacherRequests"), count: pending, group: g("people") },
+    { href: `${base}/organizations`, label: t("organizations.nav.organizations"), group: g("content") },
+    { href: `${base}/courses`, label: t("platformAdmin.nav.courses"), group: g("content") },
+    { href: `${base}/exam-templates`, label: t("examTemplates.nav.title"), group: g("content") },
+    { href: `${base}/access/settings`, label: t("platformAdmin.nav.plans"), group: g("pro") },
+    { href: `${base}/access`, label: t("platformAdmin.nav.proUsers"), exact: true, group: g("pro") },
+    { href: `${base}/access/vouchers`, label: t("platformAdmin.nav.gifts"), group: g("pro"), alsoUnder: `${base}/access/batches` },
+    { href: `${base}/access/exams`, label: t("platformAdmin.nav.paidExams"), group: g("pro") }, // D-FB8-5-5
+    { href: `${base}/storage`, label: t("storage.nav"), group: g("system") },
+    { href: `${base}/health`, label: t("platformAdmin.nav.health"), group: g("system") }, // S4 page
+    { href: `${base}/audit-log`, label: t("platformAdmin.nav.auditLog"), group: g("system") },
+    { href: `${base}/security`, label: t("adminSecurity.nav"), group: g("system") }, // S1 admin security
+    { href: `${base}/privacy`, label: t("privacy.admin.title"), group: g("system") }, // Phase 11 S3: data requests
   ];
   const visible = mustEnroll ? nav.filter((i) => i.href === securityPath) : nav;
   const items = visible.map((i) => ({
-    href: i.href, label: i.label, count: i.count,
-    active: i.exact ? pathname === i.href : pathname === i.href || pathname.startsWith(`${i.href}/`),
+    href: i.href, label: i.label, count: i.count, group: i.group,
+    active: i.exact ? pathname === i.href : pathname === i.href || pathname.startsWith(`${i.href}/`)
+      || (!!i.alsoUnder && pathname.startsWith(`${i.alsoUnder}/`)),
   }));
   return (
     <SummaryContext.Provider value={{ pending, storageLevel, error, refresh }}>

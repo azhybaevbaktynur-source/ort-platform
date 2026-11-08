@@ -155,7 +155,10 @@ def _resolve_creation(db: Session, actor: User, data: CourseCreateIn, organizati
                      ).scalar_one_or_none()
     if org is None:
         raise orgs.org_not_found()
-    org_admin = actor.is_platform_admin or orgs.is_org_admin(db, org.id, actor.id)
+    from app.lms.organizations import tree as org_tree
+
+    # fb8 review fix 1: tree-aware on the loaded row (an admin of an ancestor school counts), one SQL
+    org_admin = actor.is_platform_admin or org_tree.is_org_admin_in_tree(db, actor.id, org)
     member = org_admin or orgs.is_active_member(db, org.id, actor.id)
     if not actor.is_platform_admin:
         if not member:
@@ -190,7 +193,7 @@ def _resolve_creation(db: Session, actor: User, data: CourseCreateIn, organizati
 # ---------------------------------------------------------------- create
 
 def create_course(db: Session, actor: User, data: CourseCreateIn, *, organization_id=None,
-                  request: Optional[Request] = None) -> Course:
+                  request: Optional[Request] = None, acting_as: Optional[str] = None) -> Course:
     org_id, owner, template = _resolve_creation(db, actor, data, organization_id)  # Phase 6 S1
     # Phase 9 S1: a new course is private and has no form yet, so a form mode is always refused here
     _check_enrollment_mode(db, None, data.enrollment_mode, "private", template.get("template_key"))
@@ -231,7 +234,9 @@ def create_course(db: Session, actor: User, data: CourseCreateIn, *, organizatio
         audit.record(db, actor=actor, action="organization.course.create", target_type="course",
                      target_id=str(course.id),
                      details={"organization_id": str(org_id), "owner_id": owner_id,
-                              "template_key": template.get("template_key")}, request=request)
+                              "template_key": template.get("template_key"),
+                              # item 4: the capacity derived by `load_org_as_admin` on /org routes
+                              **({"acting_as": acting_as} if acting_as else {})}, request=request)
     # --- Phase 6 S1 end ---
     db.commit()
     return course
@@ -288,6 +293,7 @@ def update_course(db: Session, ctx: AuthzContext, course: Course, data: CourseUp
     if starts and ends and ends <= starts:
         raise ValidationFailed("ends_at must be after starts_at")
 
+    exam_link = _check_exam_link(db, ctx, course, fields)  # TEACHER_TO_STUDENT_MAP 2.2 (validates only)
     _apply_home(db, course, fields)  # --- Phase 8a S3 --- (one line; validates before any field is set)
     # --- Exam prep S2 begin --- (the exam date of an exam-prep course; validated before any field is set)
     if "exam_date" in fields:
@@ -306,8 +312,40 @@ def update_course(db: Session, ctx: AuthzContext, course: Course, data: CourseUp
     for key in _ENROLLMENT_FIELDS:
         if key in fields:
             setattr(course, key, fields[key])
+    if exam_link is not _NO_LINK_CHANGE:
+        course.exam_course_id = exam_link
     db.commit()
     return course
+
+
+# --- TEACHER_TO_STUDENT_MAP 2.2 begin --- (a platform lesson course attached to a platform exam-prep course)
+_NO_LINK_CHANGE = object()
+
+
+def _check_exam_link(db: Session, ctx: AuthzContext, course: Course, fields: dict):
+    """The new `exam_course_id` (None clears) or `_NO_LINK_CHANGE`. 422 unless: the caller is a platform admin
+    (`exam_link_forbidden`); the course is a platform course without a course template and not a sandbox
+    (`exam_link_not_allowed`; an exam course is never linked); the target is a live platform exam-prep course other
+    than this one (`exam_link_target_invalid`). Sending the current value is a no-op (no check)."""
+    if "exam_course_id" not in fields or fields["exam_course_id"] == course.exam_course_id:
+        return _NO_LINK_CHANGE
+    from app.lms.exam_prep.layout import is_exam_prep
+    from app.lms.modules.service import is_platform_course
+
+    target_id = fields["exam_course_id"]
+    if not getattr(ctx.user, "is_platform_admin", False):
+        raise ValidationFailed("Only a platform administrator links a course to an exam", code="exam_link_forbidden")
+    if target_id is None:
+        return None
+    if (course.template_key is not None or course.sandbox_for_template_id is not None
+            or not is_platform_course(db, course)):
+        raise ValidationFailed("This course cannot be linked to an exam", code="exam_link_not_allowed")
+    target = db.get(Course, target_id) if target_id != course.id else None
+    if (target is None or target.deleted_at is not None or not is_exam_prep(target)
+            or not is_platform_course(db, target)):
+        raise ValidationFailed("The exam course is not valid", code="exam_link_target_invalid")
+    return target_id
+# --- TEACHER_TO_STUDENT_MAP 2.2 end ---
 
 
 # --- Phase 9 S1 begin --- (PHASE_9_DESIGN 4.6, invariant 9: enrollment mode rules)

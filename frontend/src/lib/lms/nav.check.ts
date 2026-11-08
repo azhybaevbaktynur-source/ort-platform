@@ -32,7 +32,9 @@ const ROUTES: [string, string][] = [
 const ROLES: CourseNavRole[] = ["teacher", "assistant", "student", "observer"];
 for (const role of ROLES) {
   const all = { modules: true, files: true, announcements: true, practice: true };
-  for (const [suffix, key] of ROUTES) {
+  for (const [suffix, routeKey] of ROUTES) {
+    // FB8-5 S1: for staff Assignments is a tab of Content (the "course" link)
+    const key = (role === "teacher" || role === "assistant") && routeKey === "assignments" ? "course" : routeKey;
     const items = courseNavItems(course(role, all), role, base + suffix, t);
     const active = items.filter((i) => i.active).map((i) => i.key);
     const visible = items.some((i) => i.key === key);
@@ -43,8 +45,15 @@ for (const role of ROLES) {
 
 const keys = (role: CourseNavRole, f = { modules: true, files: false, announcements: false, practice: false }) =>
   courseNavItems(course(role, f), role, base, t).map((i) => i.key).join(",");
-ok(keys("teacher") === "course,announcements,assignments,grades,people,bank,settings,files,practice,analytics", "teacher: all links");
-ok(keys("assistant") === "course,announcements,assignments,grades,people,bank,files,practice,analytics", "assistant: no settings");
+ok(keys("teacher") === "course,people,grades,analytics,settings,announcements,files,practice,bank", "teacher: all links (FB8-5 order)");
+ok(keys("assistant") === "course,people,grades,analytics,announcements,files,practice,bank", "assistant: no settings");
+const groups = courseNavItems(course("teacher"), "teacher", base, t).map((i) => `${i.key}:${i.group}`).join(",");
+ok(groups === "course:main,people:main,grades:main,analytics:main,settings:main,announcements:more,files:more,practice:more,bank:more",
+  "teacher: main and More groups");
+ok(courseNavItems(course("teacher"), "teacher", base, t)[0].label === "courseNav.content", "staff: the course link is Content");
+ok(courseNavItems(course("teacher"), "teacher", base, t).find((i) => i.key === "people")?.label === "courseNav.students", "staff: people link is Students");
+ok(courseNavItems(course("student"), "student", base, t).every((i) => i.group === undefined)
+  && courseNavItems(course("observer"), "observer", base, t).every((i) => i.group === undefined), "students and observers: no groups");
 ok(keys("student") === "course,assignments,grades,people,progress,saved", "student: announcements, files, practice auto-hidden");
 ok(keys("student", { modules: true, files: true, announcements: true, practice: true }) === "course,announcements,assignments,grades,people,files,practice,progress,saved",
   "student: shown with published content");
