@@ -602,3 +602,4 @@ Agent 2026-11-08 (item 4): a platform admin always gets the organization switche
 Agent 2026-11-08 (item 3, G13): a lesson-course test stays in the exam home's «К выполнению» (it is real due work in a joined course); it stays out of Тесты and analytics (D6).
 2026-11-08: Neon backup `backup-2026-11-08-before-exam-link-0027` (br-dry-field-b2wtdzz1) before migration 0027 (4/10 branches).
 2026-11-08: items 3 (part), 4 and 5 deployed (main c9ca5f1, migration 0027_exam_course_link verified on Neon; /health and Vercel SW_VERSION verified).
+2026-11-08: item 3 completion deployed (main 989054d, no migration). All items 0–5 of the owner round of 2026-11-08 are deployed.
