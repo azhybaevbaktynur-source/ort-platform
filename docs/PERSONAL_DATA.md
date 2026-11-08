@@ -43,6 +43,8 @@ Erased data stays in the database provider's history until its restore window pa
 | `teacher_requests` | `reason` | about the person | Emptied | Yes |
 | `teacher_requests` | `school` | own text | Emptied | Yes |
 | `teacher_requests` | `subject` | own text | Emptied | Yes |
+| `user_identities` | `email` | contact (the provider's address) | Row deleted | No |
+| `user_identities` | `subject` | identifier (provider) | Row deleted | No |
 | `users` | `age_band` | age | Emptied | Yes |
 | `users` | `disabled_reason` | account state | Replaced | No |
 | `users` | `display_name` | identity | Emptied | Yes |
@@ -112,6 +114,7 @@ These point at the tombstone row, which holds nothing personal after deletion.
 | `submissions` | `graded_by_id`, `override_by_id`, `user_id` |
 | `teacher_requests` | `decided_by_id`, `user_id` |
 | `translation_groups` | `created_by_id` |
+| `user_identities` | `user_id` |
 | `user_mfa_recovery_codes` | `user_id` |
 | `users` | `disabled_by_id` |
 

@@ -12,11 +12,16 @@
 #   E2E_API_PORT    backend port                        (default 8765)
 #   E2E_WEB_ORIGIN  frontend origin allowed by CORS     (default http://127.0.0.1:3765)
 #   E2E_PYTHON      python with backend requirements    (default backend/venv/bin/python, else python3)
+#   E2E_OAUTH_PORT  Google sign-in stub port            (default 8766; scripts/e2e_oauth_stub.py)
 #
 # S1 admin security: `e2e_backend.sh --mfa-required <port>` starts a second server on the same scratch database and
 # signing key with ADMIN_MFA_REQUIRED=true, in the foreground, without wiping or seeding anything. Only
 # frontend/e2e/admin-mfa-gate.spec.ts uses it (it sends its own page's API calls there); every other spec keeps the main
 # server, where the requirement is off.
+#
+# Social sign-in (docs/phases/AUTH_SOCIAL_DESIGN.md 9): the main server signs in with Google through
+# scripts/e2e_oauth_stub.py (a throwaway client secret per run); the --mfa-required server has no Google keys, so
+# `GET /auth/providers` there says {"google": false} (the "buttons hidden" spec).
 set -euo pipefail
 MFA_REQUIRED_PORT=""
 if [[ "${1:-}" == "--mfa-required" ]]; then
@@ -80,11 +85,42 @@ if [[ -n "$MFA_REQUIRED_PORT" ]]; then
   exec "${run_env[@]}" ADMIN_MFA_REQUIRED=true "$PY" -m uvicorn app.main:app --host 127.0.0.1 --port "$MFA_REQUIRED_PORT" \
     --log-level warning >>"$E2E_DIR/backend_mfa_required.log" 2>&1
 fi
-"${run_env[@]}" "$PY" -m uvicorn app.main:app --host 127.0.0.1 --port "$PORT" --log-level warning \
+# --- social sign-in begin --- the Google stub and the main server's Google settings (never on production: the
+# backend refuses non-default Google URLs there)
+OAUTH_PORT="${E2E_OAUTH_PORT:-8766}"
+OAUTH_CLIENT_ID="e2e-client.apps.example"
+OAUTH_CLIENT_SECRET="e2e-$("$PY" -c 'import secrets; print(secrets.token_hex(24))')"
+API_ORIGIN="http://127.0.0.1:$PORT"
+OAUTH_ORIGIN="http://127.0.0.1:$OAUTH_PORT"
+"${run_env[@]}" E2E_OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" "$PY" "$ROOT/scripts/e2e_oauth_stub.py" \
+  --port "$OAUTH_PORT" --client-id "$OAUTH_CLIENT_ID" --redirect-uri "$API_ORIGIN/api/v1/auth/google/callback" \
+  >"$E2E_DIR/oauth_stub.log" 2>&1 &
+STUB_PID=$!
+google_env=(
+  OAUTH_PUBLIC_BASE_URL="$API_ORIGIN"
+  GOOGLE_OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID"
+  GOOGLE_OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET"
+  GOOGLE_OAUTH_AUTHORIZE_URL="$OAUTH_ORIGIN/authorize"
+  GOOGLE_OAUTH_TOKEN_URL="$OAUTH_ORIGIN/token"
+  GOOGLE_OAUTH_JWKS_URL="$OAUTH_ORIGIN/certs"
+  GOOGLE_OAUTH_ISSUERS="$OAUTH_ORIGIN"
+)
+# --- social sign-in end ---
+"${run_env[@]}" "${google_env[@]}" "$PY" -m uvicorn app.main:app --host 127.0.0.1 --port "$PORT" --log-level warning \
   >"$E2E_DIR/backend.log" 2>&1 &
 API_PID=$!
-cleanup() { kill "$API_PID" 2>/dev/null || true; wait "$API_PID" 2>/dev/null || true; }
+cleanup() {
+  kill "$API_PID" "$STUB_PID" 2>/dev/null || true
+  wait "$API_PID" 2>/dev/null || true
+  wait "$STUB_PID" 2>/dev/null || true
+}
 trap cleanup EXIT INT TERM
+
+for _ in $(seq 1 40); do
+  if curl -fsS "$OAUTH_ORIGIN/certs" >/dev/null 2>&1; then break; fi
+  if ! kill -0 "$STUB_PID" 2>/dev/null; then echo "e2e_backend: oauth stub exited" >&2; cat "$E2E_DIR/oauth_stub.log" >&2; exit 1; fi
+  sleep 0.25
+done
 
 for _ in $(seq 1 120); do
   if curl -fsS "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then break; fi

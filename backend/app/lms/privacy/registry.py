@@ -57,6 +57,10 @@ ENTRIES: list[Entry] = [
     # S4 email change: a pending change, deleted with the account
     Entry("email_change_requests", "new_email", "contact", "delete_row", True),
     Entry("email_change_requests", "token_hash", "credential (keyed hash)", "delete_row"),
+    # social sign-in (AUTH_SOCIAL_DESIGN 2.2): linked Google / Apple accounts, deleted with the account; the export
+    # lists the provider and the dates only
+    Entry("user_identities", "email", "contact (the provider's address)", "delete_row"),
+    Entry("user_identities", "subject", "identifier (provider)", "delete_row"),
     # enrollment
     Entry("enrollments", "invite_token_hash", "credential", "null"),
     Entry("enrollment_accommodations", "note", "may be medical", "null"),
@@ -166,6 +170,7 @@ ENTRIES: list[Entry] = [
     *_refs("user_mfa_recovery_codes", "user_id", action="delete_row"),
     *_refs("email_change_requests", "user_id", action="delete_row"),  # S4
     *_refs("email_change_requests", "requested_by_id"),
+    *_refs("user_identities", "user_id", action="delete_row"),  # social sign-in
     *_refs("users", "disabled_by_id"),
 ]
 
