@@ -93,6 +93,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     { href: `${base}/access`, label: t("platformAdmin.nav.proUsers"), exact: true, group: g("pro") },
     { href: `${base}/access/vouchers`, label: t("platformAdmin.nav.gifts"), group: g("pro"), alsoUnder: `${base}/access/batches` },
     { href: `${base}/access/exams`, label: t("platformAdmin.nav.paidExams"), group: g("pro") }, // D-FB8-5-5
+    { href: `${base}/services`, label: t("infra.nav"), group: g("system") }, // INFRA_PANEL_DESIGN
     { href: `${base}/storage`, label: t("storage.nav"), group: g("system") },
     { href: `${base}/health`, label: t("platformAdmin.nav.health"), group: g("system") }, // S4 page
     { href: `${base}/audit-log`, label: t("platformAdmin.nav.auditLog"), group: g("system") },
