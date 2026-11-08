@@ -16,6 +16,7 @@ _UID = "00000000-0000-0000-0000-000000000001"
 # Every route this slice owns: (method, path, json body)
 ROUTES = [
     ("GET", f"{P}/summary", None),
+    ("GET", f"{P}/overview", None),  # FB8-5 S4
     ("GET", f"{P}/teacher-requests", None),
     ("POST", f"{P}/teacher-requests/{_UID}/approve", {}),
     ("POST", f"{P}/teacher-requests/{_UID}/reject", {"reason": "x"}),

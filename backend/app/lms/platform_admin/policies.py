@@ -2,6 +2,7 @@
 _P = "/api/v1/platform"
 PLATFORM_POLICIES: dict[tuple[str, str], str] = {
     ("GET", f"{_P}/summary"): "platform_admin",
+    ("GET", f"{_P}/overview"): "platform_admin",  # FB8-5 S4: counts only, cached 60 s per process
     ("GET", f"{_P}/teacher-requests"): "platform_admin",
     ("POST", f"{_P}/teacher-requests/{{request_id}}/approve"): "platform_admin",
     ("POST", f"{_P}/teacher-requests/{{request_id}}/reject"): "platform_admin",

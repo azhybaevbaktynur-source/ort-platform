@@ -43,7 +43,7 @@ test("S1 screens (ru, 375 / 1440 / 1920)", async ({ page }) => {
   await expect(page.getByText(tr("ru", "adminSecurity.badgeOn")).first()).toBeVisible();
   await shots(page, "03-security-enabled");
 
-  await page.goto("/ru/admin");
+  await page.goto("/ru/admin/health"); // FB8-5 S4: the full health card moved off the overview
   await expect(page.getByTestId("health-checks")).toBeVisible();
   await shots(page, "04-overview-health");
 
