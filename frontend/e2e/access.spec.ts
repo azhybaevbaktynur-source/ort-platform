@@ -70,7 +70,7 @@ test.describe("free and paid exams (ru)", () => {
     try {
       // ---- admin: a new batch of three 30-day codes
       await admin.goto(`/${L}/admin/access/vouchers`);
-      await expect(admin.getByRole("heading", { name: t("access.admin.title"), level: 1 })).toBeVisible();
+      await expect(admin.getByRole("heading", { name: t("access.admin.pages.vouchers"), level: 1 })).toBeVisible();
       await admin.getByRole("button", { name: t("access.admin.batches.create") }).click();
       const dialog = admin.getByRole("dialog");
       await dialog.getByLabel(t("access.admin.batches.label")).fill("Ноябрь E2E, 30 дней");
@@ -196,7 +196,7 @@ test.describe("free and paid exams (ru)", () => {
 
       // ---- admin settings: a season end in 60 days and one price; only what changed is sent
       await admin.goto(`/${L}/admin/access/settings`);
-      await expect(admin.getByRole("link", { name: t("access.admin.tabs.settings") })).toHaveAttribute("aria-current", "page");
+      await expect(admin.getByRole("link", { name: t("platformAdmin.nav.plans") }).locator("visible=true").first()).toHaveAttribute("aria-current", "page");
       const seasonEnd = new Date(Date.now() + 60 * 86_400_000).toISOString().slice(0, 10);
       await admin.getByLabel(t("access.admin.settings.seasonEnd")).fill(seasonEnd);
       await admin.getByLabel(t("access.admin.settings.priceLabel", { plan: t("access.plan.month_1") }), { exact: false }).fill("990");
@@ -214,7 +214,7 @@ test.describe("free and paid exams (ru)", () => {
 
       // ---- admin: "Выдать Pro" with the person search, 1 month
       await admin.goto(`/${L}/admin/access`);
-      await expect(admin.getByRole("link", { name: t("access.admin.tabs.pro") })).toHaveAttribute("aria-current", "page");
+      await expect(admin.getByRole("link", { name: t("platformAdmin.nav.proUsers") }).locator("visible=true").first()).toHaveAttribute("aria-current", "page");
       await admin.getByRole("button", { name: t("access.admin.pro.grant") }).locator("visible=true").first().click();
       const grant = admin.getByRole("alertdialog");
       await grant.getByRole("combobox", { name: t("access.admin.pro.person") }).fill("e2e-access-pro");

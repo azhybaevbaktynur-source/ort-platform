@@ -9,7 +9,6 @@ import { getProSettings, putProSettings, type PlanId, type ProSettingsIn, type P
 import { Button, Card, ErrorState, Input, LoadingState, PageHeader, Textarea, toast } from "@/components/ui";
 import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
 import { useErrorText } from "@/components/lms/home/useErrorText";
-import { AccessTabs } from "@/components/lms/access/AdminAccessUi";
 
 const PLANS: PlanId[] = ["month_1", "month_3", "season"];
 const LANGS = ["ru", "ky", "en"] as const;
@@ -73,9 +72,8 @@ export default function AdminProSettingsPage() {
   const langName: Record<Lang, string> = { ru: t("common.russian"), ky: t("common.kyrgyz"), en: t("common.english") };
   const header = (
     <>
-      <PageHeader title={t("access.admin.title")} description={t("access.admin.description")}
-        breadcrumbs={crumbs({ label: t("access.admin.nav"), href: `/${lang}/admin/access` }, { label: t("access.admin.tabs.settings") })} />
-      <AccessTabs />
+      <PageHeader title={t("access.admin.pages.settings")} description={t("access.admin.description")}
+        breadcrumbs={crumbs({ label: t("access.admin.pages.settings") })} />
     </>
   );
   if (loadError && !form) return <div>{header}<ErrorState message={errorText(loadError)} onRetry={() => void load()} /></div>;
