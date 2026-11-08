@@ -3,16 +3,78 @@
 // FB8-5 S3 (STAFF_UX_AUDIT 5): Access / Pro: the course status with its lifecycle (Publish or Reopen as the one
 // button; Unpublish and Conclude in the "⋯" menu, confirmed) and what Pro means for this course. Pro is owned by the
 // server and the platform admin (Admin → Pro), so this section only explains and links; it changes nothing there.
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
-import { concludeCourse, publishCourse, reopenCourse, unpublishCourse } from "@/lib/lms/courses";
+import { listCatalog } from "@/lib/lms/catalog";
+import { concludeCourse, getCourse, publishCourse, reopenCourse, unpublishCourse, updateCourse } from "@/lib/lms/courses";
 import { pickLocalized } from "@/lib/lms/localized";
+import { templateUi } from "@/lib/lms/templates";
 import { useAuth } from "@/lib/auth-context";
-import type { CourseStaffOut } from "@/lib/lms/types";
+import type { CourseStaffOut, LocalizedText } from "@/lib/lms/types";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { StatusBadge } from "@/components/lms/course/CourseCard";
-import { Button, Card, ConfirmDialog, LinkButton, OverflowMenu } from "@/components/ui";
+import { Button, Card, ConfirmDialog, LinkButton, OverflowMenu, Select } from "@/components/ui";
 import { SavedNote, SectionLayout, useSave } from "./shared";
+
+// --- TEACHER_TO_STUDENT_MAP §2.6 begin --- (the exam link of a platform lesson course; the server checks every rule)
+interface ExamChoice { id: string; title: LocalizedText; default_language: CourseStaffOut["default_language"] }
+const CATALOG_LIMIT = 100;
+
+/** The platform's exam-prep courses: platform courses of the catalog whose template has the exam-prep layout (the
+ * course read carries the template), plus the linked exam when the catalog does not list it. */
+async function loadExamChoices(course: CourseStaffOut): Promise<ExamChoice[]> {
+  const page = await listCatalog(null, CATALOG_LIMIT);
+  const ids = page.items.filter((c) => c.is_platform_course && c.id !== course.id).map((c) => c.id);
+  if (course.exam_course_id && !ids.includes(course.exam_course_id)) ids.push(course.exam_course_id);
+  const read = await Promise.allSettled(ids.map((id) => getCourse(id)));
+  const out: ExamChoice[] = [];
+  for (const r of read) {
+    if (r.status === "fulfilled" && templateUi(r.value).studentLayout === "exam_prep") {
+      out.push({ id: r.value.id, title: r.value.title, default_language: r.value.default_language });
+    }
+  }
+  return out;
+}
+
+function ExamLinkField({ course, onSaved }: { course: CourseStaffOut; onSaved: (c: CourseStaffOut) => void }) {
+  const { lang, t } = useTranslation();
+  const s = useSave();
+  const linked = course.exam_course_id ?? "";
+  const [value, setValue] = useState(linked);
+  const [choices, setChoices] = useState<ExamChoice[] | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  useEffect(() => { setValue(course.exam_course_id ?? ""); }, [course.exam_course_id]);
+  useEffect(() => {
+    let live = true;
+    loadExamChoices(course).then((c) => { if (live) setChoices(c); }).catch(() => { if (live) { setChoices([]); setLoadError(true); } });
+    return () => { live = false; };
+    // the choices are read once per course
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [course.id]);
+  const save = () => s.run(async () => onSaved(await updateCourse(course.id, { exam_course_id: value || null })));
+  const options = [
+    { value: "", label: t("courses.settings.examLink.none") },
+    ...(choices ?? []).map((c) => ({ value: c.id, label: pickLocalized(c.title, lang, c.default_language) || t("courses.list.untitled") })),
+  ];
+  return (
+    <div className="space-y-2 border-t border-slate-100 pt-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <Select id="s-exam-link" containerClassName="min-w-0 sm:w-80" label={t("courses.settings.examLink.label")}
+          value={value} disabled={s.busy || choices === null} onChange={(e) => { setValue(e.target.value); s.setSaved(false); }}
+          aria-describedby="s-exam-link-help" options={options} />
+        <Button variant="secondary" loading={s.busy} disabled={value === linked || choices === null} onClick={() => void save()}
+          className="self-start sm:self-auto">
+          {t("common.save")}
+        </Button>
+      </div>
+      <p id="s-exam-link-help" className="text-sm leading-5 text-slate-600">{t("courses.settings.examLink.help")}</p>
+      {loadError && <p className="text-sm text-danger-700">{t("courses.settings.examLink.loadFailed")}</p>}
+      <SavedNote show={s.saved} />
+      <ErrorMessage error={s.error} />
+    </div>
+  );
+}
+// --- TEACHER_TO_STUDENT_MAP §2.6 end ---
 
 type Step = "publish" | "unpublish" | "conclude" | "reopen";
 
@@ -66,7 +128,10 @@ export function AccessSection({ course, onSaved }: { course: CourseStaffOut; onS
             ) : (
               <p className="text-slate-600">{t("courses.settings.access.adminOnly")}</p>
             )}
-            {/* FB8 item 3 (later slice): the "exam link" select of a platform course goes here. */}
+            {/* TEACHER_TO_STUDENT_MAP §2.6: the exam a platform lesson course belongs to (platform admins) */}
+            {userProfile?.is_platform_admin && !course.template && !course.sandbox_for_template_id && (
+              <ExamLinkField course={course} onSaved={onSaved} />
+            )}
           </div>
         ) : (
           <p className="text-sm leading-6 text-slate-600">{t("courses.settings.access.notPlatform")}</p>

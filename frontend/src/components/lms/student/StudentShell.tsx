@@ -4,15 +4,15 @@ import React, { useId, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  BarChart3, Bookmark, ClipboardList, Compass, Download, Dumbbell, Ellipsis, GraduationCap, House, KeyRound, LogOut,
-  PlayCircle, Plus, Settings,
+  BarChart3, Bookmark, ClipboardList, Compass, Download, Dumbbell, Ellipsis, GraduationCap, House, KeyRound, LayoutGrid,
+  LogOut, PlayCircle, Plus, Settings,
 } from "lucide-react";
 import { useTranslation, type Language } from "@/lib/i18n/context";
 import { inter } from "@/lib/fonts";
 import { fmtPassEnd } from "@/lib/lms/access";
 import type { HomeCourseOut } from "@/lib/lms/homeTypes";
 import { pickLocalized } from "@/lib/lms/localized";
-import { studentNavLinks, type StudentNavKey, type StudentNavLink } from "@/lib/lms/studentNav";
+import { lessonCourseLinks, studentNavLinks, type StudentNavKey, type StudentNavLink } from "@/lib/lms/studentNav";
 import { usePwa } from "@/components/pwa/PwaProvider";
 import { GoldPill } from "@/components/ui/GoldPill";
 import { Sheet } from "@/components/ui/Sheet";
@@ -86,19 +86,51 @@ function useNav(props: StudentShellProps) {
   };
   const item = (l: StudentNavLink | null): SidebarNavItem[] =>
     l ? [{ key: l.key, href: l.href, label: label[l.key], icon: ICONS[l.key], active: l.active }] : [];
-  return { links, label, item };
+  // TEACHER_TO_STUDENT_MAP §2.4: one row per lesson course of the current exam (ring when joined), then "Все уроки"
+  const lc = lessonCourseLinks({ lang, rest, examId: data.current?.id ?? null, rows: data.lessonCourses });
+  const titles = new Map((data.lessonCourses ?? []).map((r) => [r.id, pickLocalized(r.title, lang) || t("courses.list.untitled")]));
+  const lessonRows: SidebarNavItem[] = [
+    ...lc.rows.map((r): SidebarNavItem => {
+      const progressText = r.progress ? t("modules.syllabus.doneCount", { done: r.progress.done, total: r.progress.total }) : null;
+      return {
+        key: `lesson-course:${r.id}`, href: r.href, label: titles.get(r.id) ?? "", icon: <GraduationCap />, active: r.active,
+        badge: r.progress && progressText ? (
+          <span title={progressText} className="inline-flex">
+            <ProgressRing done={r.progress.done} total={r.progress.total} /><span className="sr-only">{progressText}</span>
+          </span>
+        ) : undefined,
+      };
+    }),
+    ...(lc.all ? [{ key: "all-lessons", href: lc.all.href, label: t("student.nav.allLessons"), icon: <LayoutGrid />, active: lc.all.active }] : []),
+  ];
+  return { links, label, item, lessonRows };
+}
+
+/** §2.4: with lesson courses the exam's own Уроки row and their rows form the УРОКИ group and Сохранённые follows it;
+ * without them the rows stay in one list (as before). */
+function lessonGroups(nav: ReturnType<typeof useNav>, label: string, keyPrefix: string): SidebarNavGroup[] {
+  const { links, item, lessonRows } = nav;
+  if (lessonRows.length === 0) return [{ key: `${keyPrefix}rest`, items: [...item(links.lessons), ...item(links.saved)] }];
+  return [
+    { key: `${keyPrefix}lessons`, label, items: [...item(links.lessons), ...lessonRows] },
+    { key: `${keyPrefix}saved`, gap: true, items: item(links.saved) },
+  ];
 }
 
 /** U9 (review 5, 6): the same links on every page and in the same order as the tab bar: Главная, Тесты, Практика,
  * Аналитика, then Уроки (F5b: the course overview, shown when the course has a lesson; tests stay under Тесты) and
  * Сохранённые (no module sub-links: the phone has none either). */
 function useMenuGroups(props: StudentShellProps): SidebarNavGroup[] {
-  const { links, item } = useNav(props);
+  const { t } = useTranslation();
+  const nav = useNav(props);
+  const { links, item } = nav;
   const { data } = props;
   if (!data.current) return [{ key: "main", items: [...item(links.home), ...item(links.catalog)] }];
-  return [
-    { key: "main", items: [...item(links.home), ...item(links.tests), ...(data.features?.practice ? item(links.practice) : []), ...item(links.analytics), ...item(links.lessons), ...item(links.saved)] },
-  ];
+  const main = [...item(links.home), ...item(links.tests), ...(data.features?.practice ? item(links.practice) : []), ...item(links.analytics)];
+  const rest = lessonGroups(nav, t("student.nav.lessonsGroup"), "");
+  // no lesson courses: one list, as before
+  if (nav.lessonRows.length === 0) return [{ key: "main", items: [...main, ...rest[0].items] }];
+  return [{ key: "main", items: main }, ...rest];
 }
 
 /** A row of the account and exam sheets. */
@@ -186,7 +218,10 @@ function ExamSwitcher({ props, tone, onNavigate, onAdd }: {
     data.setCurrent(id);
     onNavigate?.();
     // inside a page of the old exam: the same section of the new one (course page, progress, practice, modules)
-    if (old && old !== id && rest.startsWith(`/courses/${old}`)) {
+    // TEACHER_TO_STUDENT_MAP §2.4: inside a lesson course of the old exam: the new exam's course page
+    if (old && old !== id && data.lessonCourseExam === old) {
+      router.push(`/${lang}/courses/${id}`);
+    } else if (old && old !== id && rest.startsWith(`/courses/${old}`)) {
       const section = rest.slice(`/courses/${old}`.length).split("/")[1] ?? "";
       const keep = ["progress", "practice", "modules", "saved"].includes(section) ? `/${section}` : "";
       router.push(`/${lang}/courses/${id}${keep}`);
@@ -402,7 +437,8 @@ export function StudentChrome(props: StudentShellProps) {
 /** Phone bottom bar and its "More" sheet. */
 export function StudentTabBar(props: StudentShellProps) {
   const { t } = useTranslation();
-  const { links, item, label } = useNav(props);
+  const nav = useNav(props);
+  const { links, label } = nav;
   const { data, testStudent } = props;
   const [more, setMore] = useState(false);
   const [startOpen, setStartOpen] = useState(false);
@@ -416,13 +452,14 @@ export function StudentTabBar(props: StudentShellProps) {
   const items: TabBarItem[] = data.current
     ? [...slot(links.home), ...slot(links.tests), ...slot(links.practice), ...slot(links.analytics), moreSlot]
     : [...slot(links.home), ...slot(links.catalog), moreSlot];
-  const moreLinks: SidebarNavItem[] = data.current ? [...item(links.lessons), ...item(links.saved)] : [];
+  // §2.4: the same УРОКИ rows as the sidebar
+  const moreGroups: SidebarNavGroup[] = data.current ? lessonGroups(nav, t("student.nav.lessonsGroup"), "more-") : [];
   return (
     <>
       <TabBar label={t("student.nav.tabBar")} items={items} />
       <Sheet id={moreId} open={more} onClose={close} title={t("student.nav.more")} tone="navy">
         <div className="space-y-4">
-          {moreLinks.length > 0 && <SidebarNav label={t("student.nav.label")} tone="light" onNavigate={close} groups={[{ key: "more", items: moreLinks }]} />}
+          {moreGroups.some((g) => g.items.length > 0) && <SidebarNav label={t("student.nav.label")} tone="light" onNavigate={close} groups={moreGroups} />}
           {/* U8: the checklist sheet opens after "More" closed (one modal at a time) */}
           <GettingStartedPill state={start} tone="light" onOpen={() => { close(); setStartOpen(true); }} />
           {!testStudent && data.current && <div className="px-3"><AccessPill data={data} onNavigate={close} /></div>}

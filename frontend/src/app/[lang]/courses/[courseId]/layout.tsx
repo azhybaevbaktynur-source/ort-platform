@@ -13,7 +13,7 @@ import { StatusBadge } from "@/components/lms/course/CourseCard";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { StaffCourseBar } from "@/components/lms/course/StaffCourseUi"; // Phase 6b S5c
 import { useDeclareArea, useDeclareStudentCourse } from "@/components/lms/LmsShell"; // Phase 6b integration; Student UI U2
-import { templateUi } from "@/lib/lms/templates"; // Student UI U2
+import { isExamShellCourse } from "@/lib/lms/templates"; // Student UI U2; TEACHER_TO_STUDENT_MAP §2.5
 // --- Phase 8c S1 begin --- (course sidebar, Student view, hidden areas: PHASE_8C_DESIGN §2, §6)
 import { CourseSidebar } from "@/components/lms/course/CourseSidebar";
 import { AreaUnavailable } from "@/components/lms/course/AreaUnavailable";
@@ -106,13 +106,15 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
   // --- Student UI U2 (STUDENT_UI_DESIGN §2.2): inside an exam-prep course the student shell's sidebar navigates, so
   // the course sidebar is not shown. SF-1 (STUDENT_UI_FIX_PLAN §2.1): the lobby, the result and the review are
   // here too, in a reading column without course header or breadcrumbs ---
-  if (!staffFrame && role === "student" && templateUi(course).studentLayout === "exam_prep") {
+  // TEACHER_TO_STUDENT_MAP §2.5: a lesson course attached to an exam (`exam_course_id`) is in the same shell
+  if (!staffFrame && role === "student" && isExamShellCourse(course)) {
     const examPage = attemptsPage || /^\/[^/]+\/courses\/[^/]+\/assessments\/[^/]+$/.test(pathname);
     // Student UI U4 (§3.2) / U6 (§3.3) / U7 (§3.5): Тесты, Аналитика and the lesson pages have their own title (course
     // name as subtitle); the course page only redirects there
     const ownTitle = examPage || pathname === base || pathname === `${base}/tests` || pathname === `${base}/progress`
       || pathname === `${base}/modules` || pathname.startsWith(`${base}/modules/`)
-      || pathname === `${base}/saved` || pathname === `${base}/practice`; // U8: Сохранённые, Практика
+      || pathname === `${base}/saved` || pathname === `${base}/practice` // U8: Сохранённые, Практика
+      || pathname === `${base}/lessons`; // TEACHER_TO_STUDENT_MAP §2.4: "Все уроки"
     const body = hidden ? <AreaUnavailable courseId={course.id} /> : children;
     return (
       <CourseContext.Provider value={ctx}>

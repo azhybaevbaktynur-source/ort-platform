@@ -62,3 +62,44 @@ export function studentNavLinks({ lang, rest, courseId, features }: StudentNavIn
     practice: { key: "practice", href: `${base}${c}/practice`, active: under(rest, `${c}/practice`) },
   };
 }
+
+// --- TEACHER_TO_STUDENT_MAP §2.4 begin --- (the УРОКИ group: one row per lesson course attached to the current exam)
+
+/** Rows shown in the sidebar; with more, a "Все уроки" link opens `/courses/{exam}/lessons`. */
+export const LESSON_ROWS_MAX = 8;
+
+export interface LessonCourseRowInput {
+  id: string;
+  enrolled: boolean;
+  progress: { done: number; total: number } | null;
+}
+
+export interface LessonCourseLink {
+  id: string;
+  href: string;
+  active: boolean;
+  /** the ring: enrolled with something to finish; null: nothing on the right */
+  progress: { done: number; total: number } | null;
+}
+
+/**
+ * Enrolled: the course overview (`/courses/{lc}/modules`); not enrolled: its catalog landing, which joins. The row is
+ * active anywhere inside the lesson course and on its landing.
+ */
+export function lessonCourseLinks({ lang, rest, examId, rows }: {
+  lang: string; rest: string; examId: string | null; rows: LessonCourseRowInput[] | null;
+}): { rows: LessonCourseLink[]; all: { href: string; active: boolean } | null } {
+  if (!examId || !rows || rows.length === 0) return { rows: [], all: null };
+  const base = `/${lang}`;
+  const pathCourse = courseIdOfPath(rest);
+  const links = rows.slice(0, LESSON_ROWS_MAX).map((r) => ({
+    id: r.id,
+    href: r.enrolled ? `${base}/courses/${r.id}/modules` : `${base}/courses/catalog/${r.id}`,
+    active: pathCourse === r.id || under(rest, `/courses/catalog/${r.id}`),
+    progress: r.enrolled && r.progress && r.progress.total > 0 ? r.progress : null,
+  }));
+  const allPath = `/courses/${examId}/lessons`;
+  const all = rows.length > LESSON_ROWS_MAX ? { href: `${base}${allPath}`, active: under(rest, allPath) } : null;
+  return { rows: links, all };
+}
+// --- TEACHER_TO_STUDENT_MAP §2.4 end ---

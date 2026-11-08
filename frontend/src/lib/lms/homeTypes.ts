@@ -75,6 +75,8 @@ export interface HomeCourseOut {
   tests_count?: number;
   /** F7a: lessons (page, file, link) of published modules */
   lessons_count?: number;
+  /** TEACHER_TO_STUDENT_MAP §2.3: the exam course this lesson course is attached to (absent: older backend). */
+  exam_course_id?: string | null;
 }
 
 /** UX rework: one "To do" row of the dashboard. `attempt_id`: an attempt in progress. Dates are the caller's own. */

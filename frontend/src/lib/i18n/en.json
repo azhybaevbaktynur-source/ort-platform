@@ -328,7 +328,10 @@
       "season_ended": "The season has already ended.",
       "pro_not_active": "This person has no active Pro.",
       "settings_invalid": "Check the settings: the season end from today to 400 days ahead, prices as whole numbers from 0 to 1,000,000, texts up to 2000 characters.",
-      "plan_invalid": "There is no such plan."
+      "plan_invalid": "There is no such plan.",
+      "exam_link_forbidden": "Only a platform administrator links a course to an exam.",
+      "exam_link_not_allowed": "This course cannot be linked to an exam.",
+      "exam_link_target_invalid": "Choose a published exam course of the platform."
     }
   },
   "courses": {
@@ -496,6 +499,12 @@
         "proLink": "Pro section",
         "adminOnly": "Only the platform administrator changes these settings.",
         "notPlatform": "Pro is available on platform courses. All tests of this course are open to its students."
+      },
+      "examLink": {
+        "label": "Exam of this course",
+        "none": "Not linked",
+        "help": "The course appears under Lessons for the students of this exam.",
+        "loadFailed": "Could not load the exams. Try again later."
       }
     },
     "status": {
@@ -6956,7 +6965,8 @@
       "otherAreas": "Other areas",
       "catalog": "Catalog",
       "more": "More",
-      "tabBar": "Main sections"
+      "tabBar": "Main sections",
+      "allLessons": "All lessons"
     },
     "switcher": {
       "label": "My exams",
@@ -6990,6 +7000,10 @@
         "practice": "Do a practice set",
         "install": "Install the app"
       }
+    },
+    "lessonCourses": {
+      "emptyTitle": "No lesson courses yet",
+      "emptyBody": "Courses with lessons for this exam will appear here."
     }
   }
 }

@@ -25,6 +25,8 @@ export interface SidebarNavGroup {
   key: string;
   /** Small-caps group label ("УРОКИ"); none for the first group. */
   label?: string;
+  /** An unlabelled group after a labelled one: the group gap instead of the item rhythm (TEACHER_TO_STUDENT_MAP §2.4). */
+  gap?: boolean;
   items: SidebarNavItem[];
 }
 
@@ -91,7 +93,7 @@ export function SidebarNav({ label, groups, tone = "navy", onNavigate, className
     <nav aria-label={label} className={className}>
       {groups.filter((g) => g.items.length > 0).map((g, idx) => (
         // the group gap only before a labelled group; unlabelled groups continue the 2 px item rhythm
-        <div key={g.key} className={idx === 0 ? undefined : g.label ? "mt-4" : "mt-0.5"}>
+        <div key={g.key} className={idx === 0 ? undefined : g.label || g.gap ? "mt-4" : "mt-0.5"}>
           {g.label && (
             <p className={cn("mb-1 px-3 text-[11px] font-semibold uppercase leading-4 tracking-[0.08em]",
               tone === "navy" ? "text-white/80" : "text-slate-500")}>
