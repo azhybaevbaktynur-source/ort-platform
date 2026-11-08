@@ -124,7 +124,8 @@ from app.lms.exam_prep.policies import EXAM_PREP_POLICIES  # noqa: E402  (Exam p
 
 ROUTE_POLICIES.update(EXAM_PREP_POLICIES)
 # TEACHER_TO_STUDENT_MAP 2.3: lesson courses of an exam-prep course; enrolled (students, test students) or staff of
-# the exam course, else 403 (`lesson_courses.require_member`); 404 for a course without the exam-prep page
+# the exam course (`course.read`), else 403 (`lesson_courses.require_member`, checked first); then 404 for a course
+# without the exam-prep page
 ROUTE_POLICIES[("GET", "/api/v1/courses/{course_id}/lesson-courses")] = "course:course.read"
 # --- Phase 8b S1 begin --- (PHASE_8B_DESIGN 6.1: no new route in S1; the preview policy name is registered here and
 # S2 moves `exam_templates.policies.PLANNED_POLICIES` into EXAM_TEMPLATE_POLICIES when it mounts the routes)

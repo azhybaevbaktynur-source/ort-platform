@@ -91,7 +91,9 @@ def _rollup(db: Session, orgs: list) -> dict:
             select(key, func.count(distinct(Enrollment.user_id))).select_from(Enrollment)
             .join(Course, Course.id == Enrollment.course_id)
             .join(Organization, Organization.id == Course.organization_id)
+            .join(User, User.id == Enrollment.user_id)  # fb8 review fix 6: disabled accounts are not counted
             .where(Enrollment.role == "student", Enrollment.state == "active", Enrollment.is_test_student.is_(False),
+                   User.disabled_at.is_(None),
                    Course.deleted_at.is_(None), regular_courses(), in_tree).group_by(key)).all())
         # storage: one row per (tree, member) first, so a member of a school and of its department counts once
         pairs = (select(key.label("k"), OrganizationMember.user_id.label("uid")).select_from(OrganizationMember)
@@ -128,7 +130,8 @@ def affected(db: Session, org: Organization) -> dict:
 
 def students_query(org: Organization, q: Optional[str]) -> Select:
     """Rows of (User, courses, first_enrolled_at, last_active_enrollment_at, sort_key): every active student of the
-    subtree's live regular courses (test students excluded), one aggregate subquery grouped by user."""
+    subtree's live regular courses (test students and disabled accounts excluded), one aggregate subquery grouped by
+    user."""
     from app.lms.courses.models import Course
     from app.lms.courses.scopes import regular_courses
     from app.lms.enrollments.models import Enrollment
@@ -143,7 +146,7 @@ def students_query(org: Organization, q: Optional[str]) -> Select:
                   Enrollment.is_test_student.is_(False))
            .group_by(Enrollment.user_id).subquery("org_students"))
     stmt = (select(User, agg.c.courses, agg.c.first_at, agg.c.last_at, student_sort_expr().label("sort_key"))
-            .join(agg, agg.c.uid == User.id))
+            .join(agg, agg.c.uid == User.id).where(User.disabled_at.is_(None)))  # fb8 review fix 6
     if q and q.strip():
         needle = like_escape(q.strip().lower()) + "%"
         stmt = stmt.where(or_(func.lower(User.display_name).like(needle, escape="\\"),
