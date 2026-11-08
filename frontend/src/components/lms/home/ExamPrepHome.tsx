@@ -24,13 +24,14 @@ import { STUDENT_TITLE } from "@/components/lms/student/StudentPageHeader";
 import { NextCard } from "@/components/lms/examPrep/NextCard";
 import { GoalEditor, fmtExamDate } from "@/components/lms/examPrep/GoalStrip";
 import { noteExamPrep } from "@/components/lms/student/gettingStarted"; // Student UI U8
-import { COURSE_GRID, CourseCard } from "@/components/lms/course/CourseCard";
+import { CourseCard } from "@/components/lms/course/CourseCard";
 import { PlatformCourses } from "./PlatformCourses";
 import { HOME_CARD, StreakCard, StreakCardSkeleton } from "./StreakCard";
 import { useErrorText } from "./useErrorText";
 
-/** Course cards: as many 16rem columns as fit (one at 375 px, never thin at 1920 px). */
-export const HOME_CARD_GRID = COURSE_GRID;
+/** Course cards on the home: the main column sits next to a side column, so the count follows the container, not
+ * the viewport (owner 2026-11-08, item 1): as many 256–360 px columns as fit (one at 375 px, two at 1440 px, never thin). */
+export const HOME_CARD_GRID = "grid gap-4 grid-cols-[repeat(auto-fill,minmax(min(100%,256px),360px))]";
 
 type GreetingPart = "morning" | "afternoon" | "evening";
 function partOfDay(hour: number): GreetingPart {
