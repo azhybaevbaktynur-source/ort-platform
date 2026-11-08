@@ -139,8 +139,9 @@ title row).
 ### 2.6 Teacher / admin surface
 
 - Course settings (`/courses/{c}/settings`, platform courses only, caller platform admin): select **"Экзамен"** with
-  the published exam courses of the platform (`GET /courses?…` staff list filtered client-side by
-  `template.student_layout === "exam_prep"`), "—" clears. Help text: "Курс появится в разделе Уроки у студентов этого
+  the platform's exam courses, "—" clears. S3: one request, `GET /platform/courses?exam_prep=true` (platform admins
+  only; live platform courses whose template has the exam-prep layout, the same rule as the link target; no new
+  route), replacing S2's catalog read plus one `getCourse` per row. Help text: "Курс появится в разделе Уроки у студентов этого
   экзамена". Keys `courses.settings.examLink.*` (en/ky/ru).
 - Teacher course page: a quiet line under the title "Уроки экзамена: ОРТ (на русском)" when attached.
 - Admin → Courses list: column "Экзамен" (item 5 may restyle; S2 adds the field only).

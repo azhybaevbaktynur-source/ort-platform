@@ -5,10 +5,9 @@
 // server and the platform admin (Admin → Pro), so this section only explains and links; it changes nothing there.
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
-import { listCatalog } from "@/lib/lms/catalog";
-import { concludeCourse, getCourse, publishCourse, reopenCourse, unpublishCourse, updateCourse } from "@/lib/lms/courses";
+import { getAdminCourse, listAdminCourses } from "@/lib/lms/admin";
+import { concludeCourse, publishCourse, reopenCourse, unpublishCourse, updateCourse } from "@/lib/lms/courses";
 import { pickLocalized } from "@/lib/lms/localized";
-import { templateUi } from "@/lib/lms/templates";
 import { useAuth } from "@/lib/auth-context";
 import type { CourseStaffOut, LocalizedText } from "@/lib/lms/types";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
@@ -17,21 +16,18 @@ import { Button, Card, ConfirmDialog, LinkButton, OverflowMenu, Select } from "@
 import { SavedNote, SectionLayout, useSave } from "./shared";
 
 // --- TEACHER_TO_STUDENT_MAP §2.6 begin --- (the exam link of a platform lesson course; the server checks every rule)
-interface ExamChoice { id: string; title: LocalizedText; default_language: CourseStaffOut["default_language"] }
-const CATALOG_LIMIT = 100;
+interface ExamChoice { id: string; title: LocalizedText }
+const CHOICES_LIMIT = 100;
 
-/** The platform's exam-prep courses: platform courses of the catalog whose template has the exam-prep layout (the
- * course read carries the template), plus the linked exam when the catalog does not list it. */
+/** The platform's exam-prep courses in one request (`GET /platform/courses?exam_prep=true`, platform admins only, the
+ * server's rule for a link target), plus the linked exam when the list no longer has it (deleted since). */
 async function loadExamChoices(course: CourseStaffOut): Promise<ExamChoice[]> {
-  const page = await listCatalog(null, CATALOG_LIMIT);
-  const ids = page.items.filter((c) => c.is_platform_course && c.id !== course.id).map((c) => c.id);
-  if (course.exam_course_id && !ids.includes(course.exam_course_id)) ids.push(course.exam_course_id);
-  const read = await Promise.allSettled(ids.map((id) => getCourse(id)));
-  const out: ExamChoice[] = [];
-  for (const r of read) {
-    if (r.status === "fulfilled" && templateUi(r.value).studentLayout === "exam_prep") {
-      out.push({ id: r.value.id, title: r.value.title, default_language: r.value.default_language });
-    }
+  const page = await listAdminCourses({ exam_prep: true, limit: CHOICES_LIMIT });
+  const out: ExamChoice[] = page.items.filter((c) => c.id !== course.id).map((c) => ({ id: c.id, title: c.title }));
+  const linked = course.exam_course_id;
+  if (linked && !out.some((c) => c.id === linked)) {
+    const c = await getAdminCourse(linked).catch(() => null);
+    out.push({ id: linked, title: c?.title ?? {} });
   }
   return out;
 }
@@ -54,7 +50,7 @@ function ExamLinkField({ course, onSaved }: { course: CourseStaffOut; onSaved: (
   const save = () => s.run(async () => onSaved(await updateCourse(course.id, { exam_course_id: value || null })));
   const options = [
     { value: "", label: t("courses.settings.examLink.none") },
-    ...(choices ?? []).map((c) => ({ value: c.id, label: pickLocalized(c.title, lang, c.default_language) || t("courses.list.untitled") })),
+    ...(choices ?? []).map((c) => ({ value: c.id, label: pickLocalized(c.title, lang) || t("courses.list.untitled") })),
   ];
   return (
     <div className="space-y-2 border-t border-slate-100 pt-4">

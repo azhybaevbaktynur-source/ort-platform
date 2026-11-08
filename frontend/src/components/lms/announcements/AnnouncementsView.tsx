@@ -13,6 +13,9 @@ import { HiddenAreaBadge } from "@/components/lms/course/StaffCourseUi";
 import { fmtShortDateTime } from "@/components/lms/home/format";
 import { ContentError } from "@/components/lms/pages/ApiError";
 import { SafeHtml } from "@/components/lms/pages/SafeHtml";
+import { StudentPageHeader } from "@/components/lms/student/StudentPageHeader";
+import { pickLocalized } from "@/lib/lms/localized";
+import { isExamShellCourse } from "@/lib/lms/templates";
 import { Badge, Button, ConfirmDialog, EmptyState, LinkButton, LoadingState, PageHeader, Pagination, toast } from "@/components/ui";
 
 type Row = AnnouncementStaffOut | AnnouncementStudentOut;
@@ -23,6 +26,9 @@ export function AnnouncementsView() {
   const { course } = useCourse();
   const canEdit = useCanEditContent();
   const base = `/${lang}/courses/${course.id}/announcements`;
+  // G2 (TEACHER_TO_STUDENT_MAP S3): a student in the exam shell gets the student page header (the layout drops the
+  // course header here), the course name as its subtitle
+  const studentShell = !canEdit && course.my_enrollment.role === "student" && isExamShellCourse(course);
   const [items, setItems] = useState<Row[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,12 +95,17 @@ export function AnnouncementsView() {
 
   return (
     <div>
-      <PageHeader
-        title={t("announcements.title")}
-        badge={<HiddenAreaBadge course={course} area="announcements" />} /* FB8-5 S1 (D-FB8-5-2) */
-        description={canEdit ? undefined : t("announcements.descriptionStudent")}
-        primaryAction={canEdit ? <LinkButton href={`${base}/new`} leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}>{t("announcements.new")}</LinkButton> : undefined}
-      />
+      {studentShell ? (
+        <StudentPageHeader title={t("announcements.title")} className="mb-6"
+          subtitle={pickLocalized(course.title, lang, course.default_language) || undefined} />
+      ) : (
+        <PageHeader
+          title={t("announcements.title")}
+          badge={<HiddenAreaBadge course={course} area="announcements" />} /* FB8-5 S1 (D-FB8-5-2) */
+          description={canEdit ? undefined : t("announcements.descriptionStudent")}
+          primaryAction={canEdit ? <LinkButton href={`${base}/new`} leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}>{t("announcements.new")}</LinkButton> : undefined}
+        />
+      )}
       <ContentError error={actionError} className="mb-4" />
       {loading ? <LoadingState /> : error ? <ContentError error={error} onRetry={() => void load()} /> : items.length === 0 ? (
         <EmptyState mascot={canEdit ? "working" : "reading"} title={t("announcements.empty")} description={t(canEdit ? "announcements.emptyHintStaff" : "announcements.emptyHintStudent")}

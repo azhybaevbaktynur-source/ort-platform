@@ -26,6 +26,7 @@ import { GoalEditor, fmtExamDate } from "@/components/lms/examPrep/GoalStrip";
 import { noteExamPrep } from "@/components/lms/student/gettingStarted"; // Student UI U8
 import { CourseCard } from "@/components/lms/course/CourseCard";
 import { PlatformCourses } from "./PlatformCourses";
+import { ContinueLessons, LessonCourses, useLessonCourseRows } from "./LessonCourses"; // TEACHER_TO_STUDENT_MAP S3
 import { HOME_CARD, StreakCard, StreakCardSkeleton } from "./StreakCard";
 import { useErrorText } from "./useErrorText";
 
@@ -257,10 +258,11 @@ function PrepSkeleton() {
   );
 }
 
-/** The student's courses outside the exam switcher (teacher-made courses) as course cards. */
-function OtherCourses({ home }: { home: HomeOut }) {
+/** The student's courses outside the exam switcher (teacher-made courses) as course cards; S3: without the lesson
+ * courses of this exam (they are in "Уроки"). */
+function OtherCourses({ home, examId, lessonIds }: { home: HomeOut; examId: string; lessonIds: Set<string> }) {
   const { lang, t } = useTranslation();
-  const other = home.courses.filter((c) => c.student_layout !== "exam_prep");
+  const other = home.courses.filter((c) => c.student_layout !== "exam_prep" && c.exam_course_id !== examId && !lessonIds.has(c.id));
   if (other.length === 0) return null;
   return (
     <section aria-labelledby="home-other-courses" className="min-w-0">
@@ -327,6 +329,14 @@ export function ExamPrepHome({ courseId, courseTitle, home, homeError, side, emb
   const scored = (prep?.history.length ?? 0) > 0 || !!prep?.latest; // this course has a result
   const setGoal = (goal: ExamGoalOut) => { if (prep) setPrep({ ...prep, goal }); };
   const sections = !!prep && prep.history.length > 0; // U9 (review 4): the sections card only after a result
+  // TEACHER_TO_STUDENT_MAP S3: the exam's lesson courses ("Уроки", once each on the page) and the "continue" strip of
+  // this exam and its lesson courses; the platform courses wait for the rows, so a lesson course never shows twice
+  const lessonRows = useLessonCourseRows(courseId);
+  const lessonIds = new Set((lessonRows ?? []).map((r) => r.id));
+  const continueRows = lessonRows
+    ? (home?.modules_next ?? []).filter((r) => r.course_id === courseId || lessonIds.has(r.course_id))
+    : [];
+  const platformCourses = (home?.platform_courses ?? []).filter((c) => !lessonIds.has(c.id));
 
   return (
     <div className="w-full space-y-6">
@@ -338,6 +348,7 @@ export function ExamPrepHome({ courseId, courseTitle, home, homeError, side, emb
       ) : (
         <>
           <NextCard next={prep.next} courseId={courseId} className="rounded-card shadow-none" />
+          <ContinueLessons rows={continueRows} />
           {scored ? (
             <div className={cn("grid gap-4", activityState !== "failed" && "lg:grid-cols-2")}>
               {activityState === "loading" && <StreakCardSkeleton />}
@@ -363,8 +374,9 @@ export function ExamPrepHome({ courseId, courseTitle, home, homeError, side, emb
       )}
       {home ? (
         <>
-          <PlatformCourses courses={home.platform_courses ?? []} grid={HOME_CARD_GRID} joinVariant="secondary" />
-          <OtherCourses home={home} />
+          <LessonCourses rows={lessonRows} grid={HOME_CARD_GRID} />
+          {lessonRows && <PlatformCourses courses={platformCourses} grid={HOME_CARD_GRID} joinVariant="secondary" />}
+          <OtherCourses home={home} examId={courseId} lessonIds={lessonIds} />
         </>
       ) : homeError}
     </div>
