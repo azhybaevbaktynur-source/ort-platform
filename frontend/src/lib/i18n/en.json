@@ -1265,7 +1265,13 @@
       "counts": "{items} questions, {points} points",
       "attempts": "{inProgress} in progress, {submitted} submitted",
       "from": "Opens {date}",
-      "until": "Closes {date}"
+      "until": "Closes {date}",
+      "colTitle": "Title",
+      "colStatus": "Status",
+      "colAttempts": "Attempts",
+      "colAvailable": "Available",
+      "actionsFor": "Actions: {title}",
+      "always": "Always"
     },
     "student": {
       "title": "Quizzes",
@@ -5215,6 +5221,15 @@
       "title": "Not available yet",
       "body": "Your teacher has not published anything here.",
       "back": "Back to course"
+    },
+    "content": "Content",
+    "students": "Students",
+    "more": "More",
+    "tabs": {
+      "label": "Course content",
+      "structure": "Structure",
+      "assignments": "Assignments",
+      "exams": "Exams"
     }
   },
   "studentView": {

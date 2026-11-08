@@ -9,6 +9,7 @@ import { deleteAnnouncement, listAnnouncements, publishAnnouncement } from "@/li
 import type { AnnouncementStaffOut, AnnouncementStudentOut } from "@/lib/lms/pagesTypes";
 import { useCourse } from "@/components/lms/CourseContext";
 import { useCanEditContent } from "@/components/lms/content/StaffGate";
+import { HiddenAreaBadge } from "@/components/lms/course/StaffCourseUi";
 import { fmtShortDateTime } from "@/components/lms/home/format";
 import { ContentError } from "@/components/lms/pages/ApiError";
 import { SafeHtml } from "@/components/lms/pages/SafeHtml";
@@ -90,6 +91,7 @@ export function AnnouncementsView() {
     <div>
       <PageHeader
         title={t("announcements.title")}
+        badge={<HiddenAreaBadge course={course} area="announcements" />} /* FB8-5 S1 (D-FB8-5-2) */
         description={canEdit ? undefined : t("announcements.descriptionStudent")}
         primaryAction={canEdit ? <LinkButton href={`${base}/new`} leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}>{t("announcements.new")}</LinkButton> : undefined}
       />

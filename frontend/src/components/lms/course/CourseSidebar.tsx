@@ -2,12 +2,13 @@
 
 // Phase 8c S1 (PHASE_8C_DESIGN §2.1-§2.3): the short left course sidebar for staff and students, a "Course menu"
 // sheet on phones (`AreaShell` `phone="drawer"`). Links and active state come from `courseNavItems` (lib/lms/nav.ts);
-// students do not get Announcements and Files until something is published there, staff see a "hidden from
-// students" mark on those links instead.
+// students do not get Announcements and Files until something is published there.
+// FB8-5 S1 (STAFF_UX_AUDIT §2, D-FB8-5-1/2): staff get the five sections and a labelled "More" group; no crossed-eye
+// marker any more: a hidden area says so with a badge on its own page header.
 import React from "react";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3, BookOpen, Bookmark, ClipboardList, Dumbbell, EyeOff, FolderOpen, GraduationCap, Library, Megaphone, Settings,
+  BarChart3, BookOpen, Bookmark, ClipboardList, Dumbbell, FolderOpen, GraduationCap, Library, Megaphone, Settings,
   TrendingUp, Users,
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
@@ -43,7 +44,7 @@ export function CourseSidebar({ course, children }: { course: CourseOut; childre
       menuLabel={t("courseNav.menu")}
       items={links.map((l) => ({
         href: l.href, label: l.label, active: l.active, icon: ICONS[l.key],
-        marker: l.hiddenFromStudents ? { icon: <EyeOff />, label: t("courseNav.hiddenFromStudents") } : null,
+        group: l.group === "more" ? t("courseNav.more") : undefined,
       }))}
     >
       {children}
