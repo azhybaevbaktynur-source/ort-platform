@@ -585,3 +585,6 @@ Agent 2026-11-07 (problem 7): the course card's "N тестов" counts exams on
 2026-11-07: problem 6 deployed (main 68dc6cd, migration 0025_pro; Neon backup `backup-2026-11-07-before-pro-0025`). Prices, season end and how-to-pay text are empty until the owner sets them in Админ-панель → Доступ → Настройки; plans then show «уточняйте».
 2026-11-07: deleted Neon backup `backup-2026-11-01-before-phase10` (oldest; owner OK of 2026-11-07) to make room for the backup before migration 0026.
 2026-11-07: problem 7 deployed (main fe4a1e8, migration 0026_course_cover; Neon backup `backup-2026-11-07-before-covers-0026`). All seven owner problems of 2026-11-07 are deployed.
+
+## Owner feedback round 2026-11-08: staff areas, organizations, teacher → student (`phases/STAFF_FEEDBACK_2026-11-08.md`)
+Owner 2026-11-08 (item 0): keep the production branch and the 2 newest backups, delete the rest. Deleted the same day: `backup-2026-11-07-before-lessons-0024`, `backup-2026-11-06-before-person-s4`, `backup-2026-11-06-before-access-s3`, `backup-2026-11-06-before-admin-mfa-s1`, `backup-2026-11-06-before-exam-prep-s2`, `backup-2026-11-03-before-accounts`, `backup-2026-11-02-before-phase11`. Kept: `production`, `backup-2026-11-07-before-covers-0026`, `backup-2026-11-07-before-pro-0025` (3/10 branches).
