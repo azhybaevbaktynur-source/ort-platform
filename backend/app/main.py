@@ -128,6 +128,7 @@ async def lifespan(app: FastAPI):
 from app.core.logging import configure_logging  # noqa: E402
 from app.core.request_log import RequestLogMiddleware  # noqa: E402
 from app.core.sentry import init_sentry  # noqa: E402
+from app.core.server_timing import ServerTimingMiddleware  # noqa: E402
 
 configure_logging()
 init_sentry()  # Phase 11 S6: no-op without SENTRY_DSN
@@ -155,6 +156,7 @@ app.include_router(_invitations_router, prefix=settings.API_V1_STR)
 app.add_middleware(BodyCapMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(SecurityHeadersMiddleware)  # Phase 11 S4: just inside CORS, so every route's answer carries the headers
+app.add_middleware(ServerTimingMiddleware)  # PERFORMANCE_AUDIT: total, DB time and query count per answer
 app.add_middleware(RequestLogMiddleware)  # Phase 11 S6: outside the app, inside CORS
 app.add_middleware(
     CORSMiddleware,
@@ -163,7 +165,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
     # Phase 7b S5: the frontend (another origin) reads the server's file name of downloads (import-format CSV)
-    expose_headers=["Content-Disposition"],
+    # PERFORMANCE_AUDIT: scripts and developer tools on the frontend's origin read the timings
+    expose_headers=["Content-Disposition", "Server-Timing"],
 )
 
 # --- Phase 6 S2b begin --- (GET /courses/templates; before api_router so it wins over /courses/{course_id})
