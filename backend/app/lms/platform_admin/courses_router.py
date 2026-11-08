@@ -6,7 +6,7 @@ import uuid
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, Query, Request
-from sqlalchemy import String, cast, func, or_
+from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -41,13 +41,29 @@ def _one(db: Session, course_id: uuid.UUID) -> AdminCourseOut:
     return out
 
 
+def _exam_prep_platform_where():
+    """TEACHER_TO_STUDENT_MAP 2.6 (S3): `?exam_prep=true` keeps the live platform courses whose course template has
+    the exam-prep layout: the choices of the exam-link select in course settings (one request, the rule of
+    `courses.service._check_exam_link`'s target)."""
+    from app.lms.access.service import platform_path_clause
+    from app.lms.organizations.models import Organization
+    from app.lms.templates import registry
+
+    keys = [tpl.key for tpl in registry.all() if tpl.key and tpl.student_layout == "exam_prep"]
+    platform_orgs = select(Organization.id).where(platform_path_clause(Organization.path))
+    return (Course.deleted_at.is_(None), Course.template_key.in_(keys), Course.organization_id.in_(platform_orgs))
+
+
 @router.get("/courses", response_model=PageOut[AdminCourseOut])
 def list_courses(q: Optional[str] = Query(None, max_length=100),
                  status: Optional[Literal["draft", "published", "concluded"]] = None,
                  deleted: Optional[bool] = None, owner_id: Optional[str] = Query(None, max_length=64),
+                 exam_prep: Optional[bool] = None,
                  cursor: Optional[str] = None, limit: int = 25,
                  admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
     stmt = svc.admin_courses_query().where(regular_courses())  # Phase 8b S1: sandboxes are never listed
+    if exam_prep is True:
+        stmt = stmt.where(*_exam_prep_platform_where())
     if q:
         needle = "%" + svc.like_escape(q.strip().lower()) + "%"
         stmt = stmt.where(or_(

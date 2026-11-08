@@ -136,6 +136,13 @@ function SideLists({ data, skipCourse }: { data: HomeOut; skipCourse?: string })
                 )} />
             ))}
           </ul>
+          {/* G2 (TEACHER_TO_STUDENT_MAP S3): the exam course's own list (no sidebar item for it) */}
+          {skipCourse && news.some((r) => r.course_id === skipCourse) && (
+            <Link href={`${base}/${skipCourse}/announcements`}
+              className="flex min-h-11 items-center rounded-xl px-3 text-sm font-medium text-brand-700 hover:bg-slate-50 hover:underline sm:min-h-9">
+              {t("home.announcements.all")}
+            </Link>
+          )}
         </SideSection>
       )}
     </>

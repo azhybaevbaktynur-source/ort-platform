@@ -3547,7 +3547,8 @@
       }
     },
     "announcements": {
-      "title": "Announcements"
+      "title": "Announcements",
+      "all": "All announcements"
     },
     "dashboard": "Dashboard",
     "todo": {
@@ -3599,7 +3600,13 @@
         "body": "The free tests are already yours. A pass opens the other exams and practice."
       },
       "addCourse": "Find a course in the catalog",
-      "otherCourses": "Other courses"
+      "otherCourses": "Other courses",
+      "continueLesson": {
+        "title": "Continue lesson"
+      },
+      "lessonCourses": {
+        "subtitle": "Lesson courses for this exam."
+      }
     }
   },
   "shell": {
