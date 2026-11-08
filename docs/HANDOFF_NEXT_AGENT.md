@@ -61,6 +61,7 @@ Neon backups (free plan: **max 10 branches, 1 manual snapshot**): before-ux-rewo
 - Give every agent that creates branches `isolation: "worktree"`; an architect without it once switched the main checkout and later commits landed on its branch. Check `git branch --show-current` before every push.
 - A network disconnect kills agents' background commands silently: check `ps` and nudge the agent ("rerun what you were waiting on").
 - Remove a subagent's worktree as soon as its branch is merged into `main` (owner 2026-11-08): check `git status --porcelain` is empty apart from the `frontend/node_modules` symlink and `git merge-base --is-ancestor HEAD origin/main`, then `git worktree unlock` + `git worktree remove --force`; keep the branch. Skip and report any worktree that fails a check.
+- Parallel agents need their own backend scratch dirs (`/tmp/agy_t_<slice>`), not the shared `/tmp/agy_t` from AGENTS.md §5: one agent's `rm -rf` wipes another's running suite (2026-11-09).
 - Background wait loops must not use `pgrep -f <pattern>` with a pattern from their own command line (it matches itself and never ends); wait on a PID or an output file instead.
 - When two slices edit the same page files, let the later slice merge the phase branch and resolve (it knows its changes).
 - GitHub API unauthenticated limit is 60/hour: poll CI every 2 minutes at most.
