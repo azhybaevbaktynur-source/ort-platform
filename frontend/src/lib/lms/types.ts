@@ -1,4 +1,5 @@
 import type { StorageLevel } from "./storage";
+import type { HomeTeacherApplicationOut } from "./homeTypes";
 // TypeScript mirrors of the Phase 1 API schemas (docs/phases/PHASE_1_DESIGN.md section 5).
 // Single source of truth for S4 and S5.
 
@@ -35,6 +36,8 @@ export interface MeOut {
   admin_organizations: { id: string; name: string }[];
   is_guardian: boolean;
   has_student_enrollments?: boolean; // Owner feedback 2026-11-08 (item 2): shows Learning to people who also teach
+  /** Item 2: the home's "application approved" line, for an approved teacher without Learning (null otherwise). */
+  teacher_application?: HomeTeacherApplicationOut | null;
 }
 export interface MePatchIn {
   locale: Lang;

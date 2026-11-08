@@ -51,7 +51,7 @@ function useCatalogHashRedirect() {
   }, [lang, router]);
 }
 
-function TeachingList() {
+function TeachingList({ noLearning = false }: { noLearning?: boolean }) {
   const { lang, t } = useTranslation();
   const errorText = useErrorText();
   const [items, setItems] = useState<CourseCardDto[]>([]);
@@ -79,6 +79,8 @@ function TeachingList() {
     <div className="space-y-4">
       {/* Accounts: a revoked teacher keeps this list, read-only */}
       {me?.teacher_status === "revoked" && <TeacherApplicationNotice application={{ status: "revoked" }} />}
+      {/* item 2: without the Learning tab, the student home's "approved" line shows here instead (once) */}
+      {noLearning && me?.teacher_application && <TeacherApplicationNotice application={me.teacher_application} />}
       {error && items.length === 0 ? <ErrorState message={errorText(error)} onRetry={() => void load()} retrying={loading} /> : null}
       {error && items.length > 0 ? <ErrorState variant="inline" message={errorText(error)} onRetry={() => void load(cursor)} /> : null}
       {loading && items.length === 0 && !error && <LoadingState rows={3} />}
@@ -162,7 +164,7 @@ export default function CoursesPage() {
           : undefined}
       />
       <Suspense fallback={null}><ViewSync onView={setTab} noLearning={noLearning} /></Suspense>
-      {noLearning ? <TeachingList /> : (
+      {noLearning ? <TeachingList noLearning /> : (
         <>
           <Tabs id={TABS_ID} label={t("courses.list.title")} value={current} onChange={(v) => changeTab(v as Tab)} className="mb-6"
             items={[{ id: "teaching", label: t("courses.list.teaching") }, { id: "learning", label: t("courses.list.learning") }]} />

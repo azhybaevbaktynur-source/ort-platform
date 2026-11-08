@@ -77,3 +77,15 @@ async def test_student_view_does_not_make_the_teacher_a_learner(db, api):
     res = await api.call(t, "POST", f"/courses/{course.id}/student-view")
     assert res.status_code in (200, 201), res.text
     assert await _learns(api, t) is False
+
+
+async def test_the_approved_line_reaches_a_teacher_without_learning_only(db, api):
+    from app.lms.teachers.models import TeacherRequest
+
+    t, other = teacher(db), teacher(db)
+    db.add(TeacherRequest(user_id=t.id, status="approved", decided_at=utcnow()))
+    db.commit()
+    assert (await api.call(t, "GET", "/me/lms")).json()["teacher_application"]["status"] == "approved"
+    assert (await api.call(other, "GET", "/me/lms")).json()["teacher_application"] is None  # nothing to say
+    enroll(db, make_course(db, other), t)  # with Learning, the student home shows it (once)
+    assert (await api.call(t, "GET", "/me/lms")).json()["teacher_application"] is None

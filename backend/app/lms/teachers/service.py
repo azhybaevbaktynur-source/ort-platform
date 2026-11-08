@@ -100,6 +100,20 @@ def has_student_enrollments(user: User) -> bool:
     return bool(db.execute(select(learns)).scalar())
 
 
+def approved_notice(user: User):
+    """Owner feedback 2026-11-08 (item 2): the home's "application approved" line for an approved teacher, from the same
+    rule (`home.service._teacher_application`), so it also reaches a teacher whose /courses has no Learning tab."""
+    from sqlalchemy.orm import object_session
+
+    from app.lms.core import clock
+    from app.lms.home.service import _teacher_application
+
+    db = object_session(user)
+    if db is None or user.teacher_status != "approved":
+        return None
+    return _teacher_application(db, user, clock.now())
+
+
 def set_locale(db: Session, user: User, locale: str) -> User:
     user.locale = locale
     db.commit()
