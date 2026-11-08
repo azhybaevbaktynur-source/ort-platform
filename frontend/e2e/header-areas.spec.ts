@@ -67,7 +67,8 @@ test("the same menu on every page, also while the API is slow", async ({ page })
 test("a first visit shows placeholders, never a partial menu", async ({ page }) => {
   await page.setViewportSize(VIEWPORTS.desktop);
   await signIn(page, seed().admin);
-  await page.route("**/api/v1/me/lms", async (route) => {
+  // the shell's account answer: `/me/bootstrap` since PERFORMANCE_AUDIT S2 (`/me/lms` kept for other readers)
+  await page.route(/\/api\/v1\/me\/(lms|bootstrap)(\?|$)/, async (route) => {
     await new Promise((done) => setTimeout(done, 1500));
     await route.continue();
   });

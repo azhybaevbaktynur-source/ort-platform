@@ -128,6 +128,29 @@ async def test_admin_gets_no_student_part(db, api):
     assert body["student"] is None and body["me"]["is_platform_admin"] is True
 
 
+async def test_admin_without_two_step_login_gets_only_me_under_the_requirement(db, api, monkeypatch):
+    """Integration fix: with ADMIN_MFA_REQUIRED an unenrolled admin's bootstrap answers like the parts it replaced (only
+    `/me/lms` is open; every other part is refused), so the shell can draw /admin/security instead of a load error."""
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "ADMIN_MFA_REQUIRED", True)
+    w = world(db)
+    admin = make_user(db, platform_admin=True)
+    enroll(db, w.exam, admin)  # learns somewhere: the student part would otherwise be there
+    invite(db, admin.email)
+    me = (await get(api, admin, "/me/lms")).json()
+    for path in ("/me/invitations", "/me/privacy", "/me/home/courses", "/me/access", f"/courses/{w.exam.id}/lesson-courses"):
+        r = await api.call(admin, "GET", path)
+        assert r.status_code == 403 and r.json()["error"]["code"] == "mfa_enrollment_required", path
+    body = (await get(api, admin, "/me/bootstrap")).json()
+    assert body == {"me": me, "pending_invitations": 0, "privacy": None, "student": None}
+    admin.mfa_enabled_at = clock.now()  # set up: the full answer, as without the requirement
+    db.commit()
+    body = (await get(api, admin, "/me/bootstrap")).json()
+    assert body["pending_invitations"] == 1 and body["privacy"] is not None
+    assert [c["id"] for c in body["student"]["courses"]] == [str(w.exam.id)]
+
+
 async def test_revoked_teacher_is_shown_as_a_student(db, api):
     u = make_user(db, teacher_status="revoked")
     body = await check(api, u, student=True)

@@ -10,6 +10,7 @@ import { KeyRound, LayoutGrid, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
 import { listMyCourses } from "@/lib/lms/courses";
+import { loadTeachingCourses } from "@/lib/lms/pageData";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
 import { useCachedMe } from "@/lib/lms/meCache"; // PERFORMANCE_AUDIT S1
 import type { CourseCard as CourseCardDto } from "@/lib/lms/types";
@@ -65,7 +66,7 @@ function TeachingList({ noLearning = false }: { noLearning?: boolean }) {
     setLoading(true);
     setError(null);
     try {
-      const page = await listMyCourses("teaching", next);
+      const page = next ? await listMyCourses("teaching", next) : await loadTeachingCourses(); // header prefetch
       setItems((prev) => (next ? [...prev, ...page.items] : page.items));
       setCursor(page.next_cursor);
     } catch (e) {

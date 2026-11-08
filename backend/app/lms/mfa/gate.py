@@ -22,6 +22,7 @@ OPEN_ROUTES: frozenset[tuple[str, str]] = frozenset({
     ("POST", f"{_V}/auth/refresh"),
     ("POST", f"{_V}/auth/logout-all"),
     ("GET", f"{_V}/me/lms"),  # the header: the account and its areas
+    ("GET", f"{_V}/me/bootstrap"),  # PERFORMANCE_AUDIT S2: answers only its `/me/lms` part while `must_enroll`
     ("GET", f"{_V}/me/organizations"),  # the header: own memberships (read only)
     ("GET", f"{_V}/platform/security/mfa"),
     ("POST", f"{_V}/platform/security/mfa/setup"),

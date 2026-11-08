@@ -10,7 +10,8 @@ import { LmsMeProvider, useLmsMeLoader } from "@/lib/lms/useLmsMe";
 import { useCachedMe } from "@/lib/lms/meCache"; // PERFORMANCE_AUDIT S1
 import { areaFromUrl, hidesLearning, isPlayerRoute, shellKindFor, urlAreaFor, type ShellKind, type ShellMe } from "@/lib/lms/shellKind"; // S1
 import { useCurrentOrg } from "@/lib/lms/currentOrg"; // item 4
-import { AppHeader, Brand, type AppHeaderArea, type AreaKey } from "@/components/ui/AppHeader";
+import { AppHeader, Brand, type AppHeaderArea, type AppHeaderLink, type AreaKey } from "@/components/ui/AppHeader";
+import { prefetchTeachingCourses } from "@/lib/lms/pageData"; // integration fix: header section prefetch
 import { ErrorState, LoadingState, SHELL_WIDTH, Skeleton, cn } from "@/components/ui";
 import { EXAM_COLUMN_INNER, EXAM_COLUMN_OUTER } from "@/components/ui/shellWidth";
 import { inter } from "@/lib/fonts"; // SF-1: the player route's font
@@ -200,7 +201,8 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
       { key: "learning", label: t("shell.areas.learning"), href: hasTeaching ? `${base}/courses?view=learning` : `${base}/courses`, icon: <BookOpen /> },
     ];
     if (hasTeaching || isAdmin) {
-      const sections = [{ href: `${base}/courses?view=teaching`, label: t("shell.teaching.courses"), active: rest === "/courses" && urlArea === "teaching" }];
+      // integration fix: "Мои курсы" asks its first page on hover/focus (pageData); the other sections have no cached reader
+      const sections: AppHeaderLink[] = [{ href: `${base}/courses?view=teaching`, label: t("shell.teaching.courses"), active: rest === "/courses" && urlArea === "teaching", prefetch: prefetchTeachingCourses }];
       if (canCreate) sections.push({ href: `${base}/courses/new`, label: t("lms.nav.create"), active: rest === "/courses/new" });
       if (canCreate || isAdmin) sections.push({ href: `${base}/grading-schemes`, label: t("lms.nav.gradingSchemes"), active: rest.startsWith("/grading-schemes") });
       sections.push({ href: `${base}/exam-templates`, label: t("examTemplates.nav.title"), active: rest.startsWith("/exam-templates") }); // Phase 7b S4
@@ -246,7 +248,12 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   // Latched per page: a background refresh that would change the frame is applied on the next navigation, never
   // mid-page. The frame is recomputed when the URL changes, when the page declares its area and when the first
   // answer arrives (cold). A page whose area is still unknown keeps the frame it was opened from.
-  const latchKey = `${pathname}?${view ?? ""}#${declared ?? ""}#${shellMe ? 1 : 0}`;
+  // Integration fix: also once when the first server answer of this page load arrives (sticky): a session-restored
+  // answer that is out of date (an application approved meanwhile) gives way to it; with a correct cache the frame is
+  // the same, and later background refreshes still wait for the next navigation.
+  const [confirmedSeen, setConfirmedSeen] = useState(false);
+  if (meState.confirmed && !confirmedSeen) setConfirmedSeen(true); // render-time update, like the latch below
+  const latchKey = `${pathname}?${view ?? ""}#${declared ?? ""}#${shellMe ? 1 : 0}#${confirmedSeen ? 1 : 0}`;
   const [latch, setLatch] = useState<{ key: string; kind: ShellKind } | null>(null);
   let kind: ShellKind = computedKind;
   if (latch && latch.key === latchKey) {
