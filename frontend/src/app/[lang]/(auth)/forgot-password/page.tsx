@@ -3,7 +3,8 @@
 import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/context";
-import { AuthHeader } from "@/components/auth/AuthHeader";
+import { useProviders } from "@/components/auth/ProviderButtons";
+import { AuthSplit, AuthTitle } from "@/components/auth/AuthSplit";
 import { Button, Input, buttonClasses } from "@/components/ui";
 import { useBackendWarmup } from "@/lib/useBackendWarmup";
 import { Mail, ArrowRight, AlertCircle, CheckCircle2 } from "lucide-react";
@@ -17,6 +18,7 @@ function ForgotPasswordForm() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const providers = useProviders();
   useBackendWarmup();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -45,19 +47,10 @@ function ForgotPasswordForm() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <AuthHeader />
-
-      <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
-        <div className="bg-white py-8 px-6 sm:px-10 shadow-lg border border-slate-200/80 rounded-3xl">
-          <div className="mb-6 text-center">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              {t("auth.forgotPasswordTitle")}
-            </h1>
-            <p className="mt-1 text-sm text-slate-600">
-              {t("auth.forgotPasswordSubtitle")}
-            </p>
-          </div>
+    <AuthSplit pose="thinking">
+        <div>
+          <AuthTitle title={t("auth.forgotPasswordTitle")} subtitle={t("auth.forgotPasswordSubtitle")} />
+          {!success && providers?.google && <p className="-mt-3 mb-6 text-sm text-slate-600">{t("auth.forgotGoogleHint")}</p>}
 
           {error && (
             <div role="alert" className="mb-5 flex items-start gap-2 rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-medium text-danger-800">
@@ -107,8 +100,7 @@ function ForgotPasswordForm() {
             </form>
           )}
         </div>
-      </div>
-    </div>
+    </AuthSplit>
   );
 }
 

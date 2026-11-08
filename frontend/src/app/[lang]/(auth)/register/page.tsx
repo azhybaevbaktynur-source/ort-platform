@@ -4,17 +4,18 @@ import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
-import { AuthHeader } from "@/components/auth/AuthHeader";
-import { Button, Input } from "@/components/ui";
+import { AuthAlert, AuthSplit, AuthTitle } from "@/components/auth/AuthSplit";
+import { AgeRow } from "@/components/auth/AgeRow";
+import { ProviderButtons } from "@/components/auth/ProviderButtons";
+import { Button } from "@/components/ui";
 import { useAuth, RegisterResult } from "@/lib/auth-context";
 import { safeRedirect } from "@/lib/safeRedirect";
 import { useBackendWarmup, useSlowHint } from "@/lib/useBackendWarmup";
 import { VerifyEmailStep, authErrorMessage } from "@/components/auth/VerifyEmailStep";
 import { PolicyAcceptField, SignUpEmailInput, SignUpNameInput, SignUpPasswordInput, useOwnPolicies } from "@/components/auth/SignUpFields";
-import { AgeButtons } from "@/components/privacy/AgeButtons";
 import { ownPolicyIds, type AgeBand } from "@/components/privacy/privacyApi";
 import { ownPrivacyErrorText } from "@/components/privacy/privacyErrors";
-import { Phone, ArrowRight, AlertCircle } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 function RegisterForm() {
   const router = useRouter();
@@ -27,7 +28,6 @@ function RegisterForm() {
   const redirectParam = safeParam || null;
 
   const [displayName, setDisplayName] = useState("");
-  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState(searchParams.get("email") || ""); // Phase 6 S4: prefilled from an invitation
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +63,7 @@ function RegisterForm() {
     setLoading(true);
 
     try {
-      setRegistered(await signUp(email, password, displayName, phone, {
+      setRegistered(await signUp(email, password, displayName, undefined, {
         ageBand: band as AgeBand,
         policyVersionIds: needsPolicies ? ownPolicyIds(policies ?? []) : [],
       }));
@@ -75,78 +75,46 @@ function RegisterForm() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <AuthHeader />
+    <AuthSplit pose="hello">
+      {registered ? (
+        <VerifyEmailStep
+          email={registered.email}
+          password={password}
+          resendAfterSeconds={registered.resendAfterSeconds}
+          codeTtlMinutes={registered.codeTtlMinutes}
+          reason="registered"
+          onVerified={goToApp}
+          onChangeEmail={() => setRegistered(null)}
+        />
+      ) : (
+        <>
+          <AuthTitle title={t("auth.signUpTitle")} subtitle={t("auth.signUpSubtitle")} />
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
-        <div className="bg-white py-8 px-6 sm:px-10 shadow-lg border border-slate-200/80 rounded-3xl">
-          {registered ? (
-            <VerifyEmailStep
-              email={registered.email}
-              password={password}
-              resendAfterSeconds={registered.resendAfterSeconds}
-              codeTtlMinutes={registered.codeTtlMinutes}
-              reason="registered"
-              onVerified={goToApp}
-              onChangeEmail={() => setRegistered(null)}
-            />
-          ) : (
-          <>
-          <div className="mb-6 text-center">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              {t("auth.signUpTitle")}
-            </h1>
-            {band && (
-              <p className="mt-1 text-sm text-slate-600">
-                {t("auth.signUpSubtitle")}
-              </p>
-            )}
-          </div>
+          <ProviderButtons redirect={redirectParam} />
 
-          {!band ? (
-            <>
-              <AgeButtons onChoose={(b) => { setAsParent(false); setBand(b); }} />
-              <div className="mt-3 text-center">
-                <Button type="button" variant="link" onClick={() => { setAsParent(true); setBand("18_plus"); }}>{t("privacy.parentLink")}</Button>
-              </div>
-            </>
-          ) : (
-          <>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-100 px-3 py-1">
-            <span className="min-w-0 break-words text-sm font-medium text-slate-800">
-              {asParent ? t("privacy.parentLink") : `${t("privacy.age.label")}: ${t(`privacy.age.${band}`)}`}
-            </span>
-            <Button type="button" variant="link" size="sm" onClick={() => { setBand(null); setAccepted(false); setError(null); }}>{t("privacy.age.change")}</Button>
-          </div>
-
-          {error && (
-            <div role="alert" className="mb-5 flex items-start gap-2 rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-medium text-danger-800">
-              <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-danger-700" />
-              <span>{error}</span>
-            </div>
-          )}
+          {error && <AuthAlert>{error}</AuthAlert>}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <SignUpNameInput value={displayName} onChange={setDisplayName} />
-
-            <Input label={t("auth.phone")} leading={<Phone className="h-4 w-4" />} type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={t("auth.phonePlaceholder")} />
-
             <SignUpEmailInput value={email} onChange={setEmail} />
-
             <SignUpPasswordInput value={password} onChange={setPassword} />
+
+            <AgeRow value={band} onChoose={(b) => { setAsParent(false); setBand(b); if (b === "under_14") setAccepted(false); }} />
 
             {needsPolicies && <PolicyAcceptField state={policyState} checked={accepted} onChange={setAccepted} />}
 
-            <Button type="submit" size="lg" fullWidth disabled={loading || (needsPolicies && !policies)} loading={loading} rightIcon={<ArrowRight aria-hidden="true" className="h-4 w-4" />}>
+            <Button type="submit" size="lg" fullWidth disabled={loading || !band || (needsPolicies && !policies)} loading={loading} rightIcon={<ArrowRight aria-hidden="true" className="h-4 w-4" />}>
               {loading ? t("auth.signingUp") : t("auth.signUpButton")}
             </Button>
             {slow && <p className="text-sm text-center text-slate-600">{t("auth.wakingServer")}</p>}
           </form>
-          </>
-          )}
 
-          {/* Link to Login */}
-          <div className="mt-6 text-center text-sm text-slate-600">
+          <div className="mt-3 text-center">
+            <Button type="button" variant="link" onClick={() => { setAsParent(true); setBand("18_plus"); }}>{t("auth.parentCta")}</Button>
+            {asParent && <p className="text-sm text-slate-600">{t("privacy.parentLink")}</p>}
+          </div>
+
+          <div className="mt-4 text-center text-sm text-slate-600">
             <span>{t("auth.haveAccount")} </span>
             <Link
               href={`/${lang}/login${redirectParam ? `?redirect=${encodeURIComponent(redirectParam)}` : ""}`}
@@ -155,11 +123,9 @@ function RegisterForm() {
               {t("auth.signInButton")}
             </Link>
           </div>
-          </>
-          )}
-        </div>
-      </div>
-    </div>
+        </>
+      )}
+    </AuthSplit>
   );
 }
 
