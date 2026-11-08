@@ -3,7 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
-import { useTranslation } from "@/lib/i18n/context";
+import { useStaffDictionary, useTranslation } from "@/lib/i18n/context";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
 import { getPlatformSummary } from "@/lib/lms/admin";
 import type { LmsApiError } from "@/lib/lms/client";
@@ -31,6 +31,7 @@ export function useAdminCrumbs() {
 /** Platform admin area: section nav (`AreaShell`) + client-side guard (the server is authoritative). */
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const { lang, t } = useTranslation();
+  const staffReady = useStaffDictionary(); // performance audit S4
   const { me, loading } = useLmsMe();
   const pathname = usePathname();
   const router = useRouter();
@@ -68,7 +69,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     if (mustEnroll && pathname !== securityPath) router.replace(securityPath);
   }, [mustEnroll, pathname, securityPath, router]);
 
-  if (loading && !me) return <LoadingState label={t("lms.common.loading")} />;
+  if ((loading && !me) || !staffReady) return <LoadingState label={t("lms.common.loading")} />;
   if (!isAdmin) {
     return (
       <EmptyState

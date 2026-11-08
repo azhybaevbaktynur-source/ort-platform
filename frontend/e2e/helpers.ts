@@ -306,6 +306,22 @@ export async function expectScreen(page: Page, info: TestInfo, name: string, opt
 
 // ----------------------------------------------------------------------------- viewports
 
+/** Performance audit S4: no visible text node is a raw translation key (`group.sub.key`): the staff dictionary must have arrived. */
+export async function expectNoRawKeys(page: Page): Promise<void> {
+  const raw = await page.evaluate(() => {
+    const found: string[] = [];
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const el = n.parentElement;
+      if (!el || ["SCRIPT", "STYLE", "NOSCRIPT"].includes(el.tagName)) continue;
+      const text = (n.textContent || "").trim();
+      if (/^[a-z]+(\.[a-zA-Z]+)+$/.test(text) && el.getClientRects().length) found.push(text);
+    }
+    return found;
+  });
+  expect(raw, "raw translation keys visible").toEqual([]);
+}
+
 export const VIEWPORTS = {
   phone: { width: 375, height: 812 },
   desktop: { width: 1440, height: 900 },
