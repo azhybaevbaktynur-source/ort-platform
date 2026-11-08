@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { getStudentView, leaveStudentView } from "@/lib/api";
 import { API_BASE_URL } from "@/lib/apiBase";
+import { clearAll as clearCachedAnswers } from "@/lib/lms/swr"; // PERFORMANCE_AUDIT S2
 
 /** Minimal signed-in user (the app authenticates with its own backend JWT, not Firebase). */
 export interface AuthUser {
@@ -91,6 +92,22 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 const PROFILE_KEY = "ort_dev_auth_user";
+// PERFORMANCE_AUDIT S2 (§5.2): when the stored profile was last confirmed; younger than PROFILE_FRESH_MS: no /auth/me
+const PROFILE_AT_KEY = "ort_dev_auth_user_at";
+const PROFILE_FRESH_MS = 10 * 60_000;
+const ME_URL = `${API_BASE_URL}/auth/me`; // directly to the API like every other call, not through the Vercel rewrite
+
+/** Runs `fn` after the first paint, when the browser is idle (at the latest after two seconds). */
+function afterPaint(fn: () => void): () => void {
+  const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
+    cancelIdleCallback?: (h: number) => void };
+  if (w.requestIdleCallback) {
+    const h = w.requestIdleCallback(fn, { timeout: 2000 });
+    return () => w.cancelIdleCallback?.(h);
+  }
+  const h = window.setTimeout(fn, 2000);
+  return () => window.clearTimeout(h);
+}
 
 function toProfile(u: any): AuthUserProfile {
   return {
@@ -145,6 +162,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (typeof window !== "undefined") {
       localStorage.removeItem("ort_token");
       localStorage.removeItem(PROFILE_KEY);
+      localStorage.removeItem(PROFILE_AT_KEY);
+      clearCachedAnswers(); // nothing the signed-out user was shown survives
       try {
         // pending autosave queues belong to the signed-out user
         for (const k of Object.keys(localStorage)) {
@@ -159,12 +178,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const startSession = (token: string, profile: AuthUserProfile) => {
     localStorage.setItem("ort_token", token);
     localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    localStorage.setItem(PROFILE_AT_KEY, String(Date.now()));
     setUserProfile(profile);
     setUser(toAuthUser(profile, token));
   };
 
   // Restore the session instantly from the cached profile, then confirm it with the backend in the
   // background. Pages no longer wait for /auth/me (slow while the server wakes up) before rendering.
+  // PERFORMANCE_AUDIT S2: with a stored profile the check runs after the first paint, and not at all while the profile
+  // is younger than ten minutes (the LMS pages never wait for it; every API call still checks the token).
   useEffect(() => {
     // --- UX rework S1 begin --- Student view: this tab's session is the test student's. Nothing is written to the
     // stored session of the teacher (shared with other tabs), and a dead token ends the mode, not the teacher's login.
@@ -176,7 +198,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
       (async () => {
         try {
-          const res = await fetch("/api/v1/auth/me", { headers: { Authorization: `Bearer ${studentView.token}` } });
+          const res = await fetch(ME_URL, { headers: { Authorization: `Bearer ${studentView.token}` } });
           if (res.status === 401 || res.status === 403) {
             leaveStudentView();
             return;
@@ -209,11 +231,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUserProfile(cached);
       setUser(toAuthUser(cached, storedToken));
       setLoading(false);
+      const at = Number(localStorage.getItem(PROFILE_AT_KEY) || 0);
+      if (at > 0 && Date.now() - at < PROFILE_FRESH_MS) return;
     }
 
-    (async () => {
+    const confirm = async () => {
       try {
-        const res = await fetch("/api/v1/auth/me", {
+        const res = await fetch(ME_URL, {
           headers: { Authorization: `Bearer ${storedToken}` },
         });
         if (res.status === 401 || res.status === 403) {
@@ -232,7 +256,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } finally {
         setLoading(false);
       }
-    })();
+    };
+    if (!cached) {
+      void confirm();
+      return;
+    }
+    return afterPaint(() => { void confirm(); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal, Optional
+from typing import TYPE_CHECKING, Literal, Optional
 
 from pydantic import BaseModel
 
@@ -211,3 +211,38 @@ RESULT_KEYS = frozenset(HomeResultOut.model_fields)
 COURSE_KEYS = frozenset(HomeCourseOut.model_fields)
 PROGRESS_KEYS = frozenset(HomeProgressOut.model_fields)
 PLATFORM_COURSE_KEYS = frozenset(HomePlatformCourseOut.model_fields)  # Exam prep S2
+
+
+# --- PERFORMANCE_AUDIT S2 begin --- (`GET /me/bootstrap`: the shell's one request; composition of existing answers)
+if TYPE_CHECKING:  # resolved by `home.bootstrap` (model_rebuild): these modules import this one
+    from app.lms.access.schemas import MyAccessOut
+    from app.lms.courses.lesson_courses import LessonCourseOut
+    from app.lms.privacy.schemas import NeedOut
+    from app.lms.teachers.schemas import MeOut
+
+
+class PrivacyBannerOut(BaseModel):
+    """What the shell's privacy line needs: `GET /me/privacy` without `requests`."""
+    age_band: Optional[str] = None
+    consent_state: str
+    consent_due_at: Optional[datetime] = None
+    needs: list[NeedOut]
+
+
+class BootstrapStudentOut(BaseModel):
+    courses: list[HomeCourseOut]  # `GET /me/home/courses?limit=50`'s first page (every student course)
+    access: Optional[MyAccessOut] = None  # `GET /me/access`; null without an exam-prep course or in Student view
+    # exam course id -> `GET /courses/{exam}/lesson-courses`, for every exam-prep course of `courses`
+    lesson_courses: dict[str, list[LessonCourseOut]] = {}
+
+
+class BootstrapOut(BaseModel):
+    me: MeOut  # `GET /me/lms`
+    pending_invitations: int  # the count of `GET /me/invitations` (0 in Student view)
+    privacy: Optional[PrivacyBannerOut] = None  # null in Student view
+    student: Optional[BootstrapStudentOut] = None  # null for a person who teaches and learns nowhere
+
+
+BOOTSTRAP_KEYS = frozenset(BootstrapOut.model_fields)
+BOOTSTRAP_COURSES_LIMIT = 50
+# --- PERFORMANCE_AUDIT S2 end ---

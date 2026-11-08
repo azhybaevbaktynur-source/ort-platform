@@ -13,6 +13,7 @@ import { fmtPassEnd } from "@/lib/lms/access";
 import type { HomeCourseOut } from "@/lib/lms/homeTypes";
 import { pickLocalized } from "@/lib/lms/localized";
 import { lessonCourseLinks, studentNavLinks, type StudentNavKey, type StudentNavLink } from "@/lib/lms/studentNav";
+import { invalidate } from "@/lib/lms/swr"; // PERFORMANCE_AUDIT S2
 import { usePwa } from "@/components/pwa/PwaProvider";
 import { GoldPill } from "@/components/ui/GoldPill";
 import { Sheet } from "@/components/ui/Sheet";
@@ -360,6 +361,7 @@ export function StudentChrome(props: StudentShellProps) {
   const start = useShellGettingStarted(props);
   // U9: leaving the current exam course, confirmed in a dialog opened after the exam sheet closed (one modal at a time)
   const [leaving, setLeaving] = useState<HomeCourseOut | null>(null);
+  const router = useRouter();
 
   return (
     <>
@@ -431,8 +433,11 @@ export function StudentChrome(props: StudentShellProps) {
       {leaving && (
         <LeaveCourseDialog courseId={leaving.id} courseTitle={title(leaving)} open onCancel={() => setLeaving(null)}
           onLeft={() => {
+            // PERFORMANCE_AUDIT S2: no full reload; the list and the bootstrap are asked again (`forget`, `meStale`)
+            invalidate(`course:${leaving.id}`);
             data.forget(leaving.id);
-            window.location.assign(`/${lang}/courses`); // the home and the menu read everything again
+            setLeaving(null);
+            router.replace(`/${lang}/courses`);
           }} />
       )}
       <GettingStartedSheet id={startId} state={start} open={sheet === "start"} onClose={close} />
