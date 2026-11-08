@@ -805,8 +805,10 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
                 ) : canEdit && (
                   <div className={cn("px-2 py-2 sm:px-3", items.length > 0 && "border-t border-slate-100")}>
                     {items.length === 0 && <p className="px-1 pb-1.5 text-sm leading-5 text-slate-600">{t("modules.editor.emptyModule")}</p>}
-                    {/* FB8 S2: one "+ Добавить" menu (a bottom sheet on phones) instead of a button per kind */}
+                    {/* FB8 S2: one "+ Добавить" menu (a bottom sheet on phones) instead of a button per kind; from `sm` it
+                        opens under its button, left-aligned (the shared menu is right-aligned to its root by default) */}
                     <OutlineMenu trigger="button" variant="secondary" chevron label={addLabel} groups={addGroups} onSelect={(id) => onAdd(m, id)}
+                      className="w-fit sm:[&>[role=menu]]:left-0 sm:[&>[role=menu]]:right-auto"
                       leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />} text={t("modules.editor.addMenu")} />
                   </div>
                 )}
