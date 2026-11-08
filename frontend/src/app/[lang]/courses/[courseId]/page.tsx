@@ -14,7 +14,7 @@ import { StudentModulesView } from "@/components/lms/modules/StudentModulesView"
 import { StudentSyllabus } from "@/components/lms/modules/StudentSyllabus"; // F5b
 import { PageView } from "@/components/lms/pages/PageView"; // Phase 8a S4a (home_kind = page)
 import { CourseLoadingSkeleton } from "@/components/lms/home/StudentCourseFrame";
-import { templateUi } from "@/lib/lms/templates";
+import { isExamShellCourse, templateUi } from "@/lib/lms/templates";
 
 export default function CourseHomePage() {
   const { lang, t } = useTranslation();
@@ -52,6 +52,8 @@ export default function CourseHomePage() {
     // Exam prep S2 (owner 2026-11-06): the course template chooses the exam-prep layout (ORT first); Student view too.
     // Student UI U4 (STUDENT_UI_DESIGN §3.2): its students land on the Тесты page; the home is the dashboard (U3).
     if (templateUi(course).studentLayout === "exam_prep") return <ToTests courseId={course.id} />;
+    // TEACHER_TO_STUDENT_MAP §2.5: a lesson course attached to an exam opens on its overview (empty state without lessons)
+    if (isExamShellCourse(course)) return <StudentSyllabus />;
     if (course.home_kind === "page" && course.home_page_id) {
       return (
         <div className="space-y-6">

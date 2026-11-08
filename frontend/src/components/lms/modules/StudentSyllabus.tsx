@@ -15,7 +15,7 @@ import { ArrowRight, CheckCircle2, ChevronDown, Circle, CircleDot, Lock, PartyPo
 import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
 import { getModules, recordView, setDone } from "@/lib/lms/modules";
-import { templateUi } from "@/lib/lms/templates";
+import { isExamShellCourse } from "@/lib/lms/templates";
 import { isStaffModules, type ItemStudentOut, type ModuleStudentOut, type ModulesStudentOut } from "@/lib/lms/modulesTypes";
 import { useCourse } from "@/components/lms/CourseContext";
 import { CourseCardCover } from "@/components/lms/course/CourseCardCover";
@@ -451,24 +451,33 @@ export function StudentSyllabus() {
     },
   };
 
-  const examPrep = templateUi(course).studentLayout === "exam_prep";
+  const examPrep = isExamShellCourse(course); // TEACHER_TO_STUDENT_MAP §2.5: attached lesson courses too
+  // TEACHER_TO_STUDENT_MAP §2.5: a lesson course attached to an exam is named by its own title (the overview's empty state)
+  const lessonCourse = course.exam_course_id != null;
   const early = error && !data
     ? <ErrorState message={errorText(error)} onRetry={() => void load()} retrying={loading} />
     : !data
       ? <LoadingState rows={4} />
       : data.modules.length === 0
-        ? <EmptyState mascot="reading" title={t("modules.emptyStudentTitle")} description={t("modules.emptyStudentBody")} />
+        ? lessonCourse
+          ? <EmptyState mascot="reading" title={t("modules.overview.emptyTitle")} description={t("modules.overview.emptyBody")} />
+          : <EmptyState mascot="reading" title={t("modules.emptyStudentTitle")} description={t("modules.emptyStudentBody")} />
         : null;
   // exam-prep courses: the course layout shows no course header here, the banner names the page
   if (early || !data) {
     return (
       <div className="flex w-full flex-col gap-4">
-        {examPrep && (
+        {examPrep && (lessonCourse ? (
+          <header>
+            <p className="text-sm font-medium leading-5 text-brand-700">{t("student.nav.lessons")}</p>
+            <h1 className={cn(STUDENT_TITLE, "mt-0.5")}>{pickLocalized(course.title, lang, course.default_language) || t("courses.list.untitled")}</h1>
+          </header>
+        ) : (
           <header>
             <h1 className={STUDENT_TITLE}>{t("student.nav.lessons")}</h1>
             <p className={STUDENT_SUBTITLE}>{pickLocalized(course.title, lang, course.default_language)}</p>
           </header>
-        )}
+        ))}
         {early}
       </div>
     );

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getStudentView } from "@/lib/api";
 import { getMyAccess, type MyAccessOut } from "@/lib/lms/access";
-import { getCourse } from "@/lib/lms/courses";
+import { getCourse, listLessonCourses, type LessonCourseOut } from "@/lib/lms/courses";
 import { listHomeCourses } from "@/lib/lms/home";
 import type { HomeCourseOut } from "@/lib/lms/homeTypes";
 import type { CourseOut } from "@/lib/lms/types";
@@ -13,6 +13,8 @@ import type { CourseOut } from "@/lib/lms/types";
  * (`HomeCourseOut.student_layout`), the current one (this device remembers the last opened), what that course has
  * (lessons, practice) and the student's pass. Like `useLmsMe`, answers are kept per token (memory + this tab's
  * sessionStorage) and shown at once while fresh ones load; they only draw the menu, the server decides every request.
+ * TEACHER_TO_STUDENT_MAP §2.4: plus the lesson courses attached to each exam (cached per exam like `features`), and a
+ * lesson course's exam (`exam_course_id`), so inside a lesson course the current exam is the one it belongs to.
  */
 
 export interface StudentCourseFeatures {
@@ -30,6 +32,10 @@ export interface StudentShellData {
   access: MyAccessOut | null;
   /** U9: the student left this course: drop it from the list at once, then read the list again. */
   forget: (id: string) => void;
+  /** TEACHER_TO_STUDENT_MAP §2.4: the lesson courses of the current exam (null: not known yet). */
+  lessonCourses: LessonCourseOut[] | null;
+  /** The exam the lesson course of the current path belongs to (null: the path is not inside a lesson course). */
+  lessonCourseExam: string | null;
 }
 
 interface Cache {
@@ -37,9 +43,14 @@ interface Cache {
   courses: HomeCourseOut[] | null;
   access: MyAccessOut | null;
   features: Record<string, StudentCourseFeatures>;
+  /** exam id -> its lesson courses */
+  lessons: Record<string, LessonCourseOut[]>;
+  /** lesson course id -> its exam id */
+  examOf: Record<string, string>;
 }
 
-const CACHE_KEY = "ort_student_shell";
+// v2 (TEACHER_TO_STUDENT_MAP §2.4): `lessons` and `examOf` added; an older saved shape is dropped
+const CACHE_KEY = "ort_student_shell_v2";
 const CURRENT_KEY = "ort_student_course";
 const COURSES_LIMIT = 50;
 let memory: Cache | null = null;
@@ -50,18 +61,25 @@ function activeToken(): string {
   return (getStudentView()?.token ?? window.localStorage.getItem("ort_token") ?? "").slice(-16);
 }
 
+function emptyCache(token: string): Cache {
+  return { token, courses: null, access: null, features: {}, lessons: {}, examOf: {} };
+}
+
 function readCache(): Cache {
   const token = activeToken();
   if (memory?.token === token) return memory;
   try {
     const raw = window.sessionStorage.getItem(CACHE_KEY);
-    const saved = raw ? (JSON.parse(raw) as Cache) : null;
+    const saved = raw ? (JSON.parse(raw) as Partial<Cache>) : null;
     if (saved && saved.token === token) {
-      memory = { token, courses: saved.courses ?? null, access: saved.access ?? null, features: saved.features ?? {} };
+      memory = {
+        token, courses: saved.courses ?? null, access: saved.access ?? null, features: saved.features ?? {},
+        lessons: saved.lessons ?? {}, examOf: saved.examOf ?? {},
+      };
       return memory;
     }
   } catch { /* storage blocked or a bad value */ }
-  memory = { token, courses: null, access: null, features: {} };
+  memory = emptyCache(token);
   return memory;
 }
 
@@ -106,11 +124,27 @@ export function useStudentShellData({ enabled, pathCourseId, declared, onHome, p
 
   const loadCourses = useCallback(() => once("courses", async () => {
     const page = await listHomeCourses(null, COURSES_LIMIT);
-    setCache(writeCache({ courses: page.items.filter((c) => c.student_layout === "exam_prep") }));
+    // §2.4: the lesson courses the student joined name their exam (the shell keeps the exam chip inside them)
+    const examOf = { ...readCache().examOf };
+    for (const c of page.items) if (c.exam_course_id) examOf[c.id] = c.exam_course_id;
+    setCache(writeCache({ courses: page.items.filter((c) => c.student_layout === "exam_prep"), examOf }));
   }), [once]);
 
   const loadAccess = useCallback(() => once("access", async () => {
     setCache(writeCache({ access: await getMyAccess() }));
+  }), [once]);
+
+  // §2.4: the lesson courses of one exam; a refused or failed read leaves an empty group (no retry loop)
+  const loadLessons = useCallback((examId: string) => once(`lessons:${examId}`, async () => {
+    let rows: LessonCourseOut[];
+    try {
+      rows = await listLessonCourses(examId);
+    } catch {
+      rows = readCache().lessons[examId] ?? [];
+    }
+    const examOf = { ...readCache().examOf };
+    for (const r of rows) examOf[r.id] = examId;
+    setCache(writeCache({ lessons: { ...readCache().lessons, [examId]: rows }, examOf }));
   }), [once]);
 
   // first use: the cached answer at once, then fresh courses
@@ -121,11 +155,13 @@ export function useStudentShellData({ enabled, pathCourseId, declared, onHome, p
     void loadCourses();
   }, [enabled, loadCourses]);
 
-  // back on the home: the list again (a course may have been joined or left)
+  // back on the home: the list again (a course may have been joined or left), the lesson rows too
   const firstHome = useRef(true);
+  const freshLessons = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!enabled || !onHome) return;
     if (firstHome.current) { firstHome.current = false; return; }
+    freshLessons.current.clear();
     void loadCourses();
   }, [enabled, onHome, loadCourses]);
 
@@ -143,8 +179,16 @@ export function useStudentShellData({ enabled, pathCourseId, declared, onHome, p
     if (enabled && missing) void loadCourses();
   }, [enabled, missing, loadCourses]);
 
-  // the current course: the one being viewed when it is an exam course, else the remembered one, else the first
-  const viewed = pathCourseId && courses.some((c) => c.id === pathCourseId) ? pathCourseId : null;
+  // §2.4: a lesson course of the path names its exam (the layout's course first, then what the lists told)
+  const lessonCourseExam = !pathCourseId
+    ? null
+    : declared?.id === pathCourseId
+      ? declared.exam_course_id ?? null
+      : cache?.examOf[pathCourseId] ?? null;
+  // the current course: the one being viewed (or the exam of the lesson course being viewed) when it is an exam course,
+  // else the remembered one, else the first
+  const viewedId = lessonCourseExam ?? pathCourseId;
+  const viewed = viewedId && courses.some((c) => c.id === viewedId) ? viewedId : null;
   useEffect(() => {
     if (viewed && viewed !== currentId) {
       setCurrentId(viewed);
@@ -171,6 +215,19 @@ export function useStudentShellData({ enabled, pathCourseId, declared, onHome, p
     });
   }, [enabled, current, features, waitForLayout, once]);
 
+  // §2.4: the current exam's lesson courses: the cached rows at once, read again once per shell and exam (and after
+  // the home), and when the student just joined one the rows still show as not joined
+  const currentExamId = current?.id ?? null;
+  const lessonCourses = currentExamId ? cache?.lessons[currentExamId] ?? null : null;
+  const joinedStale = !!declared && declared.my_enrollment.role === "student" && !declared.my_enrollment.read_only
+    && !!lessonCourses?.some((r) => r.id === declared.id && !r.enrolled);
+  useEffect(() => {
+    if (!enabled || !currentExamId) return;
+    if (freshLessons.current.has(currentExamId) && !joinedStale) return;
+    freshLessons.current.add(currentExamId);
+    void loadLessons(currentExamId);
+  }, [enabled, currentExamId, joinedStale, onHome, loadLessons]);
+
   const forget = useCallback((id: string) => {
     const known = readCache().courses;
     if (known) setCache(writeCache({ courses: known.filter((c) => c.id !== id) }));
@@ -193,5 +250,7 @@ export function useStudentShellData({ enabled, pathCourseId, declared, onHome, p
     if (readCache().access) void loadAccess(); // a cached pass shown at once is refreshed once per shell
   }, [enabled, hasCourses, loadAccess]);
 
-  return { courses, loaded: known, current, setCurrent, features, access: cache?.access ?? null, forget };
+  return {
+    courses, loaded: known, current, setCurrent, features, access: cache?.access ?? null, forget, lessonCourses, lessonCourseExam,
+  };
 }

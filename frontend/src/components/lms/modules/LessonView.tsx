@@ -19,7 +19,7 @@ import { getModules, recordView, setDone } from "@/lib/lms/modules";
 import { downloadCourseFile } from "@/lib/lms/courseFiles";
 import { getPage } from "@/lib/lms/pages";
 import type { PageAnyOut } from "@/lib/lms/pagesTypes";
-import { templateUi } from "@/lib/lms/templates";
+import { isExamShellCourse } from "@/lib/lms/templates";
 import { isStaffModules, type ModuleStudentOut, type ModulesStudentOut } from "@/lib/lms/modulesTypes";
 import { useCourse } from "@/components/lms/CourseContext";
 import { useStudentShellDataContext } from "@/components/lms/student/StudentShellDataContext";
@@ -208,7 +208,7 @@ export function LessonView({ moduleId, itemId }: { moduleId: string; itemId: str
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<unknown>(null);
   const base = `/${lang}/courses/${course.id}`;
-  const examPrep = templateUi(course).studentLayout === "exam_prep";
+  const examPrep = isExamShellCourse(course); // TEACHER_TO_STUDENT_MAP §2.5: attached lesson courses too
   const readOnly = course.my_enrollment.role !== "student" || !!course.my_enrollment.read_only || course.status === "concluded";
 
   const lessons = useMemo(() => lessonList(data?.modules ?? []), [data]);
