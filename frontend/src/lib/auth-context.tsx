@@ -66,7 +66,15 @@ interface AuthContextType {
   resendCode: (email: string) => Promise<{ resendAfterSeconds: number }>;
   /** S1: second sign-in step after an AuthError `mfa_required` (details.challenge): authenticator or recovery code. */
   completeMfa: (challenge: string, code: string) => Promise<void>;
+  /** Social sign-in: trades the ticket from the callback fragment for a session (AUTH_SOCIAL_DESIGN 1.6). */
+  completeOAuth: (ticket: string, extras?: OAuthExtras) => Promise<void>;
   signOut: () => Promise<void>;
+}
+
+export interface OAuthExtras {
+  ageBand?: string;
+  policyVersionIds?: string[];
+  displayName?: string;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -78,6 +86,7 @@ const AuthContext = createContext<AuthContextType>({
   verifyEmail: async () => {},
   resendCode: async () => ({ resendAfterSeconds: 60 }),
   completeMfa: async () => {},
+  completeOAuth: async () => {},
   signOut: async () => {},
 });
 
@@ -262,6 +271,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     finishLogin(data);
   };
 
+  const completeOAuth = async (ticket: string, extras: OAuthExtras = {}): Promise<void> => {
+    const data = await postJson("/auth/oauth/complete", { ticket, ...extras });
+    finishLogin(data);
+  };
+
   const signOut = async () => {
     if (getStudentView()) { // UX rework S1: never the teacher's login from a Student view tab
       leaveStudentView();
@@ -281,6 +295,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         verifyEmail,
         resendCode,
         completeMfa,
+        completeOAuth,
         signOut,
       }}
     >

@@ -50,7 +50,6 @@ async function code(email: string): Promise<string> {
 
 async function fillForm(page: Page, lang: Lang, email: string): Promise<void> {
   await page.getByLabel(tr(lang, "auth.displayName")).fill("Сынак Тест");
-  await page.getByLabel(tr(lang, "auth.phone")).fill("+996700000000");
   await page.getByLabel(tr(lang, "auth.email")).fill(email);
   await page.getByLabel(tr(lang, "auth.password")).fill(PASSWORD);
 }
@@ -83,8 +82,8 @@ test("sign-up 18+: age first, policies required, then the home page without a ba
   const page = await fresh(browser, VIEWPORTS.phone);
   const email = "e2e-signup-adult@example.com";
   await page.goto("/ru/register");
-  await expect(page.getByText(tr("ru", "privacy.age.question"))).toBeVisible();
-  await expect(page.getByLabel(tr("ru", "auth.email"))).toHaveCount(0);
+  await expect(page.getByLabel(tr("ru", "auth.email"))).toBeVisible(); // the form is first (AUTH_SOCIAL_DESIGN 8.3)
+  await expect(page.getByText(tr("ru", "auth.ageRowLabel"))).toBeVisible();
   await uxShots(page, SHOTS, "register-age", ["ru", "ky", "en"]);
   await page.setViewportSize(VIEWPORTS.phone);
 
@@ -158,7 +157,7 @@ test("I'm a parent: an adult's form, then the parent page", async ({ browser }) 
   const page = await fresh(browser, VIEWPORTS.phone);
   const email = "e2e-signup-parent@example.com";
   await page.goto("/ru/register");
-  await page.getByRole("button", { name: tr("ru", "privacy.parentLink") }).click();
+  await page.getByRole("button", { name: tr("ru", "auth.parentCta") }).click();
   await fillForm(page, "ru", email);
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: tr("ru", "auth.signUpButton") }).click();

@@ -96,7 +96,17 @@
       "rate_limited": "Too many attempts. Please wait a bit and try again.",
       "mfa_required": "Enter the code from your authenticator app.",
       "mfa_invalid_code": "Wrong code. Check the code in the app and try again.",
-      "mfa_challenge_invalid": "This sign-in step has expired. Enter your password again."
+      "mfa_challenge_invalid": "This sign-in step has expired. Enter your password again.",
+      "oauth_not_configured": "This sign-in method is not available right now.",
+      "oauth_expired": "The sign-in took too long. Please try again.",
+      "oauth_state_mismatch": "The sign-in could not be verified. Please try again.",
+      "oauth_denied": "Sign-in was cancelled.",
+      "oauth_provider_error": "The provider could not sign you in. Please try again.",
+      "oauth_email_unverified": "Your email address is not verified with this provider, so we cannot use it.",
+      "oauth_ticket_invalid": "This sign-in link has expired. Please start again.",
+      "age_band_required": "Choose your age.",
+      "policy_not_accepted": "Please accept the privacy policy and terms of use.",
+      "account_disabled": "This account is disabled."
     },
     "wakingServer": "The server is waking up after being idle, so the first login may take up to a minute...",
     "resetInvalidToken": "Invalid link or token not found",
@@ -125,7 +135,22 @@
       "successTitle": "Address changed",
       "successBody": "Sign in with {email} from now on. Every earlier session has ended.",
       "missing": "The link has no code. Open the whole link from the email."
-    }
+    },
+    "continueWithGoogle": "Continue with Google",
+    "continueWithApple": "Continue with Apple",
+    "orDivider": "or",
+    "ageRowLabel": "Your age",
+    "forgotGoogleHint": "Signed up with Google? Just continue with Google on the login page.",
+    "oauth": {
+      "finishing": "Signing you in...",
+      "completeTitle": "Almost done",
+      "completeSubtitle": "Tell us a little about you to finish creating your account.",
+      "signedInAs": "Signed in with Google as {email}",
+      "completeButton": "Create account",
+      "useAnotherAccount": "Use another account",
+      "backToLogin": "Back to login"
+    },
+    "parentCta": "I'm a parent"
   },
   "lms": {
     "nav": {

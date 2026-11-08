@@ -4,7 +4,7 @@ import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
-import { AuthHeader } from "@/components/auth/AuthHeader";
+import { AuthSplit, AuthTitle } from "@/components/auth/AuthSplit";
 import { Button, Input, buttonClasses } from "@/components/ui";
 import { Lock, ArrowRight, AlertCircle, CheckCircle2 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/apiBase";
@@ -73,19 +73,9 @@ function ResetPasswordForm() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <AuthHeader />
-
-      <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
-        <div className="bg-white py-8 px-6 sm:px-10 shadow-lg border border-slate-200/80 rounded-3xl">
-          <div className="mb-6 text-center">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              {t("auth.resetPasswordTitle")}
-            </h1>
-            <p className="mt-1 text-sm text-slate-600">
-              {t("auth.resetPasswordSubtitle")}
-            </p>
-          </div>
+    <AuthSplit pose="thinking">
+        <div>
+          <AuthTitle title={t("auth.resetPasswordTitle")} subtitle={t("auth.resetPasswordSubtitle")} />
 
           {!token && (
             <div className="mb-5 p-3 rounded-xl bg-warning-50 border border-warning-200 text-warning-900 text-sm font-medium flex items-center gap-2">
@@ -147,8 +137,7 @@ function ResetPasswordForm() {
             </form>
           )}
         </div>
-      </div>
-    </div>
+    </AuthSplit>
   );
 }
 
