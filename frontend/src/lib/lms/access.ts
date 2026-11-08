@@ -42,7 +42,7 @@ export interface HowToPay { ru: string; ky: string; en: string }
 export interface OfferOut {
   /** The season plan is listed only when a season end is set, not passed, and later than the current end. */
   plans: OfferPlanOut[];
-  includes: ("tests" | "practice" | "lessons")[];
+  includes: ("tests" | "practice" | "courses")[];
   practice_free: boolean;
   /** ky/en fall back to ru; empty: show the `access.howToPay` placeholder. */
   how_to_pay: HowToPay;

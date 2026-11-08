@@ -29,6 +29,7 @@ import {
 } from "./lessons";
 import { rememberLessonModules } from "./lessonNav";
 import { ProChip } from "./ProLockCard";
+import { ProCallout } from "@/components/lms/access/ProCallout";
 
 const LESSON_KINDS = new Set(["page", "file", "url"]);
 
@@ -486,6 +487,7 @@ export function StudentSyllabus() {
   const isOpen = (id: string) => openIds?.has(id) ?? false;
   return (
     <div className="flex w-full flex-col gap-4 lg:gap-6">
+      {data.modules.some((m) => m.access_locked) && <ProCallout variant="course" />}
       <Hero lessons={lessons} data={data} base={base} examPrep={examPrep} track={!readOnly} />
       {course.status === "concluded" && (
         <p role="status" className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-base leading-6 text-slate-700 sm:text-sm">{t("courses.home.concludedNotice")}</p>

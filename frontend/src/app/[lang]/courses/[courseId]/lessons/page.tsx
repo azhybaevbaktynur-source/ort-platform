@@ -11,12 +11,15 @@ import { useCourse } from "@/components/lms/CourseContext";
 import { COURSE_GRID, CourseCard } from "@/components/lms/course/CourseCard";
 import { useErrorText } from "@/components/lms/home/useErrorText";
 import { StudentPageHeader } from "@/components/lms/student/StudentPageHeader";
+import { ProCallout } from "@/components/lms/access/ProCallout";
+import { useStudentShellDataContext } from "@/components/lms/student/StudentShellDataContext";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui";
 
 export default function LessonCoursesPage() {
   const { lang, t } = useTranslation();
   const { course } = useCourse();
   const errorText = useErrorText();
+  const access = useStudentShellDataContext()?.access ?? null;
   const [rows, setRows] = useState<LessonCourseOut[] | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
@@ -45,6 +48,8 @@ export default function LessonCoursesPage() {
       ) : rows.length === 0 ? (
         <EmptyState mascot="reading" title={t("student.lessonCourses.emptyTitle")} description={t("student.lessonCourses.emptyBody")} />
       ) : (
+        <>
+        {access && !access.active && rows.some((r) => r.has_paid_modules) && <ProCallout variant="course" />}
         <ul className={COURSE_GRID}>
           {rows.map((r) => (
             <CourseCard key={r.id} headingLevel={2}
@@ -57,6 +62,7 @@ export default function LessonCoursesPage() {
               }} />
           ))}
         </ul>
+        </>
       )}
     </div>
   );
