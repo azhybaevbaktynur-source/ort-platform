@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
 import { useStaffDictionary, useTranslation } from "@/lib/i18n/context";
@@ -14,6 +14,7 @@ import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { StaffCourseBar } from "@/components/lms/course/StaffCourseUi"; // Phase 6b S5c
 import { useDeclareArea, useDeclareStudentCourse } from "@/components/lms/LmsShell"; // Phase 6b integration; Student UI U2
 import { isExamShellCourse } from "@/lib/lms/templates"; // Student UI U2; TEACHER_TO_STUDENT_MAP §2.5
+import { invalidate, put, useCached, type SwrOptions } from "@/lib/lms/swr"; // PERFORMANCE_AUDIT S2
 // --- Phase 8c S1 begin --- (course sidebar, Student view, hidden areas: PHASE_8C_DESIGN §2, §6)
 import { CourseSidebar } from "@/components/lms/course/CourseSidebar";
 import { AreaUnavailable } from "@/components/lms/course/AreaUnavailable";
@@ -22,27 +23,24 @@ import { AreaUnavailable } from "@/components/lms/course/AreaUnavailable";
 import { CourseLoadingSkeleton, StudentCourseHeader } from "@/components/lms/home/StudentCourseFrame";
 // --- Phase 6 S6b end ---
 
+const COURSE_CACHE: SwrOptions = { ttl: 60_000, storage: "session" };
+
 export default function CourseLayout({ children }: { children: React.ReactNode }) {
   const { lang, t } = useTranslation();
   const params = useParams<{ courseId: string }>();
   const pathname = usePathname() || "";
   const courseId = params.courseId;
-  const [course, setCourse] = useState<CourseOut | null>(null);
-  const [error, setError] = useState<unknown>(null);
-
-  const reload = useCallback(async () => {
-    try {
-      setCourse(await getCourse(courseId));
-      setError(null);
-    } catch (e) {
-      setError(e);
-    }
-  }, [courseId]);
-
+  // PERFORMANCE_AUDIT S2 (§5.2): the course through the SWR cache, so switching pages inside a course does not ask it
+  // again, and a repeat visit draws the frame at once (refreshed in the background once older than a minute)
+  const key = `course:${courseId}`;
+  const { data, error, refresh: reload } = useCached<CourseOut>(key, () => getCourse(courseId), COURSE_CACHE);
+  const course = data;
+  const setCourse = useCallback((c: CourseOut) => put(key, c, COURSE_CACHE), [key]);
+  // refused or gone now (left, removed, deleted): the cached course must not keep drawing the frame
+  const status = (error as { status?: number } | null)?.status;
   useEffect(() => {
-    setCourse(null);
-    void reload();
-  }, [reload, courseId]);
+    if (status === 403 || status === 404) invalidate(key);
+  }, [status, key]);
 
   // Phase 6b integration: course pages are Teaching for staff and Learning for students (header area switcher).
   // Phase 8c S1 (§2.5): inside a course the Teaching sub-menu is hidden; the sidebar is the course's navigation.

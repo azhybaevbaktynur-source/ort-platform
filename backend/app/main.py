@@ -120,6 +120,12 @@ async def lifespan(app: FastAPI):
     _ensure_assignments()  # Phase 7a S1: after the organizations, before the ORT courses
     _seed_ort_courses()
     _ensure_policies()  # Phase 11 S1
+    try:  # PERFORMANCE_AUDIT S2: the lazy imports of the service functions, before the first request
+        from app.core.warmup import warm_up
+
+        warm_up()
+    except Exception:
+        logger.exception("Import warm-up failed")
     await _configure_thread_limiter()
     admission.logger.info("admission gate configured", extra=admission.describe())
     yield
