@@ -6,16 +6,20 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import {
-  SLUG_RE, createOrganization, listOrganizations, slugify, type OrganizationAdminRowOut, type OrganizationOut, type OrgStatus,
+  SLUG_RE, createOrganization, listOrganizations, slugify, type OrganizationAdminRowOut, type OrganizationOut, type OrgListSort,
+  type OrgRootKind, type OrgStatus,
 } from "@/lib/lms/organizations";
 import { fmtApiDate } from "@/lib/format";
-import { Button, Dialog, EmptyState, FilterBar, Input, PageHeader, Select, Table, type TableColumn } from "@/components/ui";
-import { OrgBadge, OrgError } from "@/components/lms/org/OrgUi";
+import { formatBytes } from "@/lib/lms/storage";
+import { Button, Dialog, EmptyState, FilterBar, Input, PageHeader, STAFF_WIDTH, Select, Table, cn, type TableColumn } from "@/components/ui";
+import { OrgBadge, OrgError, OrgKindBadge } from "@/components/lms/org/OrgUi";
 import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
 import { useCursorList, useDebounced } from "@/components/lms/admin/useCursorList";
 import { MoreError, useTableState } from "@/components/lms/admin/ListParts";
 
 const STATUSES: (OrgStatus | "")[] = ["", "active", "suspended"];
+const KINDS: (OrgRootKind | "")[] = ["", "school", "personal", "platform"]; // item 4: roots only, departments live inside
+const SORTS: OrgListSort[] = ["created_desc", "name_asc"];
 
 export default function AdminOrganizationsPage() {
   const { lang, t } = useTranslation();
@@ -24,31 +28,43 @@ export default function AdminOrganizationsPage() {
   const [input, setInput] = useState("");
   const q = useDebounced(input);
   const [status, setStatus] = useState<OrgStatus | "">("");
+  const [kind, setKind] = useState<OrgRootKind | "">("");
+  const [sort, setSort] = useState<OrgListSort>("created_desc");
   const [creating, setCreating] = useState(false);
-  const fetchPage = useCallback((cursor: string | null) => listOrganizations({ q, status, cursor }), [q, status]);
+  const fetchPage = useCallback((cursor: string | null) => listOrganizations({ q, status, kind, sort, cursor }), [q, status, kind, sort]);
   const list = useCursorList(fetchPage);
   const state = useTableState(list);
 
   const n = (v: number | undefined) => (typeof v === "number" ? v : "—");
+  const units: [string, string, string, string] = [t("storage.units.b"), t("storage.units.kb"), t("storage.units.mb"), t("storage.units.gb")];
   const columns: TableColumn<OrganizationAdminRowOut>[] = [
     {
       key: "name", header: t("organizations.fields.name"), primary: true,
       cell: (o) => (
         <>
-          <Link href={`/${lang}/admin/organizations/${o.id}`} className="font-semibold text-brand-700 hover:underline">{o.name}</Link>
-          <span className="block text-sm font-normal text-slate-600">{o.slug}</span>
+          <Link href={`/${lang}/admin/organizations/${o.id}`} className="break-words font-semibold text-brand-700 hover:underline">{o.name}</Link>
+          <span className="block break-all text-xs font-normal text-slate-600">
+            {o.slug}{o.departments > 0 ? ` · ${t("organizations.admin.departmentsCount", { n: o.departments })}` : ""}
+          </span>
         </>
       ),
     },
+    { key: "kind", header: t("organizations.admin.kind"), cell: (o) => <OrgKindBadge kind={o.kind} /> },
     { key: "status", header: t("organizations.admin.status"), cell: (o) => <OrgBadge tone={o.status} labelKey={`organizations.status.${o.status}`} /> },
-    { key: "admins", header: t("organizations.counts.orgAdmins"), align: "right", cell: (o) => n(o.org_admins) },
-    { key: "teachers", header: t("organizations.counts.teachers"), align: "right", cell: (o) => n(o.teachers) },
+    { key: "teachers", header: t("organizations.counts.teachers"), align: "right", hideOnMobile: true, cell: (o) => n(o.teachers) },
     { key: "courses", header: t("organizations.counts.courses"), align: "right", cell: (o) => n(o.courses) },
-    { key: "created", header: t("organizations.admin.created"), nowrap: true, cell: (o) => fmtApiDate(o.created_at, lang) },
+    { key: "students", header: t("organizations.counts.students"), align: "right", cell: (o) => n(o.students) },
+    {
+      // owner-based estimate (ADMIN_ORGS_DESIGN §2.1): the header carries the note as a tooltip
+      key: "storage", header: <span title={t("organizations.usage.storageNote")}>{t("organizations.usage.storage")}</span>,
+      label: t("organizations.usage.storage"), align: "right", nowrap: true, hideOnMobile: true,
+      cell: (o) => formatBytes(o.storage_bytes ?? 0, lang, units),
+    },
+    { key: "created", header: t("organizations.admin.created"), nowrap: true, hideOnMobile: true, cell: (o) => fmtApiDate(o.created_at, lang) },
   ];
-  const filtered = !!(q || status);
+  const filtered = !!(q || status || kind);
   return (
-    <div>
+    <div className={cn("w-full", STAFF_WIDTH.list)}>
       <PageHeader
         title={t("organizations.admin.title")}
         breadcrumbs={crumbs({ label: t("organizations.admin.title") })}
@@ -59,14 +75,19 @@ export default function AdminOrganizationsPage() {
         columns={columns}
         rows={list.items}
         rowKey={(o) => o.id}
+        density="compact"
         {...state}
         search={
           <FilterBar
             search={{ value: input, onChange: setInput, label: t("lms.common.search"), placeholder: t("organizations.admin.searchPlaceholder") }}
-            canReset={filtered} onReset={() => { setInput(""); setStatus(""); }}
+            canReset={filtered} onReset={() => { setInput(""); setStatus(""); setKind(""); }}
           >
+            <Select label={t("organizations.admin.kind")} value={kind} onChange={(e) => setKind(e.target.value as OrgRootKind | "")}
+              options={KINDS.map((k) => ({ value: k, label: k ? t(`organizations.kind.${k}`) : t("organizations.admin.anyKind") }))} />
             <Select label={t("organizations.admin.status")} value={status} onChange={(e) => setStatus(e.target.value as OrgStatus | "")}
               options={STATUSES.map((s) => ({ value: s, label: s ? t(`organizations.status.${s}`) : t("organizations.admin.anyStatus") }))} />
+            <Select label={t("organizations.admin.sort")} value={sort} onChange={(e) => setSort(e.target.value as OrgListSort)}
+              options={SORTS.map((s) => ({ value: s, label: t(s === "name_asc" ? "organizations.admin.sortName" : "organizations.admin.sortCreated") }))} />
           </FilterBar>
         }
         empty={

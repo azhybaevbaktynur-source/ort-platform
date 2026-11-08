@@ -37,7 +37,40 @@ export interface OrganizationAdminRowOut extends OrganizationOut {
   org_admins: number;
   teachers: number;
   courses: number;
+  // Item 4 (ADMIN_ORGS_DESIGN §2.1): subtree roll-ups (a school's departments count into the school)
+  students: number;
+  /** Owner-based: assets of the tree's active members (`organizations.usage.storageNote`). */
+  storage_bytes: number;
+  departments: number;
+  /** The platform organization: never suspended, slug fixed (D-ORG-1). */
+  is_protected: boolean;
 }
+
+/** Item 4: the root kinds of the Admin → Organizations list (departments are never rows). */
+export type OrgRootKind = "school" | "personal" | "platform";
+export type OrgListSort = "created_desc" | "name_asc";
+
+/** `SuspendAffectedOut`: what a suspend/resume touches (subtree counts). */
+export interface SuspendAffectedOut {
+  courses: number;
+  students: number;
+  departments: number;
+}
+/** `OrganizationSuspendOut`: POST /platform/organizations/{id}/suspend|resume. */
+export interface OrganizationSuspendOut extends OrganizationOut {
+  affected: SuspendAffectedOut;
+}
+
+/** `OrgStudentOut`: GET /platform/organizations/{id}/students (name, email and counts only, D-ORG-4). */
+export interface OrgStudentOut {
+  user: UserBrief;
+  courses: number;
+  first_enrolled_at: string | null;
+  last_active_enrollment_at: string | null;
+}
+
+/** Who the caller is inside `/org/{id}`: a member admin of the tree, or the platform admin from outside. */
+export type OrgActingAs = "org_admin" | "platform_admin";
 
 /** `MemberOut` of the members lists and of POST .../members. */
 export interface OrgMemberOut {
@@ -94,6 +127,8 @@ export interface OrgCourseOut {
 export interface OrgSummaryOut extends OrganizationOut {
   usage: OrgUsageOut;
   my_role: OrgRole | null;
+  /** Item 4: derived on the server from memberships; the UI only displays it. */
+  acting_as: OrgActingAs;
 }
 
 /** GET /me/organizations item. */
@@ -143,16 +178,16 @@ export interface ListParams {
 
 // --- Platform admin ---
 
-export const listOrganizations = (p: ListParams & { q?: string; status?: OrgStatus | "" } = {}) =>
+export const listOrganizations = (p: ListParams & { q?: string; status?: OrgStatus | ""; kind?: OrgRootKind | ""; sort?: OrgListSort } = {}) =>
   page(lmsFetch<PageOut<OrganizationAdminRowOut>>("/platform/organizations", { params: { limit: 25, ...p } }));
 export const createOrganization = (body: OrganizationCreateIn) => post<OrganizationOut>("/platform/organizations", body);
 export const getOrganization = (id: string) => lmsFetch<OrganizationAdminRowOut>(`/platform/organizations/${enc(id)}`);
 export const updateOrganization = (id: string, body: OrganizationUpdateIn) =>
   lmsFetch<OrganizationOut>(`/platform/organizations/${enc(id)}`, { method: "PATCH", body });
 export const suspendOrganization = (id: string, reason: string) =>
-  post<OrganizationOut>(`/platform/organizations/${enc(id)}/suspend`, { reason });
+  post<OrganizationSuspendOut>(`/platform/organizations/${enc(id)}/suspend`, { reason });
 export const resumeOrganization = (id: string, reason: string) =>
-  post<OrganizationOut>(`/platform/organizations/${enc(id)}/resume`, { reason });
+  post<OrganizationSuspendOut>(`/platform/organizations/${enc(id)}/resume`, { reason });
 
 export const listOrganizationMembers = (id: string, p: ListParams & { role?: OrgRole; state?: OrgMemberState } = {}) =>
   page(lmsFetch<PageOut<OrgMemberOut>>(`/platform/organizations/${enc(id)}/members`, { params: { limit: 50, ...p } }));
@@ -162,9 +197,12 @@ export const addOrganizationMember = (id: string, user_id: string, role: OrgRole
 export const removeOrganizationMember = (id: string, userId: string, reason: string) =>
   lmsFetch<void>(`/platform/organizations/${enc(id)}/members/${enc(userId)}`, { method: "DELETE", params: { reason } });
 
-export const listOrganizationCourses = (id: string, p: ListParams & { deleted?: boolean } = {}) =>
+export const listOrganizationCourses = (id: string, p: ListParams & { deleted?: boolean; q?: string; status?: CourseStatus | "" } = {}) =>
   page(lmsFetch<PageOut<OrgCourseOut>>(`/platform/organizations/${enc(id)}/courses`, { params: { limit: 25, ...p } }));
-export const getOrganizationUsage = (id: string) => lmsFetch<OrgUsageOut>(`/platform/organizations/${enc(id)}/usage`);
+/** Item 4: the subtree roll-up with per-department rows (as the org admin overview). */
+export const getOrganizationUsage = (id: string) => lmsFetch<TreeUsageOut>(`/platform/organizations/${enc(id)}/usage`);
+export const listOrganizationStudents = (id: string, p: ListParams & { q?: string } = {}) =>
+  page(lmsFetch<PageOut<OrgStudentOut>>(`/platform/organizations/${enc(id)}/students`, { params: { limit: 25, ...p } }));
 export const listOrganizationTemplates = (id: string) =>
   lmsFetch<OrgTemplateGrantOut[]>(`/platform/organizations/${enc(id)}/templates`);
 export const grantTemplate = (id: string, key: string) =>

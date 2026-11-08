@@ -7,6 +7,7 @@ import { useTranslation, type Language } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
 import { gateOpenPath } from "@/lib/api"; // Phase 11 S3
 import { LmsMeProvider, useLmsMeLoader } from "@/lib/lms/useLmsMe";
+import { useCurrentOrg } from "@/lib/lms/currentOrg"; // item 4
 import { AppHeader, AreaPillsSkeleton, Brand, type AppHeaderArea, type AreaKey } from "@/components/ui/AppHeader";
 import { ErrorState, LoadingState, SHELL_WIDTH, Skeleton, cn } from "@/components/ui";
 import { EXAM_COLUMN_INNER, EXAM_COLUMN_OUTER } from "@/components/ui/shellWidth";
@@ -166,6 +167,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
 
   // UX rework 2: the areas come from one answer, kept across pages (`useLmsMeLoader`), so the menu is the same everywhere.
   const orgs = me?.admin_organizations ?? [];
+  const currentOrg = useCurrentOrg(); // item 4: the organization `OrgShell` has open (header switcher)
   const isGuardian = me ? !!me.is_guardian : !!userProfile?.is_guardian; // Phase 11
   const areasLoading = !me && !meState.error;
 
@@ -191,7 +193,22 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
       sections.push({ href: `${base}/exam-templates`, label: t("examTemplates.nav.title"), active: rest.startsWith("/exam-templates") }); // Phase 7b S4
       list.push({ key: "teaching", label: t("shell.areas.teaching"), href: `${base}/courses?view=teaching`, icon: <Presentation />, sections });
     }
-    if (orgs.length === 1) {
+    // Item 4 (ADMIN_ORGS_DESIGN §2.5, D-ORG-3): a platform admin can manage every organization, so they always get the
+    // switcher: their own organizations, the foreign one open right now (from `OrgShell`, no extra request) and
+    // "All organizations" (Admin → Organizations). Never the whole list in the menu.
+    const inOrg = (id: string) => rest === `/org/${id}` || rest.startsWith(`/org/${id}/`);
+    const foreign = currentOrg && inOrg(currentOrg.id) && !orgs.some((o) => o.id === currentOrg.id) ? currentOrg : null;
+    if (isAdmin) {
+      list.push({
+        key: "organization", label: t(orgs.length > 1 ? "shell.areas.organizations" : "shell.areas.organization"),
+        href: orgs.length === 1 ? `${base}/org/${orgs[0].id}` : `${base}/org`, icon: <Building2 />,
+        choices: [
+          ...orgs.map((o) => ({ href: `${base}/org/${o.id}`, label: o.name, active: inOrg(o.id) })),
+          ...(foreign ? [{ href: `${base}/org/${foreign.id}`, label: t("shell.areas.asPlatformAdmin", { name: foreign.name }), active: true }] : []),
+          { href: `${base}/admin/organizations`, label: t("shell.areas.allOrganizations"), active: false, separated: true },
+        ],
+      });
+    } else if (orgs.length === 1) {
       list.push({ key: "organization", label: t("shell.areas.organization"), href: `${base}/org/${orgs[0].id}`, icon: <Building2 /> });
     } else if (orgs.length > 1) {
       list.push({
@@ -202,7 +219,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
     if (isGuardian) list.push({ key: "parent", label: t("privacy.nav.parent"), href: `${base}/parent`, icon: <Users /> }); // Phase 11
     if (isAdmin) list.push({ key: "platform", label: t("shell.areas.platform"), href: `${base}/admin`, icon: <ShieldCheck /> });
     return hideSections ? list.map((a) => ({ ...a, sections: undefined })) : list;
-  }, [lang, t, hasTeaching, hideLearning, isAdmin, canCreate, isGuardian, me, rest, urlArea, hideSections]); // `orgs` comes from `me`
+  }, [lang, t, hasTeaching, hideLearning, isAdmin, canCreate, isGuardian, me, rest, urlArea, hideSections, currentOrg]); // `orgs` comes from `me`
 
   // --- Student UI U2 begin --- (STUDENT_UI_DESIGN §2.1; SF-1): the Learning area gets the student shell, except the
   // player route (no chrome). A course page of someone who teaches waits for the course's own declaration (a

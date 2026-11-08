@@ -65,6 +65,8 @@ export interface ListAuditParams {
   action?: string;
   target_type?: string;
   target_id?: string;
+  /** Item 4: `details.acting_as` ("platform_admin": a platform admin acted inside an organization). */
+  acting_as?: "org_admin" | "platform_admin" | "";
   cursor?: string | null;
   limit?: number;
 }
