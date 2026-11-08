@@ -12,7 +12,8 @@
 #   E2E_API_PORT    backend port                        (default 8765)
 #   E2E_WEB_ORIGIN  frontend origin allowed by CORS     (default http://127.0.0.1:3765)
 #   E2E_PYTHON      python with backend requirements    (default backend/venv/bin/python, else python3)
-#   E2E_OAUTH_PORT  Google sign-in stub port            (default 8766; scripts/e2e_oauth_stub.py)
+#   E2E_OAUTH_STUB_PORT  Google sign-in stub port       (default E2E_API_PORT+2; scripts/e2e_oauth_stub.py;
+#                   E2E_API_PORT+1 is the --mfa-required server of admin-mfa-gate.spec.ts)
 #
 # S1 admin security: `e2e_backend.sh --mfa-required <port>` starts a second server on the same scratch database and
 # signing key with ADMIN_MFA_REQUIRED=true, in the foreground, without wiping or seeding anything. Only
@@ -87,7 +88,7 @@ if [[ -n "$MFA_REQUIRED_PORT" ]]; then
 fi
 # --- social sign-in begin --- the Google stub and the main server's Google settings (never on production: the
 # backend refuses non-default Google URLs there)
-OAUTH_PORT="${E2E_OAUTH_PORT:-8766}"
+OAUTH_PORT="${E2E_OAUTH_STUB_PORT:-${E2E_OAUTH_PORT:-$((PORT + 2))}}"  # E2E_OAUTH_PORT: the earlier name
 OAUTH_CLIENT_ID="e2e-client.apps.example"
 OAUTH_CLIENT_SECRET="e2e-$("$PY" -c 'import secrets; print(secrets.token_hex(24))')"
 API_ORIGIN="http://127.0.0.1:$PORT"

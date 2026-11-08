@@ -598,3 +598,32 @@ rule 7; Neon is at 10/10 branches per ACCOUNTS.md §G: the owner's OK is needed 
   custom domain planned before launch? Until then the Google screen may show the Render host name.
 - **Q3** Keep sign-in with Google in Testing mode (test users only) during the review round, then Publish on launch day?
   (Proposed: yes.)
+
+## 14. Results (2026-11-09)
+
+Built in three slices on `lms`; deploy, Neon backup branch and production checks are the orchestrator's.
+
+| Slice | What landed |
+|---|---|
+| A, backend (`4ed0e14`) | `app/lms/oauth/` (Google flow with PKCE S256, state, nonce; encrypted flow cookie; fragment ticket; `POST /auth/oauth/complete` ending in `_sign_in`), `user_identities` (migration `0029_user_identities`), Apple behind `APPLE_SIGN_IN_ENABLED=false`, `GET /auth/providers`, rate limits, route policies, privacy registry and export, production refusal of non-default Google URLs, `scripts/e2e_oauth_stub.py` |
+| B, screens (`7edab33`) | `AuthSplit` + `AuthIllustration` on every auth page, `ProviderButtons`, `AgeRow`, the form-first sign-up without phone, `/oauth-callback` ("Almost done", MFA step, errors), `completeOAuth`, i18n, `e2e/auth-screens.spec.ts` |
+| C, integration | `e2e/oauth-google.spec.ts` against the stub; admin person page "Sign-in methods" (`platform_admin.users_service.sign_in_methods`, `SignInMethodOut`, en/ky/ru); stub port `E2E_OAUTH_STUB_PORT` (default `E2E_API_PORT + 2`); `test_admin_mfa` reads the Alembic head(s) from the script directory; `docs/runbooks/GOOGLE_SIGN_IN.md`; `backend/.env.example` (names only); decisions in `PRODUCT_DECISIONS.md` |
+
+Slice A deviations (recorded in `PRODUCT_DECISIONS.md`): the export lists `id, provider, linked_at, last_login_at` only
+(no identity email); the ticket carries `lang`; `oauth_profile_required` does not count toward the failure limit; one
+link per provider per user (a second Google account with the same verified email signs into the same user without a
+second link).
+
+Browser proof (`oauth-google.spec.ts`, real backend + stub): new person → "Almost done" → age 18+ and consent → signed
+in at the `redirect` they started from, edited name stored; existing verified password user → linked and signed in, the
+password still signs in, the admin person page shows "Пароль · Google (привязан …)"; unverified Google email → login page
+with `oauth_email_unverified`, no account; disabled account → `account_disabled`, no session; platform admin with
+two-step login → the code step after Google, no token before the code; Cancel at Google → `oauth_denied`; forged state
+→ `oauth_state_mismatch`; every `oauth_error` code in ru and an unknown one as the general text; the `--mfa-required`
+server without keys → no Google button, no divider.
+
+Gates (slice C): SQLite full suite 4719 passed, 56 skipped; `npx tsc --noEmit` clean; i18n parity OK; e2e
+`oauth-google`, `auth-screens`, `admin-mfa`, `admin-mfa-gate`, `teacher-signup`, `privacy`, `ort`, `ort-visual` 55 passed, 1 skipped (the opt-in screenshot set), 1 failed under load (a teacher-signup templates list still loading at 15 s while the backend suite ran in parallel; `teacher-signup` alone 16/16); `oauth-google` 8/8
+(ports 8861 / 3061, own scratch dir). Not run in slice C: the Postgres suite (orchestrator, before the merge to `main`).
+
+Owner still to do: Google Cloud Console client and the two keys in Render (section 7.3, runbook); questions Q1–Q3.

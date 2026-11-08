@@ -11,13 +11,14 @@ import { useTranslation } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
 import { listMyCourses } from "@/lib/lms/courses";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
+import { useCachedMe } from "@/lib/lms/meCache"; // PERFORMANCE_AUDIT S1
 import type { CourseCard as CourseCardDto } from "@/lib/lms/types";
 import { COURSE_GRID, CourseCard, StatusBadge } from "@/components/lms/course/CourseCard";
 import { StudentHome } from "@/components/lms/home/StudentHome";
 import { TeacherApplicationNotice } from "@/components/lms/home/TeacherApplicationNotice";
 import { useErrorText } from "@/components/lms/home/useErrorText";
 import {
-  Badge, EmptyState, ErrorState, LinkButton, LoadingState, PageHeader, Pagination, TabPanel, Tabs, cn, focusRing,
+  Badge, EmptyState, ErrorState, LinkButton, LoadingState, PageHeader, Pagination, Tabs, cn, focusRing, panelId, tabId,
 } from "@/components/ui";
 
 type Tab = "teaching" | "learning";
@@ -122,13 +123,15 @@ function TeachingList({ noLearning = false }: { noLearning?: boolean }) {
 
 export default function CoursesPage() {
   const { lang, t } = useTranslation();
-  const { me } = useLmsMe();
+  const { me: fresh } = useLmsMe();
+  const cachedMe = useCachedMe();
+  const me = fresh ?? cachedMe; // PERFORMANCE_AUDIT S1: the cached answer first, the profile only as a fallback
   const { userProfile } = useAuth();
   const [tab, setTab] = useState<Tab | null>(null);
   useCatalogHashRedirect();
 
   // UX F4 / Phase 6 S8 (UX S1): the Teaching / Learning tabs only for people who teach (MeOut.is_teacher) and
-  // platform admins. Until MeOut loads, the cached profile decides (no flash for most users).
+  // platform admins. Until MeOut loads (and nothing is cached), the cached profile decides.
   const hasTeaching = me ? me.is_teacher || me.is_platform_admin
     : !!userProfile && (userProfile.teacher_status === "approved" || !!userProfile.is_platform_admin);
 
@@ -164,15 +167,16 @@ export default function CoursesPage() {
           : undefined}
       />
       <Suspense fallback={null}><ViewSync onView={setTab} noLearning={noLearning} /></Suspense>
-      {noLearning ? <TeachingList noLearning /> : (
-        <>
-          <Tabs id={TABS_ID} label={t("courses.list.title")} value={current} onChange={(v) => changeTab(v as Tab)} className="mb-6"
-            items={[{ id: "teaching", label: t("courses.list.teaching") }, { id: "learning", label: t("courses.list.learning") }]} />
-          <TabPanel tabsId={TABS_ID} value={current}>
-            {teaching ? <TeachingList /> : <StudentHome embedded />}
-          </TabPanel>
-        </>
+      {/* PERFORMANCE_AUDIT S1: `noLearning` toggles only the tabs; the list keeps one parent, so it loads once */}
+      {noLearning ? null : (
+        <Tabs id={TABS_ID} label={t("courses.list.title")} value={current} onChange={(v) => changeTab(v as Tab)} className="mb-6"
+          items={[{ id: "teaching", label: t("courses.list.teaching") }, { id: "learning", label: t("courses.list.learning") }]} />
       )}
+      {/* the tab panel's own element (TabPanel's markup) with the panel attributes only while the tabs are shown */}
+      <div {...(noLearning ? {} : { id: panelId(TABS_ID, current), role: "tabpanel", "aria-labelledby": tabId(TABS_ID, current), tabIndex: 0 })}
+        className={cn(!noLearning && "pt-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600")}>
+        {teaching ? <TeachingList noLearning={noLearning} /> : <StudentHome embedded />}
+      </div>
     </div>
   );
 }

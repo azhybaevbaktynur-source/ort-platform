@@ -31,3 +31,6 @@ uploads/
 # Logs
 *.log
 
+
+# Names-only example of the backend environment (no values)
+!.env.example

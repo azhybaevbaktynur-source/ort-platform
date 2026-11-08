@@ -9,7 +9,7 @@ export type ModuleState = "locked" | "unlocked" | "started" | "completed";
 export type CompletionMode = "all" | "any";
 export type ModuleWarningCode =
   | "target_unpublished" | "target_deleted" | "prerequisite_unpublished" | "prerequisite_deleted"
-  | "requirement_on_unpublished_target" | "unlock_in_past_with_locked_students";
+  | "requirement_on_unpublished_target" | "unlock_in_past_with_locked_students" | "first_module_pro";
 export type LockReasonKind = "unlock_at" | "prerequisite" | "sequential";
 /** F5a (COURSE_LESSONS_DESIGN 2, 3): Pro module tier; why a student row is locked. */
 export type AccessTier = "free" | "paid";

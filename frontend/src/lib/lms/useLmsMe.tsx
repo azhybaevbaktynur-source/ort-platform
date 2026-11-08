@@ -1,8 +1,8 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { getStudentView } from "@/lib/api";
 import { getMe } from "./courses";
+import { readCachedMe as readCache, writeCachedMe as writeCache } from "./meCache";
 import { LMS_ME_STALE_EVENT } from "./meStale";
 import type { LmsApiError } from "./client";
 import type { MeOut } from "./types";
@@ -16,43 +16,7 @@ interface LmsMeState {
 
 const LmsMeContext = createContext<LmsMeState | null>(null);
 
-/*
- * UX rework 2: every area has its own layout, so moving between areas mounts a new shell. The last answer is kept per
- * token (memory + this tab's sessionStorage) and shown at once while a fresh one loads, so the header never loses an
- * area on the way. It only draws the menu: every permission is decided by the server on each request.
- */
-const CACHE_KEY = "ort_lms_me";
-let memory: { token: string; me: MeOut } | null = null;
-
-/** The end of the token in use: tells whose answer is cached, and is useless as a credential. */
-function activeToken(): string {
-  if (typeof window === "undefined") return "";
-  return (getStudentView()?.token ?? window.localStorage.getItem("ort_token") ?? "").slice(-16);
-}
-
-function readCache(): MeOut | null {
-  const token = activeToken();
-  if (!token) return null;
-  if (memory?.token === token) return memory.me;
-  try {
-    const raw = window.sessionStorage.getItem(CACHE_KEY);
-    const saved = raw ? (JSON.parse(raw) as { token?: string; me?: MeOut }) : null;
-    if (saved?.token === token && saved.me) {
-      memory = { token, me: saved.me };
-      return saved.me;
-    }
-  } catch { /* storage blocked or a bad value: load normally */ }
-  return null;
-}
-
-function writeCache(me: MeOut | null): void {
-  const token = activeToken();
-  memory = me && token ? { token, me } : null;
-  try {
-    if (memory) window.sessionStorage.setItem(CACHE_KEY, JSON.stringify(memory));
-    else window.sessionStorage.removeItem(CACHE_KEY);
-  } catch { /* the cache is optional */ }
-}
+// The per-token cache of the answer lives in ./meCache (PERFORMANCE_AUDIT S1: the shell reads it at render time).
 
 export function useLmsMeLoader(enabled: boolean): LmsMeState {
   const [fresh, setMe] = useState<MeOut | null>(null);

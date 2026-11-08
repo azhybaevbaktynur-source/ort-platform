@@ -629,4 +629,25 @@ Filled in by the implementers (rows copied from the script's page table; laptop 
 
 | page | profile | mode | before (this audit) API / depth / first content | after S1 | after S2+S3 | after S4 |
 |---|---|---|---|---|---|---|
-| (to fill) | | | | | | |
+| teacher-courses | laptop | cold | 7 / 2 / 221, student-skeleton → student → header (YES) | 5 / 2 / 183, neutral → header (no) (same-run before: 7 / 2 / 2414, swap YES) | | |
+| teacher-courses | laptop | warm | 5 / 1 / 142, student-skeleton → header (YES) | 5 / 1 / 187, neutral → header (no) (same-run before: 5 / 1 / 714, swap YES) | | |
+| teacher-course | laptop | cold | 7 / 2 / 376, student-skeleton → header-skeleton → header (YES) | 7 / 2 / 300, neutral → header (no) (same-run before: 7 / 2 / 1117, swap YES) | | |
+| teacher-course | laptop | warm | 7 / 2 / 317, student-skeleton → header (YES) | 7 / 2 / 244, neutral → header (no) (same-run before: 7 / 2 / 630, swap YES) | | |
+| student-home | laptop | cold | 10 / 3 / 1295, student-skeleton → student | 10 / 2 / 625, neutral → student (no) (same-run before: 10 / 3 / 958) | | |
+| student-home | laptop | warm | 10 / 1 / 772, student-skeleton → student | 10 / 1 / 275, neutral → student (no) (same-run before: 10 / 1 / 1690) | | |
+| teacher-courses | phone | cold | 7 / 2 / 10978, student-skeleton → student → header (YES) | 5 / 2 / 9297, neutral → header (no) (same-run before: 7 / 2 / 11107, swap YES) | | |
+| teacher-courses | phone | warm | 5 / 1 / 1228, student-skeleton → header (YES) | 5 / 1 / 853, neutral → header (no) (same-run before: 5 / 1 / 882, swap YES) | | |
+| teacher-course | phone | cold | 7 / 2 / 13112, student-skeleton → header-skeleton → header (YES) | 7 / 2 / 11468, neutral → header (no) (same-run before: 7 / 2 / 12852, swap YES) | | |
+| teacher-course | phone | warm | 7 / 2 / 2069, student-skeleton → header (YES) | 7 / 2 / 1277, neutral → header (no) (same-run before: 7 / 2 / 1287, swap YES) | | |
+| student-home | phone | cold | 10 / 2 / 12522, student-skeleton → student | 10 / 2 / 9971, neutral → student (no) (same-run before: 10 / 2 / 11714) | | |
+| student-home | phone | warm | 10 / 1 / 3041, student-skeleton → student | 10 / 1 / 1165, neutral → student (no) (same-run before: 10 / 1 / 1488) | | |
+
+**S1 notes** (2026-11-09, branch `worktree-agent-afc03b917ca8bd44c`): cells are API requests / API depth / first content (ms), then the frames
+seen. "Same-run before" = the `lms` build `4b09a3e` measured back to back with the S1 build against one scratch backend
+on the same machine (load average ~15, so laptop first-content numbers vary by ±30 % or more; the structure columns
+are exact). Every row of the S1 run (all seven pages, both profiles, cold / client / warm) reads swap `no`; the frames
+are `neutral → student` for students, `neutral → header` for teachers and `neutral → header-skeleton → header` for the
+admin's cold overview. Teacher list 7 → 5 API requests (one `GET /courses?as=teaching`, and the student shell's
+`/me/home/courses` no longer runs for teachers). The observer in `perf-waterfall.spec.ts` gained the `neutral` state
+and ignores a `<header>` that is not rendered (a cold page renders hidden under the neutral frame so its requests start
+alongside `/me/lms`; its own `<header>` would otherwise read as the app header).

@@ -269,6 +269,8 @@ export interface AdminUserDetailOut extends AdminUserOut {
   deleted?: boolean;
   parent_links?: { parents_count: number; parents: LinkedAccountOut[]; children_count: number; children: LinkedAccountOut[] } | null;
   pending_email_change?: { new_email: string; expires_at: string; by_admin: boolean } | null;
+  /** Item 3: the password (if usable) and the linked Google / Apple accounts. */
+  sign_in_methods?: { method: "password" | "google" | "apple"; linked_at?: string | null }[];
 }
 /** S4 attempt lookup: where an attempt stands. Never answers, scores or grades. */
 export interface AdminAttemptOut {

@@ -32,6 +32,7 @@ import { rememberLessonModules } from "./lessonNav";
 import { VideoPlayer } from "./VideoPlayer";
 import { KindMeta, StatusIcon, viewOnOpen } from "./StudentSyllabus";
 import { ProChip, ProLockCard } from "./ProLockCard";
+import { ProCallout } from "@/components/lms/access/ProCallout";
 
 /** The student's outline (student shape only; staff are sent to the course page). */
 function useOutline() {
@@ -381,6 +382,7 @@ export function LessonView({ moduleId, itemId }: { moduleId: string; itemId: str
             : <h2 className="mt-1 break-words text-2xl font-bold leading-8 text-slate-900">{title}</h2>}
           {!locked && duration && <p className="mt-1 text-sm leading-5 text-slate-600"><KindMeta item={item} locked={false} /></p>}
         </div>
+        {data.modules.some((m) => m.access_locked) && <ProCallout variant="course" />}
         {body}
         {actionError ? <ErrorState variant="inline" message={errorText(actionError)} /> : null}
         {doneRow && <div className="flex flex-col sm:items-start">{doneRow}</div>}
