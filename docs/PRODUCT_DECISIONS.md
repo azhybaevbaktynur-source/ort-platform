@@ -596,3 +596,4 @@ Agent 2026-11-08 (item 4): D-ORG-2 — a platform admin inside `/org/{id}` keeps
 Agent 2026-11-08 (item 4): D-ORG-3 — the header never lists every organization for the platform admin; Admin → Organizations is the entry point; the open foreign organization shows as the active choice.
 Agent 2026-11-08 (item 4): D-ORG-4 — `GET /platform/organizations/{id}/students` shows name, email and counts only (courses, first/last enrollment); everything else stays on the person page.
 Agent 2026-11-08 (item 4): D-ORG-5 — resuming a personal organization whose owner is revoked or disabled is refused (409 `owner_not_eligible`); use "grant teacher" on the person page.
+2026-11-08: items 1–2 deployed (main bc4e090, no migration; /health and Vercel SW_VERSION verified).
