@@ -189,6 +189,9 @@ def test_offer_hides_season_and_prices_until_set(client, db, frozen_clock):
     assert body["season_end"] is None and body["how_to_pay"] == {"ru": "", "ky": "", "en": ""}
     assert body["plans"][0]["days"] == 30 and body["plans"][0]["new_ends_at"].startswith("2026-11-21T12:00")
     assert body["status"]["active"] is False and "tests" in body["includes"]
+    # SUBSCRIPTION_DESIGN 12.4: Pro includes the lesson courses (analytics is free, so not listed)
+    assert body["includes"][-1] == "courses" and "lessons" not in body["includes"]
+    assert "analytics" not in body["includes"]
 
 
 def test_offer_shows_season_and_prices_once_set_and_texts_fall_back(client, db, frozen_clock):

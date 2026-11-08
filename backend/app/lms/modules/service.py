@@ -676,6 +676,10 @@ def _module_staff_out(st: ev_mod.Structure, m: CourseModule) -> sch.ModuleStaffO
             warnings.append(sch.WarningOut(code=ids.W_PREREQUISITE_DELETED, module_id=pid))
         elif not pm.published:
             warnings.append(sch.WarningOut(code=ids.W_PREREQUISITE_UNPUBLISHED, module_id=pid))
+    if (m.access_tier or "free") == "paid" and m.deleted_at is None:  # §12.3.2: the first published module is Pro
+        first = next((x for x in st.modules if x.published), None)
+        if first is not None and first.id == m.id:
+            warnings.append(sch.WarningOut(code=ids.W_FIRST_MODULE_PRO, module_id=m.id))
     visible = [r for r in st.items.get(m.id, []) if r.visible and r.kind != "header"]
     return sch.ModuleStaffOut(
         id=m.id, title=m.title or {}, position=m.position, published=bool(m.published), unlock_at=_utc(m.unlock_at),
