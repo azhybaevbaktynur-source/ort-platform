@@ -49,6 +49,7 @@ JWKS_URL = "https://idp.test/certs"
 CLIENT_ID = "test-client.apps.example"
 PASSWORD = "correct horse battery"
 COOKIE = "ort_oauth"
+BIND = secrets.token_urlsafe(32)  # this test browser's binding (ProviderButtons keeps one in sessionStorage)
 
 
 # ----------------------------------------------------------------------------- fake identity provider
@@ -209,8 +210,8 @@ class Flow(SimpleNamespace):
 
 
 async def begin(lang: Optional[str] = "ru", redirect: Optional[str] = None, ip: Optional[str] = None,
-                provider: str = "google") -> Flow:
-    params = {k: v for k, v in (("lang", lang), ("redirect", redirect)) if v is not None}
+                provider: str = "google", bind: Optional[str] = BIND) -> Flow:
+    params = {k: v for k, v in (("lang", lang), ("redirect", redirect), ("bind", bind)) if v is not None}
     res = await call("GET", f"/auth/{provider}/start", params=params, ip=ip)
     assert res.status_code == 302, res.text
     q = {k: v[0] for k, v in parse_qs(urlparse(res.headers["location"]).query).items()}
@@ -243,8 +244,10 @@ async def google_ticket(fake: FakeProvider, **claims) -> tuple[str, dict]:
     return fragment(res)["t"], full
 
 
-async def complete(ticket: str, ip: Optional[str] = None, token: Optional[str] = None, **extras):
-    return await call("POST", "/auth/oauth/complete", json={"ticket": ticket, **extras}, ip=ip, token=token)
+async def complete(ticket: str, ip: Optional[str] = None, token: Optional[str] = None, bind: Optional[str] = BIND,
+                   **extras):
+    body = {"ticket": ticket, **({"bind": bind} if bind is not None else {}), **extras}
+    return await call("POST", "/auth/oauth/complete", json=body, ip=ip, token=token)
 
 
 def detail_code(res) -> Optional[str]:
@@ -294,6 +297,7 @@ async def test_start_redirects_to_google_with_pkce_state_and_nonce(idp):
     assert data["nonce_hash"] == hashlib.sha256(q["nonce"].encode()).hexdigest()
     assert q["nonce"] not in flow.cookie and q["nonce"] not in str(data)
     assert data["redirect"] == "/ru/courses/x"
+    assert data["bind_hash"] == hashlib.sha256(BIND.encode()).hexdigest() and BIND not in str(data)
     verifier = data["verifier"]
     assert 43 <= len(verifier) <= 128
     assert base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=") == q["code_challenge"]
@@ -309,7 +313,7 @@ async def test_start_drops_an_unsafe_redirect(idp, bad):
 
 async def test_start_is_secure_on_production(idp, monkeypatch):
     monkeypatch.setattr(settings, "ENVIRONMENT", "production")
-    res = await call("GET", "/auth/google/start")
+    res = await call("GET", "/auth/google/start", params={"bind": BIND})
     assert "secure" in [a.strip().lower() for a in set_cookie_header(res).split(";")]
 
 
@@ -490,7 +494,7 @@ async def test_an_unconfirmed_self_registration_loses_its_password_and_old_token
     db.commit()
     old_token = create_access_token({"sub": user.id, "tv": user.token_version or 0})
     ticket, _ = await google_ticket(idp, email=user.email)
-    res = await complete(ticket)
+    res = await complete(ticket, **signup_fields("18_plus"))
     assert res.status_code == 200, res.text
     db.expire_all()
     user = db.get(User, user.id)
@@ -501,6 +505,59 @@ async def test_an_unconfirmed_self_registration_loses_its_password_and_old_token
     assert (await call("GET", "/auth/me", token=res.json()["access_token"])).status_code == 200
     login = await call("POST", "/auth/login", json={"email": user.email, "password": PASSWORD})
     assert login.status_code == 401
+
+
+async def test_an_unconfirmed_self_registration_is_linked_as_a_sign_up(idp, db):
+    """Security review item 2: whoever pre-registered the address chose its name, phone, age band and consent."""
+    squatter = await call("POST", "/auth/register", json={
+        "email": f"squat-{uuid.uuid4().hex[:8]}@example.com", "password": PASSWORD, "displayName": "Squatter",
+        "phone": "+996555000111", "lang": "ru", **signup_fields("under_14")})
+    assert squatter.status_code == 200, squatter.text
+    email = squatter.json()["email"]
+    user = db.execute(select(User).where(User.email == email)).scalar_one()
+    assert (user.email_verified, user.age_band, user.consent_state, user.phone) == (
+        False, "under_14", "pending_guardian", "+996555000111")
+    ticket, claims = await google_ticket(idp, email=email, name="Real Owner")
+    assert tickets.read_ticket(ticket)["mode"] == "link"
+    # the age step first; nothing is written before it
+    first = await complete(ticket)
+    assert first.status_code == 422 and detail_code(first) == "oauth_profile_required"
+    db.expire_all()
+    assert identities(db) == [] and db.get(User, user.id).email_verified is False
+    bad = await complete(ticket, ageBand="18_plus", policyVersionIds=[])
+    assert bad.status_code == 422 and detail_code(bad) == "policy_not_accepted"
+    res = await complete(ticket, displayName="  Owner  ", **signup_fields("18_plus"))
+    assert res.status_code == 200, res.text
+    db.expire_all()
+    user = db.get(User, user.id)
+    assert res.json()["user"]["id"] == user.id
+    assert (user.display_name, user.phone, user.age_band, user.consent_state, user.consent_due_at, user.locale) == (
+        "Owner", None, "18_plus", "ok", None, "ru")
+    assert (user.email_verified, user.password_hash) == (True, "!")
+    kinds = {k for (k,) in db.execute(select(ConsentRecord.kind).where(ConsentRecord.user_id == user.id))}
+    assert {"privacy", "terms"} <= kinds
+    assert [(r.provider, r.subject) for r in identities(db, user_id=user.id)] == [("google", claims["sub"])]
+    # without a name from the person, the provider's name replaces the pre-registered one
+    other = password_user(db)
+    other.email_verified, other.display_name, other.phone = False, "Squatter 2", "+996555000222"
+    db.commit()
+    ticket2, _ = await google_ticket(idp, email=other.email, name="Provider Name")
+    assert (await complete(ticket2, **signup_fields("14_17"))).status_code == 200
+    db.expire_all()
+    other = db.get(User, other.id)
+    assert (other.display_name, other.phone, other.age_band, other.consent_state) == (
+        "Provider Name", None, "14_17", "ok")
+
+
+async def test_a_verified_account_keeps_its_profile_when_linked(idp, db):
+    user = password_user(db, display_name="Keeps Name")
+    user.phone, user.age_band, user.consent_state = "+996555000333", "18_plus", "ok"
+    db.commit()
+    ticket, _ = await google_ticket(idp, email=user.email, name="Google Name")
+    assert (await complete(ticket, displayName="Ignored")).status_code == 200
+    db.expire_all()
+    user = db.get(User, user.id)
+    assert (user.display_name, user.phone, user.age_band) == ("Keeps Name", "+996555000333", "18_plus")
 
 
 async def test_a_disabled_account_is_refused_and_not_linked(idp, db):
@@ -684,9 +741,96 @@ async def test_an_expired_ticket_is_refused(idp, monkeypatch):
     with monkeypatch.context() as m:
         m.setattr(tickets, "time", SimpleNamespace(time=lambda: time.time() - 3600))
         old = tickets.issue_ticket(provider="google", subject="g-1", email="a@gmail.test", name="", mode="signup",
-                                   uid=None, lang="ru")
+                                   uid=None, lang="ru", bind_hash=hashlib.sha256(BIND.encode()).hexdigest())
     res = await complete(old)
     assert res.status_code == 401 and detail_code(res) == "oauth_ticket_invalid"
+
+
+# ----------------------------------------------------------------------------- login CSRF: the browser binding
+
+async def test_start_without_a_well_formed_bind_starts_no_flow(idp):
+    for bind in (None, "", "short", "x" * 129, "a b" * 10, "ж" * 30):
+        res = await call("GET", "/auth/google/start", params={"lang": "en", **({"bind": bind} if bind is not None else {})})
+        assert location(res) == f"{FRONT}/en/login?oauth_error=oauth_state_mismatch", bind
+        assert not [h for h in res.headers.get_list("set-cookie") if h.startswith(COOKIE + "=")]
+        assert res.headers["cache-control"] == "no-store"
+
+
+async def test_the_ticket_carries_only_the_hash_of_the_bind(idp):
+    ticket, _ = await google_ticket(idp)
+    payload = tickets.read_ticket(ticket)
+    assert payload["bh"] == hashlib.sha256(BIND.encode()).hexdigest() and BIND not in ticket
+
+
+@pytest.mark.parametrize("case", ["missing", "empty", "wrong", "malformed"])
+async def test_complete_without_the_right_bind_is_refused_and_counts_as_a_failure(idp, db, monkeypatch, case):
+    monkeypatch.setattr(settings, "RATE_LIMIT_IP_ENFORCE", True)
+    user = password_user(db)
+    ticket, _ = await google_ticket(idp, email=user.email)
+    bind = {"missing": None, "empty": "", "wrong": secrets.token_urlsafe(32), "malformed": BIND + "!"}[case]
+    ip = new_ip()
+    res = await complete(ticket, ip=ip, bind=bind)
+    assert res.status_code == 401 and detail_code(res) == "oauth_ticket_invalid"
+    assert identities(db) == []
+    for _ in range(29):
+        await complete(ticket, ip=ip, bind=bind)
+    assert (await complete(ticket, ip=ip, bind=bind)).status_code == 429  # failures are limited per address
+
+
+async def test_a_ticket_from_another_browser_signs_nobody_in(idp, db):
+    """The attacker finishes their own Google flow and sends the callback link (ticket in the fragment) to a victim: the
+    victim's browser has its own bind (or none) in sessionStorage, so the ticket is refused."""
+    attacker_bind = secrets.token_urlsafe(32)
+    attacker_flow = await begin(bind=attacker_bind)
+    code, claims = issue_code(idp, attacker_flow)
+    link = fragment(await google_callback(attacker_flow, code))["t"]
+    victim_bind = secrets.token_urlsafe(32)
+    for bind in (victim_bind, None):
+        for extras in ({}, signup_fields("18_plus")):
+            res = await complete(link, bind=bind, **extras)
+            assert res.status_code == 401 and detail_code(res) == "oauth_ticket_invalid"
+    assert db.scalar(select(func.count()).select_from(User).where(User.email == claims["email"])) == 0
+    # only the browser that pressed the button can use it
+    done = await complete(link, bind=attacker_bind, **signup_fields("18_plus"))
+    assert done.status_code == 200 and done.json()["user"]["email"] == claims["email"]
+
+
+async def test_complete_rechecks_that_the_provider_is_on(idp, db, monkeypatch):
+    user = password_user(db)
+    ticket, _ = await google_ticket(idp, email=user.email)
+    monkeypatch.setattr(settings, "GOOGLE_SIGN_IN_ENABLED", False)
+    res = await complete(ticket)
+    assert res.status_code == 404 and detail_code(res) == "oauth_not_configured"
+    assert identities(db) == []
+    monkeypatch.setattr(settings, "GOOGLE_SIGN_IN_ENABLED", True)
+    assert (await complete(ticket)).status_code == 200
+
+
+async def test_a_test_student_behind_an_identity_never_signs_in(idp, db):
+    student = make_user(db)
+    student.is_test_student = True
+    db.commit()
+    ticket, claims = await google_ticket(idp)
+    now = utcnow()
+    db.add(UserIdentity(user_id=student.id, provider="google", subject=claims["sub"], email=claims["email"],
+                        email_verified=True, linked_at=now, last_login_at=now))
+    db.commit()
+    res = await complete(ticket)
+    assert res.status_code == 401 and detail_code(res) == "oauth_ticket_invalid" and "access_token" not in res.text
+
+
+@pytest.mark.parametrize("body", [{"keys": 5}, {"keys": "abc"}, {"keys": {"kid": "x"}}, [1, 2], "keys"])
+async def test_a_malformed_jwks_is_a_provider_error_and_clears_the_cookie(idp, monkeypatch, body):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == JWKS_URL:
+            return httpx.Response(200, json=body)
+        return idp.handler(request)
+
+    monkeypatch.setattr(transport, "http_client", lambda: httpx.Client(transport=httpx.MockTransport(handler)))
+    flow = await begin()
+    code, _ = issue_code(idp, flow)
+    res = await google_callback(flow, code)
+    assert error_code(res) == "oauth_provider_error" and cookie_cleared(res)
 
 
 # ----------------------------------------------------------------------------- 9. rate limits

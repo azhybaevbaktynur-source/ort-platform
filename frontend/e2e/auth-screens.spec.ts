@@ -16,6 +16,14 @@ const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url")
 const TICKET = `${b64({ alg: "HS256" })}.${b64({ typ: "oauth_ticket", email: "new.person@example.com", name: "Айгерим Новая", provider: "google" })}.sig`;
 const SESSION = { access_token: "e30.e30.sig", token_type: "bearer", user: { id: "usr_e2e_oauth", email: "new.person@example.com", displayName: "Айгерим Новая" } };
 
+// the browser binding ProviderButtons keeps in sessionStorage (login CSRF, AUTH_SOCIAL_DESIGN 11)
+const BIND = "e2e-bind-0123456789abcdefghijklmnopqrstuvwx";
+
+/** This tab pressed the provider button: the bind is in sessionStorage when the callback page loads. */
+async function withBind(page: Page) {
+  await page.addInitScript((b) => sessionStorage.setItem("ort_oauth_bind", b), BIND);
+}
+
 async function providers(page: Page, on: { google: boolean; apple: boolean }) {
   await page.route("**/auth/providers", (r) => r.fulfill({ json: on }));
 }
@@ -47,6 +55,30 @@ test.describe("provider buttons", () => {
     await expect(google).toHaveAttribute("href", /\/auth\/google\/start\?lang=ru&redirect=%2Fru%2Fcourses%2Fx$/);
     await expect(page.getByText(t("auth.continueWithApple"))).toHaveCount(0);
     await expect(page.getByRole("separator")).toBeVisible();
+  });
+
+  test("the click keeps a fresh random bind in sessionStorage and sends it to start", async ({ page }) => {
+    await providers(page, { google: true, apple: false });
+    const starts: string[] = [];
+    await page.route("**/auth/google/start**", async (r) => {
+      starts.push(r.request().url());
+      await r.fulfill({ status: 302, headers: { location: new URL("/ru/login", page.url()).toString() } });
+    });
+    const binds: string[] = [];
+    for (let i = 0; i < 2; i++) {
+      await page.goto("/ru/login?redirect=%2Fru%2Fcourses%2Fx");
+      await page.getByRole("link", { name: t("auth.continueWithGoogle") }).click();
+      await expect.poll(() => starts.length).toBe(i + 1);
+      await page.waitForURL(/\/ru\/login$/);
+      const sent = new URL(starts[i]).searchParams;
+      expect(sent.get("lang")).toBe("ru");
+      expect(sent.get("redirect")).toBe("/ru/courses/x");
+      const bind = sent.get("bind") ?? "";
+      expect(bind).toMatch(/^[A-Za-z0-9_-]{43}$/); // 256 bits, base64url
+      expect(await page.evaluate(() => sessionStorage.getItem("ort_oauth_bind"))).toBe(bind);
+      binds.push(bind);
+    }
+    expect(binds[0]).not.toBe(binds[1]);
   });
 
   test("Apple shown when on; forgot password has no buttons but a hint for Google users", async ({ page }) => {
@@ -82,6 +114,7 @@ test.describe("Google callback page", () => {
       else await r.fulfill({ json: SESSION });
     });
     await page.route("**/auth/me", (r) => r.fulfill({ json: { id: SESSION.user.id, email: SESSION.user.email, displayName: SESSION.user.displayName } }));
+    await withBind(page);
     await page.goto(`/ru/oauth-callback#t=${TICKET}&r=%2Fru%2Fabout`);
     await expect(page.getByRole("heading", { name: t("auth.oauth.completeTitle") })).toBeVisible();
     expect(page.url()).not.toContain("#");
@@ -96,8 +129,8 @@ test.describe("Google callback page", () => {
     await page.getByRole("button", { name: t("auth.oauth.completeButton") }).click();
     await expect(page).toHaveURL(/\/ru\/about/);
     expect(bodies).toHaveLength(2);
-    expect(bodies[0]).toEqual({ ticket: TICKET });
-    expect(bodies[1]).toMatchObject({ ticket: TICKET, ageBand: "14_17", displayName: "Айгерим К." });
+    expect(bodies[0]).toEqual({ ticket: TICKET, bind: BIND });
+    expect(bodies[1]).toMatchObject({ ticket: TICKET, bind: BIND, ageBand: "14_17", displayName: "Айгерим К." });
     expect((bodies[1].policyVersionIds as string[]).length).toBeGreaterThan(0);
     expect(await page.evaluate(() => localStorage.getItem("ort_token"))).toBe(SESSION.access_token);
   });
@@ -108,6 +141,7 @@ test.describe("Google callback page", () => {
       if (!body.ageBand) await r.fulfill({ status: 422, json: { detail: { code: "oauth_profile_required" } } });
       else await r.fulfill({ json: SESSION });
     });
+    await withBind(page);
     await page.goto(`/ru/oauth-callback#t=${TICKET}`);
     await page.getByRole("button", { name: t("privacy.age.under_14") }).click();
     await expect(page.getByRole("checkbox")).toHaveCount(0);
@@ -123,6 +157,7 @@ test.describe("Google callback page", () => {
       await r.fulfill({ json: SESSION });
     });
     await page.route("**/auth/me", (r) => r.fulfill({ json: { id: SESSION.user.id, email: SESSION.user.email } }));
+    await withBind(page);
     await page.goto(`/ru/oauth-callback#t=${TICKET}&r=%2Fru%2Fabout`);
     await expect(page.getByRole("heading", { name: t("auth.mfa.title") })).toBeVisible();
     await page.getByLabel(t("auth.mfa.codeLabel")).fill("123456");
@@ -131,9 +166,65 @@ test.describe("Google callback page", () => {
     expect(mfaBody).toEqual({ challenge: "chal-123", code: "123456" });
   });
 
+  test("a ticket link opened in a tab without the bind is refused and never sent", async ({ page }) => {
+    let calls = 0;
+    await page.route("**/auth/oauth/complete", async (r) => { calls += 1; await r.fulfill({ json: SESSION }); });
+    await page.goto(`/ru/oauth-callback#t=${TICKET}`);
+    await expect(alertBox(page)).toHaveText(t("auth.errors.oauth_ticket_invalid"));
+    expect(await page.evaluate(() => window.location.hash)).toBe("");
+    expect(calls).toBe(0);
+    expect(await page.evaluate(() => localStorage.getItem("ort_token"))).toBeNull();
+  });
+
+  test("the bind is read once and removed", async ({ page }) => {
+    await page.route("**/auth/oauth/complete", (r) => r.fulfill({ status: 422, json: { detail: { code: "oauth_profile_required" } } }));
+    await page.goto("/ru/login");
+    await page.evaluate((b) => sessionStorage.setItem("ort_oauth_bind", b), BIND);
+    await page.goto(`/ru/oauth-callback#t=${TICKET}`);
+    await expect(page.getByRole("heading", { name: t("auth.oauth.completeTitle") })).toBeVisible();
+    expect(await page.evaluate(() => sessionStorage.getItem("ort_oauth_bind"))).toBeNull();
+  });
+
+  test("signed in as someone else: asks before replacing the session", async ({ page }) => {
+    const OTHER = { uid: "usr_other", email: "other.person@example.com", displayName: "Other" };
+    await page.route("**/auth/me", (r) => r.fulfill({ json: { id: OTHER.uid, email: OTHER.email, displayName: OTHER.displayName } }));
+    const bodies: Record<string, unknown>[] = [];
+    await page.route("**/auth/oauth/complete", async (r) => {
+      bodies.push(r.request().postDataJSON());
+      await r.fulfill({ status: 422, json: { detail: { code: "oauth_profile_required" } } });
+    });
+    await page.addInitScript((profile) => { // this browser is signed in to OTHER on every page load
+      localStorage.setItem("ort_token", "e30.e30.other");
+      localStorage.setItem("ort_dev_auth_user", JSON.stringify(profile));
+    }, OTHER);
+    await withBind(page);
+    await page.goto(`/ru/oauth-callback#t=${TICKET}`);
+    await expect(page.getByRole("heading", { name: t("auth.oauth.switchTitle") })).toBeVisible();
+    await expect(page.getByText(t("auth.oauth.switchBody", { current: OTHER.email, email: "new.person@example.com" }))).toBeVisible();
+    expect(bodies).toHaveLength(0); // nothing is sent before the answer
+    await page.getByRole("button", { name: t("auth.oauth.switchStay") }).click();
+    await expect(page).toHaveURL(/\/ru\/courses/);
+    expect(bodies).toHaveLength(0);
+
+    await page.goto(`/ru/oauth-callback#t=${TICKET}`);
+    await page.getByRole("button", { name: t("auth.oauth.switchContinue", { email: "new.person@example.com" }) }).click();
+    await expect(page.getByRole("heading", { name: t("auth.oauth.completeTitle") })).toBeVisible();
+    expect(bodies).toEqual([{ ticket: TICKET, bind: BIND }]);
+
+    // the account already signed in (the ticket's uid) is not asked about
+    const own = `${b64({ alg: "HS256" })}.${b64({ typ: "oauth_ticket", email: OTHER.email, name: "", provider: "google", uid: OTHER.uid })}.sig`;
+    await page.goto("/ru/login"); // a new document: a goto that changes only the fragment would not reload the page
+    await page.goto(`/ru/oauth-callback#t=${own}`);
+    await expect.poll(() => bodies.length).toBe(2);
+    await expect(page.getByRole("heading", { name: t("auth.oauth.completeTitle") })).toBeVisible();
+    await expect(page.getByRole("heading", { name: t("auth.oauth.switchTitle") })).toHaveCount(0);
+    expect(bodies).toHaveLength(2);
+  });
+
   for (const code of ["oauth_ticket_invalid", "account_disabled", "rate_limited"]) {
     test(`error ${code}: translated text and a way back`, async ({ page }) => {
       await page.route("**/auth/oauth/complete", (r) => r.fulfill({ status: code === "rate_limited" ? 429 : 401, json: { detail: { code, message: "raw server text" } } }));
+      await withBind(page);
       await page.goto(`/ru/oauth-callback#t=${TICKET}`);
       await expect(alertBox(page)).toHaveText(t(`auth.errors.${code}`));
       await page.getByRole("link", { name: t("auth.oauth.backToLogin") }).click();
@@ -147,6 +238,7 @@ test.describe("layout", () => {
     await page.setViewportSize({ width: 375, height: 812 });
     await providers(page, { google: true, apple: true });
     await page.route("**/auth/oauth/complete", (r) => r.fulfill({ status: 422, json: { detail: { code: "oauth_profile_required" } } }));
+    await withBind(page);
     for (const p of ["/ru/register", "/ru/login", "/ru/forgot-password", "/ru/reset-password?token=abc", `/ru/oauth-callback#t=${TICKET}`]) {
       await page.goto(p);
       await page.getByRole("heading").first().waitFor();
@@ -160,6 +252,7 @@ test.describe("layout", () => {
     fs.mkdirSync(SHOTS!, { recursive: true });
     await providers(page, { google: true, apple: false });
     await page.route("**/auth/oauth/complete", (r) => r.fulfill({ status: 422, json: { detail: { code: "oauth_profile_required" } } }));
+    await withBind(page);
     const screens: [string, string, string][] = [
       ["register", "/ru/register", "form"],
       ["login", "/ru/login", "form"],

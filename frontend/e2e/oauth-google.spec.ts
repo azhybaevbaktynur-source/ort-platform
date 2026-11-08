@@ -139,6 +139,49 @@ test("pressing Cancel at Google and a wrong state come back as translated refusa
   await expect(alertBox(page)).toHaveText(t("auth.errors.oauth_state_mismatch"));
 });
 
+test("login CSRF: the attacker's ticket link signs nobody in from another browser", async ({ page, browser, baseURL }) => {
+  // the attacker finishes their own Google flow and keeps the callback link instead of using it
+  const email = `e2e-google-attacker-${rand()}@gmail.test`;
+  await nextGoogle({ email, name: "Attacker", sub: `attacker-${rand()}` });
+  let ticket = "";
+  await page.route(`${API}/api/v1/auth/oauth/complete`, async (r) => {
+    ticket = r.request().postDataJSON().ticket;
+    await r.abort();
+  });
+  await pressGoogle(page);
+  await expect.poll(() => ticket).not.toBe("");
+
+  // the victim's browser: signed in to their own account, then opens the link
+  const victim = await browser.newContext({ baseURL });
+  try {
+    const vpage = await victim.newPage();
+    watchCsp(vpage);
+    const own = seed().oauth.linked;
+    await signIn(vpage, own);
+    await vpage.goto("/ru/login");
+    const before = await vpage.evaluate(() => localStorage.getItem("ort_token"));
+    let sent = 0;
+    vpage.on("request", (req) => { if (req.url().includes("/auth/oauth/complete")) sent += 1; });
+    await vpage.goto(`/ru/oauth-callback#t=${ticket}`);
+    await expect(alertBox(vpage)).toHaveText(t("auth.errors.oauth_ticket_invalid"));
+    expect(sent).toBe(0); // no bind in this tab: nothing is even sent
+    expect(await vpage.evaluate(() => localStorage.getItem("ort_token"))).toBe(before);
+
+    // even with a bind of its own in the tab (it pressed Google once), the server refuses the ticket
+    await vpage.goto("/ru/login"); // a new document before the callback page again
+    await vpage.evaluate(() => sessionStorage.setItem("ort_oauth_bind", "victims-own-bind-0123456789abcdefghijklmnop"));
+    await vpage.goto(`/ru/oauth-callback#t=${ticket}`);
+    await vpage.getByRole("button", { name: t("auth.oauth.switchContinue", { email }) }).click();
+    await expect(alertBox(vpage)).toHaveText(t("auth.errors.oauth_ticket_invalid"));
+    expect(sent).toBe(1);
+    expect(await vpage.evaluate(() => localStorage.getItem("ort_token"))).toBe(before);
+  } finally {
+    await victim.close();
+  }
+  const found = await api(seed().admin, "GET", `/platform/users?q=${encodeURIComponent(email)}`);
+  expect(JSON.stringify(found)).not.toContain(email);
+});
+
 test("every oauth_error code is shown in Russian; an unknown one gets the general text", async ({ page }) => {
   watchCsp(page);
   for (const code of ["oauth_not_configured", "oauth_expired", "oauth_state_mismatch", "oauth_denied",

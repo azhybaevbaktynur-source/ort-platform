@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
-import { AuthError, useAuth } from "@/lib/auth-context";
+import { AuthError, storedSessionProfile, useAuth } from "@/lib/auth-context";
+import { takeOAuthBind } from "@/components/auth/ProviderButtons";
 import { safeRedirect } from "@/lib/safeRedirect";
 import { AuthAlert, AuthSplit, AuthTitle } from "@/components/auth/AuthSplit";
 import { AgeRow } from "@/components/auth/AgeRow";
@@ -16,17 +17,17 @@ import { Button } from "@/components/ui";
 import { ownPolicyIds, type AgeBand } from "@/components/privacy/privacyApi";
 import { ownPrivacyErrorText } from "@/components/privacy/privacyErrors";
 
-type Step = "working" | "profile" | "mfa" | "error";
+type Step = "working" | "switch" | "profile" | "mfa" | "error";
 
-/** Display-only read of the ticket payload (name and email for the "Almost done" step); the server verifies it. */
-function readTicket(ticket: string): { email: string; name: string } {
+/** Display-only read of the ticket payload (name, email, the matched account); the server verifies it. */
+function readTicket(ticket: string): { email: string; name: string; uid: string } {
   try {
     const part = ticket.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
     const bytes = Uint8Array.from(atob(part + "=".repeat((4 - (part.length % 4)) % 4)), (c) => c.charCodeAt(0));
     const json = JSON.parse(new TextDecoder().decode(bytes));
-    return { email: String(json.email || ""), name: String(json.name || "") };
+    return { email: String(json.email || ""), name: String(json.name || ""), uid: String(json.uid || "") };
   } catch {
-    return { email: "", name: "" };
+    return { email: "", name: "", uid: "" };
   }
 }
 
@@ -36,7 +37,9 @@ function OAuthCallback() {
   const { completeOAuth } = useAuth();
 
   const ticketRef = useRef<string | null>(null);
+  const bindRef = useRef<string>("");
   const redirectRef = useRef<string>("");
+  const [current, setCurrent] = useState("");
   const started = useRef(false);
 
   const [step, setStep] = useState<Step>("working");
@@ -79,20 +82,39 @@ function OAuthCallback() {
     const info = readTicket(ticket);
     setWho(info);
     setDisplayName(info.name || info.email.split("@")[0]);
-    (async () => {
-      try {
-        await completeOAuth(ticket);
-        goOn();
-      } catch (err) {
-        if (err instanceof AuthError && err.code === "oauth_profile_required") setStep("profile");
-        else if (err instanceof AuthError && err.code === "mfa_required" && typeof err.details.challenge === "string") {
-          setChallenge(err.details.challenge);
-          setStep("mfa");
-        } else fail(err);
-      }
-    })();
+    // login CSRF (AUTH_SOCIAL_DESIGN 11): only the tab that pressed the button holds the bind; a ticket link from
+    // anywhere else is refused here without asking anything
+    const bind = takeOAuthBind();
+    if (!bind) {
+      fail(new AuthError(401, "", "oauth_ticket_invalid"));
+      return;
+    }
+    bindRef.current = bind;
+    const signedIn = storedSessionProfile();
+    if (signedIn && (!info.uid || info.uid !== signedIn.uid)) {
+      setCurrent(signedIn.email);
+      setStep("switch"); // never replace another account's session without asking
+      return;
+    }
+    finish();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const finish = async () => {
+    const ticket = ticketRef.current;
+    if (!ticket) return;
+    setStep("working");
+    try {
+      await completeOAuth(ticket, bindRef.current);
+      goOn();
+    } catch (err) {
+      if (err instanceof AuthError && err.code === "oauth_profile_required") setStep("profile");
+      else if (err instanceof AuthError && err.code === "mfa_required" && typeof err.details.challenge === "string") {
+        setChallenge(err.details.challenge);
+        setStep("mfa");
+      } else fail(err);
+    }
+  };
 
   const submitProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,7 +122,7 @@ function OAuthCallback() {
     setError(null);
     setBusy(true);
     try {
-      await completeOAuth(ticketRef.current, {
+      await completeOAuth(ticketRef.current, bindRef.current, {
         ageBand: band,
         policyVersionIds: needsPolicies ? ownPolicyIds(policies ?? []) : [],
         displayName: displayName.trim(),
@@ -124,6 +146,25 @@ function OAuthCallback() {
     return (
       <AuthSplit pose="reading">
         <MfaStep challenge={challenge} onDone={() => goOn()} onRestart={(message) => { setError(message || null); setStep("error"); }} />
+      </AuthSplit>
+    );
+  }
+
+  if (step === "switch") {
+    return (
+      <AuthSplit pose="thinking">
+        <AuthTitle title={t("auth.oauth.switchTitle")} />
+        <p className="mb-5 break-words text-sm text-slate-700">
+          {t("auth.oauth.switchBody", { current: current || "—", email: who.email })}
+        </p>
+        <div className="space-y-3">
+          <Button type="button" size="lg" fullWidth onClick={() => finish()} rightIcon={<ArrowRight aria-hidden="true" className="h-4 w-4" />}>
+            <span className="break-all">{t("auth.oauth.switchContinue", { email: who.email })}</span>
+          </Button>
+          <Button type="button" variant="secondary" size="lg" fullWidth onClick={() => router.replace(`/${lang}/courses`)}>
+            {t("auth.oauth.switchStay")}
+          </Button>
+        </div>
       </AuthSplit>
     );
   }
