@@ -1,14 +1,16 @@
 "use client";
 
-import React, { createContext, Suspense, useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, { createContext, Suspense, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, Building2, KeyRound, Lock, Presentation, ShieldCheck, Users } from "lucide-react";
 import { useTranslation, type Language } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
 import { gateOpenPath } from "@/lib/api"; // Phase 11 S3
 import { LmsMeProvider, useLmsMeLoader } from "@/lib/lms/useLmsMe";
+import { useCachedMe } from "@/lib/lms/meCache"; // PERFORMANCE_AUDIT S1
+import { areaFromUrl, hidesLearning, isPlayerRoute, shellKindFor, urlAreaFor, type ShellKind, type ShellMe } from "@/lib/lms/shellKind"; // S1
 import { useCurrentOrg } from "@/lib/lms/currentOrg"; // item 4
-import { AppHeader, AreaPillsSkeleton, Brand, type AppHeaderArea, type AreaKey } from "@/components/ui/AppHeader";
+import { AppHeader, Brand, type AppHeaderArea, type AreaKey } from "@/components/ui/AppHeader";
 import { ErrorState, LoadingState, SHELL_WIDTH, Skeleton, cn } from "@/components/ui";
 import { EXAM_COLUMN_INNER, EXAM_COLUMN_OUTER } from "@/components/ui/shellWidth";
 import { inter } from "@/lib/fonts"; // SF-1: the player route's font
@@ -20,7 +22,7 @@ import { PrivacyBanner } from "@/components/privacy/PrivacyBanner"; // Phase 11 
 // --- Student UI U2 ---
 import type { CourseOut } from "@/lib/lms/types";
 import { courseIdOfPath } from "@/lib/lms/studentNav";
-import { STUDENT_FRAME, STUDENT_MAIN, STUDENT_SIDEBAR_BG, StudentChrome, StudentTabBar } from "./student/StudentShell";
+import { STUDENT_FRAME, STUDENT_MAIN, StudentChrome, StudentTabBar } from "./student/StudentShell";
 import { useStudentShellData } from "./student/useStudentShellData";
 import { StudentShellDataContext } from "./student/StudentShellDataContext"; // Student UI U3
 
@@ -81,31 +83,40 @@ export function useDeclareStudentCourse(course: CourseOut | null) {
 // --- SF-1 begin --- (STUDENT_UI_FIX_PLAN §2.1, replaces STUDENT_UI_DESIGN §2.4): the lobby, the result and the review
 // follow the area rule (students: the student shell); the player route (exact path) has no chrome at all, only the
 // student tokens and Inter. PlayerShell is a fixed overlay and is not changed; it inherits the CSS variables and font.
-const PLAYER_ROUTE = /^\/courses\/[^/]+\/attempts\/[^/]+$/;
-/** The attempt player, `/courses/{c}/attempts/{id}` (path without the language prefix). */
-export const isPlayerRoute = (rest: string) => PLAYER_ROUTE.test(rest);
+// PERFORMANCE_AUDIT S1: the rule lives in lib/lms/shellKind.ts (with the rest of the frame decision)
+export { isPlayerRoute };
 /** The player route's only frame: full viewport, Inter, `.student-theme`; no sidebar, tab bar, header or banners. */
 const PLAYER_FRAME = cn(inter.variable, "student-theme min-h-screen font-sans");
 /** Result and review pages outside the student shell (staff previews, sandbox) keep their wide column. */
 const ATTEMPT_PAGE = /^\/courses\/[^/]+\/attempts\//;
 // --- SF-1 end ---
 
-/**
- * Area of a URL. `/courses` follows `?view=`; without it, `coursesDefault` (the tab `/courses` opens with:
- * Teaching for people who teach or create courses). Phase 6b S11b (UX 15).
- */
-function areaFromUrl(rest: string, view: string | null, coursesDefault: AreaKey = "learning"): AreaKey {
-  if (rest === "/admin" || rest.startsWith("/admin/")) return "platform";
-  if (rest === "/org" || rest.startsWith("/org/")) return "organization";
-  if (rest === "/parent" || rest.startsWith("/parent/")) return "parent"; // Phase 11
-  if (rest.startsWith("/grading-schemes") || rest === "/courses/new" || rest === "/courses/trash") return "teaching";
-  if (rest.startsWith("/exam-templates")) return "teaching"; // Phase 7b S4
-  if (rest === "/courses") {
-    if (view === "teaching" || view === "learning") return view;
-    return coursesDefault;
-  }
-  return "learning";
+// --- PERFORMANCE_AUDIT S1 begin --- (§5.1): the frame is decided once (`shellKindFor`), never drawn and then swapped.
+/** `?view=` read at render time (null on the server and during hydration), so a cached answer decides at once. */
+const noSubscribe = () => () => {};
+const readView = () => new URLSearchParams(window.location.search).get("view");
+
+/** The loading frame used while nothing decides the frame yet: brand bar + skeleton; no sidebar, no area pills. */
+function NeutralTopBar({ lang }: { lang: string }) {
+  return (
+    <div data-testid="shell-neutral" className="border-b border-slate-200 bg-white">
+      <div className={cn("flex h-14 items-center gap-3", SHELL_WIDTH)}>
+        <Brand href={`/${lang}/courses`} />
+        <Skeleton className="ml-auto h-9 w-9 rounded-full" />
+      </div>
+    </div>
+  );
 }
+
+function NeutralBody({ label }: { label: string }) {
+  return (
+    <>
+      <Skeleton className="mb-6 h-8 w-2/3 max-w-sm" />
+      <LoadingState label={label} />
+    </>
+  );
+}
+// --- PERFORMANCE_AUDIT S1 end ---
 
 /**
  * Top-level frame for every LMS page. Redirects signed-out users to login, loads MeOut once and provides it
@@ -120,7 +131,10 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const meState = useLmsMeLoader(signedIn);
   const { me } = meState;
   const unauthorized = meState.error?.status === 401;
-  const [view, setView] = useState<string | null>(null);
+  // PERFORMANCE_AUDIT S1: `?view=` is read from the URL at render time; ViewParam's state only re-renders the shell
+  const [, setView] = useState<string | null>(null);
+  const view = useSyncExternalStore(noSubscribe, readView, () => null);
+  const cachedMe = useCachedMe(); // S1: the cached answer, readable from the render right after hydration
   const [tab, setTab] = useState<string | null>(null); // Student UI U2
   const [declaredCourse, setDeclaredCourse] = useState<CourseOut | null>(null); // Student UI U2
   const [declaredArea, setDeclared] = useState<DeclaredArea | null>(null);
@@ -163,7 +177,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const hasTeaching = isTeacher || canCreate;
   // Owner feedback 2026-11-08 (item 2): people who teach see Learning only once they learn somewhere (MeOut decides;
   // until it loads, and for an older answer without the field, Learning stays). Student view is another user.
-  const hideLearning = !!me && hasTeaching && me.has_student_enrollments === false;
+  const hideLearning = hidesLearning(me);
 
   // UX rework 2: the areas come from one answer, kept across pages (`useLmsMeLoader`), so the menu is the same everywhere.
   const orgs = me?.admin_organizations ?? [];
@@ -172,10 +186,9 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const areasLoading = !me && !meState.error;
 
   const rest = pathname.replace(/^\/(en|ky|ru)(?=\/|$)/, "") || "/";
-  // Same default as the /courses page: its Teaching tab opens first for teachers and course creators.
-  const coursesDefault: AreaKey = me && (me.is_teacher || me.is_platform_admin) && (me.is_teacher || me.can_create_courses) ? "teaching" : "learning";
-  // Without Learning, `/courses?view=learning` is Teaching (the page replaces the URL); other student URLs still open
-  const urlArea = hideLearning && rest === "/courses" ? "teaching" : areaFromUrl(rest, view, coursesDefault);
+  // Same default as the /courses page (its Teaching tab opens first for teachers and course creators); without
+  // Learning, `/courses?view=learning` is Teaching (the page replaces the URL); other student URLs still open
+  const urlArea: AreaKey = urlAreaFor(rest, view, me);
   // A page's own declaration wins only where the URL does not decide (course pages).
   const activeArea: AreaKey = urlArea === "learning" && declared ? declared : urlArea;
   // Phase 8c S1: inside a course (declared area with hidden sections) no area shows its sub-menu
@@ -221,57 +234,52 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
     return hideSections ? list.map((a) => ({ ...a, sections: undefined })) : list;
   }, [lang, t, hasTeaching, hideLearning, isAdmin, canCreate, isGuardian, me, rest, urlArea, hideSections, currentOrg]); // `orgs` comes from `me`
 
-  // --- Student UI U2 begin --- (STUDENT_UI_DESIGN §2.1; SF-1): the Learning area gets the student shell, except the
-  // player route (no chrome). A course page of someone who teaches waits for the course's own declaration (a
-  // course they teach is Teaching); the frames share one tree, so switching never remounts the page.
+  // --- PERFORMANCE_AUDIT S1 begin --- (§5.1; replaces Student UI U2's `studentFrame` guess and the two pre-auth
+  // skeletons): the frame comes from `shellKindFor` over the cached (or fresh) answer. Nothing known yet: the neutral
+  // frame. When `/me/lms` fails, the cached /auth/me profile decides as before.
   const pathCourseId = courseIdOfPath(rest);
   const playerRoute = isPlayerRoute(rest);
-  const awaitingCourseArea = !!pathCourseId && !declared && (hasTeaching || isAdmin);
-  const studentFrame = signedIn && !unauthorized && activeArea === "learning" && !playerRoute && !awaitingCourseArea;
+  const knownMe: ShellMe | null = me ?? cachedMe;
+  const fallbackMe: ShellMe | null = meState.error ? { is_teacher: isTeacher, can_create_courses: canCreate, is_platform_admin: isAdmin } : null;
+  const shellMe = signedIn && !unauthorized ? knownMe ?? fallbackMe : null;
+  const computedKind = shellKindFor({ rest, view, declared, me: shellMe });
+  // Latched per page: a background refresh that would change the frame is applied on the next navigation, never
+  // mid-page. The frame is recomputed when the URL changes, when the page declares its area and when the first
+  // answer arrives (cold). A page whose area is still unknown keeps the frame it was opened from.
+  const latchKey = `${pathname}?${view ?? ""}#${declared ?? ""}#${shellMe ? 1 : 0}`;
+  const [latch, setLatch] = useState<{ key: string; kind: ShellKind } | null>(null);
+  let kind: ShellKind = computedKind;
+  if (latch && latch.key === latchKey) {
+    kind = latch.kind;
+  } else {
+    if (computedKind === "neutral" && shellMe && (latch?.kind === "app" || latch?.kind === "student")) kind = latch.kind;
+    setLatch({ key: latchKey, kind }); // render-time update: React renders again before anything is committed
+  }
+  const studentFrame = kind === "student";
+  // Cold (nothing cached): the page renders hidden under the neutral frame, so its requests run alongside /me/lms
+  const hideChildren = kind === "neutral" && !shellMe;
+  // ...and so does the student shell's data when the URL and the cached profile say student (no extra round)
+  const profileTeaches = userProfile?.teacher_status === "approved" || !!userProfile?.is_platform_admin;
+  const guessStudent = hideChildren && !profileTeaches && areaFromUrl(rest, view) === "learning";
   const studentData = useStudentShellData({
-    enabled: studentFrame, pathCourseId, declared: declaredCourse, onHome: rest === "/courses", pathKey: rest,
+    enabled: signedIn && !unauthorized && (studentFrame || guessStudent),
+    pathCourseId, declared: declaredCourse, onHome: rest === "/courses", pathKey: rest,
   });
-  // --- Student UI U2 end ---
 
   if (authLoading || !user || unauthorized) {
     // SF-1: the player route waits in its own chrome-less frame
     if (playerRoute) {
       return <div className={PLAYER_FRAME}><LoadingState label={t("lms.common.loading")} className="px-4 py-6" /></div>;
     }
-    // Student UI U2: a student path (the cached profile does not teach) gets the student frame's skeleton
-    const teachesCached = userProfile?.teacher_status === "approved" || !!userProfile?.is_platform_admin;
-    if (urlArea === "learning" && !teachesCached) {
-      return (
-        <div className={cn("min-h-screen bg-slate-50", STUDENT_FRAME)}>
-          <div aria-hidden="true" className={cn("fixed inset-y-0 left-0 hidden w-[264px] lg:block", STUDENT_SIDEBAR_BG)} />
-          <div aria-hidden="true" className="flex h-14 items-center gap-2 border-b border-slate-200 bg-white px-4 lg:hidden">
-            <span className="h-9 w-9 rounded-control bg-navy-800" />
-            <Skeleton className="ml-auto h-9 w-9 rounded-full" />
-          </div>
-          <main className={STUDENT_MAIN}>
-            <Skeleton className="mb-6 h-8 w-2/3 max-w-sm" />
-            <LoadingState label={t("lms.common.loading")} />
-          </main>
-        </div>
-      );
-    }
-    // Student finding S16: the frame (header + skeleton content) shows at once, never a blank screen.
+    // S1: one neutral frame for everyone (the server render and the first client render have no answer)
     return (
       <div className="min-h-screen bg-slate-50">
-        <header className="border-b border-slate-200 bg-white">
-          <div className={cn("flex h-14 items-center gap-3 sm:h-16", SHELL_WIDTH)}>
-            <Brand href={`/${lang}/courses`} />
-            <AreaPillsSkeleton />
-            <Skeleton className="ml-auto h-9 w-9 rounded-full" />
-          </div>
-        </header>
-        <main className={cn("py-6 sm:py-8", SHELL_WIDTH)}>
-          <Skeleton className="mb-6 h-8 w-2/3 max-w-sm" />
-          <LoadingState label={t("lms.common.loading")} />
-        </main>
+        <NeutralTopBar lang={lang} />
+        <main className={cn("py-6 sm:py-8", SHELL_WIDTH)}><NeutralBody label={t("lms.common.loading")} /></main>
       </div>
     );
   }
+  // --- PERFORMANCE_AUDIT S1 end ---
 
   const name = testStudent ? t("studentView.testStudentName") : me?.display_name || userProfile?.displayName || user.email || "";
   const email = testStudent ? name : me?.email || user.email || ""; // the header hides an email equal to the name
@@ -313,6 +321,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
       {gated}
     </>
   );
+  const examColumn = !studentFrame && ATTEMPT_PAGE.test(rest);
   // Student UI U2: the same children in both frames (chrome slot, banner, main, tab bar slot), so React keeps <main>
   const studentProps = {
     data: studentData, rest, tab, user: { name, email }, accountLinks, onLanguageChange: switchLang,
@@ -329,7 +338,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
             className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-2 focus:z-50 focus:rounded-xl focus:bg-white focus:px-4 focus:py-3 focus:text-sm focus:font-semibold focus:text-brand-800 focus:shadow-lg">
             {t("shell.skipToContent")}
           </a>
-          {studentFrame ? <StudentChrome {...studentProps} /> : (
+          {studentFrame ? <StudentChrome {...studentProps} /> : kind === "neutral" ? <NeutralTopBar lang={lang} /> : (
             <AppHeader
               brandHref={`/${lang}/courses`}
               areas={areas}
@@ -344,11 +353,14 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
           )}
           <StudentViewBanner />
           <main id="main" tabIndex={-1} className={studentFrame ? cn(STUDENT_MAIN, "focus:outline-none") : cn("py-6 focus:outline-none sm:py-8", SHELL_WIDTH)}>
+            {/* S1: cold, the page renders hidden under the neutral skeleton (its requests start at once) */}
+            {hideChildren ? <NeutralBody label={t("lms.common.loading")} /> : null}
             {/* UX rework (PUR-6): result and review outside the student shell (staff previews) keep their column; SF-1:
-                inside the student shell the course layout gives them the reading column */}
-            {!studentFrame && ATTEMPT_PAGE.test(rest)
-              ? <div className={EXAM_COLUMN_OUTER}><div className={EXAM_COLUMN_INNER}>{content}</div></div>
-              : content}
+                inside the student shell the course layout gives them the reading column. S1: the two wrappers are
+                always there (`contents` when unused), so a frame change never remounts the page */}
+            <div className={hideChildren ? "hidden" : examColumn ? EXAM_COLUMN_OUTER : "contents"}>
+              <div className={examColumn ? EXAM_COLUMN_INNER : "contents"}>{content}</div>
+            </div>
           </main>
           {studentFrame ? <StudentTabBar {...studentProps} /> : null}
         </div>
