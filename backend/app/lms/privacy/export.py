@@ -23,6 +23,7 @@ from app.lms.assignments.models import AssignmentSubmission
 from app.lms.attempts.models import Attempt, AttemptItem
 from app.lms.core import clock
 from app.lms.email_change.models import EmailChangeRequest  # S4
+from app.lms.oauth.models import UserIdentity  # social sign-in
 from app.lms.enrollments.models import Enrollment
 from app.lms.files.models import Asset
 from app.lms.grading.models import CourseGrade, Submission
@@ -81,6 +82,9 @@ def sections() -> list[Section]:
         # S4: a pending email change (never the token)
         Section("email_change_requests", _cols(EmailChangeRequest, "id", "expires_at", "created_at"),
                 lambda uid: EmailChangeRequest.user_id == uid, EmailChangeRequest.id),
+        # social sign-in (AUTH_SOCIAL_DESIGN 2.2): the provider and the dates, never the provider's subject
+        Section("sign_in_methods", _cols(UserIdentity, "id", "provider", "linked_at", "last_login_at"),
+                lambda uid: UserIdentity.user_id == uid, UserIdentity.id),
     ]
 
 

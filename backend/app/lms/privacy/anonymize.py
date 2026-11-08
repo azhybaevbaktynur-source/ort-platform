@@ -34,6 +34,7 @@ from app.lms.grading.models import Submission
 from app.lms.guardian.models import GuardianLink, GuardianPairingCode
 from app.lms.mfa.models import MfaRecoveryCode
 from app.lms.email_change.models import EmailChangeRequest  # S4
+from app.lms.oauth.models import UserIdentity  # social sign-in
 from app.lms.access.models import AccessPass, ActivationCode  # S3 access
 from app.lms.organizations.ids import personal_org_id
 from app.lms.organizations.models import Invitation, Organization
@@ -208,6 +209,7 @@ def anonymize_user(db: Session, user_id: str, *, actor_id: str) -> dict[str, int
     _scrub_user(user, actor_id, now)
     db.execute(delete(MfaRecoveryCode).where(MfaRecoveryCode.user_id == user_id))  # S1 admin security
     db.execute(delete(EmailChangeRequest).where(EmailChangeRequest.user_id == user_id))  # S4 email change
+    db.execute(delete(UserIdentity).where(UserIdentity.user_id == user_id))  # social sign-in: no way back in
     # S3 access (design 7.5): passes stay (revenue record) without the admin's reason; the buyer on a redeemed code goes
     db.execute(update(AccessPass).where(AccessPass.user_id == user_id).values(reason=None)
                .execution_options(synchronize_session=False))

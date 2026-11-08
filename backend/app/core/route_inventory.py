@@ -215,3 +215,8 @@ from app.lms.email_change.policies import EMAIL_CHANGE_POLICIES  # noqa: E402
 
 ROUTE_POLICIES.update(EMAIL_CHANGE_POLICIES)
 # --- S4 person page end ---
+# --- Social sign-in begin --- (AUTH_SOCIAL_DESIGN 1.1)
+from app.lms.oauth.policies import OAUTH_POLICIES  # noqa: E402
+
+ROUTE_POLICIES.update(OAUTH_POLICIES)
+# --- Social sign-in end ---

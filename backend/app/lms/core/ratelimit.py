@@ -156,6 +156,12 @@ MFA_SETUP_1H = Limit("mfa_setup_1h", 10, 3600)
 # security review: every /auth/mfa try counts up front (parallel challenges cannot burst past the failure rule)
 MFA_USER_TRY_1H = Limit("mfa_user_try_1h", 30, 3600)
 MFA_IP_TRY_10M = Limit("mfa_ip_try_10m", 120, 600, is_ip_rule=True)
+# --- Social sign-in begin --- (AUTH_SOCIAL_DESIGN 5): password login is unaffected by these buckets
+OAUTH_START_IP_10M = Limit("oauth_start_ip_10m", 60, 600, is_ip_rule=True)  # every hit
+OAUTH_CALLBACK_IP_10M = Limit("oauth_callback_ip_10m", 60, 600, is_ip_rule=True)  # every hit (a token call each)
+OAUTH_COMPLETE_IP_10M = Limit("oauth_complete_ip_10m", 120, 600, is_ip_rule=True)  # every hit
+OAUTH_COMPLETE_IP_FAIL_10M = Limit("oauth_complete_ip_fail_10m", 30, 600, is_ip_rule=True)  # bad ticket, bad profile
+# --- Social sign-in end ---
 
 
 def login_failure_rules(clean_email: str, ip_key) -> list[tuple[str, Limit]]:

@@ -224,6 +224,24 @@ class Settings(BaseSettings):
     MFA_CHALLENGE_TTL_SECONDS: int = 300  # the step between the password and the code
     MFA_ISSUER: str = "ORT Platform"  # the name the authenticator app shows next to the account
     # --- S1 admin security end ---
+    # --- Social sign-in begin --- (docs/phases/AUTH_SOCIAL_DESIGN.md 7.1; app/lms/oauth). Secrets only in the host's env.
+    # The backend's own public origin; redirect_uri = this + /api/v1/auth/<provider>/callback. Never derived from headers.
+    OAUTH_PUBLIC_BASE_URL: str = ""
+    GOOGLE_SIGN_IN_ENABLED: bool = True  # effective only with the client id, the secret and OAUTH_PUBLIC_BASE_URL
+    GOOGLE_OAUTH_CLIENT_ID: str = ""
+    GOOGLE_OAUTH_CLIENT_SECRET: str = ""
+    APPLE_SIGN_IN_ENABLED: bool = False  # built, switched off (design 6)
+    APPLE_CLIENT_ID: str = ""  # the Services ID
+    APPLE_TEAM_ID: str = ""
+    APPLE_KEY_ID: str = ""
+    APPLE_PRIVATE_KEY: str = ""  # .p8 PEM; "\n" escapes accepted
+    OAUTH_FLOW_TTL_SECONDS: int = 600  # the flow cookie and the login ticket
+    # Test and e2e hooks: production refuses to start unless they are the defaults (refuse_unsafe_oauth_urls)
+    GOOGLE_OAUTH_AUTHORIZE_URL: str = "https://accounts.google.com/o/oauth2/v2/auth"
+    GOOGLE_OAUTH_TOKEN_URL: str = "https://oauth2.googleapis.com/token"
+    GOOGLE_OAUTH_JWKS_URL: str = "https://www.googleapis.com/oauth2/v3/certs"
+    GOOGLE_OAUTH_ISSUERS: str = "https://accounts.google.com,accounts.google.com"
+    # --- Social sign-in end ---
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -242,3 +260,20 @@ def refuse_unsafe_secret_keys() -> None:
     the previous one: anyone could forge login tokens with it."""
     if is_production() and DEFAULT_SECRET_KEY in (settings.SECRET_KEY, settings.SECRET_KEY_PREVIOUS):
         raise RuntimeError("SECRET_KEY or SECRET_KEY_PREVIOUS is the public default from the repository. Set SECRET_KEY.")
+    refuse_unsafe_oauth_urls()
+
+
+# Social sign-in (AUTH_SOCIAL_DESIGN 7.1): the Google endpoints may point at a stub only outside production
+GOOGLE_OAUTH_URL_DEFAULTS = {
+    name: Settings.model_fields[name].default
+    for name in ("GOOGLE_OAUTH_AUTHORIZE_URL", "GOOGLE_OAUTH_TOKEN_URL", "GOOGLE_OAUTH_JWKS_URL", "GOOGLE_OAUTH_ISSUERS")
+}
+
+
+def refuse_unsafe_oauth_urls() -> None:
+    """Production never starts with a Google endpoint other than Google's own: a stub there would accept any identity."""
+    if not is_production():
+        return
+    changed = sorted(name for name, default in GOOGLE_OAUTH_URL_DEFAULTS.items() if getattr(settings, name) != default)
+    if changed:
+        raise RuntimeError(f"{', '.join(changed)} must keep the default value on production.")

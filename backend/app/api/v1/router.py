@@ -4,6 +4,10 @@ from app.api.v1.endpoints import auth
 api_router = APIRouter()
 
 api_router.include_router(auth.router, prefix="/auth", tags=["Authentication & Profile"])
+# Social sign-in (docs/phases/AUTH_SOCIAL_DESIGN.md): Google, Apple (off), the login ticket
+from app.lms.oauth.router import router as _oauth_router  # noqa: E402
+
+api_router.include_router(_oauth_router, prefix="/auth", tags=["Authentication & Profile"])
 
 
 
