@@ -27,7 +27,7 @@
   "devDependencies": {
     "@playwright/test": "1.63.0",
     "@types/katex": "^0.16.7",
-    "@types/node": "^20.12.12",
+    "@types/node": "^26.6.6",
     "@types/pngjs": "6.0.5",
     "@types/qrcode": "1.5.5",
     "@types/react": "^19.0.0",
