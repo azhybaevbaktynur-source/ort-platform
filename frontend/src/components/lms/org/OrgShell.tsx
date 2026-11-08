@@ -4,7 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { Building2, ShieldCheck, TriangleAlert } from "lucide-react";
-import { useTranslation } from "@/lib/i18n/context";
+import { useStaffDictionary, useTranslation } from "@/lib/i18n/context";
 import { getOrg, type OrgSummaryOut } from "@/lib/lms/organizations";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
 import { setCurrentOrg } from "@/lib/lms/currentOrg"; // item 4: the header's organization switcher reads it
@@ -34,6 +34,7 @@ export function useOrg(): OrgCtx {
 /** Org admin area frame: loads GET /org/{orgId}, section nav (`AreaShell`), suspended banner, no-access state. */
 export function OrgShell({ children }: { children: React.ReactNode }) {
   const { lang, t } = useTranslation();
+  const staffReady = useStaffDictionary(); // performance audit S4
   const { orgId } = useParams<{ orgId: string }>();
   const pathname = usePathname();
   const router = useRouter();
@@ -78,6 +79,7 @@ export function OrgShell({ children }: { children: React.ReactNode }) {
   }, [acting, orgName, pathname, t]);
   // --- Admin orgs (item 4) end ---
 
+  if (!staffReady) return <LoadingState label={t("lms.common.loading")} />;
   const status = (error as { status?: number } | null)?.status;
   if (!org && (status === 403 || status === 404)) {
     return (
