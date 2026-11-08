@@ -74,14 +74,14 @@ export function KindMeta({ item, locked, className }: { item: ItemStudentOut; lo
   // row) shows the duration only, never a guessed "Ссылка"
   if (isAccessLocked(item) || (locked && item.kind === "url")) {
     return duration
-      ? <span className={cn("inline-flex shrink-0 whitespace-nowrap text-sm leading-5 tabular-nums text-slate-600", className)}>{duration}</span>
+      ? <span className={cn("inline-flex shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-0.5 text-sm leading-5 tabular-nums text-slate-600", className)}>{duration}</span>
       : null;
   }
   const icon = video
     ? <PlayCircle aria-hidden="true" className={cn("h-4 w-4 shrink-0", locked ? "text-slate-400" : "text-brand-600")} />
     : <ItemKindIcon kind={item.kind} assignmentKind={item.link?.assignment_kind ?? null} className={cn("h-4 w-4", locked ? "text-slate-400" : "text-slate-500")} />;
   return (
-    <span className={cn("inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm leading-5 text-slate-600", className)}>
+    <span className={cn("inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-0.5 text-sm leading-5 text-slate-600", className)}>
       {icon}
       {duration ? <><span className="sr-only">{kind}, </span><span className="tabular-nums">{duration}</span></> : <span>{kind}</span>}
     </span>
@@ -205,7 +205,7 @@ function ModuleSection({ mod, number, lessons, open, onToggle, ctx }: {
   const headingId = `module-${mod.id}-title`;
   return (
     <section id={`module-${mod.id}`} aria-labelledby={headingId} className="scroll-mt-20 overflow-hidden rounded-card border border-slate-200 bg-white">
-      <header className="flex flex-wrap items-start gap-x-3 gap-y-1 px-4 py-3 sm:px-5">
+      <header className="flex flex-wrap items-start gap-x-3 gap-y-1 px-4 py-3.5 sm:px-5">
         <h3 id={headingId} className="min-w-0 flex-1 basis-48">
           <button type="button" onClick={onToggle} aria-expanded={open} aria-controls={listId}
             className={cn("flex min-h-11 w-full items-center gap-2 rounded-control text-left text-base font-semibold leading-6 text-slate-900", focusRing, "focus-visible:ring-offset-0")}>
@@ -217,9 +217,12 @@ function ModuleSection({ mod, number, lessons, open, onToggle, ctx }: {
         <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 pl-14 sm:min-h-11 sm:pl-0">
           {pro && <ProChip />}
           {total > 0 && (
-            <span className="text-sm leading-6 text-slate-600">
-              <span className="tabular-nums">{t("modules.overview.moduleDone", { done, total })}</span>
-              {duration && <> · <span className="tabular-nums">{duration}</span></>}
+            <span className="flex flex-wrap items-center gap-2 text-sm leading-5 text-slate-600">
+              <span className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 tabular-nums", done === total ? "bg-success-50 text-success-800" : "bg-slate-100")}>
+                {done === total && <CheckCircle2 aria-hidden="true" className="h-4 w-4 shrink-0" />}
+                {t("modules.overview.moduleDone", { done, total })}
+              </span>
+              {duration && <span className="rounded-full bg-slate-100 px-2.5 py-0.5 tabular-nums">{duration}</span>}
             </span>
           )}
           {mod.state && (mod.state === "locked" || hasReq) && <ModuleStateBadge state={mod.state} />}

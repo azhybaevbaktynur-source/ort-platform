@@ -364,7 +364,7 @@ export function LessonView({ moduleId, itemId }: { moduleId: string; itemId: str
   const moduleDone = mod.done ?? inModule.filter((l) => isDone(l.item)).length;
   const moduleTotal = mod.total ?? inModule.length;
   return (
-    <div className="grid w-full gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+    <div className="grid w-full gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
       <div className="flex min-w-0 flex-col gap-5">
         <div className="min-w-0">
           <nav aria-label={t("modules.overview.breadcrumbLabel")} className="flex flex-wrap items-center gap-x-1.5 text-sm leading-5 text-slate-600">
