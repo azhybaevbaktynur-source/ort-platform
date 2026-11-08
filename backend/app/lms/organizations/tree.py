@@ -14,7 +14,7 @@ from __future__ import annotations
 import uuid
 from typing import Iterable, Optional
 
-from sqlalchemy import exists, false, literal, or_, select
+from sqlalchemy import exists, false, func, literal, literal_column, or_, select
 from sqlalchemy.orm import Session, aliased
 from sqlalchemy.sql import ColumnElement
 
@@ -69,6 +69,18 @@ def within_clause(path_col, ancestor_path) -> ColumnElement[bool]:
     return or_(path_col == ancestor_path, path_col.like(ancestor_path.concat(literal(PATH_SEP + "%"))))
 
 
+def prefix_expr(path_col, length: int):
+    """SQL `substr(path, 1, length)` with inline integer constants (identical text in SELECT and GROUP BY, which
+    PostgreSQL needs when grouping by an expression). With `length` = the length of an organization's path, the
+    rows whose prefix equals that path are exactly the organization and its subtree (fixed-width segments)."""
+    return func.substr(path_col, literal_column("1"), literal_column(str(int(length))))
+
+
+def root_hex(path_col):
+    """SQL: the root segment of a path (ADMIN_ORGS_DESIGN 2.1); a root's path is its own 32-character segment."""
+    return prefix_expr(path_col, 32)
+
+
 # ------------------------------------------------------------------ SQL scopes
 
 def _admin_memberships(user_id: str):
@@ -117,6 +129,30 @@ def is_org_admin_in_tree(db: Session, user_id: str, org: Optional[Organization])
     if org is None or org.deleted_at is not None:
         return False
     return admin_of_any(db, user_id, ancestor_ids(org.path))
+
+
+ACTING_ORG_ADMIN = "org_admin"
+ACTING_PLATFORM_ADMIN = "platform_admin"
+
+
+def acting_as(db: Session, user, org: Optional[Organization]) -> Optional[str]:
+    """Admin orgs (item 4, ADMIN_ORGS_DESIGN 2.4, S2): in which capacity `user` writes into `org`, from DB state only
+    (never from the request): `org_admin` when an active org-admin membership on the ancestor path exists (one SQL),
+    else `platform_admin` when the user row carries the flag, else None (e.g. the inviter of an invitation). Written
+    into audit `details`; never read back for a permission decision."""
+    if org is not None and is_org_admin_in_tree(db, user.id, org):
+        return ACTING_ORG_ADMIN
+    if getattr(user, "is_platform_admin", False):
+        return ACTING_PLATFORM_ADMIN
+    return None
+
+
+def with_acting(details: Optional[dict], acting: Optional[str]) -> dict:
+    """`details` plus `acting_as` (left out when None)."""
+    out = dict(details or {})
+    if acting:
+        out["acting_as"] = acting
+    return out
 
 
 def member_tree_roots(db: Session, user_id: str) -> list[uuid.UUID]:

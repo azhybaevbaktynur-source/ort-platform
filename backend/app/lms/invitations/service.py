@@ -29,6 +29,7 @@ from app.lms.enrollments.models import Enrollment
 from app.lms.enrollments.service import accept_student_invitation, require_staff_power
 from app.lms.invitations import emails
 from app.lms.invitations.policies import forbidden_org, load_organization, org_access
+from app.lms.organizations.tree import acting_as, with_acting  # item 4
 from app.lms.invitations.schemas import (
     InvitationAcceptOut, InvitationCreatedOut, InvitationLookupOut, InvitationOut, MyInvitationOut,
 )
@@ -260,7 +261,8 @@ def create_org_invitation(db: Session, actor: User, org: Organization, *, email:
     email = normalize_email(email)
     _check_not_member(db, org, email, None)
     return _create_and_send(db, actor=actor, org=org, email=email, role=role, course=None, message=message,
-                            language=language, request=request)
+                            language=language, request=request,
+                            extra=with_acting(None, acting_as(db, actor, org)))  # item 4: from DB memberships
 
 
 def create_staff_invitation(db: Session, ctx: AuthzContext, course: Course, *, email: str, role: str,
@@ -379,9 +381,10 @@ def revoke(db: Session, user: User, organization_id: uuid.UUID, invitation_id: u
     if inv.accepted_at is not None:
         raise Conflict("Invitation already accepted", code="invitation_not_pending")
     if inv.revoked_at is None:
+        acting = acting_as(db, user, org) if admin else None  # item 4: None for the inviter
         inv.revoked_at = clock.now()
         inv.revoked_by_id = user.id
-        _audit(db, user, "invitation_revoked", inv, request)
+        _audit(db, user, "invitation_revoked", inv, request, **with_acting(None, acting))
         db.commit()
     course = _course_of(db, inv)
     return item_out(inv, course.title if course else None, db.get(User, inv.invited_by_id))
@@ -412,9 +415,11 @@ def resend(db: Session, user: User, organization_id: uuid.UUID, invitation_id: u
     course = _course_of(db, inv)
     _ensure_active_org(org)
     _check_not_member(db, org, inv.email, course, inv.role)
+    acting = acting_as(db, user, org) if admin else None  # item 4: None for the inviter
     return _create_and_send(db, actor=user, org=org, email=inv.email, role=inv.role, course=course,
                             message=inv.message, language=inv.language, request=request,
-                            action="invitation_resent", extra={"replaces_invitation_id": str(inv.id)})
+                            action="invitation_resent",
+                            extra=with_acting({"replaces_invitation_id": str(inv.id)}, acting))
 
 
 # ---------------------------------------------------------------- public lookup

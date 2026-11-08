@@ -150,8 +150,9 @@ def health(admin: User = Depends(require_platform_admin), db: Session = Depends(
 def audit_log(
     actor_id: Optional[str] = None, action: Optional[str] = None, target_type: Optional[str] = None,
     target_id: Optional[str] = None, cursor: Optional[str] = None, limit: Optional[int] = Query(None),
+    acting_as: Optional[Literal["org_admin", "platform_admin"]] = None,  # item 4: details.acting_as
     admin: User = Depends(require_platform_admin), db: Session = Depends(get_db),
 ):
-    page = paginate(us.audit_stmt(actor_id, action, target_type, target_id), db,
+    page = paginate(us.audit_stmt(actor_id, action, target_type, target_id, acting_as), db,
                     sort_col=AdminAuditLog.created_at, id_col=AdminAuditLog.id, cursor=cursor, limit=limit)
     return PageOut(items=[us.audit_out(db, r) for r in page.items], next_cursor=page.next_cursor)

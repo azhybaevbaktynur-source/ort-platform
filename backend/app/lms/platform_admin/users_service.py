@@ -109,8 +109,10 @@ def teacher_requests_stmt(status: str):
 
 
 def audit_stmt(actor_id: Optional[str], action: Optional[str], target_type: Optional[str],
-               target_id: Optional[str]):
+               target_id: Optional[str], acting_as: Optional[str] = None):
     stmt = select(AdminAuditLog)
+    if acting_as:  # item 4: `details.acting_as` (JSON path; json_extract on SQLite, ->> on PostgreSQL)
+        stmt = stmt.where(AdminAuditLog.details["acting_as"].as_string() == acting_as)
     if actor_id:
         stmt = stmt.where(AdminAuditLog.actor_id == actor_id)
     if action:

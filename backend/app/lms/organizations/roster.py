@@ -54,7 +54,7 @@ from app.lms.organizations import defaults, ids
 from app.lms.organizations.models import Organization, OrganizationMember
 from app.lms.organizations.roster_models import RosterImport
 from app.lms.organizations.schemas import RosterImportOut, roster_import_out
-from app.lms.organizations.tree import is_within, load_root, subtree_scope, suspended_on_path
+from app.lms.organizations.tree import acting_as, is_within, load_root, subtree_scope, suspended_on_path, with_acting
 from app.models.user import User
 
 router = APIRouter(tags=["Roster imports"])
@@ -374,7 +374,7 @@ def _applied_twin(db: Session, row: RosterImport) -> Optional[RosterImport]:
 
 
 def _add_member(db: Session, actor: User, dept: Organization, target: User, role: str, import_id: uuid.UUID,
-                request: Optional[Request]) -> None:
+                request: Optional[Request], acting: Optional[str] = None) -> None:
     """As `organizations.service.add_member` (revive a removed row, else insert), without its commit."""
     m = db.execute(select(OrganizationMember).where(
         OrganizationMember.organization_id == dept.id, OrganizationMember.user_id == target.id).with_for_update()
@@ -388,8 +388,8 @@ def _add_member(db: Session, actor: User, dept: Organization, target: User, role
         m.role, m.state, m.removed_at, m.removed_by_id, m.updated_at = role, "active", None, None, now
     db.flush()
     audit.record(db, actor=actor, action="organization.member.add", target_type="user", target_id=target.id,
-                 details={"organization_id": str(dept.id), "role": role, "before": before,
-                          "roster_import_id": str(import_id)}, request=request)
+                 details=with_acting({"organization_id": str(dept.id), "role": role, "before": before,
+                                      "roster_import_id": str(import_id)}, acting), request=request)
 
 
 def apply(db: Session, user: User, org: Organization, import_id: uuid.UUID, *, raw: bytes,
@@ -397,6 +397,7 @@ def apply(db: Session, user: User, org: Organization, import_id: uuid.UUID, *, r
           request: Optional[Request] = None) -> RosterImport:
     """`language`: of the invitation emails (the wizard sends the UI language; else the actor's locale, else en)."""
     root = _ensure_writable(db, user, org)
+    acting = acting_as(db, user, org)  # item 4: from DB memberships, recorded on every audit row below
     language = language if language in ("en", "ky", "ru") else (user.locale if user.locale in ("en", "ky", "ru")
                                                                 else "en")
     row = _load_import(db, org, import_id, for_update=True)
@@ -461,7 +462,7 @@ def apply(db: Session, user: User, org: Organization, import_id: uuid.UUID, *, r
             now = clock.now()
             for r in chunk:
                 if r.action == "add":
-                    _add_member(db, actor, dept, r.user, r.role, import_id, request)
+                    _add_member(db, actor, dept, r.user, r.role, import_id, request, acting)
                 else:
                     invitation, token = inv._insert(
                         db, actor=actor, org=target_org, email=r.email,
@@ -485,10 +486,11 @@ def apply(db: Session, user: User, org: Organization, import_id: uuid.UUID, *, r
     row.status = "partial" if counts["failed"] else "applied"
     row.counts, row.report = counts, report_of(parsed.rows)
     audit.record(db, actor=actor, action="org.roster_import_applied", target_type="organization",
-                 target_id=str(org.id), details={"import_id": str(import_id), "kind": kind,
-                                                 "course_id": str(course_id) if course_id else None,
-                                                 "department_id": str(department_id) if department_id else None,
-                                                 "counts": counts}, request=request)
+                 target_id=str(org.id), details=with_acting({"import_id": str(import_id), "kind": kind,
+                                                             "course_id": str(course_id) if course_id else None,
+                                                             "department_id": str(department_id)
+                                                             if department_id else None,
+                                                             "counts": counts}, acting), request=request)
     db.commit()
     mails = mails[:ids.ROSTER_MAX_ROWS]
     if mails:
