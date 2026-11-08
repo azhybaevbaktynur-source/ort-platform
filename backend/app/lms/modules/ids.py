@@ -51,9 +51,10 @@ W_PREREQUISITE_UNPUBLISHED = "prerequisite_unpublished"
 W_PREREQUISITE_DELETED = "prerequisite_deleted"
 W_REQUIREMENT_ON_UNPUBLISHED_TARGET = "requirement_on_unpublished_target"
 W_UNLOCK_IN_PAST_WITH_LOCKED_STUDENTS = "unlock_in_past_with_locked_students"  # placeholder, none in 8a
+W_FIRST_MODULE_PRO = "first_module_pro"  # SUBSCRIPTION_DESIGN §12.3.2: no free preview
 WARNING_CODES = (
     W_TARGET_UNPUBLISHED, W_TARGET_DELETED, W_PREREQUISITE_UNPUBLISHED, W_PREREQUISITE_DELETED,
-    W_REQUIREMENT_ON_UNPUBLISHED_TARGET, W_UNLOCK_IN_PAST_WITH_LOCKED_STUDENTS,
+    W_REQUIREMENT_ON_UNPUBLISHED_TARGET, W_UNLOCK_IN_PAST_WITH_LOCKED_STUDENTS, W_FIRST_MODULE_PRO,
 )
 
 # ------------------------------------------------------------------ prerequisite_invalid reasons (2.4)

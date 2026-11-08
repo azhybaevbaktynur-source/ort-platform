@@ -69,7 +69,7 @@ class HowToPayOut(BaseModel):
 
 class OfferOut(BaseModel):
     plans: list[OfferPlanOut]
-    includes: list[Literal["tests", "practice", "lessons"]]
+    includes: list[Literal["tests", "practice", "courses"]]
     practice_free: bool
     how_to_pay: HowToPayOut
     season_end: Optional[date] = None  # null until the owner sets one (then the season plan exists)

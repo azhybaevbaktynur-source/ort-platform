@@ -29,6 +29,7 @@ CompletionMode = Literal["all", "any"]
 WarningCode = Literal[
     "target_unpublished", "target_deleted", "prerequisite_unpublished", "prerequisite_deleted",
     "requirement_on_unpublished_target", "unlock_in_past_with_locked_students",
+    "first_module_pro",  # §12.3.2
 ]
 LockReasonKind = Literal["unlock_at", "prerequisite", "sequential"]
 AccessTier = Literal["free", "paid"]                      # F5a: Pro module
