@@ -349,3 +349,30 @@ async def test_staff_of_a_lesson_course_are_reported(db, api):
     assert rows[0]["is_staff"] is True
     rows = (await api.call(w.s, "GET", f"/courses/{w.exam.id}/lesson-courses")).json()
     assert rows[0]["is_staff"] is False
+
+
+# ------------------------------------------------------------------ the exam-link choices (S3, GET /platform/courses)
+
+async def test_admin_exam_prep_choices(db, api):
+    """`?exam_prep=true`: the live platform exam-prep courses only (the course-settings select reads them in one
+    request; the rule of `_check_exam_link`'s target), platform admins only."""
+    w = world(db)
+    school_exam = make_course(db, w.admin, title={"ru": "Школа ОРТ"}, languages=["ru"], default_language="ru",
+                              organization_id=make_org(db).id, template_key="ort", template_version=1)
+    gone = make_course(db, w.admin, title={"ru": "Удалён"}, languages=["ru"], default_language="ru",
+                       organization_id=platform_org_id(), template_key="ort", template_version=1,
+                       deleted_at=utcnow())
+    draft_exam = make_course(db, w.admin, title={"ru": "ОРТ (кыр)"}, languages=["ru"], default_language="ru",
+                             status="draft", organization_id=platform_org_id(), template_key="ort",
+                             template_version=1)
+    r = await api.call(w.admin, "GET", "/platform/courses", params={"exam_prep": "true", "limit": 100})
+    assert r.status_code == 200, r.text
+    ids = {x["id"] for x in r.json()["items"]}
+    assert ids == {str(w.exam.id), str(draft_exam.id)}, r.text
+    assert not ids & {str(w.lc.id), str(school_exam.id), str(gone.id)}
+    # without the flag the list is unchanged (the lesson course is there)
+    r = await api.call(w.admin, "GET", "/platform/courses", params={"limit": 100})
+    assert str(w.lc.id) in {x["id"] for x in r.json()["items"]}
+    for user in (w.teacher, w.s):
+        r = await api.call(user, "GET", "/platform/courses", params={"exam_prep": "true"})
+        assert r.status_code == 403, r.text

@@ -467,6 +467,7 @@ def _modules_next(db: Session, uid: str, course_ids: Optional[list] = None,
         CourseModule, ItemCompletionRequirement, ItemProgress, ItemRequirementStatus, ModuleItem, ModuleProgress,
     )
     from app.lms.modules.schemas import ItemLinkOut
+    from app.lms.modules.video import parse_video
     from app.lms.pages.models import Page
 
     org_path = select(Organization.path).where(Organization.id == Course.organization_id).scalar_subquery()
@@ -565,7 +566,8 @@ def _modules_next(db: Session, uid: str, course_ids: Optional[list] = None,
                            assignment_kind=it.assignment_kind if it.kind == "assignment" else None, url=it.url)
         out.append(sch.HomeModuleNextOut(course_id=m.course_id, course_title=m.course_title, module_id=m.module_id,
                                          module_title=m.module_title, state=m.state, item_id=it.id, kind=it.kind,
-                                         title=title, link=link))
+                                         title=title, link=link,
+                                         is_video=it.kind == "url" and parse_video(it.url) is not None))
     return out
 # --- Phase 8a S3 end ---
 

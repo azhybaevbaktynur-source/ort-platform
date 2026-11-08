@@ -57,6 +57,8 @@ export interface ListAdminCoursesParams {
   status?: string;
   deleted?: boolean;
   owner_id?: string;
+  /** TEACHER_TO_STUDENT_MAP S3: only the live platform exam-prep courses (the exam-link select) */
+  exam_prep?: boolean;
   cursor?: string | null;
   limit?: number;
 }

@@ -114,7 +114,8 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
     const ownTitle = examPage || pathname === base || pathname === `${base}/tests` || pathname === `${base}/progress`
       || pathname === `${base}/modules` || pathname.startsWith(`${base}/modules/`)
       || pathname === `${base}/saved` || pathname === `${base}/practice` // U8: Сохранённые, Практика
-      || pathname === `${base}/lessons`; // TEACHER_TO_STUDENT_MAP §2.4: "Все уроки"
+      || pathname === `${base}/lessons` // TEACHER_TO_STUDENT_MAP §2.4: "Все уроки"
+      || pathname === `${base}/announcements`; // G2 (S3): the announcements list has the student page header
     const body = hidden ? <AreaUnavailable courseId={course.id} /> : children;
     return (
       <CourseContext.Provider value={ctx}>

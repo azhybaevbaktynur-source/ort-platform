@@ -2,6 +2,7 @@
 // in_progress, next_up and latest_results hold at most 3 rows, courses at most 10 (courses_total counts all).
 import type { Num, SchemeLabelValue, SchemeType } from "./gradingTypes";
 import type { Lang, LocalizedText } from "./types";
+import type { ItemLinkOut } from "./modulesTypes";
 
 export interface HomeInProgressOut {
   attempt_id: string;
@@ -170,7 +171,10 @@ export interface HomeModuleNextOut {
   item_id: string;
   kind?: "page" | "file" | "assignment" | "url" | "header";
   title: LocalizedText;
-  /** Phase 8a UX: the item's target ids (backend `ItemLinkOut`); used to drop rows already shown above */
-  link?: { assignment_id?: string | null; assessment_id?: string | null } | null;
+  /** Phase 8a UX: the item's target ids (backend `ItemLinkOut`); used to drop rows already shown above.
+   * TEACHER_TO_STUDENT_MAP S3: the home's "Продолжить урок" strip opens it (`itemHref`). */
+  link?: ItemLinkOut | null;
+  /** TEACHER_TO_STUDENT_MAP G12: a video lesson (the row shows the video icon); absent on an older backend */
+  is_video?: boolean;
 }
 // --- Phase 8a S4a end ---

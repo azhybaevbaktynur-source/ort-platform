@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { seed, settle, signIn, tr } from "./helpers";
+import { seed, settle, signIn, tr, type SeedUser } from "./helpers";
 
 /**
  * Student UI U3 (docs/phases/STUDENT_UI_DESIGN.md §3.1): the home. A student of an exam-prep course without results
@@ -10,14 +10,27 @@ import { seed, settle, signIn, tr } from "./helpers";
  * section card, no date message, no course grid and no getting-started card; the catalog, the code and leaving are
  * in the shell's exam sheet; a student of a general course only keeps the dashboard ("Панель"), whose course cards stay at least
  * 16rem wide at 1920 px. Read-only. Screens at 375 / 1440 / 1920 (ru) go to $U3_SHOTS when set.
+ * TEACHER_TO_STUDENT_MAP S3: lesson courses attached to the ORT (Russian) course appear once, in "Уроки" (not under
+ * "От платформы" or "Другие курсы"), and the "Продолжить урок" strip names the joined one's first unviewed lesson; no
+ * strip without lessons. That test deletes its two lesson courses at the end; its screens go to $ITEM3_S3_SHOTS.
  */
 
 const L = "ru" as const;
 const t = (key: string, vars: Record<string, string | number> = {}) => tr(L, key, vars);
 const WIDTHS = [375, 1440, 1920] as const;
 
-async function noOverflowAndShoot(page: Page, name: string) {
-  const dir = process.env.U3_SHOTS;
+async function api(user: SeedUser, method: string, p: string, body?: unknown) {
+  const r = await fetch(`${seed().api}/api/v1${p}`, {
+    method,
+    headers: { Authorization: `Bearer ${user.token}`, ...(body !== undefined ? { "Content-Type": "application/json" } : {}) },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  const text = await r.text();
+  expect([200, 201, 204], `${method} ${p} -> ${r.status} ${text.slice(0, 300)}`).toContain(r.status);
+  return text ? JSON.parse(text) : null;
+}
+
+async function noOverflowAndShoot(page: Page, name: string, dir = process.env.U3_SHOTS) {
   if (dir) fs.mkdirSync(dir, { recursive: true });
   for (const width of WIDTHS) {
     await page.setViewportSize({ width, height: 900 });
@@ -73,6 +86,67 @@ test.describe("student home (ru)", () => {
     await expect(confirm).toBeVisible();
     await confirm.getByRole("button", { name: t("ui.cancel") }).click(); // read-only: never leaves
     await expect(confirm).toBeHidden();
+    // S3 (G1): no lessons in this exam: no "Продолжить урок" strip, no "Уроки" section
+    await expect(page.locator('section[aria-labelledby="home-continue"]')).toHaveCount(0);
+    await expect(page.locator('section[aria-labelledby="home-lesson-courses"]')).toHaveCount(0);
+  });
+
+  test("lesson courses of the exam: once, in «Уроки»; the «Продолжить урок» strip", async ({ page }) => {
+    const s = seed();
+    const admin = s.admin;
+    const student = s.modules.ort_student;
+    const ort = await api(admin, "GET", `/courses/${s.course_id}`);
+    const made: string[] = [];
+    const mk = async (title: string) => {
+      const c = await api(admin, "POST", "/courses", {
+        title: { ru: title }, languages: ["ru"], default_language: "ru", organization_id: ort.organization_id, enrollment_mode: "open",
+      });
+      made.push(c.id);
+      await api(admin, "POST", `/courses/${c.id}/publish`);
+      await api(admin, "PATCH", `/courses/${c.id}`, { exam_course_id: s.course_id, enrollment_mode: "open", visibility: "catalog" });
+      return c as { id: string };
+    };
+    try {
+      const maths = await mk("Мастеркласс: математика");
+      const analogies = await mk("Мастеркласс: аналогии");
+      const m1 = await api(admin, "POST", `/courses/${maths.id}/modules`, { title: { ru: "Дроби и проценты" }, published: true });
+      for (const [title, minutes] of [["Дроби: основы", 6], ["Проценты за 10 минут", 10]] as const) {
+        const pg = await api(admin, "POST", `/courses/${maths.id}/pages`, { title, language: "ru", body_md: `Текст урока «${title}».`, published: true });
+        const it = await api(admin, "POST", `/courses/${maths.id}/modules/${m1.id}/items`, { kind: "page", page_id: pg.id, published: true, duration_s: minutes * 60 });
+        await api(admin, "PUT", `/courses/${maths.id}/modules/${m1.id}/items/${it.id}/requirement`, { type: "view" });
+      }
+      await api(student, "POST", `/courses/${maths.id}/join`, {});
+
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await signIn(page, student);
+      // the strip reads the stored module states (never evaluates): the student has opened the course once
+      await page.goto(`/${L}/courses/${maths.id}/modules`);
+      await expect(page.getByRole("heading", { level: 1, name: "Мастеркласс: математика" })).toBeVisible();
+      await settle(page);
+      await page.goto(`/${L}/courses`);
+      const lessons =page.locator('section[aria-labelledby="home-lesson-courses"]');
+      await expect(lessons.getByRole("heading", { level: 2, name: t("student.nav.lessonsGroup") })).toBeVisible();
+      await expect(lessons.getByRole("link", { name: "Мастеркласс: математика" })).toHaveAttribute("href", `/${L}/courses/${maths.id}/modules`);
+      await expect(lessons.getByRole("link", { name: "Мастеркласс: аналогии" })).toHaveAttribute("href", `/${L}/courses/catalog/${analogies.id}`);
+      const join = lessons.getByRole("button", { name: t("catalog.join") });
+      await expect(join).toHaveCount(1); // only the one not joined
+      await expect(join).not.toHaveClass(/bg-brand-600/); // the Next card keeps the page's only primary button
+      // nowhere else on the page (owner 2026-11-08: «аналогии» was under От платформы, «математика» under Другие курсы)
+      for (const other of ['section[aria-labelledby="home-platform"]', 'section[aria-labelledby="home-other-courses"]']) {
+        await expect(page.locator(other).getByText(/Мастеркласс/)).toHaveCount(0);
+      }
+      const main = page.locator("main#main");
+      await expect(main.getByRole("link", { name: "Мастеркласс: аналогии" })).toHaveCount(1);
+      // G1: the strip opens the first unviewed lesson of the joined lesson course
+      const strip = page.locator('section[aria-labelledby="home-continue"]');
+      await expect(strip.getByRole("heading", { level: 2, name: t("home.prep.continueLesson.title") })).toBeVisible();
+      const row = strip.getByRole("link", { name: /Дроби: основы/ });
+      await expect(row).toContainText("Мастеркласс: математика · Дроби и проценты");
+      expect(await row.getAttribute("href")).toMatch(new RegExp(`^/${L}/courses/${maths.id}/modules/${m1.id}/items/`));
+      await noOverflowAndShoot(page, "home-lesson-courses", process.env.ITEM3_S3_SHOTS);
+    } finally {
+      for (const id of made) await api(admin, "DELETE", `/courses/${id}`);
+    }
   });
 
   test("general course only: the dashboard, course cards not thin at 1920 px", async ({ page }) => {
