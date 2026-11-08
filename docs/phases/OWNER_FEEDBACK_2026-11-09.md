@@ -48,4 +48,12 @@ Verbatim brief (the reference app is not named in repo docs). Results table at t
 
 ## Results
 
-(filled in as items deploy)
+All items deployed 2026-11-09: main 09741b3 (Render /health 09741b3, Vercel SW 09741b32fcad, Neon head 0031_infra; backup branch backup-2026-11-09-before-identities-infra-0031). CI green on d0ae28d; local ORT + ORT pixel gate 10/10.
+
+| Item | Result | Docs |
+|---|---|---|
+| 1 Speed and flicker | Shell decided once (no swaps), `/me/bootstrap` + SWR cache, page waterfalls removed, nav prefetch, dictionary split, Server-Timing. Final table §9 | `PERFORMANCE_AUDIT.md` |
+| 4 Phone sheets | dvh + safe-area, pinned sign-out, WebKit + Android e2e | screens `OWNER_FEEDBACK_2026-11-09_screens/item4/` |
+| 3 Sign-up / login, Google, Apple | Split-screen auth, Google OAuth (PKCE, verified email, browser-bound ticket, MFA kept), Apple built and off, hidden buttons without keys | `AUTH_SOCIAL_DESIGN.md`, `runbooks/GOOGLE_SIGN_IN.md` |
+| 2 Pro includes courses | Unlock bar, Pro badges, offer lists courses, first-module warning, endpoint matrix | `SUBSCRIPTION_DESIGN.md` §12 |
+| 5 Services panel | Админ-панель → Система → Сервисы, "not connected" until keys | `INFRA_PANEL_DESIGN.md` |
