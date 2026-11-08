@@ -1,4 +1,5 @@
 import { lmsFetch } from "./client";
+import { thenMeStale } from "./meStale";
 import type {
   AddStaffIn, CourseCard, CourseCreateIn, CourseOut, CourseStaffOut, CourseUpdateIn, JoinCodeOut, JoinOut,
   Lang, MeOut, PageOut, RosterEntryOut, StaffPublicOut,
@@ -44,8 +45,8 @@ export const transferOwnership = (id: string, newOwnerUserId: string) =>
   });
 export const regenerateJoinCode = (id: string) =>
   lmsFetch<JoinCodeOut>(`/courses/${enc(id)}/join-code/regenerate`, { method: "POST" });
-export const joinByCode = (code: string) => lmsFetch<JoinOut>("/courses/join", { method: "POST", body: { code } });
-export const leaveCourse = (id: string) => lmsFetch<void>(`/courses/${enc(id)}/leave`, { method: "POST" });
+export const joinByCode = (code: string) => thenMeStale(lmsFetch<JoinOut>("/courses/join", { method: "POST", body: { code } }));
+export const leaveCourse = (id: string) => thenMeStale(lmsFetch<void>(`/courses/${enc(id)}/leave`, { method: "POST" }));
 
 export interface PeopleQuery {
   role?: string;

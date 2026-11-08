@@ -399,3 +399,15 @@ Sonnet slice that comes back wrong is redone on Opus, never retried on Sonnet.
   certificate). Otherwise neutral text.
 - §0: migrations are not pre-merged ahead of their designs. Each of 5, 6, 7 adds its own additive migration when its
   design is written; a Neon backup before each (owner OK 2026-11-07 to delete old backups).
+
+## 11. Results (2026-11-07)
+All seven problems built in order, each with tests, a Fable review and an ORT check:
+| # | Deployed (main) | Migration | Notes |
+|---|---|---|---|
+| 1 | 296b256 | — | one sidebar group, equal gaps |
+| 2–3 | c239e08 | — | lobby/result/review in StudentShell, player full-screen with student tokens; result page redesign; review anchors; link audit spec; 37 ORT student baselines re-approved (`STUDENT_UI_FIX_screens/ort-review/`) |
+| 4 | b625ac0 | — | one counting definition and period; rated topics (≥5) and sections (≥10); teacher analytics T1–T3; calm colours; not-enough-data states |
+| 5 | 13a2dfc | 0024_course_lessons | course overview, syllabus, lesson page, Pro modules (server lock, leak fixed in review), teacher editor |
+| 6 | 68dc6cd | 0025_pro | /pro, plans, admin grant/renew/cancel, vouchers, settings (prices/season/how-to-pay empty until the owner sets them) |
+| 7 | fe4a1e8 | 0026_course_cover | cover upload (16:9, WebP, public R2), one CourseCard, default cover, student catalog, Pro badge |
+LATER: teacher analytics T4+, cancelled-Pro filter in the admin list, payments provider (design only in SUBSCRIPTION_DESIGN.md).

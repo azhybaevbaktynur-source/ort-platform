@@ -28,7 +28,8 @@ test("the same menu on every page, also while the API is slow", async ({ page })
   const orgId = data.org_admin.organization_id;
   await signIn(page, data.admin);
   await page.goto("/ru/courses");
-  const full = [t("shell.areas.learning"), t("shell.areas.teaching"), t("shell.areas.organization"), t("shell.areas.platform")];
+  // owner feedback 2026-11-08 (item 2): the admin teaches but learns nowhere, so there is no Learning area
+  const full = [t("shell.areas.teaching"), t("shell.areas.organization"), t("shell.areas.platform")];
   await expect.poll(() => areas(page)).toEqual(full);
 
   for (const path of ["/ru/admin", `/ru/org/${orgId}`, "/ru/grading-schemes", `/ru/courses/${data.course_id}`, "/ru/admin/users"]) {
@@ -41,7 +42,7 @@ test("the same menu on every page, also while the API is slow", async ({ page })
     await new Promise((done) => setTimeout(done, 2000));
     await route.continue();
   });
-  for (const area of ["shell.areas.platform", "shell.areas.organization", "shell.areas.learning", "shell.areas.platform"]) {
+  for (const area of ["shell.areas.platform", "shell.areas.organization", "shell.areas.teaching", "shell.areas.platform"]) {
     await areaLink(page, area).click();
     for (const wait of [50, 300, 700]) {
       await page.waitForTimeout(wait);
@@ -61,7 +62,7 @@ test("a first visit shows placeholders, never a partial menu", async ({ page }) 
   await page.goto("/ru/admin");
   await expect(page.getByTestId("areas-loading").first()).toBeVisible();
   expect(await page.getByRole("navigation", { name: t("shell.areas.label") }).count()).toBe(0);
-  await expect.poll(() => areas(page)).toHaveLength(4);
+  await expect.poll(() => areas(page)).toHaveLength(3);
 });
 
 test("a student's menu has no extra areas on any page", async ({ page }) => {
@@ -81,7 +82,19 @@ test("an independent teacher has no Organization area", async ({ page }) => {
   await page.setViewportSize(VIEWPORTS.desktop);
   await signIn(page, seed().teacher_signup.independent);
   await page.goto("/ru/courses");
-  await expect.poll(() => areas(page)).toEqual([t("shell.areas.learning"), t("shell.areas.teaching")]);
+  await expect.poll(() => areas(page)).toEqual([t("shell.areas.teaching")]); // owner feedback 2026-11-08 (item 2)
+});
+
+test("a teacher who learns nowhere: no Learning tab, no Join with code; ?view=learning opens Teaching", async ({ page }) => {
+  await page.setViewportSize(VIEWPORTS.desktop);
+  await signIn(page, seed().teacher_signup.independent);
+  await page.goto("/ru/courses?view=learning");
+  await expect(page).toHaveURL(/\/ru\/courses\?view=teaching$/);
+  await expect.poll(() => areas(page)).toEqual([t("shell.areas.teaching")]);
+  await expect(page.getByRole("tab", { name: t("courses.list.learning") })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: t("courses.list.join") })).toHaveCount(0);
+  // the Teaching sub-menu stays although Teaching is the only area
+  await expect(page.getByRole("link", { name: t("examTemplates.nav.title") }).first()).toBeVisible();
 });
 
 test("admin overview: numbers, then a retry when the summary fails", async ({ page }) => {

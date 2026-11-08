@@ -5,13 +5,15 @@ import { seed, settle, signIn, tr, VIEWPORTS, type SeedUser } from "./helpers";
 
 /**
  * F5c (docs/phases/COURSE_LESSONS_DESIGN.md §6, §7.3, §9): the teacher's module editor on the Course page.
- * - a teacher course: the add row's "Видео" (dialog with the YouTube / Vimeo hint and minutes), "Ссылка" inline with
- *   minutes, ↑ ↓ reorder by keyboard (focus stays on the pressed button), the minutes chip (set, change, clear), and no
- *   Pro switch (the server refuses `paid` outside platform courses);
- * - a platform course (the platform admin's own course in the platform organization): the Pro switch is there, asks
- *   first, turns gold (`aria-checked`) and is stored as `access_tier = paid`; off again is immediate.
+ * - a teacher course: the module's one "+ Добавить" menu (FB8 S2: video, page, file, test, link, ...), "Видео" (dialog
+ *   with the YouTube / Vimeo hint and minutes), "Ссылка" inline with minutes, the publish switch (`role="switch"`), ↑ ↓
+ *   reorder by keyboard (focus stays on the pressed button), the minutes chip (set, change, clear), the drag handle
+ *   visible at desktop width, and no Pro lock (the server refuses `paid` outside platform courses);
+ * - a platform course (the platform admin's own course in the platform organization): the Pro lock (FB8 S2: a
+ *   `LockToggle`, `aria-pressed`, tooltip) is there, asks first, turns gold and is stored as `access_tier = paid`; off
+ *   again is immediate.
  * Each test builds its own course through the API, so no other spec sees it.
- * With F5C_SHOTS_DIR=<dir> the last test writes the editor at 375 and 1440 px (ru) for the UX check.
+ * With F5C_SHOTS_DIR=<dir> the last test writes the editor at 375, 1440 and 1920 px (ru) for the UX check.
  */
 
 const L = "ru" as const;
@@ -43,6 +45,12 @@ async function open(browser: Browser, user: SeedUser, viewport: { width: number;
 }
 
 interface Item { id: string; kind: string; url: string | null; duration_s: number | null; position: number }
+/** FB8 S2: the module's "+ Добавить" menu, then one entry. */
+async function addVia(page: Page, card: ReturnType<Page["locator"]>, module: string, label: string) {
+  await card.getByRole("button", { name: t("coursePage.add", { title: module }) }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: label, exact: true }).click();
+}
+
 async function items(user: SeedUser, cid: string, mid: string): Promise<Item[]> {
   const out = await api(user, "GET", `/courses/${cid}/modules`);
   const m = out.modules.find((x: { id: string }) => x.id === mid);
@@ -50,7 +58,7 @@ async function items(user: SeedUser, cid: string, mid: string): Promise<Item[]> 
 }
 
 test.describe("F5c teacher module editor", () => {
-  test("teacher course: add a video with minutes, a link, reorder by keyboard, minutes chip; no Pro switch", async ({ browser }) => {
+  test("teacher course: add menu, a video with minutes, a link, publish switch, reorder by keyboard, minutes chip; no Pro lock", async ({ browser }) => {
     const teacher = seed().modules.teacher;
     const course = await api(teacher, "POST", "/courses", { title: { ru: "Редактор F5c" }, languages: ["ru"], default_language: "ru" });
     const cid = course.id as string;
@@ -62,17 +70,30 @@ test.describe("F5c teacher module editor", () => {
     await tp.goto(`/${L}/courses/${cid}`);
     const card = tp.locator(`#m-${mod.id}`);
     await expect(card).toBeVisible();
-    // the empty module says what to do; the add row has the five lesson kinds
+    // the empty module says what to do; one "+ Добавить" button (no row of quick-add buttons) opens the lesson kinds
     await expect(card.getByText(t("modules.editor.emptyModule"))).toBeVisible();
-    const addRow = card.getByRole("group", { name: t("coursePage.add", { title: MOD }) });
-    for (const label of [t("modules.editor.addVideo"), t("coursePage.addItems.page"), t("coursePage.addItems.file"), t("coursePage.addItems.quiz"), t("coursePage.addItems.link")]) {
-      await expect(addRow.getByRole("button", { name: label, exact: true })).toBeVisible();
+    const addButton = card.getByRole("button", { name: t("coursePage.add", { title: MOD }) });
+    await expect(addButton).toHaveCount(1);
+    await expect(addButton).toHaveText(new RegExp(t("modules.editor.addMenu")));
+    await expect(card.getByRole("button", { name: t("modules.editor.addVideo"), exact: true })).toHaveCount(0);
+    await addButton.click();
+    const menu = tp.getByRole("menu");
+    for (const label of [t("modules.editor.addVideo"), t("coursePage.addItems.page"), t("coursePage.addItems.file"), t("coursePage.addItems.quiz"),
+      t("coursePage.addItems.link"), t("coursePage.addItems.assignment"), t("coursePage.addItems.header"), t("coursePage.addExisting")]) {
+      await expect(menu.getByRole("menuitem", { name: label, exact: true })).toBeVisible();
     }
+    await tp.keyboard.press("Escape");
+    await expect(menu).toHaveCount(0);
+    await expect(addButton).toBeFocused();
     // never on a teacher course
-    await expect(tp.getByRole("switch", { name: t("modules.editor.proSwitch", { title: MOD }) })).toHaveCount(0);
+    await expect(tp.getByRole("button", { name: t("modules.editor.proSwitch", { title: MOD }) })).toHaveCount(0);
+    // the module's publish switch: a draft, the header says so in text too
+    const modSwitch = card.getByRole("switch", { name: t("modules.editor.publishToggle", { title: MOD }), exact: true });
+    await expect(modSwitch).toHaveAttribute("aria-checked", "false");
+    await expect(card.getByText(t("modules.editor.draft"), { exact: true }).first()).toBeVisible();
 
     // ---- + Видео: the hint follows the address (client guess), minutes go in as seconds
-    await addRow.getByRole("button", { name: t("modules.editor.addVideo"), exact: true }).click();
+    await addVia(tp, card, MOD, t("modules.editor.addVideo"));
     const dlg = tp.getByRole("dialog", { name: t("modules.editor.video.title") });
     const urlField = dlg.getByLabel(t("modules.editor.video.url"));
     await urlField.fill("https://example.com/watch");
@@ -89,7 +110,7 @@ test.describe("F5c teacher module editor", () => {
     await expect(card.getByRole("button", { name: t("modules.editor.durationEdit", { title: VIDEO, value: t("modules.editor.minutes", { n: 6 }) }) })).toBeVisible();
 
     // ---- + Ссылка: the inline form takes minutes too
-    await addRow.getByRole("button", { name: t("coursePage.addItems.link"), exact: true }).click();
+    await addVia(tp, card, MOD, t("coursePage.addItems.link"));
     const linkTitle = card.getByRole("textbox", { name: t("coursePage.inlineTitle", { kind: t("coursePage.addItems.link") }) });
     await linkTitle.fill(LINK);
     await card.getByRole("textbox", { name: t("modules.add.url") }).fill("https://example.com/handbook");
@@ -100,6 +121,17 @@ test.describe("F5c teacher module editor", () => {
     expect(rows.map((r) => [r.kind, r.duration_s])).toEqual([["url", 360], ["url", 180]]);
     // the header line sums the published lessons
     await expect(card.getByText(`${tr(L, "modules.editor.lessons_few", { n: 2 })} · ${t("modules.editor.minutes", { n: 9 })}`)).toBeVisible();
+    // drag handles are visible at desktop width (not only on hover), one per module header and row
+    await expect(card.locator("[draggable=true]")).toHaveCount(3);
+    await expect(card.locator("[draggable=true]").first()).toBeVisible();
+
+    // ---- publish switch: the module goes live, the server stores it, off again
+    await modSwitch.click();
+    await expect(modSwitch).toHaveAttribute("aria-checked", "true");
+    await expect.poll(async () => (await api(teacher, "GET", `/courses/${cid}/modules`)).modules.find((x: { id: string }) => x.id === mod.id)?.published).toBe(true);
+    await modSwitch.click();
+    await expect(modSwitch).toHaveAttribute("aria-checked", "false");
+    await expect.poll(async () => (await api(teacher, "GET", `/courses/${cid}/modules`)).modules.find((x: { id: string }) => x.id === mod.id)?.published).toBe(false);
 
     // ---- ↑ ↓ by keyboard: focus stays on the pressed button of the moved row
     const up = card.getByRole("button", { name: t("modules.editor.moveItemUp", { title: LINK }) });
@@ -141,7 +173,7 @@ test.describe("F5c teacher module editor", () => {
     expect(rows.map((r) => r.duration_s)).toEqual([null, 180]);
 
     // tests and headers carry no minutes chip
-    await addRow.getByRole("button", { name: t("coursePage.addItems.quiz"), exact: true }).click();
+    await addVia(tp, card, MOD, t("coursePage.addItems.quiz"));
     const quizTitle = card.getByRole("textbox", { name: t("coursePage.inlineTitle", { kind: t("coursePage.addItems.quiz") }) });
     await quizTitle.fill("Тест F5c");
     await quizTitle.press("Enter");
@@ -151,7 +183,7 @@ test.describe("F5c teacher module editor", () => {
     await tp.context().close();
   });
 
-  test("platform course: the Pro switch asks first, turns gold and is stored; off again at once", async ({ browser }) => {
+  test("platform course: the Pro lock asks first, turns gold and is stored; off again at once", async ({ browser }) => {
     const admin = seed().admin;
     const ort = await api(admin, "GET", `/courses/${seed().course_id}`);
     const course = await api(admin, "POST", "/courses", {
@@ -172,13 +204,15 @@ test.describe("F5c teacher module editor", () => {
     const ap = await open(browser, admin);
     await ap.goto(`/${L}/courses/${cid}`);
     const card = ap.locator(`#m-${pro.id}`);
-    const sw = card.getByRole("switch", { name: t("modules.editor.proSwitch", { title: "Аналогии" }) });
-    await expect(sw).toHaveAttribute("aria-checked", "false");
+    const sw = card.getByRole("button", { name: t("modules.editor.proSwitch", { title: "Аналогии" }) });
+    await expect(sw).toHaveAttribute("aria-pressed", "false");
+    await expect(sw).toHaveAttribute("title", t("modules.editor.proHintOff"));
     await sw.click();
     const confirm = ap.getByRole("alertdialog", { name: t("modules.editor.proConfirmTitle") });
     await expect(confirm.getByText(t("modules.editor.proConfirmBody"))).toBeVisible();
     await confirm.getByRole("button", { name: t("modules.editor.proConfirm") }).click();
-    await expect(sw).toHaveAttribute("aria-checked", "true");
+    await expect(sw).toHaveAttribute("aria-pressed", "true");
+    await expect(sw).toHaveAttribute("title", t("modules.editor.proHintOn"));
     let mods = (await api(admin, "GET", `/courses/${cid}/modules`)).modules as { id: string; access_tier: string }[];
     expect(mods.find((m) => m.id === pro.id)?.access_tier).toBe("paid");
     await expect(ap.locator(`#m-${after.id}`).getByText(t("modules.editor.proPrereqWarning"))).toBeVisible();
@@ -195,7 +229,17 @@ test.describe("F5c teacher module editor", () => {
       await phone.getByRole("button", { name: t("coursePage.add", { title: "Аналогии" }) }).click();
       await phone.screenshot({ path: path.join(SHOTS, "editor-375-ru-add.png") });
       await phone.context().close();
-      await ap.locator(`#m-${free.id}`).getByRole("button", { name: t("modules.editor.addVideo"), exact: true }).click();
+      // FB8 S2: the wide desktop and the open "+ Добавить" menu
+      const wide = await open(browser, admin, { width: 1920, height: 1080 });
+      await wide.goto(`/${L}/courses/${cid}`);
+      await expect(wide.locator(`#m-${pro.id}`)).toBeVisible();
+      await settle(wide);
+      await wide.screenshot({ path: path.join(SHOTS, "editor-1920-ru.png"), fullPage: true });
+      await wide.context().close();
+      await ap.locator(`#m-${free.id}`).getByRole("button", { name: t("coursePage.add", { title: "Математика I" }) }).click();
+      await ap.screenshot({ path: path.join(SHOTS, "editor-1440-ru-add.png") });
+      await ap.keyboard.press("Escape");
+      await addVia(ap, ap.locator(`#m-${free.id}`), "Математика I", t("modules.editor.addVideo"));
       await ap.getByRole("dialog").getByLabel(t("modules.editor.video.url")).fill("https://youtu.be/dQw4w9WgXcQ");
       await ap.screenshot({ path: path.join(SHOTS, "editor-1440-ru-video.png") });
       await ap.keyboard.press("Escape");
@@ -203,7 +247,7 @@ test.describe("F5c teacher module editor", () => {
 
     // off: no question, back to open for everyone
     await sw.click();
-    await expect(sw).toHaveAttribute("aria-checked", "false");
+    await expect(sw).toHaveAttribute("aria-pressed", "false");
     mods = (await api(admin, "GET", `/courses/${cid}/modules`)).modules;
     expect(mods.find((m) => m.id === pro.id)?.access_tier).toBe("free");
     await settle(ap);

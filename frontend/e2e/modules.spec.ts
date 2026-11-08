@@ -16,8 +16,8 @@ import { OrtExam } from "./ort-exam";
  * specs that run next see the course exactly as seeded).
  *
  * Phase 8c S4a (PHASE_8C_DESIGN 12): the teacher works on the Course page (`base`; the staff `/modules` route redirects
- * there), adds items from the grouped "+ Add" menu (`coursePage.addItems.*`), publishes with the icon button
- * (`aria-pressed`) and finds a module card by its `#m-{id}` anchor; the student parts assert the course sidebar
+ * there), adds items from the grouped "+ Add" menu (`coursePage.addItems.*`), publishes with the row switch
+ * (`role="switch"`, `aria-checked`; FB8 S2) and finds a module card by its `#m-{id}` anchor; the student parts assert the course sidebar
  * (`courseNav`) instead of the old tab bar. Written against the design before S2 (course page) and S3 (one-page
  * objects) were merged: the selectors below are the design's roles and i18n keys.
  *
@@ -133,9 +133,9 @@ async function studentModules(page: Page, cid: string) {
   while (await closed.count() > 0) await closed.first().click();
 }
 
-/** Publish icon button of a module header or item row (design 3.6): `aria-pressed` = published. */
+/** Publish switch of a module header or item row (FB8 S2, STAFF_UX_AUDIT §3): `aria-checked` = published. */
 const publishIcon = (card: Locator, title: string, lang: "ru" | "en" = "ru") =>
-  card.getByRole("button", { name: tr(lang, "modules.editor.publishToggle", { title }), exact: true });
+  card.getByRole("switch", { name: tr(lang, "modules.editor.publishToggle", { title }), exact: true });
 
 const badge = (page: Page, title: string, state: string) => moduleCard(page, title).getByText(t(`modules.state.${state}`), { exact: true });
 
@@ -258,7 +258,7 @@ test.describe("modules walk (ru)", () => {
     await expect(set).toBeHidden();
     for (const m of [M1, M2, M3]) {
       await publishIcon(tCard(tp, m), m).click();
-      await expect(publishIcon(tCard(tp, m), m)).toHaveAttribute("aria-pressed", "true");
+      await expect(publishIcon(tCard(tp, m), m)).toHaveAttribute("aria-checked", "true");
     }
     await settle(tp);
 

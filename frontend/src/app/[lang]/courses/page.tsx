@@ -23,11 +23,16 @@ import {
 type Tab = "teaching" | "learning";
 
 /** Phase 6b integration: the header's Teaching / Learning areas link to `?view=teaching|learning`. */
-function ViewSync({ onView }: { onView: (v: Tab) => void }) {
+function ViewSync({ onView, noLearning = false }: { onView: (v: Tab) => void; noLearning?: boolean }) {
   const view = useSearchParams().get("view");
+  const { lang } = useTranslation();
+  const router = useRouter();
   useEffect(() => {
     if (view === "teaching" || view === "learning") onView(view);
   }, [view, onView]);
+  useEffect(() => { // owner feedback 2026-11-08 (item 2): without Learning, its link opens Teaching
+    if (noLearning && view === "learning") router.replace(`/${lang}/courses?view=teaching`, { scroll: false });
+  }, [noLearning, view, lang, router]);
   return null;
 }
 const TABS_ID = "my-courses";
@@ -46,7 +51,7 @@ function useCatalogHashRedirect() {
   }, [lang, router]);
 }
 
-function TeachingList() {
+function TeachingList({ noLearning = false }: { noLearning?: boolean }) {
   const { lang, t } = useTranslation();
   const errorText = useErrorText();
   const [items, setItems] = useState<CourseCardDto[]>([]);
@@ -74,6 +79,8 @@ function TeachingList() {
     <div className="space-y-4">
       {/* Accounts: a revoked teacher keeps this list, read-only */}
       {me?.teacher_status === "revoked" && <TeacherApplicationNotice application={{ status: "revoked" }} />}
+      {/* item 2: without the Learning tab, the student home's "approved" line shows here instead (once) */}
+      {noLearning && me?.teacher_application && <TeacherApplicationNotice application={me.teacher_application} />}
       {error && items.length === 0 ? <ErrorState message={errorText(error)} onRetry={() => void load()} retrying={loading} /> : null}
       {error && items.length > 0 ? <ErrorState variant="inline" message={errorText(error)} onRetry={() => void load(cursor)} /> : null}
       {loading && items.length === 0 && !error && <LoadingState rows={3} />}
@@ -128,6 +135,9 @@ export default function CoursesPage() {
   // Phase 6b S11b (UX 15): `?view=` wins over the default (ViewSync may run before MeOut arrives), and switching
   // the tab updates `?view=` so the header area follows the tab.
   const router = useRouter();
+  // Owner feedback 2026-11-08 (item 2): no Learning tab and no "Join with code" for people who teach but learn nowhere;
+  // their `?view=learning` becomes `?view=teaching` in ViewSync (the same rule as the header in LmsShell).
+  const noLearning = !!me && hasTeaching && me.has_student_enrollments === false;
   useEffect(() => {
     if (!me || tab !== null) return;
     const v = new URLSearchParams(window.location.search).get("view");
@@ -140,7 +150,7 @@ export default function CoursesPage() {
 
   if (!hasTeaching) return <StudentHome />;
 
-  const current: Tab = tab ?? "teaching";
+  const current: Tab = noLearning ? "teaching" : tab ?? "teaching";
   const teaching = current === "teaching";
   return (
     <div>
@@ -149,16 +159,20 @@ export default function CoursesPage() {
         primaryAction={teaching && me?.can_create_courses
           ? <LinkButton href={`/${lang}/courses/new`} leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}>{t("courses.list.create")}</LinkButton>
           : undefined}
-        secondaryActions={teaching
+        secondaryActions={teaching && !noLearning
           ? <LinkButton variant="secondary" href={`/${lang}/courses/join`} leftIcon={<KeyRound className="h-4 w-4" aria-hidden="true" />}>{t("courses.list.join")}</LinkButton>
           : undefined}
       />
-      <Suspense fallback={null}><ViewSync onView={setTab} /></Suspense>
-      <Tabs id={TABS_ID} label={t("courses.list.title")} value={current} onChange={(v) => changeTab(v as Tab)} className="mb-6"
-        items={[{ id: "teaching", label: t("courses.list.teaching") }, { id: "learning", label: t("courses.list.learning") }]} />
-      <TabPanel tabsId={TABS_ID} value={current}>
-        {teaching ? <TeachingList /> : <StudentHome embedded />}
-      </TabPanel>
+      <Suspense fallback={null}><ViewSync onView={setTab} noLearning={noLearning} /></Suspense>
+      {noLearning ? <TeachingList noLearning /> : (
+        <>
+          <Tabs id={TABS_ID} label={t("courses.list.title")} value={current} onChange={(v) => changeTab(v as Tab)} className="mb-6"
+            items={[{ id: "teaching", label: t("courses.list.teaching") }, { id: "learning", label: t("courses.list.learning") }]} />
+          <TabPanel tabsId={TABS_ID} value={current}>
+            {teaching ? <TeachingList /> : <StudentHome embedded />}
+          </TabPanel>
+        </>
+      )}
     </div>
   );
 }

@@ -29,8 +29,9 @@ import { PlatformCourses } from "./PlatformCourses";
 import { HOME_CARD, StreakCard, StreakCardSkeleton } from "./StreakCard";
 import { useErrorText } from "./useErrorText";
 
-/** Course cards: as many 16rem columns as fit (one at 375 px, never thin at 1920 px). */
-export const HOME_CARD_GRID = "grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-4";
+/** Course cards on the home: the main column sits next to a side column, so the count follows the container, not
+ * the viewport (owner 2026-11-08, item 1): as many 256–360 px columns as fit (one at 375 px, two at 1440 px, never thin). */
+export const HOME_CARD_GRID = "grid gap-4 grid-cols-[repeat(auto-fill,minmax(min(100%,256px),360px))]";
 
 type GreetingPart = "morning" | "afternoon" | "evening";
 function partOfDay(hour: number): GreetingPart {

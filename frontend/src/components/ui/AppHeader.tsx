@@ -274,7 +274,8 @@ export function AreaPillsSkeleton() {
 /** The one header of the signed-in app. Areas with a single entry (only Learning) hide the switcher. */
 export function AppHeader({ brandHref, areas, areasLoading = false, activeArea, user, accountLinks = [], onLanguageChange, onLogout, routeKey }: AppHeaderProps) {
   const { t } = useTranslation();
-  const multi = !areasLoading && areas.length > 1;
+  // Owner feedback 2026-11-08 (item 2): one area with a sub-menu (a teacher without Learning) still draws it
+  const multi = !areasLoading && (areas.length > 1 || !!areas[0]?.sections?.length || !!areas[0]?.choices?.length);
   const active = areas.find((a) => a.key === activeArea);
   const sections = multi && active?.sections && active.sections.length > 0 ? active.sections : null;
   return (

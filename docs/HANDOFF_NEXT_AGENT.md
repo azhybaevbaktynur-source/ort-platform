@@ -68,6 +68,7 @@ Neon backups (free plan: **max 10 branches, 1 manual snapshot**): before-ux-rewo
 ## 5. What to do next
 
 1. Follow **`docs/ROADMAP_EXAM_PREP.md`**: S1 protect control → S2 exam-prep home and ORT page → S3 free and paid exams (`phases/S3_ACCESS_DESIGN.md`) → S4 person page and payments control → S5 installable app → S6 AI chat (owner decision D5 first). Defaults D2–D4 apply until the owner changes them.
+1b. **Owner feedback round 2026-11-07 (problems 1–7) deployed**: brief `docs/phases/STUDENT_UI_FEEDBACK_2026-11-07.md`, plan + results `docs/phases/STUDENT_UI_FIX_PLAN.md` §11, designs `COURSE_LESSONS_DESIGN.md`, `SUBSCRIPTION_DESIGN.md`. Model rule from the owner: Fable for design/reviews, Opus for data/access/shell/ORT/lessons/covers and anything that failed once, Sonnet only simple styling/i18n/deletions; a Sonnet slice that comes back wrong is redone on Opus.
 1a. **Student area redesign (owner 2026-11-06/07)**: `docs/phases/STUDENT_UI_DESIGN.md` (plan, §1.1 palette, §5.1 coherence), `docs/phases/STUDENT_UI_REVIEW.md` (review; LATER items open). Student frame = `components/lms/student/StudentShell.tsx` (theme class `.student-theme` overrides the CSS-variable `brand`/`navy`); ORT lobby/attempt routes keep the old frame. The owner's reference screenshots are local only (`docs/oneprep_design/`, git-excluded).
 2. Content is the owner's: ORT (Russian) has one published test on production, ORT (Kyrgyz) none.
 3. Launch still waits on `docs/LAUNCH_CHECKLIST.md` (lawyer, keys, paid plan, 6,000-student test).

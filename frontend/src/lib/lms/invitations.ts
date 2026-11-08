@@ -2,6 +2,7 @@
 import { getAuthHeader } from "@/lib/api";
 import { API_BASE_URL } from "@/lib/apiBase";
 import { LmsApiError, lmsFetch } from "./client";
+import { thenMeStale } from "./meStale";
 import { asPage, type ListParams } from "./organizations";
 import type { Lang, LocalizedText, PageOut, RosterCounts, RosterImportOut, RosterKind } from "./types";
 
@@ -79,7 +80,7 @@ export const resendOrgInvitation = (orgId: string, id: string) =>
 
 export const getInvitation = (token: string) => lmsFetch<InvitationPublicOut>(`/invitations/${enc(token)}`);
 /** Accept by the emailed token, or by the invitation id from GET /me/invitations (same route). */
-export const acceptInvitation = (tokenOrId: string) => post<InvitationAcceptOut>(`/invitations/${enc(tokenOrId)}/accept`);
+export const acceptInvitation = (tokenOrId: string) => thenMeStale(post<InvitationAcceptOut>(`/invitations/${enc(tokenOrId)}/accept`));
 export const listMyInvitations = (p: ListParams = {}) =>
   lmsFetch<PageOut<MyInvitationOut>>("/me/invitations", { params: { limit: 50, ...p } }).then((x) => asPage<MyInvitationOut>(x).items);
 

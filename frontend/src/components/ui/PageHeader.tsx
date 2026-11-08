@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
+import { OverflowMenu, type MenuGroup } from "./OverflowMenu";
 import { cn, focusRing } from "./utils";
 
 export interface Breadcrumb {
@@ -23,17 +24,32 @@ export interface PageHeaderProps {
   breadcrumbs?: Breadcrumb[];
   /** The ONE primary action of the page (a `Button` or `LinkButton` with variant="primary"). */
   primaryAction?: React.ReactNode;
-  /** Secondary actions (secondary buttons / links). They come before the primary on desktop and after it on phones. */
+  /**
+   * Secondary actions (secondary buttons / links). They come before the primary on desktop and after it on phones.
+   * Staff pages (STAFF_UX_AUDIT §0): at most one; everything else goes in `overflow`.
+   */
   secondaryActions?: React.ReactNode;
+  /** Every other page action, in a "⋯" menu right of the primary (dangerous ones `danger: true`, drawn last). */
+  overflow?: MenuGroup[];
+  /** Called with the id of the chosen `overflow` item. */
+  onOverflow?: (id: string) => void;
+  /** Accessible name of the "⋯" trigger (default "More actions"). */
+  overflowLabel?: string;
   /** Extra content under the header row (meta line, tabs). */
   children?: React.ReactNode;
   className?: string;
 }
 
-/** Page title block: breadcrumbs, title + badge, description and actions; wraps on phones. */
-export function PageHeader({ title, description, badge, breadcrumbs, primaryAction, secondaryActions, children, className }: PageHeaderProps) {
+/**
+ * Page title block: breadcrumbs, title + badge, description and actions; wraps on phones. Use it once at the top of
+ * every page: one `primaryAction`, the rest in `overflow` ("⋯"); state (Draft, Hidden) as a `badge` with text.
+ */
+export function PageHeader({
+  title, description, badge, breadcrumbs, primaryAction, secondaryActions, overflow, onOverflow, overflowLabel, children, className,
+}: PageHeaderProps) {
   const { t } = useTranslation();
-  const hasActions = primaryAction || secondaryActions;
+  const hasOverflow = !!overflow && overflow.some((g) => g.items.length > 0);
+  const hasActions = primaryAction || secondaryActions || hasOverflow;
   return (
     <header className={cn("mb-6", className)}>
       {breadcrumbs && breadcrumbs.length > 0 && (
@@ -66,7 +82,13 @@ export function PageHeader({ title, description, badge, breadcrumbs, primaryActi
         {hasActions && (
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end [&>*]:w-full sm:[&>*]:w-auto">
             {secondaryActions && <div className="flex flex-wrap gap-2 [&>*]:flex-1 sm:[&>*]:flex-none">{secondaryActions}</div>}
-            {primaryAction}
+            {hasOverflow ? (
+              // the primary takes the row on phones, the "⋯" stays beside it
+              <div className="flex items-center justify-end gap-2 [&>*:first-child:not(:last-child)]:flex-1 sm:[&>*:first-child:not(:last-child)]:flex-none">
+                {primaryAction}
+                <OverflowMenu label={overflowLabel} groups={overflow!} onSelect={(id) => onOverflow?.(id)} />
+              </div>
+            ) : primaryAction}
           </div>
         )}
       </div>
