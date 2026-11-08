@@ -197,6 +197,7 @@ NOT_PERSONAL: dict[tuple[str, str], str] = {
     ("policy_versions", "body_en"): "policy text",
     ("policy_versions", "body_ky"): "policy text",
     ("policy_versions", "body_ru"): "policy text",
+    ("infra_snapshots", "payload"): "allow-listed provider usage figures (I5a): no personal data, no keys",
 }
 
 
