@@ -700,3 +700,46 @@ this run: student home "first content" warm laptop 509 ms (target ≤ 250; the m
 vary ±30 %, and the home's `exam-prep` wait is S3's) and phone warm settled 1.29 s (target ≤ 1.2 s). `/auth/me` still runs
 on these cold contexts (no stored confirmation time yet); with a profile confirmed less than ten minutes ago it is skipped,
 and otherwise it runs after first paint, directly against the API.
+
+### S3 Page waterfalls (same machine, own builds of `lms` `7289553` (S1 + S2 + S4) and S3, one run each, same scratch backend)
+
+Cells: API requests / API depth / first content ms / settled ms.
+
+| page | profile | mode | before S3 | after S3 |
+|---|---|---|---|---|
+| student-home | laptop | cold | 5 / 2 / 309 / 338 | 5 / 2 / 390 / 407 (median of 3: 244 / 257) |
+| student-home | laptop | warm | 4 / 1 / 125 / 151 | 4 / 1 / 171 / 200 (median of 3: 156 / 165) |
+| student-tests | laptop | cold | 6 / 2 / 243 / 260 | 5 / 2 / 271 / 284 |
+| student-tests | laptop | warm | 5 / 1 / 175 / 194 | 4 / 1 / 156 / 174 |
+| student-analytics | laptop | cold | 7 / 2 / 236 / 257 | 7 / 2 / 269 / 316 (median of 3: 240 / 365) |
+| student-analytics | laptop | warm | 6 / 1 / 154 / 168 | 6 / 1 / 212 / 227 (median of 3: 159 / 179) |
+| teacher-course | laptop | cold | 6 / 2 / 238 / 266 | 6 / 2 / 214 / 231 |
+| teacher-course | laptop | warm | 5 / 1 / 136 / 144 | 5 / 1 / 174 / 190 |
+| admin-overview | laptop | cold | 6 / 3 / 229 / 350 | 6 / 2 / 254 / 341 |
+| admin-overview | laptop | warm | 5 / 2 / 166 / 189 | 5 / 1 / 199 / 217 |
+| student-home | phone | cold | 5 / 2 / 8879 / 11016 | 5 / 2 / 8893 / 11081 |
+| student-home | phone | warm | 4 / 1 / 702 / 1249 | 4 / 1 / 727 / 1057 |
+| student-tests | phone | cold | 6 / 2 / 8570 / 10147 | 5 / 2 / 8687 / 10209 |
+| student-tests | phone | warm | 5 / 1 / 667 / 1157 | 4 / 1 / 685 / 1177 |
+| student-analytics | phone | cold | 7 / 2 / 8769 / 9213 | 7 / 2 / 8829 / 10364 |
+| student-analytics | phone | warm | 6 / 1 / 794 / 1245 | 6 / 1 / 753 / 1192 |
+| teacher-course | phone | cold | 6 / 2 / 11661 / 11742 | 6 / 2 / 11712 / 11797 |
+| teacher-course | phone | warm | 5 / 1 / 822 / 936 | 5 / 1 / 805 / 940 |
+| admin-overview | phone | cold | 6 / 3 / 9846 / 10475 | 6 / 3 / 10491 / 11282 |
+| admin-overview | phone | warm | 5 / 2 / 1255 / 1598 | 5 / 1 / 932 / 1671 |
+
+**S3 notes** (2026-11-09, branch `worktree-agent-ac5d345a0d6b57fba`). The exam-prep page goes through the SWR cache
+(`src/lib/lms/pageData.ts`): the Тесты page and the "Начало работы" checklist share one request (tests 6 → 5 cold,
+5 → 4 warm). A page that draws an answer asks it again on every mount (a finished attempt changes it) and shows the
+cached one meanwhile; only an answer a hover/focus prefetch asked in the last 10 s stands in for that request. The shell's
+main links (sidebar and tab bar) prefetch on hover, focus and touch: Главная and Тесты the exam-prep page, Аналитика
+progress and activity (30 days). `AppHeaderLink.prefetch` exists for header sections but nothing passes it yet (the
+sections are built in `LmsShell`). Admin overview: the page's three requests go out with the shell's
+`/platform/summary` (laptop cold depth 3 → 2, warm 2 → 1); `AdminShell` draws from the cached `MeOut`. On the phone
+profile the cold overview stays at depth 3: the page's requests wait for the staff dictionary chunk (S4: `AreaShell` and
+`AdminShell` render children only once it is loaded, ~1.8 s at 400 kbit/s), so they start after the summary ended.
+Frames before data: the exam-prep home draws the Next card frame, the score line with skeleton numbers, the streak and
+the side column before `exam-prep` answers; Тесты draws its header and status chips at once; Аналитика draws its four
+tiles with skeleton numbers. `TeacherCoursePage` already fired `modules`, `modules/unsorted` and `todo` together at mount
+(no change). Every cold page is at API depth ≤ 2 except the phone admin overview above. No `window.location` navigation
+in the S3 files. First-content numbers are within the ±30 % laptop noise; the structure columns are exact.
