@@ -174,5 +174,7 @@ export interface HomeModuleNextOut {
   /** Phase 8a UX: the item's target ids (backend `ItemLinkOut`); used to drop rows already shown above.
    * TEACHER_TO_STUDENT_MAP S3: the home's "Продолжить урок" strip opens it (`itemHref`). */
   link?: ItemLinkOut | null;
+  /** TEACHER_TO_STUDENT_MAP G12: a video lesson (the row shows the video icon); absent on an older backend */
+  is_video?: boolean;
 }
 // --- Phase 8a S4a end ---

@@ -129,6 +129,7 @@ class HomeModuleNextOut(BaseModel):
     kind: str
     title: dict
     link: Optional[ItemLinkOut] = None
+    is_video: bool = False  # a url item that is an allowlisted YouTube / Vimeo video (the syllabus's `parse_video` rule)
 # --- Phase 8a S3 end ---
 
 

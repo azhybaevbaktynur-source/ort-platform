@@ -7,7 +7,7 @@
 // them for the sidebar) when it shows this exam, else from one request.
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, PlayCircle } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { joinOpenCourse } from "@/lib/lms/catalog";
 import { listLessonCourses, type LessonCourseOut } from "@/lib/lms/courses";
@@ -58,7 +58,9 @@ export function ContinueLessons({ rows }: { rows: HomeModuleNextOut[] }) {
             <SideRow key={`${r.course_id}:${r.item_id}`} href={href}
               icon={(
                 <span aria-hidden="true" className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
-                  <ItemKindIcon kind={kind} assignmentKind={r.link?.assignment_kind} />
+                  {r.is_video && kind === "url"
+                    ? <PlayCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
+                    : <ItemKindIcon kind={kind} assignmentKind={r.link?.assignment_kind} />}
                 </span>
               )}
               title={pickLocalized(r.title, lang) || untitled}

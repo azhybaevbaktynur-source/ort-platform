@@ -681,6 +681,13 @@ async def test_modules_next_reads_caches_only(db, api):
     assert [r["item_id"] for r in (await home(api, w.S))["modules_next"]] == [str(lesson.id)]
     record_fact(db, w.enr, lesson)
     assert (await home(api, w.S))["modules_next"] == []
+    # G12: a video url lesson is flagged, a plain link is not
+    for url, flag in (("https://www.youtube.com/watch?v=dQw4w9WgXcQ", True), ("https://example.com/x", False)):
+        u = make_item(db, open_, url)
+        rows = (await home(api, w.S))["modules_next"]
+        assert [(r["item_id"], r["is_video"]) for r in rows] == [(str(u.id), flag)]
+        db.delete(u)
+        db.commit()
     db.query(ItemRequirementStatus).filter(ItemRequirementStatus.item_id == nxt.id).delete()
     db.commit()
     # the other student's caches are not mine; staff get nothing

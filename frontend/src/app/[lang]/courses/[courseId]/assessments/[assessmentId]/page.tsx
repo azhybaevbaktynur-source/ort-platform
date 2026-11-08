@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { getAssessment, listAssessmentVersions } from "@/lib/lms/assessments";
 import { isStaffAssessment, type AssessmentDetailOut, type AssessmentStaffOut, type VersionOut } from "@/lib/lms/assessmentTypes";
-import { isExamPrepStudent } from "@/lib/lms/templates"; // SF-1
+import { isExamPrepStudent, isExamShellCourse } from "@/lib/lms/templates"; // SF-1
 import { BackLink } from "@/components/lms/BackLink";
 import { pickLocalized } from "@/lib/lms/localized";
 import { useCourse } from "@/components/lms/CourseContext";
@@ -48,7 +48,9 @@ export default function AssessmentPage() {
   // SF-1: an exam-prep student goes back to Тесты; other students to the course's list of assignments
   const backLink = isExamPrepStudent(course)
     ? <BackLink href={`/${lang}/courses/${course.id}/tests`}>{t("results.backToTests")}</BackLink>
-    : <BackLink href={base}>{t("assessments.backToList")}</BackLink>;
+    : isExamShellCourse(course)  // G11: a lesson course in the exam shell goes back to the syllabus
+      ? <BackLink href={`/${lang}/courses/${course.id}/modules`}>{t("modules.overview.toSyllabus")}</BackLink>
+      : <BackLink href={base}>{t("assessments.backToList")}</BackLink>;
 
   // Phase 8a fix1 (M2): the lobby of a quiz in a locked module answers 423 `module_locked` for students
   if (error && !data && isModuleLocked(error)) {
