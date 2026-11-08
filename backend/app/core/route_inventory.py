@@ -79,6 +79,7 @@ ROUTE_POLICIES.update(INVITATION_POLICIES)
 ROUTE_POLICIES.update({
     ("GET", "/api/v1/me/home"): "authenticated",  # the caller's own enrollments, attempts, grades, invitations
     ("GET", "/api/v1/me/home/courses"): "authenticated",  # the caller's own student courses: pages of the same cards
+    ("GET", "/api/v1/me/bootstrap"): "authenticated",  # PERFORMANCE_AUDIT S2: the shell's parts of the caller's own data
 })
 # --- Phase 6 S6a end ---
 # --- Phase 7a S1 begin --- (assignments, hand-ins, grades: S2/S3 fill ASSIGNMENT_POLICIES; accommodations: S4)
@@ -215,3 +216,14 @@ from app.lms.email_change.policies import EMAIL_CHANGE_POLICIES  # noqa: E402
 
 ROUTE_POLICIES.update(EMAIL_CHANGE_POLICIES)
 # --- S4 person page end ---
+# --- Social sign-in begin --- (AUTH_SOCIAL_DESIGN 1.1)
+from app.lms.oauth.policies import OAUTH_POLICIES  # noqa: E402
+
+ROUTE_POLICIES.update(OAUTH_POLICIES)
+# --- Social sign-in end ---
+
+# --- I5a infrastructure panel begin --- (INFRA_PANEL_DESIGN 5)
+from app.lms.infra.policies import INFRA_POLICIES  # noqa: E402
+
+ROUTE_POLICIES.update(INFRA_POLICIES)
+# --- I5a infrastructure panel end ---

@@ -49,6 +49,15 @@ async function shoot(page: Page, name: string) {
   await page.setViewportSize({ width: 1440, height: 900 });
 }
 
+/** PERFORMANCE_AUDIT S2: a mark on the window survives client navigations and is gone after a full reload. */
+async function markPage(page: Page) {
+  await page.evaluate(() => { (window as unknown as { __s2Mark?: number }).__s2Mark = 1; });
+}
+
+async function samePage(page: Page): Promise<boolean> {
+  return page.evaluate(() => (window as unknown as { __s2Mark?: number }).__s2Mark === 1);
+}
+
 test.describe("exam-prep page (ru)", () => {
   test.describe.configure({ mode: "serial" });
 
@@ -70,9 +79,14 @@ test.describe("exam-prep page (ru)", () => {
       const card = platform.locator("li").filter({ has: page.locator(`a[href="/${L}/courses/catalog/${cid}"]`) });
       await expect(card).toHaveCount(1);
       await shoot(page, "home-platform");
+      await markPage(page);
       await card.getByRole("button", { name: t("catalog.join"), exact: true }).click();
       // Student UI U4: the course page of an exam-prep course is its Тесты page for students
       await page.waitForURL(new RegExp(`/${L}/courses/${cid}/tests$`));
+      // PERFORMANCE_AUDIT S2: the shell shows the joined course without a page reload (the bootstrap is asked again)
+      await expect(page.getByRole("navigation", { name: t("student.nav.label") }).getByRole("link", { name: t("student.nav.tests") }))
+        .toHaveAttribute("href", `/${L}/courses/${cid}/tests`);
+      expect(await samePage(page), "joining reloaded the page").toBe(true);
 
       // ---- the Тесты page: title with the count, status chips, one card per test, nothing done yet
       const library = page.getByRole("region", { name: t("examPrep.library.title") });
@@ -159,6 +173,31 @@ test.describe("exam-prep page (ru)", () => {
       await shoot(page, "home-prep-after");
     } finally {
       await api(s.admin, "PATCH", `/courses/${cid}`, { exam_date: null });
+      await ctx.close();
+    }
+  });
+
+  test("leave from the exam sheet: no reload, the home no longer shows the course", async ({ browser }) => {
+    const s = seed();
+    const cid = s.course_id;
+    const newcomer = s.exam_prep!.newcomer;
+    const ctx = await browser.newContext({ viewport: { width: 375, height: 812 }, locale: "ru-RU", timezoneId: "UTC", colorScheme: "light" });
+    const page = await ctx.newPage();
+    try {
+      await signIn(page, newcomer);
+      await page.goto(`/${L}/courses`);
+      await expect(page.getByRole("region", { name: t("examPrep.next.title") })).toBeVisible(); // the exam-prep home of ORT
+      await markPage(page);
+      await page.getByRole("button", { name: new RegExp(`^${t("student.switcher.open", { name: "ОРТ" }).split(":")[0]}:`) }).click();
+      await page.getByRole("dialog").getByRole("button", { name: t("courses.home.leave"), exact: true }).click();
+      await page.getByRole("alertdialog", { name: t("courses.home.leaveTitle") }).getByRole("button", { name: t("courses.home.leave"), exact: true }).click();
+      await page.waitForURL(new RegExp(`/${L}/courses$`));
+      // the home reads itself again: the course is offered under "From the platform", its exam-prep home is gone
+      await expect(page.getByRole("region", { name: t("home.platform.title") }).locator(`a[href="/${L}/courses/catalog/${cid}"]`)).toHaveCount(1);
+      await expect(page.getByRole("region", { name: t("examPrep.next.title") })).toHaveCount(0);
+      expect(await samePage(page), "leaving reloaded the page").toBe(true);
+    } finally {
+      await api(newcomer, "POST", `/courses/${cid}/join`); // as it was for any later run
       await ctx.close();
     }
   });

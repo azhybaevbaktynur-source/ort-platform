@@ -3,8 +3,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
-import { useTranslation } from "@/lib/i18n/context";
+import { useStaffDictionary, useTranslation } from "@/lib/i18n/context";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
+import { useCachedMe } from "@/lib/lms/meCache"; // PERFORMANCE_AUDIT S3
 import { getPlatformSummary } from "@/lib/lms/admin";
 import type { LmsApiError } from "@/lib/lms/client";
 import type { StorageLevel } from "@/lib/lms/storage";
@@ -31,7 +32,10 @@ export function useAdminCrumbs() {
 /** Platform admin area: section nav (`AreaShell`) + client-side guard (the server is authoritative). */
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const { lang, t } = useTranslation();
-  const { me, loading } = useLmsMe();
+  const staffReady = useStaffDictionary(); // performance audit S4
+  const { me: fresh, loading } = useLmsMe();
+  const cachedMe = useCachedMe(); // PERFORMANCE_AUDIT S3: the cached answer draws the area at once (no spinner)
+  const me = fresh ?? cachedMe;
   const pathname = usePathname();
   const router = useRouter();
   const [pending, setPending] = useState<number | null>(null);
@@ -68,8 +72,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     if (mustEnroll && pathname !== securityPath) router.replace(securityPath);
   }, [mustEnroll, pathname, securityPath, router]);
 
+  // Integration fix: only `me` is awaited here; while the staff dictionary loads, AreaShell renders the area hidden under
+  // its loading state, so the page's requests go out with `/platform/summary` instead of after the dictionary chunk.
   if (loading && !me) return <LoadingState label={t("lms.common.loading")} />;
   if (!isAdmin) {
+    if (!staffReady) return <LoadingState label={t("lms.common.loading")} />;
     return (
       <EmptyState
         icon={<ShieldAlert />}
@@ -93,6 +100,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     { href: `${base}/access`, label: t("platformAdmin.nav.proUsers"), exact: true, group: g("pro") },
     { href: `${base}/access/vouchers`, label: t("platformAdmin.nav.gifts"), group: g("pro"), alsoUnder: `${base}/access/batches` },
     { href: `${base}/access/exams`, label: t("platformAdmin.nav.paidExams"), group: g("pro") }, // D-FB8-5-5
+    { href: `${base}/services`, label: t("infra.nav"), group: g("system") }, // INFRA_PANEL_DESIGN
     { href: `${base}/storage`, label: t("storage.nav"), group: g("system") },
     { href: `${base}/health`, label: t("platformAdmin.nav.health"), group: g("system") }, // S4 page
     { href: `${base}/audit-log`, label: t("platformAdmin.nav.auditLog"), group: g("system") },

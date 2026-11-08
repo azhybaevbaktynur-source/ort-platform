@@ -495,7 +495,7 @@ def offer(db: Session, user_id: str, *, now: datetime) -> dict:
             plans.append({"id": pid, "days": days, "season_end": None, "price_kgs": cfg.prices.get(pid),
                           "new_ends_at": period.ends_at})
     free_practice = platform_practice_free(db)
-    includes = ["tests"] + ([] if free_practice else ["practice"]) + ["lessons"]
+    includes = ["tests"] + ([] if free_practice else ["practice"]) + ["courses"]  # §12.4 (analytics is in Free)
     season_end = cfg.season_end if pro_plans.season_available(cfg.season_end, now) else None
     return {"plans": plans, "includes": includes, "practice_free": free_practice,
             "how_to_pay": cfg.how_to_pay_with_fallback(), "season_end": season_end, "status": status_of(rows, now)}

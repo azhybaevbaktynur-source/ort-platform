@@ -117,6 +117,8 @@ export interface Seed {
   /** S1 admin security: a platform admin without two-step login, with a password (admin-mfa.spec.ts). */
   mfa_admin: SeedUser & { password: string };
   gate_admin: SeedUser & { password: string };
+  /** Item 3 social sign-in (oauth-google.spec.ts): a password student, a disabled student, a platform admin. */
+  oauth: { linked: SeedUser & { password: string }; disabled: SeedUser; admin: SeedUser & { password: string } };
   shots_admin: SeedUser & { password: string };
   /** TEACHER_TO_STUDENT_MAP S5: the lesson course "Мастеркласс E2E" (platform organization, draft, open enrollment in
    * the catalog, not linked yet) and a student of ORT (Russian) only (teacher-to-student.spec.ts). */
@@ -303,6 +305,22 @@ export async function expectScreen(page: Page, info: TestInfo, name: string, opt
 }
 
 // ----------------------------------------------------------------------------- viewports
+
+/** Performance audit S4: no visible text node is a raw translation key (`group.sub.key`): the staff dictionary must have arrived. */
+export async function expectNoRawKeys(page: Page): Promise<void> {
+  const raw = await page.evaluate(() => {
+    const found: string[] = [];
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const el = n.parentElement;
+      if (!el || ["SCRIPT", "STYLE", "NOSCRIPT"].includes(el.tagName)) continue;
+      const text = (n.textContent || "").trim();
+      if (/^[a-z]+(\.[a-zA-Z]+)+$/.test(text) && el.getClientRects().length) found.push(text);
+    }
+    return found;
+  });
+  expect(raw, "raw translation keys visible").toEqual([]);
+}
 
 export const VIEWPORTS = {
   phone: { width: 375, height: 812 },

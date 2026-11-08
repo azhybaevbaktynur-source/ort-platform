@@ -1,20 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { getStudentView } from "@/lib/api";
-import { getMyAccess, type MyAccessOut } from "@/lib/lms/access";
-import { getCourse, listLessonCourses, type LessonCourseOut } from "@/lib/lms/courses";
-import { listHomeCourses } from "@/lib/lms/home";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BOOTSTRAP_KEY, BOOTSTRAP_OPTIONS, fetchBootstrap, getBootstrap, reloadBootstrap, type BootstrapOut } from "@/lib/lms/bootstrap";
+import type { MyAccessOut } from "@/lib/lms/access";
+import { getCourse, type LessonCourseOut } from "@/lib/lms/courses";
 import type { HomeCourseOut } from "@/lib/lms/homeTypes";
+import { revalidate, useCached } from "@/lib/lms/swr";
 import type { CourseOut } from "@/lib/lms/types";
 
 /*
  * Student UI U2 (STUDENT_UI_DESIGN §2.2): what the student shell needs besides MeOut: the student's exam-prep courses
  * (`HomeCourseOut.student_layout`), the current one (this device remembers the last opened), what that course has
- * (lessons, practice) and the student's pass. Like `useLmsMe`, answers are kept per token (memory + this tab's
- * sessionStorage) and shown at once while fresh ones load; they only draw the menu, the server decides every request.
- * TEACHER_TO_STUDENT_MAP §2.4: plus the lesson courses attached to each exam (cached per exam like `features`), and a
- * lesson course's exam (`exam_course_id`), so inside a lesson course the current exam is the one it belongs to.
+ * (lessons, practice) and the student's pass. TEACHER_TO_STUDENT_MAP §2.4: plus the lesson courses attached to each
+ * exam, and a lesson course's exam (`exam_course_id`), so inside a lesson course the current exam is the one it belongs to.
+ * PERFORMANCE_AUDIT S2: all of it comes from `GET /me/bootstrap` (the courses, the pass and every exam's lesson courses
+ * in one answer, cached per token by `swr`, shown at once while a fresh one loads); it only draws the menu, the server
+ * decides every request.
  */
 
 export interface StudentCourseFeatures {
@@ -38,57 +39,10 @@ export interface StudentShellData {
   lessonCourseExam: string | null;
 }
 
-interface Cache {
-  token: string;
-  courses: HomeCourseOut[] | null;
-  access: MyAccessOut | null;
-  features: Record<string, StudentCourseFeatures>;
-  /** exam id -> its lesson courses */
-  lessons: Record<string, LessonCourseOut[]>;
-  /** lesson course id -> its exam id */
-  examOf: Record<string, string>;
-}
-
-// v2 (TEACHER_TO_STUDENT_MAP §2.4): `lessons` and `examOf` added; an older saved shape is dropped
-const CACHE_KEY = "ort_student_shell_v2";
 const CURRENT_KEY = "ort_student_course";
-const COURSES_LIMIT = 50;
-let memory: Cache | null = null;
 const NO_COURSES: HomeCourseOut[] = [];
-
-function activeToken(): string {
-  if (typeof window === "undefined") return "";
-  return (getStudentView()?.token ?? window.localStorage.getItem("ort_token") ?? "").slice(-16);
-}
-
-function emptyCache(token: string): Cache {
-  return { token, courses: null, access: null, features: {}, lessons: {}, examOf: {} };
-}
-
-function readCache(): Cache {
-  const token = activeToken();
-  if (memory?.token === token) return memory;
-  try {
-    const raw = window.sessionStorage.getItem(CACHE_KEY);
-    const saved = raw ? (JSON.parse(raw) as Partial<Cache>) : null;
-    if (saved && saved.token === token) {
-      memory = {
-        token, courses: saved.courses ?? null, access: saved.access ?? null, features: saved.features ?? {},
-        lessons: saved.lessons ?? {}, examOf: saved.examOf ?? {},
-      };
-      return memory;
-    }
-  } catch { /* storage blocked or a bad value */ }
-  memory = emptyCache(token);
-  return memory;
-}
-
-function writeCache(patch: Partial<Omit<Cache, "token">>): Cache {
-  const next = { ...readCache(), ...patch };
-  memory = next;
-  try { window.sessionStorage.setItem(CACHE_KEY, JSON.stringify(next)); } catch { /* the cache is optional */ }
-  return next;
-}
+const NO_LESSONS: Record<string, LessonCourseOut[]> = {};
+const NO_IDS: string[] = [];
 
 function readCurrent(): string | null {
   try { return window.localStorage.getItem(CURRENT_KEY); } catch { return null; }
@@ -99,6 +53,9 @@ function writeCurrent(id: string) {
 }
 
 const featuresOf = (c: CourseOut): StudentCourseFeatures => ({ modules: !!c.features?.modules, practice: !!c.features?.practice });
+
+/** Asks the bootstrap again, sharing a request already running (e.g. the one `meStale` started after a join). */
+const refreshBootstrap = () => revalidate(BOOTSTRAP_KEY, fetchBootstrap, BOOTSTRAP_OPTIONS);
 
 /**
  * `pathCourseId`: the course of the current path, if any; `declared`: the course the course layout loaded (saves a
@@ -112,79 +69,75 @@ export function useStudentShellData({ enabled, pathCourseId, declared, onHome, p
   /** Changes on every navigation (the access is read again after leaving /pro). */
   pathKey: string;
 }): StudentShellData {
-  const [cache, setCache] = useState<Cache | null>(null);
+  const boot = useCached<BootstrapOut>(enabled ? BOOTSTRAP_KEY : null, fetchBootstrap, BOOTSTRAP_OPTIONS);
+  const student = boot.data?.student ?? null;
   const [currentId, setCurrentId] = useState<string | null>(null);
+  const [extraFeatures, setExtraFeatures] = useState<Record<string, StudentCourseFeatures>>({});
   const loading = useRef<Set<string>>(new Set());
 
-  const once = useCallback(async (key: string, run: () => Promise<void>) => {
+  const once = useCallback(async (key: string, run: () => Promise<unknown>) => {
     if (loading.current.has(key)) return;
     loading.current.add(key);
     try { await run(); } catch { /* the menu falls back to what it knows */ } finally { loading.current.delete(key); }
   }, []);
 
-  const loadCourses = useCallback(() => once("courses", async () => {
-    const page = await listHomeCourses(null, COURSES_LIMIT);
-    // §2.4: the lesson courses the student joined name their exam (the shell keeps the exam chip inside them)
-    const examOf = { ...readCache().examOf };
-    for (const c of page.items) if (c.exam_course_id) examOf[c.id] = c.exam_course_id;
-    setCache(writeCache({ courses: page.items.filter((c) => c.student_layout === "exam_prep"), examOf }));
-  }), [once]);
-
-  const loadAccess = useCallback(() => once("access", async () => {
-    setCache(writeCache({ access: await getMyAccess() }));
-  }), [once]);
-
-  // §2.4: the lesson courses of one exam; a refused or failed read leaves an empty group (no retry loop)
-  const loadLessons = useCallback((examId: string) => once(`lessons:${examId}`, async () => {
-    let rows: LessonCourseOut[];
-    try {
-      rows = await listLessonCourses(examId);
-    } catch {
-      rows = readCache().lessons[examId] ?? [];
-    }
-    const examOf = { ...readCache().examOf };
-    for (const r of rows) examOf[r.id] = examId;
-    setCache(writeCache({ lessons: { ...readCache().lessons, [examId]: rows }, examOf }));
-  }), [once]);
-
-  // first use: the cached answer at once, then fresh courses
   useEffect(() => {
-    if (!enabled) return;
-    setCache(readCache());
-    setCurrentId(readCurrent());
-    void loadCourses();
-  }, [enabled, loadCourses]);
+    if (enabled) setCurrentId(readCurrent());
+  }, [enabled]);
 
-  // back on the home: the list again (a course may have been joined or left), the lesson rows too
+  // U9: a course just left disappears at once; the next bootstrap answer (without it) replaces this
+  const [gone, setGone] = useState<{ ids: string[]; of: BootstrapOut | null }>({ ids: [], of: null });
+  const goneIds = gone.of === boot.data ? gone.ids : NO_IDS;
+
+  const allCourses = student?.courses ?? NO_COURSES;
+  const courses = useMemo(() => {
+    const list = allCourses.filter((c) => c.student_layout === "exam_prep" && !goneIds.includes(c.id));
+    return list.length ? list : NO_COURSES;
+  }, [allCourses, goneIds]);
+  const known = !!boot.data;
+  const lessonsByExam = student?.lesson_courses ?? NO_LESSONS;
+
+  // §2.4: lesson course -> its exam: the lesson courses the student joined name it, and every exam's rows list theirs
+  const examOf = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const [examId, rows] of Object.entries(lessonsByExam)) for (const r of rows) out[r.id] = examId;
+    for (const c of allCourses) if (c.exam_course_id) out[c.id] = c.exam_course_id;
+    return out;
+  }, [allCourses, lessonsByExam]);
+
+  // back on the home: the cached answer, asked again once it is older than its freshness (a join or leave already
+  // asked through `meStale`)
   const firstHome = useRef(true);
-  const freshLessons = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!enabled || !onHome) return;
     if (firstHome.current) { firstHome.current = false; return; }
-    freshLessons.current.clear();
-    void loadCourses();
-  }, [enabled, onHome, loadCourses]);
+    void getBootstrap().catch(() => undefined);
+  }, [enabled, onHome]);
 
-  const courses = cache?.courses ?? NO_COURSES;
-  const known = cache?.courses != null;
-
-  // the course layout loaded an exam-prep course this list does not have yet (joined a moment ago)
+  // the course layout loaded an exam-prep course this list does not have yet (joined a moment ago): once per course
   const declaredExamPrep = !!declared && declared.template?.student_layout === "exam_prep" && declared.my_enrollment.role === "student";
   useEffect(() => {
     if (!enabled || !declared) return;
-    setCache(writeCache({ features: { ...readCache().features, [declared.id]: featuresOf(declared) } }));
+    const f = featuresOf(declared);
+    setExtraFeatures((prev) => {
+      const had = prev[declared.id];
+      return had && had.modules === f.modules && had.practice === f.practice ? prev : { ...prev, [declared.id]: f };
+    });
   }, [enabled, declared]);
+  const asked = useRef<Set<string>>(new Set());
   const missing = declaredExamPrep && known && !courses.some((c) => c.id === declared?.id);
   useEffect(() => {
-    if (enabled && missing) void loadCourses();
-  }, [enabled, missing, loadCourses]);
+    if (!enabled || !missing || !declared || asked.current.has(`course:${declared.id}`)) return;
+    asked.current.add(`course:${declared.id}`);
+    void once("bootstrap", refreshBootstrap);
+  }, [enabled, missing, declared, once]);
 
   // §2.4: a lesson course of the path names its exam (the layout's course first, then what the lists told)
   const lessonCourseExam = !pathCourseId
     ? null
     : declared?.id === pathCourseId
       ? declared.exam_course_id ?? null
-      : cache?.examOf[pathCourseId] ?? null;
+      : examOf[pathCourseId] ?? null;
   // the current course: the one being viewed (or the exam of the lesson course being viewed) when it is an exam course,
   // else the remembered one, else the first
   const viewedId = lessonCourseExam ?? pathCourseId;
@@ -203,54 +156,45 @@ export function useStudentShellData({ enabled, pathCourseId, declared, onHome, p
   }, []);
 
   // what the current course has: with the course list (U9: the same menu on every page), else from the course layout
-  // when the student is inside it, else one request (an older backend or cache without `features`)
-  const features = current ? current.features ?? cache?.features[current.id] ?? null : null;
+  // when the student is inside it, else one request (an older backend without `features`)
+  const features = current ? current.features ?? extraFeatures[current.id] ?? null : null;
   const waitForLayout = !!current && pathCourseId === current.id && declared?.id !== current.id;
   useEffect(() => {
     if (!enabled || !current || features || waitForLayout) return;
     const id = current.id;
     void once(`course:${id}`, async () => {
       const c = await getCourse(id);
-      setCache(writeCache({ features: { ...readCache().features, [id]: featuresOf(c) } }));
+      setExtraFeatures((prev) => ({ ...prev, [id]: featuresOf(c) }));
     });
   }, [enabled, current, features, waitForLayout, once]);
 
-  // §2.4: the current exam's lesson courses: the cached rows at once, read again once per shell and exam (and after
-  // the home), and when the student just joined one the rows still show as not joined
+  // §2.4: the current exam's lesson courses (from the bootstrap); when the student just joined one and the rows still
+  // show it as not joined, the bootstrap is asked again once
   const currentExamId = current?.id ?? null;
-  const lessonCourses = currentExamId ? cache?.lessons[currentExamId] ?? null : null;
+  const lessonCourses = currentExamId && known ? lessonsByExam[currentExamId] ?? [] : null;
   const joinedStale = !!declared && declared.my_enrollment.role === "student" && !declared.my_enrollment.read_only
     && !!lessonCourses?.some((r) => r.id === declared.id && !r.enrolled);
   useEffect(() => {
-    if (!enabled || !currentExamId) return;
-    if (freshLessons.current.has(currentExamId) && !joinedStale) return;
-    freshLessons.current.add(currentExamId);
-    void loadLessons(currentExamId);
-  }, [enabled, currentExamId, joinedStale, onHome, loadLessons]);
+    if (!enabled || !joinedStale || !declared || asked.current.has(`lesson:${declared.id}`)) return;
+    asked.current.add(`lesson:${declared.id}`);
+    void once("bootstrap", refreshBootstrap);
+  }, [enabled, joinedStale, declared, once]);
 
   const forget = useCallback((id: string) => {
-    const known = readCache().courses;
-    if (known) setCache(writeCache({ courses: known.filter((c) => c.id !== id) }));
-    void loadCourses();
-  }, [loadCourses]);
+    setGone((prev) => ({ ids: [...(prev.of === boot.data ? prev.ids : []), id], of: boot.data }));
+    void once("bootstrap", refreshBootstrap);
+  }, [boot.data, once]);
 
-  // the pass: only students with an exam course see the access pill; read again after leaving /pro
-  const hasCourses = courses.length > 0;
+  // the pass: read again after leaving /pro (a code may have been redeemed there)
   const lastPath = useRef(pathKey);
   useEffect(() => {
-    if (!enabled || !hasCourses) return;
+    if (!enabled) return;
     const leftUnlock = lastPath.current !== pathKey && /\/pro$/.test(lastPath.current);
     lastPath.current = pathKey;
-    if (!readCache().access || leftUnlock) void loadAccess();
-  }, [enabled, hasCourses, pathKey, loadAccess]);
-  const firstAccess = useRef(true);
-  useEffect(() => {
-    if (!enabled || !hasCourses || !firstAccess.current) return;
-    firstAccess.current = false;
-    if (readCache().access) void loadAccess(); // a cached pass shown at once is refreshed once per shell
-  }, [enabled, hasCourses, loadAccess]);
+    if (leftUnlock) void once("bootstrap", reloadBootstrap);
+  }, [enabled, pathKey, once]);
 
   return {
-    courses, loaded: known, current, setCurrent, features, access: cache?.access ?? null, forget, lessonCourses, lessonCourseExam,
+    courses, loaded: known, current, setCurrent, features, access: student?.access ?? null, forget, lessonCourses, lessonCourseExam,
   };
 }

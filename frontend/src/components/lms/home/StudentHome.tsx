@@ -18,6 +18,7 @@ import { CourseCard } from "@/components/lms/course/CourseCard";
 import { useGradeListText } from "@/components/lms/results/GradeBadge";
 import { PendingApplicationsLine } from "@/components/lms/catalog/ApplicationStatus"; // Phase 9 S4
 import { useStudentShellDataContext } from "@/components/lms/student/StudentShellDataContext"; // Student UI U3
+import { LMS_ME_STALE_EVENT } from "@/lib/lms/meStale"; // PERFORMANCE_AUDIT S2
 import { TeacherApplicationNotice } from "./TeacherApplicationNotice"; // Accounts
 import { PlatformCourses } from "./PlatformCourses"; // Exam prep S2
 import { ExamPrepHome, HOME_CARD_GRID } from "./ExamPrepHome"; // Student UI U3
@@ -262,10 +263,20 @@ export function StudentHome({ embedded = false }: { embedded?: boolean }) {
     }
   }, []);
   useEffect(() => { void load(); }, [load]);
+  // PERFORMANCE_AUDIT S2: leaving or joining a course no longer reloads the page; the home reads itself again
+  useEffect(() => {
+    const stale = () => { void load(); };
+    window.addEventListener(LMS_ME_STALE_EVENT, stale);
+    return () => window.removeEventListener(LMS_ME_STALE_EVENT, stale);
+  }, [load]);
 
   // Student UI U3: the shell's current exam course (known at once from its cache, so the three reads start together),
   // else the first exam-prep course of the home's answer
-  const prepCourse = shell?.current ?? data?.courses.find((c) => c.student_layout === "exam_prep") ?? null;
+  // (PERFORMANCE_AUDIT S2: once the shell knows the student's exam courses, a course just left is not taken from an
+  // older home answer)
+  const prepCourse = shell?.current
+    ?? (shell?.loaded ? null : data?.courses.find((c) => c.student_layout === "exam_prep"))
+    ?? null;
   if (prepCourse) {
     const side = data && sideListsShown(data, prepCourse.id) ? <SideLists data={data} skipCourse={prepCourse.id} /> : null;
     // U9 (review 1): no course grid here; the platform courses and the other courses are compact rows in ExamPrepHome

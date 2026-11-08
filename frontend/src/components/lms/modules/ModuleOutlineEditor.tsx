@@ -930,7 +930,7 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
       )}
       {d?.kind === "pro" && (
         <ConfirmDialog open busy={busy === `pro-${d.module.id}`} title={t("modules.editor.proConfirmTitle")} object={moduleName(d.module)}
-          effect={t("modules.editor.proConfirmBody")} confirmLabel={t("modules.editor.proConfirm")} error={dialogError ?? undefined}
+          effect={live.find((x) => x.published)?.id === d.module.id ? `${t("modules.editor.proConfirmBody")} ${t("modules.editor.proFirstHint")}` : t("modules.editor.proConfirmBody")} confirmLabel={t("modules.editor.proConfirm")} error={dialogError ?? undefined}
           onConfirm={() => void run(`pro-${d.module.id}`, () => updateModule(course.id, d.module.id, { access_tier: "paid" }),
             { inDialog: true, success: t("modules.editor.toastPro", { title: moduleName(d.module) }) })}
           onCancel={closeDialog} />

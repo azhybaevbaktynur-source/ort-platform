@@ -1,5 +1,5 @@
 """`GET /me/home` (PHASE_6_DESIGN 2.3 / 8.4) and `GET /me/home/courses` (the dashboard's "show all", same cards), policy
-`authenticated`: the caller's own data only. Mounted under /api/v1 in app/main.py (Phase 6 S6a block)."""
+`authenticated`: the caller's own data only. PERFORMANCE_AUDIT S2: `GET /me/bootstrap` (the app shell's one request). Mounted under /api/v1 in app/main.py (Phase 6 S6a block)."""
 from __future__ import annotations
 
 from typing import Optional
@@ -10,8 +10,9 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.lms.core.deps import get_lms_user
 from app.lms.core.pagination import PageOut
+from app.lms.home import bootstrap as boot
 from app.lms.home import service as svc
-from app.lms.home.schemas import HomeCourseOut, HomeOut
+from app.lms.home.schemas import BootstrapOut, HomeCourseOut, HomeOut
 from app.models.user import User
 
 router = APIRouter(tags=["Me"])
@@ -26,3 +27,8 @@ def my_home(user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
 def my_home_courses(cursor: Optional[str] = None, limit: int = 24, user: User = Depends(get_lms_user),
                     db: Session = Depends(get_db)):
     return svc.courses_page(db, user, cursor=cursor, limit=limit)
+
+
+@router.get("/me/bootstrap", response_model=BootstrapOut)
+def my_bootstrap(user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
+    return boot.bootstrap(db, user)

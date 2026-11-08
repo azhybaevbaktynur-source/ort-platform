@@ -603,3 +603,31 @@ Agent 2026-11-08 (item 3, G13): a lesson-course test stays in the exam home's «
 2026-11-08: Neon backup `backup-2026-11-08-before-exam-link-0027` (br-dry-field-b2wtdzz1) before migration 0027 (4/10 branches).
 2026-11-08: items 3 (part), 4 and 5 deployed (main c9ca5f1, migration 0027_exam_course_link verified on Neon; /health and Vercel SW_VERSION verified).
 2026-11-08: item 3 completion deployed (main 989054d, no migration). All items 0–5 of the owner round of 2026-11-08 are deployed.
+
+## Owner round 2026-11-09, item 3: sign-up and login redesign, Google and Apple sign-in (`phases/AUTH_SOCIAL_DESIGN.md`)
+Agent 2026-11-09 (design section 12):
+- **D1** Google sign-in uses the server-side authorization-code flow with PKCE S256, state and nonce; the callback URL is on the backend (Render); the session reaches the Vercel frontend through a 10-minute signed ticket in the URL fragment, traded at `POST /auth/oauth/complete` for the same `TokenResponse` as password login.
+- **D2** Flow state (state, PKCE verifier, nonce hash, lang, redirect) lives in an encrypted, HttpOnly, 10-minute cookie on the backend origin; no database table for the flow.
+- **D3** Linked identities are stored in a new table `user_identities` (migration `0029_user_identities`), one row per (provider, subject), at most one identity per provider per user. Never columns on `users`.
+- **D4** An existing account is linked by email only when the provider marks the email verified; an unverified claim is refused with a clear message and nothing is read or written. Linking to an unconfirmed self-registration discards its unconfirmed password and old tokens. `users.email` never changes from a provider claim.
+- **D5** New Google users pass exactly the email sign-up age and consent rules, on an "Almost done" step after the Google round trip; the Google name is editable there; Google-only accounts have no password until the person sets one via "Forgot password".
+- **D6** Sign-up asks for name, email and password; the phone field is removed from sign-up; the age question moves from a screen before the form to one row inside it; the parent link moves under the form.
+- **D7** Platform admins' two-step login is unchanged: every social sign-in ends in `_sign_in`, which issues the MFA challenge instead of a token.
+- **D8** Deferred: unlinking a provider, linking a second provider from the person page, Apple's revoke endpoint, calling the Apple account-deletion API.
+- **D9** Apple sign-in is built behind `APPLE_SIGN_IN_ENABLED=false`; buying the Apple Developer Program membership is the owner's decision (money).
+- **D10** Provider buttons are rendered only when `GET /auth/providers` says the provider is configured; no frontend variable holds a client id.
+- **D11** No Microsoft or other providers.
+
+Agent 2026-11-09 (slice A, deviations from the design):
+- The personal-data export lists `id`, `provider`, `linked_at` and `last_login_at` of each identity; neither the subject nor the identity's email is exported (the account email is already in the export).
+- The login ticket also carries `lang`, so a new account gets the locale of the screen the person started from.
+- `oauth_profile_required` (the normal first answer for a new person) does not count toward the `OAUTH_COMPLETE_IP_FAIL_10M` failure limit; bad tickets and bad profiles do.
+- One link per provider per user: a different Google account with the same verified email signs into the same user (matched by email) without writing a second link; the first linked Google account stays the linked one.
+
+Agent 2026-11-09 (slice C): the admin person page shows "Sign-in methods" (password when the account has a usable one; Google / Apple with the link date), never the provider's email or subject. Runbook `runbooks/GOOGLE_SIGN_IN.md`; names in `backend/.env.example`. The e2e Google stub listens on `E2E_OAUTH_STUB_PORT` (default `E2E_API_PORT + 2`; `+ 1` is the `--mfa-required` server).
+
+Agent 2026-11-09 (security review fixes, design section 11):
+- **Login CSRF through the ticket link**: every flow is bound to the browser tab that pressed the button. `ProviderButtons` makes a random 256-bit `bind` on the click (`crypto.getRandomValues`, base64url), keeps it in this tab's `sessionStorage` and sends it to `/auth/<provider>/start`; `start` refuses a missing or malformed bind (302 to the login page with `oauth_state_mismatch`, no cookie) and stores only sha256(bind) in the encrypted flow cookie; `callback` copies it into the ticket (`bh`); `POST /auth/oauth/complete` requires `bind` and compares sha256(bind) with `bh` in constant time, else 401 `oauth_ticket_invalid`, counted as a failure. The callback page reads the bind once and removes it; with no bind in the tab it shows `oauth_ticket_invalid` without calling the server. Same for Apple's form_post path. A middle or modified click (new tab) is not bound and is refused at `start`.
+- **Session replacement**: when the browser is already signed in to another account (the stored session's id differs from the ticket's `uid`, or the ticket is a sign-up), the callback page asks "Switch account?" before sending the ticket; "Keep the current account" goes to the courses page and sends nothing.
+- **Linking an unconfirmed self-registration is a sign-up**: the age step is required (`oauth_profile_required`, nothing written before it); the name is replaced (the name from the step, else the provider's name, else the email's local part), the phone is cleared, the locale is the ticket's, and the age band and consent state are set again by the sign-up rules (`apply_age_band`, source `signup`; consent records are append-only, so a version the pre-registration already accepted is not written twice). A verified account keeps its profile when linked.
+- `complete` checks again that the ticket's provider is still on (404 `oauth_not_configured`, not a failure); a JWKS whose `keys` is not a list is a provider error (`oauth_provider_error`, the flow cookie is cleared); `complete` never signs in a test student, even through a linked identity.

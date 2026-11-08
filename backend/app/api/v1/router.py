@@ -4,6 +4,10 @@ from app.api.v1.endpoints import auth
 api_router = APIRouter()
 
 api_router.include_router(auth.router, prefix="/auth", tags=["Authentication & Profile"])
+# Social sign-in (docs/phases/AUTH_SOCIAL_DESIGN.md): Google, Apple (off), the login ticket
+from app.lms.oauth.router import router as _oauth_router  # noqa: E402
+
+api_router.include_router(_oauth_router, prefix="/auth", tags=["Authentication & Profile"])
 
 
 
@@ -141,3 +145,8 @@ from app.lms.email_change.router import router as _email_change_router  # noqa: 
 
 api_router.include_router(_email_change_router, tags=["Email change"])
 # --- S4 person page end ---
+# --- I5a infrastructure panel begin --- (INFRA_PANEL_DESIGN 5: provider snapshots, exams that fit, costs)
+from app.lms.infra.router import router as _infra_router  # noqa: E402
+
+api_router.include_router(_infra_router, prefix="/platform", tags=["Platform Admin"])
+# --- I5a infrastructure panel end ---

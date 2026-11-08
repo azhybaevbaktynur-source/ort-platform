@@ -468,7 +468,6 @@ test("invited with no account: sign-up asks the age first, keeps the address, th
   await page.getByRole("button", { name: tr("ru", "privacy.age.14_17") }).click();
   await expect(page.getByLabel(tr("ru", "auth.email"))).toHaveValue(email);
   await page.getByLabel(tr("ru", "auth.displayName")).fill("Новый Приглашённый");
-  await page.getByLabel(tr("ru", "auth.phone")).fill("+996700000001");
   const password = `e2e-${Math.random().toString(36).slice(2)}-pass`;
   await page.getByLabel(tr("ru", "auth.password")).fill(password);
   await page.getByRole("checkbox").check();

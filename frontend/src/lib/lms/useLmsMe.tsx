@@ -1,9 +1,10 @@
 "use client";
 
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { getStudentView } from "@/lib/api";
-import { getMe } from "./courses";
+import { createContext, useCallback, useContext, useEffect } from "react";
+import { BOOTSTRAP_KEY, BOOTSTRAP_OPTIONS, fetchBootstrap, reloadBootstrap, type BootstrapOut } from "./bootstrap";
+import { readCachedMe as readCache, writeCachedMe as writeCache } from "./meCache";
 import { LMS_ME_STALE_EVENT } from "./meStale";
+import { useCached } from "./swr";
 import type { LmsApiError } from "./client";
 import type { MeOut } from "./types";
 
@@ -12,75 +13,40 @@ interface LmsMeState {
   loading: boolean;
   error: LmsApiError | null;
   reload: () => Promise<void>;
+  /** True once the answer in hand came from the server in this page load (not a session-restored, stale copy). */
+  confirmed?: boolean;
 }
 
 const LmsMeContext = createContext<LmsMeState | null>(null);
 
-/*
- * UX rework 2: every area has its own layout, so moving between areas mounts a new shell. The last answer is kept per
- * token (memory + this tab's sessionStorage) and shown at once while a fresh one loads, so the header never loses an
- * area on the way. It only draws the menu: every permission is decided by the server on each request.
- */
-const CACHE_KEY = "ort_lms_me";
-let memory: { token: string; me: MeOut } | null = null;
-
-/** The end of the token in use: tells whose answer is cached, and is useless as a credential. */
-function activeToken(): string {
-  if (typeof window === "undefined") return "";
-  return (getStudentView()?.token ?? window.localStorage.getItem("ort_token") ?? "").slice(-16);
-}
-
-function readCache(): MeOut | null {
-  const token = activeToken();
-  if (!token) return null;
-  if (memory?.token === token) return memory.me;
-  try {
-    const raw = window.sessionStorage.getItem(CACHE_KEY);
-    const saved = raw ? (JSON.parse(raw) as { token?: string; me?: MeOut }) : null;
-    if (saved?.token === token && saved.me) {
-      memory = { token, me: saved.me };
-      return saved.me;
-    }
-  } catch { /* storage blocked or a bad value: load normally */ }
-  return null;
-}
-
-function writeCache(me: MeOut | null): void {
-  const token = activeToken();
-  memory = me && token ? { token, me } : null;
-  try {
-    if (memory) window.sessionStorage.setItem(CACHE_KEY, JSON.stringify(memory));
-    else window.sessionStorage.removeItem(CACHE_KEY);
-  } catch { /* the cache is optional */ }
-}
+// The per-token cache of the answer lives in ./meCache (PERFORMANCE_AUDIT S1: the shell reads it at render time).
 
 export function useLmsMeLoader(enabled: boolean): LmsMeState {
-  const [fresh, setMe] = useState<MeOut | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<LmsApiError | null>(null);
+  // PERFORMANCE_AUDIT S2 (§5.2): MeOut is the `me` of `GET /me/bootstrap`, read through the SWR cache (one request for
+  // the whole shell, shared with the student shell's data and the banners; fresh for a minute, then refreshed in the
+  // background while the cached answer stays on screen)
+  const boot = useCached<BootstrapOut>(enabled ? BOOTSTRAP_KEY : null, fetchBootstrap, BOOTSTRAP_OPTIONS);
+  const error = (boot.error as LmsApiError | null) ?? null;
   // `enabled` is false on the server and the first client render, so this cannot cause a hydration mismatch
-  const me = fresh ?? (enabled ? readCache() : null);
+  const me = boot.data?.me ?? (enabled ? readCache() : null);
+  const loading = enabled && !boot.data && !error;
+
+  // S1's render-time cache (`meCache`) follows every answer; a 401 forgets it
+  const fresh = boot.data?.me ?? null;
+  useEffect(() => {
+    if (fresh) writeCache(fresh);
+  }, [fresh]);
+  const status = error?.status;
+  useEffect(() => {
+    if (status === 401) writeCache(null);
+  }, [status]);
 
   const reload = useCallback(async () => {
-    setLoading(true);
-    try {
-      const next = await getMe();
-      writeCache(next);
-      setMe(next);
-      setError(null);
-    } catch (e) {
-      if ((e as LmsApiError).status === 401) writeCache(null);
-      setError(e as LmsApiError);
-    } finally {
-      setLoading(false);
-    }
+    try { await reloadBootstrap(); } catch { /* the error is the cache's, shown by the shell */ }
   }, []);
 
-  useEffect(() => {
-    if (enabled) void reload();
-  }, [enabled, reload]);
-
-  // Owner feedback 2026-11-08 (item 2): a join or leave changes the areas, so the answer is asked again
+  // Owner feedback 2026-11-08 (item 2): a join or leave changes the areas (and the student's courses), so the answer
+  // is asked again
   useEffect(() => {
     if (!enabled) return;
     const stale = () => { void reload(); };
@@ -88,10 +54,15 @@ export function useLmsMeLoader(enabled: boolean): LmsMeState {
     return () => window.removeEventListener(LMS_ME_STALE_EVENT, stale);
   }, [enabled, reload]);
 
-  return { me, loading, error, reload };
+  return { me, loading, error, reload, confirmed: !!boot.data && !boot.stale };
 }
 
 export const LmsMeProvider = LmsMeContext.Provider;
+
+/** True inside LmsShell (or another LmsMeProvider): the shell's bootstrap is there to read. */
+export function useInLmsShell(): boolean {
+  return useContext(LmsMeContext) !== null;
+}
 
 /** Current user's LMS profile (MeOut). Requires LmsShell (or another LmsMeProvider) above. */
 export function useLmsMe(): LmsMeState {

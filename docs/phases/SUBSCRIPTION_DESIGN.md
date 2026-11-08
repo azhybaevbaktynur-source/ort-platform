@@ -229,3 +229,103 @@ a "Оплатить" button only when `PAYMENT_PROVIDER` is set; until then the 
   its lock column, not this one.
 - Open for the owner: prices; season end; whether the "Отменить" action should refund (today: revoke only, refund
   outside the platform, both audited; S3 §7.8).
+
+## 12. Pro includes lesson courses (2026-11-09, Fable; owner round item 2)
+
+Owner: "Pro unlocks all paid tests AND all lesson courses (masterclasses) with their materials. The course owner can mark
+modules as Pro; the first module or first lessons stay free as a preview. Students see a Pro badge on locked modules
+and lessons, with the unlock bar on course pages. The Pro offer page lists what's included. Staff, previews and
+Student view are never locked. ORT unchanged." The reference app is not named.
+
+### 12.1 Audit: what already works (F5a/F5b of `COURSE_LESSONS_DESIGN.md` §5, FB8 round)
+| Piece | Where | State |
+|---|---|---|
+| Pro = active pass chain; one decision per request | `access/service.py` `course_gate()` → `Gate.gated` = platform course ∧ no active pass ∧ not test student | done |
+| Module tier | `course_modules.access_tier` (`free`/`paid`, CHECK, migration 0024); `paid` accepted only in platform courses (`modules/service._check_tier`, 422) | done |
+| Lesson courses are platform courses | `courses/service._check_exam_link`: a course links to an exam only if `is_platform_course`; so every lesson course can hold Pro modules and is gated | done |
+| Editor switch | `LockToggle` on each module (`ModuleOutlineEditor.tsx:659`), only when `ModulesStaffOut.is_platform_course`; confirm dialog on lock; warning when a Pro module is a prerequisite of a free one | done |
+| Student outline | `modules/service.module_student_out(gated=…)`: module `access_locked`, every row `locked` with `locked_reason = access`; link, `url`, `video`, `due_at` stripped from locked rows (no leak of the video address) | done |
+| Lesson page | `LessonView.tsx`: `ProLockCard` instead of the player/page/file when `locked_reason = access`; `ProChip` on the module header | done |
+| Syllabus | `StudentSyllabus.tsx`: `ProChip` + gold "Открыть доступ" pill per locked Pro module; course action "Открыть доступ" when only Pro lessons remain | done |
+| Lesson-course cards | `LessonCourseOut.has_paid_modules` (platform ∧ a live published `paid` module) → quiet gold "Pro" mark on `CourseCard` (home strip, `/courses/{exam}/lessons`) | done |
+| Home "continue" | `home/service._modules_next` and the to-do query skip Pro modules without a pass | done |
+| Server checks | `modules/gate.require_access` (403 `access_required` before the module evaluation when every referencing module is Pro): pages `pages/service.py:243-245` (any language variant), files `course_files/service._readable:264`, assignment detail / hand-ins / assignment files, quiz lobby (`assessments/router.py:79`, lock shown instead of an error), attempt start (`attempts/engine.py:703`), "viewed" facts (`modules/facts.py:59-64`) | done |
+| Exemptions | `ctx.role_for(course.id) != "student"` → return (teachers, assistants, org/platform admins, Student view of staff); `Enrollment.is_test_student` → `Gate.test_student`; staff `GET /modules/progress/{eid}` renders "as that student"; ORT preset exams `_ort_exempt` (`LOCK_GATING`) | done |
+| Pages list | `PageSummaryStudentOut` carries no body; file list carries metadata only | done |
+
+### 12.2 What is missing
+1. **Unlock bar on course pages.** The syllabus has per-module pills and a bottom action; there is no `ProCallout`
+   at the top of the course overview, on the lesson page or on `/courses/{exam}/lessons`.
+2. **Offer page lists lessons, not courses.** `offer()` returns `includes = ["tests", ("practice"), "lessons"]`;
+   `/pro` shows "Pro lessons". The owner wants "tests, courses, analytics".
+3. **Preview rule.** Nothing keeps the first module free; no warning when the first module is Pro.
+4. **Materials outside modules** (course Files tab, pages opened by direct link that no module references) are
+   ungated by design ("content outside modules is ungated"). Rule 12.3.4 below keeps that and says so to teachers.
+5. **Open attempts.** A quiz of a Pro module started while Pro was active keeps autosave/resume after Pro ends
+   (only `assessments.access_tier = paid` tests go through `check_resume`). Accepted: timed attempts must finish.
+6. A table-driven test of the whole endpoint matrix does not exist (the checks are tested one by one).
+
+### 12.3 Rules
+1. **Granularity: modules only.** No per-item Pro. `require_access`, `pro_only_assignment/assessment` SQL, the
+   outline, the home queries and the editor all work per module; a teacher who wants one Pro lesson splits the
+   module. Owner alternative (item-level `module_items.access_tier`) would need migration `0030_item_tier` and a
+   second predicate set everywhere; not recommended.
+2. **Preview: owner choice with a default and a warning, not an enforced rule.** New modules are `free`. The staff
+   outline gains warning `first_module_pro` (`WarningOut`, existing channel) on the first *published* module when it
+   is Pro: "Первый модуль закрыт для бесплатных учеников: превью нет". The editor shows it like the other warnings;
+   the lock confirm dialog on module #1 adds the same sentence. Titles of every module and lesson stay visible to
+   free students (today's behaviour: titles kept, destinations stripped), which is the "preview" of the syllabus.
+   Reason: an enforced rule breaks on reorder/unpublish and forbids a fully paid masterclass the owner may want.
+3. **Server-side enforcement is the existing matrix (12.1)**; the only new server behaviour is the warning and the
+   offer text. Every endpoint keeps its check; the new test (12.6) pins the matrix.
+4. **Outside modules stays free**; the editor's "Unsorted" group hint says "Материалы вне модулей открыты всем".
+5. **Never locked:** staff roles, platform/org admins, test students (Student view), `GET /modules/progress/{eid}`
+   for staff, template sample previews (staff only), ORT preset exams (`_ort_exempt`), non-platform courses.
+6. **ORT unchanged:** the ORT courses have no modules with lessons; `ort_main` is exempt; the player, import and
+   scoring are untouched; parity gate as always.
+
+### 12.4 Backend changes (small)
+- `access/service.offer()`: `includes = ["tests", ("practice"), "courses"]` (`lessons` dropped; the frontend maps
+  `courses` → `access.pro.compare.courses`). No schema change (list of strings).
+- `modules/service._module_staff_out`: warning `first_module_pro` when `m` is the first published live module by
+  position and `access_tier == "paid"`; `WarningCode` literal gains the value (`schemas.py:31`).
+- No migration, no route change, no policy change (`route_inventory` unchanged).
+
+### 12.5 Frontend changes
+- `ProCallout` gets an optional `variant="course"` (copy: `access.courseBar.title/body/action`): shown at the top of
+  `StudentSyllabus` and `LessonView` when `modules.some(m => m.access_locked)` (the server sets it only for gated
+  students, so staff and test students never see it), and on `/courses/{exam}/lessons` when a card has
+  `has_paid_modules` and the shell's `/me/access` says no active pass. Link `/{lang}/pro`.
+- `/pro`: "What you get" Pro column: "Everything in Free (free tests, analytics, results)", "Every paid test",
+  "Lesson courses with videos, pages, files and tests", "(Practice)", "Results stay". Keys: `access.pro.compare.courses`,
+  `access.pro.compare.everythingFree` (text updated to name analytics), `access.courseBar.*`,
+  `modules.warnings.first_module_pro`, `modules.editor.proFirstHint`, `modules.unsorted.openHint` in en/ky/ru.
+- Badges already exist (`ProChip`); no new component.
+
+### 12.6 Tests
+- Backend `tests/lms/test_pro_matrix.py` (table-driven, SQLite): a platform lesson course with module 1 free and
+  module 2 Pro holding a page (2 language variants), a file, a video url, a quiz; actors: free student, Pro student,
+  test student, teacher, assistant, platform admin, expired-Pro student. For each actor × endpoint
+  (`GET modules`, `GET pages/{id}` both variants, `GET files/{id}/download`, `GET assessments/{id}/lobby`,
+  `POST attempts` start, `POST items/{id}/viewed`) assert the expected code (200 / 403 `access_required` / lobby
+  `locked`) and that locked outline rows carry no `link`, `url`, `video`, `due_at`. Plus: page referenced by a free
+  module too → open; module 2 unpublished → nothing locked; non-platform course with `paid` stored → never locked.
+- `offer()` includes `courses`; warning `first_module_pro` appears/disappears on reorder and unpublish.
+- ORT parity: the ORT baseline suite; a Pro module in an ORT course does not touch `ort_main`.
+- Frontend: tsc, i18n parity, e2e `lessons.spec.ts` gains "free student sees the course bar and Pro chips; Pro
+  student sees neither"; UX check 375/1440/1920 ru on the syllabus, lesson page, `/pro`.
+
+### 12.7 Slices (strict file ownership)
+- **P2a (Opus, backend)**: `access/service.py` (offer), `modules/service.py` + `modules/schemas.py` (warning),
+  `tests/lms/test_pro_matrix.py`, `tests/lms/test_access_pro.py` (offer). Gate: full suite on a scratch DB.
+- **P2b (Sonnet, frontend)**: `ProCallout.tsx`, `StudentSyllabus.tsx`, `LessonView.tsx`, `lessons/page.tsx`,
+  `pro/page.tsx`, `ModuleOutlineEditor.tsx` (hint text only), `en/ky/ru.json`. Gate: tsc, parity, e2e, UX check.
+- No migration. Numbers 0028/0029 belong to the performance and auth designs; 0030 is reserved only if the owner
+  picks item-level Pro (12.3.1).
+
+### 12.8 Proposed decisions (record in `PRODUCT_DECISIONS.md` when built)
+- D-P2-1 Pro granularity is the module; no per-lesson Pro.
+- D-P2-2 Preview is the owner's choice: default free modules, warning when the first module is Pro, titles always visible.
+- D-P2-3 Content outside modules is free; the editor says so.
+- D-P2-4 Open attempts are never cut by a module tier change or Pro expiry (timed or not).
+- D-P2-5 The offer lists "Everything in Free (incl. analytics)", paid tests, lesson courses, practice where paid.

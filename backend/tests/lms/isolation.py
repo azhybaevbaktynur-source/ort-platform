@@ -65,6 +65,15 @@ def reset_lms_state() -> None:
         from app.lms.email_change.models import EmailChangeRequest
 
         conn.execute(delete(EmailChangeRequest.__table__))
+        # --- social sign-in --- linked provider accounts reference users
+        from app.lms.oauth.models import UserIdentity
+
+        conn.execute(delete(UserIdentity.__table__))
+
+        # --- I5a infrastructure panel --- cached provider snapshots (no references)
+        from app.lms.infra.models import InfraSnapshot
+
+        conn.execute(delete(InfraSnapshot.__table__))
         # --- Phase 11 S1 end ---
         # --- Phase 7a S1 begin --- hand-ins, rubric scores, overrides, accommodations before the submissions
         from app.lms.accommodations.models import EnrollmentAccommodation

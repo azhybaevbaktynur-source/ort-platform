@@ -1,5 +1,5 @@
 import path from "node:path";
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
 
 /**
  * ORT browser e2e + screenshot baselines (PHASE_6_DESIGN section 6, docs/phases/ORT_BASELINE/README.md).
@@ -40,6 +40,14 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
+  // Item 4: the phone-sheet spec runs on iPhone (WebKit) and Pixel 7 (Chromium) only; every other spec keeps the
+  // desktop project exactly as before.
+  projects: [
+    { name: "default", testIgnore: /mobile-sheets\.spec/ },
+    { name: "mobile-ios", testMatch: /mobile-sheets\.spec/, use: { ...devices["iPhone 14"], channel: "" as never, // "" (not undefined) overrides the top-level Chrome channel, WebKit has none
+      locale: "ru-RU" } },
+    { name: "mobile-android", testMatch: /mobile-sheets\.spec/, use: { ...devices["Pixel 7"], channel: CI ? undefined : "chrome", locale: "ru-RU" } },
+  ],
   webServer: [
     {
       command: "bash ../scripts/e2e_backend.sh",
@@ -54,6 +62,8 @@ export default defineConfig({
         E2E_API_PORT: String(API_PORT),
         E2E_WEB_ORIGIN: WEB_ORIGIN,
         ...(process.env.E2E_PYTHON ? { E2E_PYTHON: process.env.E2E_PYTHON } : {}),
+        // the Google sign-in stub (default E2E_API_PORT+2; +1 is admin-mfa-gate's second server): oauth-google.spec.ts
+        ...(process.env.E2E_OAUTH_STUB_PORT ? { E2E_OAUTH_STUB_PORT: process.env.E2E_OAUTH_STUB_PORT } : {}),
       },
     },
     {

@@ -1,17 +1,18 @@
 "use client";
 
-import React, { useState, Suspense } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
-import { AuthHeader } from "@/components/auth/AuthHeader";
+import { AuthAlert, AuthSplit, AuthTitle } from "@/components/auth/AuthSplit";
+import { ProviderButtons } from "@/components/auth/ProviderButtons";
 import { Button, Input } from "@/components/ui";
 import { AuthError, useAuth } from "@/lib/auth-context";
 import { safeRedirect } from "@/lib/safeRedirect";
 import { useBackendWarmup, useSlowHint } from "@/lib/useBackendWarmup";
 import { VerifyEmailStep, authErrorMessage } from "@/components/auth/VerifyEmailStep";
 import { MfaStep } from "@/components/auth/MfaStep";
-import { Mail, Lock, ArrowRight, AlertCircle } from "lucide-react";
+import { Mail, Lock, ArrowRight } from "lucide-react";
 
 function LoginForm() {
   const router = useRouter();
@@ -31,6 +32,19 @@ function LoginForm() {
   const [pendingVerification, setPendingVerification] = useState<{ email: string; resendAfterSeconds: number } | null>(null);
   // S1: the password was right and the account has two-step login: the challenge for the code step
   const [mfaChallenge, setMfaChallenge] = useState<string | null>(null);
+
+  // Social sign-in refused: the backend sent us back with ?oauth_error=<code>; shown once, then removed from the URL
+  useEffect(() => {
+    const code = searchParams.get("oauth_error");
+    if (!code) return;
+    const key = `auth.errors.${code}`;
+    const text = t(key);
+    setError(text !== key ? text : t("auth.loginError"));
+    const url = new URL(window.location.href);
+    url.searchParams.delete("oauth_error");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useBackendWarmup();
   const slow = useSlowHint(loading);
@@ -68,49 +82,35 @@ function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <AuthHeader />
+    <AuthSplit pose="reading">
+      {mfaChallenge ? (
+        <MfaStep
+          challenge={mfaChallenge}
+          onDone={handleNavigateAfterAuth}
+          onRestart={(message) => { setMfaChallenge(null); setPassword(""); setError(message || null); }}
+        />
+      ) : pendingVerification ? (
+        <VerifyEmailStep
+          email={pendingVerification.email}
+          password={password}
+          resendAfterSeconds={pendingVerification.resendAfterSeconds}
+          reason="notVerified"
+          onVerified={handleNavigateAfterAuth}
+          onChangeEmail={() => setPendingVerification(null)}
+        />
+      ) : (
+        <>
+          <AuthTitle title={t("auth.signInTitle")} subtitle={t("auth.signInSubtitle")} />
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-md px-4">
-        <div className="bg-white py-8 px-6 sm:px-10 shadow-lg border border-slate-200/80 rounded-3xl">
-          {mfaChallenge ? (
-            <MfaStep
-              challenge={mfaChallenge}
-              onDone={handleNavigateAfterAuth}
-              onRestart={(message) => { setMfaChallenge(null); setPassword(""); setError(message || null); }}
-            />
-          ) : pendingVerification ? (
-            <VerifyEmailStep
-              email={pendingVerification.email}
-              password={password}
-              resendAfterSeconds={pendingVerification.resendAfterSeconds}
-              reason="notVerified"
-              onVerified={handleNavigateAfterAuth}
-              onChangeEmail={() => setPendingVerification(null)}
-            />
-          ) : (
-          <>
-          <div className="mb-6 text-center">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              {t("auth.signInTitle")}
-            </h1>
-            <p className="mt-1 text-sm text-slate-600">
-              {t("auth.signInSubtitle")}
-            </p>
-          </div>
+          <ProviderButtons redirect={redirectParam} />
 
-          {error && (
-            <div role="alert" className="mb-5 flex items-start gap-2 rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-medium text-danger-800">
-              <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-danger-700" />
-              <span>{error}</span>
-            </div>
-          )}
+          {error && <AuthAlert>{error}</AuthAlert>}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Input label={t("auth.email")} leading={<Mail className="h-4 w-4" />} type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("auth.emailPlaceholder")} />
+            <Input label={t("auth.email")} leading={<Mail className="h-4 w-4" />} type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("auth.emailPlaceholder")} />
 
             <div>
-              <Input label={t("auth.password")} leading={<Lock className="h-4 w-4" />} type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.passwordPlaceholder")} />
+              <Input label={t("auth.password")} leading={<Lock className="h-4 w-4" />} type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.passwordPlaceholder")} />
               <div className="flex justify-end mt-1.5">
                 <Link
                   href={`/${lang}/forgot-password`}
@@ -127,7 +127,6 @@ function LoginForm() {
             {slow && <p className="text-sm text-center text-slate-600">{t("auth.wakingServer")}</p>}
           </form>
 
-          {/* Link to Register */}
           <div className="mt-6 text-center text-sm text-slate-600">
             <span>{t("auth.noAccount")} </span>
             <Link
@@ -137,11 +136,9 @@ function LoginForm() {
               {t("auth.signUpButton")}
             </Link>
           </div>
-          </>
-          )}
-        </div>
-      </div>
-    </div>
+        </>
+      )}
+    </AuthSplit>
   );
 }
 

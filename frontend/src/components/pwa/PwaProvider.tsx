@@ -190,7 +190,7 @@ function UpdateToast({ onUpdate, onHide }: { onUpdate: () => void; onHide: () =>
   const { t } = useTranslation();
   return (
     <div role="status" data-testid="pwa-update"
-      className="fixed inset-x-4 bottom-4 z-[60] flex items-center gap-2 rounded-2xl border border-slate-200 bg-white py-2 pl-4 pr-2 shadow-lg sm:inset-x-auto sm:bottom-5 sm:left-5 sm:max-w-sm">
+      className="fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-[60] flex items-center gap-2 rounded-2xl border border-slate-200 bg-white py-2 pl-4 pr-2 shadow-lg sm:inset-x-auto sm:left-5 sm:max-w-sm lg:bottom-5">
       <RefreshCw aria-hidden="true" className="h-5 w-5 shrink-0 text-brand-700" />
       <p className="min-w-0 flex-1 text-sm font-medium leading-5 text-slate-900">{t("pwa.update.message")}</p>
       <Button size="sm" onClick={onUpdate}>{t("pwa.update.action")}</Button>

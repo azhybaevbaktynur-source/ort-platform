@@ -10,7 +10,7 @@ import { AlertCircle, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
 import { confirmEmailChange } from "@/lib/lms/emailChange";
-import { AuthHeader } from "@/components/auth/AuthHeader";
+import { AuthSplit, AuthTitle } from "@/components/auth/AuthSplit";
 import { Button, buttonClasses } from "@/components/ui";
 import { useApiErrorText } from "@/components/lms/org/OrgUi";
 
@@ -40,14 +40,9 @@ function ConfirmEmailForm() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col justify-center bg-gradient-to-b from-slate-50 via-white to-slate-100 py-12 sm:px-6 lg:px-8">
-      <AuthHeader />
-      <div className="px-4 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="rounded-3xl border border-slate-200/80 bg-white px-6 py-8 shadow-lg sm:px-10">
-          <div className="mb-6 text-center">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t(done ? "auth.confirmEmail.successTitle" : "auth.confirmEmail.title")}</h1>
-            {!done && <p className="mt-1 text-sm text-slate-600">{t("auth.confirmEmail.subtitle")}</p>}
-          </div>
+    <AuthSplit pose={done ? "celebrating" : "thinking"}>
+        <div>
+          <AuthTitle title={t(done ? "auth.confirmEmail.successTitle" : "auth.confirmEmail.title")} subtitle={done ? undefined : t("auth.confirmEmail.subtitle")} />
           {!token && !done && (
             <div className="mb-5 flex items-center gap-2 rounded-xl border border-warning-200 bg-warning-50 p-3 text-sm font-medium text-warning-900">
               <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0 text-warning-700" />
@@ -84,8 +79,7 @@ function ConfirmEmailForm() {
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </AuthSplit>
   );
 }
 

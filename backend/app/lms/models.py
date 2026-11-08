@@ -60,3 +60,5 @@ from app.lms.guardian.models import GuardianLink, GuardianPairingCode  # noqa: F
 from app.lms.mfa.models import MfaRecoveryCode  # noqa: F401,E402  (S1 admin security)
 from app.lms.access.models import AccessPass, ActivationCode, ActivationCodeBatch, PlatformSetting  # noqa: F401,E402  (S3 access)
 from app.lms.email_change.models import EmailChangeRequest  # noqa: F401,E402  (S4 email change)
+from app.lms.oauth.models import UserIdentity  # noqa: F401,E402  (social sign-in, AUTH_SOCIAL_DESIGN 2.2)
+from app.lms.infra.models import InfraSnapshot  # noqa: F401,E402  (I5a infrastructure panel)

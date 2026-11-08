@@ -1,5 +1,5 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
-import { seed, settle, signIn, tr, VIEWPORTS, type SeedUser, goToReviewPage } from "./helpers";
+import { expectNoRawKeys, seed, settle, signIn, tr, VIEWPORTS, type SeedUser, goToReviewPage } from "./helpers";
 
 /**
  * Phase 7c quiz editor walk (PHASE_7C_DESIGN 11, 10 "Frontend"): a teacher of a general (non-ORT) course writes a quiz
@@ -90,6 +90,7 @@ test.describe("quiz editor walk (ru)", () => {
     const editUrl = `/${L}/courses/${qe.course_id}/assessments/${aid}/edit`;
     if (!page.url().endsWith("/edit")) await page.goto(editUrl);
     await expect(page.getByText(t("quizEditor.section.emptyQuizTitle"))).toBeVisible();
+    await expectNoRawKeys(page); // S4: the staff dictionary has arrived
 
     // ---- multiple choice: all seven types offered, Enter adds answers, Backspace removes an empty one, mark correct
     await page.getByRole("button", { name: t("quizEditor.card.addQuestion") }).click();

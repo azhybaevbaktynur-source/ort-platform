@@ -61,4 +61,6 @@ test("an admin without two-step login is sent to set it up, then reaches the ove
   await page.waitForURL(/\/ru\/admin$/);
   await expect(page.getByRole("heading", { name: tr("ru", "platformAdmin.overview.title") })).toBeVisible();
   await expect(page.getByText(tr("ru", "adminHealth.title"))).toBeVisible();
+  // the overview's requests run in parallel now; a proxied one may still be in flight when the test ends
+  await page.unrouteAll({ behavior: "ignoreErrors" });
 });

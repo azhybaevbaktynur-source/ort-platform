@@ -18,8 +18,8 @@ from app.lms.organizations.ids import personal_org_id
 from app.lms.organizations.models import Organization, OrganizationMember
 from app.lms.organizations.tree import within_clause
 from app.lms.platform_admin.schemas import (
-    AdminUserDetailOut, AdminUserOut, AuditEntryOut, OwnedCourseBrief, RevokeImpactOut, TeacherRequestAdminOut,
-    UserBrief,
+    AdminUserDetailOut, AdminUserOut, AuditEntryOut, OwnedCourseBrief, RevokeImpactOut, SignInMethodOut,
+    TeacherRequestAdminOut, UserBrief,
 )
 from app.lms.teachers.models import TeacherRequest
 from app.models.user import User
@@ -222,7 +222,25 @@ def user_detail(db: Session, user: User) -> AdminUserDetailOut:
         teacher_requests=requests_out(db, list(reqs)),
         revoke_impact=revoke_impact(db, user),
         **person_extras(db, user),
+        sign_in_methods=sign_in_methods(db, user),
     )
+
+
+def sign_in_methods(db: Session, user: User) -> list[SignInMethodOut]:
+    """Item 3: the password (when the account has a usable one) and the linked providers with the link date. The
+    provider's email and subject are not shown."""
+    from app.lms.oauth.models import PROVIDERS, UserIdentity
+    from app.lms.privacy.anonymize import UNUSABLE_PASSWORD_HASH
+
+    out = []
+    if user.password_hash and user.password_hash != UNUSABLE_PASSWORD_HASH:
+        out.append(SignInMethodOut(method="password"))
+    rows = db.execute(
+        select(UserIdentity.provider, UserIdentity.linked_at).where(UserIdentity.user_id == user.id)
+    ).all()
+    linked = dict(rows)
+    out.extend(SignInMethodOut(method=p, linked_at=linked[p]) for p in PROVIDERS if p in linked)
+    return out
 
 
 def person_extras(db: Session, user: User) -> dict:

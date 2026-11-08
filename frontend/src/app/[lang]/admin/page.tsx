@@ -32,9 +32,9 @@ export default function AdminOverviewPage() {
   const router = useRouter();
   const { pending, storageLevel, error, refresh } = useAdminSummary();
   const base = `/${lang}/admin`;
-  // S3: the other calls go out only once the summary answered, so an admin who must set up two-step login sends no
-  // extra refused calls
-  const ready = !error && pending !== null;
+  // PERFORMANCE_AUDIT S3 (§5.2): the page's calls go out at mount, together with the shell's summary (one round, not
+  // two); an admin who must set up two-step login gets them refused like the summary and is sent to the security page
+  const ready = error?.code !== "mfa_enrollment_required";
   const overview = useOverview(ready);
   const { data: access } = useAccessOverview(ready);
   const { health, failed } = usePlatformHealth(ready);
@@ -71,8 +71,8 @@ export default function AdminOverviewPage() {
                 </div>
               </section>
             </div>
-            {ready && <HealthLine health={health} failed={failed} />}
-            {ready && <RecentExamsCard data={access} compact />}
+            <HealthLine health={health} failed={failed} />
+            <RecentExamsCard data={access} compact />
           </div>
         )}
     </div>

@@ -3,10 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/split_dictionaries.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/split_dictionaries.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "pretype-check": "node scripts/split_dictionaries.mjs",
     "type-check": "tsc --noEmit",
     "e2e": "playwright test",
     "e2e:update": "UPDATE_BASELINES=1 playwright test e2e/ort-visual.spec.ts"

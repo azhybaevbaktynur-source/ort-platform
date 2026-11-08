@@ -5,7 +5,8 @@ import Link from "next/link";
 import { CheckCircle2, ChevronRight, Circle } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
-import { getExamPrep, type ExamPrepOut } from "@/lib/lms/examPrep";
+import type { ExamPrepOut } from "@/lib/lms/examPrep";
+import { loadExamPrep } from "@/lib/lms/pageData"; // PERFORMANCE_AUDIT S3: one request with the page reading it
 import { listPractice } from "@/lib/lms/practice";
 import { usePwa } from "@/components/pwa/PwaProvider";
 import { Sheet } from "@/components/ui/Sheet";
@@ -63,7 +64,7 @@ async function loadPrep(courseId: string) {
   const key = `prep:${courseId}`;
   if (busy.has(key)) return;
   busy.add(key);
-  try { noteExamPrep(courseId, await getExamPrep(courseId)); } catch { /* the pill waits for the next page */ } finally { busy.delete(key); }
+  try { noteExamPrep(courseId, await loadExamPrep(courseId)); } catch { /* the pill waits for the next page */ } finally { busy.delete(key); }
 }
 
 async function loadPractice(courseId: string) {
