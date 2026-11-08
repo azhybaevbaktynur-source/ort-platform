@@ -105,6 +105,8 @@ export interface MyOrganizationOut {
   role: OrgRole;
   status: OrgStatus;
   can_create_courses: boolean;
+  /** FB8-5 S3: templates granted to the organization (only where the caller may create courses; absent: older backend) */
+  template_keys?: string[];
 }
 
 /** GET /platform/users/{userId}/organizations item (admin user detail). */

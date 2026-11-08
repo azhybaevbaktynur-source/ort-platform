@@ -208,7 +208,7 @@ async def test_me_organizations(db, api):
     add_member(db, a, u, "teacher")
     items = (await api.call(u, "GET", "/me/organizations")).json()["items"]
     assert items == [{"id": str(a.id), "slug": a.slug, "name": "A", "kind": "school", "status": "active", "role": "teacher",
-                      "can_create_courses": False}]
+                      "can_create_courses": False, "template_keys": []}]  # FB8-5 S3: template_keys
     me = (await api.call(u, "GET", "/me/lms")).json()
     assert me["can_create_courses"] is False
     assert me["is_teacher"] is True  # Phase 6 S8: an org teacher sees the Teaching area without creating

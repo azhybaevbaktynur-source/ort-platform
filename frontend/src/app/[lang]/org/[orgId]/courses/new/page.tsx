@@ -7,7 +7,7 @@ import { cleanLocalized } from "@/lib/lms/localized";
 import { createOrgCourse, searchOrgMembers } from "@/lib/lms/organizations";
 import { listCourseTemplates, templateTitle, type TemplateChoiceOut } from "@/lib/lms/templates";
 import type { Lang, LocalizedText } from "@/lib/lms/types";
-import { LanguagePicker } from "@/components/lms/LanguagePicker";
+import { LanguageFields } from "@/components/lms/course/form/LanguageFields"; // FB8-5 S3: replaces LanguagePicker
 import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
 import { Button, Card, FieldError, LinkButton, PageHeader, Select, UserPicker, type PickedUser, type UserSearch } from "@/components/ui";
 import { useOrg } from "@/components/lms/org/OrgShell";
@@ -78,7 +78,7 @@ export default function OrgNewCoursePage() {
         breadcrumbs={crumbs({ label: t("organizations.org.nav.courses"), href: coursesHref }, { label: t("organizations.courses.createTitle") })} />
     <Card>
     <form onSubmit={submit} noValidate className="space-y-6">
-      <LanguagePicker languages={languages} defaultLanguage={defaultLanguage} disabled={disabled}
+      <LanguageFields idPrefix="org-new" languages={languages} defaultLanguage={defaultLanguage} disabled={disabled}
         onChange={(ls, d) => { setLanguages(ls); setDefaultLanguage(d); }} />
       <LocalizedTextInput label={t("courses.create.courseTitle")} languages={languages} defaultLanguage={defaultLanguage}
         value={title} onChange={setTitle} maxLength={200} required disabled={disabled} />

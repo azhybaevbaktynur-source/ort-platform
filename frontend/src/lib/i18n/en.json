@@ -358,7 +358,27 @@
       "modeClosed": "Closed (nobody can join)",
       "limit": "Student limit (optional)",
       "limitPlaceholder": "No limit",
-      "submit": "Create course"
+      "submit": "Create course",
+      "pageTitle": "New course",
+      "subtitle": "You can change the title and language later.",
+      "basics": "About the course",
+      "mainLanguage": "Main language",
+      "mainLanguageHint": "The language the course is taught in. Students see it on the course card.",
+      "addTranslations": "Add translations",
+      "translationsHint": "The title and description get a tab for each chosen language. Students see the text in their interface language.",
+      "mainNote": "main",
+      "fallbackHint": "An empty translation shows the text of the main language.",
+      "coverChosen": "The image is uploaded right after the course is created.",
+      "coverDefault": "No image: the course gets the default cover. You can add one later in the settings.",
+      "coverUseDefault": "Use the default cover",
+      "previewLabel": "Course card preview",
+      "previewTitle": "Students will see the card like this",
+      "previewHint": "The numbers of tests and lessons appear once you add them.",
+      "modeHintInviteCode": "Students join with the course code. The code appears after the course is created.",
+      "catalogHint": "Students find the course in the catalog. A draft is not shown until you publish it.",
+      "catalogFailed": "The course is created, but the catalog setting was not saved. Turn it on in the settings.",
+      "coverFailed": "The course is created, but the cover was not uploaded. Try again in the settings.",
+      "modeLabel": "How students join"
     },
     "join": {
       "title": "Join with code",
@@ -454,6 +474,28 @@
         "label": "Exam date",
         "hint": "Students see how many days are left. Leave it empty to hide the countdown.",
         "clear": "Clear the date"
+      },
+      "pageTitle": "Course settings",
+      "sectionsLabel": "Settings sections",
+      "joinCodeMenu": "Code actions",
+      "codeRegenerated": "New code created",
+      "statusMenu": "Change status",
+      "sections": {
+        "general": "General",
+        "cover": "Cover",
+        "enrollment": "Enrollment",
+        "access": "Access and Pro",
+        "grading": "Grading",
+        "danger": "Danger zone"
+      },
+      "access": {
+        "title": "Pro",
+        "platformPro": "Tests of this course can be free or for Pro only. The platform administrator marks paid tests in Admin → Pro → Paid exams.",
+        "practiceFree": "Practice is always free.",
+        "paidExamsLink": "Paid exams",
+        "proLink": "Pro section",
+        "adminOnly": "Only the platform administrator changes these settings.",
+        "notPlatform": "Pro is available on platform courses. All tests of this course are open to its students."
       }
     },
     "status": {
