@@ -142,7 +142,7 @@ export function OverflowMenu({
           <div aria-hidden="true" className="fixed inset-0 z-40 bg-slate-900/40 sm:hidden" onClick={() => close()} />
           <div id={menuId} role="menu" aria-labelledby={buttonId} onKeyDown={onMenuKey}
             className={cn(
-              "fixed inset-x-0 bottom-0 z-50 max-h-[80vh] overflow-y-auto rounded-t-2xl border border-slate-200 bg-white p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-lg",
+              "fixed inset-x-0 bottom-0 z-50 max-h-[80vh] max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-2xl border border-slate-200 bg-white p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-lg",
               "sm:absolute sm:inset-x-auto sm:bottom-auto sm:z-30 sm:mt-2 sm:w-72 sm:max-h-[70vh] sm:rounded-xl sm:p-1",
               "sm:right-0",
             )}>
