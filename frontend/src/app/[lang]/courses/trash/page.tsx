@@ -7,6 +7,7 @@ import { listTrash, restoreCourse } from "@/lib/lms/courses";
 import type { CourseCard as CourseCardDto } from "@/lib/lms/types";
 import { COURSE_GRID, CourseCard, StatusBadge } from "@/components/lms/course/CourseCard";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
+import { PageHeader, STAFF_WIDTH } from "@/components/ui";
 import { Pager } from "@/components/lms/Pager";
 
 export default function TrashPage() {
@@ -46,10 +47,9 @@ export default function TrashPage() {
   };
 
   return (
-    <div>
-      <Link href={`/${lang}/courses`} className="text-sm font-medium text-brand-700 hover:underline">{t("courses.trash.back")}</Link>
-      <h1 className="mb-2 mt-2 text-2xl font-bold text-slate-900">{t("courses.trash.title")}</h1>
-      <p className="mb-6 text-sm text-slate-600">{t("courses.trash.hint")}</p>
+    <div className={`w-full ${STAFF_WIDTH.list}`}>
+      <Link href={`/${lang}/courses`} className="mb-2 inline-flex min-h-11 items-center text-sm font-medium text-brand-700 hover:underline sm:min-h-0">{t("courses.trash.back")}</Link>
+      <PageHeader title={t("courses.trash.title")} description={t("courses.trash.hint")} />
       {error ? <ErrorMessage error={error} onRetry={() => load()} className="mb-4" /> : null}
       {loading && items.length === 0 && !error && <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p>}
       {!loading && !error && items.length === 0 && (

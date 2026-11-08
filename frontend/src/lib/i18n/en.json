@@ -698,7 +698,16 @@
       "subject": "Subject",
       "phone": "Phone",
       "teachesAt": "Already teaches at",
-      "message": "Message"
+      "message": "Message",
+      "subtitle": "Applications from people who want to create courses. Approve or reject each one.",
+      "applicant": "Applicant",
+      "status": "Status",
+      "submitted": "Submitted",
+      "actions": "Actions",
+      "details": "Details",
+      "openUser": "Open user",
+      "email": "Email",
+      "decided": "Decision"
     },
     "users": {
       "title": "Users",
@@ -730,7 +739,8 @@
       "filterAdmins": "Platform admins",
       "filterAccess": "Has exam access",
       "lastLogin": "Last sign-in",
-      "neverLoggedIn": "Never"
+      "neverLoggedIn": "Never",
+      "subtitle": "Everyone with an account: find a person, open their page, manage teacher access."
     },
     "courses": {
       "title": "Courses",
@@ -767,7 +777,8 @@
       "rosterAudited": "Viewing the roster is recorded in the audit log.",
       "showRoster": "Show roster",
       "role": "Role",
-      "ownerTag": "owner"
+      "ownerTag": "owner",
+      "subtitle": "Every course on the platform, with its owner and number of students."
     },
     "audit": {
       "title": "Audit log",
@@ -798,7 +809,8 @@
       "actingAsOptions": {
         "org_admin": "Org admin",
         "platform_admin": "Platform admin"
-      }
+      },
+      "subtitle": "Who did what: the append-only log of administrative actions."
     },
     "auditActions": {
       "student_view_enter": "Entered student view",
@@ -2603,7 +2615,8 @@
       "error": "Details",
       "notR2": "The server does not use R2 storage (LMS_STORAGE_DRIVER is not r2), so there is nothing to check.",
       "rateLimited": "The check was run too often. Wait a while and try again."
-    }
+    },
+    "subtitle": "Used space, monthly operations and a storage smoke test."
   },
   "files": {
     "errors": {
@@ -6093,7 +6106,8 @@
       "course": "Course",
       "department": "Department",
       "submittedCount": "Submitted"
-    }
+    },
+    "subtitle": "How students progress through the course, per module, assignment and quiz."
   },
   "privacy": {
     "nav": {
@@ -6198,7 +6212,8 @@
         "duplicate": "Duplicate request"
       },
       "ranToast": "Account deleted",
-      "rejectedToast": "Request rejected"
+      "rejectedToast": "Request rejected",
+      "subtitle": "Requests to export or delete personal data."
     },
     "errors": {
       "consent_required": "A parent must confirm first",
@@ -6831,6 +6846,12 @@
         "vouchers": "Gift codes",
         "exams": "Paid exams",
         "settings": "Plans and settings"
+      },
+      "subtitles": {
+        "pro": "People with Pro access: who has it, until when, and why.",
+        "vouchers": "Gift code batches: create, give out and track codes.",
+        "exams": "Which exams are free and which are paid.",
+        "settings": "Prices, plans and the text students see when they pay."
       }
     },
     "plan": {

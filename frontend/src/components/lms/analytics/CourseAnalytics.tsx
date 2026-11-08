@@ -13,7 +13,7 @@ import { useCourse } from "@/components/lms/CourseContext";
 import { fmtShortDateTime } from "@/components/lms/home/format";
 import { useCursorList } from "@/components/lms/admin/useCursorList";
 import { MoreError, useTableState } from "@/components/lms/admin/ListParts";
-import { PageHeader, StatTile, Table, TabPanel, Tabs, type TableColumn } from "@/components/ui";
+import { PageHeader, STAFF_WIDTH, StatTile, Table, TabPanel, Tabs, type TableColumn } from "@/components/ui";
 import { Loaded, ScoreAndSubmissions, pct, useLoaded } from "./parts";
 
 export function CourseAnalytics() {
@@ -21,8 +21,8 @@ export function CourseAnalytics() {
   const { course } = useCourse();
   const [tab, setTab] = useState("overview");
   return (
-    <div>
-      <PageHeader title={t("analytics.title")} />
+    <div className={`w-full ${STAFF_WIDTH.list}`}>
+      <PageHeader title={t("analytics.title")} description={t("analytics.subtitle")} />
       <Tabs id="an" label={t("analytics.title")} value={tab} onChange={setTab}
         items={[{ id: "overview", label: t("analytics.tabs.overview") }, { id: "quizzes", label: t("analytics.tabs.quizzes") }]} />
       <TabPanel tabsId="an" value="overview" hidden={tab !== "overview"}>{tab === "overview" && <Overview courseId={course.id} />}</TabPanel>
@@ -68,7 +68,7 @@ function Modules({ courseId }: { courseId: string }) {
   return (
     <section className="mt-8">
       <h2 className="mb-2 text-base font-semibold text-slate-900">{t("analytics.modules")}</h2>
-      <Table caption={t("analytics.modules")} columns={columns} rows={list.items} rowKey={(r) => r.module_id} {...state} />
+      <Table density="compact" caption={t("analytics.modules")} columns={columns} rows={list.items} rowKey={(r) => r.module_id} {...state} />
       <MoreError list={list} />
     </section>
   );
@@ -94,7 +94,7 @@ function Assignments({ courseId }: { courseId: string }) {
   return (
     <section className="mt-8">
       <h2 className="mb-2 text-base font-semibold text-slate-900">{t("analytics.assignments")}</h2>
-      <Table caption={t("analytics.assignments")} columns={columns} rows={list.items} rowKey={(r) => r.assignment_id} {...state} />
+      <Table density="compact" caption={t("analytics.assignments")} columns={columns} rows={list.items} rowKey={(r) => r.assignment_id} {...state} />
       <MoreError list={list} />
     </section>
   );
@@ -120,7 +120,7 @@ function Quizzes({ courseId }: { courseId: string }) {
   ];
   return (
     <>
-      <Table caption={t("analytics.tabs.quizzes")} columns={columns} rows={list.items} rowKey={(r) => r.assessment_id} {...state} />
+      <Table density="compact" caption={t("analytics.tabs.quizzes")} columns={columns} rows={list.items} rowKey={(r) => r.assessment_id} {...state} />
       <MoreError list={list} />
     </>
   );

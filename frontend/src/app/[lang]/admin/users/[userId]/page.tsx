@@ -10,11 +10,10 @@ import type { AdminUserDetailOut, LinkedAccountOut } from "@/lib/lms/types";
 import { pickLocalized } from "@/lib/lms/localized";
 import { isSystemAccount } from "@/lib/lms/organizations";
 import { fmtApiDate, fmtApiDateTimeShort } from "@/lib/format";
-import { Badge, Button, Card, DescriptionList, LoadingState, PageHeader, ReasonDialog, toast } from "@/components/ui";
+import { Badge, Button, Card, DescriptionList, LoadingState, PageHeader, STAFF_WIDTH, type MenuGroup, ReasonDialog, toast } from "@/components/ui";
 import { UserStatusBadge } from "@/components/lms/admin/UserStatusBadge";
 import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
 import { LoadError, OrgError, SystemAccountBadge } from "@/components/lms/org/OrgUi";
-import { OutlineMenu } from "@/components/lms/modules/OutlineMenu";
 import { UserOrganizationsSection } from "@/components/lms/org/admin/UserOrganizationsSection"; // Phase 6 S4b
 import { CodeReasonDialog } from "@/components/lms/admin/CodeReasonDialog";
 import { UserAccessSection } from "@/components/lms/access/UserAccessSection"; // S3 access
@@ -135,15 +134,14 @@ export default function AdminUserDetailPage() {
       {user.disabled_at && <UserStatusBadge kind="account" status="disabled" />}
     </span>
   ) : undefined;
-  const actions = !system ? (
-    <>
-      {user.teacher_status === "approved" ? (
-        <Button variant="secondary" onClick={() => { setDialogError(null); setAction("revoke"); }}>{t("platformAdmin.users.revokeTeacher")}</Button>
-      ) : (
-        <Button variant="secondary" onClick={() => { setDialogError(null); setAction("grant"); }}>{t("platformAdmin.users.grantTeacher")}</Button>
-      )}
-      <OutlineMenu label={t("coursePage.moreActions")} disabled={enabling}
-        groups={[
+  const primary = !system ? (
+    user.teacher_status === "approved" ? (
+      <Button variant="secondary" onClick={() => { setDialogError(null); setAction("revoke"); }}>{t("platformAdmin.users.revokeTeacher")}</Button>
+    ) : (
+      <Button variant="secondary" onClick={() => { setDialogError(null); setAction("grant"); }}>{t("platformAdmin.users.grantTeacher")}</Button>
+    )
+  ) : undefined;
+  const overflow: MenuGroup[] | undefined = !system ? [
           { id: "sessions", items: [{ id: "endSessions", label: t("adminSecurity.user.endSessions") }] },
           // S4: one person's problem (a disabled or deleted account gets neither; an admin changes their own address)
           ...(!user.disabled_at && !user.deleted ? [{ id: "person", items: [
@@ -158,25 +156,26 @@ export default function AdminUserDetailPage() {
           ...(canDisable ? [{ id: "account", items: [user.disabled_at
             ? { id: "enable", label: t("platformAdmin.users.enable") }
             : { id: "disable", label: t("platformAdmin.users.disable"), danger: true }] }] : []),
-        ]}
-        onSelect={(id) => {
+        ] : undefined;
+  const onOverflow = (id: string) => {
           setDialogError(null);
           if (id === "enable") void enable();
           else if (id === "makeAdmin" || id === "removeAdmin") setAdminAction(id);
           else if (id === "endSessions" || id === "disable" || id === "resetPassword") setAction(id);
           else if (id === "changeEmail" || id === "correctAge") setPersonDialog(id);
-        }} />
-    </>
-  ) : undefined;
+        };
 
   return (
-    <div>
+    <div className={`w-full ${STAFF_WIDTH.list}`}>
       <PageHeader
         title={userName}
         description={user.display_name ? user.email : undefined}
         badge={badges}
         breadcrumbs={crumbs(usersCrumb, { label: userName })}
-        secondaryActions={actions}
+        primaryAction={primary}
+        overflow={overflow}
+        onOverflow={onOverflow}
+        overflowLabel={t("coursePage.moreActions")}
       />
       {error ? <OrgError error={error} onRetry={load} className="mb-4" /> : null}
       <Card className="mb-6">

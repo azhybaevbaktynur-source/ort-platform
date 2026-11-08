@@ -138,7 +138,7 @@ export default function AdminVouchersPage() {
 
   return (
     <div>
-      <PageHeader title={t("access.admin.pages.vouchers")} description={t("access.admin.description")}
+      <PageHeader title={t("access.admin.pages.vouchers")} description={t("access.admin.subtitles.vouchers")}
         breadcrumbs={crumbs({ label: t("access.admin.pages.vouchers") })}
         primaryAction={<Button onClick={() => setCreating(true)} leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />}>{t("access.admin.batches.create")}</Button>} />
       {overview?.reveal_alert && <RevealAlert count={overview.reveals_last_hour} className="mb-6" />}

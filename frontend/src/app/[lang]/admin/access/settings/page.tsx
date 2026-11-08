@@ -72,7 +72,7 @@ export default function AdminProSettingsPage() {
   const langName: Record<Lang, string> = { ru: t("common.russian"), ky: t("common.kyrgyz"), en: t("common.english") };
   const header = (
     <>
-      <PageHeader title={t("access.admin.pages.settings")} description={t("access.admin.description")}
+      <PageHeader title={t("access.admin.pages.settings")} description={t("access.admin.subtitles.settings")}
         breadcrumbs={crumbs({ label: t("access.admin.pages.settings") })} />
     </>
   );

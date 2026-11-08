@@ -75,7 +75,7 @@ export default function AdminPaidExamsPage() {
     ...(courses ?? []).map((c) => ({ value: c.id, label: pickLocalized(c.title, lang) }))];
   return (
     <div>
-      <PageHeader title={t("access.admin.pages.exams")} description={t("access.admin.description")}
+      <PageHeader title={t("access.admin.pages.exams")} description={t("access.admin.subtitles.exams")}
         breadcrumbs={crumbs({ label: t("access.admin.pages.exams") })} />
       <p className="mb-4 max-w-3xl text-sm leading-5 text-slate-700">{t("access.admin.exams.hint")}</p>
       <Table caption={t("access.admin.exams.title")} columns={columns} rows={items} rowKey={(e) => e.id}

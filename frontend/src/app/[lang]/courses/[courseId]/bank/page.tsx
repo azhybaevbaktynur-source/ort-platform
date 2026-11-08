@@ -10,7 +10,8 @@ import { pickLocalized } from "@/lib/lms/localized";
 import { useCourse } from "@/components/lms/CourseContext";
 import { Pager } from "@/components/lms/Pager";
 import { BankDialog } from "@/components/lms/content/BankDialog";
-import { Button, ConfirmDialog, EmptyState, LinkButton, LoadingState, PageHeader } from "@/components/ui";
+import { useRouter } from "next/navigation";
+import { Button, ConfirmDialog, EmptyState, LinkButton, LoadingState, PageHeader, STAFF_WIDTH } from "@/components/ui";
 import { ContentError } from "@/components/lms/content/ContentError";
 import { useCanEditContent } from "@/components/lms/content/StaffGate";
 import { btnSmall } from "@/components/lms/course/staffUi"; // Phase 6b S5c
@@ -20,6 +21,7 @@ import { SharedBankPicker } from "@/components/lms/content/SharedBankPicker";
 
 export default function BankListPage() {
   const { lang, t } = useTranslation();
+  const router = useRouter();
   const { course } = useCourse();
   const canEdit = useCanEditContent();
   const base = `/${lang}/courses/${course.id}/bank`;
@@ -141,12 +143,13 @@ export default function BankListPage() {
   );
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 w-full ${STAFF_WIDTH.list}`}>
       <PageHeader title={t("bank.list.title")} className="mb-2"
-        secondaryActions={<>
-          {staff && <Button variant="secondary" onClick={() => setTrash((s) => !s)}>{trash ? t("bank.list.hideTrash") : t("bank.list.showTrash")}</Button>}
-          {canEdit && <LinkButton variant="secondary" href={`${base}/import`}>{t("bank.list.import")}</LinkButton>}
-        </>}
+        overflow={[{ id: "more", items: [
+          ...(staff ? [{ id: "trash", label: trash ? t("bank.list.hideTrash") : t("bank.list.showTrash") }] : []),
+          ...(canEdit ? [{ id: "import", label: t("bank.list.import") }] : []),
+        ] }]}
+        onOverflow={(id) => { if (id === "trash") setTrash((s) => !s); else if (id === "import") router.push(`${base}/import`); }}
         primaryAction={canEdit ? <Button onClick={() => { setActionError(null); setDialog({ bank: null }); }}>{t("bank.list.create")}</Button> : undefined} />
       <ContentError error={error || (!dialog && !toDelete ? actionError : null)} onRetry={error ? () => load() : undefined} />
       {loading && items.length === 0 && !error && <LoadingState rows={2} />}
