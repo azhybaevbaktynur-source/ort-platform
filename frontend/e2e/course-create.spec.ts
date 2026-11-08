@@ -222,12 +222,16 @@ test("settings: sections as deep links, one Save per section, Danger zone only f
   await expect(page.getByText(t("courses.settings.access.notPlatform"))).toBeVisible();
   await page.context().close();
 
-  // a co-teacher who is not the owner (the admin on the ORT course): no Danger zone; a platform course explains Pro
+  // the admin on the ORT course: Danger zone only if they own it (a second backend's startup bootstrap, e.g. in
+  // admin-mfa-gate, can hand the ORT courses to the admin, so the rule is checked against `is_owner`, not assumed);
+  // a platform course explains Pro
+  const ortOwner = (await api(s.admin, "GET", `/courses/${s.course_id}`)).is_owner as boolean;
   const admin = await open(browser, s.admin);
   await admin.goto(`/ru/courses/${s.course_id}/settings?section=danger`);
   const anav = admin.getByRole("navigation", { name: t("courses.settings.sectionsLabel") });
-  await expect(anav.getByRole("link", { name: t("courses.settings.sections.general") })).toHaveAttribute("aria-current", "page");
-  await expect(anav.getByRole("link", { name: t("courses.settings.sections.danger") })).toHaveCount(0);
+  const shown = t(`courses.settings.sections.${ortOwner ? "danger" : "general"}`);
+  await expect(anav.getByRole("link", { name: shown })).toHaveAttribute("aria-current", "page");
+  await expect(anav.getByRole("link", { name: t("courses.settings.sections.danger") })).toHaveCount(ortOwner ? 1 : 0);
   await admin.goto(`/ru/courses/${s.course_id}/settings?section=access`);
   await expect(admin.getByText(t("courses.settings.access.platformPro"))).toBeVisible();
   await expect(admin.getByRole("link", { name: t("courses.settings.access.paidExamsLink") })).toHaveAttribute("href", "/ru/admin/access/exams");
