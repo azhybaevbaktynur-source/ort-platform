@@ -537,11 +537,29 @@ rule 7; Neon is at 10/10 branches per ACCOUNTS.md §G: the owner's OK is needed 
   attacker's account): the callback requires our cookie, set only by `start` in the victim's own browser, and its `state`
   must equal the query `state`; an attacker cannot set that cookie cross-site. The ticket then arrives in a fragment of a
   page the attacker never controls.
+- **Login CSRF through the ticket link** (security review, fixed 2026-11-09): the attacker finishes their own flow and
+  sends the 302 target `FRONTEND/<lang>/oauth-callback#t=<ticket>` to the victim. Every flow is therefore bound to the
+  browser tab: `ProviderButtons` makes a random `bind` on the click (32 bytes from `crypto.getRandomValues`, base64url)
+  in this tab's `sessionStorage` and sends it to `start`; `start` refuses a missing or malformed bind (302 to the login
+  page with `oauth_state_mismatch`, no cookie) and seals only sha256(bind) into the flow cookie; `callback` copies it
+  into the ticket as `bh`; `POST /auth/oauth/complete` requires `bind` and compares sha256(bind) with `bh` in constant
+  time, else 401 `oauth_ticket_invalid`, counted toward the per-address failure limit. The callback page reads the bind
+  once and removes it; without one it shows `oauth_ticket_invalid` and sends nothing. If the browser is signed in to
+  another account (stored session id differs from the ticket's `uid`, or a sign-up ticket), the page asks "Switch
+  account?" before sending the ticket. Apple's form_post path uses the same `start`, cookie and ticket.
+- **Unconfirmed self-registration** (security review, fixed 2026-11-09): linking one is a sign-up. The age step is
+  required (`oauth_profile_required`, nothing written before it); the pre-registered name is replaced, the phone
+  cleared, the locale taken from the ticket, and the age band and consent state set again by the sign-up rules. A
+  verified account keeps its profile.
+- **Defence in depth** (security review, 2026-11-09): `complete` checks again that the provider is on (404
+  `oauth_not_configured`); `_login` refuses a test student even through a linked identity; a JWKS whose `keys` is not a
+  list is `oauth_provider_error` and the flow cookie is cleared.
 - **Open redirect**: the only redirect targets are `GOOGLE_OAUTH_AUTHORIZE_URL` (configuration) and
   `FRONTEND_URL + fixed path`; the person's `redirect` is validated server-side, stored in our cookie (never in Google's
   `state`), passed in the fragment and validated again by `safeRedirect` before `router.push`.
 - **Account takeover through unverified email**: `email_verified` must be exactly `True` (Google) before any lookup; an
-  unconfirmed self-registration that gets linked loses its unconfirmed password and its old tokens (1.6 step 5);
+  unconfirmed self-registration that gets linked loses its unconfirmed password, its old tokens and its profile (1.6
+  step 5; see below);
   `users.email` is never rewritten from a provider claim.
 - **Token leakage in URLs, referrers, logs**: no session token or ticket ever in a query string; the ticket is in a
   fragment (not sent to servers, not in `Referer`, removed from history by `replaceState`); request logging already drops

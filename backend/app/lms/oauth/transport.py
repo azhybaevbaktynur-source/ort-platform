@@ -70,15 +70,19 @@ class JwksCache:
             with http_client() as client:
                 res = client.get(url, headers={"Accept": "application/json"})
             res.raise_for_status()
+            body = res.json()
+            raw = body.get("keys") if isinstance(body, dict) else None
+            if not isinstance(raw, list):
+                raise ValueError("the JWKS has no list of keys")
             keys = {}
-            for data in res.json().get("keys", []):
+            for data in raw:
                 if not isinstance(data, dict) or not data.get("kid"):
                     continue
                 try:
                     keys[str(data["kid"])] = jwt.PyJWK(data)
                 except jwt.PyJWTError:
                     continue  # a key type we do not use
-        except (httpx.HTTPError, ValueError, AttributeError) as exc:
+        except (httpx.HTTPError, ValueError, AttributeError, TypeError) as exc:
             logger.warning("oauth signing keys unavailable", extra={"error": type(exc).__name__})
             if self._url == url and self._keys:
                 return  # keep the cached keys through an outage

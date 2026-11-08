@@ -5,8 +5,9 @@ POST /auth/oauth/complete, which recomputes login / link / signup from the datab
 two-step login, `last_login_at`, token versions and the consent gate see an ordinary sign-in.
 
 Rules (design 2.3): only a verified provider email is ever matched or used; `users.email` never changes from a provider;
-a disabled account gets no session and no link; a test student never matches; an unconfirmed self-registration that gets
-linked loses its unconfirmed password and its old tokens.
+a disabled account gets no session and no link; a test student never matches or signs in; an unconfirmed
+self-registration that gets linked is treated as a sign-up (age step; its password, old tokens, name, phone, age band and
+consent are replaced); a ticket completes only with the `bind` of the browser that pressed the button.
 """
 from __future__ import annotations
 
@@ -14,6 +15,7 @@ import base64
 import hashlib
 import hmac
 import logging
+import re
 import secrets
 import uuid
 from typing import Optional
@@ -49,6 +51,10 @@ MAX_EMAIL_CHARS = 320
 MAX_SUBJECT_CHARS = 255
 MAX_NAME_CHARS = 200
 DENIED_ERRORS = ("access_denied", "user_cancelled_authorize")  # Google; Apple
+# The browser binding (design 11, login CSRF): ProviderButtons keeps a random `bind` (>= 128 bits, base64url) in this tab's
+# sessionStorage and sends it to `start`; only its sha256 travels in the flow cookie and in the ticket (`bh`), and
+# `complete` wants the `bind` itself, so a ticket link sent to another browser signs nobody in.
+_BIND_RE = re.compile(r"^[A-Za-z0-9_-]{22,128}$")
 
 
 def cookie_path() -> str:
@@ -109,20 +115,38 @@ def _provider_module(name: str):
     return {"google": google, "apple": apple}[name]
 
 
+def bind_hash(bind: Optional[str]) -> Optional[str]:
+    """sha256 hex of a well-formed `bind`, else None."""
+    if not isinstance(bind, str) or not _BIND_RE.match(bind):
+        return None
+    return hashlib.sha256(bind.encode("ascii")).hexdigest()
+
+
+def bind_matches(bind: Optional[str], expected_hash: Optional[str]) -> bool:
+    """The ticket is completed by the browser that pressed the button: sha256(bind) equals the ticket's `bh`."""
+    return _same(bind_hash(bind), expected_hash)
+
+
 # ------------------------------------------------------------------ start and callback
 
-def start(request: Request, provider: str, lang: Optional[str], redirect: Optional[str]) -> RedirectResponse:
+def start(request: Request, provider: str, lang: Optional[str], redirect: Optional[str],
+          bind: Optional[str] = None) -> RedirectResponse:
     prov = _provider_module(provider)
     if not prov.enabled():
         raise auth_ep._error(404, "oauth_not_configured", "This sign-in method is not available.")
     auth_ep._count_all(auth_ep._ip_rule(request, ratelimit.OAUTH_START_IP_10M))
+    bh = bind_hash(bind)
+    if bh is None:  # no browser binding (a hand-made link, a tab without sessionStorage): no flow is started
+        response = RedirectResponse(error_url(clean_lang(lang), "oauth_state_mismatch"), status_code=302)
+        _no_store(response)
+        return response
     state = secrets.token_urlsafe(32)
     verifier = secrets.token_urlsafe(48)  # 64 characters (RFC 7636: 43-128)
     nonce = secrets.token_urlsafe(32)
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode("ascii")).digest()).decode("ascii").rstrip("=")
     blob = tickets.seal_flow({"provider": provider, "state": state, "verifier": verifier,
                               "nonce_hash": hashlib.sha256(nonce.encode("ascii")).hexdigest(),
-                              "lang": clean_lang(lang), "redirect": safe_redirect(redirect)})
+                              "lang": clean_lang(lang), "redirect": safe_redirect(redirect), "bind_hash": bh})
     response = RedirectResponse(prov.authorize_url(state=state, nonce=nonce, code_challenge=challenge), status_code=302)
     _set_flow_cookie(response, request, blob, cross_site=provider == "apple")
     _no_store(response)
@@ -170,7 +194,7 @@ def callback(request: Request, db: Session, provider: str, *, state: Optional[st
             raise OAuthFailure("oauth_state_mismatch")
         if error:
             raise OAuthFailure("oauth_denied" if error in DENIED_ERRORS else "oauth_provider_error")
-        if not code or not isinstance(flow.get("verifier"), str):
+        if not code or not isinstance(flow.get("verifier"), str) or not isinstance(flow.get("bind_hash"), str):
             raise OAuthFailure("oauth_provider_error")
         id_token = prov.exchange_code(code, flow["verifier"])
         claims = prov.verify_id_token(id_token, flow.get("nonce_hash"))
@@ -185,7 +209,7 @@ def callback(request: Request, db: Session, provider: str, *, state: Optional[st
         name = name.strip()[:MAX_NAME_CHARS] if isinstance(name, str) else ""
         mode, uid = decide_mode(db, provider, subject, email)
         ticket = tickets.issue_ticket(provider=provider, subject=subject, email=email, name=name, mode=mode, uid=uid,
-                                      lang=lang)
+                                      lang=lang, bind_hash=flow["bind_hash"])
         url = ticket_url(lang, ticket, safe_redirect(flow.get("redirect")))
     except OAuthFailure as failure:
         logger.info("social sign-in refused", extra={"provider": provider, "code": failure.code})
@@ -213,7 +237,7 @@ def _disabled(db: Session, user: User, provider: str, request: Optional[Request]
 
 def _login(db: Session, identity: UserIdentity, claims: dict, request: Optional[Request]) -> TokenResponse:
     user = db.get(User, identity.user_id)
-    if user is None or user.deleted_at is not None:
+    if user is None or user.deleted_at is not None or user.is_test_student:  # a test student never signs in
         raise _invalid_ticket()
     if user.disabled_at is not None:
         raise _disabled(db, user, identity.provider, request)
@@ -244,7 +268,25 @@ def _after_race(db: Session, claims: dict, request: Optional[Request]) -> TokenR
     return _login(db, identity, claims, request)
 
 
-def _link(db: Session, user_id: str, claims: dict, request: Optional[Request]) -> TokenResponse:
+def _profile(db: Session, body) -> tuple[str, list]:
+    """The sign-up extras (age band, accepted policies), checked like /auth/register; 422 when missing or wrong."""
+    if body.ageBand is None:
+        raise auth_ep._error(422, "oauth_profile_required", "Choose an age band to finish signing up.")
+    if body.ageBand not in privacy.AGE_BANDS:
+        raise auth_ep._error(422, "age_band_required", "Choose an age band.")
+    try:
+        accepted = privacy.accepted_policies(db, body.ageBand, body.policyVersionIds)
+    except ValidationFailed as e:
+        raise auth_ep._error(422, e.code, e.message) from None
+    return body.ageBand, accepted
+
+
+def _display_name(body, claims: dict) -> str:
+    name = (body.displayName or "").strip() or (claims.get("name") or "").strip() or claims["email"].split("@")[0]
+    return name[:MAX_NAME_CHARS]
+
+
+def _link(db: Session, user_id: str, claims: dict, body, request: Optional[Request]) -> TokenResponse:
     provider = claims["provider"]
     user = privacy._lock_user(db, user_id)
     if user is None or user.deleted_at is not None or user.is_test_student:
@@ -259,14 +301,26 @@ def _link(db: Session, user_id: str, claims: dict, request: Optional[Request]) -
         # link nothing.
         db.commit()
         return auth_ep._sign_in(user)
-    db.add(_new_identity(user.id, claims))
     if not user.email_verified:
-        # An unconfirmed self-registration: its password was chosen by someone who never proved the mailbox (design 1.6)
+        # An unconfirmed self-registration: everything in it was chosen by someone who never proved the mailbox (design
+        # 1.6, 11). Treated as a sign-up: the provider's person gives the age step, and the name, phone, age band and
+        # consent of the pre-registration are replaced; its password and old tokens are dropped.
+        try:
+            band, accepted = _profile(db, body)  # before any write
+        except HTTPException:
+            db.rollback()  # releases the row lock
+            raise
+        lang = clean_lang(claims.get("lang"))
         user.password_hash = UNUSABLE_PASSWORD_HASH
         user.email_code_hash = user.email_code_expires = user.email_code_sent_at = None
         user.email_code_attempts = 0
         user.email_verified = True
         user.token_version = (user.token_version or 0) + 1
+        user.display_name = _display_name(body, claims)
+        user.phone = None
+        user.locale = lang
+        privacy.apply_age_band(db, user, band, accepted, source="signup", locale=lang, due_at=privacy.now())
+    db.add(_new_identity(user.id, claims))
     audit.record(db, actor=user, action="auth.identity.linked", target_type="user", target_id=user.id,
                  details={"provider": provider}, request=request)
     try:
@@ -277,27 +331,19 @@ def _link(db: Session, user_id: str, claims: dict, request: Optional[Request]) -
 
 
 def _signup(db: Session, claims: dict, body, request: Optional[Request]) -> TokenResponse:
-    if body.ageBand is None:
-        raise auth_ep._error(422, "oauth_profile_required", "Choose an age band to finish signing up.")
-    if body.ageBand not in privacy.AGE_BANDS:
-        raise auth_ep._error(422, "age_band_required", "Choose an age band.")
-    try:
-        accepted = privacy.accepted_policies(db, body.ageBand, body.policyVersionIds)
-    except ValidationFailed as e:
-        raise auth_ep._error(422, e.code, e.message) from None
+    band, accepted = _profile(db, body)
     email = claims["email"]
-    display_name = (body.displayName or "").strip() or (claims.get("name") or "").strip() or email.split("@")[0]
     lang = clean_lang(claims.get("lang"))
     user = User(id=f"usr_{uuid.uuid4().hex[:12]}", email=email, password_hash=UNUSABLE_PASSWORD_HASH,
-                email_verified=True, display_name=display_name[:MAX_NAME_CHARS], locale=lang, created_at=utcnow())
+                email_verified=True, display_name=_display_name(body, claims), locale=lang, created_at=utcnow())
     try:
         db.add(user)
         db.flush()
-        privacy.apply_age_band(db, user, body.ageBand, accepted, source="signup", locale=lang,
+        privacy.apply_age_band(db, user, band, accepted, source="signup", locale=lang,
                                due_at=privacy.now())  # under 14: gated from the first request, as for email sign-up
         db.add(_new_identity(user.id, claims))
         audit.record(db, actor=user, action="auth.identity.signup", target_type="user", target_id=user.id,
-                     details={"provider": claims["provider"], "age_band": body.ageBand}, request=request)
+                     details={"provider": claims["provider"], "age_band": band}, request=request)
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -306,7 +352,7 @@ def _signup(db: Session, claims: dict, body, request: Optional[Request]) -> Toke
         existing = _user_by_email(db, email)  # a password registration took the address meanwhile
         if existing is None:
             raise _invalid_ticket() from None
-        return _link(db, existing.id, claims, request)
+        return _link(db, existing.id, claims, body, request)
     return auth_ep._sign_in(user)  # a brand-new account never has two-step login: a token
 
 
@@ -315,10 +361,12 @@ def complete(db: Session, claims: dict, body, request: Optional[Request]) -> Tok
     create a second account nor link again (design 1.6)."""
     if claims.get("provider") not in ("google", "apple") or not isinstance(claims.get("sub"), str):
         raise _invalid_ticket()
+    if not _provider_module(claims["provider"]).enabled():  # switched off after the ticket was issued
+        raise auth_ep._error(404, "oauth_not_configured", "This sign-in method is not available.")
     identity = _identity(db, claims)
     if identity is not None:
         return _login(db, identity, claims, request)
     user = _user_by_email(db, claims["email"])
     if user is not None:
-        return _link(db, user.id, claims, request)
+        return _link(db, user.id, claims, body, request)
     return _signup(db, claims, body, request)

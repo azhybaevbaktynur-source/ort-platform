@@ -20,7 +20,7 @@ from app.models.user import User
 from tests.auth_helpers import signup_fields
 from tests.lms.s3_support import clean_rate_limits, db  # noqa: F401
 from tests.lms.test_oauth_google import (  # noqa: F401
-    FakeProvider, _fresh_key_caches, call, configure, cookie_cleared, cookie_value, detail_code, error_code, fragment,
+    BIND, FakeProvider, _fresh_key_caches, call, configure, cookie_cleared, cookie_value, detail_code, error_code, fragment,
     identities, install, set_cookie_header,
 )
 
@@ -47,8 +47,8 @@ def apple_idp(monkeypatch, apple_key) -> FakeProvider:
     return fake
 
 
-async def apple_begin():
-    res = await call("GET", "/auth/apple/start", params={"lang": "en"})
+async def apple_begin(bind: str = BIND):
+    res = await call("GET", "/auth/apple/start", params={"lang": "en", "bind": bind})
     assert res.status_code == 302, res.text
     q = {k: v[0] for k, v in parse_qs(urlparse(res.headers["location"]).query).items()}
     return res, q
@@ -106,7 +106,12 @@ async def test_apple_form_post_first_login_puts_the_name_in_the_ticket(apple_idp
     assert 0 < decoded["exp"] - decoded["iat"] <= 300 and abs(decoded["iat"] - time.time()) < 60
     assert apple_idp.token_forms[0]["client_id"] == SERVICES_ID
     # the relay address becomes the account's email
-    done = await call("POST", "/auth/oauth/complete", json={"ticket": ticket, **signup_fields("18_plus")})
+    # the form_post path binds the ticket to the browser like Google's: another browser's bind is refused
+    for bind in (None, "z" * 43):
+        body = {"ticket": ticket, **({"bind": bind} if bind else {}), **signup_fields("18_plus")}
+        refused = await call("POST", "/auth/oauth/complete", json=body)
+        assert refused.status_code == 401 and detail_code(refused) == "oauth_ticket_invalid"
+    done = await call("POST", "/auth/oauth/complete", json={"ticket": ticket, "bind": BIND, **signup_fields("18_plus")})
     assert done.status_code == 200, done.text
     user = db.execute(select(User).where(User.email == claims["email"])).scalar_one()
     assert user.display_name == "Aibek Usonov" and user.locale == "en"

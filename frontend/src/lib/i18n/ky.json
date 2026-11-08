@@ -148,7 +148,11 @@
       "signedInAs": "Google аркылуу {email} катары кирдиңиз",
       "completeButton": "Аккаунт түзүү",
       "useAnotherAccount": "Башка аккаунтту колдонуу",
-      "backToLogin": "Кирүүгө кайтуу"
+      "backToLogin": "Кирүүгө кайтуу",
+      "switchTitle": "Аккаунтту алмаштырасызбы?",
+      "switchBody": "Сиз {current} катары кирдиңиз. Улантсаңыз, бул аккаунттан чыгып, {email} катары киресиз.",
+      "switchContinue": "{email} катары улантуу",
+      "switchStay": "Учурдагы аккаунтта калуу"
     },
     "parentCta": "Мен ата-энемин"
   },

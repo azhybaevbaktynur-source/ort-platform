@@ -148,7 +148,11 @@
       "signedInAs": "Вход через Google как {email}",
       "completeButton": "Создать аккаунт",
       "useAnotherAccount": "Использовать другой аккаунт",
-      "backToLogin": "Назад ко входу"
+      "backToLogin": "Назад ко входу",
+      "switchTitle": "Сменить аккаунт?",
+      "switchBody": "Вы вошли как {current}. Если продолжить, вы выйдете из этого аккаунта и войдёте как {email}.",
+      "switchContinue": "Продолжить как {email}",
+      "switchStay": "Остаться в текущем аккаунте"
     },
     "parentCta": "Я родитель"
   },

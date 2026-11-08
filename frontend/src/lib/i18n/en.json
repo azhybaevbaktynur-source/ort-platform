@@ -148,7 +148,11 @@
       "signedInAs": "Signed in with Google as {email}",
       "completeButton": "Create account",
       "useAnotherAccount": "Use another account",
-      "backToLogin": "Back to login"
+      "backToLogin": "Back to login",
+      "switchTitle": "Switch account?",
+      "switchBody": "You are signed in as {current}. Continuing will sign you out of that account and sign you in as {email}.",
+      "switchContinue": "Continue as {email}",
+      "switchStay": "Keep the current account"
     },
     "parentCta": "I'm a parent"
   },
