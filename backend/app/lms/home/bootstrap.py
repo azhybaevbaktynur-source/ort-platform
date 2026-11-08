@@ -12,7 +12,9 @@ per request; nothing is computed per row beyond what the parts already do.
   shows the pass pill only then), `lesson_courses` = `GET /courses/{exam}/lesson-courses` per exam-prep course (the
   caller is its student, so `lesson_courses.require_member` holds).
 
-Student view (a test student): no invitations, no privacy state and no pass, as the routes it may not call."""
+Student view (a test student): no invitations, no privacy state and no pass, as the routes it may not call.
+A platform admin who must set up two-step login (`mfa.gate.must_enroll`): `me` only, as the shell got before when every
+other part answered 403 `mfa_enrollment_required` (the gate opens this route only for that)."""
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
@@ -24,6 +26,7 @@ from app.lms.courses.lesson_courses import LessonCourseOut, lesson_courses
 from app.lms.courses.models import Course
 from app.lms.home import schemas as sch
 from app.lms.home import service as home_svc
+from app.lms.mfa import gate as mfa_gate
 from app.lms.privacy import service as privacy_svc
 from app.lms.privacy.schemas import NeedOut
 from app.lms.teachers import router as teachers_router
@@ -60,6 +63,8 @@ def _student(db: Session, user: User, test_student: bool) -> sch.BootstrapStuden
 def bootstrap(db: Session, user: User) -> sch.BootstrapOut:
     test_student = bool(getattr(user, "is_test_student", False))
     me = teachers_router._me(user)
+    if mfa_gate.must_enroll(user):
+        return sch.BootstrapOut(me=me, pending_invitations=0, privacy=None, student=None)
     learns_here = me.has_student_enrollments or not _teaches(me)
     return sch.BootstrapOut(
         me=me,

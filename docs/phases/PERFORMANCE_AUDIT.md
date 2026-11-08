@@ -743,3 +743,29 @@ the side column before `exam-prep` answers; Тесты draws its header and stat
 tiles with skeleton numbers. `TeacherCoursePage` already fired `modules`, `modules/unsorted` and `todo` together at mount
 (no change). Every cold page is at API depth ≤ 2 except the phone admin overview above. No `window.location` navigation
 in the S3 files. First-content numbers are within the ±30 % laptop noise; the structure columns are exact.
+
+### Integration fixes on `lms` (same machine, own builds of `lms` `dcd4f11` and the fix, one run each, same scratch backend)
+
+Cells: API requests / API depth / first content ms / settled ms. Admin overview only (the other pages are unchanged by these fixes).
+
+| page | profile | mode | before (`dcd4f11`) | after |
+|---|---|---|---|---|
+| admin-overview | laptop | cold | 6 / 2 / 225 / 521 | 6 / 2 / 239 / 340 |
+| admin-overview | laptop | warm | 5 / 1 / 118 / 147 | 5 / 1 / 167 / 199 |
+| admin-overview | phone | cold | 6 / 3 / 10488 / 11288 | 6 / 2 / 10050 / 11291 |
+| admin-overview | phone | warm | 5 / 1 / 926 / 1667 | 5 / 1 / 817 / 1736 |
+
+**Integration notes** (2026-11-09, branch `worktree-agent-aca6b243bc29f1d78`). (1) `admin-mfa-gate.spec.ts` regression since S2: the
+MFA gate (`app/lms/mfa/gate.py`) opened `/me/lms` but not `/me/bootstrap`, so an unenrolled admin's shell got 403
+`mfa_enrollment_required` and showed a load error instead of `/admin/security`. `/me/bootstrap` is now an open route of the gate
+and answers only its `me` part while `must_enroll` (no invitations, privacy or student part: those routes stay refused), as the
+parts did before (`test_bootstrap.py::test_admin_without_two_step_login_gets_only_me_under_the_requirement`). (2) `AreaShell`
+renders the area hidden under its loading state while the staff dictionary loads (the wrapper stays in place, nothing
+remounts) and `AdminShell` awaits only `me`: the phone cold overview's page requests go out with `/platform/summary`, depth
+3 → 2. (3) The header's "Мои курсы" section prefetches the teaching list's first page on hover/focus (`pageData.prefetchTeachingCourses`,
+read by `TeachingList` through `loadTeachingCourses`); the other teaching sections have no cached reader, so they pass none.
+(4) `teacher-signup.spec.ts` "the header changes": the S1 latch kept the student frame from a session-restored (stale)
+bootstrap after the application was approved; the frame is now recomputed once more when the first server answer of the page
+load arrives (`useLmsMeLoader().confirmed`, sticky per shell), so a changed role shows on reload; later background refreshes
+still wait for the next navigation. (5) `header-areas.spec.ts` "first visit" delayed only `/me/lms`; it now delays
+`/me/bootstrap` too (the shell's request since S2). Every frames-seen cell of both runs reads swap `no`.

@@ -13,6 +13,8 @@ interface LmsMeState {
   loading: boolean;
   error: LmsApiError | null;
   reload: () => Promise<void>;
+  /** True once the answer in hand came from the server in this page load (not a session-restored, stale copy). */
+  confirmed?: boolean;
 }
 
 const LmsMeContext = createContext<LmsMeState | null>(null);
@@ -52,7 +54,7 @@ export function useLmsMeLoader(enabled: boolean): LmsMeState {
     return () => window.removeEventListener(LMS_ME_STALE_EVENT, stale);
   }, [enabled, reload]);
 
-  return { me, loading, error, reload };
+  return { me, loading, error, reload, confirmed: !!boot.data && !boot.stale };
 }
 
 export const LmsMeProvider = LmsMeContext.Provider;

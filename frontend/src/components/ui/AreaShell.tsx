@@ -148,11 +148,15 @@ function PhoneDrawer({ label, menuLabel, items, heading, navFooter }: {
  * a drawer on phones. Give items a `group` to split a long menu into labelled sections.
  */
 export function AreaShell({ label, items, heading, banner, children, className, phone = "tabs", menuLabel, navFooter }: AreaShellProps) {
-  // S4: staff strings live in their own dictionary part; neutral loading state until it is here (never raw keys)
+  // S4: staff strings live in their own dictionary part; neutral loading state until it is here (never raw keys).
+  // Integration fix: meanwhile the area renders hidden under that state (as S1 under the neutral frame), so the page's
+  // requests start at once; the wrapper stays in place, so nothing remounts when the strings arrive.
   const staffReady = useStaffDictionary();
   const { t } = useTranslation();
-  if (!staffReady) return <LoadingState label={t("lms.common.loading")} />;
   return (
+    <>
+    {!staffReady && <LoadingState label={t("lms.common.loading")} />}
+    <div className={staffReady ? "contents" : "hidden"}>
     <div className={className}>
       {banner}
       {phone === "drawer" ? (
@@ -173,5 +177,7 @@ export function AreaShell({ label, items, heading, banner, children, className, 
         <div className="min-w-0 flex-1">{children}</div>
       </div>
     </div>
+    </div>
+    </>
   );
 }

@@ -72,8 +72,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     if (mustEnroll && pathname !== securityPath) router.replace(securityPath);
   }, [mustEnroll, pathname, securityPath, router]);
 
-  if ((loading && !me) || !staffReady) return <LoadingState label={t("lms.common.loading")} />;
+  // Integration fix: only `me` is awaited here; while the staff dictionary loads, AreaShell renders the area hidden under
+  // its loading state, so the page's requests go out with `/platform/summary` instead of after the dictionary chunk.
+  if (loading && !me) return <LoadingState label={t("lms.common.loading")} />;
   if (!isAdmin) {
+    if (!staffReady) return <LoadingState label={t("lms.common.loading")} />;
     return (
       <EmptyState
         icon={<ShieldAlert />}

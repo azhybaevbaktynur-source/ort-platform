@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import { getExamPrep, type ExamPrepOut } from "./examPrep";
 import { getActivity, getProgress, type ActivityDays, type ActivityOut, type ProgressOut } from "./progress";
+import { listMyCourses } from "./courses";
+import type { CourseCard, PageOut } from "./types";
 import { peek, put, revalidate, useCached, type SwrOptions } from "./swr";
 
 /*
@@ -85,4 +87,18 @@ export function prefetchExamPrep(courseId: string): void {
 export function prefetchAnalytics(courseId: string, days: ActivityDays = 30): void {
   intentLoad(progressKey(courseId, days), () => getProgress(courseId, { days }), ANALYTICS_CACHE);
   intentLoad(activityKey(courseId, days), () => getActivity(courseId, days), ANALYTICS_CACHE);
+}
+
+/* Integration fix (S3 follow-up): the header's teaching sections prefetch like the student sidebar. "Мои курсы" reads
+ * the first page of `/courses?as=teaching` through here; the other sections' pages have no cached reader yet. */
+const TEACHING_CACHE: SwrOptions = { ttl: 15_000 };
+const TEACHING_KEY = "teaching-courses:first";
+const fetchTeaching = () => listMyCourses("teaching");
+
+/** The teaching list's first page (a prefetch asked moments ago stands for it). */
+export function loadTeachingCourses(): Promise<PageOut<CourseCard>> {
+  return pageLoad(TEACHING_KEY, fetchTeaching, TEACHING_CACHE);
+}
+export function prefetchTeachingCourses(): void {
+  intentLoad(TEACHING_KEY, fetchTeaching, TEACHING_CACHE);
 }
