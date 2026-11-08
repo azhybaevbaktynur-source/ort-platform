@@ -569,7 +569,18 @@
       "teacherRequests": "Teacher requests",
       "users": "Users",
       "courses": "Courses",
-      "auditLog": "Audit log"
+      "auditLog": "Audit log",
+      "groups": {
+        "people": "People",
+        "content": "Content",
+        "pro": "Pro",
+        "system": "System"
+      },
+      "proUsers": "Pro users",
+      "plans": "Plans and settings",
+      "gifts": "Gift codes",
+      "paidExams": "Paid exams",
+      "health": "Health"
     },
     "notAuthorized": {
       "title": "Not authorized",
@@ -6673,6 +6684,12 @@
         "saved": "Settings saved.",
         "unchanged": "Nothing changed.",
         "priceInvalid": "A price is a whole number from 0 to 1,000,000."
+      },
+      "pages": {
+        "pro": "Pro users",
+        "vouchers": "Gift codes",
+        "exams": "Paid exams",
+        "settings": "Plans and settings"
       }
     },
     "plan": {

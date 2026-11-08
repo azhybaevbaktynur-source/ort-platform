@@ -11,7 +11,7 @@ import { createBatch, fmtPlanDay, listBatches, type BatchOut } from "@/lib/lms/a
 import { Badge, Button, Dialog, EmptyState, ErrorState, Input, PageHeader, Table, Textarea, cn, focusRing, toast, type TableColumn } from "@/components/ui";
 import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
 import { useErrorText } from "@/components/lms/home/useErrorText";
-import { AccessTabs, RevealAlert, batchLength, useAccessOverview } from "@/components/lms/access/AdminAccessUi";
+import { RevealAlert, batchLength, useAccessOverview } from "@/components/lms/access/AdminAccessUi";
 import { useSeasonEnd } from "@/components/lms/access/ProAdminUi";
 
 type Mode = "month_1" | "month_3" | "season" | "days" | "date";
@@ -138,12 +138,11 @@ export default function AdminVouchersPage() {
 
   return (
     <div>
-      <PageHeader title={t("access.admin.title")} description={t("access.admin.description")}
-        breadcrumbs={crumbs({ label: t("access.admin.nav") })}
+      <PageHeader title={t("access.admin.pages.vouchers")} description={t("access.admin.description")}
+        breadcrumbs={crumbs({ label: t("access.admin.pages.vouchers") })}
         primaryAction={<Button onClick={() => setCreating(true)} leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />}>{t("access.admin.batches.create")}</Button>} />
-      <AccessTabs />
       {overview?.reveal_alert && <RevealAlert count={overview.reveals_last_hour} className="mb-6" />}
-      <Table caption={t("access.admin.tabs.vouchers")} columns={columns} rows={items} rowKey={(b) => b.id}
+      <Table caption={t("access.admin.pages.vouchers")} columns={columns} rows={items} rowKey={(b) => b.id}
         loading={loading && items.length === 0}
         error={error && items.length === 0 ? <ErrorState variant="inline" message={errorText(error)} onRetry={() => void load()} /> : undefined}
         empty={<EmptyState variant="plain" title={t("access.admin.batches.empty")} />}

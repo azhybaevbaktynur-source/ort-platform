@@ -17,7 +17,7 @@ import {
 } from "@/components/ui";
 import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
 import { useErrorText } from "@/components/lms/home/useErrorText";
-import { AccessTabs, batchLength } from "@/components/lms/access/AdminAccessUi";
+import { batchLength } from "@/components/lms/access/AdminAccessUi";
 
 const STATUS_TONE: Record<CodeStatus, BadgeTone> = { unused: "neutral", given: "info", redeemed: "success", revoked: "danger" };
 const STATUSES: CodeStatus[] = ["unused", "given", "redeemed", "revoked"];
@@ -106,8 +106,8 @@ export default function AdminBatchPage() {
     } catch (e) { setDialogError(errorText(e)); } finally { setBusyId(null); }
   };
 
-  const accessCrumb = { label: t("access.admin.nav"), href: `/${lang}/admin/access` };
-  const vouchersCrumb = { label: t("access.admin.tabs.vouchers"), href: `/${lang}/admin/access/vouchers` };
+  const accessCrumb = { label: t("access.admin.pages.pro"), href: `/${lang}/admin/access` };
+  const vouchersCrumb = { label: t("access.admin.pages.vouchers"), href: `/${lang}/admin/access/vouchers` };
   if (error && !batch) {
     return (
       <div>
@@ -161,7 +161,6 @@ export default function AdminBatchPage() {
               else { setDialogError(null); setRevoking(true); }
             }} />
         } />
-      <AccessTabs />
       <Card className="mb-6">
         <DescriptionList twoColumns items={[
           { key: "length", term: t("access.admin.batches.columns.length"), description: batchLength(batch, t, lang) },

@@ -1,31 +1,15 @@
 "use client";
 
-// S3 access, platform admin: the section tabs (F6b: Pro · Ваучеры · Экзамены · Настройки) and the attention block (exams published in the last 14 days with
+// S3 access, platform admin: the attention block (exams published in the last 14 days with
 // their tier, and the alert after more than 20 codes shown in an hour). Used by /admin/access and the overview.
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
 import { fmtApiDate } from "@/lib/format";
 import { getAccessOverview, type AccessOverviewOut, type AccessTier, type BatchOut } from "@/lib/lms/access";
-import { Badge, Card, Skeleton, TabsNav, cn, focusRing } from "@/components/ui";
-
-export function AccessTabs({ className }: { className?: string }) {
-  const { lang, t } = useTranslation();
-  const pathname = usePathname();
-  const base = `/${lang}/admin/access`;
-  return (
-    <TabsNav label={t("access.admin.title")} className={cn("mb-6", className)} items={[
-      { href: base, label: t("access.admin.tabs.pro"), active: pathname === base },
-      { href: `${base}/vouchers`, label: t("access.admin.tabs.vouchers"),
-        active: pathname.startsWith(`${base}/vouchers`) || pathname.startsWith(`${base}/batches`) },
-      { href: `${base}/exams`, label: t("access.admin.tabs.exams"), active: pathname.startsWith(`${base}/exams`) },
-      { href: `${base}/settings`, label: t("access.admin.tabs.settings"), active: pathname.startsWith(`${base}/settings`) },
-    ]} />
-  );
-}
+import { Badge, Card, Skeleton, cn, focusRing } from "@/components/ui";
 
 export function TierBadge({ tier }: { tier: AccessTier }) {
   const { t } = useTranslation();

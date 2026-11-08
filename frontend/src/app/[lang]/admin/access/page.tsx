@@ -12,7 +12,6 @@ import { fmtPassEnd, getProSummary, listPro, type ProRowOut, type ProStatus, typ
 import { Button, EmptyState, ErrorState, PageHeader, SearchInput, Table, cn, focusRing, type PickedUser, type TableColumn } from "@/components/ui";
 import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
 import { useErrorText } from "@/components/lms/home/useErrorText";
-import { AccessTabs } from "@/components/lms/access/AdminAccessUi";
 import { CancelProDialog, GrantProDialog, planLabel, sourceLabel } from "@/components/lms/access/ProAdminUi";
 
 const STATUSES: ProStatus[] = ["active", "expiring", "expired"];
@@ -111,10 +110,9 @@ export default function AdminProPage() {
 
   return (
     <div>
-      <PageHeader title={t("access.admin.title")} description={t("access.admin.description")}
-        breadcrumbs={crumbs({ label: t("access.admin.nav") })}
+      <PageHeader title={t("access.admin.pages.pro")} description={t("access.admin.description")}
+        breadcrumbs={crumbs({ label: t("access.admin.pages.pro") })}
         primaryAction={<Button onClick={() => setGranting({ person: null, row: null })} leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />}>{t("access.admin.pro.grant")}</Button>} />
-      <AccessTabs />
       <Summary data={summary} />
       <Table caption={t("access.admin.pro.caption")} columns={columns} rows={items} rowKey={(r) => r.user_id}
         search={
