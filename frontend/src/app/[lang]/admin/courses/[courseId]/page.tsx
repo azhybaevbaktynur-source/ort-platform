@@ -12,12 +12,11 @@ import { pickLocalized } from "@/lib/lms/localized";
 import { isSystemAccount } from "@/lib/lms/organizations";
 import { fmtApiDateTimeShort } from "@/lib/format";
 import {
-  Badge, Button, Card, DescriptionList, LoadingState, PageHeader, ReasonDialog, Table, UserPicker, toast, type TableColumn,
+  Badge, Button, Card, DescriptionList, LoadingState, PageHeader, STAFF_WIDTH, type MenuGroup, ReasonDialog, Table, UserPicker, toast, type TableColumn,
 } from "@/components/ui";
 import { platformUserSearch, type PickedUser } from "@/components/lms/UserPicker";
 import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
 import { Disclosure } from "@/components/lms/admin/Disclosure";
-import { OutlineMenu } from "@/components/lms/modules/OutlineMenu";
 import { CourseStatusBadge, LoadError, OrgError, SystemAccountBadge } from "@/components/lms/org/OrgUi";
 import { CourseCoverSection } from "@/components/lms/course/CourseCoverSection"; // F7b
 
@@ -126,17 +125,13 @@ export default function AdminCourseDetailPage() {
     transfer: t("organizations.adminCourse.transferBody", { course: courseTitle, from: ownerName, to: newOwner ? newOwner.display_name || newOwner.email : "" }),
   };
 
-  const actions = isDeleted ? (
-    <Button variant="secondary" onClick={() => open("restore")}>{labels.restore}</Button>
-  ) : (
-    <OutlineMenu label={t("coursePage.moreActions")} onSelect={(id) => open(id as Action)}
-      groups={[{
-        id: "course", items: [
-          course.unlisted_by_admin_at ? { id: "relist", label: labels.relist } : { id: "unlist", label: labels.unlist },
-          { id: "delete", label: labels.delete, danger: true },
-        ],
-      }]} />
-  );
+  const primary = isDeleted ? <Button variant="secondary" onClick={() => open("restore")}>{labels.restore}</Button> : undefined;
+  const overflow: MenuGroup[] | undefined = isDeleted ? undefined : [{
+    id: "course", items: [
+      course.unlisted_by_admin_at ? { id: "relist", label: labels.relist } : { id: "unlist", label: labels.unlist },
+      { id: "delete", label: labels.delete, danger: true },
+    ],
+  }];
   const badges = (
     <span className="flex flex-wrap items-center gap-2">
       <CourseStatusBadge status={course.status} />
@@ -154,8 +149,8 @@ export default function AdminCourseDetailPage() {
   ];
 
   return (
-    <div>
-      <PageHeader title={courseTitle} badge={badges} breadcrumbs={crumbs(coursesCrumb, { label: courseTitle })} secondaryActions={actions} />
+    <div className={`w-full ${STAFF_WIDTH.list}`}>
+      <PageHeader title={courseTitle} badge={badges} breadcrumbs={crumbs(coursesCrumb, { label: courseTitle })} primaryAction={primary} overflow={overflow} onOverflow={(id) => open(id as Action)} overflowLabel={t("coursePage.moreActions")} />
       {error ? <OrgError error={error} onRetry={load} className="mb-4" /> : null}
       <Card className="mb-6">
         <DescriptionList twoColumns items={[
@@ -204,6 +199,7 @@ export default function AdminCourseDetailPage() {
         ) : (
           <>
             <Table
+              density="compact"
               caption={t("platformAdmin.courses.roster")}
               columns={rosterColumns}
               rows={people}

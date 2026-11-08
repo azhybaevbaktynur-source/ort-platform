@@ -2,16 +2,17 @@
 
 import React, { useCallback, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { approveTeacherRequest, getUser, listTeacherRequests, rejectTeacherRequest, setTeacherStatus } from "@/lib/lms/admin";
 import type { TeacherRequestAdminOut, TeacherRequestStatus } from "@/lib/lms/types";
 import { fmtApiDateTimeShort } from "@/lib/format";
-import { Badge, Button, Card, DescriptionList, EmptyState, LoadingState, PageHeader, Pagination, ReasonDialog, TabPanel, Tabs, toast } from "@/components/ui";
+import { Badge, Button, DescriptionList, EmptyState, OverflowMenu, PageHeader, ReasonDialog, Sheet, STAFF_WIDTH, TabPanel, Table, Tabs, toast, type TableColumn } from "@/components/ui";
 import { UserStatusBadge } from "@/components/lms/admin/UserStatusBadge";
 import { useAdminCrumbs, useAdminSummary } from "@/components/lms/admin/AdminShell";
 import { useCursorList } from "@/components/lms/admin/useCursorList";
-import { MoreError } from "@/components/lms/admin/ListParts";
-import { LoadError, OrgError } from "@/components/lms/org/OrgUi";
+import { MoreError, useTableState } from "@/components/lms/admin/ListParts";
+import { OrgError } from "@/components/lms/org/OrgUi";
 
 type Filter = TeacherRequestStatus | "all";
 // Phase 6 S4 (admin M7): the teacher status a request status implies; a badge shows only when they differ.
@@ -19,30 +20,10 @@ const IMPLIED_TEACHER_STATUS: Record<string, string> = { pending: "pending", app
 const FILTERS: Filter[] = ["pending", "approved", "rejected", "all"];
 const REQUEST_TONE: Record<string, "warning" | "success" | "danger" | "neutral"> = { pending: "warning", approved: "success", rejected: "danger", cancelled: "neutral" };
 
-/** What the applicant sent. A request from before the form has only its optional message. */
-function RequestFields({ request: r }: { request: TeacherRequestAdminOut }) {
-  const { t } = useTranslation();
-  const hasForm = !!(r.school || r.subject || r.phone);
-  if (!hasForm && !r.message) return <p className="mt-3 text-base leading-6 text-slate-600 sm:text-sm">{t("platformAdmin.requests.noMessage")}</p>;
-  const items = [
-    { key: "school", term: t("platformAdmin.requests.school"), description: r.school },
-    { key: "subject", term: t("platformAdmin.requests.subject"), description: r.subject },
-    { key: "phone", term: t("platformAdmin.requests.phone"), description: r.phone && (
-      <a href={`tel:${r.phone.replace(/[^0-9+]/g, "")}`} className="inline-flex min-h-11 items-center font-medium text-brand-700 hover:underline sm:min-h-0">{r.phone}</a>
-    ) },
-    { key: "teachesAt", term: t("platformAdmin.requests.teachesAt"), description: (r.teaches_at?.length ?? 0) > 0 ? r.teaches_at.join(", ") : null },
-  ].filter((item) => item.description);
-  return (
-    <div className="mt-3 space-y-3 border-t border-slate-100 pt-3">
-      {items.length > 0 && <DescriptionList twoColumns items={items} />}
-      {r.message && <DescriptionList items={[{ key: "message", term: t("platformAdmin.requests.message"), description: <span className="whitespace-pre-wrap">{r.message}</span> }]} />}
-    </div>
-  );
-}
-
 export default function TeacherRequestsPage() {
   const { lang, t } = useTranslation();
   const crumbs = useAdminCrumbs();
+  const router = useRouter();
   const { refresh } = useAdminSummary();
   const [filter, setFilter] = useState<Filter>("pending");
   const fetchPage = useCallback((cursor: string | null) => listTeacherRequests(filter, cursor), [filter]);
@@ -52,6 +33,8 @@ export default function TeacherRequestsPage() {
   const [dialog, setDialog] = useState<{ kind: "reject" | "revoke"; req: TeacherRequestAdminOut } | null>(null);
   const [revokeImpact, setRevokeImpact] = useState<{ students: number; courses: number } | null>(null);
   const [dialogError, setDialogError] = useState<unknown>(null);
+  const [details, setDetails] = useState<TeacherRequestAdminOut | null>(null);
+  const state = useTableState(list);
 
   const replace = (u: TeacherRequestAdminOut) => list.setItems((prev) => prev.map((r) => (r.id === u.id ? u : r)));
   const nameOf = (r: TeacherRequestAdminOut) => r.user.display_name || r.user.email;
@@ -107,69 +90,91 @@ export default function TeacherRequestsPage() {
     }
   };
 
+  const columns: TableColumn<TeacherRequestAdminOut>[] = [
+    {
+      key: "applicant", header: t("platformAdmin.requests.applicant"), primary: true,
+      cell: (r) => (
+        <>
+          <button type="button" onClick={() => setDetails(r)} className="break-words text-left font-semibold text-brand-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600">{r.applicant_name || nameOf(r)}</button>
+          <span className="block break-all text-sm font-normal text-slate-600">{r.user.email}</span>
+        </>
+      ),
+    },
+    { key: "school", header: t("platformAdmin.requests.school"), cell: (r) => r.school || <span className="text-slate-500">—</span>, hideInCard: (r) => !r.school },
+    { key: "subject", header: t("platformAdmin.requests.subject"), cell: (r) => r.subject || <span className="text-slate-500">—</span>, hideInCard: (r) => !r.subject },
+    {
+      // Phase 6 S4 (admin M7): request status; teacher status only when it differs, prefixed "Now:"
+      key: "status", header: t("platformAdmin.requests.status"),
+      cell: (r) => (
+        <span className="inline-flex flex-wrap items-center justify-end gap-1.5 sm:justify-start">
+          <Badge tone={REQUEST_TONE[r.status] ?? "neutral"}>{t(`teacherRequest.requestStatus.${r.status}`)}</Badge>
+          {r.user_teacher_status !== IMPLIED_TEACHER_STATUS[r.status] && (
+            <span className="inline-flex items-center gap-1 text-sm text-slate-600">{t("organizations.adminUser.nowPrefix")} <UserStatusBadge kind="teacher" status={r.user_teacher_status} /></span>
+          )}
+        </span>
+      ),
+    },
+    { key: "submitted", header: t("platformAdmin.requests.submitted"), nowrap: true, cell: (r) => fmtApiDateTimeShort(r.created_at, lang) },
+    {
+      key: "actions", header: <span className="sr-only">{t("platformAdmin.requests.actions")}</span>, label: t("platformAdmin.requests.actions"), actions: true, align: "right",
+      cell: (r) => {
+        const danger = [
+          ...(r.status === "pending" ? [{ id: "reject", label: t("platformAdmin.requests.reject"), danger: true }] : []),
+          ...(r.user_teacher_status === "approved" ? [{ id: "revoke", label: t("platformAdmin.requests.revoke"), danger: true }] : []),
+        ];
+        return (
+          <span className="inline-flex items-center justify-end gap-2">
+            {r.status === "pending" && (
+              <Button size="sm" loading={busyId === r.id && !dialog} disabled={busyId === r.id} onClick={() => void approve(r)}>{t("platformAdmin.requests.approve")}</Button>
+            )}
+            <OverflowMenu
+              groups={[{ id: "r", items: [{ id: "details", label: t("platformAdmin.requests.details") }, { id: "user", label: t("platformAdmin.requests.openUser") }, ...danger] }]}
+              onSelect={(id) => {
+                if (id === "details") setDetails(r);
+                else if (id === "user") router.push(`/${lang}/admin/users/${r.user.id}`);
+                else if (id === "reject") { setDialogError(null); setDialog({ kind: "reject", req: r }); }
+                else if (id === "revoke") void openRevoke(r);
+              }} />
+          </span>
+        );
+      },
+    },
+  ];
+
   const tabsId = "teacher-requests";
+  const d = details;
+  const detailItems = d ? [
+    { key: "email", term: t("platformAdmin.requests.email"), description: <span className="break-all">{d.user.email}</span> },
+    { key: "school", term: t("platformAdmin.requests.school"), description: d.school },
+    { key: "subject", term: t("platformAdmin.requests.subject"), description: d.subject },
+    { key: "phone", term: t("platformAdmin.requests.phone"), description: d.phone && (
+      <a href={`tel:${d.phone.replace(/[^0-9+]/g, "")}`} className="inline-flex min-h-11 items-center font-medium text-brand-700 hover:underline sm:min-h-0">{d.phone}</a>
+    ) },
+    { key: "teachesAt", term: t("platformAdmin.requests.teachesAt"), description: (d.teaches_at?.length ?? 0) > 0 ? d.teaches_at.join(", ") : null },
+    { key: "message", term: t("platformAdmin.requests.message"), description: d.message ? <span className="whitespace-pre-wrap">{d.message}</span> : null },
+    { key: "reason", term: t("teacherRequest.reason"), description: d.reason && <span className="break-words">{d.reason}</span> },
+    { key: "decided", term: t("platformAdmin.requests.decided"), description: d.decided_by && d.decided_at
+      ? t("platformAdmin.requests.decidedBy", { name: d.decided_by.display_name || d.decided_by.email, date: fmtApiDateTimeShort(d.decided_at, lang) }) : null },
+  ].filter((it) => it.description) : [];
   return (
-    <div>
-      <PageHeader title={t("platformAdmin.requests.title")} breadcrumbs={crumbs({ label: t("platformAdmin.requests.title") })} />
+    <div className={`w-full ${STAFF_WIDTH.list}`}>
+      <PageHeader title={t("platformAdmin.requests.title")} description={t("platformAdmin.requests.subtitle")} breadcrumbs={crumbs({ label: t("platformAdmin.requests.title") })} />
       <Tabs id={tabsId} label={t("platformAdmin.requests.filter")} value={filter} onChange={(v) => setFilter(v as Filter)}
         items={FILTERS.map((f) => ({ id: f, label: t(`platformAdmin.requests.filters.${f}`) }))} />
       <TabPanel tabsId={tabsId} value={filter}>
         {actionError ? <OrgError error={actionError} className="mb-4" /> : null}
-        {list.items.length > 0 && <p className="mb-3 text-sm font-medium text-slate-700" aria-live="polite">{t("shell.list.shown", { n: list.items.length })}</p>}
-        {list.error && list.items.length === 0 ? <LoadError error={list.error} onRetry={() => void list.reload()} />
-          : list.loading && list.items.length === 0 ? <LoadingState label={t("lms.common.loading")} />
-          : list.items.length === 0 ? <EmptyState title={t("platformAdmin.requests.empty")} />
-          : (
-            <ul className="space-y-3">
-              {list.items.map((r) => (
-                <Card as="li" key={r.id}>
-                  <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-                    <div className="min-w-0">
-                      <Link href={`/${lang}/admin/users/${r.user.id}`} className="inline-flex min-h-11 items-center break-words text-base font-semibold text-brand-700 hover:underline sm:min-h-0">{r.applicant_name || nameOf(r)}</Link>
-                      <p className="break-all text-sm text-slate-600">{r.user.email}</p>
-                    </div>
-                    {/* Phase 6 S4 (admin M7): request status; teacher status only when it differs, prefixed "Now:" */}
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge tone={REQUEST_TONE[r.status] ?? "neutral"}>{t(`teacherRequest.requestStatus.${r.status}`)}</Badge>
-                      {r.user_teacher_status !== IMPLIED_TEACHER_STATUS[r.status] && (
-                        <span className="inline-flex items-center gap-1 text-sm text-slate-600">
-                          {t("organizations.adminUser.nowPrefix")} <UserStatusBadge kind="teacher" status={r.user_teacher_status} />
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <p className="mt-1 text-sm text-slate-600">{fmtApiDateTimeShort(r.created_at, lang)}</p>
-                  <RequestFields request={r} />
-                  {r.reason && <p className="mt-2 break-words text-sm text-slate-800"><strong>{t("teacherRequest.reason")}:</strong> {r.reason}</p>}
-                  {r.decided_by && r.decided_at && (
-                    <p className="mt-1 text-sm text-slate-600">{t("platformAdmin.requests.decidedBy", { name: r.decided_by.display_name || r.decided_by.email, date: fmtApiDateTimeShort(r.decided_at, lang) })}</p>
-                  )}
-                  {(r.status === "pending" || r.user_teacher_status === "approved") && (
-                    <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap">
-                      {r.user_teacher_status === "approved" && (
-                        <Button variant="secondary" disabled={busyId === r.id} onClick={() => void openRevoke(r)}>
-                          {t("platformAdmin.requests.revoke")}
-                        </Button>
-                      )}
-                      {r.status === "pending" && (
-                        <>
-                          <Button variant="secondary" disabled={busyId === r.id} onClick={() => { setDialogError(null); setDialog({ kind: "reject", req: r }); }}>
-                            {t("platformAdmin.requests.reject")}
-                          </Button>
-                          <Button loading={busyId === r.id && !dialog} disabled={busyId === r.id} onClick={() => void approve(r)} className="sm:order-first">
-                            {t("platformAdmin.requests.approve")}
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </Card>
-              ))}
-            </ul>
-          )}
-        <Pagination nextCursor={list.cursor} onLoadMore={list.loadMore} loading={list.loading && list.items.length > 0} />
+        <Table caption={t("platformAdmin.requests.title")} density="compact" columns={columns} rows={list.items} rowKey={(r) => r.id} {...state}
+          empty={<EmptyState variant="plain" title={t("platformAdmin.requests.empty")} />} />
         <MoreError list={list} />
       </TabPanel>
+      <Sheet open={!!d} onClose={() => setDetails(null)} title={d ? (d.applicant_name || nameOf(d)) : ""}>
+        {d && (
+          <div className="space-y-4">
+            {detailItems.length > 0 ? <DescriptionList items={detailItems} /> : <p className="text-sm text-slate-600">{t("platformAdmin.requests.noMessage")}</p>}
+            <Link href={`/${lang}/admin/users/${d.user.id}`} className="inline-flex min-h-11 items-center text-sm font-medium text-brand-700 hover:underline sm:min-h-0">{t("platformAdmin.requests.openUser")}</Link>
+          </div>
+        )}
+      </Sheet>
       <ReasonDialog
         open={!!dialog}
         title={dialog?.kind === "reject" ? t("platformAdmin.requests.rejectTitle") : t("platformAdmin.requests.revokeTitle")}

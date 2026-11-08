@@ -110,7 +110,7 @@ export default function AdminProPage() {
 
   return (
     <div>
-      <PageHeader title={t("access.admin.pages.pro")} description={t("access.admin.description")}
+      <PageHeader title={t("access.admin.pages.pro")} description={t("access.admin.subtitles.pro")}
         breadcrumbs={crumbs({ label: t("access.admin.pages.pro") })}
         primaryAction={<Button onClick={() => setGranting({ person: null, row: null })} leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />}>{t("access.admin.pro.grant")}</Button>} />
       <Summary data={summary} />

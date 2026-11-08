@@ -257,6 +257,7 @@ export function StaffGradebook() {
           <GradebookLegend />
           <div className={loading ? "opacity-60" : undefined}>
             <Table<GbRowOut>
+              density="compact"
               caption={t("gradebook.title")}
               rows={rows}
               rowKey={(r) => r.enrollment_id}

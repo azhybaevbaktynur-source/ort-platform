@@ -3,7 +3,7 @@
 import React, { useCallback, useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { listAuditLog } from "@/lib/lms/admin";
-import { Button, EmptyState, Input, PageHeader, Select } from "@/components/ui";
+import { Button, EmptyState, Input, PageHeader, STAFF_WIDTH, Select } from "@/components/ui";
 import { AuditTable } from "@/components/lms/admin/AuditTable";
 import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
 import { useCursorList } from "@/components/lms/admin/useCursorList";
@@ -27,8 +27,8 @@ export default function AuditLogPage() {
   const state = useTableState(list);
 
   return (
-    <div>
-      <PageHeader title={t("platformAdmin.audit.title")} breadcrumbs={crumbs({ label: t("platformAdmin.audit.title") })} />
+    <div className={`w-full ${STAFF_WIDTH.list}`}>
+      <PageHeader title={t("platformAdmin.audit.title")} description={t("platformAdmin.audit.subtitle")} breadcrumbs={crumbs({ label: t("platformAdmin.audit.title") })} />
       <form role="search" className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end"
         onSubmit={(e) => { e.preventDefault(); setApplied({ action: action.trim(), actorId: actorId.trim(), targetType }); }}>
         <Input containerClassName="sm:w-56" label={t("platformAdmin.audit.action")} value={action} onChange={(e) => setAction(e.target.value)} placeholder="course.delete" />
