@@ -229,5 +229,6 @@ test.describe("a server without Google keys", () => {
       await expect(page.getByText(t("auth.continueWithGoogle"))).toHaveCount(0);
       await expect(page.getByRole("separator")).toHaveCount(0);
     }
+    await page.unrouteAll({ behavior: "ignoreErrors" });
   });
 });
