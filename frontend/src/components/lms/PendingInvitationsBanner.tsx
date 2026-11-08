@@ -6,25 +6,37 @@ import { usePathname } from "next/navigation";
 import { MailOpen } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { INVITATIONS_CHANGED_EVENT, listMyInvitations } from "@/lib/lms/invitations";
+import { BOOTSTRAP_KEY, BOOTSTRAP_OPTIONS, fetchBootstrap, reloadBootstrap, type BootstrapOut } from "@/lib/lms/bootstrap";
+import { useCached } from "@/lib/lms/swr";
+import { useInLmsShell } from "@/lib/lms/useLmsMe";
 
 /**
  * Phase 6 S4b: "Invitations for you: N" after login (GET /me/invitations), linking to the list with
  * Accept buttons on /invitations. Navigation only: fails silently, hidden on that page itself.
+ * PERFORMANCE_AUDIT S2: inside LmsShell the count comes from the shell's bootstrap (no request of its own); a change
+ * asks the bootstrap again. Outside the shell it keeps its own request.
  */
 export function PendingInvitationsBanner({ enabled }: { enabled: boolean }) {
   const { lang, t } = useTranslation();
   const pathname = usePathname();
-  const [count, setCount] = useState(0);
+  const inShell = useInLmsShell();
+  const [ownCount, setOwnCount] = useState(0);
+  const boot = useCached<BootstrapOut>(enabled && inShell ? BOOTSTRAP_KEY : null, fetchBootstrap, BOOTSTRAP_OPTIONS);
 
   const load = useCallback(() => {
-    listMyInvitations().then((rows) => setCount(rows.length)).catch(() => setCount(0));
-  }, []);
+    if (inShell) {
+      void reloadBootstrap().catch(() => undefined);
+      return;
+    }
+    listMyInvitations().then((rows) => setOwnCount(rows.length)).catch(() => setOwnCount(0));
+  }, [inShell]);
   useEffect(() => {
     if (!enabled) return;
-    load();
+    if (!inShell) load();
     window.addEventListener(INVITATIONS_CHANGED_EVENT, load);
     return () => window.removeEventListener(INVITATIONS_CHANGED_EVENT, load);
-  }, [enabled, load]);
+  }, [enabled, inShell, load]);
+  const count = !enabled ? 0 : inShell ? boot.data?.pending_invitations ?? 0 : ownCount;
 
   const href = `/${lang}/invitations`;
   if (count === 0 || pathname === href) return null;

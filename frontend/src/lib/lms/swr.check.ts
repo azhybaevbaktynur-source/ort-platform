@@ -77,6 +77,10 @@ async function main() {
   ok(!disk.ort_swr_v1.includes("course:1"), "memory entries are not written to the session");
   configureSwr({}); // a reload: memory gone, the session copy comes back for the same token only
   ok((peek<{ id: string }>("me")?.value)?.id === "u1", "same token after a reload reads the session copy");
+  const again = counter([{ id: "u1b" }]);
+  ok((await cached("me", again, { storage: "session" }))?.id === "u1" && again.calls === 1, "a session copy after a reload is shown and asked again once");
+  await flush();
+  ok(peek<{ id: string }>("me")?.value.id === "u1b", "the reload's answer replaces the session copy");
   ok(peek("course:1") === null, "memory entries do not survive a reload");
   token = "tok-b";
   ok(peek("me") === null && peek("a") === null, "another token sees nothing");
