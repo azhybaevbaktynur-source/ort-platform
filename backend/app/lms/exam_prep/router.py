@@ -60,7 +60,7 @@ def delete_exam_goal(course_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz
 @router.get("/courses/{course_id}/lesson-courses", response_model=list[LessonCourseOut])
 def exam_lesson_courses(course_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
     course = load_course(ctx.db, course_id)
-    service.require_exam_prep(course)  # 404 for any other course
-    lessons.require_member(ctx, course)  # 403 `not_enrolled`
+    lessons.require_member(ctx, course)  # 403 `not_enrolled` first: a stranger never learns the course's kind
+    service.require_exam_prep(course)  # 404 for any other course (readers only)
     return lessons.lesson_courses(ctx.db, course, ctx.user.id)
 # --- TEACHER_TO_STUDENT_MAP 2.3 end ---

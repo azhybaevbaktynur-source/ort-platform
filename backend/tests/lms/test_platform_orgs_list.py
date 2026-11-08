@@ -170,3 +170,26 @@ async def test_courses_q_and_status(db, api):
     assert ids(await api.call(admin, "GET", f"{P}/{org.id}/courses", params={"q": "algebra"})) == [str(c1.id)]
     assert ids(await api.call(admin, "GET", f"{P}/{org.id}/courses", params={"status": "draft"})) == [str(c2.id)]
     assert (await api.call(admin, "GET", f"{P}/{org.id}/courses", params={"status": "nope"})).status_code == 422
+
+
+async def test_disabled_students_are_neither_counted_nor_listed(db, api):
+    """fb8 review fix 6: an account with `disabled_at` is not a student of the tree (roll-up and student list)."""
+    from app.lms.core.models import utcnow
+
+    admin = make_user(db, platform_admin=True)
+    school = make_org(db, "School")
+    dept = make_department(db, school, "Dept")
+    t = make_user(db)
+    add_member(db, dept, t, "teacher")
+    course = make_course(db, t, organization_id=dept.id, status="published")
+    active, disabled = make_user(db), make_user(db)
+    enroll(db, course, active)
+    enroll(db, course, disabled)
+    disabled.disabled_at = utcnow()
+    db.commit()
+    for org in (school, dept):
+        assert (await api.call(admin, "GET", f"{P}/{org.id}")).json()["students"] == 1
+        items = (await api.call(admin, "GET", f"{P}/{org.id}/students")).json()["items"]
+        assert [i["user"]["id"] for i in items] == [active.id], items
+    rows = {i["id"]: i for i in (await api.call(admin, "GET", P)).json()["items"]}
+    assert rows[str(school.id)]["students"] == 1

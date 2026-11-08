@@ -149,18 +149,11 @@ def load_org(db: Session, organization_id: uuid.UUID, *, for_update: bool = Fals
 
 
 def load_org_for_admin(db: Session, user: User, organization_id: uuid.UUID, *, write: bool = False) -> Organization:
-    """Policy `org_admin`: active org admin of the organization, or the platform admin. Anyone else gets the
-    same 404 as a missing organization. A suspended organization is read-only except for the platform admin."""
-    org = db.execute(select(Organization).where(
-        Organization.id == organization_id, Organization.deleted_at.is_(None))).scalar_one_or_none()
-    if org is None or not (user.is_platform_admin or is_org_admin(db, org.id, user.id)):
-        raise org_not_found()
-    if write and not user.is_platform_admin:
-        from app.lms.organizations.tree import suspended_on_path
-
-        if suspended_on_path(db, org):  # Phase 9 fix 2 (M1): a suspended ancestor makes the department read-only
-            raise org_suspended_error()
-    return org
+    """Policy `org_admin`: active org admin of the organization or of one of its ancestors (fb8 review fix 1: a
+    school admin reaches every tab of a department, not only its overview), or the platform admin. A department
+    admin never reaches the parent school. Anyone else gets the same 404 as a missing organization. A suspended
+    organization (or a suspended ancestor) is read-only except for the platform admin."""
+    return load_org_as_admin(db, user, organization_id, write=write)[0]
 
 
 # --- Admin orgs (item 4) begin --- (ADMIN_ORGS_DESIGN 2.2-2.4)
@@ -315,6 +308,11 @@ def set_suspended(db: Session, admin: User, org: Organization, *, suspended: boo
     org = load_org(db, org.id, for_update=True)
     if suspended and org.kind == "platform":  # D-ORG-1: ORT and every platform exam live there (rule 6.9)
         raise Conflict("The platform organization cannot be suspended", code=E_PLATFORM_ORG_PROTECTED)
+    if suspended and org.parent_id is not None:  # fb8 review fix 2: nor a department of the platform tree
+        from app.lms.organizations import tree
+
+        if tree.load_root(db, org).kind == "platform":
+            raise Conflict("The platform organization cannot be suspended", code=E_PLATFORM_ORG_PROTECTED)
     if suspended == (org.status == "suspended"):
         raise Conflict("Invalid status transition", code="invalid_transition")
     if not suspended and org.kind == "personal":  # D-ORG-5: re-enable a revoked teacher only via "grant teacher"

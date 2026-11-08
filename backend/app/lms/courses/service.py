@@ -155,7 +155,10 @@ def _resolve_creation(db: Session, actor: User, data: CourseCreateIn, organizati
                      ).scalar_one_or_none()
     if org is None:
         raise orgs.org_not_found()
-    org_admin = actor.is_platform_admin or orgs.is_org_admin(db, org.id, actor.id)
+    from app.lms.organizations import tree as org_tree
+
+    # fb8 review fix 1: tree-aware on the loaded row (an admin of an ancestor school counts), one SQL
+    org_admin = actor.is_platform_admin or org_tree.is_org_admin_in_tree(db, actor.id, org)
     member = org_admin or orgs.is_active_member(db, org.id, actor.id)
     if not actor.is_platform_admin:
         if not member:

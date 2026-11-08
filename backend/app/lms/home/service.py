@@ -445,7 +445,8 @@ def _pending_invitations(db: Session, user: User, now: datetime) -> int:
 # --- Phase 8a S3 begin --- (PHASE_8A_DESIGN 5.4, 6.7: two more statements for the modules strip, one for news)
 # Open modules read for the strip (bounded; at most MODULES_NEXT_MAX rows are returned). Known limit (design 6.7):
 # ordered by course id, so a student with more than 100 open modules across courses may see no strip entry for the
-# courses past the bound; accepted (the course's own Modules page is always complete).
+# courses past the bound; accepted (the course's own Modules page is always complete). With `course_ids` (the
+# lesson course list) the bound applies per course (fb8 review fix 5).
 MODULES_SCAN_MAX = 100
 
 
@@ -469,12 +470,14 @@ def _modules_next(db: Session, uid: str, course_ids: Optional[list] = None,
     from app.lms.pages.models import Page
 
     org_path = select(Organization.path).where(Organization.id == Course.organization_id).scalar_subquery()
-    mods = db.execute(
-        select(Course.id.label("course_id"), Course.title.label("course_title"), Course.default_language.label("lang"),
-               Enrollment.id.label("enrollment_id"), CourseModule.id.label("module_id"),
-               CourseModule.title.label("module_title"), ModuleProgress.state.label("state"),
-               ModuleProgress.evaluated_at.label("evaluated_at"), CourseModule.access_tier.label("tier"),
-               Enrollment.is_test_student.label("is_test"), org_path.label("org_path"))
+    cols = (Course.id.label("course_id"), Course.title.label("course_title"), Course.default_language.label("lang"),
+            Enrollment.id.label("enrollment_id"), CourseModule.id.label("module_id"),
+            CourseModule.title.label("module_title"), ModuleProgress.state.label("state"),
+            ModuleProgress.evaluated_at.label("evaluated_at"), CourseModule.access_tier.label("tier"),
+            Enrollment.is_test_student.label("is_test"), org_path.label("org_path"),
+            CourseModule.position.label("position"))
+    scan = (
+        select(*cols)
         .select_from(Enrollment).join(Course, Course.id == Enrollment.course_id)
         .join(ModuleProgress, ModuleProgress.enrollment_id == Enrollment.id)
         .join(CourseModule, CourseModule.id == ModuleProgress.module_id)
@@ -482,8 +485,17 @@ def _modules_next(db: Session, uid: str, course_ids: Optional[list] = None,
                CourseModule.deleted_at.is_(None), CourseModule.published.is_(True),
                ModuleProgress.state.in_(("unlocked", "started", "completed")),
                *([Course.id.in_(course_ids)] if course_ids is not None else []))
-        .order_by(Course.id, CourseModule.position, CourseModule.id).limit(MODULES_SCAN_MAX)
-    ).all()
+    )
+    if course_ids is None:
+        mods = db.execute(scan.order_by(Course.id, CourseModule.position, CourseModule.id)
+                          .limit(MODULES_SCAN_MAX)).all()
+    else:
+        # fb8 review fix 5: the lesson course list scans per course (row_number per course, still one statement),
+        # so one course with many open modules never pushes the others past a global bound
+        per = scan.add_columns(func.row_number().over(
+            partition_by=Course.id, order_by=(CourseModule.position, CourseModule.id)).label("scan_rn")).subquery()
+        mods = db.execute(select(*(per.c[c.key] for c in cols)).where(per.c.scan_rn <= MODULES_SCAN_MAX)
+                          .order_by(per.c.course_id, per.c.position, per.c.module_id)).all()
     # F5a: Pro modules of platform courses need a pass (S3 Gate; test students never locked); one statement, only
     # when such a module is among the rows
     tiered = [m for m in mods if m.tier == "paid" and not m.is_test and is_platform_path(m.org_path)]

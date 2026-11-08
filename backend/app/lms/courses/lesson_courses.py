@@ -28,7 +28,6 @@ from app.lms.home.schemas import HomeProgressOut
 from app.lms.modules.schemas import ItemLinkOut
 
 LESSON_COURSES_MAX = 20
-_MEMBER_ROLES = ("student", "teacher", "assistant")
 
 
 class LessonCourseOut(BaseModel):
@@ -39,15 +38,17 @@ class LessonCourseOut(BaseModel):
     lessons_count: int = 0
     duration_s: int = 0  # the summed length of its lessons (lessons without a length count 0)
     enrolled: bool
+    is_staff: bool = False  # the caller teaches or assists the lesson course (fb8 review fix 7): the UI offers no Join
     progress: Optional[HomeProgressOut] = None  # enrolled only; null without a requirement (as the home card)
     has_paid_modules: bool
     next_item: Optional[ItemLinkOut] = None  # enrolled only: the first item not done (the home's "continue")
 
 
 def require_member(ctx: AuthzContext, course: Course) -> None:
-    """Enrolled (students, test students) or staff of the exam course; platform and organization admins read it as
-    any course. Everyone else: 403 `not_enrolled`."""
-    if ctx.role_for(course.id) in _MEMBER_ROLES or can(ctx, A.COURSE_READ, course):
+    """Read access to the exam course (`course.read`, so the course status counts: a student of a draft course does
+    not read it; fb8 review fix 4): enrolled (students, test students) or staff; platform and organization admins
+    read it as any course. Everyone else: 403 `not_enrolled`, before any exam-prep check (fix 3)."""
+    if can(ctx, A.COURSE_READ, course):
         return
     raise Forbidden("Not enrolled in this course", code="not_enrolled")
 
@@ -94,10 +95,14 @@ def lesson_courses(db: Session, exam: Course, user_id: str) -> list[LessonCourse
                 .where(Enrollment.course_id == Course.id, Enrollment.user_id == user_id,
                        Enrollment.role == "student", Enrollment.state == "active")
                 .correlate(Course).exists())
+    staff = (select(Enrollment.id)
+             .where(Enrollment.course_id == Course.id, Enrollment.user_id == user_id,
+                    Enrollment.role.in_(("teacher", "assistant")), Enrollment.state == "active")
+             .correlate(Course).exists())
     rows = db.execute(
         select(Course.id, Course.title, Asset.sha256, _lessons_agg(func.count(ModuleItem.id)),
                _lessons_agg(func.coalesce(func.sum(ModuleItem.duration_s), 0)), Organization.path,
-               paid, enrolled)
+               paid, enrolled, staff)
         .outerjoin(Asset, and_(Asset.id == Course.cover_asset_id, Asset.erased_at.is_(None)))
         .outerjoin(Organization, Organization.id == Course.organization_id)
         .where(Course.exam_course_id == exam.id, Course.status == "published", Course.deleted_at.is_(None))
@@ -108,12 +113,13 @@ def lesson_courses(db: Session, exam: Course, user_id: str) -> list[LessonCourse
     next_items = ({n.course_id: n.link for n in _modules_next(db, user_id, course_ids=mine, max_out=len(mine))}
                   if mine else {})
     out = []
-    for cid, title, sha, lessons, duration, path, has_paid, is_enrolled in rows:
+    for cid, title, sha, lessons, duration, path, has_paid, is_enrolled, is_staff in rows:
         done_total = progress.get(cid) if is_enrolled else None
         platform = is_platform_path(path)
         out.append(LessonCourseOut(
             id=cid, title=title, cover_url=media_url(sha) if sha else None, is_platform_course=platform,
             lessons_count=int(lessons or 0), duration_s=int(duration or 0), enrolled=bool(is_enrolled),
+            is_staff=bool(is_staff),
             progress=HomeProgressOut(done=done_total[0], total=done_total[1]) if done_total else None,
             has_paid_modules=bool(has_paid) and platform,
             next_item=next_items.get(cid) if is_enrolled else None))

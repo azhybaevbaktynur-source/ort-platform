@@ -243,3 +243,20 @@ async def test_platform_admin_reads_every_org_admin_get_route(db, api):
         path = p.replace("/api/v1", "", 1).replace("{organization_id}", str(school.id))
         assert (await api.call(admin, "GET", path)).status_code == 200, p
         assert (await api.call(stranger, "GET", path)).status_code in (403, 404), p
+
+
+async def test_department_of_the_platform_tree_cannot_be_suspended(db, api):
+    """fb8 review fix 2: the protection covers the whole platform tree, not only its root row."""
+    ensure_platform_org(db.connection())
+    db.commit()
+    admin = make_user(db, platform_admin=True)
+    dept = make_department(db, db.get(Organization, platform_org_id()), "Platform dept")
+    r = await api.call(admin, "POST", f"{P}/{dept.id}/suspend", json={"reason": "test"})
+    assert r.status_code == 409 and r.json()["error"]["code"] == "platform_org_protected", r.text
+    db.expire_all()
+    assert db.get(Organization, dept.id).status == "active"
+    assert _audit(db, "organization.suspend") is None
+    # a department of an ordinary school is still suspendable
+    other = make_department(db, make_org(db, "School"), "Dept")
+    r = await api.call(admin, "POST", f"{P}/{other.id}/suspend", json={"reason": "test"})
+    assert r.status_code == 200 and r.json()["status"] == "suspended", r.text

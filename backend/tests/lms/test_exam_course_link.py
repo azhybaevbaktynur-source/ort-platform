@@ -25,7 +25,7 @@ from tests.lms.org_support import make_org
 from tests.lms.s3_support import api, clean_rate_limits, db  # noqa: F401
 
 LESSON_KEYS = {"id", "title", "cover_url", "is_platform_course", "lessons_count", "duration_s", "enrolled",
-               "progress", "has_paid_modules", "next_item"}
+               "is_staff", "progress", "has_paid_modules", "next_item"}
 
 
 class W:
@@ -281,3 +281,71 @@ def test_ort_seed_writes_no_link(db):
     db.expire_all()
     assert db.scalar(select(func.count()).select_from(Course).where(Course.template_key == "ort")) >= 1
     assert db.scalar(select(func.count()).select_from(Course).where(Course.exam_course_id.isnot(None))) == 0
+
+
+# ------------------------------------------------------------------ fb8 review fixes 3, 4, 5, 7
+
+async def test_stranger_never_learns_whether_a_course_is_exam_prep(db, api):
+    """Fix 3: read access first, so a stranger gets the same 403 on an exam-prep course and on any other one."""
+    w = world(db)
+    link(db, w.lc, w.exam)
+    stranger = make_user(db)
+    for course in (w.exam, w.lc):
+        r = await api.call(stranger, "GET", f"/courses/{course.id}/lesson-courses")
+        assert r.status_code == 403 and r.json()["error"]["code"] == "not_enrolled", r.text
+
+
+async def test_read_access_respects_the_course_status(db, api):
+    """Fix 4: `course.read` semantics: a student of a draft exam course does not read it; its staff still do; a
+    removed enrollment counts as none."""
+    w = world(db)
+    link(db, w.lc, w.exam)
+    url = f"/courses/{w.exam.id}/lesson-courses"
+    gone = make_user(db)
+    enroll(db, w.exam, gone, state="removed")
+    r = await api.call(gone, "GET", url)
+    assert r.status_code == 403 and r.json()["error"]["code"] == "not_enrolled", r.text
+    w.exam.status = "draft"
+    db.commit()
+    r = await api.call(w.s, "GET", url)
+    assert r.status_code == 403 and r.json()["error"]["code"] == "not_enrolled", r.text
+    assert (await api.call(w.admin, "GET", url)).status_code == 200
+
+
+async def test_next_item_for_every_course_past_the_module_scan_bound(db, api):
+    """Fix 5: the module scan is bounded per lesson course, so a course with more than MODULES_SCAN_MAX open modules
+    does not hide the next item of the courses after it (Course.id order)."""
+    from app.lms.home.service import MODULES_SCAN_MAX
+    from app.lms.modules.models import CourseModule
+
+    w = world(db)
+    second = lesson_course(db, w.admin, "Second")
+    for c in (w.lc, second):
+        link(db, c, w.exam)
+        enr = enroll(db, c, w.s)
+        first = make_module(db, c, w.admin)
+        make_item(db, first, make_page(db, c, w.admin, language="ru"), requirement=("view",))
+        mods = [CourseModule(course_id=c.id, title={"ru": f"M{i}"}, position=first.position + 1 + i, published=True)
+                for i in range(MODULES_SCAN_MAX)]
+        db.add_all(mods)
+        db.flush()
+        db.add_all(ModuleProgress(enrollment_id=enr.id, module_id=m.id, state="unlocked", evaluated_rules_version=1,
+                                  evaluated_at=utcnow()) for m in [first, *mods])
+        db.commit()
+    rows = (await api.call(w.s, "GET", f"/courses/{w.exam.id}/lesson-courses")).json()
+    assert len(rows) == 2 and all(x["next_item"] is not None for x in rows), rows
+
+
+async def test_staff_of_a_lesson_course_are_reported(db, api):
+    """Fix 7: a teacher or assistant of the lesson course is `is_staff` (the UI offers no Join), not `enrolled`."""
+    w = world(db)
+    link(db, w.lc, w.exam)
+    assistant = make_user(db)
+    enroll(db, w.exam, assistant)
+    enroll(db, w.lc, assistant, role="assistant")
+    rows = (await api.call(assistant, "GET", f"/courses/{w.exam.id}/lesson-courses")).json()
+    assert (rows[0]["is_staff"], rows[0]["enrolled"], rows[0]["progress"]) == (True, False, None)
+    rows = (await api.call(w.admin, "GET", f"/courses/{w.exam.id}/lesson-courses")).json()  # the owner
+    assert rows[0]["is_staff"] is True
+    rows = (await api.call(w.s, "GET", f"/courses/{w.exam.id}/lesson-courses")).json()
+    assert rows[0]["is_staff"] is False
