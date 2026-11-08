@@ -1,6 +1,7 @@
 // Design system (Phase 6b S5a). Pages import from "@/components/ui" instead of re-styling raw elements.
 export { cn, focusRing } from "./utils";
-export { SHELL_WIDTH } from "./shellWidth";
+export { SHELL_WIDTH, STAFF_WIDTH } from "./shellWidth";
+export type { StaffWidth } from "./shellWidth";
 export { Spinner } from "./Spinner";
 export { Button, LinkButton, buttonClasses } from "./Button";
 export type { ButtonProps, LinkButtonProps, ButtonVariant, ButtonSize, ButtonStyleOptions } from "./Button";
@@ -73,3 +74,8 @@ export { Sheet } from "./Sheet";
 export type { SheetProps } from "./Sheet";
 export { UserPicker } from "./UserPicker";
 export type { UserPickerProps, PickedUser, UserSearch } from "./UserPicker";
+// FB8 S0 staff primitives (docs/phases/STAFF_UX_AUDIT.md §1)
+export { OverflowMenu } from "./OverflowMenu";
+export type { OverflowMenuProps, OverflowMenuItem, MenuGroup } from "./OverflowMenu";
+export { LockToggle } from "./LockToggle";
+export type { LockToggleProps } from "./LockToggle";

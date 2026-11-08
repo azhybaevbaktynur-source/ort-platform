@@ -26,6 +26,12 @@ export interface AreaNavItem {
   icon?: React.ReactNode;
   /** Phase 8c S1: a small trailing mark with its own accessible name (for example "hidden from students"). */
   marker?: { icon: React.ReactNode; label: string } | null;
+  /**
+   * FB8 S0 (STAFF_UX_AUDIT §1): the group label this item sits under ("Content", "Access"). Consecutive items with the
+   * same group form one labelled section of the side nav (and of the phone sheet); items without one form an
+   * unlabelled section. When no item has a group the nav is the old flat list. The phone tab row ignores groups.
+   */
+  group?: string;
 }
 
 export interface AreaShellProps {
@@ -46,9 +52,40 @@ export interface AreaShellProps {
   navFooter?: React.ReactNode;
 }
 
+/** Splits the items into runs of the same `group` (in order); one unlabelled run when no item has a group. */
+function groupRuns(items: AreaNavItem[]): { label?: string; items: AreaNavItem[] }[] {
+  const runs: { label?: string; items: AreaNavItem[] }[] = [];
+  for (const it of items) {
+    const last = runs[runs.length - 1];
+    if (last && last.label === it.group) last.items.push(it);
+    else runs.push({ label: it.group, items: [it] });
+  }
+  return runs;
+}
+
 function NavList({ items, onChoose }: { items: AreaNavItem[]; onChoose?: () => void }) {
+  const baseId = useId();
+  if (!items.some((i) => i.group)) return <NavLinks items={items} onChoose={onChoose} />;
   return (
-    <ul className="space-y-0.5">
+    <div>
+      {groupRuns(items).map((run, idx) => {
+        const headingId = `${baseId}-g${idx}`;
+        return (
+          <div key={`${idx}-${run.label ?? ""}`} className={idx === 0 ? undefined : run.label ? "mt-4" : "mt-0.5"}>
+            {run.label && (
+              <p id={headingId} className="mb-1 px-3 text-[11px] font-semibold uppercase leading-4 tracking-[0.08em] text-slate-500">{run.label}</p>
+            )}
+            <NavLinks items={run.items} onChoose={onChoose} labelledBy={run.label ? headingId : undefined} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function NavLinks({ items, onChoose, labelledBy }: { items: AreaNavItem[]; onChoose?: () => void; labelledBy?: string }) {
+  return (
+    <ul className="space-y-0.5" aria-labelledby={labelledBy}>
       {items.map((i) => (
         <li key={i.href}>
           <Link href={i.href} aria-current={i.active ? "page" : undefined} onClick={onChoose}
@@ -104,6 +141,10 @@ function PhoneDrawer({ label, menuLabel, items, heading, navFooter }: {
   );
 }
 
+/**
+ * The side navigation frame of a staff area (platform admin, organization, course): side nav from `md`, a tab row or
+ * a drawer on phones. Give items a `group` to split a long menu into labelled sections.
+ */
 export function AreaShell({ label, items, heading, banner, children, className, phone = "tabs", menuLabel, navFooter }: AreaShellProps) {
   return (
     <div className={className}>
