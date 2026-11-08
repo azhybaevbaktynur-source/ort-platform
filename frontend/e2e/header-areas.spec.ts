@@ -13,7 +13,8 @@ const otherAreas = (page: Page) => page.getByRole("navigation", { name: t("stude
 
 /** Area labels as drawn on the desktop header, or (Learning, student sidebar) Learning plus the sidebar's other areas. */
 async function areas(page: Page): Promise<string[]> {
-  if (await headerAreas(page).count()) return headerAreas(page).getByRole("link").allInnerTexts();
+  // item 4: an area with choices (the platform admin's organization switcher) is a button, not a link
+  if (await headerAreas(page).count()) return headerAreas(page).locator(":scope > ul > li").locator(":scope > a, :scope > div > button").allInnerTexts();
   if (await otherAreas(page).count()) return [t("shell.areas.learning"), ...await otherAreas(page).getByRole("link").allInnerTexts()];
   return [];
 }
@@ -21,6 +22,17 @@ async function areas(page: Page): Promise<string[]> {
 /** The link to an area: on the header, or on the student sidebar's "other areas". */
 const areaLink = (page: Page, key: string) => headerAreas(page).getByRole("link", { name: t(key) })
   .or(otherAreas(page).getByRole("link", { name: t(key) }));
+
+/** Opens an area: its link, or (a switcher, item 4) the dropdown's first choice. */
+async function goToArea(page: Page, key: string) {
+  const switcher = headerAreas(page).getByRole("button", { name: t(key), exact: true });
+  if (await switcher.count()) {
+    await switcher.click();
+    await switcher.locator("xpath=..").getByRole("link").first().click();
+    return;
+  }
+  await areaLink(page, key).click();
+}
 
 test("the same menu on every page, also while the API is slow", async ({ page }) => {
   await page.setViewportSize(VIEWPORTS.desktop);
@@ -43,7 +55,7 @@ test("the same menu on every page, also while the API is slow", async ({ page })
     await route.continue();
   });
   for (const area of ["shell.areas.platform", "shell.areas.organization", "shell.areas.teaching", "shell.areas.platform"]) {
-    await areaLink(page, area).click();
+    await goToArea(page, area);
     for (const wait of [50, 300, 700]) {
       await page.waitForTimeout(wait);
       expect(await areas(page), `${area} after ${wait} ms`).toEqual(full);

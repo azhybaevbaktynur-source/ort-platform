@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { Info } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { updateOrgSettings, type OrgSettingsViewOut } from "@/lib/lms/organizations";
-import type { CatalogDefaults, OrganizationSettings } from "@/lib/lms/types";
+import type { CatalogDefaults, OrganizationSettings, OrganizationSettingsIn } from "@/lib/lms/types";
 import { Button, Card, Input, Select, Switch, toast } from "@/components/ui";
 import { OrgError } from "./OrgUi";
 
@@ -14,7 +14,11 @@ const MODES: CatalogDefaults["enrollment_mode"][] = ["invite_code", "open", "clo
  * Phase 9 S2 (PHASE_9_DESIGN 4.3): the settings of a tree. They live on the root; a department (or a suspended
  * organization) shows them read-only with the reason. One Save at the end (sends only what changed).
  */
-export function OrgSettingsForm({ view, readOnly, onSaved }: { view: OrgSettingsViewOut; readOnly: boolean; onSaved: (v: OrgSettingsViewOut) => void }) {
+export function OrgSettingsForm({ view, readOnly, onSaved, submit }: {
+  view: OrgSettingsViewOut; readOnly: boolean; onSaved: (v: OrgSettingsViewOut) => void;
+  /** Item 4: Admin → Organizations saves through `PATCH /platform/organizations/{id}`; default `PATCH /org/{id}/settings`. */
+  submit?: (body: OrganizationSettingsIn) => Promise<OrgSettingsViewOut>;
+}) {
   const { t } = useTranslation();
   const [value, setValue] = useState<OrganizationSettings>(view.settings);
   const [busy, setBusy] = useState(false);
@@ -34,14 +38,14 @@ export function OrgSettingsForm({ view, readOnly, onSaved }: { view: OrgSettings
     setBusy(true);
     setError(null);
     try {
-      const body = {
+      const body: OrganizationSettingsIn = {
         teachers_can_create_courses: value.teachers_can_create_courses,
         catalog_defaults: value.catalog_defaults,
         application_retention_days: value.application_retention_days,
         student_invitations_enabled: value.student_invitations_enabled,
         ...(personal ? {} : { bank_sharing_enabled: value.bank_sharing_enabled }),
       };
-      const out = await updateOrgSettings(view.organization_id, body);
+      const out = submit ? await submit(body) : await updateOrgSettings(view.organization_id, body);
       onSaved(out);
       toast.success(t("orgSettings.saved"));
     } catch (err) {

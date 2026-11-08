@@ -791,7 +791,14 @@
         "assessment": "Assessment"
       },
       "apply": "Apply filters",
-      "empty": "No entries."
+      "empty": "No entries.",
+      "actingAs": "as platform admin",
+      "actingAsFilter": "Acted as",
+      "actingAsAny": "Anyone",
+      "actingAsOptions": {
+        "org_admin": "Org admin",
+        "platform_admin": "Platform admin"
+      }
     },
     "auditActions": {
       "student_view_enter": "Entered student view",
@@ -2689,7 +2696,9 @@
       "department_not_empty": "Move or delete the department's courses and sub-departments first.",
       "department_self": "Delete this department from the organization above it.",
       "course_move_invalid": "This course cannot be moved.",
-      "language_not_in_course": "The bank has questions in a language this course does not use. Add the language to the course first."
+      "language_not_in_course": "The bank has questions in a language this course does not use. Add the language to the course first.",
+      "platform_org_protected": "The platform organization cannot be suspended and its short name is fixed.",
+      "owner_not_eligible": "The owner is no longer an active teacher. Grant teacher rights on the person's page instead."
     },
     "admin": {
       "title": "Organizations",
@@ -2725,11 +2734,37 @@
         "courses": "Courses",
         "departments": "Departments",
         "templates": "Templates",
-        "log": "Log"
+        "log": "Log",
+        "students": "Students",
+        "settings": "Settings"
       },
       "logAll": "Open the full audit log",
       "systemAccount": "System account",
-      "systemAccountHint": "The platform needs this account (for example the ORT system teacher). It cannot be edited, blocked or given other rights."
+      "systemAccountHint": "The platform needs this account (for example the ORT system teacher). It cannot be edited, blocked or given other rights.",
+      "kind": "Type",
+      "anyKind": "Any",
+      "sort": "Sort",
+      "sortCreated": "Newest first",
+      "sortName": "By name",
+      "departmentsCount": "Departments: {n}",
+      "openAsOrgAdmin": "Open as org admin",
+      "openAsOrgAdminDisabled": "The owner's account is disabled: there is nothing to manage.",
+      "protectedNote": "Platform organization: it holds the ORT courses and every platform exam, so it cannot be suspended.",
+      "affected": "This affects: courses {courses}, students {students}, departments {departments}.",
+      "students": {
+        "searchPlaceholder": "Name or email",
+        "person": "Student",
+        "courses": "Courses",
+        "firstEnrolled": "First enrolled",
+        "lastEnrolled": "Latest enrollment",
+        "empty": "No students in this organization's courses yet.",
+        "emptySearch": "No students match this search.",
+        "note": "Only name, email and course counts. Everything else is on the person's page."
+      },
+      "courses": {
+        "searchPlaceholder": "Course title",
+        "anyStatus": "Any"
+      }
     },
     "adminCourse": {
       "deleteBody": "The course «{course}» ({n} students) goes to the trash; students lose access. You can restore it later.",
@@ -2854,7 +2889,17 @@
       "suspendedBanner": "This organization is suspended: its courses are read-only and changes are disabled. Contact the platform administrator.",
       "pickTitle": "Your organizations",
       "pickEmpty": "You do not administer any organization.",
-      "rosterImport": "Roster import"
+      "rosterImport": "Roster import",
+      "areaPlatformAdmin": "Organization · platform admin",
+      "actingAsPlatformAdmin": "You are viewing {org} as platform admin. Your actions are recorded as platform admin.",
+      "actingAsPlatformAdminBack": "Back to Admin → Organizations",
+      "titleSuffix": "platform admin"
+    },
+    "kind": {
+      "school": "School",
+      "personal": "Personal",
+      "platform": "Platform",
+      "department": "Department"
     }
   },
   "invitations": {
@@ -3544,7 +3589,9 @@
       "teaching": "Teaching",
       "organization": "Organization",
       "organizations": "Organizations",
-      "platform": "Admin"
+      "platform": "Admin",
+      "allOrganizations": "All organizations",
+      "asPlatformAdmin": "{name} · platform admin"
     },
     "teaching": {
       "courses": "Courses I teach"

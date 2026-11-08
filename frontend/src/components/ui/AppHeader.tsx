@@ -23,6 +23,8 @@ export interface AppHeaderLink {
   href: string;
   label: string;
   active?: boolean;
+  /** Item 4: a line above this link in a dropdown (the platform admin's "All organizations"). */
+  separated?: boolean;
 }
 
 export interface AppHeaderArea {
@@ -138,7 +140,9 @@ function AreaMenu({ areas, activeArea, routeKey, className }: { areas: AppHeader
                 {(a.choices?.length || a.sections?.length) ? (
                   <ul className="mt-0.5 space-y-0.5">
                     {[...(a.choices ?? []), ...(a.sections ?? [])].map((s) => (
-                      <li key={s.href}><MenuLink href={s.href} active={s.active} onNavigate={close} indent>{s.label}</MenuLink></li>
+                      <li key={s.href} className={s.separated ? "mt-1 border-t border-slate-100 pt-1" : undefined}>
+                        <MenuLink href={s.href} active={s.active} onNavigate={close} indent>{s.label}</MenuLink>
+                      </li>
                     ))}
                   </ul>
                 ) : null}
@@ -171,7 +175,9 @@ function AreaDropdown({ area, active, routeKey }: { area: AppHeaderArea; active:
         <div id={panelId} className={cn(PANEL, "left-0 w-72")}>
           <ul className="space-y-0.5">
             {(area.choices ?? []).map((c) => (
-              <li key={c.href}><MenuLink href={c.href} active={c.active} onNavigate={() => pop.setOpen(false)}>{c.label}</MenuLink></li>
+              <li key={c.href} className={c.separated ? "mt-1 border-t border-slate-100 pt-1" : undefined}>
+                <MenuLink href={c.href} active={c.active} onNavigate={() => pop.setOpen(false)}>{c.label}</MenuLink>
+              </li>
             ))}
           </ul>
         </div>

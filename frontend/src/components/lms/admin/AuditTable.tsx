@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import type { AuditEntryOut } from "@/lib/lms/types";
 import { fmtApiDateTimeShort } from "@/lib/format";
-import { Button, Dialog, Table, type PaginationProps, type TableColumn } from "@/components/ui";
+import { Badge, Button, Dialog, Table, type PaginationProps, type TableColumn } from "@/components/ui";
 import { focusRing } from "@/components/ui";
 
 export function useAuditActionLabel() {
@@ -36,7 +36,18 @@ export function AuditTable({ entries, loading, error, empty, pagination, countTe
   const prettyDetails = (e: AuditEntryOut) => JSON.stringify(e.details, null, 2);
   const [open, setOpen] = useState<AuditEntryOut | null>(null);
   const columns: TableColumn<AuditEntryOut>[] = [
-    { key: "action", header: t("platformAdmin.audit.action"), primary: true, cell: (e) => label(e.action) },
+    {
+      // Item 4 (ADMIN_ORGS_DESIGN §2.4): a platform admin acting inside an organization gets a small neutral badge
+      key: "action", header: t("platformAdmin.audit.action"), primary: true,
+      cell: (e) => (
+        <>
+          {label(e.action)}
+          {e.details?.acting_as === "platform_admin" && (
+            <Badge tone="neutral" className="ml-2 align-middle font-normal">{t("platformAdmin.audit.actingAs")}</Badge>
+          )}
+        </>
+      ),
+    },
     { key: "when", header: t("platformAdmin.audit.when"), nowrap: true, cell: (e) => fmtApiDateTimeShort(e.created_at, lang) },
     { key: "actor", header: t("platformAdmin.audit.actor"), cell: (e) => e.actor.display_name || e.actor.email },
     {
