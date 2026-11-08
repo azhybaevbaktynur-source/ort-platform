@@ -68,7 +68,7 @@ interface AuthContextType {
   /** S1: second sign-in step after an AuthError `mfa_required` (details.challenge): authenticator or recovery code. */
   completeMfa: (challenge: string, code: string) => Promise<void>;
   /** Social sign-in: trades the ticket from the callback fragment for a session (AUTH_SOCIAL_DESIGN 1.6). */
-  completeOAuth: (ticket: string, extras?: OAuthExtras) => Promise<void>;
+  completeOAuth: (ticket: string, bind: string, extras?: OAuthExtras) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -121,6 +121,17 @@ function toProfile(u: any): AuthUserProfile {
     is_test_student: Boolean(u.is_test_student),
     is_guardian: Boolean(u.is_guardian),
   };
+}
+
+/** The account this browser is signed in to (stored session), read synchronously; null when signed out. */
+export function storedSessionProfile(): { uid: string; email: string } | null {
+  try {
+    if (!localStorage.getItem("ort_token")) return null;
+    const p = JSON.parse(localStorage.getItem(PROFILE_KEY) || "null");
+    return p && typeof p.uid === "string" ? { uid: p.uid, email: String(p.email || "") } : null;
+  } catch {
+    return null;
+  }
 }
 
 function toAuthUser(profile: AuthUserProfile, token: string): AuthUser {
@@ -300,8 +311,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     finishLogin(data);
   };
 
-  const completeOAuth = async (ticket: string, extras: OAuthExtras = {}): Promise<void> => {
-    const data = await postJson("/auth/oauth/complete", { ticket, ...extras });
+  const completeOAuth = async (ticket: string, bind: string, extras: OAuthExtras = {}): Promise<void> => {
+    const data = await postJson("/auth/oauth/complete", { ticket, bind, ...extras });
     finishLogin(data);
   };
 

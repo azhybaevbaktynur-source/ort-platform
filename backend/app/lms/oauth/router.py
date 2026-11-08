@@ -21,6 +21,8 @@ class OAuthCompleteRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     ticket: str = Field(..., min_length=1, max_length=4096)
+    # mandatory, checked in the route (a missing one is a 401 failure like a wrong one, not a 422): the browser binding
+    bind: Optional[str] = Field(None, max_length=256)
     ageBand: Optional[str] = Field(None, max_length=16)
     policyVersionIds: Optional[list[str]] = Field(None, max_length=10)
     displayName: Optional[str] = Field(None, max_length=200)
@@ -34,8 +36,9 @@ def sign_in_providers():
 
 @router.get("/google/start")
 def google_start(request: Request, lang: Optional[str] = Query(None, max_length=8),
-                 redirect: Optional[str] = Query(None, max_length=2048)):
-    return service.start(request, "google", lang, redirect)
+                 redirect: Optional[str] = Query(None, max_length=2048),
+                 bind: Optional[str] = Query(None, max_length=256)):
+    return service.start(request, "google", lang, redirect, bind)
 
 
 @router.get("/google/callback")
@@ -47,8 +50,9 @@ def google_callback(request: Request, db: Session = Depends(get_db), state: Opti
 
 @router.get("/apple/start")
 def apple_start(request: Request, lang: Optional[str] = Query(None, max_length=8),
-                redirect: Optional[str] = Query(None, max_length=2048)):
-    return service.start(request, "apple", lang, redirect)
+                redirect: Optional[str] = Query(None, max_length=2048),
+                bind: Optional[str] = Query(None, max_length=256)):
+    return service.start(request, "apple", lang, redirect, bind)
 
 
 @router.post("/apple/callback")
@@ -69,7 +73,7 @@ def oauth_complete(req: OAuthCompleteRequest, db: Session = Depends(get_db), req
     failure_rules = auth_ep._ip_rule(request, ratelimit.OAUTH_COMPLETE_IP_FAIL_10M)
     auth_ep._check_failures(failure_rules)
     claims = tickets.read_ticket(req.ticket)
-    if claims is None:
+    if claims is None or not service.bind_matches(req.bind, claims.get("bh")):  # login CSRF: another browser's ticket
         ratelimit.record_failures(failure_rules)
         raise service._invalid_ticket()
     try:

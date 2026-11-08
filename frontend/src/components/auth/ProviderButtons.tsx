@@ -22,6 +22,35 @@ function loadProviders(): Promise<Providers> {
   return pending;
 }
 
+/**
+ * Login-CSRF binding (AUTH_SOCIAL_DESIGN 11): a random value kept in this tab's sessionStorage and sent to `start`; the
+ * callback page sends it back with the ticket, so a ticket link made in another browser signs nobody in.
+ */
+export const OAUTH_BIND_KEY = "ort_oauth_bind";
+
+function newBind(): string | null {
+  try {
+    const bytes = new Uint8Array(32); // 256 bits
+    crypto.getRandomValues(bytes);
+    const bind = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    sessionStorage.setItem(OAUTH_BIND_KEY, bind);
+    return bind;
+  } catch {
+    return null; // no sessionStorage: `start` refuses a flow without a bind
+  }
+}
+
+/** The callback page: this tab's bind, read once and removed. */
+export function takeOAuthBind(): string | null {
+  try {
+    const bind = sessionStorage.getItem(OAUTH_BIND_KEY);
+    sessionStorage.removeItem(OAUTH_BIND_KEY);
+    return bind;
+  } catch {
+    return null;
+  }
+}
+
 /** Test hook: forget the answer of `GET /auth/providers`. */
 export function resetProvidersCache() { cached = null; pending = null; }
 
@@ -64,17 +93,24 @@ export function ProviderButtons({ redirect }: { redirect?: string | null }) {
   if (!providers || (!providers.google && !providers.apple)) return null;
   const qs = `?lang=${lang}${redirect ? `&redirect=${encodeURIComponent(redirect)}` : ""}`;
   const cls = buttonClasses({ variant: "secondary", size: "lg", fullWidth: true });
+  // the bind is made on the click, not at render: a fresh one per flow, and never in a link that could be copied
+  const go = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; // a new tab: `start` refuses it
+    e.preventDefault();
+    const bind = newBind();
+    window.location.assign(`${e.currentTarget.href}${bind ? `&bind=${bind}` : ""}`);
+  };
   return (
     <div className="mb-5">
       <div className="space-y-3">
         {providers.google && (
-          <a href={`${API_BASE_URL}/auth/google/start${qs}`} className={cls}>
+          <a href={`${API_BASE_URL}/auth/google/start${qs}`} onClick={go} className={cls}>
             <GoogleMark />
             <span>{t("auth.continueWithGoogle")}</span>
           </a>
         )}
         {providers.apple && (
-          <a href={`${API_BASE_URL}/auth/apple/start${qs}`} className={cls}>
+          <a href={`${API_BASE_URL}/auth/apple/start${qs}`} onClick={go} className={cls}>
             <AppleMark />
             <span>{t("auth.continueWithApple")}</span>
           </a>

@@ -665,3 +665,38 @@ Raw JS fell by 160 to 184 kB (target 200): about 48 % of the keys are `staff` (`
 prefix there to move more). Phone cold login settled 8.5 s to 7.6 s on this machine (target 6.5 s not reached; the
 rest is images and scripts, S1-S3 and hosting). API counts differ between the runs because the "after" run used a
 seed already touched by the "before" run, not because of S4.
+
+### S2 Bootstrap request and SWR cache (same machine, own builds of `lms` `058e72a` (S1 + S4) and S2, one run each, same scratch backend)
+
+Cells: API requests / API depth / first content ms / settled ms. Bootstrap = `GET /me/bootstrap` (`/me/lms` + `/me/home/courses` +
+`/me/access` + `/me/invitations` count + `/me/privacy` state + `/courses/{exam}/lesson-courses` in one answer).
+
+| page | profile | mode | before S2 | after S2 |
+|---|---|---|---|---|
+| student-home | laptop | cold | 10 / 2 / 934 / 1366 | 5 / 2 / 351 / 437 |
+| student-home | laptop | warm | 10 / 1 / 522 / 547 | 4 / 1 / 509 / 589 |
+| student-tests | laptop | cold | 10 / 3 / 409 / 473 | 6 / 2 / 743 / 774 |
+| student-tests | laptop | warm | 10 / 2 / 388 / 434 | 5 / 1 / 157 / 180 |
+| student-analytics | laptop | warm | 11 / 2 / 425 / 457 | 6 / 1 / 274 / 303 |
+| teacher-courses | laptop | cold | 5 / 2 / 341 / 479 | 3 / 1 / 258 / 420 |
+| teacher-courses | laptop | warm | 5 / 1 / 379 / 494 | 2 / 1 / 236 / 260 |
+| teacher-course | laptop | warm | 7 / 2 / 390 / 418 | 5 / 1 / 267 / 285 |
+| admin-overview | laptop | warm | 7 / 2 / 582 / 723 | 5 / 2 / 163 / 214 |
+| student-home | phone | cold | 10 / 2 / 9530 / 11821 | 5 / 2 / 8881 / 11014 |
+| student-home | phone | warm | 10 / 1 / 1421 / 1793 | 4 / 1 / 735 / 1290 |
+| student-tests | phone | warm | 10 / 2 / 1231 / 1701 | 5 / 1 / 1042 / 1557 |
+| teacher-courses | phone | warm | 5 / 1 / 805 / 1275 | 2 / 1 / 1064 / 1539 |
+| teacher-course | phone | warm | 7 / 2 / 1434 / 1491 | 5 / 1 / 981 / 1161 |
+| admin-overview | phone | warm | 7 / 2 / 1472 / 1853 | 5 / 2 / 1281 / 1657 |
+
+**S2 notes** (2026-11-09, branch `worktree-agent-aea59b38f2971bcc9`). Student home cold 10 → 5 API requests (target ≤ 6),
+warm depth 1; teacher list 5 → 3 cold, 2 warm (target ≤ 3); every frames-seen cell is unchanged and swap `no`. Server-Timing
+of the cold student home: the bootstrap needs 19 statements where its six parts needed 26 (5 + 6 + 6 + 2 + 4 + 3);
+a teacher's bootstrap 10. Warm loads show the cached bootstrap and the cached course at once and refresh them in the
+background once per page load (session-restored answers count as stale, so another person's change, e.g. a teacher
+linking a lesson course, shows on the next load); client navigations inside a load use the fresh in-memory answer
+(60 s). The remaining depth 2 on cold student pages is the page's own requests after the bootstrap (S3). Not met on
+this run: student home "first content" warm laptop 509 ms (target ≤ 250; the machine was under load, laptop numbers
+vary ±30 %, and the home's `exam-prep` wait is S3's) and phone warm settled 1.29 s (target ≤ 1.2 s). `/auth/me` still runs
+on these cold contexts (no stored confirmation time yet); with a profile confirmed less than ten minutes ago it is skipped,
+and otherwise it runs after first paint, directly against the API.

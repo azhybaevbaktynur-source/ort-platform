@@ -75,7 +75,12 @@ function current(): Store {
   try {
     const raw = env.storage()?.getItem(SESSION_KEY);
     const saved = raw ? (JSON.parse(raw) as Partial<Store>) : null;
-    if (token && saved?.token === token && saved.entries) entries = saved.entries;
+    // a new page load (or another token's tab state): the saved answers are shown at once but count as stale, so each
+    // full load asks once in the background (another person's change, e.g. a teacher linking a lesson course, shows on
+    // the next load; client navigations inside the load use the fresh in-memory answer)
+    if (token && saved?.token === token && saved.entries) {
+      for (const [k, e] of Object.entries(saved.entries)) entries[k] = { ...e, at: 0 };
+    }
   } catch { /* storage blocked or a bad value: start empty */ }
   store = { token, entries };
   return store;
@@ -224,7 +229,8 @@ export function useCached<T>(key: string | null, fetcher: () => Promise<T>, opts
     () => (key ? peek<T>(key) : null),
     serverSnapshot,
   );
-  const [error, setError] = useState<unknown>(null);
+  // an error belongs to the entry it was seen with: a new answer (from any caller) clears it
+  const [failure, setFailure] = useState<{ error: unknown; entry: SwrEntry<T> | null; key: string | null } | null>(null);
   const { ttl, storage } = opts;
   // the fetcher is usually an inline closure over the key: the key decides, not the closure's identity
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -234,8 +240,8 @@ export function useCached<T>(key: string | null, fetcher: () => Promise<T>, opts
     if (!key || !missingOrStale) return;
     let alive = true;
     cached(key, fetch, { ttl, storage }).then(
-      () => { if (alive) setError(null); },
-      (e: unknown) => { if (alive) setError(e); },
+      () => { if (alive) setFailure(null); },
+      (e: unknown) => { if (alive) setFailure({ error: e, entry: peek<T>(key), key }); },
     );
     return () => { alive = false; };
   }, [key, missingOrStale, fetch, ttl, storage]);
@@ -243,10 +249,11 @@ export function useCached<T>(key: string | null, fetcher: () => Promise<T>, opts
     if (!key) return;
     try {
       await revalidate(key, fetch, { ttl, storage });
-      setError(null);
+      setFailure(null);
     } catch (e) {
-      setError(e);
+      setFailure({ error: e, entry: peek<T>(key), key });
     }
   }, [key, fetch, ttl, storage]);
+  const error = failure && failure.key === key && failure.entry === entry ? failure.error : null;
   return { data: entry ? entry.value : null, stale: !!entry && isStale(entry), error, refresh };
 }

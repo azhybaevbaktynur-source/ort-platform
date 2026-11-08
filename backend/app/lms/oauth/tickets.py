@@ -1,7 +1,7 @@
 """The flow cookie and the login ticket (AUTH_SOCIAL_DESIGN 1.2 step 5, 1.5). Both are stateless; neither is a session.
 
 - Flow cookie: AES-256-GCM, key derived with HKDF from SECRET_KEY (purpose `oauth-flow`; SECRET_KEY_PREVIOUS still
-  opens it). Holds state, the PKCE verifier, sha256(nonce), lang, redirect and its own expiry. Encrypted so the verifier
+  opens it). Holds state, the PKCE verifier, sha256(nonce), sha256(bind), lang, redirect and its own expiry. Encrypted so the verifier
   never travels in clear, authenticated so it cannot be forged.
 - Login ticket: HS256 JWT with its own derived key (purpose `oauth-ticket`), `typ: oauth_ticket`, so it never verifies as
   an access token and `get_lms_user` refuses it a second time on the `typ` claim. 10 minutes.
@@ -72,10 +72,12 @@ def open_flow(blob: Optional[str]) -> Optional[dict]:
 # ------------------------------------------------------------------ login ticket
 
 def issue_ticket(*, provider: str, subject: str, email: str, name: Optional[str], mode: str, uid: Optional[str],
-                 lang: str) -> str:
+                 lang: str, bind_hash: str) -> str:
+    """`bh` = sha256 of the browser's `bind` (the flow cookie's copy): `complete` wants the `bind` itself."""
     now = int(time.time())
     claims = {"typ": TICKET_TYP, "jti": secrets.token_urlsafe(16), "iat": now, "exp": now + _ttl(),
-              "provider": provider, "sub": subject, "email": email, "name": name or "", "mode": mode, "lang": lang}
+              "provider": provider, "sub": subject, "email": email, "name": name or "", "mode": mode, "lang": lang,
+              "bh": bind_hash}
     if uid:
         claims["uid"] = uid
     return jwt.encode(claims, _derive(settings.SECRET_KEY, b"oauth-ticket").hex(), algorithm="HS256")
