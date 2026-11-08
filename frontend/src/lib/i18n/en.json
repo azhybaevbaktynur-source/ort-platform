@@ -577,8 +577,34 @@
       "back": "Back to my courses"
     },
     "overview": {
-      "title": "Platform administration",
-      "pendingRequests": "Teacher requests waiting for review"
+      "title": "Overview",
+      "pendingRequests": "Teacher requests waiting for review",
+      "metrics": {
+        "users": "Users",
+        "activeStudents": "Active students (7 days)",
+        "pro": "Pro subscribers",
+        "tests": "Tests this week"
+      },
+      "attention": {
+        "title": "Needs attention",
+        "storage": {
+          "warn": "Storage: nearly full",
+          "full": "Storage: full"
+        },
+        "reveals": "Code reveals in the last hour",
+        "health": "Health checks failing",
+        "none": "All good, nothing needs attention"
+      },
+      "quick": {
+        "title": "Quick actions",
+        "newCourse": "New platform course",
+        "grantPro": "Grant Pro",
+        "codes": "Create codes"
+      },
+      "menu": {
+        "health": "Check system health",
+        "auditLog": "Open audit log"
+      }
     },
     "reasonRequired": "Reason (required)",
     "reasonOptional": "Reason (optional)",
@@ -6453,7 +6479,17 @@
     "storage": "File storage",
     "storageDetail": "Driver: {driver}. R2 configured: {r2}",
     "commit": "Deployed version: {commit}",
-    "migrationsUntracked": "The database has no version table (built without migrations). The code expects: {expected}"
+    "migrationsUntracked": "The database has no version table (built without migrations). The code expects: {expected}",
+    "unavailable": "Could not check",
+    "line": {
+      "ok": "System is fine",
+      "problems": "Problems: {count}",
+      "commit": "commit {commit}",
+      "details": "Details"
+    },
+    "page": {
+      "title": "System health"
+    }
   },
   "access": {
     "menu": "Unlock exams",

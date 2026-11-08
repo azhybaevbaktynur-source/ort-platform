@@ -9,6 +9,22 @@ const post = <T,>(path: string, body?: unknown) => lmsFetch<T>(path, { method: "
 
 export const getPlatformSummary = () => lmsFetch<PlatformSummaryOut>("/platform/summary");
 
+/** FB8-5 S4: the overview page's numbers (`GET /platform/overview`, cached 60 s on the server; D-FB8-5-4). */
+export interface PlatformOverviewOut {
+  users_total: number;
+  /** Distinct non-test people with a non-preview attempt started in the last 7 days. */
+  active_students_7d: number;
+  pro_active: number;
+  /** Non-preview, non-practice attempts submitted in the last 7 days. */
+  attempts_submitted_7d: number;
+  pending_teacher_requests: number;
+  storage_level: "ok" | "warn" | "full";
+  reveals_last_hour: number;
+  reveal_alert: boolean;
+  computed_at: string;
+}
+export const getPlatformOverview = () => lmsFetch<PlatformOverviewOut>("/platform/overview");
+
 export const listTeacherRequests = (status: TeacherRequestStatus | "all", cursor?: string | null, limit = 25) =>
   lmsFetch<PageOut<TeacherRequestAdminOut>>("/platform/teacher-requests", { params: { status, cursor, limit } });
 export const approveTeacherRequest = (id: string, note?: string) =>

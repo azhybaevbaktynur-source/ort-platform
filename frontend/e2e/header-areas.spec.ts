@@ -103,7 +103,8 @@ test("admin overview: numbers, then a retry when the summary fails", async ({ pa
   await page.goto("/ru/admin");
   const pending = page.getByRole("link", { name: new RegExp(t("platformAdmin.overview.pendingRequests")) });
   await expect(pending).toContainText(/\d+/);
-  await expect(page.getByRole("link", { name: new RegExp(`${t("storage.nav")}.*${t("storage.level.ok")}`) })).toBeVisible();
+  // FB8-5 S4: storage shows in "Needs attention" only when it is not ok; the metrics row has the user count
+  await expect(page.getByRole("link", { name: new RegExp(`${t("platformAdmin.overview.metrics.users")}\\s*\\d+`) })).toBeVisible();
   await expect(page.locator("main")).not.toContainText("—");
 
   await page.route("**/api/v1/platform/summary", (route) => route.fulfill({ status: 503, contentType: "application/json", body: '{"error":{"code":"server_busy","message":"busy"}}' }));
