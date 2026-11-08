@@ -630,3 +630,17 @@ Filled in by the implementers (rows copied from the script's page table; laptop 
 | page | profile | mode | before (this audit) API / depth / first content | after S1 | after S2+S3 | after S4 |
 |---|---|---|---|---|---|---|
 | (to fill) | | | | | | |
+
+### S4 Dictionary split (same machine, own builds of `4b09a3e` and S4, median of 3, `PERF_RUNS=3`)
+
+| page | profile | mode | before S4 JS kB / first content / settled | after S4 JS kB / first content / settled |
+|---|---|---|---|---|
+| login | laptop | cold | 957 / 68 ms / 478 ms | 773 (-184) / 47 ms / 204 ms |
+| login | phone | cold | 957 / 1297 ms / 8527 ms | 773 (-184) / 1332 ms / 7628 ms (-0.9 s) |
+| student-home | phone | cold | 1077 / 10100 ms / 11165 ms | 917 (-160) / 10272 ms / 10927 ms |
+| student-tests | phone | cold | 1134 / 9884 ms / 11654 ms | 950 (-184) / 9859 ms / 10357 ms (-1.3 s) |
+
+Raw JS fell by 160 to 184 kB (target 200): about 48 % of the keys are `staff` (`src/lib/i18n/staffPrefixes.json`; add a
+prefix there to move more). Phone cold login settled 8.5 s to 7.6 s on this machine (target 6.5 s not reached; the
+rest is images and scripts, S1-S3 and hosting). API counts differ between the runs because the "after" run used a
+seed already touched by the "before" run, not because of S4.

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
+import staffPrefixes from "./staffPrefixes.json";
 
 export type Language = "en" | "ky" | "ru";
 type Dictionary = Record<string, any>;
@@ -10,6 +11,8 @@ interface LanguageContextType {
   lang: Language;
   setLang: (lang: Language) => void;
   t: (keyPath: string, params?: Record<string, string | number>) => string;
+  /** The staff part of the current language's dictionary is loaded (performance audit S4). */
+  staffReady: boolean;
 }
 
 /*
@@ -21,14 +24,37 @@ interface LanguageContextType {
 const dictionaries: Partial<Record<Language, Dictionary>> = {};
 const loading: Partial<Record<Language, Promise<void>>> = {};
 const LOADERS: Record<Language, () => Promise<{ default: unknown }>> = {
-  en: () => import("./en.json?lazy"),
-  ky: () => import("./ky.json?lazy"),
-  ru: () => import("./ru.json?lazy"),
+  en: () => import("./generated/en.core.json?lazy"),
+  ky: () => import("./generated/ky.core.json?lazy"),
+  ru: () => import("./generated/ru.core.json?lazy"),
+};
+
+/*
+ * Performance audit S4: each language is split at build time (scripts/split_dictionaries.mjs, by key prefix) into `core`
+ * (every page) and `staff` (editors, admin, organization, grading set-up: a separate chunk). Staff areas preload it with
+ * useStaffDictionary(); a staff key asked anywhere else loads it on demand and renders empty (never the raw key) until it
+ * has arrived. Never requested on the server, so server HTML and the first client render agree.
+ */
+const staffDictionaries: Partial<Record<Language, Dictionary>> = {};
+const staffLoading: Partial<Record<Language, Promise<void>>> = {};
+const staffListeners = new Set<() => void>();
+const STAFF_LOADERS: Record<Language, () => Promise<{ default: unknown }>> = {
+  en: () => import("./generated/en.staff.json?lazy"),
+  ky: () => import("./generated/ky.staff.json?lazy"),
+  ru: () => import("./generated/ru.staff.json?lazy"),
 };
 
 /** Called by dictionaries/<lang>.tsx when it renders. */
 export function registerDictionary(lang: Language, dictionary: unknown) {
   dictionaries[lang] ??= dictionary as Dictionary;
+}
+
+function loadStaff(lang: Language): Promise<void> {
+  staffLoading[lang] ??= retrying(STAFF_LOADERS[lang]).then((m) => {
+    staffDictionaries[lang] = m.default as Dictionary;
+    staffListeners.forEach((fn) => fn());
+  });
+  return staffLoading[lang];
 }
 
 /** A download that never rejects: when it fails (no network) it is tried again later; meanwhile the server's HTML stays. */
@@ -46,6 +72,11 @@ function loadDictionary(lang: Language): Promise<void> {
   return loading[lang];
 }
 
+/** Language switch: when the staff part was in use, the new language's staff part arrives with its core. */
+function loadDictionaryFor(next: Language, withStaff: boolean): Promise<void> {
+  return Promise.all([loadDictionary(next), withStaff ? loadStaff(next) : undefined]).then(() => undefined);
+}
+
 /*
  * The page's own language arrives with the page: rendered through next/dynamic, its chunk is named in the server's
  * HTML, so the browser fetches it together with the other scripts, and hydration waits for it (the server's HTML stays
@@ -56,6 +87,9 @@ const PAGE_DICTIONARY: Record<Language, React.ComponentType<{ children: React.Re
   ky: dynamic(() => retrying(() => import("./dictionaries/ky"))),
   ru: dynamic(() => retrying(() => import("./dictionaries/ru"))),
 };
+
+/** The key belongs to the staff part (same rule as scripts/split_dictionaries.mjs). */
+const isStaffKey = (keyPath: string) => staffPrefixes.some((x) => keyPath === x || keyPath.startsWith(x + "."));
 
 /** Value at a dotted path, or undefined. */
 function lookupPath(dict: any, keys: string[]): unknown {
@@ -71,7 +105,9 @@ function lookupPath(dict: any, keys: string[]): unknown {
 function resolveKey(lang: Language, keyPath: string): string | undefined {
   const keys = keyPath.split(".");
   let value = lookupPath(dictionaries[lang], keys);
+  if (value === undefined) value = lookupPath(staffDictionaries[lang], keys);
   if (value === undefined) value = lookupPath(dictionaries["ru"], keys);
+  if (value === undefined) value = lookupPath(staffDictionaries["ru"], keys);
   return typeof value === "string" ? value : undefined;
 }
 
@@ -109,12 +145,19 @@ export function LanguageProvider({
   const PageDictionary = PAGE_DICTIONARY[initialLang];
   const [lang, setLangState] = useState<Language>(initialLang);
   const wanted = useRef<Language>(initialLang);
+  const [, setStaffTick] = useState(0);
+
+  useEffect(() => {
+    const listener = () => setStaffTick((n) => n + 1);
+    staffListeners.add(listener);
+    return () => { staffListeners.delete(listener); };
+  }, []);
 
   /** Shows `next` once its dictionary is here; a later choice wins over a slower earlier one. */
   const switchTo = (next: Language) => {
     wanted.current = next;
-    if (dictionaries[next]) { setLangState(next); return; }
-    loadDictionary(next).then(() => { if (wanted.current === next) setLangState(next); }).catch(() => undefined);
+    if (dictionaries[next] && (!staffDictionaries[lang] || staffDictionaries[next])) { setLangState(next); return; }
+    loadDictionaryFor(next, !!staffDictionaries[lang]).then(() => { if (wanted.current === next) setLangState(next); }).catch(() => undefined);
   };
 
   useEffect(() => {
@@ -142,7 +185,12 @@ export function LanguageProvider({
     let template: string | undefined;
     if (count !== null) template = resolveKey(lang, `${keyPath}_${pluralCategory(lang, count)}`);
     if (template === undefined) template = resolveKey(lang, keyPath);
-    if (template === undefined) return keyPath;
+    if (template === undefined) {
+      // a staff key whose part has not arrived yet renders empty (and loads it), never the raw key; any other missing
+      // key stays the key itself (callers test `t(k) !== k`)
+      if (!staffDictionaries[lang] && isStaffKey(keyPath) && typeof window !== "undefined") { void loadStaff(lang); return ""; }
+      return keyPath;
+    }
 
     let result = template;
     if (params) {
@@ -154,7 +202,7 @@ export function LanguageProvider({
   };
 
   return (
-    <LanguageContext.Provider value={{ lang, setLang, t }}>
+    <LanguageContext.Provider value={{ lang, setLang, t, staffReady: !!staffDictionaries[lang] }}>
       <PageDictionary>{children}</PageDictionary>
     </LanguageContext.Provider>
   );
@@ -168,3 +216,15 @@ export function useTranslation() {
   return context;
 }
 
+
+/**
+ * Staff areas (AreaShell, AdminShell, OrgShell, the course staff layout) call this to preload the staff part of the
+ * dictionary. Returns whether it is here; until then the caller shows its neutral loading state.
+ */
+export function useStaffDictionary(enabled = true): boolean {
+  const { lang, staffReady } = useTranslation();
+  useEffect(() => {
+    if (enabled && !staffDictionaries[lang]) void loadStaff(lang);
+  }, [enabled, lang]);
+  return !enabled || staffReady;
+}

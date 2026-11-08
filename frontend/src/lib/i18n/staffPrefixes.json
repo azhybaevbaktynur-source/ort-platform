@@ -1,0 +1,5 @@
+[
+  "examTemplates", "bank", "organizations", "modules", "schemes", "quizEditor", "gradebook", "platformAdmin",
+  "enrollmentForm", "applications", "rosterImport", "grading", "adminSecurity", "departments", "orgSettings",
+  "sharedBanks", "quizStats", "adminHealth", "teacherRequest", "templates"
+]

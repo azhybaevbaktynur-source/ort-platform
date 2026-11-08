@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { seed, settle, signIn, tr, VIEWPORTS } from "./helpers";
+import { expectNoRawKeys, seed, settle, signIn, tr, VIEWPORTS } from "./helpers";
 
 const t = (key: string, vars: Record<string, string | number> = {}) => tr("ru", key, vars);
 const SHOTS = process.env.S4_SHOTS_DIR || "";
@@ -54,6 +54,7 @@ test("admin overview: metrics, attention, health line and the health page", asyn
   await expect(line).toContainText(new RegExp(`${t("adminHealth.line.ok")}|${status}\\d`));
   await expect(page.getByTestId("health-checks")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: t("access.admin.recent.title") })).toBeVisible();
+  await expectNoRawKeys(page); // S4: the staff dictionary has arrived
   await shots(page, "01-overview");
 
   await line.getByRole("link", { name: t("adminHealth.line.details") }).click();

@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
-import { useTranslation } from "@/lib/i18n/context";
+import { useStaffDictionary, useTranslation } from "@/lib/i18n/context";
 import { getCourse } from "@/lib/lms/courses";
 import { pickLocalized } from "@/lib/lms/localized";
 import { courseNavRole, hiddenAreaFor } from "@/lib/lms/nav";
@@ -48,6 +48,7 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
   // Phase 8c S1 (§2.5): inside a course the Teaching sub-menu is hidden; the sidebar is the course's navigation.
   // Phase 9 UX: the server's staff serializer decides (org admins reading a course of their organization get it too).
   const staffRole = !!course && isStaffCourse(course);
+  const staffReady = useStaffDictionary(staffRole); // performance audit S4: the staff part of the dictionary, preloaded
   useDeclareArea(course ? (staffRole ? "teaching" : "learning") : null, { hideSections: true });
   useDeclareStudentCourse(course); // Student UI U2: the student shell's links for this course
 
@@ -124,6 +125,7 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
       </CourseContext.Provider>
     );
   }
+  if (staffFrame && !staffReady) return <CourseLoadingSkeleton />;
   const header = staffFrame
     ? <StaffCourseBar course={course} titleAsHeading={pathname === base} studentViewButton />
     : role === "student"
