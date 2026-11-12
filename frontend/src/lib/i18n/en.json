@@ -526,9 +526,7 @@
         "platformPro": "Tests of this course can be free or for Pro only. The platform administrator marks paid tests in Admin → Pro → Paid exams.",
         "practiceFree": "Practice is always free.",
         "paidExamsLink": "Paid exams",
-        "proLink": "Pro section",
-        "adminOnly": "Only the platform administrator changes these settings.",
-        "notPlatform": "Pro is available on platform courses. All tests of this course are open to its students."
+        "proLink": "Pro section"
       },
       "examLink": {
         "label": "Exam of this course",

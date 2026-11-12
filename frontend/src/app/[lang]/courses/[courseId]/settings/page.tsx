@@ -5,7 +5,9 @@
  * General (default), Cover, Enrollment, Access / Pro, Grading, Danger zone. Each section is its own component in
  * `components/lms/course/settings/` and keeps its own Save (one sticky save bar stays deferred, UX T28). Cover is
  * hidden from the non-admin staff of a platform course (the server refuses them: 403 platform_course_admin_only),
- * Danger zone from everyone but the owner. An unknown or hidden section shows General.
+ * Danger zone from everyone but the owner. An unknown or hidden section shows General. Fix round 2026-11-12 (1d): Access
+ * / Pro only for a platform admin on a platform course (from `useLmsMe`, the DB-backed answer); the course status card
+ * lives at the top of General for every teacher.
  */
 import React, { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -13,6 +15,7 @@ import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
 import { isStaffCourse, type CourseStaffOut } from "@/lib/lms/types";
 import { useAuth } from "@/lib/auth-context";
+import { useLmsMe } from "@/lib/lms/useLmsMe";
 import { useCourse } from "@/components/lms/CourseContext";
 import { CourseGradingSection } from "@/components/lms/grading/settings/CourseGradingSection";
 import { GeneralSection } from "@/components/lms/course/settings/GeneralSection";
@@ -27,11 +30,14 @@ function Settings({ course }: { course: CourseStaffOut }) {
   const { lang, t } = useTranslation();
   const { setCourse } = useCourse();
   const { userProfile } = useAuth();
+  const { me } = useLmsMe();
   const params = useSearchParams();
   const base = `/${lang}/courses/${course.id}/settings`;
 
   const visible = SETTINGS_SECTIONS.filter((s) =>
-    s === "cover" ? !course.is_platform_course || !!userProfile?.is_platform_admin : s === "danger" ? course.is_owner : true);
+    s === "cover" ? !course.is_platform_course || !!userProfile?.is_platform_admin
+      : s === "access" ? course.is_platform_course && !!me?.is_platform_admin
+        : s === "danger" ? course.is_owner : true);
   const asked = params.get("section") as SettingsSection | null;
   const section: SettingsSection = asked && visible.includes(asked) ? asked : "general";
   // The API returns CourseStaffOut for every course mutation; keep the shared context in sync.

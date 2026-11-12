@@ -244,9 +244,11 @@ test.describe("teacher builds a lesson course, the student sees each step (ru)",
       expect(coverUrl).toMatch(/\.webp$/);
 
       // ---- 02 publish and link to the exam (Settings → Доступ и Pro)
-      await tp.goto(`${base}/settings?section=access`);
+      // the status card is at the top of General (fix round 2026-11-12, 1d), the exam link on Доступ и Pro
+      await tp.goto(`${base}/settings`);
       await tp.getByRole("button", { name: t("courses.settings.publish") }).click();
       await expect(tp.getByRole("button", { name: t("courses.settings.publish") })).toHaveCount(0);
+      await tp.goto(`${base}/settings?section=access`);
       const select = tp.getByLabel(t("courses.settings.examLink.label"));
       await expect(select).toBeEnabled();
       await select.selectOption(exam);
