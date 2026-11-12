@@ -126,6 +126,9 @@ export interface Seed {
   /** Fix round 2026-11-12 1c: a teacher whose application was just approved, learning nowhere
    * (teacher-approved-notice.spec.ts closes the "approved" line). */
   teacher_notice: SeedUser;
+  /** Fix round 2026-11-12 1e: an approved teacher who still has a student enrolment in ORT (Russian) and one published
+   * course of their own; "approved" line never closed (header-areas.spec.ts: the teacher-only design, Student view). */
+  teacher_enrolled: SeedUser & { course_id: string; course_title: string };
   /** Phase 8b S3: the scrolling-player course (its published quizzes serve the Student view "Start" check). */
   scrolling: {
     course_id: string;

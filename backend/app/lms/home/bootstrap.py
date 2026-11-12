@@ -65,7 +65,9 @@ def bootstrap(db: Session, user: User) -> sch.BootstrapOut:
     me = teachers_router._me(user)
     if mfa_gate.must_enroll(user):
         return sch.BootstrapOut(me=me, pending_invitations=0, privacy=None, student=None)
-    learns_here = me.has_student_enrollments or not _teaches(me)
+    # owner decision 2026-11-12 (fix round 1e): people who teach have no Learning area, whatever student enrolments they
+    # still have (the same rule as `hidesLearning` in frontend/src/lib/lms/shellKind.ts), so no student data for them
+    learns_here = not _teaches(me)
     return sch.BootstrapOut(
         me=me,
         pending_invitations=0 if test_student else home_svc._pending_invitations(db, user, clock.now()),

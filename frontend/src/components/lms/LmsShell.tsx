@@ -176,8 +176,8 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const canCreate = me ? me.can_create_courses : teacherStatus === "approved";
   const isTeacher = me ? me.is_teacher : teacherStatus === "approved";
   const hasTeaching = isTeacher || canCreate;
-  // Owner feedback 2026-11-08 (item 2): people who teach see Learning only once they learn somewhere (MeOut decides;
-  // until it loads, and for an older answer without the field, Learning stays). Student view is another user.
+  // Owner decision 2026-11-12 (fix round 1e): people who teach never see Learning, whatever student enrolments they
+  // have (MeOut decides; until it loads, the areas show placeholders). Student view is another user.
   const hideLearning = hidesLearning(me);
 
   // UX rework 2: the areas come from one answer, kept across pages (`useLmsMeLoader`), so the menu is the same everywhere.

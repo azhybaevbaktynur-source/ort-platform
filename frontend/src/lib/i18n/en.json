@@ -367,9 +367,6 @@
   "courses": {
     "list": {
       "title": "My courses",
-      "teaching": "Teaching",
-      "learning": "Learning",
-      "join": "Join with code",
       "create": "Create course",
       "trash": "Deleted courses",
       "becomeTeacher": "Become a teacher",
