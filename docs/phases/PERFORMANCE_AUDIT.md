@@ -1034,3 +1034,17 @@ entry starts before the address becomes `/ru/courses`, one bootstrap with `inclu
 3. **Say how long the wake-up takes**: after 1a the shell shows «Сервер запускается…» on a 502/503; with P1 that state
    will be rare, so it should also carry «обычно 30–60 секунд» so the student waits instead of reloading (reloads queue
    behind each other on the 0.1-CPU instance).
+
+**P4 result (2026-11-12, branch of `lms` `dd34899`).** `staffPrefixes.json` gains `infra`; every `courses.settings.*`
+subkey except `tab` (course nav, also built on student pages) and `enrollment` (`courses/new`, outside the staff
+shells); `assessments.{builder,item,add,pick,publish,issues,presets,create,scorePolicy}`;
+`assignments.{editor,rubric,create,fields,grade,gradebook,list,page,kindHints}`. Rejected after reading every user:
+`assessments.settings` and `assessments.section` (the student lobby), `assignments.errors` and `assignments.kinds`
+(student hand-in view), `courses.cover` (`courses/new`), `access.admin` (`/pro`). Core dictionary gzip, before → after:
+en 41.6 → 35.6 kB, ky 51.6 → 44.2 kB, ru 52.6 → 44.9 kB (−6.0 / −7.4 / −7.7 kB); staff part grows by the same.
+"First Load JS" in the `npm run build` table is unchanged at its rounding (login 156 kB, `/courses` 175 kB, shared
+103 kB), because the dictionaries are separate lazy chunks that the table does not count; the saving is the dictionary
+download on every student and public page. Checks: parity OK (5876 keys), `tsc` clean, e2e admin-overview,
+quiz-editor, role-links, admin-services, course-create, student-home: 35 passed; a temporary spec with
+`expectNoRawKeys` on course settings, `courses/new`, assignments list/page/edit/grade and the assessment page/edit
+in ru at 1440: no raw keys.

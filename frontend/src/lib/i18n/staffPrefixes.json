@@ -1,5 +1,22 @@
 [
-  "examTemplates", "bank", "organizations", "modules", "schemes", "quizEditor", "gradebook", "platformAdmin",
-  "enrollmentForm", "applications", "rosterImport", "grading", "adminSecurity", "departments", "orgSettings",
-  "sharedBanks", "quizStats", "adminHealth", "teacherRequest", "templates"
+  "examTemplates", "bank", "organizations", "modules",
+  "schemes", "quizEditor", "gradebook", "platformAdmin",
+  "enrollmentForm", "applications", "rosterImport", "grading",
+  "adminSecurity", "departments", "orgSettings", "sharedBanks",
+  "quizStats", "adminHealth", "teacherRequest", "templates",
+  "infra", "courses.settings.general", "courses.settings.saved", "courses.settings.joinCode",
+  "courses.settings.joinCodeInactiveUnpublished", "courses.settings.regenerate", "courses.settings.regenerateTitle", "courses.settings.regenerateBody",
+  "courses.settings.activeStudents", "courses.settings.lifecycle", "courses.settings.lifecycleHint", "courses.settings.publish",
+  "courses.settings.unpublish", "courses.settings.unpublishTitle", "courses.settings.unpublishBody", "courses.settings.conclude",
+  "courses.settings.concludeTitle", "courses.settings.concludeBody", "courses.settings.reopen", "courses.settings.danger",
+  "courses.settings.newOwner", "courses.settings.chooseTeacher", "courses.settings.noOtherTeachers", "courses.settings.transfer",
+  "courses.settings.transferTitle", "courses.settings.transferBody", "courses.settings.transferHint", "courses.settings.delete",
+  "courses.settings.deleteTitle", "courses.settings.deleteBody", "courses.settings.joinCodeInactiveMode", "courses.settings.joinCodeInactiveOpen",
+  "courses.settings.joinCodeInactiveClosed", "courses.settings.examDate", "courses.settings.pageTitle", "courses.settings.sectionsLabel",
+  "courses.settings.joinCodeMenu", "courses.settings.codeRegenerated", "courses.settings.statusMenu", "courses.settings.sections",
+  "courses.settings.access", "courses.settings.examLink", "assessments.builder", "assessments.item",
+  "assessments.add", "assessments.pick", "assessments.publish", "assessments.issues",
+  "assessments.presets", "assessments.create", "assessments.scorePolicy", "assignments.editor",
+  "assignments.rubric", "assignments.create", "assignments.fields", "assignments.grade",
+  "assignments.gradebook", "assignments.list", "assignments.page", "assignments.kindHints"
 ]
