@@ -2,6 +2,7 @@
 
 // FB8-5 S3 (STAFF_UX_AUDIT 5): General: main language + translations, title, description (one Save), then the course
 // home and, on exam-prep courses, the exam date (each its own Save, as before). The card beside it follows the typing.
+// Fix round 2026-11-12 (1d): the course status card (publish, unpublish, conclude) comes first.
 import React, { useState } from "react";
 import { useTranslation } from "@/lib/i18n/context";
 import { updateCourse } from "@/lib/lms/courses";
@@ -15,6 +16,7 @@ import { ExamDateSection } from "@/components/lms/examPrep/ExamDateSection"; // 
 import { LanguageFields, moveSingleLanguageText } from "@/components/lms/course/form/LanguageFields";
 import { CoursePreview } from "@/components/lms/course/form/CoursePreview";
 import { Button, Card } from "@/components/ui";
+import { CourseStatusCard } from "./CourseStatusCard";
 import { SavedNote, SectionLayout, cardDataOf, useSave } from "./shared";
 
 export function GeneralSection({ course, onSaved }: { course: CourseStaffOut; onSaved: (c: CourseStaffOut) => void }) {
@@ -54,6 +56,7 @@ export function GeneralSection({ course, onSaved }: { course: CourseStaffOut; on
 
   return (
     <SectionLayout preview={preview}>
+      <CourseStatusCard course={course} onSaved={onSaved} />
       <Card title={t("courses.settings.general")}>
         <form onSubmit={save} className="space-y-5" noValidate data-testid="settings-general">
           <LanguageFields idPrefix="s" languages={languages} defaultLanguage={defaultLanguage} disabled={s.busy} onChange={changeLanguages} />

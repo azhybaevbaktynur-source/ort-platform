@@ -185,9 +185,11 @@ test("settings: sections as deep links, one Save per section, Danger zone only f
   const page = await open(browser, teacher);
   await page.goto(base);
   const nav = page.getByRole("navigation", { name: t("courses.settings.sectionsLabel") });
-  const names = ["general", "cover", "enrollment", "access", "grading", "danger"].map((k) => t(`courses.settings.sections.${k}`));
+  // fix round 2026-11-12 (1d): no Access / Pro tab for a teacher on their own course; its URL shows General
+  const names = ["general", "cover", "enrollment", "grading", "danger"].map((k) => t(`courses.settings.sections.${k}`));
   await expect(nav.getByRole("link")).toHaveText(names);
   await expect(nav.getByRole("link", { name: names[0] })).toHaveAttribute("aria-current", "page");
+  await expect(nav.getByRole("link", { name: t("courses.settings.sections.access") })).toHaveCount(0);
 
   // General: the title saves and the card follows
   await page.getByRole("textbox", { name: t("courses.create.courseTitle") }).fill("Настройки E2E: новое имя");
@@ -199,7 +201,7 @@ test("settings: sections as deep links, one Save per section, Danger zone only f
   await shots(page, "settings-general");
 
   // every other section by its link
-  for (const key of ["cover", "enrollment", "access", "grading", "danger"]) {
+  for (const key of ["cover", "enrollment", "grading", "danger"]) {
     await nav.getByRole("link", { name: t(`courses.settings.sections.${key}`) }).click();
     await expect(page).toHaveURL(new RegExp(`\\?section=${key}$`));
     await expect(nav.getByRole("link", { name: t(`courses.settings.sections.${key}`) })).toHaveAttribute("aria-current", "page");
@@ -214,12 +216,16 @@ test("settings: sections as deep links, one Save per section, Danger zone only f
   await expect(form.getByText(t("courses.settings.saved"))).toBeVisible();
   expect((await api(teacher, "GET", `/courses/${course.id}`)).enrollment_limit).toBe(25);
 
-  // Access: publish is the one button; unpublish lives in the status menu
+  // Course status, at the top of General (the old Access / Pro link lands there too): publish is the one button;
+  // unpublish lives in the status menu
   await page.goto(`${base}?section=access`);
-  await page.getByRole("button", { name: t("courses.settings.publish") }).click();
-  await expect(page.getByRole("button", { name: t("courses.settings.statusMenu") })).toBeVisible();
+  await expect(nav.getByRole("link", { name: names[0] })).toHaveAttribute("aria-current", "page");
+  const status = page.getByTestId("settings-status");
+  await expect(page.getByRole("heading", { name: t("courses.settings.lifecycle") })).toBeVisible();
+  await status.getByRole("button", { name: t("courses.settings.publish") }).click();
+  await expect(status.getByRole("button", { name: t("courses.settings.statusMenu") })).toBeVisible();
   expect((await api(teacher, "GET", `/courses/${course.id}`)).status).toBe("published");
-  await expect(page.getByText(t("courses.settings.access.notPlatform"))).toBeVisible();
+  await expect(page.getByText(t("courses.settings.access.platformPro"))).toHaveCount(0);
   await page.context().close();
 
   // the admin on the ORT course: Danger zone only if they own it (a second backend's startup bootstrap, e.g. in
@@ -232,7 +238,9 @@ test("settings: sections as deep links, one Save per section, Danger zone only f
   const shown = t(`courses.settings.sections.${ortOwner ? "danger" : "general"}`);
   await expect(anav.getByRole("link", { name: shown })).toHaveAttribute("aria-current", "page");
   await expect(anav.getByRole("link", { name: t("courses.settings.sections.danger") })).toHaveCount(ortOwner ? 1 : 0);
+  await expect(anav.getByRole("link", { name: t("courses.settings.sections.access") })).toBeVisible();
   await admin.goto(`/ru/courses/${s.course_id}/settings?section=access`);
+  await expect(anav.getByRole("link", { name: t("courses.settings.sections.access") })).toHaveAttribute("aria-current", "page");
   await expect(admin.getByText(t("courses.settings.access.platformPro"))).toBeVisible();
   await expect(admin.getByRole("link", { name: t("courses.settings.access.paidExamsLink") })).toHaveAttribute("href", "/ru/admin/access/exams");
   await shots(admin, "settings-access-platform", true);
