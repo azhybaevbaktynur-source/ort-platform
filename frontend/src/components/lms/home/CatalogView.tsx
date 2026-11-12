@@ -16,7 +16,6 @@ import { ApplicationStatusBadge } from "@/components/lms/catalog/ApplicationStat
 import { useErrorText } from "./useErrorText";
 import { useLmsMe } from "@/lib/lms/useLmsMe"; // fix round 1b
 import { hidesLearning } from "@/lib/lms/shellKind"; // fix round 1b
-import { StudentViewButton } from "@/components/lms/course/StudentViewBanner"; // fix round 1b
 
 function CatalogSkeleton() {
   const { t } = useTranslation();
@@ -109,12 +108,8 @@ export function CatalogView() {
   const action = (c: CatalogCourseOut) => {
     if (teaches) {
       const staff = isActiveMember(c) && (c.my_enrollment?.role === "teacher" || c.my_enrollment?.role === "assistant");
-      return staff ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <LinkButton href={`/${lang}/courses/${c.id}`}>{t("catalog.open")}</LinkButton>
-          <StudentViewButton courseId={c.id} />
-        </div>
-      ) : null;
+      // owner 2026-11-12: Student view only on the course page itself
+      return staff ? <LinkButton fullWidth href={`/${lang}/courses/${c.id}`}>{t("catalog.open")}</LinkButton> : null;
     }
     if (isActiveMember(c)) {
       return <LinkButton fullWidth href={`/${lang}/courses/${c.id}`}>{t("catalog.open")}</LinkButton>;
