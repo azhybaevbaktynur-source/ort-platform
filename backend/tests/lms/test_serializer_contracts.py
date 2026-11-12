@@ -35,7 +35,7 @@ def test_declared_key_sets():
                                                   "exam_course_id",  # TEACHER_TO_STUDENT_MAP 2.3: the lesson's exam
                                                   "exam_family", "subject"}  # step 3a S1: the exam group
     assert set(CourseStaffOut.model_fields) == set(CourseStudentOut.model_fields) | {
-        "join_code", "enrollment_mode", "enrollment_limit", "visibility", "unlisted_by_admin",
+        "join_code", "enrollment_mode", "enrollment_limit", "visibility",
         "active_student_count", "owner", "is_owner", "created_at", "updated_at", "published_at", "concluded_at",
         "sandbox_for_template_id",  # Phase 8b S5 (staff only)
         "can_import_roster",  # Accounts (staff only)

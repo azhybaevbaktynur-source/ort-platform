@@ -198,7 +198,6 @@
       "already_enrolled": "This person is already in the course.",
       "user_not_found": "No user with this email was found.",
       "limit_below_current": "The limit cannot be lower than the number of current students.",
-      "unlisted_by_admin": "An administrator removed this course from the catalog.",
       "invalid_transition": "This action is not possible in the current course status.",
       "has_students": "The course has active students, so it cannot be unpublished.",
       "not_deleted": "This course is not deleted.",
@@ -362,7 +361,13 @@
       "exam_link_forbidden": "Only a platform administrator links a course to an exam.",
       "exam_link_not_allowed": "This course cannot be linked to an exam.",
       "exam_link_target_invalid": "Choose a published exam course of the platform.",
-      "teacher_cannot_enroll": "You teach on the platform, so you cannot join courses as a student. To study, use a separate student account."
+      "teacher_cannot_enroll": "You teach on the platform, so you cannot join courses as a student. To study, use a separate student account.",
+      "listing_incomplete": "The course cannot be suggested for the catalog yet: something is missing.",
+      "listing_state": "The course's catalog state has already changed. Reload the page.",
+      "listing_blocked": "The platform administrator removed this course from the catalog; it cannot be suggested again.",
+      "listing_rate_limited": "Too many catalog requests in one day. Try again tomorrow.",
+      "listing_note_required": "Write a comment for the teacher.",
+      "listing_not_allowed": "The platform manages the catalog for this course."
     }
   },
   "courses": {
@@ -406,8 +411,8 @@
       "previewTitle": "Students will see the card like this",
       "previewHint": "The numbers of tests and lessons appear once you add them.",
       "modeHintInviteCode": "Students join with the course code. The code appears after the course is created.",
-      "catalogHint": "Students find the course in the catalog. A draft is not shown until you publish it.",
-      "catalogFailed": "The course is created, but the catalog setting was not saved. Turn it on in the settings.",
+      "catalogHint": "Students can open the course page by link (a draft after you publish it). The course enters the catalog after a review: suggest it in the course settings.",
+      "catalogFailed": "The course is created, but the link access was not saved. Turn it on in the settings.",
       "coverFailed": "The course is created, but the cover was not uploaded. Try again in the settings.",
       "modeLabel": "How students join"
     },
@@ -498,7 +503,7 @@
       "deleteTitle": "Delete this course?",
       "deleteBody": "The course disappears for everyone. You can restore it from deleted courses.",
       "joinCodeInactiveMode": "The code is off because students join by application form. Choose “{code}” to use it.",
-      "joinCodeInactiveOpen": "The code is off because students join from the catalog without it. Choose “{code}” to use it.",
+      "joinCodeInactiveOpen": "The code is off because students join from the course page without it. Choose “{code}” to use it.",
       "joinCodeInactiveClosed": "The code is off because enrollment is closed. Choose “{code}” to use it.",
       "examDate": {
         "title": "Exam",
@@ -671,7 +676,8 @@
       "plans": "Plans and settings",
       "gifts": "Gift codes",
       "paidExams": "Paid exams",
-      "health": "Health"
+      "health": "Health",
+      "catalog": "Catalog"
     },
     "notAuthorized": {
       "title": "Not authorized",
@@ -701,7 +707,8 @@
         "database_other": "Database: {percent}% used ({count} more exams fit)",
         "databaseFull": "Database: {percent}% used, a full exam no longer fits",
         "database_few": "Database: {percent}% used ({count} more exams fit)",
-        "database_many": "Database: {percent}% used ({count} more exams fit)"
+        "database_many": "Database: {percent}% used ({count} more exams fit)",
+        "catalogPending": "Catalog requests waiting for a decision"
       },
       "quick": {
         "title": "Quick actions",
@@ -808,22 +815,21 @@
       "students": "Active students",
       "flags": "Flags",
       "deleted": "Deleted",
-      "unlisted": "Unlisted by admin",
       "back": "Back to courses",
-      "visibility": "Visibility",
+      "visibility": "Page by link",
       "visibilityValues": {
-        "private": "Private",
-        "catalog": "Catalog"
+        "private": "Off",
+        "catalog": "Open"
       },
       "delete": "Delete",
       "restore": "Restore",
-      "unlist": "Unlist",
-      "relist": "Relist",
+      "unlist": "Remove from the catalog",
+      "relist": "Return to the catalog",
       "transfer": "Transfer ownership",
       "deleteTitle": "Delete this course?",
       "restoreTitle": "Restore this course?",
-      "unlistTitle": "Unlist this course?",
-      "relistTitle": "Relist this course?",
+      "unlistTitle": "Remove the course from the catalog?",
+      "relistTitle": "Return the course to the catalog?",
       "transferTitle": "Transfer ownership?",
       "transferHeading": "Ownership",
       "transferHint": "Search the new owner by name or email. They must be an enabled account; the current owner stays a teacher of the course.",
@@ -833,7 +839,9 @@
       "showRoster": "Show roster",
       "role": "Role",
       "ownerTag": "owner",
-      "subtitle": "Every course on the platform, with its owner and number of students."
+      "subtitle": "Every course on the platform, with its owner and number of students.",
+      "listing": "Catalog",
+      "openCatalog": "Open in Catalog"
     },
     "audit": {
       "title": "Audit log",
@@ -877,7 +885,7 @@
       "user_enable": "Enabled account",
       "course_delete": "Deleted course",
       "course_restore": "Restored course",
-      "course_unlist": "Unlisted course",
+      "course_unlist": "Course removed from the catalog",
       "course_relist": "Relisted course",
       "course_transfer_ownership": "Transferred course ownership",
       "course_roster_view": "Viewed course roster",
@@ -898,8 +906,64 @@
       "courseDeleted": "«{course}» moved to the trash.",
       "courseRestored": "«{course}» restored.",
       "courseUnlisted": "«{course}» removed from the catalog.",
-      "courseRelisted": "«{course}» can appear in the catalog again.",
+      "courseRelisted": "«{course}» can be in the catalog again.",
       "ownerChanged": "{name} is now the owner of «{course}»."
+    },
+    "catalog": {
+      "title": "Catalog",
+      "subtitle": "Teachers' requests to show courses in the catalog, and the courses already in it.",
+      "tabsLabel": "Catalog state",
+      "tabs": {
+        "pending": "Requests",
+        "listed": "In the catalog",
+        "declined": "Declined",
+        "blocked": "Removed"
+      },
+      "columns": {
+        "course": "Course",
+        "teacher": "Teacher",
+        "mode": "Enrollment",
+        "content": "Content",
+        "requested": "Requested",
+        "decided": "Decided",
+        "actions": "Actions"
+      },
+      "content": "Tests: {tests} · lessons: {lessons}",
+      "students": "Students: {n}",
+      "independent": "Independent teacher",
+      "platform": "Platform",
+      "school": "School",
+      "open": "Open",
+      "openCourse": "Course details",
+      "more": "More actions: {course}",
+      "approve": "Approve",
+      "recheck": "Checked",
+      "decline": "Decline",
+      "block": "Remove from the catalog",
+      "relist": "Return to the catalog",
+      "changedSince": "Changed after approval",
+      "note": "Comment: {note}",
+      "declineTitle": "Decline the request?",
+      "declineBody": "The course «{course}» will not appear in the catalog. The teacher sees the comment in the course settings and by email; students never see it. They can fix the course and send the request again.",
+      "declineNote": "Comment for the teacher",
+      "declineNoteHint": "What to fix so the course is accepted. Up to 500 characters.",
+      "blockTitle": "Remove the course from the catalog?",
+      "blockBody": "The course «{course}» leaves the catalog and its page stops opening by link. The teacher cannot suggest it again. Enrolled students keep their access.",
+      "relistTitle": "Return the course to the catalog?",
+      "relistBody": "The course «{course}» appears in the catalog again if its page is open by link.",
+      "empty": {
+        "pending": "No new requests.",
+        "listed": "No teacher courses in the catalog yet.",
+        "declined": "No declined requests.",
+        "blocked": "No removed courses."
+      },
+      "toast": {
+        "approved": "«{course}» is now in the catalog.",
+        "rechecked": "«{course}» checked.",
+        "declined": "Request declined: «{course}».",
+        "blocked": "«{course}» removed from the catalog.",
+        "relisted": "«{course}» returned to the catalog."
+      }
     }
   },
   "bank": {
@@ -2614,7 +2678,55 @@
       "teachers": "Teachers' courses",
       "pick": "Find courses for me",
       "mainCourse": "Main course"
-    }
+    },
+    "listing": {
+      "title": "Platform catalog",
+      "states": {
+        "off": "Not in the catalog",
+        "pending": "Under review",
+        "listed": "In the catalog",
+        "declined": "Declined",
+        "blocked": "Removed by an administrator"
+      },
+      "off": "The course is not shown in the catalog. Students join with the code {code} or through the link to the course page.",
+      "offPrivate": "The course is not shown in the catalog. Students join with the code {code}.",
+      "pending": "Under review since {date}. The platform administrator will review the request; the decision comes by email.",
+      "listed": "In the catalog since {date}. Students find the course in the catalog and search.",
+      "declined": "Declined on {date}. Fix the course and send the request again.",
+      "blocked": "Removed by the platform administrator on {date}. The course is not shown in the catalog and its page does not open by link. Enrolled students keep their access.",
+      "noteLabel": "Administrator's comment",
+      "contentChanged": "The course changed after approval. The platform administrator may check it again.",
+      "platformNote": "A platform course: it is in the catalog while the course page is open by link. No review is needed.",
+      "lockedNote": "The platform manages the catalog for this course.",
+      "request": "Suggest for the catalog",
+      "withdraw": "Withdraw",
+      "remove": "Remove from the catalog",
+      "resend": "Send again",
+      "incomplete": {
+        "heading": "Before you can suggest the course, add:",
+        "published": "publish the course",
+        "link_access": "turn on “Course page open by link” and save",
+        "title": "a title in the main language",
+        "description": "a description in the main language",
+        "cover_or_content": "a cover or at least one published lesson or test"
+      },
+      "linkAccess": "Course page open by link",
+      "linkAccessHint": "Any student with the link opens the course page and joins when enrollment is open. The course appears in the catalog only after a review.",
+      "linkAccessNeeded": "Application modes need this: students apply from the course page.",
+      "privateWarning": "After saving, the course leaves the catalog. To bring it back you will need to send a new request.",
+      "openLanding": "Open the course page",
+      "openPreview": "See the catalog as students do",
+      "removeTitle": "Remove the course from the catalog?",
+      "removeBody": "The course disappears from the catalog. Enrolled students keep their access and the course page stays open by link. To bring it back you need to send a new request.",
+      "toast": {
+        "requested": "Request sent. The course appears in the catalog after the review.",
+        "withdrawn": "Request withdrawn.",
+        "removed": "The course was removed from the catalog."
+      },
+      "offLink": "The course is not shown in the catalog. Students come through the link to the course page.",
+      "offHidden": "The course is not shown in the catalog and its page is not open by link."
+    },
+    "previewNote": "This is the catalog as students see it. You teach, so you cannot join from here."
   },
   "storage": {
     "nav": "Storage",
@@ -2843,8 +2955,8 @@
     "adminCourse": {
       "deleteBody": "The course «{course}» ({n} students) goes to the trash; students lose access. You can restore it later.",
       "restoreBody": "The course «{course}» comes back from the trash with its students and content.",
-      "unlistBody": "The course «{course}» disappears from the catalog. Current students keep their access.",
-      "relistBody": "The course «{course}» can appear in the catalog again if its teacher has made it public.",
+      "unlistBody": "The course «{course}» leaves the catalog and its page stops opening by link. The teacher cannot suggest it again. Enrolled students keep their access.",
+      "relistBody": "The course «{course}» appears in the catalog again if its page is open by link.",
       "transferBody": "The course «{course}» moves from {from} to {to}. The new owner gets full control; {from} stays a teacher of the course."
     },
     "adminUser": {
@@ -3515,7 +3627,6 @@
     "noMatch": "No one found. Check the spelling.",
     "studentAnswer": "Student's answer",
     "manageEnrollment": "Enrollment settings",
-    "showCatalog": "Course catalog",
     "ownerStays": "The owner cannot be removed. Transfer the course in Settings."
   },
   "home": {
@@ -5740,22 +5851,19 @@
     },
     "modes": {
       "invite_code": "With a join code",
-      "open": "Open: anyone joins from the catalog",
+      "open": "Open: anyone joins from the course page",
       "form_review": "By application (teacher approves)",
       "form_auto": "By application (instant entry)",
       "closed": "Closed (nobody can join)"
     },
     "modeHints": {
       "invite_code": "Students join with the code above.",
-      "open": "Any student can join from the catalog with one click.",
+      "open": "Any student who opens the course page (in the catalog or by link) joins with one click.",
       "form_review": "Students fill in the enrollment form; you approve or reject them in People → Applications.",
       "form_auto": "Students fill in the enrollment form and join at once (the student limit still applies).",
       "closed": "Nobody can join. Students already in the course stay."
     },
     "settings": {
-      "catalog": "Show in the catalog",
-      "catalogHint": "Students can find the course in the catalog and open its page.",
-      "catalogNeeded": "Application modes need this on: students apply from the course page in the catalog.",
       "noActive": "No form in use. Create one to use application modes.",
       "active": "Version {n} in use",
       "open": "Open the form",
@@ -5784,7 +5892,7 @@
     },
     "errors": {
       "form_required": "Create and activate an enrollment form first, then choose this mode.",
-      "form_needs_catalog": "Application modes need the course in the catalog. Turn on \"Show in the catalog\".",
+      "form_needs_catalog": "Application modes need the course page open by link. Turn on “Course page open by link”.",
       "form_answered": "Students have already answered this form. Create a new version to change it.",
       "form_draft_exists": "There is already a draft. Open it to continue.",
       "form_retired": "This version is no longer in use and cannot change.",
@@ -5852,7 +5960,7 @@
       "view": "Open",
       "empty": "No applications yet",
       "emptyFilter": "No applications match",
-      "emptyHint": "Students apply from the course page in the catalog.",
+      "emptyHint": "Students apply from the course page.",
       "showAll": "Show all applications"
     },
     "panel": {

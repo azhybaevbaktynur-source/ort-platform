@@ -138,7 +138,7 @@ const ENTRY = {
     return { user: u, entries: ["/ru/courses", "/ru/home", "/ru/courses?view=learning", `/ru/courses/${u.course_id}`, `/ru/courses/${s.course_id}`, "/ru/courses/catalog", "/ru/courses/join", "/ru/pro"] };
   },
   org_admin: () => { const s = seed(); return { user: s.org_admin.org_admin, entries: ["/ru/courses", "/ru/home", "/ru/courses/choose", `/ru/org/${s.org_admin.organization_id}`, `/ru/courses/${s.org_admin.maths_course_id}`, "/ru/pro"] }; },
-  platform_admin: () => { const s = seed(); return { user: s.admin, entries: ["/ru/courses", "/ru/home", "/ru/courses/choose", "/ru/admin", "/ru/org", `/ru/courses/${s.course_id}`, "/ru/pro"] }; },
+  platform_admin: () => { const s = seed(); return { user: s.admin, entries: ["/ru/courses", "/ru/home", "/ru/courses/choose", "/ru/admin", "/ru/admin/catalog", "/ru/org", `/ru/courses/${s.course_id}`, "/ru/pro"] }; },
 } satisfies Record<Role, () => { user: SeedUser; entries: string[] }>;
 
 for (const role of Object.keys(ENTRY) as Role[]) {
@@ -200,4 +200,22 @@ test("a teacher's course list: the whole card opens the course's management view
   await expect(page.locator("[data-shell]").first()).not.toHaveAttribute("data-shell", "neutral");
   expect(await frameOf(page)).toBe(`${expectedFrame("teacher", `/ru/courses/${s.course_nav.course_id}`)}/${expectedArea("teacher", `/ru/courses/${s.course_nav.course_id}`)}`);
   await expect(page.getByRole("button", { name: t("studentView.button") })).toBeVisible(); // top right of the course page
+});
+
+test("Admin → Каталог: the platform admin's page, refused for everyone else; the Teaching list has no catalog link", async ({ page }) => {
+  // step 3b S2 (CATALOG_AND_TEACHERS_DESIGN 2.4, 2.5): the server refuses `/platform/catalog`; the page says so
+  await page.setViewportSize(VIEWPORTS.desktop);
+  const s = seed();
+  for (const user of [s.course_nav.teacher, s.org_admin.org_admin, s.access!.student]) {
+    const r = await fetch(`${s.api}/api/v1/platform/catalog?state=pending`, { headers: { Authorization: `Bearer ${user.token}` } });
+    expect(r.status, user.email).toBe(403);
+  }
+  const teacher = s.course_nav.teacher;
+  await signIn(page, teacher);
+  await open(page, "/ru/admin/catalog");
+  await expect(page.locator("main").getByText(t("platformAdmin.notAuthorized.title"), { exact: true })).toBeVisible();
+  await expect(page.getByRole("table")).toHaveCount(0);
+  await open(page, "/ru/courses");
+  await expect(page.locator("main").getByRole("listitem").first()).toBeVisible();
+  await expect(page.locator(`main a[href="/ru/courses/catalog"]`)).toHaveCount(0);
 });

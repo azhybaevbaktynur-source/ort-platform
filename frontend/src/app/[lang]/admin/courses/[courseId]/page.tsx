@@ -19,6 +19,7 @@ import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
 import { Disclosure } from "@/components/lms/admin/Disclosure";
 import { CourseStatusBadge, LoadError, OrgError, SystemAccountBadge } from "@/components/lms/org/OrgUi";
 import { CourseCoverSection } from "@/components/lms/course/CourseCoverSection"; // F7b
+import { LISTING_TONE } from "@/lib/lms/listing"; // step 3b S2
 
 type Action = "delete" | "restore" | "unlist" | "relist" | "transfer";
 
@@ -103,6 +104,9 @@ export default function AdminCourseDetailPage() {
   if (!course) return <LoadingState label={t("lms.common.loading")} />;
 
   const isDeleted = !!course.deleted_at;
+  // step 3b S2: «Снять с каталога» / «Вернуть в каталог» are block / relist of the listing state
+  const listingState = course.listing?.state ?? "off";
+  const blocked = listingState === "blocked";
   const open = (a: Action) => { setDialogError(null); setAction(a); };
   const titles: Record<Action, string> = {
     delete: t("platformAdmin.courses.deleteTitle"), restore: t("platformAdmin.courses.restoreTitle"),
@@ -128,7 +132,7 @@ export default function AdminCourseDetailPage() {
   const primary = isDeleted ? <Button variant="secondary" onClick={() => open("restore")}>{labels.restore}</Button> : undefined;
   const overflow: MenuGroup[] | undefined = isDeleted ? undefined : [{
     id: "course", items: [
-      course.unlisted_by_admin_at ? { id: "relist", label: labels.relist } : { id: "unlist", label: labels.unlist },
+      blocked ? { id: "relist", label: labels.relist } : { id: "unlist", label: labels.unlist },
       { id: "delete", label: labels.delete, danger: true },
     ],
   }];
@@ -136,7 +140,7 @@ export default function AdminCourseDetailPage() {
     <span className="flex flex-wrap items-center gap-2">
       <CourseStatusBadge status={course.status} />
       {course.deleted_at && <Badge tone="danger">{t("platformAdmin.courses.deleted")}</Badge>}
-      {course.unlisted_by_admin_at && <Badge tone="warning">{t("platformAdmin.courses.unlisted")}</Badge>}
+      {listingState !== "off" && <Badge tone={LISTING_TONE[listingState]}>{t(`catalog.listing.states.${listingState}`)}</Badge>}
     </span>
   );
   const rosterColumns: TableColumn<RosterEntryOut>[] = [
@@ -166,7 +170,17 @@ export default function AdminCourseDetailPage() {
           { key: "visibility", term: t("platformAdmin.courses.visibility"), description: t(`platformAdmin.courses.visibilityValues.${course.visibility}`) },
           { key: "students", term: t("platformAdmin.courses.students"), description: course.active_student_count },
           { key: "created", term: t("platformAdmin.users.created"), description: fmtApiDateTimeShort(course.created_at, lang) },
-          ...(course.unlisted_by_admin_at ? [{ key: "unlisted", term: t("platformAdmin.courses.unlisted"), description: fmtApiDateTimeShort(course.unlisted_by_admin_at, lang) }] : []),
+          {
+            key: "listing", term: t("platformAdmin.courses.listing"),
+            description: (
+              <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span>{t(`catalog.listing.states.${listingState}`)}{course.listing?.decided_at && listingState !== "pending" ? ` · ${fmtApiDateTimeShort(course.listing.decided_at, lang)}` : ""}</span>
+                {listingState !== "off" && (
+                  <Link href={`/${lang}/admin/catalog${listingState === "pending" ? "" : `?state=${listingState}`}`} className="font-medium text-brand-700 hover:underline">{t("platformAdmin.courses.openCatalog")}</Link>
+                )}
+              </span>
+            ),
+          },
           ...(course.deleted_at ? [{ key: "deleted", term: t("platformAdmin.courses.deleted"), description: fmtApiDateTimeShort(course.deleted_at, lang) }] : []),
         ]} />
       </Card>

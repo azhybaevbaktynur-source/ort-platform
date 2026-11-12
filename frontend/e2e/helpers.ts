@@ -122,6 +122,11 @@ export interface Seed {
   shots_admin: SeedUser & { password: string };
   /** Step 3a S3: the hub's people: in no course, in ORT (Russian) only, and one the specs join to eight courses. */
   hub: { empty: SeedUser; one: SeedUser; many: SeedUser };
+  /** Step 3b S2: an independent teacher's courses for the catalog listing walk (catalog-listing.spec.ts). */
+  catalog_listing: {
+    teacher: SeedUser; student: SeedUser;
+    ready_id: string; declined_id: string; incomplete_id: string; blocked_id: string;
+  };
   /** PERFORMANCE_AUDIT P3: a password student in no course (login.spec.ts). */
   login_student: SeedUser & { password: string };
   /** TEACHER_TO_STUDENT_MAP S5: the lesson course "Мастеркласс E2E" (platform organization, draft, open enrollment in
