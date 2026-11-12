@@ -840,3 +840,139 @@ Notes:
   about 0.3 s wall for a call whose app time is 1 to 2 ms, and Render Free sleeps after 15 minutes idle with a cold start of tens
   of seconds; Neon also scales to zero after 5 minutes. Removing those costs about $7/month (Render Starter) and about $20/month
   (Neon Launch, scale-to-zero off), see §3.5.
+
+## 10. Fix round 2026-11-12 review (step 2, speed)
+
+Architect: Fable, 2026-11-12. Production = `main` `348b910` (Render `/health` shows it; Vercel the same). Everything
+below was measured again, not copied from §1–§9; the method per number is named. The architect's machine is in Korea,
+Neon and Render are in Frankfurt: every local figure that touches the database carries about **0.45 s per statement of
+network time** (measured: `GET /auth/ping` locally against the triage branch, `db;dur=446 ms` for one statement), so
+local timings are reported as **statement counts and app time**, and the production cost is derived from the
+production `Server-Timing` (Render ↔ Neon round trip ≈ 3 ms, below). Storage is in `docs/phases/DB_STORAGE_REVIEW.md`.
+
+### 10.1 What is slow today, with numbers
+
+**Production, public endpoints (curl from Korea, connect 11–40 ms, 2026-11-12 ~07:00 UTC, service awake):**
+
+| request | TTFB (s) | `Server-Timing` | reading |
+|---|---|---|---|
+| Render `GET /health` ×5 | 0.26, 0.27, 0.29, 0.32, 0.33 | `total` 1.7–2.7 ms, `db` 0 | the app answers in 2 ms; **≈ 0.27 s is Render's proxy + the Free instance**, the floor §3.5 also saw from Europe |
+| Render `GET /api/v1/auth/ping` ×3 | 0.29, 0.30, 0.80 | `total` 6.7–8.5 ms, `db` 3.0–3.9 ms, n=1 | **one statement costs ≈ 3 ms on Render** (pooled connection); the 0.80 s outlier is the proxy, not the app |
+| Render `GET /api/v1/auth/providers` ×3 | 0.29, 0.32, 0.34 | `total` 1.1–2.2 ms | |
+| Vercel `GET /ru/login` (static HTML, 2.9 kB gz) ×3 | 0.33, 0.14, 0.10 | — | edge cache |
+| Vercel rewrite `GET /api/v1/auth/ping` → Render ×2 | **2.76, 0.82** | — | the rewrite path is 3–9× slower than calling Render directly; only `useBackendWarmup.ts:11` still uses it (a fire-and-forget warm-up) |
+| Vercel `GET /ru` landing HTML (6.8 kB gz) | 0.19 | — | 17 scripts, 10 images |
+
+Bytes over the wire (gzip, production): login page scripts **205 kB** (803 kB raw, §9), landing 202 kB of scripts plus
+10 images (mascot PNG 21–25 kB each ×6, screenshots WebP 17–38 kB ×3, all `loading="lazy"` except the hero mascot).
+No web fonts, no third-party scripts. The built chunks of `348b910` (`npm run build` in `/tmp/agy_fe_s2`): shared
+first-load 103 kB; the biggest chunks are KaTeX 74.6 kB gz (content routes only), React DOM 67.5 + 53.1 kB gz, the
+three **core dictionaries 50–51 kB gz each** (`7442` ru, `8411` ky, `1832` en; one is loaded), the staff dictionaries
+44–46 kB gz (lazy), `9032` 45 kB gz (shared UI), polyfills 38.5 kB gz (`nomodule`, old browsers only). First-load JS
+per route: login 154 kB, `/courses` 176 kB, course page 220 kB, tests 148 kB, analytics 155 kB, admin 153 kB, player
+245 kB, exam template 309 kB (KaTeX). Nothing moved into the first screen since §9.
+
+**Signed-in endpoints** (production code on port 8131 against the Neon branch `triage-2026-11-12`, the real accounts of
+`scratchpad/triage/accounts.md` signed in through `/auth/login` and `/auth/mfa`, three calls each, best of three;
+`queries` is exact; `app ms` = `total − db` and includes one `pool_pre_ping` round trip ≈ 230 ms from here, ≈ 1–3 ms on
+Render):
+
+| role | endpoint | queries | app ms (here) | production estimate = Render app + n × 3 ms + 0.27 s proxy |
+|---|---|---|---|---|
+| student | `GET /me/bootstrap` | **21** | 332 | ≈ 0.35–0.40 s |
+| student | `GET /me/home` | 18 | 407 | ≈ 0.35–0.40 s |
+| student | `GET /courses/{ort}/exam-prep` | 15 | 474 | ≈ 0.35–0.40 s |
+| student | `GET /courses/{ort}/modules` (student outline) | **20** | 788 | ≈ 0.4 s (the outline evaluator; lessons page only) |
+| student | `GET /courses/{ort}/my/progress` | 11 | 330 | ≈ 0.33 s |
+| student | `GET /courses/{ort}` | 8 | 254 | ≈ 0.30 s |
+| student | `exam-prep/library`, `my/activity`, `my/saved`, `lesson-courses`, `/me/home/courses`, `/me/lms`, `/me/privacy`, `/me/access`, `/me/invitations`, `/auth/me` | 7, 7, 7, 4, 6, 6, 5, 3, 2, 2 | 230–370 | ≈ 0.28–0.31 s each |
+| teacher | `GET /me/bootstrap` | 10 | 279 | ≈ 0.31 s |
+| teacher | `GET /courses?as=teaching` | 3 | 257 | ≈ 0.28 s |
+| teacher | `GET /courses/{id}`, `/modules`, `/modules/unsorted`, `/todo`, `/people`, `/assessments` | 9, 7, 9, 7, 4, 4 | 245–350 | ≈ 0.29–0.31 s each |
+| admin | `GET /me/bootstrap`, `/platform/summary`, `/overview`, `/health`, `/access/overview`, `/users` | 9, 3, 1, 3, 3, 2 | 240–335 | ≈ 0.28–0.31 s each |
+| admin | **`GET /platform/audit-log?limit=50`** | **42** | 340 | ≈ 0.40 s: an N+1 (`platform_admin/users_service.py:255-259`: `audit_out` does `db.get(User, row.actor_id)` per row) |
+| admin | `GET /platform/infra` | 12 | 1,278 | provider calls are "not connected" in production (all four keys unset: `infra_snapshots` rows `neon/render/vercel/r2 = not_connected`), so only SQL plus the capacity statement |
+| admin | `GET /platform/storage` | 7 | 1,536 | the R2 usage read; admin-only |
+
+Reading: **no endpoint is slow on its own**. With ≈ 3 ms per statement on Render, even the 21-statement bootstrap
+costs ≈ 65 ms of database time; the fixed ≈ 0.27 s per request from Render's Free proxy is 3–10× larger than any
+endpoint's own work. The two real backend findings are the audit-log N+1 (42 statements for 50 rows) and the
+statement counts of the three student-home requests (21 + 18 + 15 = 54 statements for one cold home), which matter
+only under load on the 0.1-CPU instance, not for one visitor.
+
+**Startup** (what a Render spin-up pays after the container start): the lifespan runs Alembic (`db/migrate.py`, 10 s
+lock timeout, 8 retries since `b0b8ea9`), the grading-scheme, privacy-policy and ORT course seeds, and `warm_up()`.
+Measured here: 28 s to the first `/health` 200 from Korea, i.e. roughly 50–60 statements × 0.45 s; on Render the same
+statements cost ≈ 0.2 s, so the spin-up is the container, not our startup.
+
+**Cold starts, re-measured where possible.** Render Free still sleeps after 15 idle minutes and the uptime workflow
+pings every 30 minutes (`.github/workflows/uptime.yml`, `cron: "*/30 * * * *"`), so the service is asleep about half of
+each quiet hour and the next visitor waits ≈ 60 s (slice 1a now shows «Сервер запускается…» instead of an error). Neon
+Free suspends after 5 idle minutes and resumes in ≈ 0.65 s on the first statement (§3.5). Neon compute used this
+month: 32,064 s = **8.9 CU-hours in 12 days** of the 100 CU-hours allowance (`describe_project`), ≈ 22 CU-hours/month at
+this pace; keeping the compute awake around the clock would be ≈ 180 CU-hours/month, over the Free allowance, so a
+database-touching keep-alive is **not** an option on Free (as §3.5 said). Plan changes (Render Starter ≈ $7, Neon Launch
+≈ $20) remain the only way to remove the two cold starts; the owner has said not to change plans, so they are listed
+here once and not proposed again.
+
+### 10.2 Ranked improvements (gain, effort, risk)
+
+| # | change | gain | effort | risk | where |
+|---|---|---|---|---|---|
+| 1 | **Ping every 10 minutes instead of 30** (`uptime.yml` cron `*/10 * * * *`). Render sleeps after 15 idle minutes, so a 10-minute ping keeps the service awake except when GitHub skips or delays a run. Render Free gives 750 instance hours per month; one always-on service ≈ 720 h, inside the allowance (verify in the Render dashboard after a week). | **high** for the owner and students (the only slowness anyone sees is the ~60 s wake-up) | 1 line | GitHub cron drift (documented in the workflow); if Render counts the pings against anything, revert | `.github/workflows/uptime.yml:7` |
+| 2 | **One request for the student's first screen.** `GET /me/bootstrap?include=home` adds `home: HomeOut` (today's `/me/home`) and `exam_prep: {[course_id]: ExamPrepOut}` for the active exam course to the same answer; `useStudentShellData` + `ExamPrepHome` read them through the existing `pageData`/`swr` caches. Cold student home goes from API depth 2 (bootstrap → home + exam-prep) to **1**: ≈ 0.3–0.5 s less on every cold visit in production (one proxy round), 54 → ≈ 45 statements (the user row and the enrolment list are loaded once). | medium–high (every cold student visit) | 1–1.5 days | low: composition of existing service functions, same shapes; the parts stay as routes | `backend/app/lms/home/bootstrap.py`, `home/schemas.py`, `frontend/src/lib/lms/bootstrap.ts`, `pageData.ts`, `useStudentShellData.ts`, `ExamPrepHome.tsx` |
+| 3 | **Start the bootstrap during login.** `login/page.tsx` has the token before `router.push("/courses")`; calling the bootstrap fetcher (`cached("bootstrap", …)`) right there overlaps the shell request with the route change and the JS of the next page: ≈ 0.3 s less on the first page after sign-in (the slowest moment a new student sees). | medium (first visit only) | 2 hours | low | `frontend/src/app/[lang]/(auth)/login/page.tsx`, `lib/lms/bootstrap.ts` |
+| 4 | **Audit-log actors in one statement**: collect the page's `actor_id`s, `select(User).where(User.id.in_(ids))`, build `brief` from a dict; 42 → 2 statements. | small (admin page only, ≈ 120 ms on Render) | 1 hour | none | `backend/app/lms/platform_admin/users_service.py:255-259`, `router.py:157-166` |
+| 5 | **Warm-up ping through the API origin**: `useBackendWarmup.ts:11` fetches the relative `/api/v1/auth/ping`, which goes through the Vercel rewrite (0.8–2.8 s measured) instead of Render directly (0.3 s); use `apiBase()`. Keep the rewrite itself for local dev with an unset `NEXT_PUBLIC_API_URL`. | small (the warm-up lands sooner; nothing waits for it) | 30 min | none | `frontend/src/lib/useBackendWarmup.ts`, `lib/apiBase.ts` |
+| 6 | **More staff keys out of the core dictionary**: `infra` (1.7 kB gz), `courses.settings.*`, the builder parts of `assessments.*`, the staff screens of `assignments.*`; the core chunk is 50 kB gz per language and a large share of its keys are screens a student never opens (per top-level key: `assignments` 6.2, `lms` 5.6, `courses` 4.5, `assessments` 4.5, `access` 4.1, `ui` 3.7 kB gz). Expected −8 to −12 kB gz on every student and public page. | small (≈ 0.2 s on the Slow 4G profile) | half a day, Sonnet | raw keys on a staff screen if a prefix is wrong: the S4 "no raw keys" e2e assertion guards it | `frontend/src/lib/i18n/staffPrefixes.json` only |
+| 7 | Student outline `GET /courses/{id}/modules` 20 statements and `/me/home` 18: fold the per-module requirement and progress reads into the `IN (...)` statements the staff outline already uses. | small today (3 ms per statement); matters at 6,000 students | 1 day | medium: the gating evaluator has many tests; only worth it with the load test | `backend/app/lms/modules/service.py:840-880`, `evaluator.py` |
+
+Recommended order: 1 → 4 + 5 (one small slice) → 2 → 3 → 6; 7 waits for the load-test phase
+(`docs/phases/PHASE_11_LOADTEST.md`).
+
+### 10.3 What not to do, and why
+
+- **No new indexes, no index drops.** 230 indexes, 3.9 MB in total; 74 show fewer than 50 scans in
+  `pg_stat_user_indexes`, but every table fits in one or two pages and the planner prefers sequential scans (`courses`
+  18,486 seq scans vs 275 index scans, `organizations` 30,756 vs 436, `users` 15,699 vs 53). Those indexes are the ones
+  that will carry the load at 100,000 rows; the counters say nothing about that. Re-check when `enrollments` passes
+  50,000 rows.
+- **No `pool_pre_ping=False`.** It costs one round trip per request (≈ 1–3 ms on Render) and is what lets the pool
+  survive Neon's 5-minute suspend without a failed request.
+- **No in-process or Redis response cache for `/me/*`**: the SWR cache in the browser already removes the repeat
+  requests; the server has one worker and sleeps, so a process cache is cold most of the time (the `infra_snapshots`
+  table exists for that reason).
+- **No database keep-alive from the uptime ping** (Neon Free compute budget, above) and **no change of hosting plans**
+  (owner).
+- **No bundle surgery beyond item 6**: KaTeX is route-scoped, there is no chart/date/editor library, React + Next are
+  the floor. Server components for the signed-in pages would be a rewrite for a gain the measurements do not justify.
+- **No removal of the JSON request logging or `Server-Timing`**: both are microseconds and they are how this review
+  was possible.
+
+### 10.4 Slices (each deployable alone; Opus unless noted)
+
+- **P1 keep-awake + small backend fixes** (Opus, half a day): items 1, 4, 5. Tests: `tests/lms/test_platform_admin.py`
+  gets a statement-count assertion on the audit-log page (SQL capture with `before_cursor_execute`: ≤ 3 statements for
+  50 rows with 10 distinct actors); `tsc`. Measure before/after: Render dashboard events "spin down" per day for 3 days
+  before and after; `curl -w` TTFB of `/health` at :05, :15, :25 past the hour; the audit page's `Server-Timing` `n`.
+- **P2 bootstrap includes the home** (Opus, 1–1.5 days): item 2. Tests: `tests/lms/test_bootstrap.py` (the `home` and
+  `exam_prep` parts equal `/me/home` and `/courses/{id}/exam-prep` for the same student and time; teachers and admins get
+  neither; the MFA gate still answers only `me`); e2e `student-home.spec.ts` asserts one API round before first content.
+  Measure: `perf-waterfall.spec.ts` student-home cold (API depth 2 → 1, requests 5 → 3) and the production signed-in
+  Network tab after deploy (owner's account).
+- **P3 login prefetch** (Opus, 2 hours): item 3. Test: e2e `login.spec.ts` asserts `/me/bootstrap` starts before the
+  `/courses` navigation ends. Measure: perf script "first content" of the page after login, cold.
+- **P4 dictionary prefixes** (Sonnet, half a day): item 6. Gate: parity script, the S4 "no raw keys" e2e on admin, quiz
+  editor, course settings, assignments; measure "JS kB" of login and student pages.
+
+### 10.5 Better ideas than the brief's
+
+1. **Measure production signed-in from the owner's browser, once, after P1–P3**: the owner opens the student home with
+   DevTools → Network and screenshots the waterfall; `Server-Timing` is on every answer. That is the only way to see the
+   real proxy floor per request; everything measured from here or from a seeded local backend is a model of it.
+2. **The uptime workflow already is the scheduler** that production "does not have" (`DB_STORAGE_REVIEW.md` §5): a
+   second scheduled workflow with a repository secret can call the existing `POST /internal/*` routes daily. Same
+   mechanism, zero cost.
+3. **Say how long the wake-up takes**: after 1a the shell shows «Сервер запускается…» on a 502/503; with P1 that state
+   will be rare, so it should also carry «обычно 30–60 секунд» so the student waits instead of reloading (reloads queue
+   behind each other on the 0.1-CPU instance).
