@@ -17,7 +17,6 @@ import { useCachedMe } from "@/lib/lms/meCache"; // PERFORMANCE_AUDIT S1
 import { hidesLearning, teaches } from "@/lib/lms/shellKind";
 import type { CourseCard as CourseCardDto } from "@/lib/lms/types";
 import { COURSE_GRID, CourseCard, StatusBadge } from "@/components/lms/course/CourseCard";
-import { StudentViewButton } from "@/components/lms/course/StudentViewBanner";
 import { StudentHome } from "@/components/lms/home/StudentHome";
 import { TeacherApplicationNotice } from "@/components/lms/home/TeacherApplicationNotice";
 import { useErrorText } from "@/components/lms/home/useErrorText";
@@ -91,9 +90,8 @@ function TeachingList() {
       {items.length > 0 && (
         <ul className={COURSE_GRID}>
           {items.map((c) => (
+            // owner 2026-11-12: the whole card opens the course; Student view lives only on the course page
             <CourseCard key={c.id} course={c} href={`/${lang}/courses/${c.id}`}
-              // fix round 2026-11-12 1e: see the course as a student (the server decides; staff enrolments only)
-              action={c.my_role === "teacher" || c.my_role === "assistant" ? <StudentViewButton courseId={c.id} /> : undefined}
               badges={(
                 <>
                   <StatusBadge status={c.status} />

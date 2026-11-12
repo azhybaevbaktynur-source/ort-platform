@@ -117,7 +117,7 @@ test("a teacher who learns nowhere: no Learning tab, no Join with code; ?view=le
 const approvedLine = (page: Page) => page.getByRole("status").filter({ hasText: t("home.teacherApplication.approved") });
 const studentViewBanner = (page: Page) => page.getByRole("status").filter({ hasText: t("studentView.banner") });
 
-test("a teacher with a student enrolment: the teacher-only design; Student view from the list and the course page", async ({ page }) => {
+test("a teacher with a student enrolment: the teacher-only design; Student view only on the course page", async ({ page }) => {
   await page.setViewportSize(VIEWPORTS.desktop);
   const teacher = seed().teacher_enrolled;
   await signIn(page, teacher);
@@ -130,15 +130,14 @@ test("a teacher with a student enrolment: the teacher-only design; Student view 
   await expect(page.locator('a[href="/ru/courses/join"]')).toHaveCount(0); // no "Войти по коду"
   await expect(approvedLine(page)).toHaveCount(1); // the application line is on the Teaching list
 
-  // Student view from the course card: the course page as the test student, with the banner
+  // owner 2026-11-12: no Student view on the course cards; the whole card opens the course's management view
   const card = page.getByRole("listitem").filter({ has: page.getByRole("heading", { name: teacher.course_title }) });
-  await card.getByRole("button", { name: t("studentView.button") }).click();
+  await expect(card.getByRole("button", { name: t("studentView.button") })).toHaveCount(0);
+  await card.getByRole("link").first().click();
   await expect(page).toHaveURL(new RegExp(`/ru/courses/${teacher.course_id}$`));
-  await expect(studentViewBanner(page)).toBeVisible();
-  await studentViewBanner(page).getByRole("button", { name: t("studentView.leave") }).click();
   await expect(studentViewBanner(page)).toHaveCount(0);
 
-  // and from the staff course page header
+  // Student view from the staff course page header only
   const fromPage = page.getByRole("button", { name: t("studentView.button") });
   await expect(fromPage).toBeVisible();
   await fromPage.click();

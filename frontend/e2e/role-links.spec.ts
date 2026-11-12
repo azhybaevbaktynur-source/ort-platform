@@ -179,3 +179,24 @@ test("a teacher with a leftover student enrolment: the course they studied is no
   await expect(page.getByRole("link", { name: t("privacy.title") })).toBeVisible();
   await expect(page.getByRole("link", { name: t("access.pro.menu"), exact: true })).toHaveCount(0);
 });
+
+test("a teacher's course list: the whole card opens the course's management view; Student view only on the course page", async ({ page }) => {
+  // owner 2026-11-12: no «Режим ученика» on the cards of «Курсы, которые я веду» (nor on the catalog's cards)
+  await page.setViewportSize(VIEWPORTS.desktop);
+  const s = seed();
+  const teacher = s.course_nav.teacher;
+  await signIn(page, teacher);
+  await open(page, "/ru/courses");
+  const cards = page.locator("main").getByRole("listitem");
+  await expect(cards.first()).toBeVisible();
+  await expect(page.locator("main").getByRole("button", { name: t("studentView.button") })).toHaveCount(0);
+  await open(page, "/ru/courses/catalog");
+  await expect(page.locator("main").getByRole("button", { name: t("studentView.button") })).toHaveCount(0);
+  await open(page, "/ru/courses");
+  const card = cards.filter({ has: page.locator(`a[href="/ru/courses/${s.course_nav.course_id}"]`) }).first();
+  await card.locator(`a[href="/ru/courses/${s.course_nav.course_id}"]`).first().click();
+  await expect(page).toHaveURL(new RegExp(`/ru/courses/${s.course_nav.course_id}$`));
+  await expect(page.locator("[data-shell]").first()).not.toHaveAttribute("data-shell", "neutral");
+  expect(await frameOf(page)).toBe(`${expectedFrame("teacher", `/ru/courses/${s.course_nav.course_id}`)}/${expectedArea("teacher", `/ru/courses/${s.course_nav.course_id}`)}`);
+  await expect(page.getByRole("button", { name: t("studentView.button") })).toBeVisible(); // top right of the course page
+});
