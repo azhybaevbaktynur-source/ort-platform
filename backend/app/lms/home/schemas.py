@@ -3,7 +3,7 @@ unreleased grades, join codes or other students' data. Localized titles stay `{l
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Literal, Optional
 
@@ -78,12 +78,6 @@ class HomeProgressOut(BaseModel):
     total: int
 
 
-class HomeCourseFeaturesOut(BaseModel):
-    """Student UI U9 (review item 5): what an exam-prep course has for the student shell's menu, read with the list."""
-    modules: bool
-    practice: bool
-
-
 class HomeCourseOut(BaseModel):
     id: uuid.UUID
     title: dict
@@ -98,14 +92,22 @@ class HomeCourseOut(BaseModel):
     progress: Optional[HomeProgressOut] = None  # null: no module item with a requirement, so no bar
     # Student UI U2 (STUDENT_UI_DESIGN §4.1): `exam_prep` courses are listed in the student shell's exam switcher
     student_layout: Literal["exam_prep", "general"] = "general"
-    # Student UI U9: exam-prep courses only (null otherwise), so the shell draws the same menu on every page
-    features: Optional[HomeCourseFeaturesOut] = None
+    # Student UI U9; STUDENT_IA_DESIGN 6.2.1: the six tab flags of `GET /courses/{id}`, for every course, read with the
+    # list (never null since step 3a S1)
+    features: Optional["CourseFeaturesOut"] = None
     # F7a (STUDENT_UI_FIX_PLAN 7.2): the one course card's cover and meta line
     cover_url: Optional[str] = None
     tests_count: int = 0
     lessons_count: int = 0
     # TEACHER_TO_STUDENT_MAP 2.3: the exam a lesson course belongs to (the shell keeps that exam's switcher chip)
     exam_course_id: Optional[uuid.UUID] = None
+    # --- STUDENT_IA_DESIGN 6.2.2 begin --- (the hub's grouped cards: group, countdown, next step, last result)
+    exam_family: Optional[str] = None  # null = «Другие курсы»
+    subject: Optional[str] = None  # null = the family's main course
+    exam_date: Optional[date] = None  # exam-prep courses only (`settings.exam_date` of the loaded row)
+    next_step: Optional["HomeNextStepOut"] = None  # never null in an answer: `open` when nothing else applies
+    last_result: Optional["HomeLastResultOut"] = None  # the newest released result of the course
+    # --- STUDENT_IA_DESIGN 6.2.2 end ---
 
 
 # --- Phase 8a S3 begin --- (PHASE_8A_DESIGN 5.4, 6.7, 8.1: "continue in course" strip and announcements)
@@ -131,6 +133,43 @@ class HomeModuleNextOut(BaseModel):
     link: Optional[ItemLinkOut] = None
     is_video: bool = False  # a url item that is an allowlisted YouTube / Vimeo video (the syllabus's `parse_video` rule)
 # --- Phase 8a S3 end ---
+
+
+# --- STUDENT_IA_DESIGN 6.2.2 begin ---
+class HomeNextStepOut(BaseModel):
+    """The course card's one button, first that applies: `resume_test` (the caller's newest open attempt of the course:
+    `attempt_id`, `assessment_id`, the test's title), `continue_lesson` (the course's `modules_next` row: module, item,
+    link), `start` (the course's first `next_up` assignment: `assignment_id`, `assignment_kind`, the quiz's
+    `assessment_id`), else `open` (the course page). Titles are `{lang: text}`."""
+    kind: Literal["resume_test", "continue_lesson", "start", "open"]
+    title: Optional[dict] = None
+    attempt_id: Optional[uuid.UUID] = None
+    assessment_id: Optional[uuid.UUID] = None
+    assignment_id: Optional[uuid.UUID] = None
+    assignment_kind: Optional[str] = None
+    module_id: Optional[uuid.UUID] = None
+    item_id: Optional[uuid.UUID] = None
+    item_kind: Optional[str] = None
+    link: Optional[ItemLinkOut] = None
+    is_video: bool = False
+
+
+class HomeLastResultOut(BaseModel):
+    """The newest released result of the course, by the same student gate as `latest_results` ("132 / 245")."""
+    value: Optional[Decimal] = None
+    max_value: Optional[Decimal] = None
+    label: Optional[str] = None
+    labels: dict = {}
+    scheme_type: Optional[str] = None
+    at: datetime
+
+
+from app.lms.courses.schemas import CourseFeaturesOut  # noqa: E402
+
+HomeCourseOut.model_rebuild()
+NEXT_STEP_KEYS = frozenset(HomeNextStepOut.model_fields)
+LAST_RESULT_KEYS = frozenset(HomeLastResultOut.model_fields)
+# --- STUDENT_IA_DESIGN 6.2.2 end ---
 
 
 # --- Phase 9 S4 begin --- (PHASE_9_DESIGN 8.1: "Pending applications" line; ids, titles and dates only)
@@ -246,8 +285,9 @@ class BootstrapOut(BaseModel):
     # --- PERFORMANCE_AUDIT P2 begin --- (`?include=home`: the student home's own reads in the same answer; the three
     # keys are left out of the answer unless asked, so the default answer stays the same)
     home: Optional[HomeOut] = None  # `GET /me/home`; only with `student`
-    # exam course id -> `GET /courses/{id}/exam-prep` / `.../my/activity?days=7`, for the home's exam course (at most one)
+    # exam course id -> `GET /courses/{id}/exam-prep`, for the home's exam course (at most one)
     exam_prep: Optional[dict[str, ExamPrepOut]] = None
+    # STUDENT_IA_DESIGN 6.2.3: {"all": the 7-day activity over all the student's courses} (was: the exam course's)
     activity: Optional[dict[str, ActivityOut]] = None
 
     @model_serializer(mode="wrap")
@@ -263,5 +303,6 @@ class BootstrapOut(BaseModel):
 BOOTSTRAP_HOME_KEYS = frozenset({"home", "exam_prep", "activity"})  # PERFORMANCE_AUDIT P2
 BOOTSTRAP_KEYS = frozenset(BootstrapOut.model_fields) - BOOTSTRAP_HOME_KEYS
 BOOTSTRAP_HOME_ACTIVITY_DAYS = 7  # the home's streak strip (`ExamPrepHome`)
+BOOTSTRAP_ACTIVITY_ALL = "all"  # STUDENT_IA_DESIGN 6.2.3: the key of the cross-course activity
 BOOTSTRAP_COURSES_LIMIT = 50
 # --- PERFORMANCE_AUDIT S2 end ---

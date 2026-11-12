@@ -119,4 +119,5 @@ def bank_org_listener(mapper, conn: Connection, target) -> None:
 def ort_course_fields(conn: Connection, lang: str) -> dict:
     """Columns of a new ORT course (design 4 step 4): platform organization, locked ORT template v1."""
     return dict(organization_id=ensure_platform_org(conn), template_key="ort", template_version=1,
-                template_settings={"language": lang}, template_locked=True)
+                template_settings={"language": lang}, template_locked=True,
+                exam_family="ort")  # STUDENT_IA_DESIGN 6.1 (migration 0033)

@@ -54,7 +54,8 @@ def test_course_out_defaults(db):
     w = structure_world(db)
     out = course_student_out(w.course, w.enr, w.O)
     assert out.home_kind == "assignments" and out.home_page_id is None
-    assert out.features.model_dump() == {"modules": False, "files": False, "announcements": False, "practice": False}
+    assert out.features.model_dump() == {"modules": False, "files": False, "announcements": False, "practice": False,
+                                         "tests": False, "hand_ins": False}  # + step 3a S1
     assert {"home_kind", "home_page_id", "features"} <= set(CourseStaffOut.model_fields)
 
 

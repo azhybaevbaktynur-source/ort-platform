@@ -345,3 +345,56 @@ def test_0006_downgrade_refused(alembic_engine):
         conn.rollback()
         assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0006_phase5_cutover"
         assert "legacy_ort_export" in inspect(conn).get_table_names()
+
+
+def test_0033_exam_family_backfill_on_pg(alembic_engine):
+    """Step 3a S1 (STUDENT_IA_DESIGN 6.1): on the production-like fixture (migrated through 0032) the ORT template
+    courses get `ort`, a course linked to an ORT course takes its family, a teacher course (and one linked to a
+    teacher course) stays null; subjects stay null; the index exists. Down: both columns and the index are gone, the
+    courses stay; up again: the same backfill."""
+    from alembic import command
+
+    from app.db.migrate import _config
+    from tests.test_migration_0008 import ADMIN_COURSE, NOBODY_COURSE, ORT_KY, ORT_RU, OTHER_COURSE
+    from tests.test_migration_0014 import _migrate
+    from tests.test_migration_0015 import _upgrade
+
+    engine = _migrate(TEST_URL)[0]
+    cfg = _config(TEST_URL)
+    ids = {k: str(v) for k, v in zip("abcde", (ORT_KY, ORT_RU, OTHER_COURSE, ADMIN_COURSE, NOBODY_COURSE))}
+
+    def families(conn) -> dict:
+        return {str(r[0]): (r[1], r[2]) for r in conn.execute(text(
+            "SELECT id, exam_family, subject FROM courses WHERE id IN (:a, :b, :c, :d, :e)"), ids)}
+
+    expected = {str(ORT_KY): ("ort", None), str(ORT_RU): ("ort", None), str(OTHER_COURSE): ("ort", None),
+                str(ADMIN_COURSE): (None, None), str(NOBODY_COURSE): (None, None)}
+    with engine.connect() as conn:
+        cfg.attributes["connection"] = conn
+        _upgrade(cfg, conn, "0032_teacher_notice_dismissed")
+        assert {r[0] for r in conn.execute(text("SELECT template_key FROM courses WHERE id IN (:a, :b)"),
+                                           {"a": ids["a"], "b": ids["b"]})} == {"ort"}
+        link = text("UPDATE courses SET exam_course_id = :p WHERE id = :c")
+        conn.execute(link, {"p": str(ORT_RU), "c": str(OTHER_COURSE)})      # a lesson course of an ORT course
+        conn.execute(link, {"p": str(NOBODY_COURSE), "c": str(ADMIN_COURSE)})  # linked to a teacher course
+        conn.commit()
+        total = conn.execute(text("SELECT count(*) FROM courses")).scalar()
+        _upgrade(cfg, conn, "0033_course_exam_family")
+        assert families(conn) == expected
+        # nothing else got a family: only the ORT courses and the course linked to one
+        assert conn.execute(text("SELECT count(*) FROM courses WHERE exam_family IS NOT NULL")).scalar() == 3
+        insp = inspect(conn)
+        cols = {c["name"]: c for c in insp.get_columns("courses")}
+        assert cols["exam_family"]["nullable"] and cols["subject"]["nullable"]
+        assert cols["exam_family"]["type"].length == 16 and cols["subject"]["type"].length == 32
+        idx = {i["name"]: i["column_names"] for i in insp.get_indexes("courses")}
+        assert idx["ix_courses_exam_family_subject"] == ["exam_family", "subject"]
+        command.downgrade(cfg, "0032_teacher_notice_dismissed")
+        conn.commit()
+        insp = inspect(conn)
+        assert not {"exam_family", "subject"} & {c["name"] for c in insp.get_columns("courses")}
+        assert "ix_courses_exam_family_subject" not in {i["name"] for i in insp.get_indexes("courses")}
+        assert conn.execute(text("SELECT count(*) FROM courses")).scalar() == total
+        _upgrade(cfg, conn, "0033_course_exam_family")
+        assert families(conn) == expected
+    engine.dispose()

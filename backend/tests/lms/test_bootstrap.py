@@ -197,8 +197,9 @@ async def home_parts(api, user, exam):
     rs = {"boot": await get(api, user, "/me/bootstrap"), "home": await get(api, user, "/me/home"),
           "prep": await get(api, user, f"/courses/{exam}/exam-prep"),
           "activity": await get(api, user, f"/courses/{exam}/my/activity", params={"days": 7})}
+    # 3a S1 (STUDENT_IA_DESIGN 6.2.3): the activity is the student's across courses; here only the exam course has one
     out = {**rs["boot"].json(), "home": rs["home"].json(), "exam_prep": {str(exam): rs["prep"].json()},
-           "activity": {str(exam): rs["activity"].json()}}
+           "activity": {"all": rs["activity"].json()}}
     return out, sum(queries(r) for r in rs.values())
 
 
@@ -214,7 +215,9 @@ async def test_include_home_equals_the_parts_in_fewer_statements(db, api):
     assert body == expected
     # statement budget: one request instead of four, fewer statements than they needed together (here 50 against 57:
     # the user, profile and enrolment reads once), and no more than today's 50 for this world (51 on PostgreSQL, which
-    # runs one dialect-only statement; the ceiling is the regression guard, the comparison with the parts is the point)
+    # runs one dialect-only statement; the ceiling is the regression guard, the comparison with the parts is the point).
+    # Step 3a S1: 45 against 58 (the home reuses the student page's cards and module rows; the cards gained one windowed
+    # statement for last results and the per-course module scan); the ceiling stays 52
     assert queries(r) < parts_n, (queries(r), parts_n)
     assert queries(r) <= 52, queries(r)
     default = (await get(api, w.s, "/me/bootstrap")).json()
@@ -227,9 +230,9 @@ async def test_include_home_follows_the_remembered_exam_course(db, api):
     enroll(db, second, w.s)
     first = (await get(api, w.s, "/me/bootstrap", params=HOME)).json()
     exams = [c["id"] for c in first["student"]["courses"] if c["student_layout"] == "exam_prep"]
-    assert len(exams) == 2 and list(first["exam_prep"]) == [exams[0]] and list(first["activity"]) == [exams[0]]
+    assert len(exams) == 2 and list(first["exam_prep"]) == [exams[0]] and list(first["activity"]) == ["all"]
     picked = (await get(api, w.s, "/me/bootstrap", params={**HOME, "course": exams[1]})).json()
-    assert list(picked["exam_prep"]) == [exams[1]] and list(picked["activity"]) == [exams[1]]
+    assert list(picked["exam_prep"]) == [exams[1]] and list(picked["activity"]) == ["all"]
     assert picked["exam_prep"][exams[1]] == (await get(api, w.s, f"/courses/{exams[1]}/exam-prep")).json()
     # a course that is not one of the student's exam courses, or no id at all: the first, never an error
     for bad in (str(w.lc.id), "not-an-id", ""):
@@ -242,7 +245,7 @@ async def test_include_home_without_an_exam_course_has_the_home_only(db, api):
     enroll(db, make_lesson_free_course(db), s)
     body = (await get(api, s, "/me/bootstrap", params=HOME)).json()
     assert body["home"] == (await get(api, s, "/me/home")).json()
-    assert body["exam_prep"] == {} and body["activity"] == {}
+    assert body["exam_prep"] == {} and list(body["activity"]) == ["all"]  # 3a S1: the activity of every course
 
 
 async def test_include_home_for_a_test_student(db, api):

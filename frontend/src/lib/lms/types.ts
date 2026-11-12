@@ -304,6 +304,9 @@ export interface AdminCourseOut {
   /** F7b: the detail only (absent or null in the list) */
   cover_url?: string | null;
   is_platform_course?: boolean | null;
+  /** Step 3a S1: the exam group and subject (absent: older backend) */
+  exam_family?: string | null;
+  subject?: string | null;
 }
 export interface AuditEntryOut {
   id: string;
@@ -419,6 +422,10 @@ export interface CourseFeaturesOut {
   announcements: boolean;
   /** Phase 10: a live, published practice quiz exists (optional: older backend). */
   practice?: boolean;
+  /** Step 3a S1 (STUDENT_IA_DESIGN §6.2.1): «Тесты» (a published test of an exam course, a visible quiz otherwise) and
+   * «Задания» (a visible non-quiz assignment), for every course (optional: older backend). */
+  tests?: boolean;
+  hand_ins?: boolean;
 }
 
 export interface CourseStudentOut {
@@ -448,6 +455,25 @@ export interface CourseStudentOut {
 export interface CourseUpdateIn {
   /** Platform admin, platform lesson course; null clears it. */
   exam_course_id?: string | null;
+}
+
+// Step 3a S1 (STUDENT_IA_DESIGN §6.1): the exam group of a course (null = «Другие курсы») and its subject (null = the
+// family's main course). Set by a platform admin on a platform course only; labels `exam.family.*`, `exam.subject.*`.
+export type ExamFamily = "ort" | "nct";
+export const EXAM_FAMILIES: readonly ExamFamily[] = ["ort", "nct"];
+export type ExamSubject =
+  | "math" | "physics" | "chemistry" | "biology" | "history" | "geography" | "kyrgyz" | "russian" | "english"
+  | "literature";
+export const EXAM_SUBJECTS: readonly ExamSubject[] = [
+  "math", "physics", "chemistry", "biology", "history", "geography", "kyrgyz", "russian", "english", "literature",
+];
+export interface CourseStudentOut {
+  exam_family?: ExamFamily | null;
+  subject?: ExamSubject | null;
+}
+export interface CourseUpdateIn {
+  exam_family?: ExamFamily | null;
+  subject?: ExamSubject | null;
 }
 // --- Phase 8a S4a end ---
 
