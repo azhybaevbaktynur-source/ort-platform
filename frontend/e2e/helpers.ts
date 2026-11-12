@@ -123,6 +123,9 @@ export interface Seed {
   /** TEACHER_TO_STUDENT_MAP S5: the lesson course "Мастеркласс E2E" (platform organization, draft, open enrollment in
    * the catalog, not linked yet) and a student of ORT (Russian) only (teacher-to-student.spec.ts). */
   item3: { lesson_course_id: string; exam_course_id: string; student: SeedUser };
+  /** Fix round 2026-11-12 1c: a teacher whose application was just approved, learning nowhere
+   * (teacher-approved-notice.spec.ts closes the "approved" line). */
+  teacher_notice: SeedUser;
   /** Phase 8b S3: the scrolling-player course (its published quizzes serve the Student view "Start" check). */
   scrolling: {
     course_id: string;

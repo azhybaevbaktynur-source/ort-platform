@@ -274,7 +274,7 @@ test("the admin reads the application and approves it; the header changes", asyn
   await expect(student).toHaveURL(/\/ru\/courses\?view=teaching$/);
   const line = student.getByRole("status").filter({ hasText: t("home.teacherApplication.approved") });
   await expect(line).toHaveCount(1); // shown once, on the Teaching view
-  await expect(line.getByRole("link", { name: t("home.teacherApplication.approvedLink") })).toHaveAttribute("href", "/ru/courses?view=teaching");
+  await expect(line.getByRole("link")).toHaveCount(0); // fix round 2026-11-12 1c: no link to the page it is on
 
   await student.goto(APPLY);
   await expect(student.getByRole("heading", { level: 2, name: t("teacherApply.approved.title") })).toBeVisible();
