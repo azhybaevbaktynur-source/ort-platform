@@ -98,6 +98,7 @@ test.describe("student link audit (ru)", () => {
       `/${L}/home`, `/${L}/courses`, `${c}/tests`, `${c}/progress`, // step 3a S3: the hub and «Мои курсы»
       `${c}/saved`, `${c}/saved?tab=mistakes`, `${c}/modules`,
       `${c}/practice`, `/${L}/pro`, `${c}/attempts/${attemptId}/result`,
+      `/${L}/courses/choose?first=1`, `/${L}/courses/catalog`, // step 3a S4: the choose step and the catalog chips
     ];
     const visited = new Set<string>();
     for (const from of pages) {

@@ -266,6 +266,7 @@ function usePageTitle(props: StudentShellProps): string {
   if (rest === "/home") return t("student.nav.home");
   if (rest === "/courses") return t("student.nav.myCourses");
   if (rest === "/courses/catalog" || rest.startsWith("/courses/catalog/")) return t("student.nav.catalog");
+  if (rest === "/courses/choose") return t("student.nav.chooseCourses"); // step 3a S4
   const id = courseIdOfPath(rest);
   const c = id ? data.courses.find((x) => x.id === id) : undefined;
   return c ? title(c) : t("common.appName");

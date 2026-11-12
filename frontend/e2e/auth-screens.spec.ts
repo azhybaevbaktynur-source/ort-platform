@@ -141,12 +141,23 @@ test.describe("Google callback page", () => {
       if (!body.ageBand) await r.fulfill({ status: 422, json: { detail: { code: "oauth_profile_required" } } });
       else await r.fulfill({ json: SESSION });
     });
+    // SESSION's token is not a real account: the scratch backend answers the privacy page's own reads 401 and the
+    // shell then rightly signs out to /login (the race that failed full runs). Answer them as the backend answers a
+    // new under-14 account: its privacy state, and 403 `consent_required` for the gated frame reads. The real flow
+    // (a real token) is `oauth-google.spec.ts` «new user under 14».
+    await page.route("**/api/v1/me/privacy", (r) => r.fulfill({ json: {
+      age_band: "under_14", consent_state: "pending_guardian", consent_due_at: null, needs: [], requests: [] } }));
+    for (const p of ["**/api/v1/me/bootstrap*", "**/api/v1/me/lms*"]) {
+      await page.route(p, (r) => r.fulfill({ status: 403, json: { error: { code: "consent_required", message: "Consent required", details: {} } } }));
+    }
     await withBind(page);
     await page.goto(`/ru/oauth-callback#t=${TICKET}`);
     await page.getByRole("button", { name: t("privacy.age.under_14") }).click();
     await expect(page.getByRole("checkbox")).toHaveCount(0);
     await page.getByRole("button", { name: t("auth.oauth.completeButton") }).click();
-    await expect(page).toHaveURL(/\/ru\/privacy/);
+    await expect(page).toHaveURL(/\/ru\/privacy$/);
+    await page.waitForLoadState("networkidle");
+    await expect(page).toHaveURL(/\/ru\/privacy$/); // and stays there (no bounce to /login)
   });
 
   test("two-step login: the existing MFA step appears and finishes with /auth/mfa", async ({ page }) => {
@@ -188,6 +199,9 @@ test.describe("Google callback page", () => {
   test("signed in as someone else: asks before replacing the session", async ({ page }) => {
     const OTHER = { uid: "usr_other", email: "other.person@example.com", displayName: "Other" };
     await page.route("**/auth/me", (r) => r.fulfill({ json: { id: OTHER.uid, email: OTHER.email, displayName: OTHER.displayName } }));
+    // OTHER's token is not a real account: the hub's own reads would answer 401 and the shell would rightly sign out
+    // to /login (a race in full runs). They are held off the network here (the shell keeps the session offline).
+    await page.route(/\/api\/v1\/me(\/|\?|$)/, (r) => r.abort());
     const bodies: Record<string, unknown>[] = [];
     await page.route("**/auth/oauth/complete", async (r) => {
       bodies.push(r.request().postDataJSON());
@@ -203,7 +217,9 @@ test.describe("Google callback page", () => {
     await expect(page.getByText(t("auth.oauth.switchBody", { current: OTHER.email, email: "new.person@example.com" }))).toBeVisible();
     expect(bodies).toHaveLength(0); // nothing is sent before the answer
     await page.getByRole("button", { name: t("auth.oauth.switchStay") }).click();
-    await expect(page).toHaveURL(/\/ru\/home/); // step 3a S3: the hub
+    await expect(page).toHaveURL(/\/ru\/home$/); // step 3a S3: the hub
+    await page.waitForLoadState("networkidle");
+    await expect(page).toHaveURL(/\/ru\/home$/); // the session stays (no bounce to /login)
     expect(bodies).toHaveLength(0);
 
     await page.goto(`/ru/oauth-callback#t=${TICKET}`);

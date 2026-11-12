@@ -17,7 +17,7 @@ import type { HomeCourseOut, HomeOut } from "@/lib/lms/homeTypes";
 import { continueTarget, type ContinueTarget } from "@/lib/lms/lastPlace";
 import { useLastPlaceRead } from "@/lib/lms/useLastPlace";
 import { HUB_GROUP_MAX } from "@/lib/lms/examFamilies";
-import { chooseCoursesHref } from "@/lib/lms/chooseCourses"; // until S4: the catalog
+import { chooseCoursesHref } from "@/lib/lms/chooseCourses";
 import { pickLocalized } from "@/lib/lms/localized";
 import { LMS_ME_STALE_EVENT } from "@/lib/lms/meStale";
 import type { ActivityOut } from "@/lib/lms/progress";
