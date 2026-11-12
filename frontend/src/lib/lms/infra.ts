@@ -1,7 +1,8 @@
 import { lmsFetch } from "./client";
 
 /** Infrastructure panel (INFRA_PANEL_DESIGN): GET /platform/infra, POST /platform/infra/refresh (platform admin). */
-export type InfraLevel = "ok" | "warning" | "critical";
+/** `notice` only for the database (50 %; DB_STORAGE_REVIEW 7.2); other metrics are ok / warning (80 %) / critical (95 %). */
+export type InfraLevel = "ok" | "notice" | "warning" | "critical";
 export type InfraCardStatus = "ok" | "warning" | "error" | "not_connected" | "unavailable" | "refreshing";
 export type InfraUnit = "bytes" | "cu_hours" | "count" | "requests" | "emails" | "seconds";
 
@@ -40,9 +41,18 @@ export interface InfraCapacity {
   exam_bytes: number;
   used_bytes: number;
   limit_bytes: number;
-  used_source: "neon" | "database";
+  used_source: "neon" | "database" | "database_estimate";
+  /** Used of the limit, 0-100 (one decimal). */
+  percent: number | null;
+  /** Database levels: notice 50 %, warning 70 %, critical 85 %; no full exam left raises it (server-side). */
+  level: InfraLevel;
+  measured_at: string | null;
   estimated: boolean;
   history_seconds: number | null;
+  branches: number | null;
+  branches_limit: number | null;
+  /** Neon Launch storage price (backend `costs.py`), for the upgrade hint. */
+  upgrade_storage_usd_per_gb_month: number | null;
   per_row_bytes: Record<string, number>;
 }
 
@@ -86,11 +96,12 @@ export const INFRA_ENV: Record<string, string[]> = {
 export const INFRA_EMAIL_ENV: Record<string, string[]> = { brevo: ["BREVO_API_KEY"], resend: ["RESEND_API_KEY"] };
 
 /** The card's tone: the server's status, raised by the worst metric or flag level. */
-export function cardTone(c: InfraCard): "ok" | "warning" | "critical" | "error" | "muted" {
+export function cardTone(c: InfraCard): "ok" | "notice" | "warning" | "critical" | "error" | "muted" {
   if (c.status === "error") return "error";
   if (c.status === "not_connected" || c.status === "unavailable") return "muted";
   const levels = [...c.metrics.map((m) => m.level), ...c.flags.map((f) => f.level)];
   if (levels.includes("critical")) return "critical";
   if (c.status === "warning" || levels.includes("warning")) return "warning";
+  if (levels.includes("notice")) return "notice";
   return "ok";
 }

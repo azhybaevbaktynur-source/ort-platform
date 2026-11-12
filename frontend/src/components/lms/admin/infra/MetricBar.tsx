@@ -5,8 +5,8 @@ import { useTranslation } from "@/lib/i18n/context";
 import { formatBytes } from "@/lib/lms/storage";
 import type { InfraMetric } from "@/lib/lms/infra";
 
-const BAR = { ok: "bg-brand-600", warning: "bg-warning-500", critical: "bg-danger-600" } as const;
-const TEXT = { ok: "text-slate-600", warning: "text-warning-900", critical: "text-danger-700" } as const;
+export const BAR = { ok: "bg-brand-600", notice: "bg-warning-300", warning: "bg-warning-500", critical: "bg-danger-600" } as const;
+export const TEXT = { ok: "text-slate-600", notice: "text-warning-800", warning: "text-warning-900", critical: "text-danger-700" } as const;
 
 /** One usage line: label, "value of limit", percent and a bar coloured by the server's `level`. */
 export function MetricBar({ metric }: { metric: InfraMetric }) {

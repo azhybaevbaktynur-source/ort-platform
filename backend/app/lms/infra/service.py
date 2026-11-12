@@ -136,10 +136,11 @@ def refresh(db: Session, *, force: bool = False) -> dict[str, dict]:
     return report
 
 
-def _card(row: InfraSnapshot, db: Session, email_provider: str) -> dict:
+def _card(row: InfraSnapshot, db: Session, email_provider: str, db_fits: Optional[int] = None) -> dict:
     mod = PROVIDERS[row.provider]
     payload = row.payload or {}
-    plan, metrics, flags, details = cards.build(row.provider, payload, db, email_provider=email_provider)
+    plan, metrics, flags, details = cards.build(row.provider, payload, db, email_provider=email_provider,
+                                                db_fits=db_fits)
     error_code, error_status = None, None
     if row.status == "error" and row.error:
         code, _, status = row.error.partition(":")
@@ -149,7 +150,8 @@ def _card(row: InfraSnapshot, db: Session, email_provider: str) -> dict:
     elif row.status in ("empty", "refreshing") and not payload:
         status = "refreshing"
     else:
-        hot = any(m["level"] != "ok" for m in metrics) or any(f["level"] != "ok" for f in flags)
+        quiet = ("ok", "notice")  # a notice (database at 50 %) colours its bar, not the whole card
+        hot = any(m["level"] not in quiet for m in metrics) or any(f["level"] not in quiet for f in flags)
         status = "warning" if hot else "ok"
     if status in ("not_connected", "unavailable") and row.provider != "r2":
         plan, metrics, flags = None, [], []  # an old payload of a removed key is not shown as current
@@ -164,18 +166,27 @@ def read(db: Session) -> dict:
     """The panel from the stored rows; no provider call."""
     rows = {r.provider: r for r in db.scalars(select(InfraSnapshot)).all()}
     email_provider = email.selected()
-    out_cards = [_card(rows[p], db, email_provider) for p in PROVIDERS if p in rows]
     neon_row = rows.get("neon")
-    neon_payload = neon_row.payload if neon_row is not None and neon_row.fetched_at is not None else None
+    fetched = neon_row is not None and neon_row.fetched_at is not None
+    cap = capacity.compute(db, neon_row.payload if fetched else None,
+                           neon_fetched_at=_aware(neon_row.fetched_at) if fetched else None)
+    out_cards = [_card(rows[p], db, email_provider, cap["fits"]) for p in PROVIDERS if p in rows]
     return {
         "generated_at": clock.now(),
         "ttl_seconds": settings.INFRA_TTL_SECONDS,
         "cards": out_cards,
-        "capacity": capacity.compute(db, neon_payload),
+        "capacity": cap,
         "costs": costs.summary(),
     }
 
 
 def overview(db: Session, *, force: bool = False) -> tuple[dict, dict[str, dict]]:
     report = refresh(db, force=force)
-    return read(db), report
+    out = read(db)
+    try:  # the admin overview's database line reads this row (DB_STORAGE_REVIEW 7.4); never fails the page
+        capacity.store(db, out["capacity"])
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.warning("infra capacity: storing the measurement failed (%s)", type(e).__name__)
+    return out, report

@@ -1,5 +1,7 @@
 """Turn a stored snapshot payload into a card: metrics with limits and levels, flags, details (INFRA_PANEL_DESIGN 1, 5).
-Read-time only: no provider call, no write. The R2 card also reads our own counters (`storage_usage`)."""
+Read-time only: no provider call, no write. The R2 card also reads our own counters (`storage_usage`). The Neon storage
+metric uses the database levels of `capacity.db_level` (50 / 70 / 85 % and the exams-that-fit rule; DB_STORAGE_REVIEW 7);
+every other metric keeps 80 / 95 %."""
 from __future__ import annotations
 
 import os
@@ -7,6 +9,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from app.lms.infra import capacity
 from app.lms.infra.providers import cloudflare, neon, render, vercel
 
 WARNING_PERCENT = 80.0
@@ -31,10 +34,13 @@ def metric(key: str, value, limit, unit: str, source: Optional[str] = None) -> d
             "source": source}
 
 
-def _neon(p: dict) -> tuple[Optional[str], list, list, dict]:
+def _neon(p: dict, db_fits: Optional[int] = None) -> tuple[Optional[str], list, list, dict]:
     compute = round(p["compute_seconds"] / 3600, 2) if p.get("compute_seconds") is not None else None
+    storage = metric("storage", p.get("storage_bytes"), p.get("storage_limit_bytes"), "bytes")
+    if storage["percent"] is not None:
+        storage["level"] = capacity.db_level(storage["percent"], db_fits)
     metrics = [
-        metric("storage", p.get("storage_bytes"), p.get("storage_limit_bytes"), "bytes"),
+        storage,
         metric("compute", compute, neon.FREE_COMPUTE_CU_HOURS if neon.is_free(p.get("plan")) else None, "cu_hours"),
         metric("branches", p.get("branches"), p.get("branches_limit"), "count"),
         metric("data_transfer", p.get("data_transfer_bytes"), None, "bytes"),
@@ -113,10 +119,12 @@ def _email(p: dict, selected: str) -> tuple[Optional[str], list, list, dict]:
     return p.get("plan"), metrics, [], details
 
 
-def build(provider: str, payload: dict, db: Session, *, email_provider: str = "") -> tuple:
-    """(plan, metrics, flags, details) for one provider's stored payload ({} when never fetched)."""
+def build(provider: str, payload: dict, db: Session, *, email_provider: str = "",
+          db_fits: Optional[int] = None) -> tuple:
+    """(plan, metrics, flags, details) for one provider's stored payload ({} when never fetched). `db_fits`: the
+    capacity block's exams-that-fit, which raises the Neon storage level."""
     if provider == "neon":
-        return _neon(payload) if payload else (None, [], [], {})
+        return _neon(payload, db_fits) if payload else (None, [], [], {})
     if provider == "render":
         return _render(payload) if payload else (None, [], [], {})
     if provider == "vercel":

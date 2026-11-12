@@ -186,3 +186,33 @@ test("admin overview: the health check failing leaves the page whole", async ({ 
   await expectOtherCards(page);
   await page.unrouteAll({ behavior: "ignoreErrors" });
 });
+
+// DB_STORAGE_REVIEW 7.4 (slice D1): the stored database measurement adds one line to Needs attention from 70 % or when
+// no full exam fits; below that the overview stays quiet.
+test("admin overview: the database line appears from warning and links to Services", async ({ page }) => {
+  await page.setViewportSize(VIEWPORTS.desktop);
+  await signIn(page, seed().admin);
+  let database: Record<string, unknown> = { level: "warning", percent: 72, fits: 1, used_bytes: 773_094_113, limit_bytes: 1_073_741_824, measured_at: new Date().toISOString() };
+  await page.route("**/api/v1/platform/overview", async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    await route.fulfill({ response: res, json: { ...body, database } });
+  });
+  await page.goto("/ru/admin");
+  const attention = page.getByTestId("needs-attention");
+  const row = attention.locator('[data-attention="database"]').getByRole("link");
+  await expect(row).toContainText(t("platformAdmin.overview.attention.database_one", { percent: 72, count: 1 }));
+  await expect(row).toHaveAttribute("href", "/ru/admin/services");
+  await expect(row.getByText("72%", { exact: true })).toBeVisible(); // the badge
+  await shots(page, "04-overview-database");
+
+  database = { ...database, level: "critical", percent: 40, fits: 0 };
+  await page.reload();
+  await expect(attention.locator('[data-attention="database"]')).toContainText(t("platformAdmin.overview.attention.databaseFull", { percent: 40 }));
+
+  database = { ...database, level: "notice", percent: 55, fits: 2 };
+  await page.reload();
+  await expect(page.getByTestId("overview-metrics")).toBeVisible();
+  await expect(attention.locator('[data-attention="database"]')).toHaveCount(0);
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+});

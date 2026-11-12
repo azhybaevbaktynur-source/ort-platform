@@ -9,8 +9,10 @@ from httpx import ASGITransport, AsyncClient
 from app.core.route_inventory import ROUTE_POLICIES
 from app.db.session import SessionLocal
 from app.lms.access import admin as access_admin
+from app.lms.access.models import PlatformSetting
 from app.lms.audit.models import AdminAuditLog
 from app.lms.core import clock
+from app.lms.infra import capacity
 from app.lms.platform_admin import overview as ov
 from app.lms.teachers.models import TeacherRequest
 from app.main import app
@@ -156,3 +158,72 @@ async def test_cache_holds_60s_then_refreshes_by_clock(client, db, monkeypatch):
     refreshed = await _get(client, admin, fresh=False)
     assert refreshed["users_total"] == first["users_total"] + 1
     assert refreshed["computed_at"] != first["computed_at"]
+
+
+# ------------------------------------------------------------------ DB_STORAGE_REVIEW 7.4: the database line
+
+
+def _seed_measurement(db, *, percent, fits, at, used_source="neon"):
+    limit = 1_073_741_824
+    used = int(limit * percent / 100) if isinstance(percent, (int, float)) else None
+    db.merge(PlatformSetting(key=capacity.MEASUREMENT_KEY, updated_at=at, value={
+        "measured_at": at.isoformat(), "used_bytes": used, "limit_bytes": limit,
+        "used_source": used_source, "percent": percent, "fits": fits, "exam_bytes": 228_600_000,
+        "level": "stale-level-ignored"}))
+    db.commit()
+
+
+async def test_database_line_reads_the_stored_measurement(client, db, monkeypatch):
+    admin = make_user(db, platform_admin=True)
+    t0 = datetime.now(timezone.utc).replace(microsecond=0)
+    monkeypatch.setattr(clock, "now", lambda: t0)
+    _seed_measurement(db, percent=75.0, fits=1, at=t0 - timedelta(minutes=59))
+    called = []
+    monkeypatch.setattr(capacity, "measure_storage", lambda _db: called.append(1) or {})
+    body = await _get(client, admin)
+    assert called == []  # fresh enough: no measuring, no provider call
+    d = body["database"]
+    assert d["level"] == "warning" and d["percent"] == 75.0 and d["fits"] == 1
+    assert d["limit_bytes"] == 1_073_741_824
+    assert datetime.fromisoformat(d["measured_at"]) == t0 - timedelta(minutes=59)
+    _seed_measurement(db, percent=40.0, fits=0, at=t0 - timedelta(minutes=1))
+    assert (await _get(client, admin))["database"]["level"] == "critical"  # no full exam left
+    _seed_measurement(db, percent=55.0, fits=3, at=t0 - timedelta(minutes=1))
+    assert (await _get(client, admin))["database"]["level"] == "notice"
+
+
+async def test_database_line_remeasures_when_older_than_an_hour(client, db, monkeypatch):
+    admin = make_user(db, platform_admin=True)
+    t0 = datetime.now(timezone.utc).replace(microsecond=0)
+    monkeypatch.setattr(clock, "now", lambda: t0)
+    _seed_measurement(db, percent=75.0, fits=1, at=t0 - timedelta(minutes=60))
+    d = (await _get(client, admin))["database"]
+    assert datetime.fromisoformat(d["measured_at"]) == t0 and d["level"] == "ok"  # SQLite: a few MB of 1 GiB
+    db.expire_all()
+    assert capacity.stored_measurement(db)["used_source"] == "database"
+
+    def measured(_db):
+        raise AssertionError("measured again")
+
+    # inside the 60 s cache: the same answer, nothing measured again
+    monkeypatch.setattr(capacity, "measure_storage", measured)
+    assert (await _get(client, admin, fresh=False))["database"] == d
+
+
+async def test_database_line_fails_alone(client, db, monkeypatch):
+    admin = make_user(db, platform_admin=True)
+
+    def boom(_db):
+        raise RuntimeError("no measurement")
+
+    monkeypatch.setattr(capacity, "measure_storage", boom)
+    body = await _get(client, admin)
+    assert body["database"] is None and isinstance(body["users_total"], int)
+    assert body["storage_level"] in ("ok", "warn", "full")
+    # a stale stored value is still shown when re-measuring fails
+    _seed_measurement(db, percent=72.0, fits=1, at=datetime.now(timezone.utc) - timedelta(hours=3))
+    body = await _get(client, admin)
+    assert body["database"]["level"] == "warning" and body["database"]["percent"] == 72.0
+    # a malformed stored value gives no line, never a 500
+    _seed_measurement(db, percent="lots", fits=1, at=datetime.now(timezone.utc))
+    assert (await _get(client, admin))["database"] is None
