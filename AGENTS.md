@@ -41,7 +41,7 @@ alembic upgrade head && alembic check                       # DATABASE_URL=<db>
 pytest tests/test_migrations.py tests/lms/test_pg_concurrency.py tests/lms/test_pg_concurrency_content.py   # + ALEMBIC_TEST_DATABASE_URL, LMS_PG_TEST_DATABASE_URL
 pytest -q --ignore=tests/test_migrations.py                 # full suite; DATABASE_URL and LMS_PG_TEST_DATABASE_URL = the same DB (~4288 passed)
 ```
-Frontend: `cd frontend && npx tsc --noEmit`; `python scripts/check_i18n_parity.py` (~4823 keys). Full build only in an rsync'd copy (`rsync -a --exclude node_modules --exclude .next frontend/ /tmp/agy_fe/`, symlink `node_modules`, `npx next build`), never inside `frontend/` while a dev server runs. Dev servers: `cd backend && venv/bin/uvicorn app.main:app --reload --port 8000`; `cd frontend && npm run dev`.
+Frontend: `cd frontend && npx tsc --noEmit`; `python scripts/check_i18n_parity.py` (~4823 keys). Full build only in an rsync'd copy (`rsync -a --exclude node_modules --exclude .next frontend/ /tmp/agy_fe/`, symlink `node_modules`, `npm run build`; `npx next build` skips the prebuild that regenerates the split dictionaries), never inside `frontend/` while a dev server runs. Dev servers: `cd backend && venv/bin/uvicorn app.main:app --reload --port 8000`; `cd frontend && npm run dev`.
 
 ## 6. Hard rules
 1. **Never read, print or modify `backend/.env`** (live credentials). Read `app/core/config.py` for variable names.

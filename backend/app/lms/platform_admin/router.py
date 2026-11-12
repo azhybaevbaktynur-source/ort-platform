@@ -163,4 +163,4 @@ def audit_log(
 ):
     page = paginate(us.audit_stmt(actor_id, action, target_type, target_id, acting_as), db,
                     sort_col=AdminAuditLog.created_at, id_col=AdminAuditLog.id, cursor=cursor, limit=limit)
-    return PageOut(items=[us.audit_out(db, r) for r in page.items], next_cursor=page.next_cursor)
+    return PageOut(items=us.audit_page_out(db, page.items), next_cursor=page.next_cursor)

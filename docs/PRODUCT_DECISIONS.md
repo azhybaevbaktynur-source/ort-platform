@@ -660,3 +660,11 @@ Owner: "We already decided that student and teacher will be separate. A teacher 
 - Teachers check the student experience with Student view, reachable from the Teaching list and the course page.
 - Consequences: slice 1e builds this; slice 1b's per-role link check has no "teacher who is also a student" role; step 3b decides what the catalog offers a teacher (Student view instead of «Записаться»).
 
+### Owner 2026-11-12: storage retention answers (DB_STORAGE_REVIEW.md Q-S1…Q-S6)
+
+- Q-S1: never-verified accounts are deleted after 90 days (yes).
+- Q-S2: staff preview attempts are not kept: deleted by the daily maintenance run (owner: "can be deleted right away, it is only for checking the course structure"). Agent rule: every preview attempt that is not in progress, plus in-progress ones older than 24 h (so a preview being taken is never cut off).
+- Q-S3: Student view (test-student) attempts are not kept either: same rule as Q-S2, at the daily run; retired test-student users and enrolments go too.
+- Q-S4: the owner asked whether the audit log matters. Agent answer: yes, keep it: it is the only record of who approved teachers, changed roles, disabled accounts, ran grade overrides, used admin tools and handled privacy requests; it is what answers "who did this?" after a dispute or a stolen admin account, and it is under 1 MB. Decision pending the owner's reply; default: keep, revisit if it passes 50 MB (then 3 years with export).
+- Q-S5 (Neon backups, numbered Q-S6 in the review): keep only the two newest backup branches. 2026-11-12: deleted `backup-2026-11-07-before-pro-0025`, `backup-2026-11-07-before-covers-0026`, `backup-2026-11-08-before-exam-link-0027`; kept `backup-2026-11-09-before-identities-infra-0031`, `backup-2026-11-12-before-notice-0032`. After each new backup the oldest is deleted.
+

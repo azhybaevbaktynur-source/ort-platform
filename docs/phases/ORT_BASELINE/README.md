@@ -70,7 +70,7 @@ submitted attempt, so no screen depends on test order.
 ```bash
 # once: build the frontend against the scratch backend, in a copy (never inside frontend/ while a dev server runs)
 rsync -a --exclude node_modules --exclude .next frontend/ /tmp/ort_e2e_fe/ && ln -s "$PWD/frontend/node_modules" /tmp/ort_e2e_fe/node_modules
-(cd /tmp/ort_e2e_fe && NEXT_PUBLIC_API_URL=http://127.0.0.1:8765 npx next build)
+(cd /tmp/ort_e2e_fe && NEXT_PUBLIC_API_URL=http://127.0.0.1:8765 npm run build)  # npm run: prebuild regenerates the split dictionaries
 
 cd frontend
 E2E_WEB_DIR=/tmp/ort_e2e_fe npx playwright test                    # both specs (about 1.5 min)
