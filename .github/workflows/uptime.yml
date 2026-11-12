@@ -2,9 +2,13 @@ name: Uptime
 
 # Free: GitHub schedule on a public repo. Checks only public URLs (no secrets). A failure opens or updates ONE issue
 # titled "Uptime: site check failed"; a success closes it. GitHub may delay or skip scheduled runs under load.
+# Every 10 minutes (fix round 2026-11-12 P1, PERFORMANCE_AUDIT.md 10.2 item 1): Render Free sleeps after 15 idle
+# minutes, so a 10-minute ping keeps it awake unless GitHub delays or skips a run; one always-on service uses ~720 of
+# Render's 750 free instance hours a month. /health never touches the database ("database": "not_checked"), so Neon
+# still suspends after 5 idle minutes and its free compute hours are not spent.
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 permissions:

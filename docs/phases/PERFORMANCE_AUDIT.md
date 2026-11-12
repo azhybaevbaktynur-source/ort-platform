@@ -965,6 +965,18 @@ Recommended order: 1 → 4 + 5 (one small slice) → 2 → 3 → 6; 7 waits for 
 - **P4 dictionary prefixes** (Sonnet, half a day): item 6. Gate: parity script, the S4 "no raw keys" e2e on admin, quiz
   editor, course settings, assignments; measure "JS kB" of login and student pages.
 
+**P1 result (2026-11-12, branch of `lms` `9902629`).** (1) `uptime.yml` cron `*/30` → `*/10`; the probe stays
+`GET /health`, which answers `"database": "not_checked"` in production (checked, commit `348b910`), so Neon still
+suspends; failure/issue steps unchanged. The spin-down count per day is to be read in the Render dashboard for 3 days
+after deploy. (2) Audit log: `audit_page_out` loads a page's actors with one `IN (...)` statement. The new test
+(`test_audit_log_page_loads_actors_in_one_statement`, 50 rows by 10 actors, `before_cursor_execute` capture of the
+whole request) counts **53 statements before, 4 after** (two auth user reads, the page, the actors); production's 42
+for 50 rows becomes ≈ 4. (3) `useBackendWarmup` calls `${API_BASE_URL}/auth/ping` (the Render origin on Vercel,
+`/api/v1` when `NEXT_PUBLIC_API_URL` is unset); production CSP `connect-src` already lists
+`https://ort-platform-w77q.onrender.com` and Render answers the Vercel origin with `access-control-allow-origin`.
+`curl -w` TTFB from Korea, 11 calls each, service awake: Render direct median **0.31 s** (0.29–1.40), Vercel rewrite
+median **0.51 s** (0.33–1.83).
+
 ### 10.5 Better ideas than the brief's
 
 1. **Measure production signed-in from the owner's browser, once, after P1–P3**: the owner opens the student home with

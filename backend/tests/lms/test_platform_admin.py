@@ -2,8 +2,10 @@ import uuid
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import event
 
 from app.core.security import create_access_token
+from app.db import session as db_session
 from app.db.session import SessionLocal
 from app.lms.audit.models import AdminAuditLog
 from app.main import app
@@ -188,3 +190,37 @@ async def test_audit_log_pagination_and_filters(client, db):
     assert sorted(i["action"] for i in body["items"]) == ["user.disable", "user.enable"]
     assert set(body["items"][0]) == {"id", "created_at", "actor", "action", "target_type", "target_id",
                                      "reason", "details"}
+
+
+async def test_audit_log_page_loads_actors_in_one_statement(client, db):
+    """Fix round 2026-11-12 P1 (PERFORMANCE_AUDIT.md 10.2 item 4): 50 rows by 10 distinct actors. The page answer
+    must not cost one `users` statement per row (was 42 statements in production for 50 rows)."""
+    admin = make_user(db, platform_admin=True)
+    actors = [make_user(db) for _ in range(10)]
+    tag = f"perf.{uuid.uuid4().hex[:8]}"
+    for i in range(50):
+        db.add(AdminAuditLog(actor_id=actors[i % 10].id, action=tag, target_type="user", target_id=f"t{i}"))
+    db.commit()
+
+    statements = []
+
+    def on(conn, cursor, statement, params, context, executemany):
+        if "rate_limit_buckets" in statement or statement.strip().upper().startswith(("PRAGMA", "SELECT 1")):
+            return
+        statements.append(statement)
+
+    event.listen(db_session.engine, "before_cursor_execute", on)
+    try:
+        r = await client.get(f"{P}/audit-log?action={tag}&limit=50", headers=auth(admin))
+    finally:
+        event.remove(db_session.engine, "before_cursor_execute", on)
+    assert r.status_code == 200, r.text
+    items = r.json()["items"]
+    assert len(items) == 50
+    assert {i["actor"]["id"] for i in items} == {a.id for a in actors}
+    assert all(i["actor"]["email"] == f'{i["actor"]["id"]}@test.example' for i in items)
+    audit = [s for s in statements if "admin_audit_log" in s]
+    user_reads = [s for s in statements if "FROM users" in s and "admin_audit_log" not in s]
+    assert len(audit) == 1, audit  # the page itself
+    assert len(statements) <= 5, statements  # auth user reads + page + actors (4 today; was 53), not per row
+    assert len(user_reads) <= 3, user_reads

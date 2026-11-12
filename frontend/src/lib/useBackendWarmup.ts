@@ -1,14 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { API_BASE_URL } from "@/lib/apiBase";
 
 /**
  * Sends a cheap request as soon as an auth page opens, so a sleeping backend (Render free tier)
  * and database (Neon autosuspend) start waking up while the user is still typing.
+ * Goes to the backend origin directly (API_BASE_URL; CSP connect-src allows it), not through the Vercel rewrite,
+ * which was 3-9x slower (PERFORMANCE_AUDIT.md 10.2 item 5). Unset NEXT_PUBLIC_API_URL (local dev): "/api/v1" as before.
  */
 export function useBackendWarmup() {
   useEffect(() => {
-    fetch("/api/v1/auth/ping", { cache: "no-store" }).catch(() => {});
+    fetch(`${API_BASE_URL}/auth/ping`, { cache: "no-store" }).catch(() => {});
   }, []);
 }
 

@@ -252,8 +252,15 @@ def person_extras(db: Session, user: User) -> dict:
                 pending_email_change=pending_email(db, user.id))
 
 
-def audit_out(db: Session, row: AdminAuditLog) -> AuditEntryOut:
+def audit_out(db: Session, row: AdminAuditLog, actor: Optional[User] = None) -> AuditEntryOut:
     return AuditEntryOut(
-        id=row.id, created_at=row.created_at, actor=brief(db.get(User, row.actor_id)), action=row.action,
+        id=row.id, created_at=row.created_at, actor=brief(actor or db.get(User, row.actor_id)), action=row.action,
         target_type=row.target_type, target_id=row.target_id, reason=row.reason, details=row.details,
     )
+
+
+def audit_page_out(db: Session, rows: list[AdminAuditLog]) -> list[AuditEntryOut]:
+    """Fix round 2026-11-12 P1: the actors of a page in one statement (was one `db.get` per row)."""
+    ids = {r.actor_id for r in rows}
+    actors = {u.id: u for u in db.scalars(select(User).where(User.id.in_(ids)))} if ids else {}
+    return [audit_out(db, r, actors.get(r.actor_id)) for r in rows]
