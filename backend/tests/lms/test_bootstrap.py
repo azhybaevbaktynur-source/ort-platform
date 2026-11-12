@@ -115,11 +115,13 @@ async def test_teacher_without_enrollments_gets_no_student_part(db, api):
     assert body["student"] is None and body["me"]["is_teacher"] is True and body["pending_invitations"] == 1
 
 
-async def test_teacher_who_also_learns_gets_the_student_part(db, api):
+async def test_teacher_with_a_student_enrollment_gets_no_student_part(db, api):
+    """Owner decision 2026-11-12 (fix round 1e): student and teacher are separate accounts; the enrolment stays but the
+    person who teaches has no Learning area, so the bootstrap reads no student data for them."""
     w = world(db)
     enroll(db, w.exam, w.teacher)
-    body = await check(api, w.teacher, student=True, exams=[w.exam.id])
-    assert [c["id"] for c in body["student"]["courses"]] == [str(w.exam.id)]
+    body = await check(api, w.teacher, student=False)
+    assert body["student"] is None and body["me"]["has_student_enrollments"] is True
 
 
 async def test_admin_gets_no_student_part(db, api):
@@ -136,7 +138,7 @@ async def test_admin_without_two_step_login_gets_only_me_under_the_requirement(d
     monkeypatch.setattr(settings, "ADMIN_MFA_REQUIRED", True)
     w = world(db)
     admin = make_user(db, platform_admin=True)
-    enroll(db, w.exam, admin)  # learns somewhere: the student part would otherwise be there
+    enroll(db, w.exam, admin)  # a student enrolment (ignored for people who teach: fix round 1e)
     invite(db, admin.email)
     me = (await get(api, admin, "/me/lms")).json()
     for path in ("/me/invitations", "/me/privacy", "/me/home/courses", "/me/access", f"/courses/{w.exam.id}/lesson-courses"):
@@ -147,8 +149,7 @@ async def test_admin_without_two_step_login_gets_only_me_under_the_requirement(d
     admin.mfa_enabled_at = clock.now()  # set up: the full answer, as without the requirement
     db.commit()
     body = (await get(api, admin, "/me/bootstrap")).json()
-    assert body["pending_invitations"] == 1 and body["privacy"] is not None
-    assert [c["id"] for c in body["student"]["courses"]] == [str(w.exam.id)]
+    assert body["pending_invitations"] == 1 and body["privacy"] is not None and body["student"] is None
 
 
 async def test_revoked_teacher_is_shown_as_a_student(db, api):

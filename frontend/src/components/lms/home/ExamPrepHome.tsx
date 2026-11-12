@@ -61,12 +61,9 @@ const plain = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 const label = "text-sm font-medium leading-5 text-slate-600";
 const big = "text-[2rem] font-bold leading-9 tabular-nums text-slate-900";
 
-function Hero({ title, prep, best, embedded }: {
-  title: LocalizedText | null; prep: ExamPrepOut | null; best: boolean; embedded: boolean;
-}) {
+function Hero({ title, prep, best }: { title: LocalizedText | null; prep: ExamPrepOut | null; best: boolean }) {
   const { lang, t } = useTranslation();
   const greeting = useGreeting();
-  const Title = embedded ? "h2" : "h1";
   const date = prep?.exam_date ?? null;
   const target = date ? examDayStart(date) : null;
   const over = !!target && Date.now() - target.getTime() >= 86_400_000; // the exam day has passed
@@ -79,7 +76,7 @@ function Hero({ title, prep, best, embedded }: {
       <div className="flex min-w-0 items-center gap-3 sm:gap-4">
         <Mascot pose={best ? "celebrating" : "hello"} size={88} eager className="h-16 w-auto sm:h-[88px]" />
         <div className="min-w-0">
-          <Title className={STUDENT_TITLE}>{greeting}</Title>
+          <h1 className={STUDENT_TITLE}>{greeting}</h1>
           <p className="mt-1 break-words text-sm leading-5 text-slate-700">
             {course}
             {course && date && !over ? " · " : ""}
@@ -296,7 +293,7 @@ function OtherCourses({ home, examId, lessonIds }: { home: HomeOut; examId: stri
   );
 }
 
-export function ExamPrepHome({ courseId, courseTitle, home, homeError, side, embedded = false }: {
+export function ExamPrepHome({ courseId, courseTitle, home, homeError, side }: {
   courseId: string;
   courseTitle: LocalizedText | null;
   /** `/me/home`, null while it loads */
@@ -305,7 +302,6 @@ export function ExamPrepHome({ courseId, courseTitle, home, homeError, side, emb
   homeError?: React.ReactNode;
   /** to-do, grades and announcements of other courses (rendered by the caller) */
   side: React.ReactNode;
-  embedded?: boolean;
 }) {
   const errorText = useErrorText();
   const { data: prep, error: prepError, refresh: refreshPrep } = useExamPrep(courseId);
@@ -345,7 +341,7 @@ export function ExamPrepHome({ courseId, courseTitle, home, homeError, side, emb
 
   return (
     <div className="w-full space-y-6">
-      <Hero title={courseTitle} prep={prep} best={best} embedded={embedded} />
+      <Hero title={courseTitle} prep={prep} best={best} />
       {prepError && !prep ? (
         <ErrorState message={errorText(prepError)} onRetry={retryPrep} retrying={retrying} />
       ) : !prep ? (

@@ -104,10 +104,57 @@ test("a teacher who learns nowhere: no Learning tab, no Join with code; ?view=le
   await page.goto("/ru/courses?view=learning");
   await expect(page).toHaveURL(/\/ru\/courses\?view=teaching$/);
   await expect.poll(() => areas(page)).toEqual([t("shell.areas.teaching")]);
-  await expect(page.getByRole("tab", { name: t("courses.list.learning") })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: t("courses.list.join") })).toHaveCount(0);
+  await expect(page.getByRole("tablist")).toHaveCount(0);
+  await expect(page.locator('a[href="/ru/courses/join"]')).toHaveCount(0);
   // the Teaching sub-menu stays although Teaching is the only area
   await expect(page.getByRole("link", { name: t("examTemplates.nav.title") }).first()).toBeVisible();
+});
+
+/**
+ * Fix round 2026-11-12 1e (owner decision): student and teacher are separate accounts. A teacher who still has a student
+ * enrolment gets exactly the teacher-only design and checks courses through Student view.
+ */
+const approvedLine = (page: Page) => page.getByRole("status").filter({ hasText: t("home.teacherApplication.approved") });
+const studentViewBanner = (page: Page) => page.getByRole("status").filter({ hasText: t("studentView.banner") });
+
+test("a teacher with a student enrolment: the teacher-only design; Student view from the list and the course page", async ({ page }) => {
+  await page.setViewportSize(VIEWPORTS.desktop);
+  const teacher = seed().teacher_enrolled;
+  await signIn(page, teacher);
+  await page.goto("/ru/courses?view=learning"); // the old Learning link lands on Teaching
+  await expect(page).toHaveURL(/\/ru\/courses\?view=teaching$/);
+  await expect(page.getByRole("heading", { level: 1, name: t("courses.list.title") })).toBeVisible();
+  await expect.poll(() => areas(page)).toEqual([t("shell.areas.teaching")]);
+  await expect(areaLink(page, "shell.areas.learning")).toHaveCount(0); // no "Учёба"
+  await expect(page.getByRole("tablist")).toHaveCount(0); // no "Преподаю / Учусь"
+  await expect(page.locator('a[href="/ru/courses/join"]')).toHaveCount(0); // no "Войти по коду"
+  await expect(approvedLine(page)).toHaveCount(1); // the application line is on the Teaching list
+
+  // Student view from the course card: the course page as the test student, with the banner
+  const card = page.getByRole("listitem").filter({ has: page.getByRole("heading", { name: teacher.course_title }) });
+  await card.getByRole("button", { name: t("studentView.button") }).click();
+  await expect(page).toHaveURL(new RegExp(`/ru/courses/${teacher.course_id}$`));
+  await expect(studentViewBanner(page)).toBeVisible();
+  await studentViewBanner(page).getByRole("button", { name: t("studentView.leave") }).click();
+  await expect(studentViewBanner(page)).toHaveCount(0);
+
+  // and from the staff course page header
+  const fromPage = page.getByRole("button", { name: t("studentView.button") });
+  await expect(fromPage).toBeVisible();
+  await fromPage.click();
+  await expect(studentViewBanner(page)).toBeVisible();
+  await studentViewBanner(page).getByRole("button", { name: t("studentView.leave") }).click();
+  await expect(studentViewBanner(page)).toHaveCount(0);
+});
+
+test("a newly approved teacher who learns nowhere: no Learning area, the approved line on the Teaching list", async ({ page }) => {
+  await page.setViewportSize(VIEWPORTS.desktop);
+  await signIn(page, seed().teacher_notice); // teacher-approved-notice.spec.ts (later) closes it
+  await page.goto("/ru/courses");
+  await expect(page.getByRole("heading", { level: 1, name: t("courses.list.title") })).toBeVisible();
+  await expect.poll(() => areas(page)).toEqual([t("shell.areas.teaching")]);
+  await expect(areaLink(page, "shell.areas.learning")).toHaveCount(0);
+  await expect(approvedLine(page)).toHaveCount(1);
 });
 
 test("admin overview: numbers, then a retry when the summary fails", async ({ page }) => {

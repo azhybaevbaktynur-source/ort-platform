@@ -37,9 +37,13 @@ export function coursesDefault(me: ShellMe | null): ShellArea {
   return me && (me.is_teacher || me.is_platform_admin) && (me.is_teacher || me.can_create_courses) ? "teaching" : "learning";
 }
 
-/** Owner feedback 2026-11-08 (item 2): people who teach see Learning only once they learn somewhere. */
+/**
+ * Owner decision 2026-11-12 (fix round 1e): student and teacher are separate accounts. A person who teaches never gets
+ * the Learning area, whatever student enrolments they still have (the data stays; the UI ignores it); they check their
+ * courses through Student view. The backend's `learns_here` (`home/bootstrap.py`) is the same rule.
+ */
 export function hidesLearning(me: ShellMe | null): boolean {
-  return !!me && (me.is_teacher || me.can_create_courses) && me.has_student_enrollments === false;
+  return !!me && teaches(me);
 }
 
 /**

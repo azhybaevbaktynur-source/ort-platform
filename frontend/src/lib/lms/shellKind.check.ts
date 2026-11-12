@@ -3,7 +3,7 @@
  * Run: cd frontend && npx tsc --outDir /tmp/agy_shell --module commonjs --target es2020 --skipLibCheck \
  *   src/lib/lms/studentNav.ts src/lib/lms/shellKind.ts src/lib/lms/shellKind.check.ts && node /tmp/agy_shell/shellKind.check.js
  */
-import { shellKindFor, urlAreaFor, type ShellArea, type ShellMe } from "./shellKind";
+import { hidesLearning, shellKindFor, urlAreaFor, type ShellArea, type ShellMe } from "./shellKind";
 
 let failed = 0;
 function ok(cond: boolean, msg: string) {
@@ -31,11 +31,14 @@ ok(kind("/courses", teacherOnly, "teaching") === "app", "teacher on ?view=teachi
 ok(kind("/courses", teacherOnly, "learning") === "app", "teacher without Learning on ?view=learning: app (the page opens Teaching)");
 ok(urlAreaFor("/courses", "learning", teacherOnly) === "teaching", "without Learning, /courses is Teaching");
 
-// --- teacher with enrollments ---
-ok(kind("/courses", teacherLearning) === "app", "teacher (learns too) on /courses: app (Teaching opens first)");
-ok(kind("/courses", teacherLearning, "teaching") === "app", "teacher (learns too) on ?view=teaching: app");
-ok(kind("/courses", teacherLearning, "learning") === "student", "teacher (learns too) on ?view=learning: student");
-ok(kind("/courses", teacherOld, "learning") === "student", "an older answer without the field keeps Learning");
+// --- teacher with student enrollments (owner decision 2026-11-12, fix round 1e: ignored, no Learning) ---
+ok(kind("/courses", teacherLearning) === "app", "teacher (with enrollments) on /courses: app");
+ok(kind("/courses", teacherLearning, "teaching") === "app", "teacher (with enrollments) on ?view=teaching: app");
+ok(kind("/courses", teacherLearning, "learning") === "app", "teacher (with enrollments) on ?view=learning: app (Teaching)");
+ok(urlAreaFor("/courses", "learning", teacherLearning) === "teaching", "teacher (with enrollments): /courses is Teaching");
+ok(kind("/courses", teacherOld, "learning") === "app", "an older answer without the field: no Learning either");
+ok(hidesLearning(teacherLearning) && hidesLearning(admin) && !hidesLearning(student) && !hidesLearning(null),
+  "hidesLearning: everyone who teaches, nobody else");
 
 // --- admin ---
 ok(kind("/admin", null) === "app", "admin cold on /admin: app (the URL decides)");

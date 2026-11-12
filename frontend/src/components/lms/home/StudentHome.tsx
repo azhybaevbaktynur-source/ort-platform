@@ -2,8 +2,8 @@
 
 // UX rework (UX_REWORK_DESIGN C): the student dashboard, one call (`GET /me/home`). Title with two secondary actions,
 // banners when needed, course cards on the left, "To do", recent grades and announcements on the right. Phone: cards
-// first, then to-do, grades and announcements (owner, 2026-11-03; replaces "to-do first", PUR-5). A teacher's Learning
-// tab is the same screen.
+// first, then to-do, grades and announcements (owner, 2026-11-03; replaces "to-do first", PUR-5). People who teach never
+// see it (owner decision 2026-11-12, fix round 1e: their /courses is the Teaching list, with their application line).
 // Student UI U3 (STUDENT_UI_DESIGN §3.1): a student with an exam-prep course (the student shell's current course) gets
 // the exam-prep home (`ExamPrepHome`); everyone else keeps this dashboard in the new tokens.
 import React, { useCallback, useEffect, useState } from "react";
@@ -242,8 +242,8 @@ function DashboardSkeleton() {
   );
 }
 
-/** The student dashboard. `embedded`: inside the Teaching/Learning tabs (the page already has its h1). */
-export function StudentHome({ embedded = false }: { embedded?: boolean }) {
+/** The student dashboard. */
+export function StudentHome() {
   const { lang, t } = useTranslation();
   const errorText = useErrorText();
   const shell = useStudentShellDataContext();
@@ -285,7 +285,7 @@ export function StudentHome({ embedded = false }: { embedded?: boolean }) {
       <div className="w-full space-y-6">
         {data?.teacher_application && <TeacherApplicationNotice application={data.teacher_application} />}
         {data && <PendingApplicationsLine items={data.pending_applications ?? []} />}
-        <ExamPrepHome courseId={prepCourse.id} courseTitle={prepCourse.title} home={data} homeError={homeError} embedded={embedded}
+        <ExamPrepHome courseId={prepCourse.id} courseTitle={prepCourse.title} home={data} homeError={homeError}
           side={side} />
       </div>
     );
@@ -294,12 +294,11 @@ export function StudentHome({ embedded = false }: { embedded?: boolean }) {
   // the shell is still reading the student's exam courses for the first time: no title yet (it may be the greeting)
   if (!data && !error && shell && !shell.loaded) return <DashboardSkeleton />;
 
-  const Title = embedded ? "h2" : "h1";
   const isNew = !!data && data.courses_total === 0 && (data.todo ?? []).length === 0; // its empty state has the two actions
   return (
     <div className="w-full space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <Title className="text-2xl font-bold leading-8 text-slate-900 lg:text-[28px] lg:leading-9">{t("home.dashboard")}</Title>
+        <h1 className="text-2xl font-bold leading-8 text-slate-900 lg:text-[28px] lg:leading-9">{t("home.dashboard")}</h1>
         {!isNew && (
           <div className="flex flex-wrap gap-2">
             <LinkButton variant="secondary" href={`/${lang}/courses/join`} leftIcon={<KeyRound aria-hidden="true" className="h-4 w-4" />}>{t("home.primary.join")}</LinkButton>
