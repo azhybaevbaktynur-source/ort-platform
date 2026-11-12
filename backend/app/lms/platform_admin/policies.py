@@ -6,6 +6,7 @@ PLATFORM_POLICIES: dict[tuple[str, str], str] = {
     ("GET", f"{_P}/teacher-requests"): "platform_admin",
     ("POST", f"{_P}/teacher-requests/{{request_id}}/approve"): "platform_admin",
     ("POST", f"{_P}/teacher-requests/{{request_id}}/reject"): "platform_admin",
+    ("GET", f"{_P}/teachers"): "platform_admin",  # step 3b S3: Admin → Преподаватели (five statements per page)
     ("GET", f"{_P}/users"): "platform_admin",
     ("GET", f"{_P}/users/{{user_id}}"): "platform_admin",
     ("POST", f"{_P}/users/{{user_id}}/teacher-status"): "platform_admin",

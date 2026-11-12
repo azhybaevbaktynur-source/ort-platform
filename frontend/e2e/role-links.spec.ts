@@ -138,7 +138,7 @@ const ENTRY = {
     return { user: u, entries: ["/ru/courses", "/ru/home", "/ru/courses?view=learning", `/ru/courses/${u.course_id}`, `/ru/courses/${s.course_id}`, "/ru/courses/catalog", "/ru/courses/join", "/ru/pro"] };
   },
   org_admin: () => { const s = seed(); return { user: s.org_admin.org_admin, entries: ["/ru/courses", "/ru/home", "/ru/courses/choose", `/ru/org/${s.org_admin.organization_id}`, `/ru/courses/${s.org_admin.maths_course_id}`, "/ru/pro"] }; },
-  platform_admin: () => { const s = seed(); return { user: s.admin, entries: ["/ru/courses", "/ru/home", "/ru/courses/choose", "/ru/admin", "/ru/admin/catalog", "/ru/org", `/ru/courses/${s.course_id}`, "/ru/pro"] }; },
+  platform_admin: () => { const s = seed(); return { user: s.admin, entries: ["/ru/courses", "/ru/home", "/ru/courses/choose", "/ru/admin", "/ru/admin/catalog", "/ru/admin/teachers", "/ru/org", `/ru/courses/${s.course_id}`, "/ru/pro"] }; },
 } satisfies Record<Role, () => { user: SeedUser; entries: string[] }>;
 
 for (const role of Object.keys(ENTRY) as Role[]) {
@@ -218,4 +218,41 @@ test("Admin → Каталог: the platform admin's page, refused for everyone 
   await open(page, "/ru/courses");
   await expect(page.locator("main").getByRole("listitem").first()).toBeVisible();
   await expect(page.locator(`main a[href="/ru/courses/catalog"]`)).toHaveCount(0);
+});
+
+test("Admin → Преподаватели: the platform admin's page, refused for everyone else; the old address redirects", async ({ page }) => {
+  // step 3b S3 (CATALOG_AND_TEACHERS_DESIGN 3.2, D9): the server refuses `/platform/teachers`; the page says so
+  await page.setViewportSize(VIEWPORTS.desktop);
+  const s = seed();
+  for (const user of [s.course_nav.teacher, s.org_admin.org_admin, s.access!.student]) {
+    const r = await fetch(`${s.api}/api/v1/platform/teachers`, { headers: { Authorization: `Bearer ${user.token}` } });
+    expect(r.status, user.email).toBe(403);
+  }
+  await signIn(page, s.course_nav.teacher);
+  await open(page, "/ru/admin/teachers");
+  await expect(page.locator("main").getByText(t("platformAdmin.notAuthorized.title"), { exact: true })).toBeVisible();
+  await expect(page.getByRole("table")).toHaveCount(0);
+
+  await signIn(page, s.admin);
+  await open(page, "/ru/admin/teacher-requests?status=rejected");
+  await expect(page).toHaveURL(/\/ru\/admin\/teachers\?tab=requests&status=rejected$/);
+  expect(await frameOf(page)).toBe("app/platform");
+  await expect(page.getByRole("tab", { name: new RegExp(t("platformAdmin.teachers.tabs.requests")) })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByLabel(t("platformAdmin.requests.filter"))).toHaveValue("rejected");
+});
+
+test("an independent teacher never sees the word «организация»: Teaching, course pages, new course, exam templates", async ({ page }) => {
+  // step 3b S3 (CATALOG_AND_TEACHERS_DESIGN 3.3, D4): the personal organization is an implementation detail; the only
+  // exception (an invitation banner from a school) does not apply to this teacher
+  await page.setViewportSize(VIEWPORTS.desktop);
+  const s = seed();
+  const cid = s.course_nav.course_id;
+  await signIn(page, s.course_nav.teacher);
+  for (const url of ["/ru/courses", "/ru/home", "/ru/courses/new", "/ru/exam-templates", `/ru/courses/${cid}`,
+    `/ru/courses/${cid}/settings`, `/ru/courses/${cid}/people`]) {
+    await open(page, url);
+    await expect(page.locator("main").first()).toBeVisible();
+    const text = await page.locator("body").innerText();
+    expect(text, url).not.toMatch(/организац/i);
+  }
 });

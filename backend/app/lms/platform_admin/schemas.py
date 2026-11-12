@@ -81,6 +81,26 @@ class SignInMethodOut(BaseModel):
     linked_at: Optional[datetime] = None  # providers only
 
 
+# --- step 3b S3 begin --- (CATALOG_AND_TEACHERS_DESIGN 3.2: Admin → Преподаватели, the person page's «Преподавание»)
+class TeacherRowOut(BaseModel):
+    """One person who teaches: `independent` (no active school membership), `school` (school memberships only) or
+    `both` (an approved or revoked independent teacher who also teaches in a school). Counts: live regular courses
+    the person owns or staffs, their distinct active students (no test students, no disabled accounts), and those
+    courses that are listed in the catalog."""
+    user: UserBrief
+    kind: Literal["independent", "school", "both"]
+    teacher_status: str
+    schools: list[str] = []  # active school memberships (the school's name), at most 3
+    school_count: int = 0
+    courses: int = 0
+    students: int = 0
+    listed_courses: int = 0
+    last_login_at: Optional[datetime] = None
+    since: Optional[datetime] = None  # the approval (latest approved request), else the first teaching membership
+    disabled: bool = False
+# --- step 3b S3 end ---
+
+
 class AdminUserDetailOut(AdminUserOut):
     owned_courses: list[OwnedCourseBrief]
     active_enrollment_count: int
@@ -94,6 +114,7 @@ class AdminUserDetailOut(AdminUserOut):
     parent_links: Optional[ParentLinksOut] = None
     pending_email_change: Optional[PendingEmailOut] = None
     sign_in_methods: list[SignInMethodOut] = []  # item 3: password and linked Google / Apple accounts
+    teaching: Optional[TeacherRowOut] = None  # step 3b S3: the «Преподавание» card (None: the person does not teach)
 
 
 class AdminAttemptOut(BaseModel):
@@ -131,6 +152,7 @@ class AuditEntryOut(BaseModel):
     target_id: str
     reason: Optional[str] = None
     details: Optional[dict[str, Any]] = None
+    target_kind: Optional[str] = None  # step 3b S3: an organization target's kind (the viewer labels `personal`)
 
 
 class SummaryOut(BaseModel):

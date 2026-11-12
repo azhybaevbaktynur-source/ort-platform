@@ -4,7 +4,7 @@
   "enrollmentForm", "applications", "rosterImport", "grading",
   "adminSecurity", "departments", "orgSettings", "sharedBanks",
   "quizStats", "adminHealth", "teacherRequest", "templates",
-  "infra", "catalog.listing", "courses.settings.general", "courses.settings.saved", "courses.settings.joinCode",
+  "infra", "catalog.listing", "person.teaching", "courses.settings.general", "courses.settings.saved", "courses.settings.joinCode",
   "courses.settings.joinCodeInactiveUnpublished", "courses.settings.regenerate", "courses.settings.regenerateTitle", "courses.settings.regenerateBody",
   "courses.settings.activeStudents", "courses.settings.lifecycle", "courses.settings.lifecycleHint", "courses.settings.publish",
   "courses.settings.unpublish", "courses.settings.unpublishTitle", "courses.settings.unpublishBody", "courses.settings.conclude",

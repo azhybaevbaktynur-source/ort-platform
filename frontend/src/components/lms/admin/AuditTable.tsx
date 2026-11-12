@@ -35,6 +35,10 @@ export function AuditTable({ entries, loading, error, empty, pagination, countTe
   const details = (e: AuditEntryOut) => (hasDetails(e) ? JSON.stringify(e.details) : "—");
   const prettyDetails = (e: AuditEntryOut) => JSON.stringify(e.details, null, 2);
   const [open, setOpen] = useState<AuditEntryOut | null>(null);
+  // step 3b S3 (CATALOG_AND_TEACHERS_DESIGN 3.2): an independent teacher's personal organization is named as their own
+  // space, never as an organization
+  const targetType = (e: AuditEntryOut) =>
+    e.target_type === "organization" && e.target_kind === "personal" ? t("platformAdmin.audit.personalSpace") : e.target_type;
   const columns: TableColumn<AuditEntryOut>[] = [
     {
       // Item 4 (ADMIN_ORGS_DESIGN §2.4): a platform admin acting inside an organization gets a small neutral badge
@@ -52,7 +56,7 @@ export function AuditTable({ entries, loading, error, empty, pagination, countTe
     { key: "actor", header: t("platformAdmin.audit.actor"), cell: (e) => e.actor.display_name || e.actor.email },
     {
       key: "target", header: t("platformAdmin.audit.target"), hideOnMobile: true,
-      cell: (e) => <><span className="text-slate-600">{e.target_type}</span> <code className="break-all text-xs">{e.target_id}</code></>,
+      cell: (e) => <><span className="text-slate-600">{targetType(e)}</span> <code className="break-all text-xs">{e.target_id}</code></>,
     },
     { key: "reason", header: t("platformAdmin.audit.reason"), cell: (e) => e.reason || "—" },
     {
@@ -69,7 +73,7 @@ export function AuditTable({ entries, loading, error, empty, pagination, countTe
           <summary className={`inline-flex min-h-11 cursor-pointer items-center rounded-lg text-sm font-semibold text-brand-700 ${focusRing}`}>
             {t("platformAdmin.audit.details")}
           </summary>
-          <p className="break-all text-xs"><span className="text-slate-600">{e.target_type}</span> <code>{e.target_id}</code></p>
+          <p className="break-all text-xs"><span className="text-slate-600">{targetType(e)}</span> <code>{e.target_id}</code></p>
           {hasDetails(e)
             ? <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-slate-50 p-2 text-xs text-slate-700">{prettyDetails(e)}</pre>
             : <p className="mt-1 text-xs text-slate-500">{details(e)}</p>}
@@ -96,7 +100,7 @@ export function AuditTable({ entries, loading, error, empty, pagination, countTe
       footer={<Button variant="secondary" onClick={() => setOpen(null)}>{t("ui.close")}</Button>}>
       {open && (
         <>
-          <p className="break-all text-sm"><span className="text-slate-600">{t("platformAdmin.audit.target")}:</span> {open.target_type} <code className="text-xs">{open.target_id}</code></p>
+          <p className="break-all text-sm"><span className="text-slate-600">{t("platformAdmin.audit.target")}:</span> {targetType(open)} <code className="text-xs">{open.target_id}</code></p>
           <pre className="mt-3 max-h-[60vh] overflow-auto whitespace-pre-wrap break-all rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-800">{prettyDetails(open)}</pre>
         </>
       )}

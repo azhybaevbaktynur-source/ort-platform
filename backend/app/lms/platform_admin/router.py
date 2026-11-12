@@ -23,6 +23,7 @@ from app.lms.email_change.schemas import AdminEmailChangeIn  # S4
 from app.lms.platform_admin.health import PlatformHealthOut, platform_health
 from app.lms.platform_admin import overview as overview_service  # FB8-5 S4
 from app.lms.platform_admin.schemas import OverviewOut  # FB8-5 S4
+from app.lms.platform_admin.schemas import TeacherRowOut  # step 3b S3
 from app.lms.teachers import purge as teacher_purge
 from app.lms.teachers import service as teacher_service
 from app.lms.teachers.models import TeacherRequest
@@ -72,6 +73,25 @@ def reject_request(request_id: uuid.UUID, body: RejectIn, request: Request,
                    admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
     req = teacher_service.reject(db, admin, request_id, body.reason, request)
     return us.request_out(db, req)
+
+
+# --- step 3b S3 begin --- (CATALOG_AND_TEACHERS_DESIGN 3.2: Admin → Преподаватели)
+@router.get("/teachers", response_model=PageOut[TeacherRowOut])
+def list_teachers(
+    q: Optional[str] = Query(None, max_length=200),
+    kind: Optional[Literal["independent", "school"]] = None,
+    status: Optional[Literal["approved", "revoked"]] = None,
+    cursor: Optional[str] = None, limit: Optional[int] = Query(None),
+    admin: User = Depends(require_platform_admin), db: Session = Depends(get_db),
+):
+    """People who teach, by name; five statements per page (`platform_admin/teachers.py`)."""
+    from app.lms.platform_admin import teachers
+    from app.lms.platform_admin.organizations_service import paginate_by_text
+
+    rows, nxt = paginate_by_text(db, teachers.teachers_query(q, kind, status), sort_expr=teachers.sort_expr(),
+                                 id_col=User.id, id_of=lambda r: r[0].id, cursor=cursor, limit=limit)
+    return PageOut[TeacherRowOut](items=teachers.teacher_rows(db, rows), next_cursor=nxt)
+# --- step 3b S3 end ---
 
 
 @router.get("/users", response_model=PageOut[AdminUserOut])
