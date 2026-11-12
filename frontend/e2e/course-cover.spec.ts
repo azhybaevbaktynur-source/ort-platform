@@ -157,7 +157,8 @@ test("teacher uploads a cover with a chosen focus, the overview shows it, then r
   // the student's course overview banner shows the same WebP
   const sp = await open(browser, c.student, 375);
   await sp.goto(`/ru/courses/${c.id}`);
-  const banner = sp.locator('section[aria-labelledby="course-overview-title"] img').first();
+  // step 3a S2: the cover strip is the course frame's header on Обзор (the header holding the course title h1)
+  const banner = sp.locator("main header").filter({ has: sp.getByRole("heading", { level: 1 }) }).locator("img").first();
   await expect(banner).toHaveAttribute("src", saved.cover_url);
   await expect.poll(() => banner.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBe(528);
   await sp.context().close();
