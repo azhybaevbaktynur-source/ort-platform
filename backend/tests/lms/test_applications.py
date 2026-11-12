@@ -244,3 +244,12 @@ async def test_concluded_course_refuses_approve_allows_reject(db, api):
     enroll(db, c, a, role="assistant")
     r = await api.call(a, "POST", f"/courses/{c.id}/applications/{a1}/reject", json={})
     assert r.status_code == 403
+
+
+async def test_a_teacher_cannot_apply_as_a_student(db, api):
+    # fix round 2026-11-12 1b: teachers and students are separate accounts (the join refusal, for form courses too)
+    c, form, _ = await form_course(db, api)
+    other = teacher(db)
+    r = await apply(api, other, c, form)
+    assert r.status_code == 403 and r.json()["error"]["code"] == "teacher_cannot_enroll", r.text
+    assert db.execute(select(EnrollmentApplication).where(EnrollmentApplication.user_id == other.id)).first() is None
