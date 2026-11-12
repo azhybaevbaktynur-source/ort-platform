@@ -46,13 +46,15 @@ function intentLoad<T>(key: string, fetcher: () => Promise<T>, opts: SwrOptions)
 const HOME_KEY = "home";
 const HOME_CACHE: SwrOptions = { ttl: 15_000 };
 const HOME_ACTIVITY_DAYS: ActivityDays = 7;
+const HOME_ACTIVITY_KEY = "home:activity";
 
 onBootstrapHome((parts) => {
   const at = Date.now();
   const land = <T,>(key: string, value: T, opts: SwrOptions) => { prefetched.set(key, at); put(key, value, opts); };
   land(HOME_KEY, parts.home, HOME_CACHE);
   for (const [id, prep] of Object.entries(parts.exam_prep)) land(examPrepKey(id), prep, EXAM_PREP_CACHE);
-  for (const [id, a] of Object.entries(parts.activity)) land(activityKey(id, HOME_ACTIVITY_DAYS), a, ANALYTICS_CACHE);
+  // step 3a S1: the bootstrap's activity is `{all: …}` (every course of the student), the home streak strip's own key
+  for (const [id, a] of Object.entries(parts.activity)) land(id === "all" ? HOME_ACTIVITY_KEY : activityKey(id, HOME_ACTIVITY_DAYS), a, ANALYTICS_CACHE);
 });
 
 /** `fetcher`, unless a running bootstrap brings this key's answer (then that answer, used up). */
@@ -115,10 +117,9 @@ export function loadHome(): Promise<HomeOut> {
   return pageLoad(HOME_KEY, viaBootstrap(HOME_KEY, () => getHome()), HOME_CACHE);
 }
 
-/** P2: the home's streak strip (`my/activity?days=7`; from the bootstrap when it brought it). */
+/** P2: the home's streak strip: the bootstrap's 7-day activity over all courses; alone, the course's `my/activity?days=7`. */
 export function loadHomeActivity(courseId: string): Promise<ActivityOut> {
-  const key = activityKey(courseId, HOME_ACTIVITY_DAYS);
-  return pageLoad(key, viaBootstrap(key, () => getActivity(courseId, HOME_ACTIVITY_DAYS)), ANALYTICS_CACHE);
+  return pageLoad(HOME_ACTIVITY_KEY, viaBootstrap(HOME_ACTIVITY_KEY, () => getActivity(courseId, HOME_ACTIVITY_DAYS)), ANALYTICS_CACHE);
 }
 
 /** Аналитика's two reads (a prefetch asked moments ago stands for them). */

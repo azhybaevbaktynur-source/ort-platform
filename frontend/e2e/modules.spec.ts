@@ -453,7 +453,7 @@ test.describe("modules walk (ru)", () => {
       await sp.waitForURL(`${base}/tests`);
       const course0 = await api(ortStudent, "GET", `/courses/${cid}`);
       expect(course0.home_kind).toBe("assignments");
-      expect(course0.features).toEqual({ modules: false, files: false, announcements: false, practice: false });
+      expect(course0.features).toEqual({ modules: false, files: false, announcements: false, practice: false, tests: true, hand_ins: false });
       await review(sp, "ort-student-course-home-before");
       // the home kind is locked on ORT courses
       await api(admin, "PATCH", `/courses/${cid}`, { home_kind: "modules" }, [409]);
@@ -528,7 +528,7 @@ test.describe("modules walk (ru)", () => {
       for (const id of created.modules) await api(admin, "DELETE", `/courses/${cid}/modules/${id}`);
       if (created.file) await api(admin, "DELETE", `/courses/${cid}/course-files/${created.file}`);
       const after = await api(ortStudent, "GET", `/courses/${cid}`);
-      expect(after.features).toEqual({ modules: false, files: false, announcements: false, practice: false });
+      expect(after.features).toEqual({ modules: false, files: false, announcements: false, practice: false, tests: true, hand_ins: false });
     }
   });
 
