@@ -7,7 +7,8 @@ import { useTranslation } from "@/lib/i18n/context";
 import { AuthAlert, AuthSplit, AuthTitle } from "@/components/auth/AuthSplit";
 import { ProviderButtons } from "@/components/auth/ProviderButtons";
 import { Button, Input } from "@/components/ui";
-import { AuthError, useAuth } from "@/lib/auth-context";
+import { AuthError, storedSessionProfile, useAuth } from "@/lib/auth-context";
+import { prefetchBootstrap } from "@/lib/lms/bootstrap";
 import { safeRedirect } from "@/lib/safeRedirect";
 import { useBackendWarmup, useSlowHint } from "@/lib/useBackendWarmup";
 import { VerifyEmailStep, authErrorMessage } from "@/components/auth/VerifyEmailStep";
@@ -50,7 +51,10 @@ function LoginForm() {
   const slow = useSlowHint(loading);
 
   const handleNavigateAfterAuth = () => {
-    router.push(redirectParam || `/${lang}/courses`);
+    const dest = redirectParam || `/${lang}/courses`;
+    // PERFORMANCE_AUDIT P3: the token is stored; the first page's bootstrap starts now, alongside the route change
+    prefetchBootstrap(dest, !!storedSessionProfile()?.is_platform_admin);
+    router.push(dest);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

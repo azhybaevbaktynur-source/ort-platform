@@ -7,6 +7,7 @@ import { ArrowRight } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { AuthError, storedSessionProfile, useAuth } from "@/lib/auth-context";
 import { takeOAuthBind } from "@/components/auth/ProviderButtons";
+import { prefetchBootstrap } from "@/lib/lms/bootstrap";
 import { safeRedirect } from "@/lib/safeRedirect";
 import { AuthAlert, AuthSplit, AuthTitle } from "@/components/auth/AuthSplit";
 import { AgeRow } from "@/components/auth/AgeRow";
@@ -58,7 +59,11 @@ function OAuthCallback() {
   const goOn = (ageBand?: AgeBand | null, parent = false) => {
     if (ageBand === "under_14") router.replace(`/${lang}/privacy`);
     else if (parent) router.replace(`/${lang}/parent`);
-    else router.replace(redirectRef.current || `/${lang}/courses`);
+    else {
+      const dest = redirectRef.current || `/${lang}/courses`;
+      prefetchBootstrap(dest, !!storedSessionProfile()?.is_platform_admin); // PERFORMANCE_AUDIT P3
+      router.replace(dest);
+    }
   };
 
   const fail = (err: unknown) => {

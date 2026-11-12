@@ -124,11 +124,13 @@ function toProfile(u: any): AuthUserProfile {
 }
 
 /** The account this browser is signed in to (stored session), read synchronously; null when signed out. */
-export function storedSessionProfile(): { uid: string; email: string } | null {
+export function storedSessionProfile(): { uid: string; email: string; is_platform_admin: boolean } | null {
   try {
     if (!localStorage.getItem("ort_token")) return null;
     const p = JSON.parse(localStorage.getItem(PROFILE_KEY) || "null");
-    return p && typeof p.uid === "string" ? { uid: p.uid, email: String(p.email || "") } : null;
+    return p && typeof p.uid === "string"
+      ? { uid: p.uid, email: String(p.email || ""), is_platform_admin: Boolean(p.is_platform_admin) }
+      : null;
   } catch {
     return null;
   }

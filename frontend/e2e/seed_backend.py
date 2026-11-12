@@ -990,6 +990,9 @@ def main() -> int:
     oauth = seed_oauth(api, log, tok, root)  # item 3 social sign-in (people only, no courses)
     teacher_notice = seed_teacher_notice(api, log, tok)  # fix round 2026-11-12 1c (one person, no courses)
     teacher_enrolled = seed_teacher_enrolled(api, log, tok, cid)  # fix round 2026-11-12 1e (joins ORT, one course)
+    # PERFORMANCE_AUDIT P3: a password student in no course for the sign-in prefetch walk (login.spec.ts only)
+    login_student = register(api, log, "e2e-login-student@example.com", "Login Student", keep_password=True)
+    login_student["profile"] = profile(api, login_student["token"])
 
     seed = {
         "quiz_editor": quiz_editor,
@@ -1009,6 +1012,7 @@ def main() -> int:
         "oauth": oauth,
         "teacher_notice": teacher_notice,
         "teacher_enrolled": teacher_enrolled,
+        "login_student": login_student,
         "mfa_admin": mfa_admin,
         "gate_admin": extra_admins["gate"], "shots_admin": extra_admins["shots"],
         "api": args.api, "course_id": cid, "bank_id": bank_id, "exam": exam, "staff_exam": staff_exam,
