@@ -21,10 +21,12 @@ from app.models.user import User
 
 
 def organizations_query(q: Optional[str], status: Optional[str], kind: Optional[str] = None) -> Select:
-    """Rows of (Organization, lower(name)): non-deleted **roots** (depth 0); `kind` narrows to school / personal /
-    platform (departments are never rows, ADMIN_ORGS_DESIGN 2.1)."""
+    """Rows of (Organization, lower(name)): non-deleted **roots** (depth 0) of kind school or platform; `kind` narrows
+    to one of them (departments are never rows, ADMIN_ORGS_DESIGN 2.1). Step 3b S3 (CATALOG_AND_TEACHERS_DESIGN 3.2):
+    personal organizations are never listed; independent teachers are on Admin → Преподаватели."""
     stmt = select(Organization, func.lower(Organization.name).label("sort_key")).where(
-        Organization.deleted_at.is_(None), Organization.depth == 0)
+        Organization.deleted_at.is_(None), Organization.depth == 0,
+        Organization.kind.in_(("school", "platform")))
     if q:
         needle = "%" + like_escape(q.strip().lower()) + "%"
         stmt = stmt.where(or_(func.lower(Organization.name).like(needle, escape="\\"),

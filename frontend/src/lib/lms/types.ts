@@ -272,6 +272,24 @@ export interface AdminUserDetailOut extends AdminUserOut {
   pending_email_change?: { new_email: string; expires_at: string; by_admin: boolean } | null;
   /** Item 3: the password (if usable) and the linked Google / Apple accounts. */
   sign_in_methods?: { method: "password" | "google" | "apple"; linked_at?: string | null }[];
+  /** Step 3b S3: the «Преподавание» card; null when the person does not teach. */
+  teaching?: TeacherRowOut | null;
+}
+/** Step 3b S3 (CATALOG_AND_TEACHERS_DESIGN 3.2): a row of Admin → Преподаватели (`GET /platform/teachers`). */
+export interface TeacherRowOut {
+  user: UserBrief;
+  /** independent: no school membership; school: school memberships only; both: an independent teacher in a school too. */
+  kind: "independent" | "school" | "both";
+  teacher_status: TeacherStatus;
+  /** At most 3 school names; `school_count` is how many there are. */
+  schools: string[];
+  school_count: number;
+  courses: number;
+  students: number;
+  listed_courses: number;
+  last_login_at: string | null;
+  since: string | null;
+  disabled: boolean;
 }
 /** S4 attempt lookup: where an attempt stands. Never answers, scores or grades. */
 export interface AdminAttemptOut {
@@ -350,6 +368,8 @@ export interface AuditEntryOut {
   target_id: string;
   reason: string | null;
   details: Record<string, unknown>;
+  /** Step 3b S3: an organization target's kind (`personal` is labelled as a teacher's own space). */
+  target_kind?: string | null;
 }
 export interface PlatformSummaryOut {
   pending_teacher_requests: number;

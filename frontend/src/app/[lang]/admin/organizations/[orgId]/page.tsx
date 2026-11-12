@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { ExternalLink, Info, TriangleAlert } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { listAuditLog } from "@/lib/lms/admin";
@@ -48,14 +48,22 @@ export default function AdminOrganizationDetailPage() {
   const [busy, setBusy] = useState(false);
   const [dialogError, setDialogError] = useState<unknown>(null);
 
+  const router = useRouter();
   const load = useCallback(async () => {
     setError(null);
     try {
-      setOrg(await getOrganization(orgId));
+      const o = await getOrganization(orgId);
+      // step 3b S3 (CATALOG_AND_TEACHERS_DESIGN 3.2): an independent teacher's own space is not an organization in
+      // the admin UI; its detail opens the teacher's person page
+      if (o.kind === "personal" && o.owner_user_id) {
+        router.replace(`/${lang}/admin/users/${o.owner_user_id}`);
+        return;
+      }
+      setOrg(o);
     } catch (e) {
       setError(e);
     }
-  }, [orgId]);
+  }, [orgId, lang, router]);
   const loadUsage = useCallback(async () => {
     setUsageError(null);
     try {

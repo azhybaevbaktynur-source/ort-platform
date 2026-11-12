@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useCallback, useState } from "react";
+import React, { Suspense, useCallback, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { listAdminCourses } from "@/lib/lms/admin";
 import type { AdminCourseOut } from "@/lib/lms/types";
@@ -15,12 +16,22 @@ import { CourseStatusBadge, SystemAccountBadge } from "@/components/lms/org/OrgU
 import { LISTING_TONE } from "@/lib/lms/listing";
 
 export default function AdminCoursesPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminCourses />
+    </Suspense>
+  );
+}
+
+function AdminCourses() {
   const { lang, t } = useTranslation();
   const crumbs = useAdminCrumbs();
   const [input, setInput] = useState("");
   const q = useDebounced(input);
   const [deleted, setDeleted] = useState(false);
-  const fetchPage = useCallback((cursor: string | null) => listAdminCourses({ q, deleted: deleted ? true : undefined, cursor }), [q, deleted]);
+  // step 3b S3: the person page's «Преподавание» card links here with `?owner_id=` (one teacher's courses)
+  const ownerId = useSearchParams().get("owner_id") || undefined;
+  const fetchPage = useCallback((cursor: string | null) => listAdminCourses({ q, deleted: deleted ? true : undefined, owner_id: ownerId, cursor }), [q, deleted, ownerId]);
   const list = useCursorList(fetchPage);
   const state = useTableState(list);
 
@@ -58,6 +69,13 @@ export default function AdminCoursesPage() {
   return (
     <div className={`w-full ${STAFF_WIDTH.list}`}>
       <PageHeader title={t("platformAdmin.courses.title")} description={t("platformAdmin.courses.subtitle")} breadcrumbs={crumbs({ label: t("platformAdmin.courses.title") })} />
+      {ownerId && (
+        <p className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-700">
+          {t("platformAdmin.courses.ownerFilter")}
+          <Link href={`/${lang}/admin/users/${encodeURIComponent(ownerId)}`} className="inline-flex min-h-11 items-center font-medium text-brand-700 hover:underline sm:min-h-0">{t("platformAdmin.courses.ownerFilterPerson")}</Link>
+          <Link href={`/${lang}/admin/courses`} className="inline-flex min-h-11 items-center font-medium text-brand-700 hover:underline sm:min-h-0">{t("platformAdmin.courses.ownerFilterReset")}</Link>
+        </p>
+      )}
       <Table
         caption={t("platformAdmin.courses.title")}
         density="compact"

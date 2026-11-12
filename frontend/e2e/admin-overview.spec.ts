@@ -41,7 +41,7 @@ test("admin overview: metrics, attention, health line and the health page", asyn
   const attention = page.getByTestId("needs-attention");
   const requests = attention.getByRole("link", { name: new RegExp(t("platformAdmin.overview.pendingRequests")) });
   await expect(requests).toBeVisible();
-  await expect(requests).toHaveAttribute("href", "/ru/admin/teacher-requests");
+  await expect(requests).toHaveAttribute("href", "/ru/admin/teachers?tab=requests");
 
   for (const key of ["newCourse", "grantPro", "codes"]) {
     await expect(page.getByRole("link", { name: t(`platformAdmin.overview.quick.${key}`) })).toBeVisible();

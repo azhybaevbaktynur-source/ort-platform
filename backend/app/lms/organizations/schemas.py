@@ -41,6 +41,7 @@ class OrganizationAdminRowOut(OrganizationOut):
     storage_bytes: int = 0   # owner-based: assets of the tree's active members (as `tree_usage`)
     departments: int = 0
     is_protected: bool = False  # the platform organization: never suspended, slug fixed
+    owner_user_id: Optional[str] = None  # step 3b S3: a personal organization's teacher (the detail route only)
     # --- Admin orgs (item 4) end ---
 
 
