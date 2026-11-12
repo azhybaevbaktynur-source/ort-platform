@@ -103,7 +103,7 @@ remains → "Открыть доступ" (gold); none and nothing locked → "�
   reference" rule as the module gate). `url` items have no content route: the outline is the only place, covered.
 - The lesson page never builds an embed or an anchor from client state: it renders a lock card when `locked` and
   shows "Открыть доступ" (`/courses/{c}/unlock`) when `locked_reason = access_required`, the module reason otherwise.
-- ORT preset exams inside a paid module: exempt as today (their own `access_tier` governs them; ORT unchanged).
+- ORT preset exams inside a paid module: exempt as today (their own `access_tier` governs them; ORT exam rules fixed).
 - Prerequisite chains: a free student cannot complete a paid module, so a later free module requiring it stays
   locked with "Finish A first". Honest; the editor warns ("Pro module as prerequisite of a free module").
 

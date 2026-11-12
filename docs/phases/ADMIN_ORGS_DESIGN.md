@@ -160,7 +160,7 @@ Order A → B → C → D → E; A and B can run in parallel (different files ex
 
 | # | Decision | Default |
 |---|---|---|
-| D-ORG-1 | The platform organization cannot be suspended. | Yes (rule 6.9: ORT must not change) |
+| D-ORG-1 | The platform organization cannot be suspended. | Yes (rule 6.9 at the time; since 2026-11-12 only ORT exam rules are fixed) |
 | D-ORG-2 | A platform admin inside `/org/{id}` keeps full org-admin powers, including in a suspended organization; every write is recorded with `acting_as: platform_admin`; no shared-bank content (A4 pending). | Yes |
 | D-ORG-3 | The header never lists every organization for the platform admin; Admin → Organizations is the entry point; the current foreign organization appears as the active choice while open. | Yes |
 | D-ORG-4 | The Students tab shows name, email and counts only; everything else stays on the person page. | Yes |

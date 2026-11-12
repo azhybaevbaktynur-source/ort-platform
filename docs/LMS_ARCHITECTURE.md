@@ -13,7 +13,7 @@
 4. **Numbers are truth, labels are derived.** Scores are stored as points. Scaled scores and labels come from versioned, immutable grading schemes.
 5. **Attempts are sacred.** A snapshot at start, a server-owned deadline, one-shot submit, one row per answer, never deleted by cascade.
 6. **Server-side everything that matters**: timer, submit lock, answer-key privacy, roles from the database.
-7. **ORT is a locked course template, and ORT must not change** (owner rule A, 2026-10-24; replaces "ORT is data, not code"). ORT's scoring schemes are data; its section rules, presets, importers, result view and player behaviour are the *existing code*, registered unchanged as the `ort` template. The database stores only which template a course uses (key, version, settings, lock). ORT logic is never rewritten into generic settings. A parity gate (imports, e2e, screenshots, scores) runs every phase.
+7. **ORT is a locked course template; its exam rules are fixed** (owner rule A, 2026-10-24, revised 2026-11-12: only section order and timers, forward-only sections, ORT scoring and the CSV/zip import format are fixed; ORT's interface is the normal course interface, not a separate one). ORT's scoring schemes are data; its section rules, presets, importers, result view and player behaviour are the *existing code*, registered unchanged as the `ort` template. The database stores only which template a course uses (key, version, settings, lock). ORT logic is never rewritten into generic settings. The parity tests (imports, exam-rule e2e, scores) run every phase; screenshot baselines are re-approved when the layout changes on purpose.
 8. **Small and cheap**: Postgres, Cloudflare R2, our own policy module, synchronous gating. No queues in v1.
 9. **The assignment is the gradable unit** (from Phase 7). A quiz is one kind of assignment; offline, text and file work are the others. Submissions point to assignments.
 10. **Mobile-first, one design system, UX gate every phase** (`docs/UX_GUIDELINES.md`): students get one main action per screen; teachers and admins get organized tables; everything works at 375 px and in en/ky/ru.
@@ -205,7 +205,7 @@ Canvas's full account tree and account-level settings beyond `teachers_can_creat
 | Risk | Mitigation |
 |---|---|
 | Scope creep toward "all of Canvas" | The skip list above; each phase has an exit test and a stop point. |
-| ORT regression (hard rule: ORT must not change) | Parity gate every phase: identical CSV/zip import results, ORT e2e, exam-player and result-view screenshot comparison against versioned baselines with tolerance, scoring property test. ORT code is wrapped by the template, never rewritten. |
+| ORT regression (hard rule since 2026-11-12: ORT exam rules, scoring and import format fixed) | Parity gate every phase: identical CSV/zip import results, ORT e2e, exam-player and result-view screenshot comparison against versioned baselines with tolerance, scoring property test. ORT code is wrapped by the template, never rewritten. |
 | Template abstraction leaking into ORT code | The `ort` template only registers existing modules; any edit to ORT modules needs the parity gate and, for behaviour changes, the owner's decision (`ORT_PLAYER_IDEAS.md`). |
 | Cross-organization leaks | Organization isolation suite; `organization_id` on every course and bank; org admin scope in SQL scopes. |
 | Authorization mistakes leak data (today's #1 problem) | One `can()`, SQL scopes, route-inventory merge gate, two-teacher isolation suite. |
