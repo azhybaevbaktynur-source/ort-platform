@@ -715,3 +715,11 @@ overview. **Platform name: not decided**; build 3a and 3b first, ask the owner b
 
 **Check that nothing is lost.** Every student page, feature, state, role, cross-course need and old link is mapped
 in `phases/STUDENT_IA_DESIGN.md` §10; the teacher side in `phases/TEACHER_TO_STUDENT_MAP.md` §0.
+
+**3b S1–S3: deviations from the design, as built.** D11 preconditions are those of design §2.3 (published, link access on,
+title and description in the main language, cover or one published lesson or test). Blocking an owner's course keeps
+its link access closed for new visitors but enrolled students keep theirs. A teacher can withdraw a request from the
+listed state too. Approving re-checks the preconditions at decision time. The ORT courses answer `409 listing_not_allowed`
+to any listing change. The D10 sweep (revoking a teacher's access) covers courses the teacher owns or that sit in their
+personal organization. Platform courses have no request button; they are in the catalog while their page is open by link.
+The system account that owns the ORT courses is shown as «Платформа».

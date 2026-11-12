@@ -63,12 +63,11 @@ export function EnrollmentSection({ course, onSaved }: { course: CourseStaffOut;
         <div className="space-y-5">
           <div>
             <p className="mb-2 text-sm font-medium text-slate-700">{t("courses.settings.joinCode")}</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <JoinCodeDisplay code={course.join_code} />
+            <JoinCodeDisplay code={course.join_code} trailing={
               <OverflowMenu label={t("courses.settings.joinCodeMenu")} disabled={code.busy}
                 groups={[{ id: "code", items: [{ id: "regenerate", label: t("courses.settings.regenerate"), icon: <RefreshCw aria-hidden="true" className="h-4 w-4" /> }] }]}
                 onSelect={() => { code.setError(null); code.setSaved(false); setConfirmCode(true); }} />
-            </div>
+            } />
             {/* Phase 9 UX: the reason the code does not work: a draft course, or the saved enrollment mode */}
             {st !== "published" ? (
               <p className="mt-1 text-xs text-amber-700">{t("courses.settings.joinCodeInactiveUnpublished")}</p>
