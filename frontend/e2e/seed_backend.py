@@ -860,6 +860,18 @@ def seed_item3(api: Api, log: Path, admin_tok: str, ort_course_id: str) -> dict:
 # --- TEACHER_TO_STUDENT_MAP S5 end ---
 
 
+# --- Fix round 2026-11-12 1c begin ---
+def seed_teacher_notice(api: Api, log: Path, admin_tok: str) -> dict:
+    """A teacher whose application was just approved and who learns nowhere: the "approved" line on the Teaching view
+    (frontend/e2e/teacher-approved-notice.spec.ts closes it; no other spec uses this person)."""
+    u = register(api, log, "e2e-approved-notice@example.com", "Новый Учитель Одобрен")
+    rid = api.call("POST", "/me/teacher-requests", u["token"], {"applicant_name": u["name"], **APPLICATION})["id"]
+    api.call("POST", f"/platform/teacher-requests/{rid}/approve", admin_tok, {"note": None})
+    u["profile"] = profile(api, u["token"])
+    return u
+# --- Fix round 2026-11-12 1c end ---
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--api", required=True)
@@ -957,6 +969,7 @@ def main() -> int:
         extra_admins[key] = extra
     item3 = seed_item3(api, log, tok, cid)  # TEACHER_TO_STUDENT_MAP S5 (after every ORT and every other row)
     oauth = seed_oauth(api, log, tok, root)  # item 3 social sign-in (people only, no courses)
+    teacher_notice = seed_teacher_notice(api, log, tok)  # fix round 2026-11-12 1c (one person, no courses)
 
     seed = {
         "quiz_editor": quiz_editor,
@@ -974,6 +987,7 @@ def main() -> int:
         "person": person,
         "item3": item3,
         "oauth": oauth,
+        "teacher_notice": teacher_notice,
         "mfa_admin": mfa_admin,
         "gate_admin": extra_admins["gate"], "shots_admin": extra_admins["shots"],
         "api": args.api, "course_id": cid, "bank_id": bank_id, "exam": exam, "staff_exam": staff_exam,

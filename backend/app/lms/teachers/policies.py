@@ -4,4 +4,5 @@ ME_POLICIES: dict[tuple[str, str], str] = {
     ("PATCH", "/api/v1/me/lms"): "authenticated",
     ("POST", "/api/v1/me/teacher-requests"): "authenticated+ratelimit",
     ("GET", "/api/v1/me/teacher-requests"): "authenticated",
+    ("POST", "/api/v1/me/teacher-application/dismiss"): "authenticated",  # fix round 2026-11-12 1c: own row only
 }

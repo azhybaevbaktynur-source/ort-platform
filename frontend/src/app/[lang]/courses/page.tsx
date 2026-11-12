@@ -80,7 +80,7 @@ function TeachingList({ noLearning = false }: { noLearning?: boolean }) {
   return (
     <div className="space-y-4">
       {/* Accounts: a revoked teacher keeps this list, read-only */}
-      {me?.teacher_status === "revoked" && <TeacherApplicationNotice application={{ status: "revoked" }} />}
+      {me?.teacher_status === "revoked" && <TeacherApplicationNotice application={{ status: "revoked" }} dismissible={false} />}
       {/* item 2: without the Learning tab, the student home's "approved" line shows here instead (once) */}
       {noLearning && me?.teacher_application && <TeacherApplicationNotice application={me.teacher_application} />}
       {error && items.length === 0 ? <ErrorState message={errorText(error)} onRetry={() => void load()} retrying={loading} /> : null}
