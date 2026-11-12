@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
 import { useStaffDictionary, useTranslation } from "@/lib/i18n/context";
@@ -15,12 +15,16 @@ import { EmptyState, LinkButton, LoadingState, type Breadcrumb } from "@/compone
 interface AdminSummary {
   pending: number | null;
   storageLevel: StorageLevel | null;
-  /** The summary could not be loaded, even after a retry. */
+  /** The summary could not be loaded, even after the retries (a value loaded before stays shown). */
   error: LmsApiError | null;
   refresh: () => void;
 }
 const SummaryContext = createContext<AdminSummary>({ pending: null, storageLevel: null, error: null, refresh: () => {} });
-const RETRY_MS = 1500;
+/** FIX_ROUND_2026-11-12 1a: waits before each retry, long enough to span most of a server wake-up. */
+const RETRY_MS = [1500, 4000, 8000];
+/** A failure worth trying again: no answer, the server starting or busy, or a server error. */
+const retryable = (e: LmsApiError) =>
+  e?.code === "network" || e?.code === "server_starting" || e?.code === "server_busy" || (e?.status ?? 0) >= 500;
 export const useAdminSummary = () => useContext(SummaryContext);
 
 /** Breadcrumbs of an admin page: Admin → section (→ page). */
@@ -41,29 +45,36 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const [pending, setPending] = useState<number | null>(null);
   const [storageLevel, setStorageLevel] = useState<StorageLevel | null>(null);
   const [error, setError] = useState<LmsApiError | null>(null);
+  const run = useRef(0); // a newer refresh replaces the retries of an older one
   const isAdmin = !!me?.is_platform_admin;
 
-  // UX rework 2: one retry, for a slow or restarting server; after that the page says so instead of showing nothing.
+  // UX rework 2, FIX_ROUND_2026-11-12 1a: retries with growing waits for a slow or waking server; after that only the
+  // overview's "Needs attention" card says so (never the whole page), and a failure never clears a value already loaded.
   const refresh = useCallback(() => {
+    const id = ++run.current;
     setError(null);
-    const load = async (retry: boolean) => {
+    const load = async (attempt: number): Promise<void> => {
       try {
         const s = await getPlatformSummary();
+        if (id !== run.current) return;
         setPending(s.pending_teacher_requests);
         setStorageLevel(s.storage_level);
       } catch (e) {
-        if ((e as LmsApiError)?.code === "mfa_enrollment_required") { // S1: set up two-step login first
-          setError(e as LmsApiError);
+        if (id !== run.current) return;
+        const err = e as LmsApiError;
+        if (err?.code === "mfa_enrollment_required") { // S1: set up two-step login first
+          setError(err);
           return;
         }
-        if (retry) {
-          await new Promise((done) => setTimeout(done, RETRY_MS));
-          return load(false);
+        if (attempt < RETRY_MS.length && retryable(err)) {
+          await new Promise((done) => setTimeout(done, RETRY_MS[attempt]));
+          if (id === run.current) await load(attempt + 1);
+          return;
         }
-        setError(e as LmsApiError);
+        setError(err);
       }
     };
-    void load(true);
+    void load(0);
   }, []);
   useEffect(() => { if (isAdmin) refresh(); }, [isAdmin, refresh]);
   const securityPath = `/${lang}/admin/security`;

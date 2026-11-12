@@ -75,8 +75,10 @@ export async function lmsFetch<T>(path: string, opts: LmsFetchOptions = {}): Pro
       mfaEnrollmentRedirect(err.code); // S1
       throw new LmsApiError(res.status, err.code, err.message || err.code, err.details || {});
     }
-    // Old-style or unparseable error: map the status to a coarse code.
-    const code = res.status === 401 ? "unknown" : res.status === 403 ? "forbidden" : res.status === 404 ? "not_found" : "unknown";
+    // Old-style or unparseable error: map the status to a coarse code. A 502/503/504 without our JSON error is the
+    // hosting proxy's page while the server wakes up (FIX_ROUND_2026-11-12 1a): `server_starting`, worth retrying.
+    const code = res.status === 401 ? "unknown" : res.status === 403 ? "forbidden" : res.status === 404 ? "not_found"
+      : res.status === 502 || res.status === 503 || res.status === 504 ? "server_starting" : "unknown";
     throw new LmsApiError(res.status, code, `HTTP ${res.status}`);
   }
 
