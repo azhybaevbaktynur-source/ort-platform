@@ -99,6 +99,9 @@ async def test_share_refusals(db, api):
     r = await _share(api, w.i1, pc, pb)
     assert (r.status_code, _code(r)) == (422, "sharing_disabled")
     assert (await api.call(w.i1, "GET", f"/courses/{pc.id}/bank-sharing")).json()["reason"] == "personal"
+    # fix round 2026-11-12 1b: no copy picker either (its list, /org/{personal}/shared-banks, is a 404)
+    assert (await api.call(w.i1, "GET", f"/courses/{pc.id}/bank-sharing")).json()["can_copy"] is False
+    assert (await api.call(w.i1, "GET", f"/org/{personal_org_id(w.i1.id)}/shared-banks")).status_code == 404
     # ORT course (P9-9)
     ort = make_course(db, w.T, organization_id=w.D.id, template_key="ort", template_version=1, template_locked=True)
     ob = make_bank(db, ort, w.T)

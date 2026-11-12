@@ -370,6 +370,8 @@ export const LMS_ERROR_CODES = [
   "email_change_not_found",
   // TEACHER_TO_STUDENT_MAP §2.2: the exam link of a lesson course
   "exam_link_forbidden", "exam_link_not_allowed", "exam_link_target_invalid",
+  // fix round 2026-11-12 1b: people who teach cannot join a course as a student
+  "teacher_cannot_enroll",
 ] as const;
 export type LmsErrorCode = (typeof LMS_ERROR_CODES)[number];
 

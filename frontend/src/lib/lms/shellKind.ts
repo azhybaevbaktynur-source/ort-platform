@@ -8,8 +8,6 @@
  * - `student`: the sidebar + tab bar frame (the Learning area);
  * - `neutral`: a loading frame (brand bar + skeleton) used only while nothing decides yet.
  */
-import { courseIdOfPath } from "./studentNav";
-
 export type ShellKind = "student" | "app" | "player" | "neutral";
 /** Same union as `AreaKey` in `components/ui/AppHeader.tsx` (kept here so this file has no component imports). */
 export type ShellArea = "learning" | "teaching" | "organization" | "platform" | "parent";
@@ -46,6 +44,17 @@ export function hidesLearning(me: ShellMe | null): boolean {
   return !!me && teaches(me);
 }
 
+/** Owner decision 2026-11-12 (fix round 1b): the person learns here (gets the Learning area, the student frame and Pro). */
+export function learnsHere(me: ShellMe): boolean {
+  return !teaches(me);
+}
+
+/** Where a person who has no Learning area lives: Teaching for people who teach or create courses, else Platform. */
+export function homeArea(me: ShellMe): ShellArea {
+  if (me.is_teacher || me.can_create_courses) return "teaching";
+  return me.is_platform_admin ? "platform" : "learning";
+}
+
 /**
  * Area of a URL. `/courses` follows `?view=`; without it, `coursesDefault` (the tab `/courses` opens with:
  * Teaching for people who teach or create courses). Phase 6b S11b (UX 15).
@@ -63,9 +72,29 @@ export function areaFromUrl(rest: string, view: string | null, coursesDefault: S
   return "learning";
 }
 
-/** The URL's area for this person: without Learning, `/courses` (any `?view=`) is Teaching. */
+/**
+ * The URL's area for this person. Fix round 1b (Better idea 4): a URL no staff area claims (`/courses?view=learning`,
+ * `/pro`, `/privacy`, the catalog, `/courses/join`, `/invitations`, course pages, anything new) is Learning only for
+ * people who learn; people who teach or administer get their home area (`homeArea`) there.
+ */
 export function urlAreaFor(rest: string, view: string | null, me: ShellMe | null): ShellArea {
-  return hidesLearning(me) && rest === "/courses" ? "teaching" : areaFromUrl(rest, view, coursesDefault(me));
+  const area = areaFromUrl(rest, view, coursesDefault(me));
+  return area === "learning" && me && hidesLearning(me) ? homeArea(me) : area;
+}
+
+/** The URL claims no area itself (only Learning would), so a page's own declaration may decide (course pages). */
+export function pageDecidesArea(rest: string, view: string | null, me: ShellMe | null): boolean {
+  return areaFromUrl(rest, view, coursesDefault(me)) === "learning";
+}
+
+/**
+ * The header's active area: the URL's, or where the URL claims none, the page's declaration (a course page is
+ * Teaching for its staff); a declared Learning never wins for people without Learning.
+ */
+export function activeAreaFor(rest: string, view: string | null, declared: ShellArea | null, me: ShellMe | null): ShellArea {
+  const urlArea = urlAreaFor(rest, view, me);
+  if (!declared || !pageDecidesArea(rest, view, me)) return urlArea;
+  return declared === "learning" && hidesLearning(me) ? urlArea : declared;
 }
 
 export interface ShellKindInput {
@@ -84,9 +113,11 @@ export function shellKindFor({ rest, view, declared, me }: ShellKindInput): Shel
   // URLs of the other areas are the app frame for everyone: no answer is needed to know it
   if (areaFromUrl(rest, view) !== "learning") return "app";
   if (!me) return "neutral";
+  // Fix round 1b (owner decision 2026-11-12, Better idea 4): the frame comes from the person, not the URL. People who
+  // teach or administer never get the student frame (not on /pro, the catalog, a course they once joined as a student
+  // or a course they do not teach); their course pages need no declaration to know it, so they never wait for one
+  if (!learnsHere(me)) return "app";
   if (urlAreaFor(rest, view, me) !== "learning") return "app";
   if (declared && declared !== "learning") return "app";
-  // a course page of someone who teaches: the course's own declaration decides (a course they teach is Teaching)
-  if (!declared && courseIdOfPath(rest) && teaches(me)) return "neutral";
   return "student";
 }

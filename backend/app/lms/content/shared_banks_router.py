@@ -141,6 +141,12 @@ def bank_sharing(course_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
     ok, reason, root = svc.sharing_state(ctx.db, course)
     can_copy = (can(ctx, A.CONTENT_MANAGE, course) and course.template_key != "ort"
                 and course.sandbox_for_template_id is None)
+    # fix round 2026-11-12 1b (per-role link check): the picker lists `/org/{root}/shared-banks`, which answers 404 for a
+    # personal organization and for anyone outside the tree (the platform admin included); no picker there
+    if can_copy:
+        from app.lms.organizations import tree
+
+        can_copy = root.kind != "personal" and root.id in tree.member_tree_roots(ctx.db, ctx.user.id)
     return BankSharingOut(enabled=ok, reason=reason, root_id=root.id, root_name=root.name, can_copy=can_copy)
 
 

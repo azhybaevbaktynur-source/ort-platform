@@ -64,6 +64,19 @@ def join_open(db: Session, user: User, course_id: uuid.UUID, ip_hash: Optional[s
     return _join(db, user, course, source="open", ip_hash=ip_hash)
 
 
+# --- fix round 2026-11-12 1b begin --- (owner decision 2026-11-12: teachers and students are separate accounts)
+TEACHER_CANNOT_ENROLL = "teacher_cannot_enroll"
+
+
+def teaches(user: User) -> bool:
+    """The person teaches, creates courses or runs the platform: the frontend's `teaches(me)` (shellKind.ts) and the
+    home bootstrap's `_teaches` over the same MeOut fields. Such a person never joins a course as a student."""
+    from app.lms.teachers import service as teachers_svc
+
+    return bool(user.is_platform_admin) or teachers_svc.is_teacher(user) or teachers_svc.can_create_courses(user)
+# --- fix round 2026-11-12 1b end ---
+
+
 def _joinable(course: Course, source: str) -> bool:
     if course.deleted_at is not None or course.status != "published":
         return False
@@ -84,6 +97,9 @@ def _join(db: Session, user: User, course: Course, *, source: str,
     # open join) is never locked. Same 404 as below; the check after the lock stays authoritative.
     if not _joinable(course, source):
         raise _join_failure(db, ip_hash)
+    # fix round 2026-11-12 1b: asked before any lock (a course that cannot be joined stays the same 404); refused below,
+    # after the course's own staff got their enrollment back unchanged
+    refuse = teaches(user)
     # --- Phase 6 S1 begin --- (suspended organization: the same generic answer as a wrong code)
     from app.lms.organizations.models import Organization
 
@@ -104,6 +120,9 @@ def _join(db: Session, user: User, course: Course, *, source: str,
     if existing is not None and existing.state == "active":
         db.rollback()
         return db.get(Enrollment, existing.id), db.get(Course, course.id), True
+    if refuse:
+        db.rollback()
+        raise Forbidden("People who teach cannot join a course as a student", code=TEACHER_CANNOT_ENROLL)
     if course.enrollment_limit is not None and active_student_count(db, course.id) >= course.enrollment_limit:
         raise _join_failure(db, ip_hash)
 

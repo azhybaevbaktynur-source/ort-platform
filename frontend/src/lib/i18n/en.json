@@ -361,7 +361,8 @@
       "plan_invalid": "There is no such plan.",
       "exam_link_forbidden": "Only a platform administrator links a course to an exam.",
       "exam_link_not_allowed": "This course cannot be linked to an exam.",
-      "exam_link_target_invalid": "Choose a published exam course of the platform."
+      "exam_link_target_invalid": "Choose a published exam course of the platform.",
+      "teacher_cannot_enroll": "You teach on the platform, so you cannot join courses as a student. To study, use a separate student account."
     }
   },
   "courses": {
@@ -626,6 +627,10 @@
       "lessons_few": "{count} lessons",
       "lessons_many": "{count} lessons",
       "lessons_other": "{count} lessons"
+    },
+    "notYours": {
+      "title": "This course opens only in a student account",
+      "body": "You teach on the platform, so student courses do not open here. To see a course you teach the way a student does, use Student view on the Teaching list."
     }
   },
   "teacherRequest": {

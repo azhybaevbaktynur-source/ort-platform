@@ -57,9 +57,11 @@ ok(courseNavItems(course("student"), "student", base, t).every((i) => i.group ==
 ok(keys("student") === "course,assignments,grades,people,progress,saved", "student: announcements, files, practice auto-hidden");
 ok(keys("student", { modules: true, files: true, announcements: true, practice: true }) === "course,announcements,assignments,grades,people,files,practice,progress,saved",
   "student: shown with published content");
-ok(keys("observer") === "course,assignments,grades,people,analytics", "observer without the staff shape: no banks, no settings");
+// fix round 1b (per-role link check): observers get no Grades (A13) and no Question banks (shared banks are reached from
+// Organization → Shared banks); both links opened a refusal
+ok(keys("observer") === "course,assignments,people,analytics", "observer without the staff shape: no grades, banks or settings");
 ok(courseNavItems(course("observer"), "observer", base, t, { staffShape: true }).map((i) => i.key).join(",")
-  === "course,assignments,grades,people,bank,analytics", "org admin (staff shape): question banks, no settings");
+  === "course,assignments,people,analytics", "org admin (staff shape): no grades, banks or settings either");
 const marks = courseNavItems(course("teacher"), "teacher", base, t).filter((i) => i.hiddenFromStudents).map((i) => i.key);
 ok(marks.join(",") === "announcements,files,practice", "staff: hidden-from-students marks");
 ok(courseNavItems(course("student"), "student", base, t).every((i) => !i.hiddenFromStudents), "students: no marks");

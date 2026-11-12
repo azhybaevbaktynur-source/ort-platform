@@ -59,11 +59,11 @@ const LANG_RE = /^\/(en|ky|ru)(?=\/|$)/;
 
 /**
  * `staffShape`: the server answered with the staff serializer (`isStaffCourse`): org admins reading a course of their
- * organization (Phase 9 UX) also get Question banks (read-only there; the server decides every write). Settings stay
- * for course teachers only (A13).
+ * organization (Phase 9 UX). Fix round 1b: it no longer adds Question banks (see the observer list below). Settings
+ * stay for course teachers only (A13).
  */
 export function courseNavItems(course: CourseNavCourse, role: CourseNavRole, pathname: string, t: T,
-  opts: { staffShape?: boolean } = {}): CourseNavItem[] {
+  _opts: { staffShape?: boolean } = {}): CourseNavItem[] {
   const lang = (pathname.match(LANG_RE) || [])[1] || "ru";
   const base = `/${lang}/courses/${course.id}`;
   const staff = role === "teacher" || role === "assistant";
@@ -98,10 +98,14 @@ export function courseNavItems(course: CourseNavCourse, role: CourseNavRole, pat
     ...item("announcements", `${base}/announcements`, t("announcements.title"), under(pathname, `${base}/announcements`),
       f.announcements, f.announcements),
     ...item("assignments", `${base}/assignments`, t("assignments.tab"), assignmentsActive, true),
-    ...item("grades", `${base}/grades`, t("gradebook.tab"), under(pathname, `${base}/grades`), true),
+    // fix round 1b (per-role link check): observers (org admins reading the course) have no grades (A13): no link
+    ...item("grades", `${base}/grades`, t("gradebook.tab"), under(pathname, `${base}/grades`), role !== "observer"),
     ...item("people", `${base}/people`, t(role === "student" ? "courses.people.tabStudent" : "courses.people.tab"),
       under(pathname, `${base}/people`), true),
-    ...item("bank", `${base}/bank`, t("bank.tab"), under(pathname, `${base}/bank`), role === "observer" && !!opts.staffShape),
+    // fix round 1b (per-role link check): no Question banks link for observers either. It opened "only teachers and
+    // assistants" (and a refused request) wherever the course has no organization-shared bank; org admins reach the
+    // shared banks from Organization → Shared banks → Open (`BankGate` still lets them in there); `staffShape` is kept
+    // for callers but no longer adds a link
     ...item("files", `${base}/files`, t("courseFiles.title"), under(pathname, `${base}/files`), f.files, f.files),
     // Phase 10: practice (students once a practice quiz is published), progress (students), analytics (observers)
     ...item("practice", `${base}/practice`, t("practice.nav"), under(pathname, `${base}/practice`), role === "student" && !!f.practice, !!f.practice),
