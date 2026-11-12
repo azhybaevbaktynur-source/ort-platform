@@ -4,6 +4,9 @@ import { useEffect } from "react";
 import { getExamPrep, type ExamPrepOut } from "./examPrep";
 import { getActivity, getProgress, type ActivityDays, type ActivityOut, type ProgressOut } from "./progress";
 import { listMyCourses } from "./courses";
+import { homeBootstrap, onBootstrapHome } from "./bootstrap"; // PERFORMANCE_AUDIT P2
+import { getHome } from "./home";
+import type { HomeOut } from "./homeTypes";
 import type { CourseCard, PageOut } from "./types";
 import { peek, put, revalidate, useCached, type SwrOptions } from "./swr";
 
@@ -34,6 +37,41 @@ function intentLoad<T>(key: string, fetcher: () => Promise<T>, opts: SwrOptions)
   revalidate(key, fetcher, opts).catch(() => { prefetched.delete(key); });
 }
 
+/*
+ * PERFORMANCE_AUDIT P2: the home's reads (`/me/home`, the exam course's exam-prep page and 7-day activity) can come
+ * inside the shell's bootstrap (`bootstrap.ts`, `?include=home`). They land here like a prefetch that just answered, so
+ * the page that draws them takes them once without asking; while that bootstrap is running, the home's reads wait for it
+ * (`viaBootstrap`) instead of asking alone, and ask alone only when it did not carry them.
+ */
+const HOME_KEY = "home";
+const HOME_CACHE: SwrOptions = { ttl: 15_000 };
+const HOME_ACTIVITY_DAYS: ActivityDays = 7;
+
+onBootstrapHome((parts) => {
+  const at = Date.now();
+  const land = <T,>(key: string, value: T, opts: SwrOptions) => { prefetched.set(key, at); put(key, value, opts); };
+  land(HOME_KEY, parts.home, HOME_CACHE);
+  for (const [id, prep] of Object.entries(parts.exam_prep)) land(examPrepKey(id), prep, EXAM_PREP_CACHE);
+  for (const [id, a] of Object.entries(parts.activity)) land(activityKey(id, HOME_ACTIVITY_DAYS), a, ANALYTICS_CACHE);
+});
+
+/** `fetcher`, unless a running bootstrap brings this key's answer (then that answer, used up). */
+function viaBootstrap<T>(key: string, fetcher: () => Promise<T>): () => Promise<T> {
+  return async () => {
+    const boot = homeBootstrap();
+    if (boot) {
+      await boot.catch(() => undefined); // the shell shows a failed bootstrap; the page then asks its own
+      const at = prefetched.get(key);
+      const e = peek<T>(key);
+      if (at !== undefined && e && e.at >= at) {
+        prefetched.delete(key);
+        return e.value;
+      }
+    }
+    return fetcher();
+  };
+}
+
 /** Page mount: the answer of a prefetch asked moments ago (or its running request), else a new request. */
 function pageLoad<T>(key: string, fetcher: () => Promise<T>, opts: SwrOptions): Promise<T> {
   const at = prefetched.get(key);
@@ -44,7 +82,7 @@ function pageLoad<T>(key: string, fetcher: () => Promise<T>, opts: SwrOptions): 
 }
 
 export const examPrepKey = (courseId: string) => `exam-prep:${courseId}`;
-const fetchExamPrep = (courseId: string) => () => getExamPrep(courseId);
+const fetchExamPrep = (courseId: string) => viaBootstrap(examPrepKey(courseId), () => getExamPrep(courseId)); // P2
 
 /** The exam-prep page for a reader that does not draw it (the checklist): a fresh cached answer, else one request. */
 export function loadExamPrep(courseId: string): Promise<ExamPrepOut> {
@@ -71,6 +109,17 @@ export function putExamPrep(courseId: string, prep: ExamPrepOut): void {
 
 const progressKey = (courseId: string, days: ActivityDays) => `analytics:progress:${courseId}:${days}`;
 const activityKey = (courseId: string, days: ActivityDays) => `analytics:activity:${courseId}:${days}`;
+
+/** P2: the home's `/me/home` (asked on every mount, as before; from the bootstrap when it brought it). */
+export function loadHome(): Promise<HomeOut> {
+  return pageLoad(HOME_KEY, viaBootstrap(HOME_KEY, () => getHome()), HOME_CACHE);
+}
+
+/** P2: the home's streak strip (`my/activity?days=7`; from the bootstrap when it brought it). */
+export function loadHomeActivity(courseId: string): Promise<ActivityOut> {
+  const key = activityKey(courseId, HOME_ACTIVITY_DAYS);
+  return pageLoad(key, viaBootstrap(key, () => getActivity(courseId, HOME_ACTIVITY_DAYS)), ANALYTICS_CACHE);
+}
 
 /** Аналитика's two reads (a prefetch asked moments ago stands for them). */
 export function loadAnalytics(courseId: string, days: ActivityDays): Promise<[ProgressOut, ActivityOut]> {

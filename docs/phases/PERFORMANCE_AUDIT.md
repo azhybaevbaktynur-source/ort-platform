@@ -977,6 +977,33 @@ for 50 rows becomes ≈ 4. (3) `useBackendWarmup` calls `${API_BASE_URL}/auth/pi
 `curl -w` TTFB from Korea, 11 calls each, service awake: Render direct median **0.31 s** (0.29–1.40), Vercel rewrite
 median **0.51 s** (0.33–1.83).
 
+**P2 result (2026-11-12, branch of `lms` `b112c43`).** `GET /me/bootstrap?include=home&course=<id>` adds `home`
+(= `/me/home`), `exam_prep` and `activity` (= `/courses/{id}/exam-prep` and `/courses/{id}/my/activity?days=7`, keyed by
+the exam course id) for the exam course the device remembers (`ort_student_course`; not one of the student's exam
+courses or not an id: the first, as the shell picks it). The exam course passes the routes' own checks
+(`exam_prep.router._course`, which includes the activity route's; Student view: only the test student's own course, the
+allow-list's rule); a refusal leaves those two parts out and the page asks its routes. Only with `student` (people who
+teach, admins and the two-step gate get none of the three keys); without `include` the answer is unchanged (a wrap
+serializer leaves the keys out). Deviation from §10.2: the 7-day activity is included too, otherwise the streak strip
+keeps the home at depth 2. Frontend: the first bootstrap of a page load on `/courses` asks `include=home`
+(`bootstrap.ts`); the parts land in the home's own `swr` entries like a just-answered prefetch (`pageData.ts`
+`onBootstrapHome`), never in the cached bootstrap (its shape and session cache unchanged); `StudentHome` (`loadHome`),
+`ExamPrepHome` (`loadHomeActivity`, `useExamPrep`) wait for a running combined request instead of asking alone and ask
+alone when it did not carry their part; `reloadBootstrap` (join/leave, `meStale`) never includes the home (the home
+reads itself on the same signal). Measured: `perf-waterfall.spec.ts` on the seeded scratch backend, own builds of `lms`
+`b112c43` and P2, one run each — student home **cold laptop: API 5 → 2 (bootstrap + `/auth/me`), depth 2 → 1, first
+content 397 → 210 ms**; warm laptop API 4 → 1, depth 1; cold phone (Slow 4G, dominated by JS) API 5 → 2, depth 2 → 1, first
+content 8.95 → 8.68 s; warm phone API 4 → 1, first content 870 → 703 ms; no frame swap; other pages unchanged. Triage
+branch (worktree backend on 8132, a student with 5 enrolments and 2 exam courses, best of 3): before 4 requests in 2
+rounds, **56 statements** (bootstrap 21, home 17, exam-prep 11, activity 7), app time (`total − db`) 1,539 ms summed;
+after 1 request, **50 statements**, app 528 ms. Production estimate (3 ms per statement, 0.27 s proxy per round): ≈ 0.63 s
+→ ≈ 0.42 s for a cold home, three requests fewer. Real browser (Chrome, 375 and 1440 px, ru): cold `neutral → student`
+once, 2 API requests (one bootstrap); reload 1; skeletons only before content, none after it. Tests:
+`tests/lms/test_bootstrap.py` (parts equal the routes; 50 statements against the parts' 57 in its world, budget ≤ 50;
+remembered course; no exam course; test student; teacher/admin; two-step gate), e2e `student-home.spec.ts` "P2" (one
+bootstrap with `include=home`, no `/me/home`/`exam-prep`/`my/activity`, no chained request before first content, cold
+and reload; fails on `b112c43`).
+
 ### 10.5 Better ideas than the brief's
 
 1. **Measure production signed-in from the owner's browser, once, after P1–P3**: the owner opens the student home with

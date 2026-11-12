@@ -10,7 +10,8 @@ import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { KeyRound, LayoutGrid, Trophy } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
-import { getHome, listHomeCourses } from "@/lib/lms/home";
+import { listHomeCourses } from "@/lib/lms/home";
+import { loadHome } from "@/lib/lms/pageData"; // PERFORMANCE_AUDIT P2
 import type { HomeCourseOut, HomeOut } from "@/lib/lms/homeTypes";
 import { pickLocalized } from "@/lib/lms/localized";
 import { Badge, Button, EmptyState, ErrorState, LinkButton, Pagination, Skeleton } from "@/components/ui";
@@ -255,7 +256,7 @@ export function StudentHome() {
     setLoading(true);
     setError(null);
     try {
-      setData(await getHome());
+      setData(await loadHome()); // P2: from the shell's bootstrap on a fresh load of the home (one request)
     } catch (e) {
       setError(e);
     } finally {

@@ -14,26 +14,45 @@ per request; nothing is computed per row beyond what the parts already do.
 
 Student view (a test student): no invitations, no privacy state and no pass, as the routes it may not call.
 A platform admin who must set up two-step login (`mfa.gate.must_enroll`): `me` only, as the shell got before when every
-other part answered 403 `mfa_enrollment_required` (the gate opens this route only for that)."""
+other part answered 403 `mfa_enrollment_required` (the gate opens this route only for that).
+
+PERFORMANCE_AUDIT P2 (fix round 2026-11-12, §10.2 item 2): `?include=home` adds the student home's own reads, so a cold
+home is one request: `home` = `GET /me/home`, and for the home's exam course (`course`, the one this device remembers,
+when it is one of the student's exam-prep courses, else the first of them, as the shell picks it) `exam_prep` =
+`GET /courses/{id}/exam-prep` and `activity` = `GET /courses/{id}/my/activity?days=7`, behind the same checks as those
+routes. Only with `student` (never for people who teach, never under the two-step gate). A refusal of the exam course's
+part leaves that part out (the page asks its route and shows the route's answer); the home itself stays."""
 from __future__ import annotations
+
+import uuid
+from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from app.core.authz import AuthzContext, enrollment_role_resolver
 from app.lms.access import router as access_router
 from app.lms.access.schemas import MyAccessOut
 from app.lms.core import clock
+from app.lms.core.errors import LMSError
 from app.lms.courses.lesson_courses import LessonCourseOut, lesson_courses
 from app.lms.courses.models import Course
+from app.lms.exam_prep import router as exam_prep_router
+from app.lms.exam_prep import service as exam_prep_svc
+from app.lms.exam_prep.schemas import ExamPrepOut
 from app.lms.home import schemas as sch
 from app.lms.home import service as home_svc
 from app.lms.mfa import gate as mfa_gate
 from app.lms.privacy import service as privacy_svc
 from app.lms.privacy.schemas import NeedOut
+from app.lms.progress import service as progress_svc
+from app.lms.progress.schemas import ActivityOut
+from app.lms.student_view import allowlist as student_view_allowlist
 from app.lms.teachers import router as teachers_router
 from app.lms.teachers.schemas import MeOut
 from app.models.user import User
 
-_NS = {"MeOut": MeOut, "MyAccessOut": MyAccessOut, "LessonCourseOut": LessonCourseOut, "NeedOut": NeedOut}
+_NS = {"MeOut": MeOut, "MyAccessOut": MyAccessOut, "LessonCourseOut": LessonCourseOut, "NeedOut": NeedOut,
+       "ExamPrepOut": ExamPrepOut, "ActivityOut": ActivityOut}
 sch.PrivacyBannerOut.model_rebuild(_types_namespace=_NS)
 sch.BootstrapStudentOut.model_rebuild(_types_namespace=_NS)
 sch.BootstrapOut.model_rebuild(_types_namespace=_NS)
@@ -60,7 +79,36 @@ def _student(db: Session, user: User, test_student: bool) -> sch.BootstrapStuden
     return sch.BootstrapStudentOut(courses=page.items, access=access, lesson_courses=lessons)
 
 
-def bootstrap(db: Session, user: User) -> sch.BootstrapOut:
+def _parse_id(raw: Optional[str]) -> Optional[uuid.UUID]:
+    try:
+        return uuid.UUID(raw) if raw else None
+    except ValueError:
+        return None  # a stale or broken remembered id: the first exam course, as the shell does
+
+
+def _home(db: Session, user: User, student: sch.BootstrapStudentOut, course: Optional[str]) -> dict:
+    """PERFORMANCE_AUDIT P2: `/me/home` and the home exam course's exam-prep page and 7-day activity."""
+    parts: dict = {"home": home_svc.home(db, user), "exam_prep": {}, "activity": {}}
+    exams = [c.id for c in student.courses if c.student_layout == "exam_prep"]
+    wanted = _parse_id(course)
+    pick = wanted if wanted in exams else (exams[0] if exams else None)
+    if pick is None:
+        return parts
+    if getattr(user, "is_test_student", False) and pick != student_view_allowlist._own_course_id(db, user):
+        return parts  # Student view: course routes answer for the test student's own course only (the allow-list's rule)
+    ctx = AuthzContext(user, db, enrollment_role_resolver(db, user.id))
+    try:
+        # the checks of both routes: the exam-prep route's own (`_course`) include the activity route's (`_enrollment`)
+        exam = exam_prep_router._course(ctx, pick)
+    except LMSError:
+        return parts
+    now = clock.now()
+    parts["exam_prep"][str(pick)] = exam_prep_svc.page(db, exam, user.id, now=now)
+    parts["activity"][str(pick)] = progress_svc.activity(db, exam, user.id, days=sch.BOOTSTRAP_HOME_ACTIVITY_DAYS, now=now)
+    return parts
+
+
+def bootstrap(db: Session, user: User, *, include_home: bool = False, course: Optional[str] = None) -> sch.BootstrapOut:
     test_student = bool(getattr(user, "is_test_student", False))
     me = teachers_router._me(user)
     if mfa_gate.must_enroll(user):
@@ -68,9 +116,11 @@ def bootstrap(db: Session, user: User) -> sch.BootstrapOut:
     # owner decision 2026-11-12 (fix round 1e): people who teach have no Learning area, whatever student enrolments they
     # still have (the same rule as `hidesLearning` in frontend/src/lib/lms/shellKind.ts), so no student data for them
     learns_here = not _teaches(me)
+    student = _student(db, user, test_student) if learns_here else None
     return sch.BootstrapOut(
         me=me,
         pending_invitations=0 if test_student else home_svc._pending_invitations(db, user, clock.now()),
         privacy=None if test_student else _privacy(db, user),
-        student=_student(db, user, test_student) if learns_here else None,
+        student=student,
+        **(_home(db, user, student, course) if include_home and student is not None else {}),
     )

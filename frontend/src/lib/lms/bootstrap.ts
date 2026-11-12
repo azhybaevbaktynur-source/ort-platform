@@ -4,7 +4,9 @@ import type { PrivacyState } from "@/components/privacy/privacyApi";
 import type { MyAccessOut } from "./access";
 import { lmsFetch } from "./client";
 import type { LessonCourseOut } from "./courses";
-import type { HomeCourseOut } from "./homeTypes";
+import type { ExamPrepOut } from "./examPrep";
+import type { HomeCourseOut, HomeOut } from "./homeTypes";
+import type { ActivityOut } from "./progress";
 import { cached, markStale, peek, revalidate, type SwrOptions } from "./swr";
 import type { MeOut } from "./types";
 
@@ -14,6 +16,11 @@ import type { MeOut } from "./types";
  * `/me/invitations`, `/me/privacy` without `requests`, `/courses/{exam}/lesson-courses`), so the shapes stay the same.
  * Cached through `swr` (60 s, this tab's sessionStorage, per token); a join or leave asks it again (`meStale` ->
  * `reloadBootstrap`).
+ *
+ * PERFORMANCE_AUDIT P2 (fix round 2026-11-12): on the student home, the first bootstrap request of a page load asks
+ * `?include=home` as well: `/me/home` and the home exam course's exam-prep page and 7-day activity come in the same
+ * answer, so a cold home is one request. Those parts go to the home's own cache entries (`pageData.ts` takes them
+ * through `onBootstrapHome`), never into the cached bootstrap, whose shape stays the same for every other reader.
  */
 
 export interface BootstrapStudentOut {
@@ -37,7 +44,72 @@ export interface BootstrapOut {
 export const BOOTSTRAP_KEY = "bootstrap";
 export const BOOTSTRAP_OPTIONS: SwrOptions = { ttl: 60_000, storage: "session" };
 
-export const fetchBootstrap = () => lmsFetch<BootstrapOut>("/me/bootstrap");
+/** P2: the home's own reads, as `?include=home` adds them (only for a person the student shell is for). */
+export interface BootstrapHomeParts {
+  home: HomeOut;
+  /** Exam course id -> `GET /courses/{id}/exam-prep` (the home's exam course; empty without one). */
+  exam_prep: Record<string, ExamPrepOut>;
+  /** Exam course id -> `GET /courses/{id}/my/activity?days=7`. */
+  activity: Record<string, ActivityOut>;
+}
+
+type BootstrapWithHome = BootstrapOut & {
+  home?: HomeOut | null;
+  exam_prep?: Record<string, ExamPrepOut> | null;
+  activity?: Record<string, ActivityOut> | null;
+};
+
+let homeSink: ((parts: BootstrapHomeParts) => void) | null = null;
+/** `pageData.ts` receives the home's parts here (set once, when it loads). */
+export function onBootstrapHome(sink: (parts: BootstrapHomeParts) => void): void {
+  homeSink = sink;
+}
+
+// one combined request per page load, the first on the home (a client navigation back to the home asks its own reads)
+let homeAsked = false;
+let homeRequest: Promise<BootstrapOut> | null = null;
+// the exam course this device remembers (`useStudentShellData`'s CURRENT_KEY): the server takes it when it is one of
+// the student's exam courses, else the first, as the shell does
+const CURRENT_COURSE_KEY = "ort_student_course";
+
+function onHome(): boolean {
+  if (typeof window === "undefined") return false;
+  return /^\/(en|ky|ru)\/courses\/?$/.test(window.location.pathname);
+}
+
+function rememberedCourse(): string | undefined {
+  try { return window.localStorage.getItem(CURRENT_COURSE_KEY) ?? undefined; } catch { return undefined; }
+}
+
+function fetchBoot(withHome: boolean): Promise<BootstrapOut> {
+  if (!withHome) return lmsFetch<BootstrapOut>("/me/bootstrap");
+  homeAsked = true;
+  const p = lmsFetch<BootstrapWithHome>("/me/bootstrap", { params: { include: "home", course: rememberedCourse() } }).then((b) => {
+    const { home, exam_prep, activity, ...shell } = b;
+    if (home && homeSink) homeSink({ home, exam_prep: exam_prep ?? {}, activity: activity ?? {} });
+    return shell;
+  });
+  homeRequest = p;
+  const done = () => { if (homeRequest === p) homeRequest = null; };
+  p.then(done, done);
+  return p;
+}
+
+/** The shell's fetcher: on the home, the first request of this page load carries the home's reads too. */
+export const fetchBootstrap = () => fetchBoot(!homeAsked && onHome());
+
+/**
+ * P2: a running bootstrap that carries the home's reads, so the home waits for it instead of asking them alone; on the
+ * home, when this page load has not asked one yet, it asks it now (shared with the shell's request of the same key).
+ * Null when there is none to wait for.
+ */
+export function homeBootstrap(): Promise<BootstrapOut> | null {
+  if (homeRequest) return homeRequest;
+  if (homeAsked || !onHome()) return null;
+  const p = revalidate(BOOTSTRAP_KEY, () => fetchBoot(true), BOOTSTRAP_OPTIONS);
+  homeAsked = true; // a request without the home's reads was already running: the home asks its own after it
+  return homeRequest ?? p;
+}
 
 /** The bootstrap: cached at once when fresh, the cached one plus a background refresh when stale. */
 export const getBootstrap = () => cached(BOOTSTRAP_KEY, fetchBootstrap, BOOTSTRAP_OPTIONS);
@@ -48,7 +120,8 @@ export const getBootstrap = () => cached(BOOTSTRAP_KEY, fetchBootstrap, BOOTSTRA
  */
 export function reloadBootstrap(): Promise<BootstrapOut> {
   markStale(BOOTSTRAP_KEY);
-  return revalidate(BOOTSTRAP_KEY, fetchBootstrap, BOOTSTRAP_OPTIONS);
+  // P2: never with the home's reads: the home reads itself again on the same signal (`StudentHome`)
+  return revalidate(BOOTSTRAP_KEY, () => fetchBoot(false), BOOTSTRAP_OPTIONS);
 }
 
 /** The cached bootstrap (fresh or stale), read synchronously; null when none. */
