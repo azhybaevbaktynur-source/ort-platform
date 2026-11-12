@@ -8,6 +8,7 @@ import { useTranslation } from "@/lib/i18n/context";
 import { updateCourse } from "@/lib/lms/courses";
 import { cleanLocalized } from "@/lib/lms/localized";
 import { templateUi } from "@/lib/lms/templates";
+import { useLmsMe } from "@/lib/lms/useLmsMe";
 import type { CourseStaffOut, Lang, LocalizedText } from "@/lib/lms/types";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { LocalizedTextInput } from "@/components/lms/LocalizedTextInput";
@@ -26,6 +27,10 @@ export function GeneralSection({ course, onSaved }: { course: CourseStaffOut; on
   const [title, setTitle] = useState<LocalizedText>(course.title);
   const [description, setDescription] = useState<LocalizedText>(course.description ?? {});
   const s = useSave();
+  const { me } = useLmsMe();
+  const examPrep = templateUi(course).studentLayout === "exam_prep";
+  // Step 3a S1 (STUDENT_IA_DESIGN §6.1): the exam group and subject, platform admins on platform courses only
+  const canSetFamily = !!course.is_platform_course && !!me?.is_platform_admin;
 
   const changeLanguages = (ls: Lang[], d: Lang, from: Lang) => {
     setTitle((v) => moveSingleLanguageText(v, languages, from, d));
@@ -73,7 +78,7 @@ export function GeneralSection({ course, onSaved }: { course: CourseStaffOut; on
       </Card>
       {/* --- Phase 8a S4a: course home (locked on ORT with the template note) --- */}
       <CourseHomeSection course={course} />
-      {templateUi(course).studentLayout === "exam_prep" && <ExamDateSection course={course} />}
+      {(examPrep || canSetFamily) && <ExamDateSection course={course} showDate={examPrep} showFamily={canSetFamily} />}
     </SectionLayout>
   );
 }

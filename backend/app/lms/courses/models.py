@@ -99,6 +99,10 @@ class Course(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
         Uuid(as_uuid=True), ForeignKey("courses.id", ondelete="SET NULL", name="fk_courses_exam_course_id_courses"),
         nullable=True,
     )
+    # STUDENT_IA_DESIGN 6.1 (migration 0033): the exam a course prepares for and its subject; null family = «Другие
+    # курсы», null subject = the family's main course. Values: `courses.exam_families` (service-validated, no CHECK).
+    exam_family: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    subject: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
 
     __table_args__ = (
         CheckConstraint("grading_total_mode IN ('points','weighted')", name="grading_total_mode_valid"),
@@ -133,6 +137,7 @@ class Course(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
         Index("ix_courses_cover_asset_id", "cover_asset_id"),  # F7a
         Index("ix_courses_exam_course_id", "exam_course_id"),  # 0027
         CheckConstraint("exam_course_id IS NULL OR exam_course_id <> id", name="exam_course_not_self"),  # 0027
+        Index("ix_courses_exam_family_subject", "exam_family", "subject"),  # 0033
     )
 
 

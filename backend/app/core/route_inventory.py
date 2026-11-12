@@ -233,3 +233,11 @@ from app.lms.maintenance.router import MAINTENANCE_POLICIES  # noqa: E402
 
 ROUTE_POLICIES.update(MAINTENANCE_POLICIES)
 # --- Fix round 2026-11-12 D2 end ---
+
+# --- STUDENT_IA_DESIGN 6.3 begin --- (step 3a S1: the choose step; `GET /catalog/courses?exam=` keeps its row above)
+ROUTE_POLICIES.update({
+    ("GET", "/api/v1/catalog/exams"): "authenticated",  # listed open platform courses by exam family; teachers read it
+    # people who teach 403 `teacher_cannot_enroll`; test students 403; 5 a minute per user; joins through `_join`
+    ("POST", "/api/v1/catalog/choose"): "authenticated+ratelimit",
+})
+# --- STUDENT_IA_DESIGN 6.3 end ---

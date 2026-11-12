@@ -50,6 +50,7 @@ JOIN_USER_24H = Limit("join_user_24h", 30, 86400)
 JOIN_IP_FAIL_10M = Limit("join_ip_fail_10m", 60, 600, is_ip_rule=True)
 TEACHER_REQUEST_24H = Limit("teacher_request_24h", 3, 86400)
 STAFF_ADD_1H = Limit("staff_add_1h", 30, 3600)
+CATALOG_CHOOSE_1M = Limit("catalog_choose_1m", 5, 60)  # STUDENT_IA_DESIGN 6.3: `POST /catalog/choose`, per user
 
 
 def student_view_limit() -> Limit:

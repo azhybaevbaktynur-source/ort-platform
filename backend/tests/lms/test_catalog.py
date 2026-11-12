@@ -176,7 +176,8 @@ async def test_catalog_payload_is_an_allow_list(db, api):
     # Phase 9 S4: cards add the root organization, the active-form flag and the caller's own application
     assert CATALOG_CARD_KEYS == CATALOG_COURSE_KEYS | {
         "organization_id", "organization_name", "organization_display_name", "owner_display_name",
-        "is_platform_course", "has_active_form", "my_application"}
+        "is_platform_course", "has_active_form", "my_application",
+        "exam_family", "subject"}  # step 3a S1 (STUDENT_IA_DESIGN 6.1): the catalog's family chips and subjects
     r = await api.call(s, "GET", "/catalog/courses")
     body = r.json()
     assert all(set(i) == CATALOG_CARD_KEYS for i in body["items"])

@@ -67,8 +67,13 @@ def clear_goal(db: Session, enrollment_id: uuid.UUID) -> None:
 
 def visible_assessments(db: Session, course_id: uuid.UUID, user_id: str, now: datetime) -> dict[uuid.UUID, Assessment]:
     """Assessments with a final attempt of this student whose results the review page would show."""
+    return visible_assessments_in(db, [course_id], user_id, now)
+
+
+def visible_assessments_in(db: Session, course_ids: list, user_id: str, now: datetime) -> dict[uuid.UUID, Assessment]:
+    """`visible_assessments` over several courses (STUDENT_IA_DESIGN 6.2.3: the home's cross-course activity)."""
     ids = select(Attempt.assessment_id).where(
-        Attempt.user_id == user_id, Attempt.course_id == course_id,
+        Attempt.user_id == user_id, _in_courses(Attempt.course_id, course_ids),
         Attempt.status.in_(("graded", "needs_review")), Attempt.is_preview.is_(False)).distinct()
     rows = db.execute(select(Assessment).where(Assessment.id.in_(ids))).scalars().all()
     return {a.id: a for a in rows if results.assessment_results_visible(db, a, now)}
@@ -402,21 +407,35 @@ def _streaks(active_desc: list[date], today: date) -> tuple[int, int]:
     return current, longest
 
 
+def _in_courses(col, course_ids: list):
+    """`col = id` for one course (the course routes' statements stay as they were), `col IN (...)` for several."""
+    ids = list(course_ids)
+    return col == ids[0] if len(ids) == 1 else col.in_(ids)
+
+
 def activity(db: Session, course: Course, user_id: str, *, days: int, now: datetime) -> ActivityOut:
     """The caller's answers in the course (the one definition above), by `attempt_items.answered_at`. One statement
     (UNION ALL of the per-day, per-hour, session and all-time branches) after the visible-assessments read; every
     branch is grouped in SQL and bounded."""
+    return activity_in(db, [course.id], user_id, days=days, now=now)
+
+
+def activity_in(db: Session, course_ids: list, user_id: str, *, days: int, now: datetime) -> ActivityOut:
+    """`activity` over several courses (STUDENT_IA_DESIGN 6.2.3: the bootstrap's cross-course 7 days), the same
+    statements; no course, no statement."""
     check_days(days)
     if days is None:
         raise ValidationFailed("days must be one of 7, 30, 90, 365", code="invalid_days")
+    if not course_ids:
+        return _activity_out([], days, now)
     dialect = db.get_bind().dialect.name
     today, first, start = window(days, now)
     start7 = window(7, now)[2]
-    visible = list(visible_assessments(db, course.id, user_id, now))
+    visible = list(visible_assessments_in(db, course_ids, user_id, now))
     _prefer_item_index(db)
     a, i, qv, bq = _A, AttemptItem, QuestionVersion, BankQuestion
     shown = and_(final_attempt(a), a.c.assessment_id.in_(visible)) if visible else false()
-    mine = [a.c.user_id == user_id, a.c.course_id == course.id, shown, _answer(i)]
+    mine = [a.c.user_id == user_id, _in_courses(a.c.course_id, course_ids), shown, _answer(i)]
     # the gap of the first answer in the window uses the answer before it (same attempt)
     src = (select(i.answered_at.label("at"), i.attempt_id.label("aid"), bq.section.label("section"),
                   case((i.correctness == "correct", 1), else_=0).label("is_c"),
@@ -458,7 +477,11 @@ def activity(db: Session, course: Course, user_id: str, *, days: int, now: datet
           .where(*mine).group_by(yday).order_by(yday.desc()).limit(STREAK_SCAN_DAYS).subquery("y1"))
     heat = select(literal_column("'y'"), y1.c.day, ns, nh, y1.c.n, zero, zero, zero, zero, nt, nt)
     rows = db.execute(union_all(by_day, by_hour, sessions, heat)).all()
+    return _activity_out(rows, days, now)
 
+
+def _activity_out(rows, days: int, now: datetime) -> ActivityOut:
+    today, first, _ = window(days, now)
     out = ActivityOut(days_window=days)
     by_date = {first + timedelta(days=k): ActivityDay(date=first + timedelta(days=k)) for k in range(days)}
     seconds: dict[date, float] = {}

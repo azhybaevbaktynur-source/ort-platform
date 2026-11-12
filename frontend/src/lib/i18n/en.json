@@ -504,7 +504,12 @@
         "title": "Exam",
         "label": "Exam date",
         "hint": "Students see how many days are left. Leave it empty to hide the countdown.",
-        "clear": "Clear the date"
+        "clear": "Clear the date",
+        "familyLabel": "Exam group",
+        "familyNone": "None (other courses)",
+        "subjectLabel": "Subject",
+        "subjectMain": "Main course of the exam",
+        "familyHelp": "Students see the course in this exam's group: on the home page, in My courses and in the catalog."
       },
       "pageTitle": "Course settings",
       "sectionsLabel": "Settings sections",
@@ -7293,6 +7298,24 @@
         "retired_test_students": "Removed test students",
         "measure_storage": "Database size measured"
       }
+    }
+  },
+  "exam": {
+    "family": {
+      "ort": "ORT",
+      "nct": "NTC"
+    },
+    "subject": {
+      "math": "Mathematics",
+      "physics": "Physics",
+      "chemistry": "Chemistry",
+      "biology": "Biology",
+      "history": "History",
+      "geography": "Geography",
+      "kyrgyz": "Kyrgyz language",
+      "russian": "Russian language",
+      "english": "English",
+      "literature": "Literature"
     }
   }
 }

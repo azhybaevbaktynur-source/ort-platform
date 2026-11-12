@@ -415,7 +415,8 @@ async def test_student_layout_exam_prep_for_ort_general_for_teacher_course(db, a
 
 
 async def test_exam_prep_course_carries_menu_features(db, api):
-    """Student UI U9 (review item 5): the shell's menu reads `features` from the course list, exam-prep courses only."""
+    """Student UI U9 (review item 5): the shell's menu reads `features` from the course list; STUDENT_IA_DESIGN 6.2.1:
+    all six flags of `GET /courses/{id}`, for every course."""
     from tests.lms.modules_support import make_item, make_module
 
     ensure_platform_org(db.connection())
@@ -426,10 +427,12 @@ async def test_exam_prep_course_carries_menu_features(db, api):
     own = course(db, t)
     enroll(db, ort, s)
     enroll(db, own, s)
-    make_module(db, own, t)  # a general course never gets the field
+    make_module(db, own, t)  # a general course: a published module is its «Уроки»
     rows = {x["id"]: x for x in (await home(api, s))["courses"]}
-    assert rows[str(ort.id)]["features"] == {"modules": False, "practice": False}
-    assert rows[str(own.id)]["features"] is None
+    none = {"modules": False, "files": False, "announcements": False, "practice": False, "tests": False,
+            "hand_ins": False}
+    assert rows[str(ort.id)]["features"] == none
+    assert rows[str(own.id)]["features"] == {**none, "modules": True}
     m = make_module(db, ort, t)
     make_item(db, m)  # F5a: a header is not a lesson
     assert {x["id"]: x["features"] for x in (await home(api, s))["courses"]}[str(ort.id)]["modules"] is False
@@ -438,7 +441,8 @@ async def test_exam_prep_course_carries_menu_features(db, api):
     assessment(db, ort, t, is_practice=True)
     r = await api.call(s, "GET", "/me/home/courses")
     assert r.status_code == 200, r.text
-    assert {x["id"]: x["features"] for x in r.json()["items"]}[str(ort.id)] == {"modules": True, "practice": True}
+    assert {x["id"]: x["features"] for x in r.json()["items"]}[str(ort.id)] == {**none, "modules": True,
+                                                                                "practice": True}
 
 
 # ------------------------------------------------------------------ statement budget
@@ -482,7 +486,9 @@ async def test_statement_count_is_fixed(db, api):
         # Accounts: the caller's latest teacher request, one indexed statement;
         # Exam prep S2: the platform's open courses ("From the platform"), one statement
         # F7a: the course cards' cover, tests and lessons, one statement for the page
-        assert counts[name] <= 16, "\n".join(st[:120] for st in c.statements)
+        # STUDENT_IA_DESIGN 6.2.2 (3a S1): the cards' last results, one windowed statement (next step and features
+        # come from the statements above; the strip reads the cards' module scan)
+        assert counts[name] <= 17, "\n".join(st[:120] for st in c.statements)
     assert counts["small"] == counts["big"], counts
 
 
@@ -821,3 +827,154 @@ async def test_todo_is_limited_in_progress_kept_and_next_up_is_its_head(db, api)
     assert rows[0]["attempt_id"] is not None
     assert all(x["attempt_id"] is None for x in rows[1:])
     assert [x["assignment_id"] for x in body["next_up"]] == [x["assignment_id"] for x in rows[1:4]]
+
+
+# ------------------------------------------------------------------ step 3a S1 (STUDENT_IA_DESIGN 6.2.2): hub cards
+
+def _card(body, c):
+    return {x["id"]: x for x in body["courses"]}[str(c.id)]
+
+
+def _open_module(db, enr, m, state="unlocked"):
+    from app.lms.core.models import utcnow
+    from app.lms.modules.models import ModuleProgress
+
+    db.add(ModuleProgress(enrollment_id=enr.id, module_id=m.id, state=state, evaluated_rules_version=1,
+                          evaluated_at=utcnow()))
+    db.commit()
+
+
+async def test_card_next_step_order(db, api):
+    """Open attempt, else the course's `modules_next` row, else its first startable assignment, else the course."""
+    from app.lms.home.schemas import NEXT_STEP_KEYS
+    from tests.lms.modules_support import make_item, make_module, structure_world
+
+    w = structure_world(db)
+
+    async def step():
+        body = await home(api, w.S)
+        page = (await api.call(w.S, "GET", "/me/home/courses")).json()["items"]
+        assert {x["id"]: x["next_step"] for x in page}[w.cid] == _card(body, w.course)["next_step"]
+        return _card(body, w.course)["next_step"]
+
+    first = await step()
+    assert set(first) == NEXT_STEP_KEYS and first["kind"] == "open" and first["title"] is None
+    a, _ = assessment(db, w.course, w.O, title={"en": "Mock 1"})
+    s = await step()
+    assert (s["kind"], s["assignment_id"], s["assessment_id"], s["assignment_kind"], s["title"]) == (
+        "start", str(assignment_id_for(a.id)), str(a.id), "quiz", {"en": "Mock 1"})
+    m = make_module(db, w.course, w.O)
+    lesson = make_item(db, m, "https://example.com/lesson")
+    assert (await step())["kind"] == "start"  # no stored module state yet: the strip never evaluates
+    _open_module(db, w.enr, m)
+    s = await step()
+    assert (s["kind"], s["module_id"], s["item_id"], s["item_kind"]) == ("continue_lesson", str(m.id), str(lesson.id),
+                                                                         "url")
+    assert s["link"]["url"] == "https://example.com/lesson" and s["attempt_id"] is None
+    p, pv = assessment(db, w.course, w.O, is_practice=True)
+    make_attempt(db, p, pv, w.S, enrollment=w.enr, is_practice=True)  # practice is never resumed from the card
+    assert (await step())["kind"] == "continue_lesson"
+    b, bv = assessment(db, w.course, w.O, title={"en": "Mock 2"})
+    att = make_attempt(db, b, bv, w.S, enrollment=w.enr)
+    s = await step()
+    assert (s["kind"], s["attempt_id"], s["assessment_id"], s["title"]) == (
+        "resume_test", str(att.id), str(b.id), {"en": "Mock 2"})
+    # the other student of the course sees their own step
+    assert _card(await home(api, w.S2), w.course)["next_step"]["kind"] == "start"
+
+
+async def test_card_last_result_is_the_newest_released_one_per_course(db, api):
+    from app.lms.home.schemas import LAST_RESULT_KEYS
+
+    t = teacher(db)
+    s = make_user(db)
+    c = course(db, t, title="Main")
+    enr = enroll(db, c, s)
+    other = course(db, t, title="Other")
+    other_enr = enroll(db, other, s)
+    assert _card(await home(api, s), c)["last_result"] is None
+    a1, v1 = assessment(db, c, t)
+    grade_row(db, a1, v1, enr, s, 4)
+    a2, v2 = assessment(db, c, t)
+    grade_row(db, a2, v2, enr, s, 7)
+    a3, v3 = assessment(db, c, t)
+    grade_row(db, a3, v3, enr, s, 9, released=False)  # not released: not shown
+    b, bv = assessment(db, other, t)
+    grade_row(db, b, bv, other_enr, s, 2)
+    body = await home(api, s)
+    last = _card(body, c)["last_result"]
+    assert set(last) == LAST_RESULT_KEYS
+    same = next(r for r in body["latest_results"] if r["assessment_id"] == str(a2.id))
+    assert (Decimal(last["value"]), last["max_value"], last["label"], last["scheme_type"], last["at"]) == (
+        Decimal(same["display_value"]), same["max_value"], same["label"], same["scheme_type"], same["released_at"])
+    assert Decimal(last["value"]) == Decimal("70.00")
+    assert Decimal(_card(body, other)["last_result"]["value"]) == Decimal("20.00")
+    assert not (set(walk_keys(body)) & FORBIDDEN)
+    # a manual grade released later is the newest result
+    essay = hand_in_assignment(db, c, t, "text")
+    manual_grade(db, essay, enr, s)
+    assert _card(await home(api, s), c)["last_result"]["at"] > last["at"]
+
+
+async def test_card_exam_fields(db, api):
+    from datetime import date
+
+    from app.lms.exam_prep.layout import apply_exam_date
+
+    ensure_platform_org(db.connection())
+    db.commit()
+    t = teacher(db)
+    s = make_user(db)
+    ort = course(db, t, organization_id=platform_org_id(), template_key="ort", template_version=1,
+                 template_locked=True, exam_family="ort")
+    apply_exam_date(ort, date(2027, 5, 20))
+    math = course(db, t, organization_id=platform_org_id(), exam_family="ort", subject="math")
+    own = course(db, t)
+    db.commit()
+    for c in (ort, math, own):
+        enroll(db, c, s)
+    body = await home(api, s)
+    got = {k: (_card(body, c)["exam_family"], _card(body, c)["subject"], _card(body, c)["exam_date"])
+           for k, c in (("ort", ort), ("math", math), ("own", own))}
+    assert got == {"ort": ("ort", None, "2027-05-20"), "math": ("ort", "math", None), "own": (None, None, None)}
+    page = (await api.call(s, "GET", "/me/home/courses")).json()["items"]
+    assert [x for x in page if x["id"] == str(ort.id)][0]["exam_date"] == "2027-05-20"
+
+
+def _fill_cards(db, n_courses):
+    """Every course with an open module and a lesson, a running attempt and a released grade."""
+    from tests.lms.modules_support import make_item, make_module, structure_world
+
+    w = structure_world(db)
+    for i in range(n_courses):
+        c = w.course if i == 0 else course(db, w.O, title=f"C{i}")
+        enr = w.enr if i == 0 else enroll(db, c, w.S)
+        m = make_module(db, c, w.O)
+        make_item(db, m, f"https://example.com/{i}")
+        _open_module(db, enr, m, "started")
+        a, v = assessment(db, c, w.O)
+        grade_row(db, a, v, enr, w.S, 5)
+        b, bv = assessment(db, c, w.O)
+        make_attempt(db, b, bv, w.S, enrollment=enr)
+    return w.S
+
+
+async def test_card_additions_cost_no_statement_per_course(db, api):
+    """Next step, last result and features are read for the whole page at once: the same count for 1 and 8 courses,
+    on `/me/home` and `/me/home/courses`."""
+    small = _fill_cards(db, 1)
+    big = _fill_cards(db, 8)
+    counts = {}
+    for name, user in (("small", small), ("big", big)):
+        for path in ("/me/home", "/me/home/courses"):
+            await api.call(user, "GET", path)
+            with Counter() as c:
+                r = await api.call(user, "GET", path)
+            assert r.status_code == 200, r.text
+            counts[(name, path)] = len(c.statements)
+        body = await home(api, user)
+        assert all(x["next_step"]["kind"] == "resume_test" and x["last_result"] for x in body["courses"])
+    # /me/home: the 17 of `test_statement_count_is_fixed` + the open modules' items; the page: user, rows, next due and
+    # first assignment, progress, card extras, module scan + items, last results
+    assert counts[("small", "/me/home")] == counts[("big", "/me/home")] <= 18, counts
+    assert counts[("small", "/me/home/courses")] == counts[("big", "/me/home/courses")] <= 8, counts

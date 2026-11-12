@@ -2,9 +2,14 @@
 read assignments).
 
 Server-limited, no N+1: a fixed number of statements whatever the number of courses, assignments or attempts:
-1. courses page (max 10) + total (window count) + per-course `in_progress` (correlated EXISTS) + root organization;
-2. per-course `next_due_at` for that page (one grouped query; skipped without courses);
+1. courses page (max 10) + total (window count) + per-course `in_progress` (correlated EXISTS) + root organization
+   + the newest open attempt (`next_step` resume) + the six tab flags (`features`, correlated EXISTS);
+2. per-course `next_due_at` and first listable assignment (`next_step` start) for that page (one windowed query;
+   skipped without courses);
 2b. per-course module progress for that page (one grouped query over the stored caches; skipped without courses);
+2c. the page's course cards: cover, tests and lessons (one statement), the `modules_next` scan per course (two
+   statements, the second only with an open module; it also gives the home's strip) and the newest released result
+   per course (one windowed statement);
 3. in-progress attempts (max 3);
 4. listable assignments (max `TODO_MAX`; attempts left as a correlated count): `todo` and, its first 3 rows, next up;
 4b. in-progress attempts with their effective dates (max `TODO_MAX`): the head of `todo`;
@@ -30,7 +35,7 @@ from decimal import Decimal
 from typing import Optional
 
 from sqlalchemy import and_, case, exists, func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.core.config import settings
 from app.lms.accommodations.effective import MAX_ALLOWED_ATTEMPTS
@@ -45,7 +50,8 @@ from app.lms.courses import scopes as course_scopes
 from app.lms.courses.cover import NO_EXTRAS, card_extras  # F7a
 from app.lms.courses.models import Course
 from app.lms.courses.schemas import card_organization_name
-from app.lms.courses.service import paginate_rows
+from app.lms.courses.service import feature_columns, features_out, paginate_rows
+from app.lms.exam_prep.layout import exam_date_of
 from app.lms.enrollments.models import Enrollment
 from app.lms.grading.models import GradingSchemeVersion, Submission
 from app.lms.grading.schemes import label_subset, version_data_from_row
@@ -160,22 +166,35 @@ def _pro_locked(user_id: str, now: datetime):
                 ~active_pass_clause(user_id, now), ~preset_exempt, pro_only_assignment(Assignment.id))
 
 
-def _course_rows(uid: str):
+def _course_rows(uid: str, now: datetime):
     """The caller's student courses with everything a course card shows in one statement: rows of (Course, owner,
-    in_progress, org_name, org_kind)."""
+    in_progress, resume_attempt_id, resume_assessment_id, resume_title, the `feature_columns` flags, org_name,
+    org_kind). The resume columns: the caller's newest open (non-preview, non-practice) attempt of a live test of the
+    enrollment, one correlated subquery in the join (STUDENT_IA_DESIGN 6.2.2)."""
     in_progress = exists().where(Attempt.enrollment_id == Enrollment.id, Attempt.user_id == uid,
                                  Attempt.status == "in_progress", Attempt.is_preview.is_(False),
                                  Attempt.is_practice.is_(False))
+    open_a, open_x = aliased(Attempt, name="open_attempt"), aliased(Assessment, name="open_assessment")
+    resume_a, resume_x = aliased(Attempt, name="resume_attempt"), aliased(Assessment, name="resume_assessment")
+    newest = (select(open_a.id).join(open_x, open_x.id == open_a.assessment_id)
+              .where(open_a.enrollment_id == Enrollment.id, open_a.user_id == uid, open_a.status == "in_progress",
+                     open_a.is_preview.is_(False), open_a.is_practice.is_(False), open_x.deleted_at.is_(None))
+              .order_by(open_a.started_at.desc(), open_a.id.desc()).limit(1)
+              .correlate(Enrollment).scalar_subquery())
     return course_scopes.with_card_org(
-        select(Course, User.display_name.label("owner"), in_progress.label("in_progress"))
+        select(Course, User.display_name.label("owner"), in_progress.label("in_progress"),
+               resume_a.id.label("resume_attempt_id"), resume_a.assessment_id.label("resume_assessment_id"),
+               resume_x.title.label("resume_title"), *feature_columns(Course.id, now))
         .select_from(Enrollment).join(Course, Course.id == Enrollment.course_id)
         .join(User, User.id == Course.owner_id)
+        .outerjoin(resume_a, resume_a.id == newest)
+        .outerjoin(resume_x, resume_x.id == resume_a.assessment_id)
         .where(_mine(uid)))
 
 
-def _courses(db: Session, uid: str) -> tuple[list, int]:
+def _courses(db: Session, uid: str, now: datetime) -> tuple[list, int]:
     rows = db.execute(
-        _course_rows(uid).add_columns(func.count().over().label("total"))
+        _course_rows(uid, now).add_columns(func.count().over().label("total"))
         .order_by(Course.created_at.desc(), Course.id.desc()).limit(sch.COURSES_MAX)
     ).all()
     return rows, (rows[0].total if rows else 0)
@@ -226,67 +245,95 @@ def _progress(db: Session, uid: str, course_ids: list) -> dict:
     return {cid: (int(done), int(total)) for cid, done, total in rows}
 
 
-def _exam_features(db: Session, course_ids: list) -> dict:
-    """Student UI U9: course id -> (modules, practice) for the page's exam-prep courses, one statement (two correlated
-    EXISTS, the same rows `course_features` reads); none when the page has no exam-prep course."""
-    if not course_ids:
-        return {}
-    from app.lms.modules.service import lesson_exists
+def _next_step(r, pick, start) -> sch.HomeNextStepOut:
+    """STUDENT_IA_DESIGN 6.2.2, first that applies: the open attempt (course row), the course's `modules_next` row, its
+    first listable assignment (not Pro-locked), else the course page."""
+    if r.resume_attempt_id is not None:
+        return sch.HomeNextStepOut(kind="resume_test", title=r.resume_title, attempt_id=r.resume_attempt_id,
+                                   assessment_id=r.resume_assessment_id)
+    if pick is not None:
+        return sch.HomeNextStepOut(kind="continue_lesson", title=pick.title, module_id=pick.module_id,
+                                   item_id=pick.item_id, item_kind=pick.kind, link=pick.link, is_video=pick.is_video)
+    if start is not None:
+        return sch.HomeNextStepOut(kind="start", title=start.title, assignment_id=start.aid,
+                                   assignment_kind=start.kind, assessment_id=start.asid)
+    return sch.HomeNextStepOut(kind="open")
 
-    modules = lesson_exists(Course.id)  # F5a: at least one lesson (COURSE_LESSONS_DESIGN 3)
-    practice = exists().where(Assessment.course_id == Course.id, Assessment.deleted_at.is_(None),
-                              Assessment.status == "published", Assessment.is_practice.is_(True))
-    rows = db.execute(select(Course.id, modules, practice).where(Course.id.in_(course_ids))).all()
-    return {cid: (bool(m), bool(p)) for cid, m, p in rows}
 
-
-def _course_cards(db: Session, uid: str, rows: list, now: datetime) -> list[sch.HomeCourseOut]:
-    """One page of cards: the page's own statement plus one grouped statement each for next due and progress (and
-    the menu features of its exam-prep courses)."""
+def _course_cards(db: Session, uid: str, rows: list, now: datetime) -> tuple[list[sch.HomeCourseOut], list]:
+    """One page of cards and the `modules_next` rows of its courses (best first, one per course): the page's own
+    statement plus next due / first assignment, progress, card extras, the per-course module scan (one or two) and
+    the last results; never `exam_prep.page()` per course."""
     ids = [r[0].id for r in rows]
-    due = _next_due(db, uid, ids, now)
+    due = _due_and_start(db, uid, ids, now)
     progress = _progress(db, uid, ids)
-    features = _exam_features(db, [r[0].id for r in rows if is_exam_prep(r[0])])
     extras = card_extras(db, ids)  # F7a: cover, tests and lessons, one statement
+    picks = _modules_next(db, uid, course_ids=ids, max_out=len(ids)) if ids else []
+    pick_of = {p.course_id: p for p in picks}
+    last = _last_results(db, uid, ids, now)
     platform = platform_org_id()
     out = []
     for r in rows:
         c = r[0]
         done_total = progress.get(c.id)
         x = extras.get(c.id, NO_EXTRAS)
+        exam = is_exam_prep(c)
+        next_due, start = due.get(c.id, (None, None))
         out.append(sch.HomeCourseOut(
             id=c.id, title=c.title, description=c.description, languages=list(c.languages),
             default_language=c.default_language, owner_display_name=r.owner or "—",
             organization_display_name=card_organization_name(r.org_kind, r.org_name),
-            is_platform_course=c.organization_id == platform, next_due_at=due.get(c.id),
+            is_platform_course=c.organization_id == platform, next_due_at=next_due,
             in_progress=bool(r.in_progress),
             progress=sch.HomeProgressOut(done=done_total[0], total=done_total[1]) if done_total else None,
-            student_layout="exam_prep" if is_exam_prep(c) else "general",
-            features=sch.HomeCourseFeaturesOut(modules=features[c.id][0], practice=features[c.id][1])
-            if c.id in features else None,
+            student_layout="exam_prep" if exam else "general",
+            features=features_out(r, exam),
             cover_url=x.cover_url, tests_count=x.tests_count, lessons_count=x.lessons_count,
-            exam_course_id=c.exam_course_id))
-    return out
+            exam_course_id=c.exam_course_id,
+            exam_family=c.exam_family, subject=c.subject, exam_date=exam_date_of(c),
+            next_step=_next_step(r, pick_of.get(c.id), start), last_result=last.get(c.id)))
+    return out, picks
 
 
 def courses_page(db: Session, user: User, *, cursor: Optional[str] = None, limit: Optional[int] = None
                  ) -> PageOut[sch.HomeCourseOut]:
     """`GET /me/home/courses`: every student course of the caller, same order and same cards as `/me/home`."""
-    rows, nxt = paginate_rows(db, _course_rows(user.id), sort_col=Course.created_at, id_col=Course.id,
+    return courses_page_and_picks(db, user, cursor=cursor, limit=limit)[0]
+
+
+def courses_page_and_picks(db: Session, user: User, *, cursor: Optional[str] = None, limit: Optional[int] = None
+                           ) -> tuple[PageOut[sch.HomeCourseOut], list]:
+    """`courses_page` and the `modules_next` rows of its courses (the bootstrap hands both to `home`)."""
+    now = clock.now()
+    rows, nxt = paginate_rows(db, _course_rows(user.id, now), sort_col=Course.created_at, id_col=Course.id,
                               entity_of=lambda r: r[0], cursor=cursor, limit=limit)
-    return PageOut[sch.HomeCourseOut](items=_course_cards(db, user.id, rows, clock.now()), next_cursor=nxt)
+    cards, picks = _course_cards(db, user.id, rows, now)
+    return PageOut[sch.HomeCourseOut](items=cards, next_cursor=nxt), picks
 
 
-def _next_due(db: Session, uid: str, course_ids: list, now: datetime) -> dict:
+def _due_and_start(db: Session, uid: str, course_ids: list, now: datetime) -> dict:
+    """course id -> (next_due_at, first listable row or None), one windowed statement over `_listable` (the rows of
+    `next_up`, same order). `next_due_at`: the soonest effective due date still ahead, Pro-locked rows included (as
+    before); the first row: Pro-locked rows last, and none when every row is locked (`_listable_rows` skips them)."""
     if not course_ids:
         return {}
-    due = _eff_due()
-    rows = db.execute(
-        _assignments_of_mine(select(Assignment.course_id, func.min(due)))
-        .where(_mine(uid), Course.id.in_(course_ids), _listable(uid, now, _used(uid)), due > now)
-        .group_by(Assignment.course_id)
-    ).all()
-    return {cid: _utc(d) for cid, d in rows}
+    used = _used(uid)
+    due, until = _eff_due(), _eff_until()
+    locked = case((_pro_locked(uid, now), 1), else_=0)
+    rank = func.row_number().over(partition_by=Assignment.course_id,
+                                  order_by=(locked, due.is_(None), due, until.is_(None), until, Assignment.id))
+    ahead = func.min(case((due > now, due))).over(partition_by=Assignment.course_id)
+    ranked = (
+        _assignments_of_mine(select(Assignment.course_id.label("cid"), Assignment.id.label("aid"),
+                                    Assignment.kind.label("kind"), Assignment.assessment_id.label("asid"),
+                                    Assignment.title.label("title"), locked.label("locked"), ahead.label("ahead"),
+                                    rank.label("rn")))
+        .where(_mine(uid), Course.id.in_(course_ids), _listable(uid, now, used))
+    ).subquery()
+    out = {}
+    for r in db.execute(select(ranked).where(ranked.c.rn == 1)).all():
+        out[r.cid] = (_utc(r.ahead), None if r.locked else r)
+    return out
 
 
 def _in_progress(db: Session, uid: str) -> list[sch.HomeInProgressOut]:
@@ -372,10 +419,11 @@ def _ratio(raw, possible) -> Decimal:
     return Decimal(str(raw or 0)) / p if p > 0 else Decimal(0)
 
 
-def _latest_results(db: Session, uid: str, now: datetime) -> list[sch.HomeResultOut]:
-    # Quiz: same student gate as `/grades/mine` (`_student_state == "graded"`): graded + released + the assessment's
-    # results policy lets students see results now (`after_close`: window plus grace over, nothing in progress).
-    # Manual grades (none/text/file): graded + released on a published assignment.
+def _released_where(uid: str, now: datetime):
+    """The student gate of a released result (Submission, Enrollment, Course, Assignment and the quiz's Assessment
+    joined). Quiz: same gate as `/grades/mine` (`_student_state == "graded"`): graded + released + the assessment's
+    results policy lets students see results now (`after_close`: window plus grace over, nothing in progress). Manual
+    grades (none/text/file): graded + released on a published assignment."""
     open_any = exists().where(Attempt.assessment_id == Assessment.id, Attempt.status == "in_progress",
                               Attempt.is_preview.is_(False), Attempt.is_practice.is_(False))
     closed_before = now - timedelta(seconds=settings.ATTEMPT_GRACE_S)
@@ -385,18 +433,32 @@ def _latest_results(db: Session, uid: str, now: datetime) -> list[sch.HomeResult
     quiz = and_(Assignment.kind == "quiz", Assessment.deleted_at.is_(None), Assessment.status == "published",
                 visible)
     manual = and_(Assignment.kind != "quiz", Assignment.published.is_(True), Assignment.deleted_at.is_(None))
+    return and_(_mine(uid), Submission.user_id == uid, Submission.state == "graded",
+                Submission.released_at.isnot(None), or_(quiz, manual))
+
+
+def _released_from(stmt):
+    return (stmt.select_from(Submission).join(Enrollment, Enrollment.id == Submission.enrollment_id)
+            .join(Course, Course.id == Enrollment.course_id)
+            .join(Assignment, Assignment.id == Submission.assignment_id)
+            .outerjoin(Assessment, Assessment.id == Assignment.assessment_id))
+
+
+def _grade_value(display_value, version, effective_points):
+    """A grade without a scheme has points only: they are its value, so a zero still reads "0 / 10"."""
+    return display_value if display_value is not None or version is not None else effective_points
+
+
+def _latest_results(db: Session, uid: str, now: datetime) -> list[sch.HomeResultOut]:
     rows = db.execute(
-        select(Submission.assignment_id, Assignment.kind, Assignment.assessment_id, Submission.course_id,
-               Course.title, Assignment.title, Submission.display_value, Submission.label, GradingSchemeVersion.type,
-               Submission.released_at, Submission.kept_attempt_id, Submission.enrollment_id, GradingSchemeVersion,
-               Submission.points_possible, Submission.effective_points)
-        .select_from(Submission).join(Enrollment, Enrollment.id == Submission.enrollment_id)
-        .join(Course, Course.id == Enrollment.course_id)
-        .join(Assignment, Assignment.id == Submission.assignment_id)
-        .outerjoin(Assessment, Assessment.id == Assignment.assessment_id)
+        _released_from(
+            select(Submission.assignment_id, Assignment.kind, Assignment.assessment_id, Submission.course_id,
+                   Course.title, Assignment.title, Submission.display_value, Submission.label,
+                   GradingSchemeVersion.type, Submission.released_at, Submission.kept_attempt_id,
+                   Submission.enrollment_id, GradingSchemeVersion, Submission.points_possible,
+                   Submission.effective_points))
         .outerjoin(GradingSchemeVersion, GradingSchemeVersion.id == Submission.scheme_version_id)
-        .where(_mine(uid), Submission.user_id == uid, Submission.state == "graded",
-               Submission.released_at.isnot(None), or_(quiz, manual))
+        .where(_released_where(uid, now))
         .order_by(Submission.released_at.desc(), Submission.id.desc()).limit(sch.LATEST_RESULTS_MAX)
     ).all()
     if not rows:
@@ -421,14 +483,39 @@ def _latest_results(db: Session, uid: str, now: datetime) -> list[sch.HomeResult
 
     def result(r) -> sch.HomeResultOut:
         version = version_data_from_row(r[12]) if r[12] is not None else None
-        # a grade without a scheme has points only: they are its value, so a zero still reads "0 / 10"
-        value = r[6] if r[6] is not None or version is not None else r[14]
+        value = _grade_value(r[6], version, r[14])
         return sch.HomeResultOut(assignment_id=r[0], kind=r[1], assessment_id=r[2], course_id=r[3], course_title=r[4],
                                  title=r[5], display_value=value, label=r[7], labels=label_subset(version, r[7]),
                                  scheme_type=r[8], max_value=grade_max(r[8], r[13], version.scale_max if version else None),
                                  released_at=_utc(r[9]), kept_attempt_id=r[10], is_personal_best=best(r[2], r[10]))
 
     return [result(r) for r in rows]
+
+
+def _last_results(db: Session, uid: str, course_ids: list, now: datetime) -> dict:
+    """STUDENT_IA_DESIGN 6.2.2: course id -> the newest released result of the course (`latest_results`' gate and
+    values), one statement (row_number per course); skipped without courses."""
+    if not course_ids:
+        return {}
+    rank = func.row_number().over(partition_by=Submission.course_id,
+                                  order_by=(Submission.released_at.desc(), Submission.id.desc())).label("rn")
+    ranked = (_released_from(select(Submission.id.label("sid"), rank))
+              .where(_released_where(uid, now), Submission.course_id.in_(course_ids))).subquery()
+    rows = db.execute(
+        select(Submission.course_id, Submission.display_value, Submission.label, Submission.released_at,
+               Submission.points_possible, Submission.effective_points, GradingSchemeVersion)
+        .select_from(ranked).join(Submission, Submission.id == ranked.c.sid)
+        .outerjoin(GradingSchemeVersion, GradingSchemeVersion.id == Submission.scheme_version_id)
+        .where(ranked.c.rn == 1)
+    ).all()
+    out = {}
+    for cid, value, label, at, possible, points, row in rows:
+        version = version_data_from_row(row) if row is not None else None
+        kind = row.type if row is not None else None
+        out[cid] = sch.HomeLastResultOut(
+            value=_grade_value(value, version, points), label=label, labels=label_subset(version, label),
+            scheme_type=kind, max_value=grade_max(kind, possible, version.scale_max if version else None), at=_utc(at))
+    return out
 
 
 def _pending_invitations(db: Session, user: User, now: datetime) -> int:
@@ -572,18 +659,28 @@ def _modules_next(db: Session, uid: str, course_ids: Optional[list] = None,
 # --- Phase 8a S3 end ---
 
 
-def home(db: Session, user: User) -> sch.HomeOut:
+def home(db: Session, user: User, *, page: Optional[tuple[PageOut, list]] = None) -> sch.HomeOut:
+    """`page`: the caller's `courses_page_and_picks` read in the same request (the bootstrap) when it holds every
+    student course (no next page): the home's cards are its first `COURSES_MAX`, the same cards, so they are not read
+    twice. The "continue" strip (`modules_next`) is the best `MODULES_NEXT_MAX` of the cards' own rows (STUDENT_IA_DESIGN
+    6.2.2: the 10 newest courses, each scanned on its own)."""
     now = clock.now()
     uid = user.id
-    course_rows, total = _courses(db, uid)
-    courses = _course_cards(db, uid, course_rows, now)
+    if page is not None and page[0].next_cursor is None:
+        courses, picks = page[0].items[:sch.COURSES_MAX], page[1]
+        total = len(page[0].items)
+    else:
+        course_rows, total = _courses(db, uid, now)
+        courses, picks = _course_cards(db, uid, course_rows, now)
+    shown = {c.id for c in courses}
     listable = _listable_rows(db, uid, now)
     return sch.HomeOut(
         in_progress=_in_progress(db, uid), next_up=_next_up(listable), todo=_todo(db, uid, now, listable),
         latest_results=_latest_results(db, uid, now), courses=courses, courses_total=total,
         pending_invitations=_pending_invitations(db, user, now),
         # --- Phase 8a S3 begin ---
-        modules_next=_modules_next(db, uid), announcements=_announcements(db, uid),
+        modules_next=[p for p in picks if p.course_id in shown][:sch.MODULES_NEXT_MAX],
+        announcements=_announcements(db, uid),
         # --- Phase 8a S3 end ---
         pending_applications=_pending_applications(db, uid),  # Phase 9 S4
         teacher_application=_teacher_application(db, user, now),  # Accounts

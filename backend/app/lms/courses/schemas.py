@@ -29,6 +29,9 @@ class CourseFeaturesOut(BaseModel):
     files: bool = False
     announcements: bool = False
     practice: bool = False  # Phase 10 S0: a live, published practice quiz exists
+    # STUDENT_IA_DESIGN 6.2.1: the course space's «Тесты» and «Задания» tabs, for every course
+    tests: bool = False  # a published live test (exam-prep courses) or a visible quiz assignment (others)
+    hand_ins: bool = False  # a visible non-quiz assignment
 # --- Phase 8a S1 end ---
 
 
@@ -93,6 +96,10 @@ class CourseUpdateIn(BaseModel):
     # TEACHER_TO_STUDENT_MAP 2.2: platform admins only; a platform lesson course -> a platform exam-prep course;
     # null clears it (422 `exam_link_forbidden` / `exam_link_not_allowed` / `exam_link_target_invalid`)
     exam_course_id: Optional[uuid.UUID] = None
+    # STUDENT_IA_DESIGN 6.1: platform admins on platform courses only (422 `exam_family_forbidden`); values from
+    # `courses.exam_families` (422 `exam_family_invalid` / `subject_invalid`); a subject needs a family; null clears
+    exam_family: Optional[str] = Field(default=None, max_length=16)
+    subject: Optional[str] = Field(default=None, max_length=32)
 
 
 class TransferIn(BaseModel):
@@ -165,6 +172,8 @@ class CourseStudentOut(BaseModel):
     cover_url: Optional[str] = None  # F7a: the course page banner; null = generated default cover
     is_platform_course: bool = False  # F7: platform courses: default cover mark; cover editing for platform admins only
     exam_course_id: Optional[uuid.UUID] = None  # TEACHER_TO_STUDENT_MAP 2.3: the exam this lesson course belongs to
+    exam_family: Optional[str] = None  # STUDENT_IA_DESIGN 6.1: the exam group (null = «Другие курсы»)
+    subject: Optional[str] = None  # null = the family's main course
 
 
 class CourseStaffOut(CourseStudentOut):
@@ -212,6 +221,8 @@ class AdminCourseOut(BaseModel):
     cover_url: Optional[str] = None
     is_platform_course: Optional[bool] = None
     # --- F7b end ---
+    exam_family: Optional[str] = None  # STUDENT_IA_DESIGN 6.1
+    subject: Optional[str] = None
 
 
 # --- Phase 6 S2b begin --- (course template, PHASE_6_DESIGN 5.3)
@@ -266,6 +277,7 @@ def course_student_out(course, enrollment, owner, organization_name: str = "") -
         cover_url=_cover_url(course),  # F7a
         is_platform_course=_is_platform_course(course),  # F7
         exam_course_id=getattr(course, "exam_course_id", None),  # TEACHER_TO_STUDENT_MAP 2.3
+        exam_family=getattr(course, "exam_family", None), subject=getattr(course, "subject", None),  # 3a S1
     )
 
 
@@ -332,6 +344,7 @@ def admin_course_out(course, owner, active_student_count: int) -> AdminCourseOut
         visibility=course.visibility, enrollment_mode=course.enrollment_mode,
         unlisted_by_admin_at=course.unlisted_by_admin_at, active_student_count=active_student_count,
         created_at=course.created_at, deleted_at=course.deleted_at, deleted_by_id=course.deleted_by_id,
+        exam_family=course.exam_family, subject=course.subject,
     )
 
 

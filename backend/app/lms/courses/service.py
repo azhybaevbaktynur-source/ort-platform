@@ -186,6 +186,8 @@ def _resolve_creation(db: Session, actor: User, data: CourseCreateIn, organizati
             template_locked=True,
             template_settings={"language": data.default_language} if data.template_key == "ort" else {},
         )
+        if data.template_key == "ort":
+            template["exam_family"] = "ort"  # STUDENT_IA_DESIGN 6.1: as the 0033 backfill and `ort_course_fields`
     return org.id, owner, template
 # --- Phase 6 S1 end ---
 
@@ -294,6 +296,7 @@ def update_course(db: Session, ctx: AuthzContext, course: Course, data: CourseUp
         raise ValidationFailed("ends_at must be after starts_at")
 
     exam_link = _check_exam_link(db, ctx, course, fields)  # TEACHER_TO_STUDENT_MAP 2.2 (validates only)
+    family = _check_exam_family(db, ctx, course, fields, exam_link)  # STUDENT_IA_DESIGN 6.1 (validates only)
     _apply_home(db, course, fields)  # --- Phase 8a S3 --- (one line; validates before any field is set)
     # --- Exam prep S2 begin --- (the exam date of an exam-prep course; validated before any field is set)
     if "exam_date" in fields:
@@ -314,6 +317,8 @@ def update_course(db: Session, ctx: AuthzContext, course: Course, data: CourseUp
             setattr(course, key, fields[key])
     if exam_link is not _NO_LINK_CHANGE:
         course.exam_course_id = exam_link
+    if family is not _NO_LINK_CHANGE:
+        course.exam_family, course.subject = family
     db.commit()
     return course
 
@@ -346,6 +351,43 @@ def _check_exam_link(db: Session, ctx: AuthzContext, course: Course, fields: dic
         raise ValidationFailed("The exam course is not valid", code="exam_link_target_invalid")
     return target_id
 # --- TEACHER_TO_STUDENT_MAP 2.2 end ---
+
+
+# --- STUDENT_IA_DESIGN 6.1 begin --- (exam family and subject: grouping only; `is_exam_prep` still drives the header)
+def _check_exam_family(db: Session, ctx: AuthzContext, course: Course, fields: dict, exam_link):
+    """The new `(exam_family, subject)` or `_NO_LINK_CHANGE`. Sending the current values is a no-op (no check), like
+    the exam link. Otherwise 422 unless: the caller is a platform admin and the course a platform course
+    (`exam_family_forbidden`); the family is null or in `FAMILIES` (`exam_family_invalid`); the subject is null or in
+    `SUBJECTS` and has a family (`subject_invalid`). A new exam link (`exam_link`, a target id) gives a course without a
+    family the target's family when this request names none."""
+    from app.lms.courses import exam_families as reg
+
+    family = fields.get("exam_family", course.exam_family)
+    subject = fields.get("subject", course.subject)
+    if (family, subject) != (course.exam_family, course.subject):
+        if not getattr(ctx.user, "is_platform_admin", False) or not _platform_course(db, course):
+            raise ValidationFailed("Only a platform administrator sets the exam of a platform course",
+                                   code=reg.E_FAMILY_FORBIDDEN)
+        if family is not None and family not in reg.FAMILIES:
+            raise ValidationFailed("Unknown exam family", code=reg.E_FAMILY_INVALID,
+                                   details=[{"loc": ["exam_family"], "msg": reg.E_FAMILY_INVALID}])
+        if subject is not None and (subject not in reg.SUBJECTS or family is None):
+            raise ValidationFailed("Unknown subject, or a subject without an exam family", code=reg.E_SUBJECT_INVALID,
+                                   details=[{"loc": ["subject"], "msg": reg.E_SUBJECT_INVALID}])
+        return family, subject
+    if exam_link is not _NO_LINK_CHANGE and exam_link is not None and course.exam_family is None \
+            and "exam_family" not in fields:
+        target = db.get(Course, exam_link)  # read by `_check_exam_link` already: in the session
+        if target is not None and target.exam_family is not None:
+            return target.exam_family, course.subject
+    return _NO_LINK_CHANGE
+
+
+def _platform_course(db: Session, course: Course) -> bool:
+    from app.lms.modules.service import is_platform_course
+
+    return is_platform_course(db, course)
+# --- STUDENT_IA_DESIGN 6.1 end ---
 
 
 # --- Phase 9 S1 begin --- (PHASE_9_DESIGN 4.6, invariant 9: enrollment mode rules)
@@ -418,33 +460,60 @@ def _apply_home(db: Session, course: Course, fields: dict) -> None:
 
 
 def course_features(db: Session, course: Course):
-    """Which student tabs have published content (design 8.2): three EXISTS over published, live rows."""
+    """Which student tabs have published content (design 8.2; STUDENT_IA_DESIGN 6.2.1): one statement of EXISTS over
+    published, live rows (`feature_columns`), for every course."""
+    from app.lms.courses.schemas import CourseFeaturesOut
+    from app.lms.exam_prep.layout import is_exam_prep
+
+    row = db.execute(select(*feature_columns(Course.id, utcnow())).where(Course.id == course.id)).one()
+    return features_out(row, is_exam_prep(course))
+
+
+def feature_columns(course_id, now: datetime) -> list:
+    """The EXISTS behind `CourseFeaturesOut`, correlated on `course_id` (a column, so one statement serves a page of
+    courses): lessons, modules, files, announcements, practice, exam tests, quiz assignments, hand-ins. `features_out`
+    picks the exam-prep or the general variant of «Уроки» and «Тесты» (the template decides, in Python)."""
     from sqlalchemy import exists
 
     from app.lms.announcements.models import Announcement
     from app.lms.assessments.models import Assessment
+    from app.lms.assignments.models import Assignment
+    from app.lms.assignments.scopes import visible_condition
     from app.lms.course_files.models import CourseFile
-    from app.lms.courses.schemas import CourseFeaturesOut
-    from app.lms.exam_prep.layout import is_exam_prep
+    from app.lms.exam_prep.service import _visible_test
     from app.lms.modules.models import CourseModule
     from app.lms.modules.service import lesson_exists
 
-    now = utcnow()
-    # F5a (COURSE_LESSONS_DESIGN 3, L7): an exam-prep course's "Уроки" entry needs at least one lesson; teacher
-    # courses keep the 8a rule (a published live module)
-    modules = lesson_exists(course.id) if is_exam_prep(course) else exists().where(
-        CourseModule.course_id == course.id, CourseModule.deleted_at.is_(None), CourseModule.published.is_(True))
-    row = db.execute(select(
-        modules,
-        exists().where(CourseFile.course_id == course.id, CourseFile.deleted_at.is_(None),
-                       CourseFile.published.is_(True)),
-        exists().where(Announcement.course_id == course.id, Announcement.deleted_at.is_(None),
-                       Announcement.published_at.isnot(None), Announcement.published_at <= now),
-        exists().where(Assessment.course_id == course.id, Assessment.deleted_at.is_(None),
-                       Assessment.status == "published", Assessment.is_practice.is_(True)),
-    )).one()
-    return CourseFeaturesOut(modules=bool(row[0]), files=bool(row[1]), announcements=bool(row[2]),
-                             practice=bool(row[3]))
+    return [
+        # F5a (COURSE_LESSONS_DESIGN 3, L7): an exam-prep course's "Уроки" entry needs at least one lesson; teacher
+        # courses keep the 8a rule (a published live module)
+        lesson_exists(course_id).label("f_lessons"),
+        exists().where(CourseModule.course_id == course_id, CourseModule.deleted_at.is_(None),
+                       CourseModule.published.is_(True)).label("f_modules"),
+        exists().where(CourseFile.course_id == course_id, CourseFile.deleted_at.is_(None),
+                       CourseFile.published.is_(True)).label("f_files"),
+        exists().where(Announcement.course_id == course_id, Announcement.deleted_at.is_(None),
+                       Announcement.published_at.isnot(None), Announcement.published_at <= now).label("f_news"),
+        exists().where(Assessment.course_id == course_id, Assessment.deleted_at.is_(None),
+                       Assessment.status == "published", Assessment.is_practice.is_(True)).label("f_practice"),
+        # exam-prep courses: the student's test list (`exam_prep._visible_test`); others: the assignments list's quizzes
+        # (practice quizzes are mirrored too: they are `practice`, not tests)
+        exists().where(_visible_test(course_id)).label("f_exam_tests"),
+        exists().where(Assignment.course_id == course_id, Assignment.kind == "quiz", visible_condition(),
+                       Assessment.id == Assignment.assessment_id, Assessment.is_practice.is_(False)
+                       ).label("f_quizzes"),
+        exists().where(Assignment.course_id == course_id, Assignment.kind != "quiz", visible_condition()
+                       ).label("f_hand_ins"),
+    ]
+
+
+def features_out(row, exam_prep: bool):
+    from app.lms.courses.schemas import CourseFeaturesOut
+
+    return CourseFeaturesOut(
+        modules=bool(row.f_lessons if exam_prep else row.f_modules), files=bool(row.f_files),
+        announcements=bool(row.f_news), practice=bool(row.f_practice),
+        tests=bool(row.f_exam_tests if exam_prep else row.f_quizzes), hand_ins=bool(row.f_hand_ins))
 # --- Phase 8a S3 end ---
 
 
