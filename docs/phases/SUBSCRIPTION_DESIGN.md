@@ -281,8 +281,8 @@ Student view are never locked. ORT unchanged." The reference app is not named.
 4. **Outside modules stays free**; the editor's "Unsorted" group hint says "Материалы вне модулей открыты всем".
 5. **Never locked:** staff roles, platform/org admins, test students (Student view), `GET /modules/progress/{eid}`
    for staff, template sample previews (staff only), ORT preset exams (`_ort_exempt`), non-platform courses.
-6. **ORT unchanged:** the ORT courses have no modules with lessons; `ort_main` is exempt; the player, import and
-   scoring are untouched; parity gate as always.
+6. **ORT exam rules fixed** (rule of 2026-11-12): the ORT courses have no modules with lessons today; `ort_main` is exempt; the player, import and
+   scoring are untouched; parity tests as always.
 
 ### 12.4 Backend changes (small)
 - `access/service.offer()`: `includes = ["tests", ("practice"), "courses"]` (`lessons` dropped; the frontend maps

@@ -9,7 +9,9 @@ import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
 import { fmtApiDate } from "@/lib/format";
 import { getAccessOverview, type AccessOverviewOut, type AccessTier, type BatchOut } from "@/lib/lms/access";
-import { Badge, Card, Skeleton, cn, focusRing } from "@/components/ui";
+import type { LmsApiError } from "@/lib/lms/client";
+import { lmsErrorKey } from "@/components/lms/ErrorMessage";
+import { Badge, Card, ErrorState, Skeleton, cn, focusRing } from "@/components/ui";
 
 export function TierBadge({ tier }: { tier: AccessTier }) {
   const { t } = useTranslation();
@@ -18,11 +20,15 @@ export function TierBadge({ tier }: { tier: AccessTier }) {
 
 export function useAccessOverview(enabled = true) {
   const [data, setData] = useState<AccessOverviewOut | null>(null);
+  // FIX_ROUND_2026-11-12 1a: the failure is kept (an inline error with a retry, not an endless skeleton) and never
+  // clears an answer already loaded
+  const [error, setError] = useState<LmsApiError | null>(null);
   const load = useCallback(async () => {
-    try { setData(await getAccessOverview()); } catch { setData(null); }
+    setError(null);
+    try { setData(await getAccessOverview()); } catch (e) { setError(e as LmsApiError); }
   }, []);
   useEffect(() => { if (enabled) void load(); }, [enabled, load]);
-  return { data, reload: load };
+  return { data, error, reload: load };
 }
 
 export function RevealAlert({ count, className }: { count: number; className?: string }) {
@@ -39,13 +45,16 @@ export function RevealAlert({ count, className }: { count: number; className?: s
 }
 
 /** Exams of platform courses published in the last 14 days, with their tier (design 7.7). */
-export function RecentExamsCard({ data, compact = false, className }: { data: AccessOverviewOut | null; compact?: boolean; className?: string }) {
+export function RecentExamsCard({ data, error, onRetry, compact = false, className }: {
+  data: AccessOverviewOut | null; error?: { code?: string } | null; onRetry?: () => void; compact?: boolean; className?: string;
+}) {
   const { lang, t } = useTranslation();
   const manage = `/${lang}/admin/access/exams`;
   return (
-    <Card className={className} title={t("access.admin.recent.title")} description={t("access.admin.recent.hint")}
+    <Card className={className} data-testid="recent-exams" title={t("access.admin.recent.title")} description={t("access.admin.recent.hint")}
       actions={compact ? <Link href={manage} className={cn("inline-flex min-h-11 items-center text-sm font-medium text-brand-700 hover:underline sm:min-h-0", focusRing)}>{t("access.admin.recent.manage")}</Link> : undefined}>
-      {!data ? <Skeleton className="h-6 w-2/3" /> : data.recent_exams.length === 0 ? (
+      {!data && error ? <ErrorState variant="inline" message={t(lmsErrorKey(error.code))} onRetry={onRetry} />
+        : !data ? <Skeleton className="h-6 w-2/3" /> : data.recent_exams.length === 0 ? (
         <p className="text-sm text-slate-600">{t("access.admin.recent.empty")}</p>
       ) : (
         <ul className="divide-y divide-slate-100">

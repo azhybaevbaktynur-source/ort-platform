@@ -186,7 +186,9 @@ Accepted deviations from the design:
 
 Source: the owner's written answers of 2026-10-24 (verbatim copy kept by the orchestrator). The owner says these ideas are not final: where the agents see a simpler, cheaper or safer option, it goes into "Alternatives to discuss" (`IMPLEMENTATION_PLAN.md`, end of file, and the Phase 6 design), never silently applied; the owner decides. Order of work: review the whole plan (done in this update), then UX guidelines and audit, then the Phase 6 design, then stop for the owner's review. No feature code before that review.
 
-### A. ORT must not change (hard rule for every phase)
+### A. ORT must not change (hard rule for every phase), superseded 2026-11-12
+
+> **Superseded** by the owner's rule of 2026-11-12 (section "Owner rule 2026-11-12: ORT exam rules fixed, ORT is a normal course" at the end of this file). Only the exam rules, scoring and import format below stay fixed; the interface parts no longer apply.
 
 | Topic | Decision |
 |---|---|
@@ -573,7 +575,7 @@ Owner 2026-11-06: OK to delete `backup-2026-11-01-before-phase9`; deleted (8/10 
 ## Owner 2026-11-06/07: student area redesign (`phases/STUDENT_UI_DESIGN.md`, review `phases/STUDENT_UI_REVIEW.md`)
 Owner: the student dashboard was dull; take the layout and design language of a reference exam-prep app the owner chose (screenshots kept locally, git-excluded; its name, logo, mascot and illustrations are not used). Not every reference feature: daily questions, study planner, credits, question rush and vocab are not built.
 Owner chose the palette "Sky and teal" (teal sidebar, sky page, blue primary, gold unlock). Owner 2026-11-07: colours must be harmonious, so the violet accent was removed: one blue primary, gold the only accent. Owner: it must feel like one natural product, so a coherence review (Fable) followed and its 12 MUST items were done.
-Agent: the new frame applies only to the student (learning) area; teacher, organization and platform areas keep `AppHeader`; the ORT lobby, player and result keep their frame and font (pixel baselines unchanged). Mistakes live only on «Сохранённые» (tab «Ошибки»). Platform courses stay on the home as a compact «От платформы» row (owner decision of 2026-11-06). Defaults until the owner says otherwise: D8 analytics free, D9 video lessons free, D10 videos as unlisted YouTube (or Vimeo) embeds, loaded only after a tap. No database migration.
+Agent: the new frame applies only to the student (learning) area; teacher, organization and platform areas keep `AppHeader`; the ORT lobby, player and result keep their frame and font (pixel baselines unchanged) (superseded 2026-11-12: ORT uses the normal student course interface). Mistakes live only on «Сохранённые» (tab «Ошибки»). Platform courses stay on the home as a compact «От платформы» row (owner decision of 2026-11-06). Defaults until the owner says otherwise: D8 analytics free, D9 video lessons free, D10 videos as unlisted YouTube (or Vimeo) embeds, loaded only after a tap. No database migration.
 Owner 2026-11-07: "you can delete not-required Neon branches if you need" — the agent may delete old Neon backup branches (oldest first) to make room for a backup before a migration; record each deletion here.
 Owner 2026-11-07 (problems 5/6): prices and the exam-season end are not decided yet (Pro page shows them only when the admin sets them; plans without a price show "уточняйте"); refunds on cancel left for later; the Pro switch on modules only in platform courses; tests count toward course progress. Sidebar label for lessons: «Уроки» (agent default).
 Agent 2026-11-07 (problem 2, owner decision replacing STUDENT_UI_DESIGN §2.4): the ORT lobby, result and review render inside the student shell; the player is full-screen with the student tokens and font; ORT behaviour unchanged (player, grading, attempts, ort, importers untouched; behaviour suites green); 37 student ORT baselines re-approved (before/after in `phases/STUDENT_UI_FIX_screens/ort-review/`). «Незачёт»/«Идёт в зачёт» hidden for exam-prep students in the presentation layer only (no grading change). Accepted: teacher-course students' result column follows the student frame width (1200 px instead of 1152 px).
@@ -640,3 +642,12 @@ Agent 2026-11-09 (security review fixes, design section 11):
 - Item 5 (`phases/INFRA_PANEL_DESIGN.md`): Админ-панель → Система → Сервисы; provider keys backend-only (names in `backend/.env.example`); snapshots cached in `infra_snapshots` (20 min), manual refresh 6/h audited `infra.refresh`; Cloudflare GraphQL is the R2 display source, our counter stays the upload guard; costs are static rows mirroring `COSTS.md` with a drift test.
 - 2026-11-09: Neon backup branch `backup-2026-11-09-before-identities-infra-0031` (br-still-dew-b2zb7r1p) before deploying 0029 + 0031; Neon 5/10 branches. Deployed main 09741b3; Render /health 09741b3, Vercel SW 09741b32fcad, Neon head 0031_infra verified.
 - Follow-up: `tests/lms/test_submissions.py::test_release_chunks` failed once in CI on Postgres (4 released of 5); 26 local PG runs pass; code unchanged this round; investigate `_release_chunks` ordering later.
+
+## Owner rule 2026-11-12: ORT exam rules fixed, ORT is a normal course
+
+Replaces "ORT must not change" (2026-10-24, section A above, and its second round) everywhere.
+
+- **Fixed:** the ORT exam rules only: section order and timers, forward-only sections, ORT scoring (scaled score, percentile, golden certificate) and the ORT CSV/zip import format. Their tests stay and must pass (importer parity, scoring parity, exam-rule e2e).
+- **Must change:** ORT is no longer a separate interface. Test-taking and course-taking are one platform with one student interface: an ORT course is a course that contains tests and lessons, shown with the same navigation, layout and course pages as any other course. ORT pages, navigation, layout and placement may all change to achieve this. ORT screenshot baselines are re-approved when a layout change is deliberate.
+- Round plan and triage: `phases/FIX_ROUND_2026-11-12.md`.
+

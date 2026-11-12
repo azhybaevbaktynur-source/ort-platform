@@ -328,7 +328,7 @@ export const LMS_ERROR_CODES = [
   "limit_below_current", "unlisted_by_admin", "invalid_transition", "has_students", "not_deleted",
   "already_deleted", "title_required", "already_teacher", "request_pending", "not_pending",
   "cannot_disable_self", "cannot_disable_admin", "platform_admin_required", "validation_failed",
-  "invalid_cursor", "account_disabled", "network", "unknown",
+  "invalid_cursor", "account_disabled", "network", "server_starting", "unknown",
   "bank_not_found", "question_not_found", "passage_not_found", "version_not_found",
   "asset_not_found", "version_conflict", "invalid_question_data", "unsupported_type",
   "asset_not_usable", "image_invalid", "image_too_large", "image_too_many_pixels",

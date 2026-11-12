@@ -637,6 +637,23 @@ async def test_the_admin_health_check(db):
     assert (await call("GET", "/platform/health", token_for(student))).status_code == 403
 
 
+async def test_the_admin_health_answers_when_services_are_down_or_not_connected(db, monkeypatch):
+    # FIX_ROUND_2026-11-12 1a: no e-mail provider and R2 storage without keys is an answer the overview can show
+    # (200, each check ok: false), never an exception
+    admin = admin_account(db)
+    for name in ("EMAIL_PROVIDER", "RESEND_API_KEY", "BREVO_API_KEY", "SMTP_SERVER", "SMTP_USER", "SMTP_PASSWORD",
+                 "R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET", "R2_PRIVATE_BUCKET"):
+        monkeypatch.setattr(settings, name, "")
+    monkeypatch.setattr(settings, "LMS_STORAGE_DRIVER", "r2")
+    res = await call("GET", "/platform/health", token_for(admin))
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["ok"] is False
+    assert body["email"] == {"ok": False, "provider": "console", "configured": False}
+    assert body["storage"] == {"ok": False, "driver": "r2", "r2_configured": False}
+    assert body["database"]["ok"] is True
+
+
 async def test_the_public_health_never_touches_the_database():
     seen = []
 
