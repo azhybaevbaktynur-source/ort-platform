@@ -218,18 +218,20 @@ test.describe("teacher builds a lesson course, the student sees each step (ru)",
     const thirdParty: string[] = [];
     sp.context().on("request", (r: Request) => { if (THIRD_PARTY.test(new URL(r.url()).hostname)) thirdParty.push(r.url()); });
     const nav = sp.getByRole("navigation", { name: t("student.nav.label") }).first();
-    const homeLessons = sp.locator('section[aria-labelledby="home-lesson-courses"]');
+    // step 3a S3: lesson courses not joined are listed in the exam's Уроки tab; joined ones are cards of the exam's
+    // group on the hub and rows of the sidebar's «Мои курсы»
+    const examLessons = sp.locator('section[aria-labelledby="lesson-courses"]');
+    const hubCard = sp.locator('section[aria-labelledby="group-ort"] li').filter({ has: sp.locator(`a[href="${base}"]`) });
     try {
       // ---- 01 the course exists (a draft, no link): nothing for the student yet
       await tp.goto(base);
       await expect(tp.getByRole("heading", { level: 1, name: COURSE })).toBeVisible();
       await expect(tp.getByText(t("modules.editor.emptyTitle"))).toBeVisible();
       await teacherShot(tp, "01-create-course");
-      await sp.goto(`/${L}/courses`);
+      await sp.goto(`/${L}/home`);
       await expect(sp.getByRole("heading", { level: 1 })).toBeVisible();
-      await expect(nav.getByRole("link", { name: t("student.nav.tests"), exact: true })).toBeVisible();
+      await expect(nav.locator(`a[href^="/${L}/courses/${exam}"]`)).toBeVisible(); // the exam's «Мои курсы» row
       await expect(nav.getByRole("link", { name: COURSE })).toHaveCount(0);
-      await expect(homeLessons).toHaveCount(0);
       await expect(sp.locator("main#main").getByText(COURSE)).toHaveCount(0);
       await studentShot(sp, "01-create-course");
 
@@ -255,14 +257,13 @@ test.describe("teacher builds a lesson course, the student sees each step (ru)",
       await select.locator("xpath=ancestor::div[contains(@class,'space-y-2')][1]").getByRole("button", { name: t("common.save") }).click();
       await expect.poll(async () => (await api(admin, "GET", `/courses/${lc}`)).exam_course_id).toBe(exam);
       await teacherShot(tp, "02-publish-course");
-      // the student: a УРОКИ row and a «Уроки» card, both to the catalog landing (not joined: no ring, no strip)
-      await sp.goto(`/${L}/courses`);
-      await expect(nav.getByRole("link", { name: COURSE })).toHaveAttribute("href", `/${L}/courses/catalog/${lc}`);
-      await expect(homeLessons.getByRole("link", { name: COURSE })).toHaveAttribute("href", `/${L}/courses/catalog/${lc}`);
-      for (const other of ['section[aria-labelledby="home-platform"]', 'section[aria-labelledby="home-other-courses"]']) {
-        await expect(sp.locator(other).getByText(COURSE)).toHaveCount(0);
-      }
-      await expect(sp.locator('section[aria-labelledby="home-continue"]')).toHaveCount(0);
+      // the student (step 3a S3): not joined, so no sidebar row and no hub card; a card in the exam's Уроки tab, to the
+      // catalog landing
+      await sp.goto(`/${L}/home`);
+      await expect(nav.getByRole("link", { name: COURSE })).toHaveCount(0);
+      await expect(sp.locator("main#main").getByText(COURSE)).toHaveCount(0);
+      await sp.goto(`/${L}/courses/${exam}/lessons`);
+      await expect(examLessons.getByRole("link", { name: COURSE }).first()).toHaveAttribute("href", `/${L}/courses/catalog/${lc}`);
       await studentShot(sp, "02-publish-course");
 
       // ---- 06 + 07 + 08 + 09 + 11 + 16: two modules through the "+ Добавить" menu
@@ -332,10 +333,10 @@ test.describe("teacher builds a lesson course, the student sees each step (ru)",
       const m2 = mods.find((m) => m.title.ru === M2)!;
       expect(m1.items.map((i) => i.kind)).toEqual(["url", "page", "file", "assignment"]);
 
-      // ---- the student: the УРОКИ row → the landing (18: the cover) → one-tap join → the course Обзор (step 3a S2),
-      // then its Уроки tab (06)
-      await sp.goto(`/${L}/courses`);
-      await nav.getByRole("link", { name: COURSE }).click();
+      // ---- the student: the exam's Уроки tab card → the landing (18: the cover) → one-tap join → the course Обзор
+      // (step 3a S2), then its Уроки tab (06)
+      await sp.goto(`/${L}/courses/${exam}/lessons`);
+      await examLessons.getByRole("link", { name: COURSE }).first().click();
       await sp.waitForURL(new RegExp(`/courses/catalog/${lc}$`));
       await expect(sp.getByRole("heading", { level: 1, name: COURSE })).toBeVisible();
       await studentShot(sp, "18-cover");
@@ -383,14 +384,13 @@ test.describe("teacher builds a lesson course, the student sees each step (ru)",
       await studentShot(sp, "06-module");
       await studentShot(sp, "11-module-test", () => sec1);
 
-      // ---- G1: the home «Продолжить урок» strip names the first lesson (the overview was opened once)
-      await sp.goto(`/${L}/courses`);
-      const strip = sp.locator('section[aria-labelledby="home-continue"]');
-      await expect(strip.getByRole("heading", { level: 2, name: t("home.prep.continueLesson.title") })).toBeVisible();
-      const row = strip.getByRole("link", { name: new RegExp(V1) });
-      await expect(row).toContainText(`${COURSE} · ${M1}`);
+      // ---- G1 (step 3a S3): on the hub the lesson course is a card of the exam's group, «К экзамену», whose one
+      // button continues with the first lesson (the Уроки tab was opened once)
+      await sp.goto(`/${L}/home`);
+      await expect(hubCard).toHaveCount(1);
+      await expect(hubCard).toContainText(t("home.hub.card.forExam", { exam: "" }).trim());
+      const row = hubCard.getByRole("link", { name: t("home.hub.step.continue_lesson") });
       await expect(row).toHaveAttribute("href", `${base}/modules/${m1.id}/items/${v1Id}`);
-      await expect(homeLessons.getByRole("link", { name: COURSE })).toHaveAttribute("href", base); // step 3a S2: its Обзор
       await studentShot(sp, "g1-home-continue");
 
       // ---- 07 the video lesson: outline aside, click-to-load player, nothing fetched before the tap
@@ -460,15 +460,15 @@ test.describe("teacher builds a lesson course, the student sees each step (ru)",
       await expect(sp.getByText(QUIZ)).toHaveCount(0);
       await studentShot(sp, "d6-exam-tests");
 
-      // ---- 13 announcement: posted in the lesson course → the home side list → the list with the student header
+      // ---- 13 announcement: posted in the lesson course → the hub's «К выполнению» row (step 3a S3) → the list
       await tp.goto(`${base}/announcements/new`);
       await tp.getByRole("textbox", { name: t("announcements.fieldTitle") }).fill(ANN);
       await tp.getByRole("textbox", { name: t("announcements.fieldBody") }).fill("Во втором модуле появился конспект по аналогиям.");
       await teacherShot(tp, "13-announcement");
       await tp.getByRole("button", { name: t("announcements.postNow") }).click();
       await tp.waitForURL(new RegExp(`${base}/announcements$`));
-      await sp.goto(`/${L}/courses`);
-      const news = sp.locator('section[aria-labelledby="home-announcements"]');
+      await sp.goto(`/${L}/home`);
+      const news = sp.locator('section[aria-labelledby="home-todo"]');
       await news.getByRole("link", { name: new RegExp(ANN) }).click();
       await sp.waitForURL(new RegExp(`${base}/announcements$`));
       await expect(sp.getByRole("heading", { level: 1 })).toHaveCount(1);

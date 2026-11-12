@@ -82,8 +82,8 @@ test("a student's menu has no extra areas on any page", async ({ page }) => {
   await page.setViewportSize(VIEWPORTS.desktop);
   const data = seed();
   await signIn(page, data.modules.student);
-  await page.goto("/ru/courses");
-  await expect(page.getByRole("heading", { name: t("home.dashboard") })).toBeVisible();
+  await page.goto("/ru/home"); // step 3a S3: the hub
+  await expect(page.getByRole("heading", { level: 2, name: t("home.hub.coursesTitle") })).toBeVisible();
   await expect(headerAreas(page)).toHaveCount(0);
   await expect(otherAreas(page)).toHaveCount(0);
   await page.goto("/ru/parent"); // a page of another area must not add a tab
@@ -98,11 +98,13 @@ test("an independent teacher has no Organization area", async ({ page }) => {
   await expect.poll(() => areas(page)).toEqual([t("shell.areas.teaching")]); // owner feedback 2026-11-08 (item 2)
 });
 
-test("a teacher who learns nowhere: no Learning tab, no Join with code; ?view=learning opens Teaching", async ({ page }) => {
+test("a teacher who learns nowhere: no Learning tab, no Join with code; ?view=learning and /home open Teaching", async ({ page }) => {
   await page.setViewportSize(VIEWPORTS.desktop);
   await signIn(page, seed().teacher_signup.independent);
+  await page.goto("/ru/home"); // step 3a S3: the hub is never a teacher's page
+  await expect(page).toHaveURL(/\/ru\/courses$/);
   await page.goto("/ru/courses?view=learning");
-  await expect(page).toHaveURL(/\/ru\/courses\?view=teaching$/);
+  await expect(page).toHaveURL(/\/ru\/courses$/); // step 3a S3: ?view= is gone, the old link lands on the list
   await expect.poll(() => areas(page)).toEqual([t("shell.areas.teaching")]);
   await expect(page.getByRole("tablist")).toHaveCount(0);
   await expect(page.locator('a[href="/ru/courses/join"]')).toHaveCount(0);
@@ -122,7 +124,7 @@ test("a teacher with a student enrolment: the teacher-only design; Student view 
   const teacher = seed().teacher_enrolled;
   await signIn(page, teacher);
   await page.goto("/ru/courses?view=learning"); // the old Learning link lands on Teaching
-  await expect(page).toHaveURL(/\/ru\/courses\?view=teaching$/);
+  await expect(page).toHaveURL(/\/ru\/courses$/); // step 3a S3: without ?view=
   await expect(page.getByRole("heading", { level: 1, name: t("courses.list.title") })).toBeVisible();
   await expect.poll(() => areas(page)).toEqual([t("shell.areas.teaching")]);
   await expect(areaLink(page, "shell.areas.learning")).toHaveCount(0); // no "Учёба"

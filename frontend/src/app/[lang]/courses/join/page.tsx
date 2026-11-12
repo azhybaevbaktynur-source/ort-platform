@@ -11,6 +11,7 @@ import { JoinCodeForm } from "@/components/lms/JoinCodeForm";
 import { Card, PageHeader, cn, focusRing } from "@/components/ui";
 import { useLmsMe } from "@/lib/lms/useLmsMe"; // fix round 1b
 import { hidesLearning } from "@/lib/lms/shellKind"; // fix round 1b
+import { useStudentShellDataContext } from "@/components/lms/student/StudentShellDataContext"; // step 3a S3
 
 // Phase 6b S6b (UX S10): one name for the action ("Join with code"), and a way to the catalog for students
 // without a code.
@@ -20,6 +21,7 @@ function JoinInner() {
   const params = useSearchParams();
   // fix round 1b (owner decision 2026-11-12): people who teach cannot join as students (the server refuses it too)
   const teaches = hidesLearning(useLmsMe().me);
+  const studentFrame = !!useStudentShellDataContext();
   if (teaches) {
     return (
       <div className="mx-auto w-full max-w-md">
@@ -31,8 +33,9 @@ function JoinInner() {
   }
   return (
     <div className="mx-auto w-full max-w-md">
+      {/* step 3a S3: a page of the student frame («Ещё», «Мои курсы»): no breadcrumbs there */}
       <PageHeader title={t("courses.join.title")}
-        breadcrumbs={[{ label: t("lms.nav.myCourses"), href: `/${lang}/courses` }, { label: t("courses.join.title") }]} />
+        breadcrumbs={studentFrame ? undefined : [{ label: t("lms.nav.myCourses"), href: `/${lang}/courses` }, { label: t("courses.join.title") }]} />
       <Card>
         <JoinCodeForm initialCode={params.get("code") || ""} onJoined={(r) => {
           const dest = `/${lang}/courses/${r.course.id}`;

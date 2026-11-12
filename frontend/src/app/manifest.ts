@@ -18,7 +18,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: name,
     description: ruDict.landing.badge,
     lang: "ru",
-    start_url: "/ru/",
+    start_url: "/ru/home", // step 3a S3 (decision N8): the hub; signed out -> login with ?redirect=, a teacher -> Teaching
     scope: "/",
     display: "standalone",
     orientation: "any",

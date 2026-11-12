@@ -891,6 +891,19 @@ def seed_teacher_enrolled(api: Api, log: Path, admin_tok: str, ort_course_id: st
 # --- Fix round 2026-11-12 1e end ---
 
 
+# --- Step 3a S3 begin --- (frontend/e2e/student-home.spec.ts, student-ia-s3-screens.spec.ts: the hub with 0, 1 and
+# many courses; people only, written after every other row; the specs join the many-course student themselves)
+def seed_hub(api: Api, log: Path, ort_course_id: str) -> dict:
+    empty = register(api, log, "e2e-hub-empty@example.com", "Айгерим Тестова")
+    one = register(api, log, "e2e-hub-one@example.com", "Бакыт Пробный")
+    api.call("POST", f"/courses/{ort_course_id}/join", one["token"], {})
+    many = register(api, log, "e2e-hub-many@example.com", "Нурия Образцова")
+    for u in (empty, one, many):
+        u["profile"] = profile(api, u["token"])
+    return {"empty": empty, "one": one, "many": many}
+# --- Step 3a S3 end ---
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--api", required=True)
@@ -993,8 +1006,10 @@ def main() -> int:
     # PERFORMANCE_AUDIT P3: a password student in no course for the sign-in prefetch walk (login.spec.ts only)
     login_student = register(api, log, "e2e-login-student@example.com", "Login Student", keep_password=True)
     login_student["profile"] = profile(api, login_student["token"])
+    hub = seed_hub(api, log, cid)  # step 3a S3 (people only; after every other row)
 
     seed = {
+        "hub": hub,
         "quiz_editor": quiz_editor,
         "modules": modules,
         "scrolling": scrolling,

@@ -86,7 +86,9 @@ test.describe("student saved, checklist, practice, unlock (ru)", () => {
         .toHaveAttribute("aria-current", "page");
       const nav = w >= 1024 ? page.getByRole("navigation", { name: t("student.nav.label") }) : null;
       if (nav) {
-        await expect(nav.getByRole("link", { name: t("student.nav.saved") })).toHaveAttribute("aria-current", "page");
+        // step 3a S3: no global Сохранённые link; the course's «Мои курсы» row is current
+        await expect(nav.locator(`a[href^="/ru/courses/${seed().course_id}"]`)).toHaveAttribute("aria-current", "page");
+        await expect(nav.getByRole("link", { name: t("student.nav.saved") })).toHaveCount(0);
         await expect(nav.getByRole("link", { name: t("student.nav.mistakes") })).toHaveCount(0);
       }
       await settle(page);
@@ -100,8 +102,8 @@ test.describe("student saved, checklist, practice, unlock (ru)", () => {
       await shot(page, `mistakes-empty-${w}`);
 
       // getting started: the pill (sidebar on desktop, "More" on phones) opens the checklist; U9 (review 3): no home card
-      await page.goto("/ru/courses");
-      await expect(page.getByRole("region", { name: t("examPrep.next.title") })).toBeVisible();
+      await page.goto("/ru/home"); // step 3a S3: the hub
+      await expect(page.getByRole("region", { name: t("home.hub.continue") })).toBeVisible();
       await expect(page.getByRole("heading", { level: 2, name: t("student.nav.gettingStarted") })).toHaveCount(0);
       const pillName = new RegExp(`^${t("student.nav.gettingStarted")}\\s*\\d/\\d$`);
       if (w >= 1024) {

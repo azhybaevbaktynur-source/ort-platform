@@ -95,7 +95,8 @@ test.describe("student link audit (ru)", () => {
     await signIn(page, user);
 
     const pages = [
-      `/${L}/courses`, `${c}/tests`, `${c}/progress`, `${c}/saved`, `${c}/saved?tab=mistakes`, `${c}/modules`,
+      `/${L}/home`, `/${L}/courses`, `${c}/tests`, `${c}/progress`, // step 3a S3: the hub and «Мои курсы»
+      `${c}/saved`, `${c}/saved?tab=mistakes`, `${c}/modules`,
       `${c}/practice`, `/${L}/pro`, `${c}/attempts/${attemptId}/result`,
     ];
     const visited = new Set<string>();

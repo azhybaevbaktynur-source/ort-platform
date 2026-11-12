@@ -101,7 +101,7 @@ test("sign-up 18+: age first, policies required, then the home page without a ba
   });
   await page.getByRole("button", { name: tr("ru", "auth.signUpButton") }).click();
   await verify(page, "ru", email);
-  await expect(page).toHaveURL(/\/ru\/courses/);
+  await expect(page).toHaveURL(/\/ru\/home/); // step 3a S3: the hub
   await settle(page);
   await expect(page.getByRole("link", { name: tr("ru", "privacy.banner.age") })).toHaveCount(0);
   const state = await apiAs(page, "GET", "/me/privacy");
@@ -118,7 +118,7 @@ test("sign-up 14-17 in Kyrgyz", async ({ browser }) => {
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: tr("ky", "auth.signUpButton") }).click();
   await verify(page, "ky", email);
-  await expect(page).toHaveURL(/\/ky\/courses/);
+  await expect(page).toHaveURL(/\/ky\/home/); // step 3a S3: the hub
   expect((await apiAs(page, "GET", "/me/privacy")).body).toMatchObject({ age_band: "14_17", consent_state: "ok" });
   await page.context().close();
 });
@@ -187,7 +187,7 @@ test("policies are public, in three languages, with the draft badge", async ({ b
 
 test("existing account: one banner on the home page, nothing restricted, age confirmed once", async ({ browser }) => {
   const page = await as(browser, data().legacy);
-  await page.goto("/ru/courses");
+  await page.goto("/ru/home"); // step 3a S3: the banner is the hub's line
   const banner = page.getByRole("link", { name: tr("ru", "privacy.banner.age") });
   await expect(banner).toBeVisible();
   await uxShots(page, SHOTS, "home-banner", ["ru"]);
@@ -204,7 +204,7 @@ test("existing account: one banner on the home page, nothing restricted, age con
   await confirm.click();
   await expect(page.getByText(tr("ru", "privacy.age.18_plus"))).toBeVisible();
   await expect(page.getByRole("button", { name: tr("ru", "privacy.confirm") })).toHaveCount(0);
-  await page.goto("/ru/courses");
+  await page.goto("/ru/home");
   await settle(page);
   await expect(page.getByRole("link", { name: tr("ru", "privacy.banner.age") })).toHaveCount(0);
   await page.context().close();
@@ -238,7 +238,7 @@ test("my data: download, delete request with password, admin runs and rejects", 
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: tr("ru", "auth.signUpButton") }).click();
   await verify(page, "ru", email);
-  await expect(page).toHaveURL(/\/ru\/courses/);
+  await expect(page).toHaveURL(/\/ru\/home/); // step 3a S3: the hub
 
   await page.goto("/ru/privacy");
   await expect(page.getByText("Айгүл Родитель")).toBeVisible();

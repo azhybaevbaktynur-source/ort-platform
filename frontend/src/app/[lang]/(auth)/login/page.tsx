@@ -51,7 +51,7 @@ function LoginForm() {
   const slow = useSlowHint(loading);
 
   const handleNavigateAfterAuth = () => {
-    const dest = redirectParam || `/${lang}/courses`;
+    const dest = redirectParam || `/${lang}/home`; // step 3a S3: learners land on the hub (people who teach: /home -> /courses)
     // PERFORMANCE_AUDIT P3: the token is stored; the first page's bootstrap starts now, alongside the route change
     prefetchBootstrap(dest, !!storedSessionProfile()?.is_platform_admin);
     router.push(dest);

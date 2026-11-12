@@ -80,7 +80,7 @@ test.describe("installable app (ru)", () => {
       const m = await res.json();
       expect(m.name).toBe(tr("ru", "common.appName"));
       expect(m.short_name).toBeTruthy();
-      expect(m.start_url).toBe("/ru/");
+      expect(m.start_url).toBe("/ru/home"); // step 3a S3 (N8)
       expect(m.display).toBe("standalone");
       expect(m.theme_color).toMatch(/^#[0-9a-f]{6}$/);
       expect(m.background_color).toMatch(/^#[0-9a-f]{6}$/);

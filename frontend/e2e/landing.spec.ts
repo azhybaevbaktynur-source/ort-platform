@@ -163,7 +163,7 @@ test.describe("landing page", () => {
     await expect(header(page).getByRole("link", { name: t("common.register"), exact: true })).toHaveCount(0);
     await expect(roleLink(page, "student")).toHaveCount(0);
     await expect(roleLink(page, "teacher")).toHaveCount(0);
-    await expect(page.locator("section").first().getByRole("link", { name: t("landing.hero.continue") })).toHaveAttribute("href", `/${L}/courses`);
+    await expect(page.locator("section").first().getByRole("link", { name: t("landing.hero.continue") })).toHaveAttribute("href", `/${L}/home`); // step 3a S3: the hub
     await noHorizontalScroll(page, "signed in at 375");
     if (process.env.LANDING_SCREENS === "1") {
       await settle(page);
