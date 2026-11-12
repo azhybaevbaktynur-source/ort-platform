@@ -13,7 +13,7 @@ from pathlib import Path
 import httpx
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
 
 from app.core.config import settings
 from app.lms.audit.models import AdminAuditLog
@@ -395,19 +395,62 @@ async def test_full_cards_shapes(db, keys, mock, now):
     assert e["details"]["provider"] == "brevo"
     cap = body["capacity"]
     assert cap["used_source"] == "neon" and cap["used_bytes"] == 41_451_520 and cap["limit_bytes"] == GIB
-    assert cap["fits"] == 3 and cap["history_seconds"] == 21_600  # fallbacks (14 attempts today): 237.9 MB per exam
+    assert cap["fits"] == 4 and cap["history_seconds"] == 21_600  # fallbacks (14 attempts today): 228.6 MB per exam
+    assert cap["percent"] == s["percent"] and cap["level"] == "ok" and cap["branches"] == 4
+    assert cap["branches_limit"] == 10 and cap["measured_at"].startswith("2026-11-09T12:00:00")
+    assert cap["upgrade_storage_usd_per_gb_month"] == costs.NEON_LAUNCH_STORAGE_USD_PER_GB_MONTH
 
 
-async def test_warning_and_critical_levels(db, keys, monkeypatch, now):
-    m = Mock(overrides={("console.neon.tech", "/api/v2/projects/noisy-test/branches"): neon_branches(int(0.85 * GIB))})
+async def test_database_levels_on_the_neon_card(db, keys, monkeypatch, now):
+    """DB_STORAGE_REVIEW 7.2: Neon storage uses 50 / 70 / 85 %; R2, compute and email keep 80 / 95 %."""
+    branches = ("console.neon.tech", "/api/v2/projects/noisy-test/branches")
+    m = Mock(overrides={branches: neon_branches(int(0.55 * GIB))})
     monkeypatch.setattr(service, "transport_factory", lambda: httpx.MockTransport(m))
     admin = make_user(db, platform_admin=True)
-    n = card((await call(admin, "GET", "/platform/infra")).json(), "neon")
+    body = (await call(admin, "GET", "/platform/infra")).json()
+    n = card(body, "neon")
+    assert metric(n, "storage")["level"] == "notice" and n["status"] == "ok"  # a notice colours the bar only
+    assert body["capacity"]["level"] == "notice"
+    m.overrides[branches] = neon_branches(int(0.72 * GIB))
+    body = (await call(admin, "POST", "/platform/infra/refresh")).json()
+    n = card(body, "neon")
     assert metric(n, "storage")["level"] == "warning" and n["status"] == "warning"
-    m.overrides[("console.neon.tech", "/api/v2/projects/noisy-test/branches")] = neon_branches(int(0.96 * GIB))
-    n = card((await call(admin, "POST", "/platform/infra/refresh")).json(), "neon")
+    assert body["capacity"]["level"] == "warning" and body["capacity"]["fits"] == 1
+    m.overrides[branches] = neon_branches(int(0.90 * GIB))
+    body = (await call(admin, "POST", "/platform/infra/refresh")).json()
+    n = card(body, "neon")
     assert metric(n, "storage")["level"] == "critical" and n["status"] == "warning"
+    assert body["capacity"]["level"] == "critical" and body["capacity"]["fits"] == 0
     assert cards.level(79.9) == "ok" and cards.level(80) == "warning" and cards.level(95) == "critical"
+    assert metric(n, "compute")["level"] == "ok"  # 6.6 of 100 CU-h
+
+
+async def test_no_exam_fits_raises_the_neon_level_below_50_percent(db, keys, monkeypatch, now):
+    """`fits == 0` is critical at any percent: a 1 GiB limit with a huge exam estimate (measured sizes)."""
+    monkeypatch.setattr(capacity, "default_size_provider", lambda _db: lambda _d: {
+        "attempts": (2_000 * 1_200, 2_000), "attempt_sections": (10_000 * 150, 10_000),
+        "attempt_items": (3_000 * 1_000_000, 1_000_000)})  # 3 kB per item: 2.7 GB per exam
+    branches = ("console.neon.tech", "/api/v2/projects/noisy-test/branches")
+    m = Mock(overrides={branches: neon_branches(int(0.40 * GIB))})
+    monkeypatch.setattr(service, "transport_factory", lambda: httpx.MockTransport(m))
+    admin = make_user(db, platform_admin=True)
+    body = (await call(admin, "GET", "/platform/infra")).json()
+    assert body["capacity"]["fits"] == 0 and body["capacity"]["percent"] == 40.0
+    assert body["capacity"]["level"] == "critical"
+    assert metric(card(body, "neon"), "storage")["level"] == "critical"
+
+
+@pytest.mark.parametrize("percent,fits_n,expected", [
+    (None, None, "ok"), (0, 4, "ok"), (49.9, 4, "ok"), (50, 4, "notice"), (69.9, 2, "notice"), (70, 1, "warning"),
+    (84.9, 1, "warning"), (85, 1, "critical"), (99, None, "critical"),
+    (40, 0, "critical"), (10, 0, "critical"), (None, 0, "critical"), (60, 0, "critical"), (75, 3, "warning"),
+])
+def test_db_level_boundaries_and_fits_override(percent, fits_n, expected):
+    assert capacity.db_level(percent, fits_n) == expected
+
+
+def test_db_level_thresholds_are_the_review_constants():
+    assert (capacity.DB_NOTICE, capacity.DB_WARNING, capacity.DB_CRITICAL) == (0.5, 0.7, 0.85)
 
 
 async def test_error_keeps_previous_payload_and_time(db, keys, mock, now):
@@ -572,11 +615,11 @@ NEON_TODAY = {"storage_bytes": 41_451_520, "storage_limit_bytes": GIB, "history_
 def test_capacity_fallbacks_below_1000_rows(db):
     out = capacity.compute(db, NEON_TODAY)  # SQLite, empty attempt tables
     assert out["estimated"] is True
-    assert out["per_row_bytes"] == {"attempt": 1_500, "section": 400, "item": 241}
-    assert out["exam_bytes"] == 6_000 * (1_500 + 5 * 400 + 150 * 241) == 237_900_000
-    assert out["fits"] == 3 and out["used_source"] == "neon"  # 0.9 * 1,032,290,304 / 237,900,000 = 3.9
+    assert out["per_row_bytes"] == {"attempt": 1_200, "section": 150, "item": 241}  # DB_STORAGE_REVIEW 3
+    assert out["exam_bytes"] == 6_000 * (1_200 + 5 * 150 + 150 * 241) == 228_600_000
+    assert out["fits"] == 4 and out["used_source"] == "neon"  # 0.9 * 1,032,290,304 / 228,600,000 = 4.06
     big = capacity.compute(db, {**NEON_TODAY, "storage_limit_bytes": 10 * GIB})
-    assert big["fits"] == 40
+    assert big["fits"] == 42
 
 
 def test_capacity_design_example():
@@ -594,7 +637,7 @@ def test_capacity_measured_sizes_and_floor(db):
     assert capacity.compute(db, NEON_TODAY, size_provider=lambda _db: small)["per_row_bytes"]["item"] == 200
     partial = {**sizes, "attempts": (3_000_000, 999)}
     out = capacity.compute(db, NEON_TODAY, size_provider=lambda _db: partial)
-    assert out["estimated"] is True and out["per_row_bytes"]["attempt"] == 1_500
+    assert out["estimated"] is True and out["per_row_bytes"]["attempt"] == 1_200
 
 
 def test_capacity_counts_rows_on_sqlite(db):
@@ -605,6 +648,58 @@ def test_capacity_counts_rows_on_sqlite(db):
 def test_capacity_without_neon_uses_the_local_database(db):
     out = capacity.compute(db, None)
     assert out["used_source"] == "database" and out["limit_bytes"] == GIB and out["history_seconds"] is None
+
+
+def test_local_size_on_sqlite_keeps_the_file_size(db):
+    """SQLite has no pg_database: the file's pages, times the factor, source `database` (DB_STORAGE_REVIEW 7.1)."""
+    if db.get_bind().dialect.name != "sqlite":
+        pytest.skip("SQLite only")
+    pages = db.execute(text("PRAGMA page_count")).scalar()
+    size = db.execute(text("PRAGMA page_size")).scalar()
+    used, source = capacity._local_used_bytes(db)
+    assert source == "database" and used == int(pages * size * capacity.LOCAL_SIZE_FACTOR) > 0
+    assert capacity.LOCAL_SIZE_FACTOR == 1.02
+    out = capacity.compute(db, None)
+    assert out["used_source"] == "database" and out["measured_at"] is not None and out["branches"] is None
+
+
+def test_local_size_on_postgres_sums_every_database_and_falls_back(db, monkeypatch):
+    """PostgreSQL: the sum over pg_database; a refused statement → current database + 23.5 MB, `database_estimate`,
+    and the request's transaction stays usable (the statement runs in a savepoint)."""
+    if db.get_bind().dialect.name != "postgresql":
+        pytest.skip("needs Postgres (DATABASE_URL)")
+    every = db.execute(text("SELECT sum(pg_database_size(datname)) FROM pg_database")).scalar()
+    current = db.execute(text("SELECT pg_database_size(current_database())")).scalar()
+    used, source = capacity._local_used_bytes(db)
+    assert source == "database" and used >= int(int(every) * capacity.LOCAL_SIZE_FACTOR) * 0.99 and used > current
+    monkeypatch.setattr(capacity, "SQL_ALL_DATABASES", "SELECT pg_database_size('no_such_database_d1')")
+    used, source = capacity._local_used_bytes(db)
+    assert source == "database_estimate"
+    assert used >= int((current + capacity.SYSTEM_DATABASES_B) * capacity.LOCAL_SIZE_FACTOR) * 0.99
+    assert db.execute(text("SELECT 1")).scalar() == 1  # not aborted
+    assert capacity.compute(db, None)["used_source"] == "database_estimate"
+
+
+def test_measure_storage_stores_and_neon_wins(db, now):
+    value = capacity.measure_storage(db)
+    db.commit()
+    assert value["used_source"] == "database" and value["measured_at"].startswith("2026-11-09T12:00:00")
+    assert capacity.stored_measurement(db) == value and capacity.measured_at(value) == T0
+    db.add(InfraSnapshot(provider="neon", status="ok", payload={**NEON_TODAY, "storage_bytes": int(0.75 * GIB)},
+                         fetched_at=T0 - timedelta(minutes=5), updated_at=T0))  # the panel's stored Neon figure
+    db.commit()
+    value = capacity.measure_storage(db)
+    db.commit()
+    assert value["used_source"] == "neon" and value["percent"] == 75.0 and value["level"] == "warning"
+    assert capacity.measured_at(value) == T0 - timedelta(minutes=5)
+
+
+async def test_services_get_stores_the_measurement(db, mock, now):
+    admin = make_user(db, platform_admin=True)
+    body = (await call(admin, "GET", "/platform/infra")).json()
+    stored = capacity.stored_measurement(db)
+    assert stored is not None and stored["used_bytes"] == body["capacity"]["used_bytes"]
+    assert stored["fits"] == body["capacity"]["fits"] and stored["level"] == body["capacity"]["level"]
 
 
 def test_fits_is_monotone_in_headroom():

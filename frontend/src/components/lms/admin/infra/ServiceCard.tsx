@@ -9,7 +9,8 @@ import { Badge, Card } from "@/components/ui";
 import { MetricBar } from "./MetricBar";
 
 const BORDER = {
-  ok: "", muted: "bg-slate-50", warning: "border-warning-300", critical: "border-danger-300", error: "border-danger-300",
+  ok: "", muted: "bg-slate-50", notice: "border-warning-200", warning: "border-warning-300", critical: "border-danger-300",
+  error: "border-danger-300",
 } as const;
 
 /** "5 minutes ago" in the page language. */

@@ -685,7 +685,12 @@
         },
         "reveals": "Code reveals in the last hour",
         "health": "Health checks failing",
-        "none": "All good, nothing needs attention"
+        "none": "All good, nothing needs attention",
+        "database_one": "Database: {percent}% used ({count} more exam fits)",
+        "database_other": "Database: {percent}% used ({count} more exams fit)",
+        "databaseFull": "Database: {percent}% used, a full exam no longer fits",
+        "database_few": "Database: {percent}% used ({count} more exams fit)",
+        "database_many": "Database: {percent}% used ({count} more exams fit)"
       },
       "quick": {
         "title": "Quick actions",
@@ -7155,8 +7160,9 @@
     },
     "level": {
       "ok": "normal",
-      "warning": "over 80%",
-      "critical": "over 95%"
+      "notice": "notice",
+      "warning": "warning",
+      "critical": "critical"
     },
     "status": {
       "ok": "OK",
@@ -7230,8 +7236,15 @@
       "launch": "On the Neon Launch plan the limit is lifted.",
       "source": {
         "neon": "per Neon",
-        "database": "per database size"
-      }
+        "database": "per database size",
+        "database_estimate": "estimate: this database + system ones"
+      },
+      "writesStop": "At 1 GB Neon stops writes (INSERT, UPDATE, DELETE); reads keep working. Free plan limit.",
+      "upgradeHint": "The Launch plan is needed before the next exam (storage {price} per GB per month).",
+      "notice": "More than half is used. Plan the move to the Launch plan before the next exam.",
+      "branches": "Neon branches: {value} of {limit}",
+      "measured": "Measured {when}",
+      "percent": "{percent}% of the limit"
     },
     "costs": {
       "title": "Estimated cost per month",
