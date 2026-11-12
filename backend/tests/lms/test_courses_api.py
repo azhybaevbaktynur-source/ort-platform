@@ -115,7 +115,7 @@ async def test_limit_below_current_and_unlisted(db, api):
     c.listing = "blocked"
     db.commit()
     r = await api.call(t, "PATCH", f"/courses/{c.id}", json={"visibility": "catalog"})
-    assert r.status_code == 200 and r.json()["unlisted_by_admin"] is True and r.json()["listing"]["state"] == "blocked"
+    assert r.status_code == 200 and r.json()["listing"]["state"] == "blocked"
 
 
 def make_course_pub(db, owner, **kw):
@@ -261,8 +261,8 @@ async def test_admin_moderation_is_audited(db, api):
     assert r.json()["active_student_count"] == 1 and "join_code" not in r.json()
     assert (await api.call(admin, "GET", f"/platform/courses/{c.id}/people")).status_code == 200
     r = await post("unlist", {"reason": "spam"})
-    assert r.json()["unlisted_by_admin_at"]
-    assert (await post("relist", {})).json()["unlisted_by_admin_at"] is None
+    assert r.json()["listing"]["state"] == "blocked" and "unlisted_by_admin_at" not in r.json()
+    assert (await post("relist", {})).json()["listing"]["state"] != "blocked"
     r = await post("transfer-ownership", {"new_owner_user_id": new.id, "reason": "handover"})
     assert r.status_code == 422 and r.json()["error"]["code"] == "invalid_new_owner"  # S5: not a member
     _add_org_member(db, c.organization_id, new)

@@ -110,7 +110,7 @@ test("teacher turns on the application mode and the catalog", async ({ browser }
   await page.goto(`/ru/courses/${data().course_id}/settings?section=enrollment`);
   await expect(page.getByText(t("enrollmentForm.settings.active", { n: 1 }))).toBeVisible();
   await page.locator("#s-mode").selectOption("form_review");
-  await page.getByRole("switch", { name: t("enrollmentForm.settings.catalog") }).click();
+  await page.getByRole("switch", { name: t("catalog.listing.linkAccess") }).click();
   const form = page.locator("form", { has: page.locator("#s-mode") });
   await form.getByRole("button", { name: t("lms.common.save") }).click();
   await expect(form.getByText(t("courses.settings.saved"))).toBeVisible();

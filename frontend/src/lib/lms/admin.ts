@@ -1,6 +1,6 @@
 import { lmsFetch } from "./client";
 import type {
-  AdminAttemptOut, AdminCourseOut, AdminUserDetailOut, AdminUserOut, AuditEntryOut, PageOut, PlatformSummaryOut,
+  AdminAttemptOut, AdminCatalogRowOut, AdminCourseOut, AdminUserDetailOut, AdminUserOut, AuditEntryOut, PageOut, PlatformSummaryOut,
   RosterEntryOut, TeacherRequestAdminOut, TeacherRequestStatus, TeacherStatus,
 } from "./types";
 
@@ -89,6 +89,16 @@ export const unlistCourse = (id: string, reason?: string) =>
   post<AdminCourseOut>(`/platform/courses/${enc(id)}/unlist`, reason ? { reason } : {});
 export const relistCourse = (id: string, reason?: string) =>
   post<AdminCourseOut>(`/platform/courses/${enc(id)}/relist`, reason ? { reason } : {});
+/** Step 3b (CATALOG_AND_TEACHERS_DESIGN 2.4): Admin → Каталог, one listing state per page. */
+export type AdminCatalogState = "pending" | "listed" | "declined" | "blocked";
+export const listAdminCatalog = (state: AdminCatalogState, cursor?: string | null, limit = 25) =>
+  lmsFetch<PageOut<AdminCatalogRowOut>>("/platform/catalog", { params: { state, cursor, limit } });
+/** `pending` → `listed` (email to the owner); on a listed course the re-check that clears the content-changed marker. */
+export const approveListing = (id: string, note?: string) =>
+  post<AdminCourseOut>(`/platform/courses/${enc(id)}/listing/approve`, note ? { note } : {});
+/** `pending` → `declined`; the note is required (course staff see it, students never). */
+export const declineListing = (id: string, note: string) =>
+  post<AdminCourseOut>(`/platform/courses/${enc(id)}/listing/decline`, { note });
 export const adminTransferOwnership = (id: string, new_owner_user_id: string, reason: string) =>
   post<AdminCourseOut>(`/platform/courses/${enc(id)}/transfer-ownership`, { new_owner_user_id, reason });
 

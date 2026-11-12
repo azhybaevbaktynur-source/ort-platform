@@ -1,8 +1,9 @@
 "use client";
 
 // FB8-5 S3 (STAFF_UX_AUDIT 5): Enrollment: the join code (copy; "new code" in the "⋯" menu, confirmed), mode, limit,
-// catalog switch, the enrollment form link and the active student count. Save semantics as before (Phase 9 S4): the
-// visibility is sent with the mode only when it changed.
+// link-access switch, the enrollment form link and the active student count. Save semantics as before (Phase 9 S4): the
+// visibility is sent with the mode only when it changed. Step 3b S2: «Страница курса открыта по ссылке» (link access) and
+// the «Каталог платформы» card below (the catalog list, decided by the platform admin).
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { RefreshCw } from "lucide-react";
@@ -17,6 +18,7 @@ import { JoinCodeDisplay } from "@/components/lms/JoinCodeDisplay";
 import { useApplicationErrorText } from "@/components/lms/catalog/useApplicationErrorText";
 import { Button, Card, ConfirmDialog, ErrorState, Input, OverflowMenu, Select, Switch, buttonClasses } from "@/components/ui";
 import { SavedNote, SectionLayout, useSave } from "./shared";
+import { CatalogListingCard } from "./CatalogListingCard";
 
 const SETTINGS_MODES: EnrollmentMode[] = ["invite_code", "open", "form_review", "form_auto", "closed"];
 
@@ -94,11 +96,15 @@ export function EnrollmentSection({ course, onSaved }: { course: CourseStaffOut;
                 onChange={(e) => setLimit(e.target.value)} placeholder={t("courses.create.limitPlaceholder")}
                 hint={t("courses.settings.activeStudents", { count: course.active_student_count })} />
             </div>
-            {/* --- Phase 9 S4: catalog visibility, the enrollment form, the ORT lock note --- */}
-            <Switch id="s-visibility" label={t("enrollmentForm.settings.catalog")} checked={visibility === "catalog"}
-              disabled={s.busy || (course.unlisted_by_admin && visibility !== "catalog")}
-              hint={course.unlisted_by_admin ? t("lms.errors.unlisted_by_admin") : isFormMode(mode) ? t("enrollmentForm.settings.catalogNeeded") : t("enrollmentForm.settings.catalogHint")}
+            {/* --- Phase 9 S4: link access (step 3b: no longer "in the catalog"), the enrollment form, the ORT lock note --- */}
+            <Switch id="s-visibility" label={t("catalog.listing.linkAccess")} checked={visibility === "catalog"}
+              disabled={s.busy}
+              hint={isFormMode(mode) ? t("catalog.listing.linkAccessNeeded") : t("catalog.listing.linkAccessHint")}
               onChange={(on) => setVisibility(on ? "catalog" : "private")} />
+            {/* step 3b §2.3: a course nobody can open by link leaves the catalog list (the server sets `off` on save) */}
+            {visibility === "private" && course.visibility === "catalog" && (course.listing?.state === "listed" || course.listing?.state === "pending") && (
+              <p role="status" className="-mt-2 text-sm leading-6 text-amber-700">{t("catalog.listing.privateWarning")}</p>
+            )}
             {ortLocked ? (
               <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">{t("enrollmentForm.settings.ortNote")}</p>
             ) : (
@@ -125,6 +131,7 @@ export function EnrollmentSection({ course, onSaved }: { course: CourseStaffOut;
           </form>
         </div>
       </Card>
+      <CatalogListingCard course={course} onSaved={onSaved} />
       {confirmCode && (
         <ConfirmDialog open tone="primary" busy={code.busy} title={t("courses.settings.regenerateTitle")}
           object={formatJoinCode(course.join_code)} effect={t("courses.settings.regenerateBody")}

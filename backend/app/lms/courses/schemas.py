@@ -236,7 +236,6 @@ class CourseStaffOut(CourseStudentOut):
     enrollment_mode: str
     enrollment_limit: Optional[int] = None
     visibility: str
-    unlisted_by_admin: bool  # step 3b: `listing.state == 'blocked'` (kept until the S2 settings block replaces the hint)
     listing: Optional[CourseListingOut] = None  # step 3b S1: the catalog listing (staff only)
     active_student_count: int
     owner: UserBrief
@@ -268,7 +267,6 @@ class AdminCourseOut(BaseModel):
     status: str
     visibility: str
     enrollment_mode: str
-    unlisted_by_admin_at: Optional[datetime] = None  # step 3b: derived, the block time when `listing == 'blocked'`
     listing: Optional[CourseListingOut] = None  # step 3b S1
     active_student_count: int
     created_at: datetime
@@ -386,7 +384,7 @@ def course_staff_out(course, enrollment, owner, active_student_count: int, viewe
     return CourseStaffOut(
         **base, join_code=course.join_code, enrollment_mode=course.enrollment_mode,
         enrollment_limit=course.enrollment_limit, visibility=course.visibility,
-        unlisted_by_admin=course.listing == "blocked", listing=course_listing_out(course),
+        listing=course_listing_out(course),
         active_student_count=active_student_count, owner=user_brief(owner),
         is_owner=(course.owner_id == viewer_id), created_at=course.created_at, updated_at=course.updated_at,
         published_at=course.published_at, concluded_at=course.concluded_at,
@@ -399,7 +397,6 @@ def admin_course_out(course, owner, active_student_count: int) -> AdminCourseOut
     return AdminCourseOut(
         id=course.id, title=course.title, owner=user_brief(owner), status=course.status,
         visibility=course.visibility, enrollment_mode=course.enrollment_mode,
-        unlisted_by_admin_at=(course.listing_decided_at or course.updated_at) if course.listing == "blocked" else None,
         listing=course_listing_out(course), active_student_count=active_student_count,
         created_at=course.created_at, deleted_at=course.deleted_at, deleted_by_id=course.deleted_by_id,
         exam_family=course.exam_family, subject=course.subject,

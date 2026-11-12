@@ -106,6 +106,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     { href: `${base}/teacher-requests`, label: t("platformAdmin.nav.teacherRequests"), count: pending, group: g("people") },
     { href: `${base}/organizations`, label: t("organizations.nav.organizations"), group: g("content") },
     { href: `${base}/courses`, label: t("platformAdmin.nav.courses"), group: g("content") },
+    { href: `${base}/catalog`, label: t("platformAdmin.nav.catalog"), group: g("content") }, // step 3b S2
     { href: `${base}/exam-templates`, label: t("examTemplates.nav.title"), group: g("content") },
     { href: `${base}/access/settings`, label: t("platformAdmin.nav.plans"), group: g("pro") },
     { href: `${base}/access`, label: t("platformAdmin.nav.proUsers"), exact: true, group: g("pro") },

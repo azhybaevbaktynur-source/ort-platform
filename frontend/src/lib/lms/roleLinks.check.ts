@@ -69,6 +69,8 @@ const staffRows: Row[] = [
   ["/ru/org/o1/teachers", "app", "organization"],
   ["/ru/admin", "app", "platform"],
   ["/ru/admin/users", "app", "platform"],
+  ["/ru/admin/catalog", "app", "platform"], // step 3b S2: Admin → Каталог (the page refuses anyone but the platform admin)
+  ["/ru/admin/catalog?state=blocked", "app", "platform"],
   ["http://127.0.0.1:3780/ru/pro#x", "app", "teaching"],
 ];
 for (const role of STAFF) {

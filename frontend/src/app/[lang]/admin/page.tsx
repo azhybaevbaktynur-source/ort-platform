@@ -60,6 +60,7 @@ export default function AdminOverviewPage() {
               failedChecks={health ? failedHealthChecks(health) : null}
               database={overview.data?.database ?? null}
               catalogRevoked={overview.data?.catalog_revoked_7d ?? null}
+              catalogPending={overview.data?.catalog_pending ?? null}
               summaryError={ready ? error : null} onRetry={refresh} />
           </CardBoundary>
           <CardBoundary>

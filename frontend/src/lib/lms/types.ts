@@ -140,7 +140,6 @@ export interface CourseStaffOut extends CourseStudentOut {
   enrollment_mode: EnrollmentMode;
   enrollment_limit: number | null;
   visibility: Visibility;
-  unlisted_by_admin: boolean;
   /** Step 3b S1: the course's place in the platform catalog list (staff only; absent: older backend). */
   listing?: CourseListingOut | null;
   active_student_count: number;
@@ -291,8 +290,9 @@ export interface AdminAttemptOut {
   item_count: number;
   saved_answers: number;
 }
-/** Step 3b S1 (CATALOG_AND_TEACHERS_DESIGN 2.3): `off` → `pending` → `listed` / `declined`; `blocked` by the admin. */
-export type ListingState = "off" | "pending" | "listed" | "declined" | "blocked";
+/** Step 3b S1 (CATALOG_AND_TEACHERS_DESIGN 2.3): defined in the dependency-free `listing.ts`. */
+import type { ListingMissing, ListingState } from "./listing";
+export type { ListingMissing, ListingState };
 export interface CourseListingOut {
   state: ListingState;
   requested_at: string | null;
@@ -302,6 +302,25 @@ export interface CourseListingOut {
   /** Title, description, cover or mode edited after the last approval. */
   content_changed: boolean;
 }
+/** Step 3b S1: one row of `GET /platform/catalog?state=` (Admin → Каталог). */
+export interface AdminCatalogRowOut {
+  id: string;
+  title: LocalizedText;
+  default_language: Lang;
+  cover_url: string | null;
+  owner: UserBrief;
+  teacher_kind: "platform" | "independent" | "school";
+  /** The root organization's name, schools only. */
+  school_name: string | null;
+  status: CourseStatus;
+  visibility: Visibility;
+  enrollment_mode: EnrollmentMode;
+  student_count: number;
+  tests_count: number;
+  lessons_count: number;
+  listing: CourseListingOut;
+  published_at: string | null;
+}
 export interface AdminCourseOut {
   id: string;
   title: LocalizedText;
@@ -309,7 +328,7 @@ export interface AdminCourseOut {
   status: CourseStatus;
   visibility: Visibility;
   enrollment_mode: EnrollmentMode;
-  unlisted_by_admin_at: string | null;
+  /** Step 3b: the catalog listing (replaces `unlisted_by_admin_at`; blocked = «Снят администратором»). */
   listing?: CourseListingOut | null;
   active_student_count: number;
   created_at: string;
@@ -342,7 +361,7 @@ export const LMS_ERROR_CODES = [
   "not_found", "course_not_found", "forbidden", "owner_only", "owner_immutable", "owner_cannot_leave",
   "use_leave", "not_active", "teacher_not_approved", "not_approved_teacher", "invalid_new_owner",
   "join_code_invalid", "join_code_exhausted", "rate_limited", "already_enrolled", "user_not_found",
-  "limit_below_current", "unlisted_by_admin", "invalid_transition", "has_students", "not_deleted",
+  "limit_below_current", "invalid_transition", "has_students", "not_deleted",
   "already_deleted", "title_required", "already_teacher", "request_pending", "not_pending",
   "cannot_disable_self", "cannot_disable_admin", "platform_admin_required", "validation_failed",
   "invalid_cursor", "account_disabled", "network", "server_starting", "unknown",
@@ -389,6 +408,9 @@ export const LMS_ERROR_CODES = [
   "exam_link_forbidden", "exam_link_not_allowed", "exam_link_target_invalid",
   // fix round 2026-11-12 1b: people who teach cannot join a course as a student
   "teacher_cannot_enroll",
+  // step 3b: the catalog listing (courses/ids.py)
+  "listing_incomplete", "listing_state", "listing_blocked", "listing_rate_limited", "listing_note_required",
+  "listing_not_allowed",
 ] as const;
 export type LmsErrorCode = (typeof LMS_ERROR_CODES)[number];
 
