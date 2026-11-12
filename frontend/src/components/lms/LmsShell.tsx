@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 import { gateOpenPath } from "@/lib/api"; // Phase 11 S3
 import { LmsMeProvider, useLmsMeLoader } from "@/lib/lms/useLmsMe";
 import { useCachedMe } from "@/lib/lms/meCache"; // PERFORMANCE_AUDIT S1
-import { areaFromUrl, hidesLearning, isPlayerRoute, shellKindFor, urlAreaFor, type ShellKind, type ShellMe } from "@/lib/lms/shellKind"; // S1
+import { activeAreaFor, areaFromUrl, hidesLearning, isPlayerRoute, learnsHere, pageDecidesArea, shellKindFor, urlAreaFor, type ShellKind, type ShellMe } from "@/lib/lms/shellKind"; // S1; fix round 1b
 import { useCurrentOrg } from "@/lib/lms/currentOrg"; // item 4
 import { AppHeader, Brand, type AppHeaderArea, type AppHeaderLink, type AreaKey } from "@/components/ui/AppHeader";
 import { prefetchTeachingCourses } from "@/lib/lms/pageData"; // integration fix: header section prefetch
@@ -190,10 +190,11 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   // Same default as the /courses page (its Teaching tab opens first for teachers and course creators); without
   // Learning, `/courses?view=learning` is Teaching (the page replaces the URL); other student URLs still open
   const urlArea: AreaKey = urlAreaFor(rest, view, me);
-  // A page's own declaration wins only where the URL does not decide (course pages).
-  const activeArea: AreaKey = urlArea === "learning" && declared ? declared : urlArea;
+  // A page's own declaration wins only where the URL does not decide (course pages); fix round 1b: never a declared
+  // Learning for people without Learning (a course they once joined as a student is not theirs to study)
+  const activeArea: AreaKey = activeAreaFor(rest, view, declared, me);
   // Phase 8c S1: inside a course (declared area with hidden sections) no area shows its sub-menu
-  const hideSections = urlArea === "learning" && !!declaredArea?.hideSections;
+  const hideSections = pageDecidesArea(rest, view, me) && !!declaredArea?.hideSections;
 
   const areas = useMemo<AppHeaderArea[]>(() => {
     const base = `/${lang}`;
@@ -280,7 +281,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
     }
     // S1: one neutral frame for everyone (the server render and the first client render have no answer)
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div data-shell="neutral" className="min-h-screen bg-slate-50">
         <NeutralTopBar lang={lang} />
         <main className={cn("py-6 sm:py-8", SHELL_WIDTH)}><NeutralBody label={t("lms.common.loading")} /></main>
       </div>
@@ -290,8 +291,11 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
 
   const name = testStudent ? t("studentView.testStudentName") : me?.display_name || userProfile?.displayName || user.email || "";
   const email = testStudent ? name : me?.email || user.email || ""; // the header hides an email equal to the name
+  // Fix round 1b (owner): Pro only for people who learn (never for teachers, org admins who teach, platform admins);
+  // Privacy for everyone; Student view (the test student) has no links
+  const showPro = !!shellMe && learnsHere(shellMe);
   const accountLinks = testStudent ? [] : [
-    { href: `/${lang}/pro`, label: t("access.pro.menu"), icon: <KeyRound />, active: rest === "/pro" }, // F6b Pro
+    ...(showPro ? [{ href: `/${lang}/pro`, label: t("access.pro.menu"), icon: <KeyRound />, active: rest === "/pro" }] : []), // F6b Pro
     { href: `/${lang}/privacy`, label: t("privacy.title"), icon: <Lock />, active: rest === "/privacy" }, // Phase 11 S3
   ];
 
@@ -309,7 +313,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
           <LmsMeProvider value={meState}>
             <StudentShellDataContext.Provider value={null}>
               <Suspense fallback={null}><ViewParam onChange={setView} onTab={setTab} /></Suspense>
-              <div className={PLAYER_FRAME}>
+              <div data-shell="player" data-area={activeArea} className={PLAYER_FRAME}>
                 <main id="main" tabIndex={-1} className="focus:outline-none">{gated}</main>
               </div>
             </StudentShellDataContext.Provider>
@@ -340,7 +344,8 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
       <LmsMeProvider value={meState}>
         <StudentShellDataContext.Provider value={studentFrame ? studentData : null}>
         <Suspense fallback={null}><ViewParam onChange={setView} onTab={setTab} /></Suspense>
-        <div className={cn("min-h-screen bg-slate-50", studentFrame && STUDENT_FRAME)}>
+        {/* fix round 1b: the frame and the area, read by the per-role link check (e2e/role-links.spec.ts) */}
+        <div data-shell={kind} data-area={activeArea} className={cn("min-h-screen bg-slate-50", studentFrame && STUDENT_FRAME)}>
           <a href="#main"
             className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-2 focus:z-50 focus:rounded-xl focus:bg-white focus:px-4 focus:py-3 focus:text-sm focus:font-semibold focus:text-brand-800 focus:shadow-lg">
             {t("shell.skipToContent")}

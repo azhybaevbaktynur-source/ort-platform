@@ -8,6 +8,9 @@ import { useRouter } from "next/navigation";
 import { CalendarDays, Languages, Users, UserRound } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { parseApiDate } from "@/lib/format";
+import { useLmsMe } from "@/lib/lms/useLmsMe"; // fix round 1b
+import { hidesLearning } from "@/lib/lms/shellKind"; // fix round 1b
+import { StudentViewButton } from "@/components/lms/course/StudentViewBanner"; // fix round 1b
 import { getCourseLanding, isActiveMember, isFormMode, joinOpenCourse, type CourseLandingOut } from "@/lib/lms/catalog";
 import { listMyApplications, withdrawApplication } from "@/lib/lms/applications";
 import { pickLocalized } from "@/lib/lms/localized";
@@ -56,6 +59,7 @@ export function CourseLanding({ courseId }: { courseId: string }) {
   const { lang, t } = useTranslation();
   const router = useRouter();
   const errorText = useApplicationErrorText();
+  const teaches = hidesLearning(useLmsMe().me); // fix round 1b
   const [course, setCourse] = useState<CourseLandingOut | null>(null);
   const [mine, setMine] = useState<ApplicationOwnOut | null>(null);
   const [loading, setLoading] = useState(true);
@@ -133,7 +137,16 @@ export function CourseLanding({ courseId }: { courseId: string }) {
   };
 
   let primary: React.ReactNode = null;
-  if (member) {
+  if (teaches) {
+    // fix round 1b (owner decision 2026-11-12): people who teach never join as students; Student view where they teach
+    const staff = member && (course.my_enrollment?.role === "teacher" || course.my_enrollment?.role === "assistant");
+    primary = staff ? (
+      <div className="flex flex-wrap items-center gap-3">
+        <LinkButton size="lg" href={`/${lang}/courses/${course.id}`}>{t("catalog.landing.openCourse")}</LinkButton>
+        <StudentViewButton courseId={course.id} />
+      </div>
+    ) : null;
+  } else if (member) {
     primary = <LinkButton size="lg" href={`/${lang}/courses/${course.id}`}>{t("catalog.landing.openCourse")}</LinkButton>;
   } else if (course.enrollment_mode === "open") {
     primary = <Button size="lg" loading={busy} onClick={() => void join()}>{t("catalog.join")}</Button>;

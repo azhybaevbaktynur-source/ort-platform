@@ -14,6 +14,9 @@ import { COURSE_GRID, CourseCard } from "@/components/lms/course/CourseCard";
 import { CatalogFilters } from "@/components/lms/catalog/CatalogFilters";
 import { ApplicationStatusBadge } from "@/components/lms/catalog/ApplicationStatus";
 import { useErrorText } from "./useErrorText";
+import { useLmsMe } from "@/lib/lms/useLmsMe"; // fix round 1b
+import { hidesLearning } from "@/lib/lms/shellKind"; // fix round 1b
+import { StudentViewButton } from "@/components/lms/course/StudentViewBanner"; // fix round 1b
 
 function CatalogSkeleton() {
   const { t } = useTranslation();
@@ -40,6 +43,8 @@ export function CatalogView() {
   const { lang, t } = useTranslation();
   const router = useRouter();
   const errorText = useErrorText();
+  // fix round 1b (owner decision 2026-11-12): people who teach never join as students; Student view where they teach
+  const teaches = hidesLearning(useLmsMe().me);
   const [items, setItems] = useState<CatalogCourseOut[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -102,6 +107,15 @@ export function CatalogView() {
   const landing = (c: CatalogCourseOut) => `/${lang}/courses/catalog/${c.id}`;
 
   const action = (c: CatalogCourseOut) => {
+    if (teaches) {
+      const staff = isActiveMember(c) && (c.my_enrollment?.role === "teacher" || c.my_enrollment?.role === "assistant");
+      return staff ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <LinkButton href={`/${lang}/courses/${c.id}`}>{t("catalog.open")}</LinkButton>
+          <StudentViewButton courseId={c.id} />
+        </div>
+      ) : null;
+    }
     if (isActiveMember(c)) {
       return <LinkButton fullWidth href={`/${lang}/courses/${c.id}`}>{t("catalog.open")}</LinkButton>;
     }
@@ -136,7 +150,7 @@ export function CatalogView() {
     <div className="w-full">
       <PageHeader title={t("catalog.title")} description={t("catalog.subtitle")}
         breadcrumbs={[{ label: t("lms.nav.myCourses"), href: `/${lang}/courses` }, { label: t("catalog.title") }]}
-        secondaryActions={<LinkButton variant="secondary" href={`/${lang}/courses/join`} leftIcon={<KeyRound className="h-4 w-4" aria-hidden="true" />}>{t("home.primary.join")}</LinkButton>} />
+        secondaryActions={teaches ? undefined : <LinkButton variant="secondary" href={`/${lang}/courses/join`} leftIcon={<KeyRound className="h-4 w-4" aria-hidden="true" />}>{t("home.primary.join")}</LinkButton>} />
 
       <CatalogFilters value={filters} onChange={setFilters}
         organizations={Array.from(orgs, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))} />
@@ -154,7 +168,7 @@ export function CatalogView() {
           action={<Button variant="secondary" onClick={() => setFilters({})}>{t("ui.resetFilters")}</Button>} />
       ) : (
         <EmptyState mascot="thinking" title={t("home.catalogEmpty.title")} description={t("home.catalogEmpty.body")}
-          action={<LinkButton href={`/${lang}/courses/join`}>{t("home.primary.join")}</LinkButton>} />
+          action={teaches ? undefined : <LinkButton href={`/${lang}/courses/join`}>{t("home.primary.join")}</LinkButton>} />
       ))}
       {items.length > 0 && (
         <ul className={COURSE_GRID} aria-busy={loading || undefined}>

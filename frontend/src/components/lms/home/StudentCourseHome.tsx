@@ -40,7 +40,8 @@ export function StudentCourseHome() {
     try {
       const [page, mine] = await Promise.all([
         listAssignments(course.id, { limit: 50 }),
-        getMyGrades(course.id).catch(() => null),
+        // fix round 1b (per-role link check): a read-only viewer (an org admin) has no grades of their own (403)
+        course.my_enrollment.read_only ? null : getMyGrades(course.id).catch(() => null),
       ]);
       setItems(page.items as AssignmentStudentOut[]);
       setGrades(mine?.items ?? []);
@@ -49,7 +50,7 @@ export function StudentCourseHome() {
     } finally {
       setLoading(false);
     }
-  }, [course.id]);
+  }, [course.id, course.my_enrollment.read_only]);
   useEffect(() => { void load(); }, [load]);
 
   // Phase 7a S5: the next assignment (a running quiz first, then the nearest one to start or hand in)
