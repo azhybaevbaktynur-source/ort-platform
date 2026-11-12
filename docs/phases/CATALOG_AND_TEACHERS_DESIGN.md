@@ -157,7 +157,7 @@ an invitation banner from a school. The `personal_org_no_members` message is rew
 
 ## 4. Data, API, i18n
 
-### 4.1 Migration `0033_course_listing` (additive except one drop)
+### 4.1 Migration `0034_course_listing` (additive except one drop)
 `courses`: `listing VARCHAR(16) NOT NULL DEFAULT 'off'` with CHECK `listing IN ('off','pending','listed','declined',
 'blocked')`; `listing_requested_at`, `listing_decided_at`, `listing_content_changed_at` timestamptz NULL;
 `listing_decided_by_id` VARCHAR(64) FK `users.id` ON DELETE SET NULL; `listing_note` VARCHAR(500) NULL.
@@ -206,7 +206,7 @@ emails `email.listing.{approved,declined}.*`. Removed: `lms.errors.unlisted_by_a
 
 | # | Slice (model) | Content | Tests |
 |---|---|---|---|
-| S1 | Listing state and catalog scope (Opus) | migration 0033 + backfill, model, `listing` service (`courses/listing.py`: transitions, preconditions, rate limit, audit, emails), catalog list/landing scopes, staff payload, `PATCH` visibility rules, `set_unlisted` → block/relist, admin `GET /platform/catalog` + approve/decline, overview tile; inventory rows | `tests/lms/test_catalog_listing.py`: **visibility matrix** (student, teacher of the course, other teacher, org admin, platform admin, test student × platform/personal/school course × 5 states × published/draft × org active/suspended → in list? landing? open join? code join? form apply?); state machine incl. every 409; `listing_incomplete` details; rate limit; note privacy (not in catalog/landing/home/student course payloads, audit has no text); isolation (teacher B cannot request/withdraw A's course, org admin only in own tree); platform switch sets `listed`; unpublish keeps `listing`; backfill cases on PG (`test_migrations.py`); `test_catalog.py` two-statement bound kept; `test_pg_concurrency` untouched |
+| S1 | Listing state and catalog scope (Opus) | migration 0034 + backfill, model, `listing` service (`courses/listing.py`: transitions, preconditions, rate limit, audit, emails), catalog list/landing scopes, staff payload, `PATCH` visibility rules, `set_unlisted` → block/relist, admin `GET /platform/catalog` + approve/decline, overview tile; inventory rows | `tests/lms/test_catalog_listing.py`: **visibility matrix** (student, teacher of the course, other teacher, org admin, platform admin, test student × platform/personal/school course × 5 states × published/draft × org active/suspended → in list? landing? open join? code join? form apply?); state machine incl. every 409; `listing_incomplete` details; rate limit; note privacy (not in catalog/landing/home/student course payloads, audit has no text); isolation (teacher B cannot request/withdraw A's course, org admin only in own tree); platform switch sets `listed`; unpublish keeps `listing`; backfill cases on PG (`test_migrations.py`); `test_catalog.py` two-statement bound kept; `test_pg_concurrency` untouched |
 | S2 | Teacher settings and admin catalog page (Opus) | settings block §2.6, link-access copy, catalog preview wording for teachers, Teaching-list link removed; `/admin/catalog` page with tabs, landing preview link, dialogs; admin overview tile; Admin → Courses buttons mapped | e2e `catalog-listing.spec.ts` (teacher requests → admin approves → student sees it; decline note visible to the teacher only; blocked course has no button), `role-links.spec.ts` (+ `/admin/catalog`, Teaching list without the catalog link), `catalog.spec.ts` (student sees platform + listed only), 375/1440/1920 ru screens |
 | S3 | Admin Teachers page and organizations filter (Opus) | `GET /platform/teachers`, `/admin/teachers` with the requests tab, redirect from `/admin/teacher-requests`, organizations list without personal rows, personal detail → person page, person «Преподавание» card, audit viewer label, `personal_org_no_members` text | `tests/lms/test_platform_teachers.py` (rows per person kind, counts exclude test students and deleted courses, five statements per page, `q`, filters, authz 403 for non-admins), `test_platform_orgs_list.py` (no personal by default, `kind=personal` 422), e2e `admin-teachers.spec.ts`, `role-links.spec.ts` (independent teacher: no «организац» text) |
 | S4 | Text and polish (Sonnet) | ky/en strings, empty states, emails copy, `docs/HANDOFF_NEXT_AGENT.md`, `PRODUCT_DECISIONS.md`, screenshots `CATALOG_screens/` | parity script, screenshot pass |
@@ -221,6 +221,14 @@ listed when its switch is on. Rollback: S2–S4 are UI; S1's migration downgrade
 `blocked` and sets `visibility = catalog` for `listed`/`pending`.
 
 ## 6. Owner decisions (recommendation first) and better ideas
+
+**Owner answers 2026-11-13** (`FIX_ROUND_2026-11-12.md`, final direction): all as recommended, **except D10**: when a
+teacher is revoked, their courses **leave the catalog automatically** (`listing` → `off`, enrolled students keep
+access) and the fact appears on the admin **attention list** (overview). Re-grant does not relist: the teacher requests
+again. The migration is **`0034_course_listing`** (3a takes `0033_course_exam_family`, built first; `exam_family` and
+`subject` on `courses` are 3a's, `STUDENT_IA_DESIGN.md` §6.1). The catalog list also gets 3a's `?exam=` family filter
+and subject grouping on top of the listing scope (`STUDENT_IA_DESIGN.md` §2.4, §6.3); whichever slice lands first,
+the other adapts `courses/scopes.py`. 3b is built after 3a.
 
 | # | Decision | Recommendation |
 |---|---|---|

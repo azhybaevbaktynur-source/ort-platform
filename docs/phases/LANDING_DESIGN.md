@@ -282,6 +282,15 @@ needed: the page uses the mascot and real screens, not stock people.
 
 ## 6. Owner decisions
 
+**Owner answers 2026-11-13** (`FIX_ROUND_2026-11-12.md`, final direction): **direction A with B's road** folded into
+the three steps (§3); all as recommended **except D2 and D5**. **D2**: the main button goes to `/register`, and after
+sign-up the student gets the skippable **"choose your courses" step** (`/courses/choose`, `STUDENT_IA_DESIGN.md` §4);
+**no automatic enrolment** of any account. **D5**: a simple **first-party count of landing visits and sign-ups** in the
+own backend (no cookies, no third-party tracker; one counter row per day and kind, a `POST /public/visit` beacon from
+the landing with a rate limit, sign-ups counted at registration), shown in the admin overview. The platform name is
+**not decided**: build 3a and 3b first, ask the owner before 3c. No migration number is taken by 3c unless the counter
+needs a table (then `0035`, after 3b's `0034`).
+
 | # | Decision | Recommendation |
 |---|---|---|
 | D1 | Direction A, B or C | **A**, with B's road as the three steps (§3) |
