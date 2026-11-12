@@ -104,14 +104,6 @@ export function isExamPrepStudent(course: Pick<CourseOut, "template" | "my_enrol
 }
 
 /**
- * TEACHER_TO_STUDENT_MAP §2.5: a course its students see in the exam shell: an exam-prep course, or a lesson course
- * attached to one (`exam_course_id`). Only the student frame reads it; staff frames and the player route do not.
- */
-export function isExamShellCourse(course: Pick<CourseOut, "template" | "exam_course_id"> | null | undefined): boolean {
-  return !!course && (templateUi(course).studentLayout === "exam_prep" || course.exam_course_id != null);
-}
-
-/**
  * Step 3a S2 (STUDENT_IA_DESIGN §3): a student of the course (Student view's test student too, never a read-only
  * viewer) sees it as a course space: `CourseFrame` (header + tabs) above every page, the page's own title is its h1.
  */

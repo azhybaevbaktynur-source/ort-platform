@@ -50,8 +50,6 @@ export interface StudentShellProps {
   data: StudentShellData;
   /** Path without the language prefix. */
   rest: string;
-  /** Unused since step 3a S3 (S5 removes the `?tab=` reading in `LmsShell`). */
-  tab?: string | null;
   user: { name: string; email: string };
   /** Areas other than Learning the person has (Teaching, Organization, Platform, Parent). */
   otherAreas: AppHeaderArea[];

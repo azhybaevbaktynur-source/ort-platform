@@ -1,8 +1,9 @@
 "use client";
 
-// Phase 8c S1 (PHASE_8C_DESIGN §2.1-§2.3): the short left course sidebar for staff and students, a "Course menu"
-// sheet on phones (`AreaShell` `phone="drawer"`). Links and active state come from `courseNavItems` (lib/lms/nav.ts);
-// students do not get Announcements and Files until something is published there.
+// Phase 8c S1 (PHASE_8C_DESIGN §2.1-§2.3): the short left course sidebar for staff and read-only viewers (step 3a:
+// students have the course space, `CourseFrame`), a "Course menu" sheet on phones (`AreaShell` `phone="drawer"`).
+// Links and active state come from `courseNavItems` (lib/lms/nav.ts); readers do not get Announcements and Files
+// until something is published there.
 // FB8-5 S1 (STAFF_UX_AUDIT §2, D-FB8-5-1/2): staff get the five sections and a labelled "More" group; no crossed-eye
 // marker any more: a hidden area says so with a badge on its own page header.
 import React from "react";
