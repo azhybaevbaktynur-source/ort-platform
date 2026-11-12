@@ -3,7 +3,7 @@
  * Run: cd frontend && npx tsc --outDir /tmp/agy_shell --module commonjs --target es2020 --skipLibCheck \
  *   src/lib/lms/studentNav.ts src/lib/lms/shellKind.ts src/lib/lms/shellKind.check.ts && node /tmp/agy_shell/shellKind.check.js
  */
-import { hidesLearning, shellKindFor, urlAreaFor, type ShellArea, type ShellMe } from "./shellKind";
+import { activeAreaFor, hidesLearning, learnsHere, shellKindFor, urlAreaFor, type ShellArea, type ShellMe } from "./shellKind";
 
 let failed = 0;
 function ok(cond: boolean, msg: string) {
@@ -15,6 +15,7 @@ const teacherOnly: ShellMe = { is_teacher: true, can_create_courses: true, is_pl
 const teacherLearning: ShellMe = { ...teacherOnly, has_student_enrollments: true };
 const teacherOld: ShellMe = { is_teacher: true, can_create_courses: true, is_platform_admin: false }; // answer without the field
 const admin: ShellMe = { is_teacher: false, can_create_courses: true, is_platform_admin: true, has_student_enrollments: false };
+const adminOnly: ShellMe = { is_teacher: false, can_create_courses: false, is_platform_admin: true }; // creates and teaches nothing
 const kind = (rest: string, me: ShellMe | null, view: string | null = null, declared: ShellArea | null = null) =>
   shellKindFor({ rest, view, declared, me });
 
@@ -47,13 +48,31 @@ ok(kind("/admin/users", admin) === "app", "admin on /admin/users: app");
 ok(kind("/org/o1", null) === "app" && kind("/grading-schemes", null) === "app", "other areas' URLs: app without an answer");
 ok(kind("/courses", admin) === "app", "admin (creates, learns nowhere) on /courses: app");
 
-// --- teacher on a course page, before and after the course's declaration ---
-ok(kind("/courses/c1", teacherOnly) === "neutral", "teacher on a course page before the declaration: neutral");
+// --- teacher on a course page (fix round 1b: the person decides, no waiting for the course's declaration) ---
+ok(kind("/courses/c1", teacherOnly) === "app", "teacher on a course page before the declaration: app at once");
 ok(kind("/courses/c1/people", teacherOnly, null, "teaching") === "app", "declared teaching: app");
-ok(kind("/courses/c1", teacherLearning, null, "learning") === "student", "declared learning (a course they study): student");
+ok(kind("/courses/c1", teacherLearning, null, "learning") === "app", "a course a teacher once joined as a student: app, never the student frame");
+ok(activeAreaFor("/courses/c1", null, "learning", teacherLearning) === "teaching", "...and the header shows Teaching, not Learning");
+ok(activeAreaFor("/courses/c1", null, "teaching", teacherOnly) === "teaching", "a course they teach: Teaching");
+ok(activeAreaFor("/courses/c1", null, "learning", student) === "learning", "a student's course: Learning");
 ok(kind("/courses/c1", null, null, "teaching") === "neutral", "declared but nothing known about the person: neutral");
+ok(kind("/courses/c1", student, null, "learning") === "student", "a student's course page: student");
 ok(kind("/courses/new", teacherOnly) === "app" && kind("/courses/trash", null) === "app", "/courses/new and /courses/trash: app");
-ok(kind("/courses/join", teacherOnly) === "student", "/courses/join is not a course page: no waiting");
+ok(kind("/courses/join", teacherOnly) === "app" && kind("/courses/join", student) === "student", "/courses/join: the person decides");
+
+// --- fix round 1b: URLs no staff area claims (Pro, Privacy, the catalog, invitations, anything new) ---
+for (const rest of ["/pro", "/privacy", "/courses/catalog", "/courses/catalog/c1", "/courses/catalog/c1/apply", "/courses/join", "/invitations", "/courses/become-teacher", "/something-new"]) {
+  ok(kind(rest, student) === "student", `student on ${rest}: student`);
+  ok(kind(rest, teacherOnly) === "app" && urlAreaFor(rest, null, teacherOnly) === "teaching", `teacher on ${rest}: app, Teaching`);
+  ok(kind(rest, teacherLearning) === "app" && urlAreaFor(rest, null, teacherLearning) === "teaching", `teacher with an old enrolment on ${rest}: app, Teaching`);
+  ok(kind(rest, admin) === "app" && urlAreaFor(rest, null, admin) === "teaching", `admin who creates courses on ${rest}: app, Teaching`);
+  ok(kind(rest, adminOnly) === "app" && urlAreaFor(rest, null, adminOnly) === "platform", `admin who teaches nothing on ${rest}: app, Platform`);
+  ok(kind(rest, null) === "neutral", `nobody known yet on ${rest}: neutral`);
+}
+ok(learnsHere(student) && !learnsHere(teacherOnly) && !learnsHere(teacherLearning) && !learnsHere(admin) && !learnsHere(adminOnly),
+  "learnsHere: only people who teach nothing (Pro in the account menu)");
+ok(urlAreaFor("/admin", null, adminOnly) === "platform" && urlAreaFor("/org/o1", null, teacherOnly) === "organization",
+  "claimed URLs keep their area");
 
 // --- player route ---
 ok(kind("/courses/c1/attempts/a1", null) === "player", "player route, cold: player");

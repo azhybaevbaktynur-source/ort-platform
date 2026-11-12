@@ -29,7 +29,7 @@ from sqlalchemy.orm import Session, aliased
 from app.core.authz import A, AuthzContext
 from app.lms.audit import service as audit
 from app.lms.core import clock, ratelimit
-from app.lms.core.errors import Conflict, NotFound, RateLimited, ValidationFailed
+from app.lms.core.errors import Conflict, Forbidden, NotFound, RateLimited, ValidationFailed
 from app.lms.core.pagination import PageOut
 from app.lms.courses import scopes
 from app.lms.courses.models import Course
@@ -196,6 +196,10 @@ def submit(db: Session, ctx: AuthzContext, course_id: uuid.UUID, data: sch.Appli
 def _submit(db: Session, user: User, course_id: uuid.UUID, data: sch.ApplicationSubmitIn,
             background: Optional[BackgroundTasks]) -> sch.ApplicationOwnOut:
     course = _catalog_course(db, user.id, course_id)
+    from app.lms.enrollments.service import TEACHER_CANNOT_ENROLL, teaches
+
+    if teaches(user):  # fix round 2026-11-12 1b: teachers and students are separate accounts (as `_join`)
+        raise Forbidden("People who teach cannot join a course as a student", code=TEACHER_CANNOT_ENROLL)
     if course.enrollment_mode not in ids.FORM_MODES or course.template_key == "ort":
         raise Conflict("This course does not take applications", code=ids.E_COURSE_NOT_OPEN)
     form = db.execute(select(EnrollmentForm).where(EnrollmentForm.course_id == course.id,

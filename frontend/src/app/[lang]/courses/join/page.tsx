@@ -9,6 +9,8 @@ import { rememberAccepted } from "@/lib/lms/invitations";
 import { pickLocalized } from "@/lib/lms/localized";
 import { JoinCodeForm } from "@/components/lms/JoinCodeForm";
 import { Card, PageHeader, cn, focusRing } from "@/components/ui";
+import { useLmsMe } from "@/lib/lms/useLmsMe"; // fix round 1b
+import { hidesLearning } from "@/lib/lms/shellKind"; // fix round 1b
 
 // Phase 6b S6b (UX S10): one name for the action ("Join with code"), and a way to the catalog for students
 // without a code.
@@ -16,6 +18,17 @@ function JoinInner() {
   const { lang, t } = useTranslation();
   const router = useRouter();
   const params = useSearchParams();
+  // fix round 1b (owner decision 2026-11-12): people who teach cannot join as students (the server refuses it too)
+  const teaches = hidesLearning(useLmsMe().me);
+  if (teaches) {
+    return (
+      <div className="mx-auto w-full max-w-md">
+        <PageHeader title={t("courses.join.title")}
+          breadcrumbs={[{ label: t("lms.nav.myCourses"), href: `/${lang}/courses` }, { label: t("courses.join.title") }]} />
+        <Card><p className="text-base leading-6 text-slate-700 sm:text-sm">{t("lms.errors.teacher_cannot_enroll")}</p></Card>
+      </div>
+    );
+  }
   return (
     <div className="mx-auto w-full max-w-md">
       <PageHeader title={t("courses.join.title")}

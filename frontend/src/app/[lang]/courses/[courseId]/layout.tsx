@@ -15,6 +15,9 @@ import { StaffCourseBar } from "@/components/lms/course/StaffCourseUi"; // Phase
 import { useDeclareArea, useDeclareStudentCourse } from "@/components/lms/LmsShell"; // Phase 6b integration; Student UI U2
 import { isExamShellCourse } from "@/lib/lms/templates"; // Student UI U2; TEACHER_TO_STUDENT_MAP §2.5
 import { invalidate, put, useCached, type SwrOptions } from "@/lib/lms/swr"; // PERFORMANCE_AUDIT S2
+import { useLmsMe } from "@/lib/lms/useLmsMe"; // fix round 1b
+import { hidesLearning } from "@/lib/lms/shellKind"; // fix round 1b
+import { LinkButton } from "@/components/ui"; // fix round 1b
 // --- Phase 8c S1 begin --- (course sidebar, Student view, hidden areas: PHASE_8C_DESIGN §2, §6)
 import { CourseSidebar } from "@/components/lms/course/CourseSidebar";
 import { AreaUnavailable } from "@/components/lms/course/AreaUnavailable";
@@ -35,6 +38,8 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
   const key = `course:${courseId}`;
   const { data, error, refresh: reload } = useCached<CourseOut>(key, () => getCourse(courseId), COURSE_CACHE);
   const course = data;
+  const { me } = useLmsMe(); // fix round 1b: people who teach never study a course here
+  const teaches = hidesLearning(me);
   const setCourse = useCallback((c: CourseOut) => put(key, c, COURSE_CACHE), [key]);
   // refused or gone now (left, removed, deleted): the cached course must not keep drawing the frame
   const status = (error as { status?: number } | null)?.status;
@@ -65,7 +70,8 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
         <p className="mt-2 text-sm text-slate-600">{t("courses.notFound.body")}</p>
         <div className="mt-5 flex flex-wrap justify-center gap-3 text-sm font-medium">
           <Link href={`/${lang}/courses`} className="rounded-xl bg-brand-600 px-4 py-2 text-white hover:bg-brand-700">{t("courses.home.backToList")}</Link>
-          <Link href={`/${lang}/courses/join`} className="rounded-xl border border-slate-200 px-4 py-2 text-slate-700 hover:bg-slate-50">{t("courses.notFound.join")}</Link>
+          {/* fix round 1b: people who teach cannot join as students */}
+          {!teaches && <Link href={`/${lang}/courses/join`} className="rounded-xl border border-slate-200 px-4 py-2 text-slate-700 hover:bg-slate-50">{t("courses.notFound.join")}</Link>}
           {/* --- Phase 6 S6b: the catalog has its own page --- */}
           <Link href={`/${lang}/courses/catalog`} className="rounded-xl border border-slate-200 px-4 py-2 text-slate-700 hover:bg-slate-50">{t("lms.nav.catalog")}</Link>
         </div>
@@ -96,6 +102,21 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
   }
   // SF-1: the player has no course frame for anyone (it is a full-screen overlay)
   if (playerPage) return <CourseContext.Provider value={ctx}>{children}</CourseContext.Provider>;
+  // Fix round 1b (owner decision 2026-11-12: teachers and students are separate accounts): a person who teaches opening a
+  // course they are enrolled in as a student (a leftover enrolment) gets a plain page in the app frame, never the student
+  // course; their own courses open as staff (Student view shows them as a student). Read-only viewers without an
+  // enrolment (an org or platform admin reading a course) keep the read-only course view, in the app frame too
+  if (teaches && !staff && role === "student" && !course.my_enrollment.read_only) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
+        <h1 className="text-xl font-bold text-slate-900">{t("courses.notYours.title")}</h1>
+        <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">{t("courses.notYours.body")}</p>
+        <div className="mt-5 flex justify-center">
+          <LinkButton href={`/${lang}/courses`}>{t("courses.home.backToList")}</LinkButton>
+        </div>
+      </div>
+    );
+  }
   // --- Phase 8c S1 begin --- (PHASE_8C_DESIGN §2.1, P8C-8: result and review pages under /attempts/** keep
   // today's full-width column without the sidebar, except for exam-prep students, SF-1 below) ---
   const attemptsPage = pathname === `${base}/attempts` || pathname.startsWith(`${base}/attempts/`);
