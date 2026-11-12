@@ -173,6 +173,10 @@ def set_cover(db: Session, ctx: AuthzContext, course: Course, raw: bytes, *, fil
         encoder=partial(encode_cover, focus_x=fx, focus_y=fy), dedup_salt=f"cover:{fx:.3f}:{fy:.3f}")
     old = course.cover_asset_id
     course.cover_asset_id = asset.id
+    if old != asset.id:
+        from app.lms.courses.listing import mark_content_changed
+
+        mark_content_changed(course)  # step 3b: edited after the catalog approval
     if old is not None and old != asset.id:
         _release(db, old, course.id, ctx.user.id)
     audit.record(db, actor=ctx.user, action="course.cover_set", target_type="course", target_id=str(course.id),
@@ -188,6 +192,9 @@ def clear_cover(db: Session, ctx: AuthzContext, course: Course, *, request: Opti
     if old is None:
         return
     course.cover_asset_id = None
+    from app.lms.courses.listing import mark_content_changed
+
+    mark_content_changed(course)  # step 3b: edited after the catalog approval
     db.flush()
     _release(db, old, course.id, ctx.user.id)
     audit.record(db, actor=ctx.user, action="course.cover_cleared", target_type="course", target_id=str(course.id),

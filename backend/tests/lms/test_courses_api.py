@@ -111,11 +111,11 @@ async def test_limit_below_current_and_unlisted(db, api):
     r = await api.call(t, "PATCH", f"/courses/{c.id}", json={"enrollment_limit": 2})
     assert r.status_code == 409 and r.json()["error"]["code"] == "limit_below_current"
     assert (await api.call(t, "PATCH", f"/courses/{c.id}", json={"enrollment_limit": 3})).status_code == 200
-    from app.lms.core.models import utcnow
-    c.unlisted_by_admin_at = utcnow()
+    # step 3b: a blocked course keeps its link-access switch (the block hides the list and the landing anyway)
+    c.listing = "blocked"
     db.commit()
     r = await api.call(t, "PATCH", f"/courses/{c.id}", json={"visibility": "catalog"})
-    assert r.status_code == 409 and r.json()["error"]["code"] == "unlisted_by_admin"
+    assert r.status_code == 200 and r.json()["unlisted_by_admin"] is True and r.json()["listing"]["state"] == "blocked"
 
 
 def make_course_pub(db, owner, **kw):

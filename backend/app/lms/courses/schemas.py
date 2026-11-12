@@ -117,6 +117,61 @@ class OptionalReasonIn(BaseModel):
     reason: Optional[str] = Field(default=None, max_length=500)
 
 
+# --- step 3b S1 begin --- (CATALOG_AND_TEACHERS_DESIGN 2.3, 4.2: the catalog listing)
+class ListingNoteIn(BaseModel):
+    """Approve (note optional) and decline (note required: 422 `listing_note_required` from the service)."""
+    model_config = ConfigDict(extra="forbid")
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
+class CourseListingOut(BaseModel):
+    """Course staff and the platform admin only; the note never reaches a student payload."""
+    state: str
+    requested_at: Optional[datetime] = None
+    decided_at: Optional[datetime] = None
+    note: Optional[str] = None
+    content_changed: bool = False  # title, description, cover or mode edited after the last approval
+
+
+def _utc(dt: datetime) -> datetime:
+    from datetime import timezone
+
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+
+
+def listing_content_changed(course) -> bool:
+    changed, decided = getattr(course, "listing_content_changed_at", None), getattr(course, "listing_decided_at", None)
+    if changed is None:
+        return False
+    return decided is None or _utc(changed) > _utc(decided)
+
+
+def course_listing_out(course) -> CourseListingOut:
+    return CourseListingOut(state=course.listing or "off", requested_at=course.listing_requested_at,
+                            decided_at=course.listing_decided_at, note=course.listing_note,
+                            content_changed=listing_content_changed(course))
+
+
+class AdminCatalogRowOut(BaseModel):
+    """`GET /platform/catalog`: one course of a listing state for the platform admin."""
+    id: uuid.UUID
+    title: dict
+    default_language: str
+    cover_url: Optional[str] = None
+    owner: UserBrief
+    teacher_kind: Literal["platform", "independent", "school"]
+    school_name: Optional[str] = None  # the root organization's name, schools only
+    status: str
+    visibility: str
+    enrollment_mode: str
+    student_count: int = 0
+    tests_count: int = 0
+    lessons_count: int = 0
+    listing: CourseListingOut
+    published_at: Optional[datetime] = None
+# --- step 3b S1 end ---
+
+
 class AdminTransferIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     new_owner_user_id: str = Field(min_length=1, max_length=64)
@@ -181,7 +236,8 @@ class CourseStaffOut(CourseStudentOut):
     enrollment_mode: str
     enrollment_limit: Optional[int] = None
     visibility: str
-    unlisted_by_admin: bool
+    unlisted_by_admin: bool  # step 3b: `listing.state == 'blocked'` (kept until the S2 settings block replaces the hint)
+    listing: Optional[CourseListingOut] = None  # step 3b S1: the catalog listing (staff only)
     active_student_count: int
     owner: UserBrief
     is_owner: bool
@@ -212,7 +268,8 @@ class AdminCourseOut(BaseModel):
     status: str
     visibility: str
     enrollment_mode: str
-    unlisted_by_admin_at: Optional[datetime] = None
+    unlisted_by_admin_at: Optional[datetime] = None  # step 3b: derived, the block time when `listing == 'blocked'`
+    listing: Optional[CourseListingOut] = None  # step 3b S1
     active_student_count: int
     created_at: datetime
     deleted_at: Optional[datetime] = None
@@ -329,7 +386,7 @@ def course_staff_out(course, enrollment, owner, active_student_count: int, viewe
     return CourseStaffOut(
         **base, join_code=course.join_code, enrollment_mode=course.enrollment_mode,
         enrollment_limit=course.enrollment_limit, visibility=course.visibility,
-        unlisted_by_admin=course.unlisted_by_admin_at is not None,
+        unlisted_by_admin=course.listing == "blocked", listing=course_listing_out(course),
         active_student_count=active_student_count, owner=user_brief(owner),
         is_owner=(course.owner_id == viewer_id), created_at=course.created_at, updated_at=course.updated_at,
         published_at=course.published_at, concluded_at=course.concluded_at,
@@ -342,7 +399,8 @@ def admin_course_out(course, owner, active_student_count: int) -> AdminCourseOut
     return AdminCourseOut(
         id=course.id, title=course.title, owner=user_brief(owner), status=course.status,
         visibility=course.visibility, enrollment_mode=course.enrollment_mode,
-        unlisted_by_admin_at=course.unlisted_by_admin_at, active_student_count=active_student_count,
+        unlisted_by_admin_at=(course.listing_decided_at or course.updated_at) if course.listing == "blocked" else None,
+        listing=course_listing_out(course), active_student_count=active_student_count,
         created_at=course.created_at, deleted_at=course.deleted_at, deleted_by_id=course.deleted_by_id,
         exam_family=course.exam_family, subject=course.subject,
     )

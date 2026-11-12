@@ -51,7 +51,8 @@ def ort_world(db, *, students=1):
     w.course = make_course(
         db, w.teacher, title={"ru": "ОРТ (рус)", "en": "ORT (Russian)"}, languages=["ru", "en"], default_language="ru",
         status="published", visibility="catalog", enrollment_mode="open", organization_id=platform_org_id(),
-        template_key="ort", template_version=1, template_locked=True, published_at=utcnow())
+        template_key="ort", template_version=1, template_locked=True, published_at=utcnow(),
+        listing="listed")  # step 3b: platform courses are listed
     w.students, w.enrs = [], []
     for i in range(students):
         s = make_user(db, display_name=f"S{i}")
@@ -388,24 +389,27 @@ async def test_home_lists_open_platform_courses_the_student_is_not_in(db, api):
     w = ort_world(db)
     ky = make_course(db, w.teacher, title={"ky": "ЖРТ"}, languages=["ky"], default_language="ky", status="published",
                      visibility="catalog", enrollment_mode="open", organization_id=platform_org_id(),
-                     template_key="ort", template_version=1, published_at=utcnow())
+                     template_key="ort", template_version=1, published_at=utcnow(), listing="listed")
     unlisted = make_course(db, w.teacher, status="published", visibility="catalog", enrollment_mode="open",
-                           organization_id=platform_org_id(), published_at=utcnow(), unlisted_by_admin_at=utcnow())
+                           organization_id=platform_org_id(), published_at=utcnow(), listing="blocked")
+    not_listed = make_course(db, w.teacher, status="published", visibility="catalog", enrollment_mode="open",
+                             organization_id=platform_org_id(), published_at=utcnow())  # step 3b: `listing` off
     private = make_course(db, w.teacher, status="published", visibility="private", enrollment_mode="open",
                           organization_id=platform_org_id(), published_at=utcnow())
     by_code = make_course(db, w.teacher, status="published", visibility="catalog", enrollment_mode="invite_code",
-                          organization_id=platform_org_id(), published_at=utcnow())
+                          organization_id=platform_org_id(), published_at=utcnow(), listing="listed")
     draft = make_course(db, w.teacher, status="draft", visibility="catalog", enrollment_mode="open",
                         organization_id=platform_org_id())
     school = make_org(db)
     school_course = make_course(db, w.teacher, status="published", visibility="catalog", enrollment_mode="open",
-                                organization_id=school.id, published_at=utcnow())
+                                organization_id=school.id, published_at=utcnow(), listing="listed")
     newcomer = make_user(db)
     r = await api.call(newcomer, "GET", "/me/home")
     listed = r.json()["platform_courses"]
     assert {c["id"] for c in listed} == {str(w.course.id), str(ky.id)}, listed
     assert all(set(c) == PLATFORM_COURSE_KEYS and c["is_platform_course"] for c in listed)
-    assert not {unlisted.id, private.id, by_code.id, draft.id, school_course.id} & {c["id"] for c in listed}
+    assert not {unlisted.id, not_listed.id, private.id, by_code.id, draft.id, school_course.id} & {
+        c["id"] for c in listed}
     # an enrolled student no longer sees it there (it is one of their courses); a removed one sees it again
     enrolled = (await api.call(w.s, "GET", "/me/home")).json()
     assert [c["id"] for c in enrolled["platform_courses"]] == [str(ky.id)]

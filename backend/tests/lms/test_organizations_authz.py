@@ -161,6 +161,7 @@ async def test_suspended_org_read_only_hidden_and_generic_join(db, api):
     from app.lms.core.models import utcnow
 
     course.visibility, course.enrollment_mode, course.published_at = "catalog", "invite_code", utcnow()
+    course.listing = "listed"  # step 3b: approved by the platform admin
     db.commit()
     code = course.join_code
     newcomer = make_user(db)

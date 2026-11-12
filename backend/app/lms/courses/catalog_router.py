@@ -50,6 +50,7 @@ CATALOG_LIMIT_MAX = 50
 
 class CourseLandingOut(CatalogCardOut):
     teachers: list[str]                   # public display names (never emails), owner first
+    is_listed: bool = False               # step 3b: in the catalog list (else reached by link only)
     starts_at: Optional[datetime] = None
     ends_at: Optional[datetime] = None
     form: Optional[dict] = None           # PublicFormOut of the active form, form modes only (fields, no answers)
@@ -151,8 +152,8 @@ EXAM_COURSE_KEYS = frozenset(ExamCourseOut.model_fields)
 
 
 def exam_families(db: Session, user_id: str) -> list[ExamFamilyOut]:
-    """Two statements: at most `EXAM_COURSES_MAX` catalog courses (`scopes._catalog_select`: published, listed, not
-    unlisted, live organization tree) of the platform organization with a known family and `enrollment_mode = open`
+    """Two statements: at most `EXAM_COURSES_MAX` catalog courses (`scopes._catalog_select`: published, link access,
+    `listing = 'listed'`, live organization tree) of the platform organization with a known family and `enrollment_mode = open`
     (the only ones `choose` can join), and their card extras. Families in `FAMILIES` order, empty ones left out; in a
     family the main courses first, then subjects in `SUBJECTS` order, newest first."""
     from app.lms.courses import exam_families as reg
@@ -206,7 +207,8 @@ def choose(data: ChooseIn, ctx: AuthzContext = Depends(get_authz)):
 # --- STUDENT_IA_DESIGN 6.3 / 4 end ---
 
 
-# --- Phase 9 S4 begin --- (landing: the same scope, so private / unlisted / suspended / deleted courses are 404)
+# --- Phase 9 S4 begin --- (landing: the linkable scope (step 3b, CATALOG_AND_TEACHERS_DESIGN 2.2), so private /
+# blocked / suspended / deleted courses are 404; an unlisted course opens by link)
 def _teachers(db: Session, course: Course) -> list[str]:
     from app.lms.enrollments.models import Enrollment
     from app.lms.enrollments.schemas import public_display_name
@@ -221,7 +223,7 @@ def _teachers(db: Session, course: Course) -> list[str]:
 
 
 def landing(db: Session, user_id: str, course_id: uuid.UUID) -> CourseLandingOut:
-    row = db.execute(scopes.catalog_cards(user_id).where(Course.id == course_id)).first()
+    row = db.execute(scopes.catalog_cards(user_id, scope="linkable").where(Course.id == course_id)).first()
     if row is None:
         raise NotFound("Course not found", code="course_not_found")
     course = row[0]
@@ -234,7 +236,7 @@ def landing(db: Session, user_id: str, course_id: uuid.UUID) -> CourseLandingOut
         if active is not None:
             form = public_form_out(db, active).model_dump(mode="json")
     return CourseLandingOut(**card.model_dump(), teachers=_teachers(db, course), starts_at=course.starts_at,
-                            ends_at=course.ends_at, form=form)
+                            ends_at=course.ends_at, form=form, is_listed=course.listing == "listed")
 
 
 @router.get("/courses/{course_id}", response_model=CourseLandingOut)

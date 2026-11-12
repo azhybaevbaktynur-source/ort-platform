@@ -9,6 +9,7 @@ from app.lms.core.models import utcnow
 from app.lms.organizations.defaults import ensure_platform_org
 from app.lms.organizations.ids import personal_org_id, platform_org_id
 from app.lms.organizations.models import Organization
+from app.models.user import User
 from tests.lms.org_support import add_member, make_department, make_org
 from tests.lms.s3_support import api, clean_rate_limits, db, enroll, make_course, make_user, teacher  # noqa: F401
 
@@ -34,6 +35,12 @@ def _platform_catalog_course(db):
 async def test_platform_org_cannot_be_suspended_and_ort_stays_in_catalog(db, api):
     admin = make_user(db, platform_admin=True)
     course = _platform_catalog_course(db)
+    # step 3b (CATALOG_AND_TEACHERS_DESIGN 2.3): the platform admin's link-access switch lists a platform course
+    # directly, no queue; switching it off takes the course off the list, on again lists it again
+    owner = db.get(User, course.owner_id)
+    for visibility, state in (("private", "off"), ("catalog", "listed")):
+        r = await api.call(owner, "PATCH", f"/courses/{course.id}", json={"visibility": visibility})
+        assert r.status_code == 200 and r.json()["listing"]["state"] == state, r.text
     r = await api.call(admin, "POST", f"{P}/{platform_org_id()}/suspend", json={"reason": "test"})
     assert r.status_code == 409 and r.json()["error"]["code"] == "platform_org_protected"
     db.expire_all()

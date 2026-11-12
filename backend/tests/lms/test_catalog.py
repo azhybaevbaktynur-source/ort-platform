@@ -16,7 +16,7 @@ from tests.lms.s3_support import api, clean_rate_limits, db, enroll, make_course
 # Catalog cards show enrollment_mode on purpose (the UI decides Join vs "ask for a code"); nothing else private.
 FORBIDDEN = {"join_code", "enrollment_limit", "email", "user_id", "visibility", "active_student_count", "owner",
              "owner_id", "is_owner", "unlisted_by_admin", "unlisted_by_admin_at", "invite_token_hash", "settings",
-             "deleted_at", "deleted_by_id"}
+             "deleted_at", "deleted_by_id", "listing", "listing_note"}  # step 3b: the listing is staff-only
 
 
 def walk_keys(obj):
@@ -33,10 +33,10 @@ _N = [0]
 
 
 def catalog_course(db, owner, *, mode="open", minutes_ago=None, **kw):
-    """Published, catalog-visible course; published_at strictly decreasing per call unless given."""
+    """Published, catalog-visible, listed course (step 3b); published_at strictly decreasing per call unless given."""
     _N[0] += 1
     ago = minutes_ago if minutes_ago is not None else 10_000 - _N[0]
-    fields = dict(status="published", visibility="catalog", enrollment_mode=mode,
+    fields = dict(status="published", visibility="catalog", enrollment_mode=mode, listing="listed",
                   published_at=utcnow() - timedelta(minutes=ago))
     fields.update(kw)
     return make_course(db, owner, **fields)
@@ -93,7 +93,7 @@ async def test_listing_shows_only_published_catalog_courses(db, api):
         make_course(db, t, status="published", enrollment_mode="open", published_at=utcnow()),  # private
         catalog_course(db, t, status="draft"),
         catalog_course(db, t, status="concluded"),
-        catalog_course(db, t, unlisted_by_admin_at=utcnow()),
+        catalog_course(db, t, listing="blocked"),
         catalog_course(db, t, deleted_at=utcnow(), deleted_by_id=t.id),
     ]
     ids, _ = await catalog_ids(api, s)
@@ -225,7 +225,7 @@ async def test_every_open_join_failure_matches_the_bad_code_404(db, api):
         catalog_course(db, t, status="draft"),
         catalog_course(db, t, status="concluded"),
         catalog_course(db, t, deleted_at=utcnow(), deleted_by_id=t.id),
-        catalog_course(db, t, unlisted_by_admin_at=utcnow()),
+        catalog_course(db, t, listing="blocked"),
         make_course(db, t, status="published", enrollment_mode="open", published_at=utcnow()),  # private
     ]
     full = catalog_course(db, t, enrollment_limit=1)

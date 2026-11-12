@@ -49,7 +49,7 @@ _N = [0]
 
 def catalog_course(db, owner, *, mode="invite_code", **kw):
     _N[0] += 1
-    fields = dict(status="published", visibility="catalog", enrollment_mode=mode,
+    fields = dict(status="published", visibility="catalog", enrollment_mode=mode, listing="listed",  # step 3b
                   published_at=utcnow() - timedelta(minutes=10_000 - _N[0]))
     fields.update(kw)
     return make_course(db, owner, **fields)

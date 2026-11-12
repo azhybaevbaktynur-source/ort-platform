@@ -367,6 +367,11 @@ def set_teacher_status(
 
         suspend_personal_org(db, user, reason)
         details["organization_id"] = str(personal_org_id(user.id))
+        # step 3b S1, owner D10 (2026-11-13): the person's courses leave the catalog list (`listing` → off, audited
+        # per course for the admin overview's attention list); students keep their access; re-grant does not relist
+        from app.lms.courses.listing import off_on_revoke
+
+        details["courses_unlisted"] = len(off_on_revoke(db, admin, user, request=request))
     # --- Phase 6 S1 end ---
     audit.record(
         db, actor=admin, action="user.teacher_status.set", target_type="user", target_id=user.id,

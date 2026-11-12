@@ -59,6 +59,7 @@ export default function AdminOverviewPage() {
               reveals={overview.data ? { count: overview.data.reveals_last_hour, alert: overview.data.reveal_alert } : null}
               failedChecks={health ? failedHealthChecks(health) : null}
               database={overview.data?.database ?? null}
+              catalogRevoked={overview.data?.catalog_revoked_7d ?? null}
               summaryError={ready ? error : null} onRetry={refresh} />
           </CardBoundary>
           <CardBoundary>

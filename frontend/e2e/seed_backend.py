@@ -362,7 +362,12 @@ def seed_catalog_apply(api: Api, log: Path, admin_tok: str) -> dict:
     teacher["profile"] = profile(api, teacher["token"])
     tok = teacher["token"]
     title = {"ru": "Курс с анкетой E2E", "ky": "Анкеталуу курс E2E", "en": "Application course E2E"}
-    course = api.call("POST", "/courses", tok, {"title": title, "languages": ["ru", "ky", "en"], "default_language": "ru"})
+    # step 3b S1: a description and one published lesson, so the walk can ask for the catalog listing
+    description = {"ru": "Курс для проверки анкеты", "ky": "Анкетаны текшерүү үчүн курс", "en": "A course to check the form"}
+    course = api.call("POST", "/courses", tok, {"title": title, "description": description,
+                                                "languages": ["ru", "ky", "en"], "default_language": "ru"})
+    api.call("POST", f"/courses/{course['id']}/modules", tok,
+             {"title": {"ru": "Введение", "ky": "Киришүү", "en": "Introduction"}, "published": True})
     api.call("POST", f"/courses/{course['id']}/publish", tok, {})
     student = register(api, log, "e2e-apply-student@example.com", "Айдана Заявка")
     student["profile"] = profile(api, student["token"])
