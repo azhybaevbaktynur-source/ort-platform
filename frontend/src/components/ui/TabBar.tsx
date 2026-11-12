@@ -31,14 +31,15 @@ export interface TabBarProps {
 /** Bottom padding for <main> below 1024 px: the bar plus 16 px and the safe area. */
 export const TAB_BAR_SPACE = "pb-[calc(80px+env(safe-area-inset-bottom))] lg:pb-8";
 
-const SLOT = "flex min-h-11 w-full flex-col items-center justify-center gap-0.5 rounded-control px-1 pt-1 text-[11px] font-semibold leading-[14px] " +
+// step 3a S3: tighter gutters, so five slots with «Продолжить» fit one line at 375 px
+const SLOT = "flex min-h-11 w-full flex-col items-center justify-center gap-0.5 rounded-control px-0 pt-1 text-[11px] font-semibold leading-[14px] tracking-tight " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600";
 
 export function TabBar({ label, items, className }: TabBarProps) {
   return (
     <nav aria-label={label}
       className={cn("fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden", className)}>
-      <ul className="mx-auto flex h-16 max-w-xl items-stretch gap-1 px-2 py-1.5">
+      <ul className="mx-auto flex h-16 max-w-xl items-stretch gap-0 px-0.5 py-1.5">
         {items.map((it) => {
           const on = !!it.active || !!it.expanded;
           const body = (

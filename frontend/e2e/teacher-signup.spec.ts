@@ -120,7 +120,7 @@ test("a new person: account, emailed code, application, pending", async ({ brows
   await expectCleanPage(page, [PASSWORD, PHONE, "Школа № 5"]);
   await expectNoSidewaysScroll(page);
 
-  await page.goto("/ru/courses");
+  await page.goto("/ru/home"); // step 3a S3: the hub carries the application line
   await expect(page.getByRole("status").filter({ hasText: t("home.teacherApplication.pending") })).toBeVisible();
   await ctx.close();
 });
@@ -220,7 +220,7 @@ test("rejected: the reason and the date during the wait; the dashboard says the 
   await expect(page.getByLabel(t("teacherApply.field.phone"))).toHaveCount(0);
   await expectNoSidewaysScroll(page);
 
-  await page.goto("/ru/courses");
+  await page.goto("/ru/home"); // step 3a S3: the hub carries the application line
   const line = page.getByRole("status").filter({ hasText: t("home.teacherApplication.rejected") });
   await expect(line).toContainText("Нет данных о школе");
   await expect(line).toContainText(/\d{2}\.\d{2}\.\d{4}/);
@@ -241,8 +241,8 @@ test("the admin reads the application and approves it; the header changes", asyn
   const d = data();
   const user = d.approve;
   const student = await as(browser, user);
-  await student.goto("/ru/courses");
-  await expect(student.getByRole("heading", { name: t("home.dashboard") })).toBeVisible();
+  await student.goto("/ru/home"); // step 3a S3: the hub
+  await expect(student.getByRole("heading", { level: 1 })).toBeVisible(); // the hub's greeting
   await expect(student.getByRole("navigation", { name: t("shell.areas.label") })).toHaveCount(0);
 
   const admin = await as(browser, seed().admin);
@@ -271,14 +271,14 @@ test("the admin reads the application and approves it; the header changes", asyn
   // owner feedback 2026-11-08 (item 2): a new teacher who learns nowhere has Teaching only; Learning's link opens it
   await expect.poll(() => areas(student)).toEqual([t("shell.areas.teaching")]);
   await student.goto("/ru/courses?view=learning");
-  await expect(student).toHaveURL(/\/ru\/courses\?view=teaching$/);
+  await expect(student).toHaveURL(/\/ru\/courses$/); // step 3a S3: ?view= is gone
   const line = student.getByRole("status").filter({ hasText: t("home.teacherApplication.approved") });
   await expect(line).toHaveCount(1); // shown once, on the Teaching view
   await expect(line.getByRole("link")).toHaveCount(0); // fix round 2026-11-12 1c: no link to the page it is on
 
   await student.goto(APPLY);
   await expect(student.getByRole("heading", { level: 2, name: t("teacherApply.approved.title") })).toBeVisible();
-  await expect(student.getByRole("link", { name: t("teacherApply.approved.link") })).toHaveAttribute("href", "/ru/courses?view=teaching");
+  await expect(student.getByRole("link", { name: t("teacherApply.approved.link") })).toHaveAttribute("href", "/ru/courses"); // step 3a S3
   await student.context().close();
   await admin.context().close();
 });
@@ -286,8 +286,8 @@ test("the admin reads the application and approves it; the header changes", asyn
 test("no teacher link anywhere for a student; the old pages redirect", async ({ browser }) => {
   const page = await as(browser, data().no_links);
   const noTeacherLink = () => expect(page.locator('a[href*="for-teachers"], a[href*="teacher-access"], a[href*="become-teacher"]')).toHaveCount(0);
-  await page.goto("/ru/courses");
-  await expect(page.getByRole("heading", { name: t("home.dashboard") })).toBeVisible();
+  await page.goto("/ru/home"); // step 3a S3: the hub
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await page.getByRole("button", { name: t("shell.account.menu", { name: data().no_links.name }) }).click();
   await expect(page.getByRole("link", { name: t("privacy.title") })).toBeVisible();
   await noTeacherLink();
@@ -369,7 +369,7 @@ test("an independent teacher: no Organization tab, /org redirects, the personal 
   await expect.poll(() => areas(page)).toEqual([t("shell.areas.teaching")]); // owner feedback 2026-11-08 (item 2)
 
   await page.goto(`/ru/org/${d.personal_org_id}`);
-  await expect(page).toHaveURL(/\/ru\/courses\?view=teaching$/);
+  await expect(page).toHaveURL(/\/ru\/courses$/); // step 3a S3: no ?view=
   await page.goto("/ru/org");
   await expect(page.getByText(t("organizations.org.pickEmpty"))).toBeVisible();
 

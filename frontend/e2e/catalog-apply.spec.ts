@@ -164,7 +164,7 @@ test("student finds the course, opens the landing and applies", async ({ browser
   await uxShots(page, UX, "student-landing-pending", STUDENT);
 
   // home: the "Pending applications" line
-  await page.goto("/ru/courses");
+  await page.goto("/ru/home"); // step 3a S3: the hub carries the pending applications line
   await expect(page.getByRole("heading", { name: t("applications.home.title") })).toBeVisible();
   await uxShots(page, UX, "student-home-pending", STUDENT);
   await page.context().close();

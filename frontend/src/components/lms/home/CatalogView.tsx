@@ -16,6 +16,7 @@ import { ApplicationStatusBadge } from "@/components/lms/catalog/ApplicationStat
 import { useErrorText } from "./useErrorText";
 import { useLmsMe } from "@/lib/lms/useLmsMe"; // fix round 1b
 import { hidesLearning } from "@/lib/lms/shellKind"; // fix round 1b
+import { useStudentShellDataContext } from "@/components/lms/student/StudentShellDataContext"; // step 3a S3
 
 function CatalogSkeleton() {
   const { t } = useTranslation();
@@ -44,6 +45,8 @@ export function CatalogView() {
   const errorText = useErrorText();
   // fix round 1b (owner decision 2026-11-12): people who teach never join as students; Student view where they teach
   const teaches = hidesLearning(useLmsMe().me);
+  // step 3a S3: a global page of the student frame (sidebar Каталог): no breadcrumbs there
+  const studentFrame = !!useStudentShellDataContext();
   const [items, setItems] = useState<CatalogCourseOut[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -144,7 +147,7 @@ export function CatalogView() {
   return (
     <div className="w-full">
       <PageHeader title={t("catalog.title")} description={t("catalog.subtitle")}
-        breadcrumbs={[{ label: t("lms.nav.myCourses"), href: `/${lang}/courses` }, { label: t("catalog.title") }]}
+        breadcrumbs={studentFrame ? undefined : [{ label: t("lms.nav.myCourses"), href: `/${lang}/courses` }, { label: t("catalog.title") }]}
         secondaryActions={teaches ? undefined : <LinkButton variant="secondary" href={`/${lang}/courses/join`} leftIcon={<KeyRound className="h-4 w-4" aria-hidden="true" />}>{t("home.primary.join")}</LinkButton>} />
 
       <CatalogFilters value={filters} onChange={setFilters}

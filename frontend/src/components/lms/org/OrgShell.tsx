@@ -54,7 +54,7 @@ export function OrgShell({ children }: { children: React.ReactNode }) {
   // Accounts: a personal organization has no area of its own; only the platform admin opens it here.
   const personal = org?.kind === "personal" && !me?.is_platform_admin;
   useEffect(() => {
-    if (personal && me) router.replace(`/${lang}/courses?view=teaching`);
+    if (personal && me) router.replace(`/${lang}/courses`); // step 3a S3: no ?view=
   }, [personal, me, lang, router]);
 
   // --- Admin orgs (item 4) begin --- (ADMIN_ORGS_DESIGN §2.4, §2.5)

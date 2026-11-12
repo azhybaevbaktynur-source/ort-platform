@@ -215,9 +215,9 @@ function pagesOf(): PageSpec[] {
   const tc = s.course_nav.course_id;
   return [
     { key: "login", url: "/ru/login", user: null },
-    { key: "student-home", url: "/ru/courses", user: student, next: `/ru/courses/${sc}/tests` },
+    { key: "student-home", url: "/ru/home", user: student, next: `/ru/courses/${sc}/tests` }, // step 3a S3: the hub
     { key: "student-tests", url: `/ru/courses/${sc}/tests`, user: student, next: `/ru/courses/${sc}/progress` },
-    { key: "student-analytics", url: `/ru/courses/${sc}/progress`, user: student, next: "/ru/courses" },
+    { key: "student-analytics", url: `/ru/courses/${sc}/progress`, user: student, next: "/ru/home" },
     { key: "teacher-courses", url: "/ru/courses", user: teacher, next: `/ru/courses/${tc}` },
     { key: "teacher-course", url: `/ru/courses/${tc}`, user: teacher, next: `/ru/courses/${tc}/people` },
     { key: "admin-overview", url: "/ru/admin", user: s.admin, next: "/ru/admin/users" },

@@ -72,11 +72,10 @@ test.describe("exam-prep page (ru)", () => {
     try {
       await signIn(page, newcomer);
 
-      // ---- home: "From the platform" lists the ORT courses; one tap joins
-      await page.goto(`/${L}/courses`);
-      const platform = page.getByRole("region", { name: t("home.platform.title") });
-      await expect(platform).toBeVisible();
-      const card = platform.locator("li").filter({ has: page.locator(`a[href="/${L}/courses/catalog/${cid}"]`) });
+      // ---- step 3a S3: the hub has no «От платформы» (the choose step, S4, picks platform courses); the catalog lists
+      // the ORT courses and one tap joins
+      await page.goto(`/${L}/courses/catalog`);
+      const card = page.locator("main#main li").filter({ has: page.locator(`a[href="/${L}/courses/catalog/${cid}"]`) });
       await expect(card).toHaveCount(1);
       await shoot(page, "home-platform");
       await markPage(page);
@@ -88,8 +87,9 @@ test.describe("exam-prep page (ru)", () => {
       await expect(tabs.getByRole("link", { name: t("course.tabs.overview"), exact: true })).toHaveAttribute("aria-current", "page");
       await expect(page.getByRole("group", { name: new RegExp(`^${t("course.header.examIn")}: \\d+ `) })).toBeVisible();
       // PERFORMANCE_AUDIT S2: the shell shows the joined course without a page reload (the bootstrap is asked again)
-      await expect(page.getByRole("navigation", { name: t("student.nav.label") }).getByRole("link", { name: t("student.nav.tests") }))
-        .toHaveAttribute("href", `/${L}/courses/${cid}/tests`);
+      // step 3a S3: as a «Мои курсы» row of the sidebar (current: the student is inside it)
+      await expect(page.getByRole("navigation", { name: t("student.nav.label") }).locator(`a[href^="/${L}/courses/${cid}"]`))
+        .toHaveAttribute("aria-current", "page");
       expect(await samePage(page), "joining reloaded the page").toBe(true);
       await tabs.getByRole("link", { name: t("course.tabs.tests"), exact: true }).click();
       await page.waitForURL(new RegExp(`/${L}/courses/${cid}/tests$`));
@@ -112,15 +112,20 @@ test.describe("exam-prep page (ru)", () => {
       await expect(page.getByRole("navigation", { name: t("ui.breadcrumbs") })).toHaveCount(0);
       await shoot(page, "tests-new");
 
-      // ---- Student UI U3: the home is now the exam-prep home of ORT (Russian): greeting, countdown, Next, no score yet
-      await page.goto(`/${L}/courses`);
+      // ---- step 3a S3: the hub: greeting, the continue card (the Тесты tab just opened), the ORT card with its countdown
+      await page.goto(`/${L}/home`);
       await expect(page.getByRole("heading", { level: 1 })).toContainText(newcomer.name.split(" ")[0]);
-      await expect(page.getByRole("group", { name: new RegExp(`^${t("examPrep.goal.daysLabel")}: \\d+ `) })).toBeVisible();
-      await expect(page.getByRole("region", { name: t("examPrep.next.title") })).toContainText("ОРТ E2E");
-      const scores = page.getByRole("region", { name: t("home.prep.score.title") });
-      await expect(scores).toContainText(t("examPrep.goal.latestLabel")); // U9: the slim line before a result
+      const cont = page.getByRole("region", { name: t("home.hub.continue") });
+      await expect(cont.getByRole("link", { name: t("home.hub.open") })).toHaveAttribute("href", `/${L}/courses/${cid}/tests`);
+      const ortGroup = page.locator('section[aria-labelledby="group-ort"]');
+      const ortCard = ortGroup.locator("li").filter({ has: page.locator(`a[href="/${L}/courses/${cid}"]`) });
+      await expect(ortCard).toContainText(new RegExp(t("home.hub.card.examIn", { count: "\\d+" })));
+      await expect(ortCard.getByRole("link", { name: t("home.hub.step.start") })).toBeVisible();
 
-      // ---- the target, inline on the home: out of range is refused, 200 is kept
+      // ---- the target, on the course Обзор (step 3a S2): out of range is refused, 200 is kept
+      await page.goto(`/${L}/courses/${cid}`);
+      const scores = page.locator("#goal");
+      await expect(scores).toContainText(t("course.header.lastScore"));
       await scores.getByRole("button", { name: t("examPrep.goal.setTarget") }).click();
       const input = page.getByLabel(t("examPrep.goal.inputLabel", { min: 60, max: 245 }));
       await input.fill("300");
@@ -164,17 +169,15 @@ test.describe("exam-prep page (ru)", () => {
       await first.getByRole("link", { name: t("examPrep.tests.result"), exact: true }).click();
       await page.waitForURL(new RegExp(`/courses/${cid}/assessments/${s.exam.id}$`));
 
-      // ---- the home: ORT (Russian) is one of the student's courses now, no longer under "From the platform"
-      await page.goto(`/${L}/courses`);
-      await expect(page.getByRole("navigation", { name: t("student.nav.label") }).getByRole("link", { name: t("student.nav.tests") }))
-        .toHaveAttribute("href", `/${L}/courses/${cid}/tests`); // U9: the course is the shell's exam, no course grid
-      await expect(page.locator(`a[href="/${L}/courses/catalog/${cid}"]`)).toHaveCount(0);
-      // Student UI U3: current vs target, the section rows of the latest result, the streak of today's answers
+      // ---- the Обзор: current vs target (step 3a S3: the hub has no statistics)
+      await page.goto(`/${L}/courses/${cid}`);
       await expect(scores).toContainText(t("examPrep.goal.outOf", { max: 245 }));
       await expect(scores).toContainText("200");
-      await expect(page.getByRole("region", { name: t("examPrep.sections.title") }).locator('[role="meter"], [role="img"]')).toHaveCount(5); // rated sections a meter, others a neutral bar (F4c)
-      await expect(page.getByRole("region", { name: t("progress.analytics.tiles.streak") })).toContainText(t("home.prep.streak.days_one", { count: 1 }));
-      await expect(page.getByRole("region", { name: t("examPrep.next.title") })).toContainText("ОРТ E2E staff");
+      // ---- the hub: the ORT card's last result line; the result list and the section rows are not on the hub
+      await page.goto(`/${L}/home`);
+      await expect(ortCard).toContainText(t("home.hub.card.lastResult", { value: "" }).trim());
+      await expect(page.getByRole("region", { name: t("examPrep.sections.title") })).toHaveCount(0);
+      await expect(page.locator(`main#main a[href="/${L}/courses/catalog/${cid}"]`)).toHaveCount(0);
       await shoot(page, "home-prep-after");
     } finally {
       await api(s.admin, "PATCH", `/courses/${cid}`, { exam_date: null });
@@ -182,7 +185,7 @@ test.describe("exam-prep page (ru)", () => {
     }
   });
 
-  test("leave from the exam sheet: no reload, the home no longer shows the course", async ({ browser }) => {
+  test("leave from the course Обзор: no reload, «Мои курсы» no longer shows the course", async ({ browser }) => {
     const s = seed();
     const cid = s.course_id;
     const newcomer = s.exam_prep!.newcomer;
@@ -190,16 +193,16 @@ test.describe("exam-prep page (ru)", () => {
     const page = await ctx.newPage();
     try {
       await signIn(page, newcomer);
-      await page.goto(`/${L}/courses`);
-      await expect(page.getByRole("region", { name: t("examPrep.next.title") })).toBeVisible(); // the exam-prep home of ORT
+      // step 3a S3: no exam sheet; leaving is the quiet link on the course Обзор (S2)
+      await page.goto(`/${L}/courses/${cid}`);
+      await expect(page.getByRole("navigation", { name: t("course.tabs.label") })).toBeVisible();
       await markPage(page);
-      await page.getByRole("button", { name: new RegExp(`^${t("student.switcher.open", { name: "ОРТ" }).split(":")[0]}:`) }).click();
-      await page.getByRole("dialog").getByRole("button", { name: t("courses.home.leave"), exact: true }).click();
+      await page.getByRole("button", { name: t("courses.home.leave"), exact: true }).click();
       await page.getByRole("alertdialog", { name: t("courses.home.leaveTitle") }).getByRole("button", { name: t("courses.home.leave"), exact: true }).click();
       await page.waitForURL(new RegExp(`/${L}/courses$`));
-      // the home reads itself again: the course is offered under "From the platform", its exam-prep home is gone
-      await expect(page.getByRole("region", { name: t("home.platform.title") }).locator(`a[href="/${L}/courses/catalog/${cid}"]`)).toHaveCount(1);
-      await expect(page.getByRole("region", { name: t("examPrep.next.title") })).toHaveCount(0);
+      // «Мои курсы» reads itself again: the course is gone (cards and the «Ещё» rows)
+      await expect(page.getByRole("heading", { level: 1, name: t("courses.mine.title") })).toBeVisible();
+      await expect(page.locator(`main#main a[href^="/${L}/courses/${cid}"]`)).toHaveCount(0);
       expect(await samePage(page), "leaving reloaded the page").toBe(true);
     } finally {
       await api(newcomer, "POST", `/courses/${cid}/join`); // as it was for any later run

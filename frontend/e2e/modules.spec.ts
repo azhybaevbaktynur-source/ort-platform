@@ -374,10 +374,10 @@ test.describe("modules walk (ru)", () => {
     await expect(badge(sp, M1, "completed")).toBeVisible();
 
     // ---- student dashboard (UX rework C): the quiz with attempts left is listed once under "To do"; no greeting, no "up next"
-    await sp.goto(`/${L}/courses`);
-    await expect(sp.getByRole("heading", { level: 1, name: t("home.dashboard") })).toBeVisible();
+    await sp.goto(`/${L}/home`); // step 3a S3: the hub
+    await expect(sp.getByRole("heading", { level: 1 })).toBeVisible();
     await expect(sp.locator('section[aria-labelledby="home-todo"]').getByText(QUIZ)).toHaveCount(1);
-    await expect(sp.locator(`section[aria-labelledby="home-courses"] a[href="${base}"]`)).toBeVisible();
+    await expect(sp.locator(`section[aria-labelledby="hub-courses"] a[href="${base}"]`).first()).toBeVisible();
 
     // ---- announcement: draft (students do not see it), then posted -> course list and the student home
     await tp.goto(`${base}/announcements`);
@@ -394,8 +394,8 @@ test.describe("modules walk (ru)", () => {
     await sp.reload();
     await expect(sp.getByRole("heading", { name: ANN_TITLE })).toBeVisible();
     await expect(sp.locator(".katex").first()).toBeVisible();
-    await sp.goto(`/${L}/courses`);
-    await expect(sp.locator('section[aria-labelledby="home-announcements"]')).toContainText(ANN_TITLE);
+    await sp.goto(`/${L}/home`); // step 3a S3: an announcement row of «К выполнению»
+    await expect(sp.locator('section[aria-labelledby="home-todo"]')).toContainText(ANN_TITLE);
 
     // ---- course home switched to the page (Settings -> "Course home"): the student's course opens on the page
     await tp.goto(`${base}/settings`);
@@ -445,8 +445,9 @@ test.describe("modules walk (ru)", () => {
       // Student UI U2/U4: inside an exam-prep course the student shell navigates (no course sidebar); without modules
       // it has no Видеоуроки link, and Files / Announcements stay hidden from the student (auto-hide)
       const studentNav = sp.getByRole("navigation", { name: t("student.nav.label") });
-      await expect(studentNav.getByRole("link", { name: t("student.nav.tests") })).toHaveAttribute("aria-current", "page");
-      await expect(studentNav.getByRole("link", { name: t("student.nav.lessons") })).toHaveCount(0);
+      // step 3a S3: the course's «Мои курсы» row is current; without modules the course has no Уроки tab
+      await expect(studentNav.locator(`a[href^="${base}"]`)).toHaveAttribute("aria-current", "page");
+      await expect(sp.getByRole("navigation", { name: t("course.tabs.label") }).getByRole("link", { name: t("course.tabs.lessons"), exact: true })).toHaveCount(0);
       await expect(tabs(sp)).toHaveCount(0);
       for (const area of ["files", "announcements"]) {
         await sp.goto(`${base}/${area}`);
@@ -496,7 +497,7 @@ test.describe("modules walk (ru)", () => {
       await expect(sp.getByText("Правила ОРТ").first()).toBeVisible();
       await expect(sp.getByText(t("courseNav.unavailable.title"))).toHaveCount(0);
       await sp.goto(`${base}/tests`);
-      await expect(sp.getByRole("navigation", { name: t("student.nav.label") }).getByRole("link", { name: t("student.nav.lessons") })).toBeVisible();
+      await expect(sp.getByRole("navigation", { name: t("course.tabs.label") }).getByRole("link", { name: t("course.tabs.lessons"), exact: true })).toBeVisible(); // step 3a S3: the tab
       // Exam prep S2 (owner 2026-11-06): ORT students open the exam-prep page; the module is a source of the test library
       // and the exam card opens the same lobby (the Modules page below keeps the module view)
       const lib = sp.getByRole("region", { name: t("examPrep.library.title") });
@@ -612,7 +613,7 @@ test.describe("modules walk (ru)", () => {
         await sp.goto(`${base}/announcements`);
         await expect(sp.getByRole("heading", { name: ANN_TITLE })).toBeVisible();
         await shoot(sp, "student-announcements", vp, lang);
-        await sp.goto(`/${lang}/courses`);
+        await sp.goto(`/${lang}/home`); // step 3a S3: the hub
         await expect(sp.locator('section[aria-labelledby="home-todo"]')).toBeVisible();
         await shoot(sp, "student-home-strip", vp, lang);
         // the quiz lobby inside a module that is locked (M3 is after M2; M2's quiz is open, so lock M2 by date briefly)

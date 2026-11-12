@@ -53,7 +53,7 @@ function RegisterForm() {
     } else if (redirectParam) {
       router.push(redirectParam);
     } else {
-      router.push(`/${lang}/courses`);
+      router.push(`/${lang}/home`); // step 3a S3: the hub (S4: the choose step)
     }
   };
 

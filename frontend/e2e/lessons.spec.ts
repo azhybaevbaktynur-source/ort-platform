@@ -128,18 +128,20 @@ test.describe("course lessons (ru)", () => {
         return mod.items.find((i) => i.id === itemId)!;
       };
 
-      // ---- the sidebar: "Уроки", already on Главная (U9: the course list carries what the course has); one Тесты link
-      await page.goto(`/${L}/courses`);
+      // ---- step 3a S3: the sidebar's «Мои курсы» row opens the course (no global Уроки / Тесты links); its Уроки tab
+      await page.goto(`/${L}/home`);
       const nav = page.getByRole("navigation", { name: t("student.nav.label") });
-      const lessonsLink = nav.getByRole("link", { name: t("student.nav.lessons"), exact: true });
-      await expect(lessonsLink).toBeVisible();
-      await expect(nav.getByRole("link", { name: t("student.nav.tests"), exact: true })).toHaveCount(1);
-      await lessonsLink.click();
+      const row = nav.locator(`a[href^="${base}"]`);
+      await expect(row).toHaveCount(1);
+      await expect(nav.getByRole("link", { name: t("student.nav.tests"), exact: true })).toHaveCount(0);
+      await row.click();
+      await page.waitForURL(new RegExp(`${base}(/[a-z]+)?$`));
+      const courseTabs = page.getByRole("navigation", { name: t("course.tabs.label") });
+      await courseTabs.getByRole("link", { name: t("course.tabs.lessons"), exact: true }).click();
       // step 3a S2: the syllabus is the course's Уроки tab
       await page.waitForURL(new RegExp(`${base}/lessons$`));
-      await expect(page.getByRole("navigation", { name: t("course.tabs.label") }).getByRole("link", { name: t("course.tabs.lessons"), exact: true }))
-        .toHaveAttribute("aria-current", "page");
-      await expect(lessonsLink).toHaveAttribute("aria-current", "page");
+      await expect(courseTabs.getByRole("link", { name: t("course.tabs.lessons"), exact: true })).toHaveAttribute("aria-current", "page");
+      await expect(row).toHaveAttribute("aria-current", "page");
       await expect(nav.getByRole("link", { name: M1, exact: true })).toHaveCount(0);
 
       // ---- the Уроки tab: one h1 (the tab), the banner with "Начать курс" to the first lesson, "Пройдено 0 из 8", About

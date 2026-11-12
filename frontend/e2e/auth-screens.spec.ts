@@ -203,7 +203,7 @@ test.describe("Google callback page", () => {
     await expect(page.getByText(t("auth.oauth.switchBody", { current: OTHER.email, email: "new.person@example.com" }))).toBeVisible();
     expect(bodies).toHaveLength(0); // nothing is sent before the answer
     await page.getByRole("button", { name: t("auth.oauth.switchStay") }).click();
-    await expect(page).toHaveURL(/\/ru\/courses/);
+    await expect(page).toHaveURL(/\/ru\/home/); // step 3a S3: the hub
     expect(bodies).toHaveLength(0);
 
     await page.goto(`/ru/oauth-callback#t=${TICKET}`);

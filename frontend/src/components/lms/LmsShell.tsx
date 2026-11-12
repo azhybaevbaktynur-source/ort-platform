@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, Suspense, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import React, { createContext, Suspense, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, Building2, KeyRound, Lock, Presentation, ShieldCheck, Users } from "lucide-react";
 import { useTranslation, type Language } from "@/lib/i18n/context";
@@ -22,16 +22,14 @@ import { StudentViewBanner } from "./course/StudentViewBanner"; // UX rework S1
 import { PrivacyBanner } from "@/components/privacy/PrivacyBanner"; // Phase 11 S3
 // --- Student UI U2 ---
 import type { CourseOut } from "@/lib/lms/types";
-import { courseIdOfPath } from "@/lib/lms/studentNav";
 import { STUDENT_FRAME, STUDENT_MAIN, StudentChrome, StudentTabBar } from "./student/StudentShell";
 import { useStudentShellData } from "./student/useStudentShellData";
 import { StudentShellDataContext } from "./student/StudentShellDataContext"; // Student UI U3
 
 /*
  * Phase 6b S5b: the frame of every signed-in page (courses/*, admin/*, org/*, grading-schemes, invitations).
- * `AppHeader` with the area switcher replaces the old link rows. Area URLs: Learning `/courses` (or
- * `/courses?view=learning` for people who also teach), Teaching `/courses?view=teaching`, Organization
- * `/org/{id}` (or the picker `/org`), Platform `/admin`.
+ * `AppHeader` with the area switcher replaces the old link rows. Area URLs (step 3a S3: no `?view=` any more): Learning
+ * `/home` (people who learn only), Teaching `/courses`, Organization `/org/{id}` (or the picker `/org`), Platform `/admin`.
  */
 
 /** Phase 8c S1 (PHASE_8C_DESIGN §2.5): a page's area plus whether the area's sub-menu (the header's second row on
@@ -56,12 +54,11 @@ export function useDeclareArea(area: AreaKey | null, opts: { hideSections?: bool
   }, [area, hideSections, declare]);
 }
 
-/** Reads `?view=` (needs a Suspense boundary for static pages). Student UI U2: also `?tab=` (the shell's active link). */
-function ViewParam({ onChange, onTab }: { onChange: (v: string | null) => void; onTab: (v: string | null) => void }) {
+/** Reads `?tab=` (needs a Suspense boundary for static pages; S5 removes it with the last reader). Step 3a S3: `?view=`
+ * no longer decides anything. */
+function ViewParam({ onTab }: { onTab: (v: string | null) => void }) {
   const params = useSearchParams();
-  const view = params.get("view");
   const tab = params.get("tab");
-  useEffect(() => { onChange(view); }, [view, onChange]);
   useEffect(() => { onTab(tab); }, [tab, onTab]);
   return null;
 }
@@ -93,10 +90,6 @@ const ATTEMPT_PAGE = /^\/courses\/[^/]+\/attempts\//;
 // --- SF-1 end ---
 
 // --- PERFORMANCE_AUDIT S1 begin --- (§5.1): the frame is decided once (`shellKindFor`), never drawn and then swapped.
-/** `?view=` read at render time (null on the server and during hydration), so a cached answer decides at once. */
-const noSubscribe = () => () => {};
-const readView = () => new URLSearchParams(window.location.search).get("view");
-
 /** The loading frame used while nothing decides the frame yet: brand bar + skeleton; no sidebar, no area pills. */
 function NeutralTopBar({ lang }: { lang: string }) {
   return (
@@ -132,9 +125,6 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const meState = useLmsMeLoader(signedIn);
   const { me } = meState;
   const unauthorized = meState.error?.status === 401;
-  // PERFORMANCE_AUDIT S1: `?view=` is read from the URL at render time; ViewParam's state only re-renders the shell
-  const [, setView] = useState<string | null>(null);
-  const view = useSyncExternalStore(noSubscribe, readView, () => null);
   const cachedMe = useCachedMe(); // S1: the cached answer, readable from the render right after hydration
   const [tab, setTab] = useState<string | null>(null); // Student UI U2
   const [declaredCourse, setDeclaredCourse] = useState<CourseOut | null>(null); // Student UI U2
@@ -187,27 +177,26 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const areasLoading = !me && !meState.error;
 
   const rest = pathname.replace(/^\/(en|ky|ru)(?=\/|$)/, "") || "/";
-  // Same default as the /courses page (its Teaching tab opens first for teachers and course creators); without
-  // Learning, `/courses?view=learning` is Teaching (the page replaces the URL); other student URLs still open
-  const urlArea: AreaKey = urlAreaFor(rest, view, me);
+  // Step 3a S3: `/courses` and `/home` are the person's home area (Teaching for people who teach, Learning otherwise)
+  const urlArea: AreaKey = urlAreaFor(rest, me);
   // A page's own declaration wins only where the URL does not decide (course pages); fix round 1b: never a declared
   // Learning for people without Learning (a course they once joined as a student is not theirs to study)
-  const activeArea: AreaKey = activeAreaFor(rest, view, declared, me);
+  const activeArea: AreaKey = activeAreaFor(rest, declared, me);
   // Phase 8c S1: inside a course (declared area with hidden sections) no area shows its sub-menu
-  const hideSections = pageDecidesArea(rest, view, me) && !!declaredArea?.hideSections;
+  const hideSections = pageDecidesArea(rest) && !!declaredArea?.hideSections;
 
   const areas = useMemo<AppHeaderArea[]>(() => {
     const base = `/${lang}`;
     const list: AppHeaderArea[] = hideLearning ? [] : [
-      { key: "learning", label: t("shell.areas.learning"), href: hasTeaching ? `${base}/courses?view=learning` : `${base}/courses`, icon: <BookOpen /> },
+      { key: "learning", label: t("shell.areas.learning"), href: `${base}/home`, icon: <BookOpen /> },
     ];
     if (hasTeaching || isAdmin) {
       // integration fix: "Мои курсы" asks its first page on hover/focus (pageData); the other sections have no cached reader
-      const sections: AppHeaderLink[] = [{ href: `${base}/courses?view=teaching`, label: t("shell.teaching.courses"), active: rest === "/courses" && urlArea === "teaching", prefetch: prefetchTeachingCourses }];
+      const sections: AppHeaderLink[] = [{ href: `${base}/courses`, label: t("shell.teaching.courses"), active: rest === "/courses" && urlArea === "teaching", prefetch: prefetchTeachingCourses }];
       if (canCreate) sections.push({ href: `${base}/courses/new`, label: t("lms.nav.create"), active: rest === "/courses/new" });
       if (canCreate || isAdmin) sections.push({ href: `${base}/grading-schemes`, label: t("lms.nav.gradingSchemes"), active: rest.startsWith("/grading-schemes") });
       sections.push({ href: `${base}/exam-templates`, label: t("examTemplates.nav.title"), active: rest.startsWith("/exam-templates") }); // Phase 7b S4
-      list.push({ key: "teaching", label: t("shell.areas.teaching"), href: `${base}/courses?view=teaching`, icon: <Presentation />, sections });
+      list.push({ key: "teaching", label: t("shell.areas.teaching"), href: `${base}/courses`, icon: <Presentation />, sections });
     }
     // Item 4 (ADMIN_ORGS_DESIGN §2.5, D-ORG-3): a platform admin can manage every organization, so they always get the
     // switcher: their own organizations, the foreign one open right now (from `OrgShell`, no extra request) and
@@ -240,12 +229,11 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   // --- PERFORMANCE_AUDIT S1 begin --- (§5.1; replaces Student UI U2's `studentFrame` guess and the two pre-auth
   // skeletons): the frame comes from `shellKindFor` over the cached (or fresh) answer. Nothing known yet: the neutral
   // frame. When `/me/lms` fails, the cached /auth/me profile decides as before.
-  const pathCourseId = courseIdOfPath(rest);
   const playerRoute = isPlayerRoute(rest);
   const knownMe: ShellMe | null = me ?? cachedMe;
   const fallbackMe: ShellMe | null = meState.error ? { is_teacher: isTeacher, can_create_courses: canCreate, is_platform_admin: isAdmin } : null;
   const shellMe = signedIn && !unauthorized ? knownMe ?? fallbackMe : null;
-  const computedKind = shellKindFor({ rest, view, declared, me: shellMe });
+  const computedKind = shellKindFor({ rest, declared, me: shellMe });
   // Latched per page: a background refresh that would change the frame is applied on the next navigation, never
   // mid-page. The frame is recomputed when the URL changes, when the page declares its area and when the first
   // answer arrives (cold). A page whose area is still unknown keeps the frame it was opened from.
@@ -254,7 +242,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   // the same, and later background refreshes still wait for the next navigation.
   const [confirmedSeen, setConfirmedSeen] = useState(false);
   if (meState.confirmed && !confirmedSeen) setConfirmedSeen(true); // render-time update, like the latch below
-  const latchKey = `${pathname}?${view ?? ""}#${declared ?? ""}#${shellMe ? 1 : 0}#${confirmedSeen ? 1 : 0}`;
+  const latchKey = `${pathname}#${declared ?? ""}#${shellMe ? 1 : 0}#${confirmedSeen ? 1 : 0}`;
   const [latch, setLatch] = useState<{ key: string; kind: ShellKind } | null>(null);
   let kind: ShellKind = computedKind;
   if (latch && latch.key === latchKey) {
@@ -268,10 +256,10 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const hideChildren = kind === "neutral" && !shellMe;
   // ...and so does the student shell's data when the URL and the cached profile say student (no extra round)
   const profileTeaches = userProfile?.teacher_status === "approved" || !!userProfile?.is_platform_admin;
-  const guessStudent = hideChildren && !profileTeaches && areaFromUrl(rest, view) === "learning";
+  const guessStudent = hideChildren && !profileTeaches && areaFromUrl(rest) === "learning";
   const studentData = useStudentShellData({
     enabled: signedIn && !unauthorized && (studentFrame || guessStudent),
-    pathCourseId, declared: declaredCourse, onHome: rest === "/courses", pathKey: rest,
+    declared: declaredCourse, onHome: rest === "/home", pathKey: rest,
   });
 
   if (authLoading || !user || unauthorized) {
@@ -312,7 +300,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
         <StudentCourseDeclareContext.Provider value={setDeclaredCourse}>
           <LmsMeProvider value={meState}>
             <StudentShellDataContext.Provider value={null}>
-              <Suspense fallback={null}><ViewParam onChange={setView} onTab={setTab} /></Suspense>
+              <Suspense fallback={null}><ViewParam onTab={setTab} /></Suspense>
               <div data-shell="player" data-area={activeArea} className={PLAYER_FRAME}>
                 <main id="main" tabIndex={-1} className="focus:outline-none">{gated}</main>
               </div>
@@ -327,8 +315,8 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
       {/* --- Phase 6 S4b / S8: invitation banner and notice stay under the header --- */}
       <PendingInvitationsBanner enabled={!!me && !testStudent} />
       <InvitationAcceptedNotice />
-      {/* Phase 11 S3: the one small home-page line; never on the player's paths */}
-      {rest === "/courses" && signedIn && !testStudent && !consentBlocked && <PrivacyBanner />}
+      {/* Phase 11 S3: the one small home-page line (step 3a S3: the hub); never on the player's paths */}
+      {rest === "/home" && signedIn && !testStudent && !consentBlocked && <PrivacyBanner />}
       {gated}
     </>
   );
@@ -343,7 +331,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
       <StudentCourseDeclareContext.Provider value={setDeclaredCourse}>
       <LmsMeProvider value={meState}>
         <StudentShellDataContext.Provider value={studentFrame ? studentData : null}>
-        <Suspense fallback={null}><ViewParam onChange={setView} onTab={setTab} /></Suspense>
+        <Suspense fallback={null}><ViewParam onTab={setTab} /></Suspense>
         {/* fix round 1b: the frame and the area, read by the per-role link check (e2e/role-links.spec.ts) */}
         <div data-shell={kind} data-area={activeArea} className={cn("min-h-screen bg-slate-50", studentFrame && STUDENT_FRAME)}>
           <a href="#main"

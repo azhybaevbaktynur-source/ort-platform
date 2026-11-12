@@ -26,7 +26,7 @@ function Hero() {
           <p className="mt-3 max-w-xl text-base leading-7 text-slate-600 sm:mt-5 sm:text-xl sm:leading-8">{t("landing.hero.subtitle")}</p>
           {user ? (
             <div className="mt-6 sm:mt-8">
-              <LinkButton size="lg" href={`/${lang}/courses`} className="w-full sm:w-auto sm:min-w-[14rem]" rightIcon={arrow}>
+              <LinkButton size="lg" href={`/${lang}/home`} className="w-full sm:w-auto sm:min-w-[14rem]" rightIcon={arrow}>
                 {t("landing.hero.continue")}
               </LinkButton>
             </div>
@@ -144,7 +144,7 @@ function FinalBlock() {
             <p className="mt-3 text-base leading-7 text-brand-100 sm:text-lg">{t(user ? "landing.final.bodySignedIn" : "landing.final.body")}</p>
           </div>
         </div>
-        <Link href={user ? `/${lang}/courses` : `/${lang}/register`}
+        <Link href={user ? `/${lang}/home` : `/${lang}/register`}
           className={buttonClasses({ variant: "secondary", size: "lg", className: "w-full shrink-0 border-white sm:w-auto sm:min-w-[14rem]" })}>
           {t(user ? "landing.hero.continue" : "landing.final.button")}
         </Link>

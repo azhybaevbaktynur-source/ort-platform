@@ -19,6 +19,9 @@ import { cn, focusRing } from "@/components/ui/utils";
  * install it or already did). Shown as a sidebar pill (phone: in "More") with a sheet; gone once every item is done
  * (U9: no home card, review item 3). One store per tab; the home seeds it from the page it already loaded.
  * Data items that are done are remembered on this device (no more requests); the install item is always read live.
+ * Step 3a S3 (STUDENT_IA_DESIGN §10.1): one checklist per student, not per exam course: its facts come from the
+ * student's newest exam course (goal -> that course's Обзор `#goal`, first test -> its Тесты tab, practice -> the
+ * Тесты tab's `#practice`), and "done" is remembered once per user.
  */
 
 export type GettingStartedKey = "goal" | "test" | "practice" | "install";
@@ -47,12 +50,16 @@ function patch(courseId: string, p: Partial<Facts>) {
   emit();
 }
 
-const doneKey = (userId: string, courseId: string) => `ort_getting_started:${userId}:${courseId}`;
+// step 3a S3: per student; the old per-course keys (`…:{userId}:{courseId}`) count too, so nobody sees it come back
+const doneKey = (userId: string) => `ort_getting_started:${userId}`;
 function readDone(userId: string, courseId: string): boolean {
-  try { return window.localStorage.getItem(doneKey(userId, courseId)) === "1"; } catch { return false; }
+  try {
+    const s = window.localStorage;
+    return s.getItem(doneKey(userId)) === "1" || s.getItem(`${doneKey(userId)}:${courseId}`) === "1";
+  } catch { return false; }
 }
-function writeDone(userId: string, courseId: string) {
-  try { window.localStorage.setItem(doneKey(userId, courseId), "1"); } catch { /* the checklist is asked again */ }
+function writeDone(userId: string) {
+  try { window.localStorage.setItem(doneKey(userId), "1"); } catch { /* the checklist is asked again */ }
 }
 
 /** The home already loaded the exam-prep page: its goal and results feed the checklist without another request. */
@@ -78,7 +85,7 @@ async function loadPractice(courseId: string) {
 }
 
 /**
- * `courseId`: the shell's current exam course; `practice`: whether it has practice (null: not known yet); `pathKey`
+ * `courseId`: the student's newest exam course; `practice`: whether it has practice (null: not known yet); `pathKey`
  * changes on every navigation (stale facts are read again then); `seeded`: the page seeds the exam-prep facts itself.
  */
 export function useGettingStarted({ courseId, practice, pathKey, enabled, seeded = false }: {
@@ -106,7 +113,7 @@ export function useGettingStarted({ courseId, practice, pathKey, enabled, seeded
   const dataDone = remembered || (facts.goal === true && facts.test === true && (practice === false || facts.practice === true));
   useEffect(() => {
     if (enabled && userId && courseId && !remembered && dataDone) {
-      writeDone(userId, courseId);
+      writeDone(userId);
       setMarked(courseId);
     }
   }, [enabled, userId, courseId, remembered, dataDone]);
@@ -114,9 +121,10 @@ export function useGettingStarted({ courseId, practice, pathKey, enabled, seeded
   const base = `/${lang}/courses`;
   const items: GettingStartedItem[] = [];
   if (courseId) {
-    items.push({ key: "goal", done: remembered || facts.goal === true, href: `${base}#home-score` }); // the home's score tiles
+    // step 3a S3: the course's Обзор goal strip, its Тесты tab and the tab's practice section
+    items.push({ key: "goal", done: remembered || facts.goal === true, href: `${base}/${courseId}#goal` });
     items.push({ key: "test", done: remembered || facts.test === true, href: `${base}/${courseId}/tests` });
-    if (practice) items.push({ key: "practice", done: remembered || facts.practice === true, href: `${base}/${courseId}/practice` });
+    if (practice) items.push({ key: "practice", done: remembered || facts.practice === true, href: `${base}/${courseId}/tests#practice` });
     if (pwa.installed || pwa.installKind) items.push({ key: "install", done: pwa.installed, href: null });
   }
   const ready = !!courseId && !!userId && practice !== null

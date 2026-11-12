@@ -46,7 +46,7 @@ test.describe("phone sheets keep sign out visible (ru)", () => {
       const user = s.students["vis-desktop-ru"];
       await page.setViewportSize(size);
       await signIn(page, user);
-      await page.goto(`/${L}/courses`);
+      await page.goto(`/${L}/home`); // step 3a S3: the hub
       const tabBar = page.getByRole("navigation", { name: t("student.nav.tabBar") });
       await expect(tabBar).toBeVisible();
       await settle(page);
@@ -75,16 +75,20 @@ test.describe("phone sheets keep sign out visible (ru)", () => {
     });
   }
 
-  test("student: exam sheet fits the short viewport", async ({ page }) => {
-    const user = seed().students["vis-desktop-ru"];
+  // step 3a S3: no exam sheet any more; the «Ещё» sheet carries the «Мои курсы» rows and «Войти по коду»
+  test("student: the More sheet's course rows fit the short viewport", async ({ page }) => {
+    const s = seed();
+    const user = s.students["vis-desktop-ru"];
     await page.setViewportSize(SHORT);
     await signIn(page, user);
-    await page.goto(`/${L}/courses`);
+    await page.goto(`/${L}/home`);
     await settle(page);
-    await page.locator("header button[aria-haspopup=dialog]").first().click();
-    const dialog = page.getByRole("dialog", { name: t("student.switcher.label") });
-    await inView(page, dialog, "exam sheet");
-    await shot(page, "student-exam");
+    await page.getByRole("navigation", { name: t("student.nav.tabBar") }).getByRole("button", { name: t("student.nav.more") }).click();
+    const dialog = page.getByRole("dialog", { name: t("student.nav.more") });
+    await inView(page, dialog, "More sheet");
+    await inView(page, dialog.locator(`a[href^="/${L}/courses/${s.course_id}"]`), "More: the course row");
+    await expect(dialog.getByRole("link", { name: t("student.nav.joinByCode") })).toHaveAttribute("href", `/${L}/courses/join`);
+    await shot(page, "student-more-rows");
   });
 
   for (const size of SIZES) {

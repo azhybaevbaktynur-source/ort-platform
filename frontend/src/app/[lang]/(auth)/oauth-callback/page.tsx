@@ -60,7 +60,7 @@ function OAuthCallback() {
     if (ageBand === "under_14") router.replace(`/${lang}/privacy`);
     else if (parent) router.replace(`/${lang}/parent`);
     else {
-      const dest = redirectRef.current || `/${lang}/courses`;
+      const dest = redirectRef.current || `/${lang}/home`; // step 3a S3: the hub
       prefetchBootstrap(dest, !!storedSessionProfile()?.is_platform_admin); // PERFORMANCE_AUDIT P3
       router.replace(dest);
     }
@@ -166,7 +166,7 @@ function OAuthCallback() {
           <Button type="button" size="lg" fullWidth onClick={() => finish()} rightIcon={<ArrowRight aria-hidden="true" className="h-4 w-4" />}>
             <span className="break-all">{t("auth.oauth.switchContinue", { email: who.email })}</span>
           </Button>
-          <Button type="button" variant="secondary" size="lg" fullWidth onClick={() => router.replace(`/${lang}/courses`)}>
+          <Button type="button" variant="secondary" size="lg" fullWidth onClick={() => router.replace(`/${lang}/home`)}>
             {t("auth.oauth.switchStay")}
           </Button>
         </div>

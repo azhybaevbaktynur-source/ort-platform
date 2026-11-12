@@ -636,6 +636,11 @@
     "notYours": {
       "title": "This course opens only in a student account",
       "body": "You teach on the platform, so student courses do not open here. To see a course you teach the way a student does, use Student view on the Teaching list."
+    },
+    "mine": {
+      "title": "My courses",
+      "join": "Join with code",
+      "addCourse": "Add a course"
     }
   },
   "teacherRequest": {
@@ -3646,6 +3651,60 @@
       },
       "lessonCourses": {
         "subtitle": "Lesson courses for this exam."
+      }
+    },
+    "hub": {
+      "continue": "Continue",
+      "continueTest": "Continue the test",
+      "continueLesson": "Continue the lesson",
+      "open": "Open",
+      "streak": "{count}-day streak",
+      "streak_one": "{count}-day streak",
+      "streak_few": "{count}-day streak",
+      "streak_many": "{count}-day streak",
+      "streak_other": "{count}-day streak",
+      "coursesTitle": "My courses",
+      "groups": {
+        "ort": "ORT",
+        "nct": "NCT",
+        "other": "Other courses"
+      },
+      "allInGroup": {
+        "ort": "All ORT courses ({n})",
+        "nct": "All NCT courses ({n})",
+        "other": "All other courses ({n})"
+      },
+      "addCourse": "Add a course",
+      "emptyTitle": "You have no courses yet",
+      "emptyBody": "Choose an exam and subjects, and we will pick the courses",
+      "choose": "Choose courses",
+      "join": "Join with code",
+      "todoEmpty": "Nothing yet",
+      "announcement": "Announcement",
+      "inProgress": "Test in progress",
+      "overview": "Course overview",
+      "place": {
+        "overview": "Overview",
+        "lessons": "Lessons",
+        "tests": "Tests",
+        "analytics": "Analytics",
+        "saved": "Saved",
+        "lesson": "Lesson",
+        "lobby": "Test",
+        "assignment": "Assignment"
+      },
+      "step": {
+        "resume_test": "Continue the test",
+        "continue_lesson": "Continue the lesson",
+        "start": "Start the test",
+        "startAssignment": "Open the assignment",
+        "open": "Open the course"
+      },
+      "card": {
+        "examIn": "{count} days to the exam",
+        "examToday": "The exam is today",
+        "lastResult": "Last score {value}",
+        "forExam": "For the exam: {exam}"
       }
     }
   },
@@ -7103,7 +7162,13 @@
       "catalog": "Catalog",
       "more": "More",
       "tabBar": "Main sections",
-      "allLessons": "All lessons"
+      "allLessons": "All lessons",
+      "myCourses": "My courses",
+      "courses": "Courses",
+      "continue": "Continue",
+      "allCourses": "All courses ({n})",
+      "chooseCourses": "Choose courses",
+      "joinByCode": "Join with code"
     },
     "switcher": {
       "label": "My exams",
