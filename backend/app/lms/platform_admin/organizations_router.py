@@ -39,7 +39,9 @@ PLATFORM = "platform_admin"  # item 4: every /platform write is recorded as the 
 @router.get("/organizations", response_model=PageOut[OrganizationAdminRowOut])
 def list_organizations(q: Optional[str] = Query(None, max_length=100),
                        status: Optional[Literal["active", "suspended"]] = None,
-                       kind: Optional[Literal["school", "personal", "platform"]] = None,  # item 4: roots only
+                       # item 4: roots only; step 3b S3: schools and the platform only (`personal` is refused 422:
+                       # independent teachers are listed on Admin → Преподаватели, never as organizations)
+                       kind: Optional[Literal["school", "platform"]] = None,
                        sort: Literal["created_desc", "name_asc"] = "created_desc",
                        cursor: Optional[str] = None, limit: int = 25,
                        admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
@@ -63,7 +65,12 @@ def create_organization(body: OrganizationCreateIn, request: Request,
 @router.get("/organizations/{organization_id}", response_model=OrganizationAdminRowOut)
 def get_organization(organization_id: uuid.UUID, admin: User = Depends(require_platform_admin),
                      db: Session = Depends(get_db)):
-    return svc.admin_rows(db, [org_svc.load_org(db, organization_id)])[0]
+    org = org_svc.load_org(db, organization_id)
+    row = svc.admin_rows(db, [org])[0]
+    if org.kind == "personal":  # step 3b S3: the admin UI opens the person page instead
+        owner = org_svc._personal_owner(db, org)
+        row.owner_user_id = owner.id if owner else None
+    return row
 
 
 @router.patch("/organizations/{organization_id}", response_model=OrganizationOut)
@@ -205,6 +212,7 @@ class UserOrganizationOut(BaseModel):
     organization_name: str
     organization_slug: str
     organization_status: str
+    organization_kind: str = "school"  # step 3b S3: the person page hides the personal row
     role: str
     state: str
     created_at: datetime
@@ -225,6 +233,6 @@ def user_organizations(user_id: str, state: Literal["active", "removed"] = "acti
                                          limit=limit, descending=False)
     return PageOut[UserOrganizationOut](items=[UserOrganizationOut(
         organization_id=o.id, organization_name=o.name, organization_slug=o.slug, organization_status=o.status,
-        role=m.role, state=m.state, created_at=m.created_at, removed_at=m.removed_at) for m, o in rows],
+        organization_kind=o.kind, role=m.role, state=m.state, created_at=m.created_at, removed_at=m.removed_at) for m, o in rows],
         next_cursor=nxt)
 # --- Phase 6 S4b end ---

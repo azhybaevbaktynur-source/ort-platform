@@ -96,13 +96,34 @@ async def test_kind_filter_and_department_refused(db, api):
         return {i["id"] for i in r.json()["items"]}
 
     assert await ids(kind="school") == {str(school.id)}
-    assert await ids(kind="personal") == {str(personal_org_id(t.id))}
     assert await ids(kind="platform") == {str(platform_org_id())}
-    assert await ids() == {str(school.id), str(personal_org_id(t.id)), str(platform_org_id())}
-    r = await api.call(admin, "GET", P, params={"kind": "department"})
-    assert r.status_code == 422
+    # step 3b S3: personal organizations are never listed (Admin → Преподаватели lists independent teachers)
+    assert await ids() == {str(school.id), str(platform_org_id())}
+    for refused in ("department", "personal"):
+        r = await api.call(admin, "GET", P, params={"kind": refused})
+        assert r.status_code == 422, refused
     plat = (await api.call(admin, "GET", f"{P}/{platform_org_id()}")).json()
     assert plat["is_protected"] is True
+
+
+async def test_personal_organizations_not_listed_detail_names_the_teacher(db, api):
+    """Step 3b S3 (CATALOG_AND_TEACHERS_DESIGN 3.2): no personal row in any search or sort; the detail route keeps
+    working for scripts and names the teacher (the admin UI opens the person page); a school detail names nobody."""
+    admin = make_user(db, platform_admin=True)
+    t = teacher(db, display_name="Personal Only Teacher")
+    school = make_org(db, "Personal Only School")
+    for params in ({"q": "personal only"}, {"q": "personal only", "sort": "name_asc"}, {"status": "active"}):
+        r = await api.call(admin, "GET", P, params={**params, "limit": 100})
+        assert r.status_code == 200, r.text
+        kinds = {i["kind"] for i in r.json()["items"]}
+        assert "personal" not in kinds
+    assert [i["id"] for i in (await api.call(admin, "GET", P, params={"q": "personal only"})).json()["items"]] == [
+        str(school.id)]
+    d = (await api.call(admin, "GET", f"{P}/{personal_org_id(t.id)}")).json()
+    assert d["kind"] == "personal" and d["owner_user_id"] == t.id
+    assert (await api.call(admin, "GET", f"{P}/{school.id}")).json()["owner_user_id"] is None
+    mine = (await api.call(admin, "GET", f"/platform/users/{t.id}/organizations")).json()["items"]
+    assert [m["organization_kind"] for m in mine] == ["personal"]
 
 
 async def test_name_asc_cursor_stable_on_ties(db, api):

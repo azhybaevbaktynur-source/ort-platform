@@ -311,7 +311,7 @@
       "reapply_wait": "You can apply again from {date}.",
       "teacher_age_required": "Independent teachers must be 18 or older.",
       "age_confirmation_required": "Confirm that you are 18 or older and accept the policies.",
-      "personal_org_no_members": "Other teachers can't be invited to your own courses as an organization. Invite the person from the course's People page.",
+      "personal_org_no_members": "Invite teachers to your courses on the course's People page.",
       "teacher_account_disabled": "This account is disabled. Enable it first, then approve.",
       "exam_date_invalid": "Choose a date between 2020 and 2100.",
       "exam_date_not_supported": "This course has no exam date.",
@@ -662,7 +662,7 @@
     "nav": {
       "label": "Platform admin navigation",
       "overview": "Overview",
-      "teacherRequests": "Teacher requests",
+      "teachers": "Teachers",
       "users": "Users",
       "courses": "Courses",
       "auditLog": "Audit log",
@@ -841,7 +841,10 @@
       "ownerTag": "owner",
       "subtitle": "Every course on the platform, with its owner and number of students.",
       "listing": "Catalog",
-      "openCatalog": "Open in Catalog"
+      "openCatalog": "Open in Catalog",
+      "ownerFilter": "Showing the courses of one owner.",
+      "ownerFilterPerson": "Open the person's page",
+      "ownerFilterReset": "Show all courses"
     },
     "audit": {
       "title": "Audit log",
@@ -873,7 +876,8 @@
         "org_admin": "Org admin",
         "platform_admin": "Platform admin"
       },
-      "subtitle": "Who did what: the append-only log of administrative actions."
+      "subtitle": "Who did what: the append-only log of administrative actions.",
+      "personalSpace": "teacher's own space"
     },
     "auditActions": {
       "student_view_enter": "Entered student view",
@@ -964,6 +968,41 @@
         "blocked": "«{course}» removed from the catalog.",
         "relisted": "«{course}» returned to the catalog."
       }
+    },
+    "teachers": {
+      "title": "Teachers",
+      "subtitle": "Everyone who teaches courses: independent teachers and school teachers. New teacher requests are on the second tab.",
+      "tabsLabel": "Sections of the Teachers page",
+      "tabs": {
+        "teachers": "Teachers",
+        "requests": "Requests"
+      },
+      "columns": {
+        "person": "Teacher",
+        "where": "Teaches at",
+        "status": "Status",
+        "courses": "Courses",
+        "students": "Students",
+        "listed": "In the catalog",
+        "lastLogin": "Last sign-in",
+        "since": "Since"
+      },
+      "independent": "Independent teacher",
+      "independentShort": "Independent",
+      "more": "and {n} more",
+      "searchPlaceholder": "Name or email",
+      "filters": {
+        "kind": "Teaches at",
+        "status": "Teacher status",
+        "anyStatus": "Any",
+        "kinds": {
+          "any": "Anywhere",
+          "independent": "Independent teachers",
+          "school": "School teachers"
+        }
+      },
+      "empty": "No teachers yet. Approved requests and school teachers appear here.",
+      "emptySearch": "Nobody found. Change the search or reset the filters."
     }
   },
   "bank": {
@@ -7199,6 +7238,16 @@
       "googleLinked": "Google (linked {date})",
       "apple": "Apple",
       "appleLinked": "Apple (linked {date})"
+    },
+    "teaching": {
+      "title": "Teaching",
+      "where": "Teaches at",
+      "independentSince": "Independent teacher since {date}",
+      "courses": "Courses (teaches)",
+      "students": "Students",
+      "listed": "Courses in the catalog",
+      "openCourses": "Their courses in Courses",
+      "openCatalog": "Open the catalog"
     }
   },
   "pwa": {

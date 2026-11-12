@@ -1,7 +1,7 @@
 import { lmsFetch } from "./client";
 import type {
   AdminAttemptOut, AdminCatalogRowOut, AdminCourseOut, AdminUserDetailOut, AdminUserOut, AuditEntryOut, PageOut, PlatformSummaryOut,
-  RosterEntryOut, TeacherRequestAdminOut, TeacherRequestStatus, TeacherStatus,
+  RosterEntryOut, TeacherRequestAdminOut, TeacherRequestStatus, TeacherRowOut, TeacherStatus,
 } from "./types";
 
 const enc = encodeURIComponent;
@@ -45,6 +45,12 @@ export const approveTeacherRequest = (id: string, note?: string) =>
   post<TeacherRequestAdminOut>(`/platform/teacher-requests/${enc(id)}/approve`, note ? { note } : {});
 export const rejectTeacherRequest = (id: string, reason: string) =>
   post<TeacherRequestAdminOut>(`/platform/teacher-requests/${enc(id)}/reject`, { reason });
+
+/** Step 3b S3: Admin → Преподаватели (`GET /platform/teachers`, by name, cursor-paged). */
+export type TeacherListKind = "independent" | "school";
+export type TeacherListStatus = "approved" | "revoked";
+export const listTeachers = (p: { q?: string; kind?: TeacherListKind | ""; status?: TeacherListStatus | ""; cursor?: string | null; limit?: number } = {}) =>
+  lmsFetch<PageOut<TeacherRowOut>>("/platform/teachers", { params: { limit: 25, ...p, kind: p.kind || undefined, status: p.status || undefined } });
 
 export interface ListUsersParams {
   q?: string;

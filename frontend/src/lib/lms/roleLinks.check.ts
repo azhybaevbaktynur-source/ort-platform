@@ -71,6 +71,10 @@ const staffRows: Row[] = [
   ["/ru/admin/users", "app", "platform"],
   ["/ru/admin/catalog", "app", "platform"], // step 3b S2: Admin → Каталог (the page refuses anyone but the platform admin)
   ["/ru/admin/catalog?state=blocked", "app", "platform"],
+  // step 3b S3: Admin → Преподаватели (platform admin only); the old requests address redirects into its second tab
+  ["/ru/admin/teachers", "app", "platform"],
+  ["/ru/admin/teachers?tab=requests", "app", "platform"],
+  ["/ru/admin/teacher-requests", "app", "platform"],
   ["http://127.0.0.1:3780/ru/pro#x", "app", "teaching"],
 ];
 for (const role of STAFF) {

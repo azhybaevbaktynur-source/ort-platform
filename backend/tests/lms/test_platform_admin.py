@@ -22,6 +22,7 @@ ROUTES = [
     ("GET", f"{P}/teacher-requests", None),
     ("POST", f"{P}/teacher-requests/{_UID}/approve", {}),
     ("POST", f"{P}/teacher-requests/{_UID}/reject", {"reason": "x"}),
+    ("GET", f"{P}/teachers", None),  # step 3b S3
     ("GET", f"{P}/users", None),
     ("GET", f"{P}/users/usr_x", None),
     ("POST", f"{P}/users/usr_x/teacher-status", {"status": "approved"}),
@@ -189,7 +190,7 @@ async def test_audit_log_pagination_and_filters(client, db):
                              headers=auth(admin))).json()
     assert sorted(i["action"] for i in body["items"]) == ["user.disable", "user.enable"]
     assert set(body["items"][0]) == {"id", "created_at", "actor", "action", "target_type", "target_id",
-                                     "reason", "details"}
+                                     "reason", "details", "target_kind"}  # step 3b S3: target_kind
 
 
 async def test_audit_log_page_loads_actors_in_one_statement(client, db):

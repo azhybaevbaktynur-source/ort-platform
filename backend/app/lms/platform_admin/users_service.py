@@ -223,7 +223,15 @@ def user_detail(db: Session, user: User) -> AdminUserDetailOut:
         revoke_impact=revoke_impact(db, user),
         **person_extras(db, user),
         sign_in_methods=sign_in_methods(db, user),
+        teaching=_teaching(db, user),
     )
+
+
+def _teaching(db: Session, user: User):
+    """Step 3b S3: the person page's «Преподавание» card (the person's Admin → Преподаватели row)."""
+    from app.lms.platform_admin.teachers import teaching_of
+
+    return teaching_of(db, user)
 
 
 def sign_in_methods(db: Session, user: User) -> list[SignInMethodOut]:
@@ -252,15 +260,37 @@ def person_extras(db: Session, user: User) -> dict:
                 pending_email_change=pending_email(db, user.id))
 
 
-def audit_out(db: Session, row: AdminAuditLog, actor: Optional[User] = None) -> AuditEntryOut:
+def audit_out(db: Session, row: AdminAuditLog, actor: Optional[User] = None,
+              target_kind: Optional[str] = None) -> AuditEntryOut:
     return AuditEntryOut(
         id=row.id, created_at=row.created_at, actor=brief(actor or db.get(User, row.actor_id)), action=row.action,
         target_type=row.target_type, target_id=row.target_id, reason=row.reason, details=row.details,
+        target_kind=target_kind,
     )
+
+
+def _org_kinds(db: Session, rows: list[AdminAuditLog]) -> dict[str, str]:
+    """Step 3b S3: {organization id: kind} for the page's organization targets (one statement, none without any), so
+    the viewer labels a personal organization «личное пространство преподавателя» instead of an organization."""
+    import uuid
+
+    ids = set()
+    for r in rows:
+        if r.target_type == "organization":
+            try:
+                ids.add(uuid.UUID(str(r.target_id)))
+            except ValueError:
+                continue
+    if not ids:
+        return {}
+    return {str(oid): kind for oid, kind in db.execute(
+        select(Organization.id, Organization.kind).where(Organization.id.in_(ids))).all()}
 
 
 def audit_page_out(db: Session, rows: list[AdminAuditLog]) -> list[AuditEntryOut]:
     """Fix round 2026-11-12 P1: the actors of a page in one statement (was one `db.get` per row)."""
     ids = {r.actor_id for r in rows}
     actors = {u.id: u for u in db.scalars(select(User).where(User.id.in_(ids)))} if ids else {}
-    return [audit_out(db, r, actors.get(r.actor_id)) for r in rows]
+    kinds = _org_kinds(db, rows)
+    return [audit_out(db, r, actors.get(r.actor_id),
+                      kinds.get(str(r.target_id)) if r.target_type == "organization" else None) for r in rows]

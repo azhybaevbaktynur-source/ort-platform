@@ -103,7 +103,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const nav: { href: string; label: string; exact?: boolean; count?: number | null; group?: string; alsoUnder?: string }[] = [
     { href: base, label: t("platformAdmin.nav.overview"), exact: true },
     { href: `${base}/users`, label: t("platformAdmin.nav.users"), group: g("people") },
-    { href: `${base}/teacher-requests`, label: t("platformAdmin.nav.teacherRequests"), count: pending, group: g("people") },
+    { href: `${base}/teachers`, label: t("platformAdmin.nav.teachers"), count: pending, group: g("people") }, // step 3b S3 (D9): replaces Teacher requests
     { href: `${base}/organizations`, label: t("organizations.nav.organizations"), group: g("content") },
     { href: `${base}/courses`, label: t("platformAdmin.nav.courses"), group: g("content") },
     { href: `${base}/catalog`, label: t("platformAdmin.nav.catalog"), group: g("content") }, // step 3b S2

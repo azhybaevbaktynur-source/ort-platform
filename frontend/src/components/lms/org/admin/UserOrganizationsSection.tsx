@@ -80,7 +80,8 @@ export function UserOrganizationsSection({ user, readOnly }: { user: { id: strin
   return (
     <section aria-labelledby="uo-title" className="mb-6">
       <h2 id="uo-title" className="mb-3 text-lg font-semibold leading-7 text-slate-900">{t("organizations.adminUser.orgsTitle")}</h2>
-      <Table caption={t("organizations.adminUser.orgsTitle")} columns={columns} rows={list.items} rowKey={(m) => m.organization_id}
+      {/* step 3b S3: an independent teacher's own space is not an organization (the «Преподавание» card says it) */}
+      <Table caption={t("organizations.adminUser.orgsTitle")} columns={columns} rows={list.items.filter((m) => m.organization_kind !== "personal")} rowKey={(m) => m.organization_id}
         {...state} countText={undefined} empty={<EmptyState title={t("organizations.adminUser.orgsEmpty")} />} />
       <MoreError list={list} />
 

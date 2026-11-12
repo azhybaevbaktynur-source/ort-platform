@@ -42,7 +42,7 @@ export function NeedsAttention({ pending, storageLevel, reveals, failedChecks, d
   const rows: Row[] = [];
   if (pending && pending > 0) {
     rows.push({ id: "requests", icon: <UserCheck />, text: t("platformAdmin.overview.pendingRequests"),
-      href: `${base}/teacher-requests`, badge: <Badge tone="info">{pending}</Badge> });
+      href: `${base}/teachers?tab=requests`, badge: <Badge tone="info">{pending}</Badge> });
   }
   if (storageLevel && storageLevel !== "ok") {
     rows.push({ id: "storage", icon: <HardDrive />, text: t(`platformAdmin.overview.attention.storage.${storageLevel}`),

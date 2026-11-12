@@ -18,7 +18,9 @@ import { useCursorList, useDebounced } from "@/components/lms/admin/useCursorLis
 import { MoreError, useTableState } from "@/components/lms/admin/ListParts";
 
 const STATUSES: (OrgStatus | "")[] = ["", "active", "suspended"];
-const KINDS: (OrgRootKind | "")[] = ["", "school", "personal", "platform"]; // item 4: roots only, departments live inside
+// item 4: roots only, departments live inside; step 3b S3: schools and the platform only (independent teachers' own
+// spaces are never organizations here: Admin → Преподаватели lists them)
+const KINDS: (OrgRootKind | "")[] = ["", "school", "platform"];
 const SORTS: OrgListSort[] = ["created_desc", "name_asc"];
 
 export default function AdminOrganizationsPage() {

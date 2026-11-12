@@ -44,10 +44,13 @@ export interface OrganizationAdminRowOut extends OrganizationOut {
   departments: number;
   /** The platform organization: never suspended, slug fixed (D-ORG-1). */
   is_protected: boolean;
+  /** Step 3b S3: a personal organization's teacher (the detail route only); the admin UI opens their person page. */
+  owner_user_id?: string | null;
 }
 
-/** Item 4: the root kinds of the Admin → Organizations list (departments are never rows). */
-export type OrgRootKind = "school" | "personal" | "platform";
+/** Item 4: the root kinds of the Admin → Organizations list (departments are never rows; step 3b S3: personal
+ *  organizations are never rows either, independent teachers are on Admin → Преподаватели). */
+export type OrgRootKind = "school" | "platform";
 export type OrgListSort = "created_desc" | "name_asc";
 
 /** `SuspendAffectedOut`: what a suspend/resume touches (subtree counts). */
@@ -150,6 +153,8 @@ export interface UserOrganizationOut {
   organization_name: string;
   organization_slug: string;
   organization_status: OrgStatus;
+  /** Step 3b S3: the person page hides the `personal` row. */
+  organization_kind?: OrgKind;
   role: OrgRole;
   state: OrgMemberState;
   created_at: string;

@@ -19,6 +19,7 @@ import { CodeReasonDialog } from "@/components/lms/admin/CodeReasonDialog";
 import { UserAccessSection } from "@/components/lms/access/UserAccessSection"; // S3 access
 import { endUserSessions, setPlatformAdmin } from "@/lib/lms/security";
 import { AgeBandDialog, AttemptLookupSection, ChangeEmailDialog } from "@/components/lms/admin/PersonParts"; // S4
+import { TeachingCard } from "@/components/lms/admin/TeachingParts"; // step 3b S3
 
 type Action = "disable" | "revoke" | "grant" | "endSessions" | "resetPassword";
 type PersonDialog = "changeEmail" | "correctAge" | "cancelEmail"; // S4
@@ -217,6 +218,9 @@ export default function AdminUserDetailPage() {
           ...(user.disabled_at ? [{ key: "reason", term: t("platformAdmin.users.disabledReason"), description: user.disabled_reason || "—" }] : []),
         ]} />
       </Card>
+
+      {/* step 3b S3: «Преподавание» (independent teacher since, or the schools; courses, students, listed courses) */}
+      {user.teaching && <TeachingCard teaching={user.teaching} />}
 
       {/* S3 access: exam passes, give and revoke (right after the summary: what the admin looks up most for a student) */}
       <UserAccessSection userId={user.id} name={user.display_name ? `${user.display_name} · ${user.email}` : user.email} readOnly={system} />
