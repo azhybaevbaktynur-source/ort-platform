@@ -1,25 +1,17 @@
 "use client";
 
-// TEACHER_TO_STUDENT_MAP S3 (G1, §2.4): on the exam-prep home, the lesson courses attached to the current exam as one
-// "Уроки" section of course cards (joined: progress, opens the overview; not joined: a one-tap join like the platform
-// courses; staff of the lesson course: no join), and the "Продолжить урок" strip from `/me/home`'s `modules_next`,
-// kept to the current exam and its lesson courses (hidden when empty). The rows come from the student shell (it reads
-// them for the sidebar) when it shows this exam, else from one request.
+// TEACHER_TO_STUDENT_MAP S3 (G1, §2.4), step 3a S2: the lesson courses attached to an exam as one section of course
+// cards (joined: progress, opens the overview; not joined: a one-tap join; staff of the lesson course: no join), on the
+// exam's Уроки tab and Обзор. The rows come from the student shell's bootstrap when it has them, else from one request.
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight, PlayCircle } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { joinOpenCourse } from "@/lib/lms/catalog";
 import { listLessonCourses, type LessonCourseOut } from "@/lib/lms/courses";
-import type { HomeModuleNextOut } from "@/lib/lms/homeTypes";
-import { pickLocalized } from "@/lib/lms/localized";
 import type { Lang } from "@/lib/lms/types";
 import { Button, ErrorState } from "@/components/ui";
 import { CourseCard } from "@/components/lms/course/CourseCard";
-import { ItemKindIcon, itemHref } from "@/components/lms/modules/moduleUi";
-import { lessonRoute } from "@/components/lms/modules/lessons";
 import { useStudentShellDataContext } from "@/components/lms/student/StudentShellDataContext";
-import { SideRow, SideSection } from "./TodoList";
 import { useErrorText } from "./useErrorText";
 
 /** The lesson courses of `examId`: null while unknown; [] when there are none or the read failed (nothing to show). */
@@ -42,39 +34,6 @@ export function useLessonCourseRows(examId: string | null): LessonCourseOut[] | 
   if (!examId) return [];
   if (shellRows) return shellRows;
   return own?.examId === examId ? own.rows : null;
-}
-
-/** "Продолжить урок": the next item of the exam and of its lesson courses (the server's order, at most three). */
-export function ContinueLessons({ rows }: { rows: HomeModuleNextOut[] }) {
-  const { lang, t } = useTranslation();
-  if (rows.length === 0) return null;
-  const untitled = t("courses.list.untitled");
-  return (
-    <SideSection id="home-continue" title={t("home.prep.continueLesson.title")}>
-      <ul className="divide-y divide-slate-100">
-        {rows.map((r) => {
-          const base = `/${lang}/courses/${r.course_id}`;
-          const kind = r.kind ?? "page";
-          const href = (kind === "assignment" ? itemHref(base, kind, r.link) : null) ?? lessonRoute(base, r.module_id, r.item_id);
-          const course = pickLocalized(r.course_title, lang) || untitled;
-          const mod = r.module_title ? pickLocalized(r.module_title, lang) : "";
-          return (
-            <SideRow key={`${r.course_id}:${r.item_id}`} href={href}
-              icon={(
-                <span aria-hidden="true" className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
-                  {r.is_video && kind === "url"
-                    ? <PlayCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
-                    : <ItemKindIcon kind={kind} assignmentKind={r.link?.assignment_kind} />}
-                </span>
-              )}
-              title={pickLocalized(r.title, lang) || untitled}
-              lines={<span className="block break-words">{mod ? `${course} · ${mod}` : course}</span>}
-              aside={<ChevronRight aria-hidden="true" className="mt-1.5 h-4 w-4 text-slate-400" />} />
-          );
-        })}
-      </ul>
-    </SideSection>
-  );
 }
 
 /** The "Уроки" section: every lesson course of the exam as a card (nothing while unknown or with none). */

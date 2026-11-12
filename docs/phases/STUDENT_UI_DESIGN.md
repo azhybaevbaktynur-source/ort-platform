@@ -72,6 +72,10 @@ group labels white 80 % (4.5:1 at the gradient's light end). Teacher/admin frame
 
 ## 2. Shell
 
+> **Superseded (2026-11-13):** the student navigation (frame, sidebar, exam switcher, per-course links) is
+> replaced by `STUDENT_IA_DESIGN.md` (hub `/home` + one course space per course, fix round 2026-11-12 step 3a).
+> Tokens, palette and page styling below still apply.
+
 ### 2.1 Where it applies
 `LmsShell` picks the frame from `activeArea`: `learning` → the new `StudentShell`; every other area → the current
 `AppHeader` frame. A teacher's `/courses?view=learning` is therefore the student shell too. Replaced by STUDENT_UI_FIX_PLAN.md §2.1 (owner 2026-11-07).

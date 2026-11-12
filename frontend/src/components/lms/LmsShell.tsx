@@ -1,7 +1,7 @@
 "use client";
 
-import React, { createContext, Suspense, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { BookOpen, Building2, KeyRound, Lock, Presentation, ShieldCheck, Users } from "lucide-react";
 import { useTranslation, type Language } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
@@ -52,15 +52,6 @@ export function useDeclareArea(area: AreaKey | null, opts: { hideSections?: bool
     declare(area ? { area, hideSections } : null);
     return () => declare(null);
   }, [area, hideSections, declare]);
-}
-
-/** Reads `?tab=` (needs a Suspense boundary for static pages; S5 removes it with the last reader). Step 3a S3: `?view=`
- * no longer decides anything. */
-function ViewParam({ onTab }: { onTab: (v: string | null) => void }) {
-  const params = useSearchParams();
-  const tab = params.get("tab");
-  useEffect(() => { onTab(tab); }, [tab, onTab]);
-  return null;
 }
 
 // --- Student UI U2 begin --- (STUDENT_UI_DESIGN §2): the course layout tells the student shell which course it loaded
@@ -126,7 +117,6 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const { me } = meState;
   const unauthorized = meState.error?.status === 401;
   const cachedMe = useCachedMe(); // S1: the cached answer, readable from the render right after hydration
-  const [tab, setTab] = useState<string | null>(null); // Student UI U2
   const [declaredCourse, setDeclaredCourse] = useState<CourseOut | null>(null); // Student UI U2
   const [declaredArea, setDeclared] = useState<DeclaredArea | null>(null);
   const declared = declaredArea?.area ?? null;
@@ -146,6 +136,11 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
       void signOut();
     }
   }, [unauthorized, signOut]);
+
+  // Step 3a S5: the old "current course" of the student shell (gone since S3) leaves this device once
+  useEffect(() => {
+    try { window.localStorage.removeItem("ort_student_course"); } catch { /* storage blocked: nothing stored either */ }
+  }, []);
 
   const switchLang = (l: Language) => {
     setLang(l);
@@ -300,7 +295,6 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
         <StudentCourseDeclareContext.Provider value={setDeclaredCourse}>
           <LmsMeProvider value={meState}>
             <StudentShellDataContext.Provider value={null}>
-              <Suspense fallback={null}><ViewParam onTab={setTab} /></Suspense>
               <div data-shell="player" data-area={activeArea} className={PLAYER_FRAME}>
                 <main id="main" tabIndex={-1} className="focus:outline-none">{gated}</main>
               </div>
@@ -323,7 +317,7 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
   const examColumn = !studentFrame && ATTEMPT_PAGE.test(rest);
   // Student UI U2: the same children in both frames (chrome slot, banner, main, tab bar slot), so React keeps <main>
   const studentProps = {
-    data: studentData, rest, tab, user: { name, email }, accountLinks, onLanguageChange: switchLang,
+    data: studentData, rest, user: { name, email }, accountLinks, onLanguageChange: switchLang,
     onLogout: () => void logout(), testStudent, otherAreas: areas.filter((a) => a.key !== "learning"),
   };
   return (
@@ -331,7 +325,6 @@ export function LmsShell({ children }: { children: React.ReactNode }) {
       <StudentCourseDeclareContext.Provider value={setDeclaredCourse}>
       <LmsMeProvider value={meState}>
         <StudentShellDataContext.Provider value={studentFrame ? studentData : null}>
-        <Suspense fallback={null}><ViewParam onTab={setTab} /></Suspense>
         {/* fix round 1b: the frame and the area, read by the per-role link check (e2e/role-links.spec.ts) */}
         <div data-shell={kind} data-area={activeArea} className={cn("min-h-screen bg-slate-50", studentFrame && STUDENT_FRAME)}>
           <a href="#main"

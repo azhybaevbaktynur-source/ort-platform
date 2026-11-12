@@ -46,6 +46,9 @@ column of §1 is unchanged: what a student sees comes only from what the teacher
 
 ## 1. Map: where each teacher action lands for the student (before 3a; history)
 
+> Pre-3a history: `StudentHome`, `ExamPrepHome`, `PlatformCourses`, the exam switcher and the per-course sidebar
+> links named below were removed in step 3a (S3, S5 cleanup). The current structure is §0 and `STUDENT_IA_DESIGN.md`.
+
 Student entry points today: sidebar `StudentShell.tsx` (links from `lib/lms/studentNav.ts`; items from
 `HomeCourseOut.features`), home `/courses` (`home/StudentHome.tsx` → `home/ExamPrepHome.tsx` + `SideLists`), Тесты
 `/courses/{c}/tests` (`examPrep/TestsPage.tsx`, data `GET /courses/{c}/exam-prep` + `/library`,
