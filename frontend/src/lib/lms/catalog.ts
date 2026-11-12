@@ -3,7 +3,8 @@
 import { lmsFetch } from "./client";
 import { thenMeStale } from "./meStale";
 import type {
-  ApplicationStatus, CourseRole, EnrollmentMode, EnrollmentState, JoinOut, Lang, LocalizedText, PageOut, PublicFormOut,
+  ApplicationStatus, CourseRole, EnrollmentMode, EnrollmentState, ExamFamily, ExamSubject, JoinOut, Lang, LocalizedText,
+  PageOut, PublicFormOut,
 } from "./types";
 
 export interface CatalogEnrollmentOut {
@@ -38,6 +39,9 @@ export interface CatalogCourseOut {
   is_platform_course: boolean;
   has_active_form: boolean;
   my_application: { id: string; status: ApplicationStatus } | null;
+  /** Step 3a S1: the family chips and subject sections (absent: older backend) */
+  exam_family?: ExamFamily | null;
+  subject?: ExamSubject | null;
 }
 
 /** `GET /catalog/courses/{id}`: the same allow-list plus teachers' public names, dates and the active form. */
@@ -53,6 +57,8 @@ export interface CatalogFilters {
   language?: Lang | "";
   mode?: EnrollmentMode | "";
   organization_id?: string;
+  /** Step 3a S1: one family, or `other` (no family); main courses first, then subject courses */
+  exam?: ExamFamily | "other" | "";
 }
 
 const enc = encodeURIComponent;
@@ -62,8 +68,38 @@ export const listCatalog = (cursor?: string | null, limit = 12, filters: Catalog
     params: {
       cursor, limit, q: filters.q?.trim() || undefined, language: filters.language || undefined,
       mode: filters.mode || undefined, organization_id: filters.organization_id || undefined,
+      exam: filters.exam || undefined,
     },
   });
+
+// --- Step 3a S1 (STUDENT_IA_DESIGN §4, §6.3): the choose step's reads and its one write ---
+export interface ExamCourseOut {
+  id: string;
+  title: LocalizedText;
+  description: LocalizedText | null;
+  default_language: Lang;
+  /** null = the family's main course */
+  subject: ExamSubject | null;
+  lessons_count: number;
+  tests_count: number;
+  has_paid_tests: boolean;
+  /** the caller is already in it */
+  enrolled: boolean;
+}
+
+/** `GET /catalog/exams`: families with at least one listed, open platform course (main courses first). */
+export interface ExamFamilyOut {
+  family: ExamFamily;
+  courses: ExamCourseOut[];
+}
+
+export const listExams = () => lmsFetch<ExamFamilyOut[]>("/catalog/exams");
+
+/** `POST /catalog/choose`: joins up to 20 open platform courses; already enrolled ones are `skipped`. */
+export const chooseCourses = (courseIds: string[]) =>
+  thenMeStale(lmsFetch<{ joined: string[]; skipped: string[] }>("/catalog/choose", {
+    method: "POST", body: { course_ids: courseIds },
+  }));
 
 export const getCourseLanding = (courseId: string) => lmsFetch<CourseLandingOut>(`/catalog/courses/${enc(courseId)}`);
 

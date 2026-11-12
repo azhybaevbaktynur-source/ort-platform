@@ -49,7 +49,7 @@ export interface BootstrapHomeParts {
   home: HomeOut;
   /** Exam course id -> `GET /courses/{id}/exam-prep` (the home's exam course; empty without one). */
   exam_prep: Record<string, ExamPrepOut>;
-  /** Exam course id -> `GET /courses/{id}/my/activity?days=7`. */
+  /** Step 3a S1: `{all: the 7-day activity over all the student's courses}` (was the exam course's). */
   activity: Record<string, ActivityOut>;
 }
 

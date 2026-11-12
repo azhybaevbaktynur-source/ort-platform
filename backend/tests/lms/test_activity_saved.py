@@ -182,6 +182,31 @@ def test_test_student_sees_own_activity(db, client, at_now):
     assert _get(client, ts, w, "activity", days=7).json()["totals"]["answered"] == 1
 
 
+def test_bootstrap_activity_counts_every_course(db, client, at_now):
+    """Step 3a S1 (STUDENT_IA_DESIGN 6.2.3): the bootstrap's 7-day activity is the student's over all their courses
+    (key `all`): what `my/activity` counts per course, added up; another student's answers never count."""
+    from app.lms.progress import service as progress_svc
+
+    one, two = _world(db), _world(db)
+    s = one.student
+    enroll(db, two.course, s)
+    t = datetime(2026, 3, 10, 4, 0, tzinfo=UTC)
+    _attempt(db, one, CORRECT, {1: t, 2: t + timedelta(minutes=1)}, submit_at=t + timedelta(minutes=2))
+    _attempt(db, two, CORRECT, {1: t - timedelta(days=1)}, user=s, submit_at=t - timedelta(days=1, minutes=-1))
+    _attempt(db, two, CORRECT, {1: t}, submit_at=t + timedelta(minutes=3))  # two's own student
+    per = [_get(client, s, w, "activity", days=7).json() for w in (one, two)]
+    assert [p["totals"]["answered"] for p in per] == [2, 1]
+    r = client.get("/api/v1/me/bootstrap", headers=auth(s), params={"include": "home"})
+    assert r.status_code == 200, r.text
+    all_ = r.json()["activity"]["all"]
+    assert all_["totals"]["answered"] == 3 and all_["streak_current"] == 2
+    assert [d["answered"] for d in all_["days"]] == [a["answered"] + b["answered"]
+                                                     for a, b in zip(per[0]["days"], per[1]["days"])]
+    direct = progress_svc.activity_in(db, [one.course.id, two.course.id], s.id, days=7, now=NOW)
+    assert direct.model_dump(mode="json") == all_
+    assert progress_svc.activity_in(db, [], s.id, days=7, now=NOW).totals.answered == 0  # no course, no statement
+
+
 @pytest.mark.parametrize("days", ["0", "8", "366", "abc", "-7"])
 def test_days_outside_the_set_is_422(db, client, days):
     w = _world(db)

@@ -1,7 +1,7 @@
 // Student home: `GET /me/home` (PHASE_6_DESIGN 8.4; backend app/lms/home/schemas.py). Server-limited lists:
 // in_progress, next_up and latest_results hold at most 3 rows, courses at most 10 (courses_total counts all).
 import type { Num, SchemeLabelValue, SchemeType } from "./gradingTypes";
-import type { Lang, LocalizedText } from "./types";
+import type { ExamFamily, ExamSubject, Lang, LocalizedText } from "./types";
 import type { ItemLinkOut } from "./modulesTypes";
 
 export interface HomeInProgressOut {
@@ -68,8 +68,8 @@ export interface HomeCourseOut {
   progress: { done: number; total: number } | null;
   /** Student UI U2: `exam_prep` courses go in the student shell's exam switcher (optional: older backend). */
   student_layout?: "exam_prep" | "general";
-  /** Student UI U9: what an exam-prep course has for the shell's menu (null for other courses; absent: older backend). */
-  features?: { modules: boolean; practice: boolean } | null;
+  /** Student UI U9; step 3a S1: the six tab flags of `GET /courses/{id}`, for every course (absent: older backend). */
+  features?: HomeCourseFeaturesOut | null;
   /** F7a: public WebP cover (16:9, at most 1280 x 720); null: draw the generated default cover. Absent: older backend. */
   cover_url?: string | null;
   /** F7a: published exams with a published version, as the Tests page lists them (no practice quizzes) */
@@ -78,6 +78,57 @@ export interface HomeCourseOut {
   lessons_count?: number;
   /** TEACHER_TO_STUDENT_MAP §2.3: the exam course this lesson course is attached to (absent: older backend). */
   exam_course_id?: string | null;
+  // --- Step 3a S1 (STUDENT_IA_DESIGN §6.2.2): the hub's grouped cards; absent: older backend ---
+  /** the card's group: null = «Другие курсы» */
+  exam_family?: ExamFamily | null;
+  /** null = the family's main course */
+  subject?: ExamSubject | null;
+  /** exam-prep courses only (ISO date): the card's countdown */
+  exam_date?: string | null;
+  /** the card's one button */
+  next_step?: HomeNextStepOut | null;
+  /** the newest released result of the course ("132 / 245") */
+  last_result?: HomeLastResultOut | null;
+}
+
+/** Step 3a S1: `CourseFeaturesOut` of `GET /courses/{id}`, every flag present. */
+export interface HomeCourseFeaturesOut {
+  modules: boolean;
+  files: boolean;
+  announcements: boolean;
+  practice: boolean;
+  tests: boolean;
+  hand_ins: boolean;
+}
+
+/** Step 3a S1: first that applies: the open attempt, the course's `modules_next` row, its first startable assignment,
+ * else the course page. Titles are `{lang: text}`. */
+export interface HomeNextStepOut {
+  kind: "resume_test" | "continue_lesson" | "start" | "open";
+  title: LocalizedText | null;
+  /** resume_test */
+  attempt_id: string | null;
+  /** resume_test; start of a quiz */
+  assessment_id: string | null;
+  /** start */
+  assignment_id: string | null;
+  assignment_kind: "none" | "text" | "file" | "quiz" | null;
+  /** continue_lesson */
+  module_id: string | null;
+  item_id: string | null;
+  item_kind: string | null;
+  link: ItemLinkOut | null;
+  is_video: boolean;
+}
+
+/** Step 3a S1: the course's newest released result, by the same student gate as `latest_results`. */
+export interface HomeLastResultOut {
+  value: Num | null;
+  max_value: Num | null;
+  label: string | null;
+  labels: Record<string, SchemeLabelValue>;
+  scheme_type: SchemeType | null;
+  at: string;
 }
 
 /** UX rework: one "To do" row of the dashboard. `attempt_id`: an attempt in progress. Dates are the caller's own. */

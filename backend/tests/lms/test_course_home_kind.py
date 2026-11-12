@@ -146,7 +146,8 @@ async def test_features_follow_published_rows(api, db):
         assert res.status_code == 200, res.text
         return res.json()["features"]
 
-    none = {"modules": False, "files": False, "announcements": False, "practice": False}
+    none = {"modules": False, "files": False, "announcements": False, "practice": False,
+            "tests": False, "hand_ins": False}  # step 3a S1: `tests_features` in test_course_features.py
     assert await features(w.S) == none
     make_module(db, w.course, w.O, published=False)
     make_course_file(db, w.course, w.O, published=False)
@@ -158,10 +159,10 @@ async def test_features_follow_published_rows(api, db):
     assert await features(w.S) == none
     m = make_module(db, w.course, w.O)
     make_item(db, m)  # F5a: a teacher course keeps the 8a rule (a published module, even with only a header)
-    assert await features(w.S) == {"modules": True, "files": False, "announcements": False, "practice": False}
+    assert await features(w.S) == {**none, "modules": True}
     make_course_file(db, w.course, w.O)
     make_announcement(db, w.course, w.O)
-    full = {"modules": True, "files": True, "announcements": True, "practice": False}
+    full = {**none, "modules": True, "files": True, "announcements": True}
     assert await features(w.S) == full
     assert await features(w.O) == full  # staff shape carries the same flags
 

@@ -153,6 +153,51 @@ def _join(db: Session, user: User, course: Course, *, source: str,
     return enr, db.get(Course, course_id), False
 
 
+# --- STUDENT_IA_DESIGN 6.3 begin --- (`POST /catalog/choose`: the choose step joins several open platform courses)
+COURSE_NOT_CHOOSABLE = "course_not_choosable"
+
+
+def choose_courses(db: Session, user: User, course_ids: list) -> tuple[list, list]:
+    """(joined, skipped) course ids, in the order asked (duplicates once). Refused: a test student (403
+    `test_student_forbidden`, besides the Student view allow-list), people who teach (403 `teacher_cannot_enroll`,
+    before any course is read), more than `CATALOG_CHOOSE_1M` requests a minute (429). Every id must be a catalog
+    course (`courses.scopes._catalog_select`: published, listed, not unlisted, live organization tree) of the platform
+    organization with `enrollment_mode = open`, else 422 `course_not_choosable` naming the ids and nothing is joined.
+    Each course then goes through `_join` (source `open`: the same checks after the lock, enrollment limit, events);
+    an active enrollment is `skipped`. A course that cannot be joined at that moment (full, closed meanwhile) stops the
+    request with the same 422; the courses joined before it stay joined (a retry skips them)."""
+    from app.lms.courses import scopes as course_scopes
+
+    if getattr(user, "is_test_student", False):
+        raise Forbidden("Not available in student view", code="test_student_forbidden")
+    ratelimit.enforce(f"catalog_choose:u:{user.id}", ratelimit.CATALOG_CHOOSE_1M)
+    if teaches(user):
+        raise Forbidden("People who teach cannot join a course as a student", code=TEACHER_CANNOT_ENROLL)
+    ids = list(dict.fromkeys(course_ids))
+    stmt, root = course_scopes._catalog_select(user.id)
+    found = {c.id: c for c in db.execute(
+        stmt.where(root.kind == "platform", Course.enrollment_mode == "open", Course.id.in_(ids))).scalars()}
+
+    def refuse(bad: list, joined: Optional[list] = None) -> ValidationFailed:
+        details = [{"loc": ["course_ids"], "msg": COURSE_NOT_CHOOSABLE, "course_id": str(i)} for i in bad]
+        if joined:
+            details.append({"loc": ["course_ids"], "msg": "joined", "joined": [str(i) for i in joined]})
+        return ValidationFailed("These courses cannot be chosen", code=COURSE_NOT_CHOOSABLE, details=details)
+
+    missing = [i for i in ids if i not in found]
+    if missing:
+        raise refuse(missing)
+    joined, skipped = [], []
+    for cid in ids:
+        try:
+            _enr, _course, already = _join(db, user, found[cid], source="open", ip_hash=None)
+        except NotFound:
+            raise refuse([cid], joined) from None
+        (skipped if already else joined).append(cid)
+    return joined, skipped
+# --- STUDENT_IA_DESIGN 6.3 end ---
+
+
 # --- Phase 9 S3 begin --- (PHASE_9_DESIGN 4.5, invariant 6, 7: the accept hook of student invitations)
 COURSE_FULL = "course_full"
 COURSE_NOT_OPEN = "course_not_open"
