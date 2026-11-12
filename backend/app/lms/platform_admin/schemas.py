@@ -138,6 +138,15 @@ class SummaryOut(BaseModel):
     storage_level: str  # UX rework 2: the overview's two cards come from one answer
 
 
+class OverviewDatabaseOut(BaseModel):
+    level: str  # ok | notice | warning | critical (`infra.capacity.db_level`)
+    percent: Optional[float] = None
+    fits: Optional[int] = None
+    used_bytes: Optional[int] = None
+    limit_bytes: Optional[int] = None
+    measured_at: Optional[datetime] = None
+
+
 class OverviewOut(BaseModel):
     """FB8-5 S4: the admin overview's metrics and attention items (cached 60 s; D-FB8-5-4)."""
     users_total: int
@@ -148,6 +157,8 @@ class OverviewOut(BaseModel):
     storage_level: str
     reveals_last_hour: int
     reveal_alert: bool
+    # DB_STORAGE_REVIEW 7.4: the stored database measurement (Services panel); None when it could not be read
+    database: Optional[OverviewDatabaseOut] = None
     computed_at: datetime
 
 

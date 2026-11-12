@@ -3,9 +3,12 @@
 `/platform/summary` stays light because the admin shell calls it on every page; this answer is only for the overview
 page. It is cached for 60 s per process (by `clock.now()`, so tests can move time), so repeated reloads do not re-scan
 the attempts table. Four statements on a miss: one with the user and attempt counts as scalar subqueries, the Pro
-summary, the storage row and the code reveals of the last hour."""
+summary, the storage row and the code reveals of the last hour; plus the database line (DB_STORAGE_REVIEW 7.4): the
+stored measurement of the Services panel (`platform_settings`), re-measured here when older than 60 minutes (SQL only,
+no provider call). The database line fails alone: any error gives `database: None` and the rest of the answer stays."""
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta
 from threading import Lock
 from typing import Optional
@@ -17,8 +20,11 @@ from app.lms.access import admin as access_admin
 from app.lms.attempts.models import Attempt
 from app.lms.core import clock
 from app.lms.files import usage
+from app.lms.infra import capacity
 from app.lms.teachers.models import TeacherRequest
 from app.models.user import User
+
+logger = logging.getLogger(__name__)
 
 CACHE_SECONDS = 60
 WINDOW = timedelta(days=7)
@@ -32,6 +38,32 @@ def clear_cache() -> None:
     global _cache
     with _lock:
         _cache = None
+
+
+def _database(db: Session, now: datetime) -> Optional[dict]:
+    """The stored measurement, refreshed when older than an hour; None when there is none and measuring fails."""
+    value = None
+    try:
+        value = capacity.stored_measurement(db)
+        when = capacity.measured_at(value) if value else None
+        if when is None or now - when >= capacity.MEASUREMENT_MAX_AGE:
+            value = capacity.measure_storage(db)
+            db.commit()
+    except Exception as e:  # the overview's other numbers must not depend on this line
+        db.rollback()
+        logger.warning("overview: database measurement failed (%s)", type(e).__name__)
+    if not value:
+        return None
+    percent, fits = value.get("percent"), value.get("fits")
+    number_ok = percent is None or (isinstance(percent, (int, float)) and not isinstance(percent, bool))
+    fits_ok = fits is None or (isinstance(fits, int) and not isinstance(fits, bool))
+    if not (number_ok and fits_ok):
+        return None
+    return {
+        "level": capacity.db_level(percent, fits),  # today's thresholds, not the stored level
+        "percent": percent, "fits": fits, "used_bytes": value.get("used_bytes"),
+        "limit_bytes": value.get("limit_bytes"), "measured_at": capacity.measured_at(value),
+    }
 
 
 def _compute(db: Session, now: datetime) -> dict:
@@ -57,6 +89,7 @@ def _compute(db: Session, now: datetime) -> dict:
         "storage_level": usage.level(usage.stored_totals(db)[0]),
         "reveals_last_hour": reveals,
         "reveal_alert": reveals > access_admin.REVEAL_ALERT_PER_HOUR,
+        "database": _database(db, now),
     }
 
 

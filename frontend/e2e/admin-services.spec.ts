@@ -41,12 +41,13 @@ const card = (provider: string, over: Record<string, unknown> = {}): Any => ({
   dashboard_url: `https://example.test/${provider}`, metrics: [], flags: [], details: {}, ...over,
 });
 
-function infra(cards: Any[]): Any {
+function infra(cards: Any[], capacity: Record<string, unknown> = {}): Any {
   return {
     generated_at: ago(4), ttl_seconds: 1200, cards,
     capacity: {
       fits: 4, students: 6000, exam_bytes: 226_000_000, used_bytes: 41_451_520, limit_bytes: 1_073_741_824, used_source: "neon",
-      estimated: true, history_seconds: 21600, per_row_bytes: { attempt_items: 241 },
+      percent: 3.9, level: "ok", measured_at: ago(4), estimated: true, history_seconds: 21600, branches: 6, branches_limit: 10,
+      upgrade_storage_usd_per_gb_month: 0.35, per_row_bytes: { attempt_items: 241 }, ...capacity,
     },
     costs: {
       total_usd: 0, complete: true, source: "docs/COSTS.md", as_of: "2026-11-09",
@@ -191,4 +192,54 @@ test("unmocked: the scratch backend has nothing connected except our R2 counter"
   await expect(page.getByTestId("infra-capacity")).toBeVisible();
   await expect(page.getByTestId("infra-costs")).toBeVisible();
   await shots(page, "02-services-unmocked");
+});
+
+// DB_STORAGE_REVIEW 7 (slice D1): the database has its own levels (notice 50 %, warning 70 %, critical 85 %, and no full
+// exam left is critical at any percent); the writes-stop sentence is always there, the upgrade hint from warning up.
+const GIB = 1_073_741_824;
+const capAt = (percent: number, fits: number, level: string): Record<string, unknown> => ({
+  percent, fits, level, used_bytes: Math.round((GIB * percent) / 100), used_source: "database",
+});
+
+for (const c of [
+  { name: "55 % notice", cap: capAt(55, 2, "notice"), advice: "infra.capacity.notice", alert: false },
+  { name: "72 % warning", cap: capAt(72, 1, "warning"), advice: "infra.capacity.upgradeHint", alert: true },
+  { name: "90 % critical", cap: capAt(90, 0, "critical"), advice: "infra.capacity.upgradeHint", alert: true },
+  { name: "fits = 0 at 40 %", cap: capAt(40, 0, "critical"), advice: "infra.capacity.upgradeHint", alert: true },
+]) {
+  test(`database capacity: ${c.name}`, async ({ page }) => {
+    await mock(page, infra([OK_NEON], c.cap));
+    await page.goto("/ru/admin/services");
+    const cap = page.getByTestId("infra-capacity");
+    await expect(cap).toHaveAttribute("data-level", String(c.cap.level));
+    await expect(cap.getByTestId("infra-capacity-fits")).toHaveText(String(c.cap.fits));
+    await expect(cap.getByText(t(`infra.level.${c.cap.level}`), { exact: true })).toBeVisible();
+    await expect(cap.getByTestId("infra-capacity-writes-stop")).toHaveText(t("infra.capacity.writesStop"));
+    const advice = cap.getByTestId("infra-capacity-advice");
+    await expect(advice).toContainText(t(c.advice).split("{")[0].trim());
+    if (c.alert) {
+      await expect(advice).toHaveAttribute("role", "alert");
+      await expect(advice).toContainText("0,35"); // the price comes from the backend (costs.py)
+    } else {
+      await expect(advice).not.toHaveAttribute("role", "alert");
+      await expect(cap).not.toContainText(t("infra.capacity.upgradeHint").split("{")[0].trim());
+    }
+    await expect(cap.getByRole("progressbar")).toHaveAttribute("aria-valuenow", String(c.cap.percent));
+    await expect(cap).toContainText(t("infra.capacity.source.database"));
+    await expect(cap.getByTestId("infra-capacity-branches")).toHaveText(t("infra.capacity.branches", { value: 6, limit: 10 }));
+    await expect(cap.getByTestId("infra-capacity-measured")).toBeVisible();
+    if (c.cap.percent === 72) await shots(page, "03-services-db-warning");
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  });
+}
+
+test("database capacity: ok keeps the writes-stop sentence and shows no advice", async ({ page }) => {
+  await mock(page, infra([OK_NEON], { used_source: "database_estimate" }));
+  await page.goto("/ru/admin/services");
+  const cap = page.getByTestId("infra-capacity");
+  await expect(cap).toHaveAttribute("data-level", "ok");
+  await expect(cap.getByTestId("infra-capacity-writes-stop")).toHaveText(t("infra.capacity.writesStop"));
+  await expect(cap.getByTestId("infra-capacity-advice")).toHaveCount(0);
+  await expect(cap).toContainText(t("infra.capacity.source.database_estimate"));
+  await page.unrouteAll({ behavior: "ignoreErrors" });
 });

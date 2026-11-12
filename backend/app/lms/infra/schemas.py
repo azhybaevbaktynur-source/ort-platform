@@ -1,5 +1,6 @@
 """`InfraOut` (INFRA_PANEL_DESIGN 5). Levels are computed server-side so every client agrees: `ok` < 80 %,
-`warning` >= 80 %, `critical` >= 95 % of the limit."""
+`warning` >= 80 %, `critical` >= 95 % of the limit; the database (Neon storage and the capacity block) uses `notice`
+>= 50 %, `warning` >= 70 %, `critical` >= 85 % and the exams-that-fit rule (`capacity.db_level`, DB_STORAGE_REVIEW 7)."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -7,7 +8,7 @@ from typing import Literal, Optional, Union
 
 from pydantic import BaseModel
 
-Level = Literal["ok", "warning", "critical"]
+Level = Literal["ok", "notice", "warning", "critical"]
 CardStatus = Literal["ok", "warning", "error", "not_connected", "unavailable", "refreshing"]
 Number = Union[int, float]
 Scalar = Union[int, float, bool, str, None]
@@ -48,9 +49,15 @@ class CapacityOut(BaseModel):
     exam_bytes: int
     used_bytes: int
     limit_bytes: int
-    used_source: Literal["neon", "database"]
+    used_source: Literal["neon", "database", "database_estimate"]
+    percent: Optional[float] = None
+    level: Level = "ok"
+    measured_at: Optional[datetime] = None
     estimated: bool
     history_seconds: Optional[int] = None
+    branches: Optional[int] = None
+    branches_limit: Optional[int] = None
+    upgrade_storage_usd_per_gb_month: Optional[float] = None  # Neon Launch, from `costs.py`
     per_row_bytes: dict[str, int]
 
 

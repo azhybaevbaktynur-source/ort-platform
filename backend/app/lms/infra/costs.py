@@ -8,6 +8,9 @@ from typing import NamedTuple, Optional
 
 SOURCE = "docs/COSTS.md"
 AS_OF = "2026-11-09"
+# Neon Launch storage (DB_STORAGE_REVIEW 3, plan pages read 2026-11-12); the Services panel's upgrade hint shows it.
+# The only place this price lives in code.
+NEON_LAUNCH_STORAGE_USD_PER_GB_MONTH = 0.35
 
 
 class CostRow(NamedTuple):

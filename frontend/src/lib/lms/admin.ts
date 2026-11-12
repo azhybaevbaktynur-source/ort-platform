@@ -21,7 +21,17 @@ export interface PlatformOverviewOut {
   storage_level: "ok" | "warn" | "full";
   reveals_last_hour: number;
   reveal_alert: boolean;
+  /** DB_STORAGE_REVIEW 7.4: the stored database measurement (Services panel); null when it could not be read. */
+  database?: PlatformOverviewDatabase | null;
   computed_at: string;
+}
+export interface PlatformOverviewDatabase {
+  level: "ok" | "notice" | "warning" | "critical";
+  percent: number | null;
+  fits: number | null;
+  used_bytes: number | null;
+  limit_bytes: number | null;
+  measured_at: string | null;
 }
 export const getPlatformOverview = () => lmsFetch<PlatformOverviewOut>("/platform/overview");
 

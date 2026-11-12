@@ -58,6 +58,7 @@ export default function AdminOverviewPage() {
             <NeedsAttention pending={pending} storageLevel={storageLevel}
               reveals={overview.data ? { count: overview.data.reveals_last_hour, alert: overview.data.reveal_alert } : null}
               failedChecks={health ? failedHealthChecks(health) : null}
+              database={overview.data?.database ?? null}
               summaryError={ready ? error : null} onRetry={refresh} />
           </CardBoundary>
           <CardBoundary>
