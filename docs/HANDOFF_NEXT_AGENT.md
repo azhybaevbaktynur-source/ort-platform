@@ -15,6 +15,8 @@
 
 ## 3. Current state (2026-10-26)
 
+**Update 2026-11-13: step 3b S1–S3 deployed.** The student catalog shows platform courses and teacher courses the platform admin approved (`courses.listing`: off, pending, listed, declined, blocked); a course page can be open by link without being listed. Admin → Каталог reviews requests (approve, decline with a comment, remove, return); Admin → Преподаватели lists teachers and their requests. Design: `docs/phases/CATALOG_AND_TEACHERS_DESIGN.md`; slice S4 is text and polish.
+
 | Phase | State | Docs |
 |---|---|---|
 | 0–5 | Done, deployed (ORT cutover 2026-10-23) | `docs/phases/PHASE_0..5.md` |

@@ -746,7 +746,7 @@
         "rejected": "Rejected",
         "all": "All"
       },
-      "empty": "No requests here.",
+      "empty": "No requests in this view. New teacher requests appear here.",
       "noMessage": "No message.",
       "decidedBy": "Decided by {name} on {date}",
       "approve": "Approve",
@@ -932,7 +932,8 @@
         "decided": "Decided",
         "actions": "Actions"
       },
-      "content": "Tests: {tests} · lessons: {lessons}",
+      "tests": "Tests: {n}",
+      "lessons": "Lessons: {n}",
       "students": "Students: {n}",
       "independent": "Independent teacher",
       "platform": "Platform",
@@ -941,7 +942,7 @@
       "openCourse": "Course details",
       "more": "More actions: {course}",
       "approve": "Approve",
-      "recheck": "Checked",
+      "recheck": "Mark as checked",
       "decline": "Decline",
       "block": "Remove from the catalog",
       "relist": "Return to the catalog",
@@ -956,10 +957,10 @@
       "relistTitle": "Return the course to the catalog?",
       "relistBody": "The course «{course}» appears in the catalog again if its page is open by link.",
       "empty": {
-        "pending": "No new requests.",
-        "listed": "No teacher courses in the catalog yet.",
-        "declined": "No declined requests.",
-        "blocked": "No removed courses."
+        "pending": "No new requests. When a teacher suggests a course for the catalog, it appears here.",
+        "listed": "No teacher courses in the catalog yet. Approved requests appear here.",
+        "declined": "No declined requests. Requests you decline are kept here.",
+        "blocked": "No removed courses. Courses you remove from the catalog are kept here."
       },
       "toast": {
         "approved": "«{course}» is now in the catalog.",

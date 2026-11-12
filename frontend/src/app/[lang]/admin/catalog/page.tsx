@@ -121,8 +121,9 @@ function AdminCatalog() {
       key: "content", header: t("platformAdmin.catalog.columns.content"),
       cell: (r) => (
         <span className="text-sm">
-          {t("platformAdmin.catalog.content", { tests: r.tests_count, lessons: r.lessons_count })}
-          <span className="block text-slate-600">{t("platformAdmin.catalog.students", { n: r.student_count })}</span>
+          <span className="block whitespace-nowrap">{t("platformAdmin.catalog.tests", { n: r.tests_count })}</span>
+          <span className="block whitespace-nowrap">{t("platformAdmin.catalog.lessons", { n: r.lessons_count })}</span>
+          <span className="block whitespace-nowrap text-slate-600">{t("platformAdmin.catalog.students", { n: r.student_count })}</span>
         </span>
       ),
     },
