@@ -7,6 +7,8 @@ import { useCourse } from "@/components/lms/CourseContext";
 import { ContentTabs } from "@/components/lms/course/ContentTabs";
 import { StaffAssignmentList } from "@/components/lms/assignments/StaffAssignmentList";
 import { StudentAssignmentList } from "@/components/lms/assignments/StudentAssignmentList";
+import { ToCourseTab } from "@/components/lms/course/ToCourseTab"; // step 3a S2
+import { inCourseSpace } from "@/lib/lms/templates"; // step 3a S2
 
 export default function AssignmentsPage() {
   const { course } = useCourse();
@@ -19,5 +21,7 @@ export default function AssignmentsPage() {
       </>
     );
   }
+  // step 3a S2 (§3.7, D4): a student's assignments are the Тесты / Задания tab
+  if (inCourseSpace(course)) return <ToCourseTab courseId={course.id} path="/tests" />;
   return <StudentAssignmentList />;
 }

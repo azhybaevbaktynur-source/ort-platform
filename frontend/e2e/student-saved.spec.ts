@@ -81,6 +81,9 @@ test.describe("student saved, checklist, practice, unlock (ru)", () => {
       await page.goto(savedUrl());
       await expect(page.getByRole("heading", { level: 1, name: t("student.saved.title") })).toBeVisible();
       await expect(page.getByText(t("student.saved.empty"))).toBeVisible();
+      // step 3a S2: Сохранённые is a tab of the course space
+      await expect(page.getByRole("navigation", { name: t("course.tabs.label") }).getByRole("link", { name: t("course.tabs.saved"), exact: true }))
+        .toHaveAttribute("aria-current", "page");
       const nav = w >= 1024 ? page.getByRole("navigation", { name: t("student.nav.label") }) : null;
       if (nav) {
         await expect(nav.getByRole("link", { name: t("student.nav.saved") })).toHaveAttribute("aria-current", "page");
@@ -148,7 +151,7 @@ test.describe("student saved, checklist, practice, unlock (ru)", () => {
 
       // one day of answers: no answers chart, study time, active hours, sessions or calendar card (not even an empty
       // one; U9, review 11), the topic cards are there
-      await page.goto(`/ru/courses/${seed().course_id}/progress`);
+      await page.goto(`/ru/courses/${seed().course_id}/analytics`); // step 3a S2: the Аналитика tab
       await expect(page.getByRole("heading", { level: 1, name: t("progress.analytics.title") })).toBeVisible();
       await expect(page.getByText(t("progress.analytics.topics.math"), { exact: true }).first()).toBeVisible();
       await expect(page.getByRole("img", { name: /Ответов за период/ })).toHaveCount(0);
@@ -158,8 +161,10 @@ test.describe("student saved, checklist, practice, unlock (ru)", () => {
       await noSideScroll(page, `analytics at ${w}px`);
       await shot(page, `analytics-little-${w}`);
 
+      // step 3a S2 (D6): practice is the «Тренировки» section of the Тесты tab; the old URL leads there
       await page.goto(`/ru/courses/${seed().course_id}/practice`);
-      await expect(page.getByRole("heading", { level: 1, name: t("practice.title") })).toBeVisible();
+      await page.waitForURL(new RegExp(`/courses/${seed().course_id}/tests#practice$`));
+      if (OUT) await expect(page.getByRole("heading", { level: 2, name: t("course.tests.practiceSection") })).toBeVisible();
       await settle(page);
       await noSideScroll(page, `practice at ${w}px`);
       await shot(page, `practice-${w}`);

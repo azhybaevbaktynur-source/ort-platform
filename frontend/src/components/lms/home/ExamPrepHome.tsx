@@ -29,6 +29,7 @@ import { NextCard } from "@/components/lms/examPrep/NextCard";
 import { GoalEditor, fmtExamDate } from "@/components/lms/examPrep/GoalStrip";
 import { noteExamPrep } from "@/components/lms/student/gettingStarted"; // Student UI U8
 import { CourseCard } from "@/components/lms/course/CourseCard";
+import { UnlockCard } from "@/components/lms/course/UnlockCard"; // step 3a S2: shared with the course Обзор
 import { PlatformCourses } from "./PlatformCourses";
 import { ContinueLessons, LessonCourses, useLessonCourseRows } from "./LessonCourses"; // TEACHER_TO_STUDENT_MAP S3
 import { HOME_CARD, StreakCard, StreakCardSkeleton } from "./StreakCard";
@@ -191,21 +192,6 @@ function ScoreLine({ prep, courseId, onGoal }: { prep: ExamPrepOut; courseId: st
         <GoalEditor courseId={courseId} goal={prep.goal} className="mb-2 mt-1 rounded-card shadow-none"
           onDone={(g) => { onGoal(g); setEditing(false); }} onCancel={() => setEditing(false)} />
       )}
-    </section>
-  );
-}
-
-/** §5.1 b, U9 (review 9): one short gold card for a student without results; the details stay on /pro. */
-function UnlockCard() {
-  const { lang, t } = useTranslation();
-  return (
-    <section aria-labelledby="home-unlock"
-      className="flex flex-col gap-3 rounded-card border border-gold-300 bg-gradient-to-br from-gold-50 to-gold-100 p-4 sm:flex-row sm:items-center sm:gap-4 sm:px-5">
-      <div className="min-w-0 flex-1">
-        <h2 id="home-unlock" className="text-base font-semibold leading-6 text-gold-900">{t("home.prep.unlock.title")}</h2>
-        <p className="text-base leading-6 text-slate-800 sm:text-sm sm:leading-5">{t("home.prep.unlock.body")}</p>
-      </div>
-      <GoldPill href={`/${lang}/pro`} className="justify-center sm:shrink-0">{t("access.needsPassLink")}</GoldPill>
     </section>
   );
 }

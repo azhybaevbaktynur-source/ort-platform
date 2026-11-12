@@ -51,15 +51,16 @@ export function studentNavLinks({ lang, rest, courseId, features }: StudentNavIn
   return {
     home,
     catalog,
-    analytics: { key: "analytics", href: `${base}${c}/progress`, active: under(rest, `${c}/progress`) },
+    // step 3a S2: the links land on the course tabs (the old URLs redirect there); S3 replaces these per-course links
+    analytics: { key: "analytics", href: `${base}${c}/analytics`, active: under(rest, `${c}/analytics`) || under(rest, `${c}/progress`) },
     // U8: flagged questions and the mistakes notebook (`?tab=mistakes`); `/progress?tab=mistakes` redirects there
     saved: { key: "saved", href: `${base}${c}/saved`, active: under(rest, `${c}/saved`) },
     lessons: features?.modules
-      ? { key: "lessons", href: `${base}${c}/modules`, active: under(rest, `${c}/modules`) || under(rest, `${c}/pages`) }
+      ? { key: "lessons", href: `${base}${c}/lessons`, active: under(rest, `${c}/lessons`) || under(rest, `${c}/modules`) || under(rest, `${c}/pages`) }
       : null,
-    // U4: the Тесты page (the course page redirects there for exam-prep students)
-    tests: { key: "tests", href: `${base}${c}/tests`, active: rest === c || under(rest, `${c}/tests`) },
-    practice: { key: "practice", href: `${base}${c}/practice`, active: under(rest, `${c}/practice`) },
+    // U4: the Тесты page (step 3a S2: the course page is Обзор, no longer Тесты)
+    tests: { key: "tests", href: `${base}${c}/tests`, active: under(rest, `${c}/tests`) },
+    practice: { key: "practice", href: `${base}${c}/tests#practice`, active: under(rest, `${c}/practice`) },
   };
 }
 
@@ -94,7 +95,7 @@ export function lessonCourseLinks({ lang, rest, examId, rows }: {
   const pathCourse = courseIdOfPath(rest);
   const links = rows.slice(0, LESSON_ROWS_MAX).map((r) => ({
     id: r.id,
-    href: r.enrolled ? `${base}/courses/${r.id}/modules` : `${base}/courses/catalog/${r.id}`,
+    href: r.enrolled ? `${base}/courses/${r.id}` : `${base}/courses/catalog/${r.id}`, // step 3a S2: its Обзор
     active: pathCourse === r.id || under(rest, `/courses/catalog/${r.id}`),
     progress: r.enrolled && r.progress && r.progress.total > 0 ? r.progress : null,
   }));

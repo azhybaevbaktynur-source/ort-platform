@@ -19,7 +19,7 @@ import { getModules, recordView, setDone } from "@/lib/lms/modules";
 import { downloadCourseFile } from "@/lib/lms/courseFiles";
 import { getPage } from "@/lib/lms/pages";
 import type { PageAnyOut } from "@/lib/lms/pagesTypes";
-import { isExamShellCourse } from "@/lib/lms/templates";
+import { inCourseSpace } from "@/lib/lms/templates";
 import { isStaffModules, type ModuleStudentOut, type ModulesStudentOut } from "@/lib/lms/modulesTypes";
 import { useCourse } from "@/components/lms/CourseContext";
 import { useStudentShellDataContext } from "@/components/lms/student/StudentShellDataContext";
@@ -209,7 +209,8 @@ export function LessonView({ moduleId, itemId }: { moduleId: string; itemId: str
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<unknown>(null);
   const base = `/${lang}/courses/${course.id}`;
-  const examPrep = isExamShellCourse(course); // TEACHER_TO_STUDENT_MAP §2.5: attached lesson courses too
+  // step 3a S2: in the course space the compact header is no heading, so the lesson title is the page's h1
+  const examPrep = inCourseSpace(course);
   const readOnly = course.my_enrollment.role !== "student" || !!course.my_enrollment.read_only || course.status === "concluded";
 
   const lessons = useMemo(() => lessonList(data?.modules ?? []), [data]);
@@ -243,7 +244,7 @@ export function LessonView({ moduleId, itemId }: { moduleId: string; itemId: str
   if (error && !data) return <ErrorState message={errorText(error)} onRetry={() => void load()} retrying={loading} />;
   if (!data || forward) return <LoadingState rows={4} />;
 
-  const back = (label: string, href = `${base}/modules`) => (
+  const back = (label: string, href = (examPrep ? `${base}/lessons` : `${base}/modules`)) => (
     <Link href={href} className={cn("inline-flex min-h-11 items-center gap-1 rounded-control text-sm font-medium text-brand-700 hover:underline", focusRing)}>
       <ChevronLeft aria-hidden="true" className="h-4 w-4 shrink-0" /><span className="min-w-0 break-words">{label}</span>
     </Link>
@@ -253,7 +254,7 @@ export function LessonView({ moduleId, itemId }: { moduleId: string; itemId: str
       <div className="space-y-4">
         {back(t("modules.overview.syllabusTitle"))}
         <EmptyState mascot="thinking" title={t("modules.lesson.notFoundTitle")} description={t("modules.lesson.notFoundBody")}
-          action={<LinkButton href={`${base}/modules`} variant="secondary">{t("modules.overview.toSyllabus")}</LinkButton>} />
+          action={<LinkButton href={(examPrep ? `${base}/lessons` : `${base}/modules`)} variant="secondary">{t("modules.overview.toSyllabus")}</LinkButton>} />
       </div>
     );
   }
@@ -308,7 +309,7 @@ export function LessonView({ moduleId, itemId }: { moduleId: string; itemId: str
         {reasons.length > 0 && (
           <ul className="mt-2 space-y-1 text-sm leading-6 text-slate-700">{reasons.map((r, i) => <li key={i} className="break-words">{r}</li>)}</ul>
         )}
-        <LinkButton href={`${base}/modules`} variant="secondary" className="mt-4 w-full sm:w-auto">{t("modules.overview.toSyllabus")}</LinkButton>
+        <LinkButton href={(examPrep ? `${base}/lessons` : `${base}/modules`)} variant="secondary" className="mt-4 w-full sm:w-auto">{t("modules.overview.toSyllabus")}</LinkButton>
       </div>
     );
   } else if (item.kind === "url" && item.video) {
@@ -370,7 +371,7 @@ export function LessonView({ moduleId, itemId }: { moduleId: string; itemId: str
         <div className="min-w-0">
           <nav aria-label={t("modules.overview.breadcrumbLabel")} className="flex flex-wrap items-center gap-x-1.5 text-sm leading-5 text-slate-600">
             <span className="hidden sm:inline">{back(t("modules.overview.syllabusTitle"))}</span>
-            <span className="sm:hidden">{back(moduleTitle, `${base}/modules#module-${mod.id}`)}</span>
+            <span className="sm:hidden">{back(moduleTitle, `${base}/${examPrep ? "lessons" : "modules"}#module-${mod.id}`)}</span>
             <span aria-hidden="true" className="hidden sm:inline">·</span>
             <span className="hidden break-words sm:inline">{moduleTitle}</span>
             <span aria-hidden="true">·</span>

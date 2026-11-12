@@ -87,21 +87,27 @@ async function noSideScroll(page: Page, name: string) {
 }
 
 async function walk(browser: Browser, user: SeedUser, name: string, check: (page: Page) => Promise<void>) {
-  const url = `/ru/courses/${seed().course_id}/progress`;
+  // step 3a S2 (STUDENT_IA_DESIGN §3.2, N4): the course's Аналитика tab; the old `/progress` redirects there
+  const url = `/ru/courses/${seed().course_id}/analytics`;
+  const legacy = `/ru/courses/${seed().course_id}/progress`;
   for (const [w, h] of SIZES) {
     const ctx = await browser.newContext({ viewport: { width: w, height: h }, locale: "ru-RU", timezoneId: "UTC" });
     const page = await ctx.newPage();
     await signIn(page, user);
     await page.goto(url);
     await expect(page.getByRole("heading", { level: 1, name: tr("ru", "progress.analytics.title") })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: tr("ru", "course.tabs.label") }).getByRole("link", { name: tr("ru", "course.tabs.analytics"), exact: true }))
+      .toHaveAttribute("aria-current", "page");
     await settle(page);
     await check(page);
     await expect(page.locator('[aria-busy="true"]')).toHaveCount(0); // the period switch has reloaded
     await noSideScroll(page, `${name} at ${w}px`);
     if (OUT) await page.screenshot({ path: path.join(OUT, `${name}-${w}.jpg`), type: "jpeg", quality: 70, fullPage: true, animations: "disabled" });
     if (name === "analytics-data") {
+      await page.goto(legacy);
+      await page.waitForURL(new RegExp(`/courses/${seed().course_id}/analytics$`));
       // U8: the notebook moved to Сохранённые; the old link still lands there
-      await page.goto(`${url}?tab=mistakes`);
+      await page.goto(`${legacy}?tab=mistakes`);
       await page.waitForURL(new RegExp(`/courses/${seed().course_id}/saved\\?tab=mistakes$`));
       await expect(page.getByRole("tab", { name: tr("ru", "student.saved.tabs.mistakes") })).toHaveAttribute("aria-selected", "true");
       await settle(page);

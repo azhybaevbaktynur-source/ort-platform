@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ChevronDown, ListChecks } from "lucide-react";
 import { BackLink } from "@/components/lms/BackLink";
 import { useTranslation } from "@/lib/i18n/context";
+import { useRememberLobby } from "@/lib/lms/useLastPlace"; // step 3a S2
 import { getAttempt, getAttemptResult, getAttemptReview } from "@/lib/lms/attempts";
 import type { AttemptResultOut, AttemptState, Correctness, ReviewItemOut, ReviewOut } from "@/lib/lms/attemptTypes";
 import { getAssessment } from "@/lib/lms/assessments";
@@ -83,6 +84,7 @@ export function StudentResult({ courseId, attemptId }: { courseId: string; attem
 
   // The test's title for the header (best effort: the page works without it)
   const assessmentId = state?.assessment_id ?? null;
+  useRememberLobby(lang, courseId, assessmentId); // step 3a S2: the result remembers its lobby
   useEffect(() => {
     if (!assessmentId) return;
     let live = true;
