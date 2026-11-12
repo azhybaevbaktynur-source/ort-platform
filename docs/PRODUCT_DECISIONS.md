@@ -656,6 +656,7 @@ Replaces "ORT must not change" (2026-10-24, section A above, and its second roun
 Owner: "We already decided that student and teacher will be separate. A teacher who is also a student will open a new student account. We do not need that. We have Student view to check how courses look; we need that function in the teacher page."
 
 - A person who teaches never gets the Learning area (no «Учёба», no student home, no Pro in the menu), whatever student enrolments they have. Existing student enrolments of teachers stay in the database untouched; only the interface ignores them (removing them would be a data change for the owner to approve).
+- 2026-11-12, owner OK: the old teacher account's 2 student enrolments (ORT Russian, ORT Kyrgyz) were set to `removed` on production (enrollment events + an audit entry; its 3 ORT attempts are kept).
 - Teachers check the student experience with Student view, reachable from the Teaching list and the course page.
 - Consequences: slice 1e builds this; slice 1b's per-role link check has no "teacher who is also a student" role; step 3b decides what the catalog offers a teacher (Student view instead of «Записаться»).
 
