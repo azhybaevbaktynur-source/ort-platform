@@ -1004,6 +1004,25 @@ remembered course; no exam course; test student; teacher/admin; two-step gate), 
 bootstrap with `include=home`, no `/me/home`/`exam-prep`/`my/activity`, no chained request before first content, cold
 and reload; fails on `b112c43`).
 
+**P3 result (2026-11-12, branch of `lms` `a7c1c7c`).** Once sign-in has stored the token, `prefetchBootstrap(dest,
+isPlatformAdmin)` (`bootstrap.ts`) asks the bootstrap through `swr` (`revalidate`, the shell's key and options) right
+before `router.push`/`replace`: password login, the two-step code step and a confirmed email (`login/page.tsx`
+`handleNavigateAfterAuth`), and Google (`oauth-callback/page.tsx` `goOn`; not for the under-14 privacy page or the
+parent page). Only for a `dest` under `/courses`; with `include=home` when `dest` is the home and the login answer
+does not say platform admin (the only teaching fact it carries; the server decides for everyone else). An admin who
+must set up two-step login gets `me` only, as the server answers whatever is asked; an admin with two-step login gets
+nothing before the code step (no token yet). The first page's `useCached` shares the running request (one bootstrap;
+the home's parts wait for it through `homeBootstrap`). The home's parts can now answer before `pageData.ts` is loaded (the
+login page does not load it): `bootstrap.ts` keeps them for 10 s for the same token and hands them over when `pageData`
+registers. Measured with the new `e2e/login.spec.ts` (a password student in no course, `seed.login_student`; click on
+"Войти" to the home's "От платформы" heading painted, page clock, own production builds of `a7c1c7c` and P3, 7 runs
+each, median): local **184 → 138 ms**; with 270 ms added to every API request (production's proxy round,
+`P3_API_DELAY_MS`) **728 → 688 ms**; with that and 150 ms on every route payload and script (`P3_WEB_DELAY_MS`, a cold
+CDN) **885 → 686 ms**. The gain is the route change's payload and the next page's JS, which now overlap the bootstrap;
+in production that is ≈ 0.2–0.3 s on the first page after sign-in. Tests: `login.spec.ts` (the bootstrap's resource
+entry starts before the address becomes `/ru/courses`, one bootstrap with `include=home`, no `/me/home`; fails on
+`a7c1c7c`); admin-mfa-gate, admin-mfa, oauth-google, header-areas, role-links, student-home, shell-stable green.
+
 ### 10.5 Better ideas than the brief's
 
 1. **Measure production signed-in from the owner's browser, once, after P1–P3**: the owner opens the student home with

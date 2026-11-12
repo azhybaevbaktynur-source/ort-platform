@@ -60,9 +60,26 @@ type BootstrapWithHome = BootstrapOut & {
 };
 
 let homeSink: ((parts: BootstrapHomeParts) => void) | null = null;
+// P3: parts that came before `pageData.ts` was loaded (a sign-in prefetch answered on the login page); kept for the
+// home of the same session for a few seconds only
+let homePending: { parts: BootstrapHomeParts; at: number; token: string } | null = null;
+const PENDING_MS = 10_000;
+
+function tokenNow(): string {
+  try { return window.localStorage.getItem("ort_token") ?? ""; } catch { return ""; }
+}
+
 /** `pageData.ts` receives the home's parts here (set once, when it loads). */
 export function onBootstrapHome(sink: (parts: BootstrapHomeParts) => void): void {
   homeSink = sink;
+  const pending = homePending;
+  homePending = null;
+  if (pending && Date.now() - pending.at <= PENDING_MS && pending.token === tokenNow()) sink(pending.parts);
+}
+
+function deliverHome(parts: BootstrapHomeParts): void {
+  if (homeSink) homeSink(parts);
+  else homePending = { parts, at: Date.now(), token: tokenNow() };
 }
 
 // one combined request per page load, the first on the home (a client navigation back to the home asks its own reads)
@@ -86,7 +103,7 @@ function fetchBoot(withHome: boolean): Promise<BootstrapOut> {
   homeAsked = true;
   const p = lmsFetch<BootstrapWithHome>("/me/bootstrap", { params: { include: "home", course: rememberedCourse() } }).then((b) => {
     const { home, exam_prep, activity, ...shell } = b;
-    if (home && homeSink) homeSink({ home, exam_prep: exam_prep ?? {}, activity: activity ?? {} });
+    if (home) deliverHome({ home, exam_prep: exam_prep ?? {}, activity: activity ?? {} });
     return shell;
   });
   homeRequest = p;
@@ -109,6 +126,23 @@ export function homeBootstrap(): Promise<BootstrapOut> | null {
   const p = revalidate(BOOTSTRAP_KEY, () => fetchBoot(true), BOOTSTRAP_OPTIONS);
   homeAsked = true; // a request without the home's reads was already running: the home asks its own after it
   return homeRequest ?? p;
+}
+
+/**
+ * PERFORMANCE_AUDIT P3: sign-in has just stored the token (password, the two-step code, Google): ask the bootstrap now,
+ * before the route change to `dest`, so the first page finds it running or cached (`swr` shares one request per key;
+ * the page's own `useCached` waits for this one). Only for the app's pages under `/courses`; with the home's reads
+ * when `dest` is the home, unless the login answer says the person runs the platform (the server leaves the student
+ * parts out for anyone who teaches and answers only `me` under the two-step gate, whatever is asked).
+ */
+export function prefetchBootstrap(dest: string, isPlatformAdmin: boolean): void {
+  if (typeof window === "undefined") return;
+  let path: string;
+  try { path = new URL(dest, window.location.origin).pathname; } catch { return; }
+  if (!/^\/(en|ky|ru)\/courses(\/|$)/.test(path)) return;
+  const home = /^\/(en|ky|ru)\/courses\/?$/.test(path);
+  revalidate(BOOTSTRAP_KEY, () => fetchBoot(home && !isPlatformAdmin), BOOTSTRAP_OPTIONS).catch(() => undefined);
+  if (home) homeAsked = true; // this page load's request for the home is the one above
 }
 
 /** The bootstrap: cached at once when fresh, the cached one plus a background refresh when stale. */
