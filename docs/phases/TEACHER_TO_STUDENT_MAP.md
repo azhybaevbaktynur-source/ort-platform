@@ -1,6 +1,6 @@
 # Teacher course → student view: map, structure design, e2e, slices (owner item 3, 2026-11-08)
 
-**Status**: design (architect on Fable), 2026-11-08. Source: `STAFF_FEEDBACK_2026-11-08.md` item 3. Base: `lms`
+**Status**: design (architect on Fable), 2026-11-08; §0 added 2026-11-13 for the step 3a structure (`STUDENT_IA_DESIGN.md` v2). Source: `STAFF_FEEDBACK_2026-11-08.md` item 3. Base: `lms`
 2a85616, alembic head `0026_course_cover`. Builds on `STUDENT_UI_DESIGN.md` §2–3, `STUDENT_UI_FIX_PLAN.md` §2.1 and
 §11, `COURSE_LESSONS_DESIGN.md` L1–L10. The reference product is "the reference app" (never named; repo is public).
 **Rules**: improve the existing architecture; ORT behaviour, player, scoring, imports untouched (`AGENTS.md` §6.9);
@@ -10,7 +10,41 @@ Vocabulary: **exam course** = a course whose template has `student_layout = "exa
 ORT ky; later olympiads, НЦТ). **Lesson course** ("masterclass") = a general course (`template_key IS NULL`) of the
 platform organization attached to one exam course (§2). **Exam shell** = `StudentShell` with the exam sidebar.
 
-## 1. Map: where each teacher action lands for the student
+## 0. Step 3a (2026-11-13): where each teacher action lands in the hub + course-space structure
+
+`STUDENT_IA_DESIGN.md` v2 (owner's final direction): `/home` is a hub (continue card, course cards grouped by exam, a
+to-do list), every course is a space with tabs Обзор · Уроки · Тесты/Задания · Аналитика · Сохранённые shown only when
+the course has published content for them, no global per-course pages, no exam switcher. The student column of §1
+below describes the interface **before** 3a and stays as history; this table is the current map. The server rules
+column of §1 is unchanged: what a student sees comes only from what the teacher published (owner point 7), and
+Режим ученика renders the same frame (the test student is a real learner).
+
+| nn | Teacher action | Student: where it appears after 3a |
+|---|---|---|
+| 01 | Create course (general), publish, student joins | **`/home`**: card in the group «Другие курсы» (or the exam's group when attached, 02) with progress, next-step button; **sidebar** «Мои курсы» row (recent first); **`/courses`** card; **course space** `/courses/{c}` Обзор (next step, last result, announcements strip, «О курсе» with the teacher's name). A draft is listed nowhere |
+| 02 | Publish / unpublish course; link access, catalog listing (3b); exam link `exam_course_id`; **new**: exam family + subject (platform admin, settings «Экзамен») | **Catalog** `/courses/catalog` under the family chip and subject section (listed courses only); **choose step** `/courses/choose` as a checkbox in its family and subject; an attached lesson course: the exam's **Уроки tab** end section «Курсы с уроками к экзамену», the exam's group on `/home` and `/courses`, «К экзамену: …» in its own header |
+| 03 | Create ORT exam (`ort_main`) and publish | **Тесты tab** card (`TestLibrary`); **Обзор**: «Следующий шаг» (`NextCard`), «Последний результат» + section bars after a released result; **Аналитика tab** (sections, topics, history); **Уроки tab** row when placed in a module; **Сохранённые tab**: flagged questions of its attempts; **`/home`**: the course card's next-step button («Начать тест» / «Продолжить тест») and the continue card when it is the last place or an attempt is in progress |
+| 04 | Create general test (quiz) and publish | **Тесты tab** card (percent); **Обзор** next step as "start"; **Уроки** row when in a module; the card's next-step button on `/home` |
+| 05 | Unpublish test | gone from Тесты, Уроки, the card's next step and the to-do; an open attempt still finishes (engine unchanged) |
+| 06 | Create module (+ publish) | **Уроки tab** appears (`features.modules`) with the module group and «N из M»; header progress bar; **Тесты** filter chip when the module holds a test |
+| 07 | Add video (url item) | **Уроки tab** row «Видео · 6 мин»; **lesson page** (same URL, compact header) with the click-to-load player; **Обзор** «Уроки» teaser «Продолжить урок» when it is `modules_next`; **`/home`** continue card «Продолжить урок» when it is the last place or the fallback |
+| 08 | Add page (Markdown) in a module | **Уроки** row «Страница»; lesson page inline. A page outside a module has no student entry (decision D3 of §2.7, unchanged) |
+| 09 | Upload file (PDF); place in a module | **Уроки** row «Файл» + lesson page download card; outside modules: **Обзор** «О курсе» → «Материалы» → `/files` (now linked in exam courses too) |
+| 10 | Add link (url item, other host) | **Уроки** row opens the address in a new tab; lesson page small link card |
+| 11 | Add test to module | **Уроки** row → lobby (inside the course space, Тесты tab active); also in **Тесты** (L7: path vs library) |
+| 12 | Publish / unpublish module or item; module locks and requirements | row/group appears or disappears; progress recounts (header, card, sidebar ring: one `courseProgress`); a locked module shows the lock state in Уроки exactly as the gating evaluator says |
+| 13 | Announcement (publish / unpublish) | **Обзор** strip (latest, two lines) + «Все объявления» → `/announcements` (compact header); **`/home`** to-do row of kind announcement (OPEN Q1, newest three) |
+| 14 | Practice set | **Тесты tab** section «Тренировки» (`#practice`); **Обзор** `NextCard` kind `practice` (weakest section); never a Тесты card |
+| 15 | Pro toggle on a test (platform admin) | **Тесты** card gold «Pro» + lock, Pro bar under the tabs while no pass; lobby `access_required`; **Обзор** unlock card (`needs_pass`); course card quiet Pro mark; sidebar / «Ещё» gold pill |
+| 16 | Pro toggle on a module | **Уроки** gold chip + Pro bar, rows without address; lesson page `ProLockCard`; **Обзор** unlock card; sidebar pill |
+| 17 | Exam date | **course card** small countdown on `/home` and `/courses` (D9); **course header** countdown tiles on Обзор; «Сегодня» on the day; nothing without a date |
+| 18 | Cover image | catalog card, course card, **Обзор** full header cover strip |
+| 19 | Assignment with text / file hand-in (publish, availability window, attempts, due date) | **Задания tab** (the Тесты tab relabelled by content, D4) card → assignment page (compact header); **`/home`** to-do row with the due date / overdue flag; the card's next-step button («Открыть») |
+| 20 | Grade and release (manual grading, rubric, feedback; result-release settings of the scheme) | **Аналитика tab** block «Оценки» (`#grades`: released grades, feedback, course total; D3); **Обзор** «Последний результат» (latest released grade with its feedback line); nothing before release (server rule unchanged) |
+| 21 | Accommodations, access codes, per-student overrides | effective dates and limits in the to-do row, the Задания card and the lobby (override-aware server rules, unchanged) |
+| 22 | Student view («Режим ученика») | opens the course **Обзор** as the test student: the same frame, tabs and cards; no Каталог, Pro, «Войти по коду», install, choose step |
+
+## 1. Map: where each teacher action lands for the student (before 3a; history)
 
 Student entry points today: sidebar `StudentShell.tsx` (links from `lib/lms/studentNav.ts`; items from
 `HomeCourseOut.features`), home `/courses` (`home/StudentHome.tsx` → `home/ExamPrepHome.tsx` + `SideLists`), Тесты

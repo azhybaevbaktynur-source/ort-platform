@@ -674,3 +674,44 @@ Owner: "We already decided that student and teacher will be separate. A teacher 
   request of the old session may still be in flight); deleting a test student's attempt also deletes its synthetic
   grade rows and the quiz submission that kept it, and drops that enrollment's course-total cache; the overview fallback
   runs only in production and only the safe tasks 1-3.
+
+## Owner 2026-11-13: final direction for 3a, 3b, 3c
+
+Verbatim brief: `phases/FIX_ROUND_2026-11-12.md` "Owner final direction on the step 3 designs (2026-11-13)". Designs:
+`phases/STUDENT_IA_DESIGN.md` (v2), `phases/CATALOG_AND_TEACHERS_DESIGN.md`, `phases/LANDING_DESIGN.md`. Build order
+3a → 3b → 3c, deploying after each with the per-role link check green and a review list; the private Neon copy stays
+until 3c is checked.
+
+**3a, one student interface (points 1–7).** (1) Главная `/home` is a hub only: a continue card (last course and place,
+one button), course cards grouped by exam (ОРТ, НЦТ, other) with progress, a next-step button and a small countdown
+for exam courses, a to-do list across courses; no test list or statistics of its own; works with 1 and with 10
+courses. (2) Every course is a separate space with tabs Обзор · Уроки · Тесты · Аналитика · Сохранённые, a tab only when
+the course has published content for it; tests, analytics, saved questions and mistakes are per course, never mixed;
+exam courses add countdown, target score and last result on Обзор. (3) No global Тесты/Аналитика/Сохранённые pages, no
+exam switcher, no automatic landing in ORT; global menu Главная, Мои курсы, Каталог, Pro; old links redirect into the
+right course tab. (4) The student's courses are listed in the sidebar under «Мои курсы» (recent first); the last
+opened course and tab are remembered; phone bar Главная · Курсы · Продолжить · Каталог · Ещё. (5) Catalog grouped by
+exam and subject; after sign-up a skippable "choose your courses" step (exam, then subjects) enrols the student in
+what they pick. (6) Exam family and subject on platform courses with the smallest change (`courses.exam_family`,
+`courses.subject`, migration `0033_course_exam_family`). (7) A student sees only what the teacher published
+(publish/unpublish per module, lesson, test, announcement; availability dates and attempts; module locks; result
+release); Режим ученика shows exactly what a student sees.
+D1 `/home` yes. D2 analytics per course, no global page. D3 no Оценки tab: scores and grades in the course's Аналитика
+tab. D4 tab named by content (Тесты / Задания). D5 lesson courses stay separate courses, listed in the related exam's
+Уроки tab. D6 practice inside Тесты. D7 lobby and result inside the course layout, player full-screen. D8 replaced by
+the phone bar of point 4. D9 countdown on the course card and on Обзор. D10 teacher names on Обзор.
+Agent decisions under this direction (N1–N10) and the open questions answered by recommendation (OPEN Q1–Q4:
+announcements as to-do rows, cross-course streak as one line in the continue card, no cross-course results list, ORT
+subject courses from the ORT template): `phases/STUDENT_IA_DESIGN.md` §8.
+
+**3b, catalog and teachers.** All as recommended (D1–D9, D11), except **D10**: when a teacher is revoked, their courses
+leave the catalog automatically (enrolled students keep access) and it appears on the admin attention list. Migration
+renumbered `0034_course_listing`.
+
+**3c, landing page.** Direction A with B's road added to the three steps. All as recommended, except **D2**: the main
+button goes to sign-up and then the "choose your courses" step, no automatic enrolment; and **D5**: a simple
+first-party count of landing visits and sign-ups (own backend, no cookies, no third-party tracker), shown in the admin
+overview. **Platform name: not decided**; build 3a and 3b first, ask the owner before 3c.
+
+**Check that nothing is lost.** Every student page, feature, state, role, cross-course need and old link is mapped
+in `phases/STUDENT_IA_DESIGN.md` §10; the teacher side in `phases/TEACHER_TO_STUDENT_MAP.md` §0.
