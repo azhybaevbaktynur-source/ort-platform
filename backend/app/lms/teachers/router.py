@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, Response
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -43,3 +43,10 @@ def create_teacher_request(body: TeacherRequestIn, background: BackgroundTasks, 
 @router.get("/teacher-requests", response_model=list[MyTeacherRequestOut])
 def list_my_teacher_requests(user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
     return [service.my_request_out(r) for r in service.my_requests(db, user, limit=10)]
+
+
+@router.post("/teacher-application/dismiss", status_code=204)
+def dismiss_teacher_application(user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
+    """Fix round 2026-11-12 1c: close the decision line for good (the caller's own latest decided request)."""
+    service.dismiss_notice(db, user)
+    return Response(status_code=204)

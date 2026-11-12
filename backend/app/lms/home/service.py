@@ -648,13 +648,20 @@ def _teacher_application(db: Session, user: User, now: datetime) -> Optional[sch
     from app.lms.teachers.models import TeacherRequest
     from app.lms.teachers.service import reapply_available_at
 
+    from app.lms.teachers.service import notice_request
+
     if user.teacher_status == "revoked":  # no stored date; the admin's reason isn't shown to the person today
+        held = notice_request(db, user)  # fix round 2026-11-12 1c: closed by the person (a revoke reopens it)
+        if held is not None and held.notice_dismissed_at is not None:
+            return None
         return sch.HomeTeacherApplicationOut(status="revoked")
     req = db.execute(
         select(TeacherRequest).where(TeacherRequest.user_id == user.id)
         .order_by(TeacherRequest.created_at.desc(), TeacherRequest.id.desc()).limit(1)
     ).scalar_one_or_none()
     if req is None:
+        return None
+    if req.notice_dismissed_at is not None:  # fix round 2026-11-12 1c: until dismissed or 14 days, whichever first
         return None
     if req.status == "pending":
         return sch.HomeTeacherApplicationOut(status="pending")

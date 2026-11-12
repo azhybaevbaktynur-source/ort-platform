@@ -3589,11 +3589,11 @@
     "teacherApplication": {
       "pending": "Your teacher application is under review. We will answer by email.",
       "approved": "Your application was approved: you can create courses.",
-      "approvedLink": "Go to Teaching",
       "rejected": "Your teacher application was rejected.",
       "rejectedWait": "You can apply again from {date}.",
       "revoked": "Your teacher access was revoked. Your courses are read-only: students can't start tests or hand in work. You can apply again.",
-      "applyLink": "Apply"
+      "applyLink": "Apply",
+      "dismiss": "Close message"
     },
     "platform": {
       "title": "From the platform",

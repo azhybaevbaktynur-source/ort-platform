@@ -114,6 +114,30 @@ def approved_notice(user: User):
     return _teacher_application(db, user, clock.now())
 
 
+# --- Fix round 2026-11-12 1c begin --- (the decision line is dismissible, once per account)
+def notice_request(db: Session, user: User) -> Optional[TeacherRequest]:
+    """The request that holds `notice_dismissed_at` for the line `home.service._teacher_application` shows: for a revoked
+    teacher the latest approved request (as `_set_phone_purge`), otherwise the latest request when it is decided."""
+    q = select(TeacherRequest).where(TeacherRequest.user_id == user.id)
+    if user.teacher_status == "revoked":
+        q = q.where(TeacherRequest.status == "approved")
+    req = db.execute(
+        q.order_by(TeacherRequest.created_at.desc(), TeacherRequest.id.desc()).limit(1)
+    ).scalar_one_or_none()
+    if req is None or req.status not in ("approved", "rejected"):
+        return None
+    return req
+
+
+def dismiss_notice(db: Session, user: User) -> None:
+    """Idempotent: the first dismissal's time stays; nothing to close (pending, no request) is a no-op."""
+    req = notice_request(db, user)
+    if req is not None and req.notice_dismissed_at is None:
+        req.notice_dismissed_at = clock.now()
+        db.commit()
+# --- Fix round 2026-11-12 1c end ---
+
+
 def set_locale(db: Session, user: User, locale: str) -> User:
     user.locale = locale
     db.commit()
@@ -233,6 +257,16 @@ def _set_phone_purge(db: Session, user_id: str, value: Optional[datetime]) -> No
         latest.phone_purge_after = value
 
 
+def _reopen_notice(db: Session, user_id: str) -> None:
+    """Fix round 2026-11-12 1c: the revoked line lives on the latest approved request; clear an earlier dismissal there."""
+    latest = db.execute(
+        select(TeacherRequest).where(TeacherRequest.user_id == user_id, TeacherRequest.status == "approved")
+        .order_by(TeacherRequest.created_at.desc(), TeacherRequest.id.desc()).limit(1)
+    ).scalar_one_or_none()
+    if latest is not None:
+        latest.notice_dismissed_at = None
+
+
 def _ensure_may_become_teacher(user: User) -> None:
     """Every approval, not only applying: an older request, or an age band corrected after applying, must not get through
     (owner decision Q2). A disabled account would otherwise become a teacher the moment it is enabled again."""
@@ -319,6 +353,7 @@ def set_teacher_status(
         if before != "approved":
             raise Conflict("Invalid transition", code="invalid_transition")
         _set_phone_purge(db, user.id, at + timedelta(days=PHONE_RETENTION_DAYS))
+        _reopen_notice(db, user.id)  # fix round 2026-11-12 1c: a closed "approved" line must not hide the revoke
     user.teacher_status = status
     # --- Phase 6 S1 begin --- approval creates (or resumes) the personal organization; revoke suspends it
     details = {"from": before, "to": status}

@@ -28,6 +28,8 @@ class TeacherRequest(UUIDPKMixin, TimestampMixin, Base):
     subject: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     phone: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     phone_purge_after: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Fix round 2026-11-12 1c (migration 0032): the person closed the decision line on their home / Teaching view.
+    notice_dismissed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint("status IN ('pending','approved','rejected','cancelled')", name="status_valid"),
