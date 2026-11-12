@@ -36,7 +36,6 @@ class Course(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
     )
     published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     concluded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    unlisted_by_admin_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     deleted_by_id: Mapped[Optional[str]] = mapped_column(
         String(64), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -103,6 +102,17 @@ class Course(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
     # курсы», null subject = the family's main course. Values: `courses.exam_families` (service-validated, no CHECK).
     exam_family: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     subject: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    # CATALOG_AND_TEACHERS_DESIGN 2.3, 4.1 (migration 0034): the course in the platform catalog list. `visibility` is
+    # link access (course staff); `listing` is decided by the platform admin (`courses.listing`). `listing_note` is the
+    # admin's note to course staff: never in student payloads, logs, audit details or exports.
+    listing: Mapped[str] = mapped_column(String(16), nullable=False, default="off", server_default="off")
+    listing_requested_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    listing_decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    listing_decided_by_id: Mapped[Optional[str]] = mapped_column(
+        String(64), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    listing_note: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    listing_content_changed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint("grading_total_mode IN ('points','weighted')", name="grading_total_mode_valid"),
@@ -138,6 +148,8 @@ class Course(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
         Index("ix_courses_exam_course_id", "exam_course_id"),  # 0027
         CheckConstraint("exam_course_id IS NULL OR exam_course_id <> id", name="exam_course_not_self"),  # 0027
         Index("ix_courses_exam_family_subject", "exam_family", "subject"),  # 0033
+        CheckConstraint("listing IN ('off','pending','listed','declined','blocked')", name="listing_valid"),  # 0034
+        Index("ix_courses_listing_published_at", "listing", "published_at"),  # 0034
     )
 
 

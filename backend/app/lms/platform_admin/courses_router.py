@@ -17,7 +17,7 @@ from app.lms.courses import service as svc
 from app.lms.courses.models import Course
 from app.lms.courses.scopes import regular_courses  # Phase 8b S1
 from app.lms.courses.schemas import (
-    AdminCourseOut, AdminTransferIn, OptionalReasonIn, ReasonIn, admin_course_out,
+    AdminCatalogRowOut, AdminCourseOut, AdminTransferIn, ListingNoteIn, OptionalReasonIn, ReasonIn, admin_course_out,
 )
 from app.lms.enrollments import service as enr_svc
 from app.lms.enrollments.models import Enrollment
@@ -132,6 +132,38 @@ def relist_course(course_id: uuid.UUID, data: OptionalReasonIn, request: Request
     course = svc.load_course(db, course_id, include_deleted=True)
     svc.set_unlisted(db, admin, course, unlisted=False, reason=data.reason, request=request)
     return _one(db, course_id)
+
+
+# --- step 3b S1 begin --- (CATALOG_AND_TEACHERS_DESIGN 2.4, 4.2: Admin → Каталог)
+@router.get("/catalog", response_model=PageOut[AdminCatalogRowOut])
+def list_catalog_listings(state: Literal["pending", "listed", "declined", "blocked"] = "pending",
+                          cursor: Optional[str] = None, limit: int = 25,
+                          admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
+    from app.lms.courses import listing
+
+    items, nxt = listing.admin_catalog_page(db, state, cursor=cursor, limit=limit)
+    return PageOut[AdminCatalogRowOut](items=items, next_cursor=nxt)
+
+
+@router.post("/courses/{course_id}/listing/approve", response_model=AdminCourseOut)
+def approve_listing(course_id: uuid.UUID, data: ListingNoteIn, request: Request,
+                    admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
+    from app.lms.courses import listing
+
+    course = svc.load_course(db, course_id)
+    listing.approve(db, admin, course, data.note, request=request)
+    return _one(db, course_id)
+
+
+@router.post("/courses/{course_id}/listing/decline", response_model=AdminCourseOut)
+def decline_listing(course_id: uuid.UUID, data: ListingNoteIn, request: Request,
+                    admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
+    from app.lms.courses import listing
+
+    course = svc.load_course(db, course_id)
+    listing.decline(db, admin, course, data.note, request=request)
+    return _one(db, course_id)
+# --- step 3b S1 end ---
 
 
 @router.post("/courses/{course_id}/transfer-ownership", response_model=AdminCourseOut)

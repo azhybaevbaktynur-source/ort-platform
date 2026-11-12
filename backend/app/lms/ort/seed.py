@@ -236,6 +236,7 @@ def _ensure_course(db: Session, demo: User, lang: str, report: SeedReport) -> Co
                     description=dict(COURSE_DESCRIPTIONS[lang]), languages=[lang], default_language=lang,
                     status="published", visibility="catalog", enrollment_mode="open", enrollment_limit=None,
                     join_code=generate_join_code(), join_code_rotated_at=now, settings={}, published_at=now,
+                    listing="listed", listing_decided_at=now,  # step 3b S1: platform courses are listed (D-ORG-1)
                 )
                 # --- Phase 6 S1 begin --- (platform organization, locked ORT template v1)
                 from app.lms.organizations.defaults import ort_course_fields

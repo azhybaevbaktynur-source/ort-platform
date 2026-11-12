@@ -154,6 +154,8 @@ class OverviewOut(BaseModel):
     pro_active: int
     attempts_submitted_7d: int
     pending_teacher_requests: int
+    catalog_pending: int = 0  # step 3b S1: courses waiting for a catalog decision (tile «Заявки в каталог»)
+    catalog_revoked_7d: int = 0  # owner D10: courses that left the catalog in 7 days because the teacher was revoked
     storage_level: str
     reveals_last_hour: int
     reveal_alert: bool

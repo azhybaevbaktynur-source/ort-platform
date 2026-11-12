@@ -56,7 +56,7 @@ def join_by_code(db: Session, user: User, raw_code: str, ip_hash: Optional[str])
 
 
 def join_open(db: Session, user: User, course_id: uuid.UUID, ip_hash: Optional[str]) -> tuple[Enrollment, Course, bool]:
-    """One-click join of a published, catalog-visible, open course (P5-5). Every miss is the bad-code 404."""
+    """One-click join of a published, link-accessible (not blocked), open course (P5-5). Every miss is the bad-code 404."""
     _enforce_join_limits(user.id, ip_hash)
     course = db.execute(select(Course).where(Course.id == course_id)).scalar_one_or_none()
     if course is None:
@@ -84,7 +84,8 @@ def _joinable(course: Course, source: str) -> bool:
         return False
     if course.enrollment_mode != _MODE_FOR_SOURCE[source]:
         return False
-    if source == "open" and (course.visibility != "catalog" or course.unlisted_by_admin_at is not None):
+    # step 3b (CATALOG_AND_TEACHERS_DESIGN 2.2): open join works from the landing (link access), never on a blocked course
+    if source == "open" and (course.visibility != "catalog" or course.listing == "blocked"):
         return False
     return True
 
@@ -161,7 +162,7 @@ def choose_courses(db: Session, user: User, course_ids: list) -> tuple[list, lis
     """(joined, skipped) course ids, in the order asked (duplicates once). Refused: a test student (403
     `test_student_forbidden`, besides the Student view allow-list), people who teach (403 `teacher_cannot_enroll`,
     before any course is read), more than `CATALOG_CHOOSE_1M` requests a minute (429). Every id must be a catalog
-    course (`courses.scopes._catalog_select`: published, listed, not unlisted, live organization tree) of the platform
+    course (`courses.scopes._catalog_select`: published, link access, `listing = 'listed'`, live organization tree) of the platform
     organization with `enrollment_mode = open`, else 422 `course_not_choosable` naming the ids and nothing is joined.
     Each course then goes through `_join` (source `open`: the same checks after the lock, enrollment limit, events);
     an active enrollment is `skipped`. A course that cannot be joined at that moment (full, closed meanwhile) stops the

@@ -18,6 +18,10 @@ export interface PlatformOverviewOut {
   /** Non-preview, non-practice attempts submitted in the last 7 days. */
   attempts_submitted_7d: number;
   pending_teacher_requests: number;
+  /** Step 3b S1: courses waiting for a catalog decision. */
+  catalog_pending?: number;
+  /** Owner D10: courses that left the catalog in the last 7 days because their teacher was revoked. */
+  catalog_revoked_7d?: number;
   storage_level: "ok" | "warn" | "full";
   reveals_last_hour: number;
   reveal_alert: boolean;

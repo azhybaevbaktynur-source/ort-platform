@@ -78,16 +78,26 @@ def my_deleted_courses(user_id: str) -> Select:
 
 # ---------------------------------------------------------------- Phase 5 S3: catalog (PHASE_5_DESIGN 5)
 
-def catalog_courses(user_id: str) -> Select:
-    """Rows of (Course, my_role, my_state): published, catalog-visible, not deleted, not unlisted by an admin.
+CatalogScope = Literal["listed", "linkable"]
+
+
+def catalog_courses(user_id: str, scope: CatalogScope = "listed") -> Select:
+    """Rows of (Course, my_role, my_state): published, link-accessible (`visibility = 'catalog'`), not deleted, and
+    (step 3b, CATALOG_AND_TEACHERS_DESIGN 2.1-2.2) `listing = 'listed'` for the catalog list (`scope="listed"`) or
+    `listing != 'blocked'` for the landing reached by link (`scope="linkable"`).
 
     published_at IS NOT NULL keeps the keyset cursor well defined (the publish transition always sets it).
     Phase 9 S4: the course's organization **and the root of its tree** must be active and not deleted (a suspended
     school takes its departments' courses out of the catalog)."""
-    return _catalog_select(user_id)[0]
+    return _catalog_select(user_id, scope)[0]
 
 
-def _catalog_select(user_id: str):
+def listing_predicate(scope: CatalogScope = "listed"):
+    """SQL: the listing part of a catalog scope (step 3b)."""
+    return Course.listing == "listed" if scope == "listed" else Course.listing != "blocked"
+
+
+def _catalog_select(user_id: str, scope: CatalogScope = "listed"):
     from app.lms.organizations.models import Organization  # Phase 6 S1
 
     mine = aliased(Enrollment)
@@ -99,7 +109,7 @@ def _catalog_select(user_id: str):
         .join(root, root.path == func.substr(Organization.path, 1, 32))  # Phase 9 S4
         .where(
             Course.status == "published", Course.visibility == "catalog", Course.deleted_at.is_(None),
-            Course.unlisted_by_admin_at.is_(None), Course.published_at.is_not(None),
+            listing_predicate(scope), Course.published_at.is_not(None),  # step 3b: the listing scope
             Organization.status == "active", Organization.deleted_at.is_(None),
             root.status == "active", root.deleted_at.is_(None),  # Phase 9 S4
             regular_courses(),  # Phase 8b S1
@@ -115,7 +125,7 @@ CATALOG_Q_MAX = 80
 
 
 def catalog_cards(user_id: str, *, q: Optional[str] = None, language: Optional[str] = None,
-                  mode: Optional[str] = None, organization_id=None) -> Select:
+                  mode: Optional[str] = None, organization_id=None, scope: CatalogScope = "listed") -> Select:
     """Rows of (Course, my_role, my_state, root_id, root_name, has_active_form, my_app_id, my_app_status, root_kind,
     owner_display_name).
 
@@ -125,7 +135,7 @@ def catalog_cards(user_id: str, *, q: Optional[str] = None, language: Optional[s
     from app.lms.enrollment_forms.models import EnrollmentApplication, EnrollmentForm
     from app.lms.courses.service import like_escape
 
-    stmt, root = _catalog_select(user_id)
+    stmt, root = _catalog_select(user_id, scope)
     has_form = exists().where(EnrollmentForm.course_id == Course.id, EnrollmentForm.status == "active")
     latest = (select(EnrollmentApplication.id, EnrollmentApplication.status)
               .where(EnrollmentApplication.course_id == Course.id, EnrollmentApplication.user_id == user_id)

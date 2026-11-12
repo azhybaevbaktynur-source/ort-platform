@@ -75,9 +75,8 @@ async def test_landing(db, api):
     assert body["form"]["id"] == form["id"] and [f["key"] for f in body["form"]["fields"]][0] == "full_name"
     assert body["teachers"] and t.email not in r.text and c.join_code not in r.text
     assert "enrollment_limit" not in body and body["my_enrollment"] is None
-    # private, unlisted and draft courses are 404
-    for field, value in (("visibility", "private"), ("unlisted_by_admin_at", __import__("datetime").datetime.now()),
-                         ("status", "draft")):
+    # private, blocked and draft courses are 404 (step 3b: an unlisted course opens by link)
+    for field, value in (("visibility", "private"), ("listing", "blocked"), ("status", "draft")):
         other = catalog_course(db, t, **{field: value})
         assert (await api.call(s, "GET", f"/catalog/courses/{other.id}")).status_code == 404
     # no form block outside form modes

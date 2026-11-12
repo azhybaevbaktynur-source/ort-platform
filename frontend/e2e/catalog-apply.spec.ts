@@ -120,6 +120,12 @@ test("teacher turns on the application mode and the catalog", async ({ browser }
   await page.locator("#s-mode").scrollIntoViewIfNeeded();
   await uxShots(page, UX, "course-settings-enrollment", STAFF);
   await page.context().close();
+  // step 3b S1 (CATALOG_AND_TEACHERS_DESIGN 2.3): the catalog list needs the platform admin's approval; the teacher
+  // asks and the admin approves through the API (the settings block and Admin → Каталог are S2's screens)
+  const asked = await api(data().teacher, "POST", `/courses/${data().course_id}/listing/request`);
+  expect(asked.listing.state).toBe("pending");
+  const approved = await api(seed().admin, "POST", `/platform/courses/${data().course_id}/listing/approve`, {});
+  expect(approved.listing.state).toBe("listed");
 });
 
 test("student finds the course, opens the landing and applies", async ({ browser }) => {

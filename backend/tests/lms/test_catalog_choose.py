@@ -28,7 +28,7 @@ def code(res) -> str:
 def platform_course(db, owner, title="ОРТ", *, family="ort", subject=None, **kw):
     fields = dict(title={"ru": title}, languages=["ru"], default_language="ru", status="published",
                   visibility="catalog", enrollment_mode="open", organization_id=platform_org_id(),
-                  published_at=utcnow(), exam_family=family, subject=subject)
+                  published_at=utcnow(), exam_family=family, subject=subject, listing="listed")  # step 3b
     fields.update(kw)
     return make_course(db, owner, **fields)
 
@@ -91,9 +91,10 @@ async def test_only_open_listed_published_platform_courses(db, api):
         platform_course(db, admin, "Closed", enrollment_mode="closed"),
         platform_course(db, admin, "Private", visibility="private"),
         platform_course(db, admin, "Draft", status="draft", published_at=None),
-        platform_course(db, admin, "Unlisted", unlisted_by_admin_at=utcnow()),
+        platform_course(db, admin, "Unlisted", listing="blocked"),
+        platform_course(db, admin, "Not listed", listing="off"),  # step 3b: link access alone is not enough
         make_course(db, teacher, title={"en": "Teacher's"}, status="published", visibility="catalog",
-                    enrollment_mode="open", published_at=utcnow()),
+                    enrollment_mode="open", published_at=utcnow(), listing="listed"),  # listed, not a platform course
     ]
     gone = platform_course(db, admin, "Deleted")
     gone.deleted_at = utcnow()

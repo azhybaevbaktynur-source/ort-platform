@@ -40,7 +40,7 @@ class Clock:
 def platform_course(db, owner, title, *, family="ort", subject=None, lang="ru", **kw):
     fields = dict(title={lang: title}, languages=[lang], default_language=lang, status="published",
                   visibility="catalog", enrollment_mode="open", organization_id=platform_org_id(),
-                  published_at=Clock.next(), exam_family=family, subject=subject)
+                  published_at=Clock.next(), exam_family=family, subject=subject, listing="listed")  # step 3b
     fields.update(kw)
     return make_course(db, owner, **fields)
 
@@ -65,9 +65,12 @@ def catalog_world(db):
     c["code"] = platform_course(db, admin, "Code", enrollment_mode="invite_code")  # in the catalog, not here
     platform_course(db, admin, "Private", visibility="private")
     platform_course(db, admin, "Unknown family", family="sat")
+    platform_course(db, admin, "Not listed", listing="off")  # step 3b: link access alone is not enough
+    platform_course(db, admin, "Blocked", listing="blocked")
     teacher = make_user(db, teacher_status="approved")
     c["teacher"] = make_course(db, teacher, title={"en": "Teacher ORT"}, status="published", visibility="catalog",
-                               enrollment_mode="open", published_at=Clock.next(), exam_family="ort")
+                               enrollment_mode="open", published_at=Clock.next(), exam_family="ort",
+                               listing="listed")
     return admin, c
 
 

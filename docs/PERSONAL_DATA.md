@@ -81,7 +81,7 @@ These point at the tombstone row, which holds nothing personal after deletion.
 | `consent_records` | `granted_by_id`, `user_id` |
 | `course_files` | `created_by_id`, `deleted_by_id` |
 | `course_modules` | `created_by_id`, `deleted_by_id` |
-| `courses` | `deleted_by_id`, `owner_id` |
+| `courses` | `deleted_by_id`, `listing_decided_by_id`, `owner_id` |
 | `data_requests` | `handled_by_id`, `requested_by_id`, `user_id` |
 | `email_change_requests` | `requested_by_id`, `user_id` |
 | `enrollment_accommodations` | `set_by_id` |
@@ -128,6 +128,7 @@ These point at the tombstone row, which holds nothing personal after deletion.
 | `attempt_sections` | `close_reason` | a fixed code |
 | `attempts` | `submit_reason` | a fixed code |
 | `bank_questions` | `search_text` | question text |
+| `courses` | `listing_note` | the platform admin's note about a course's catalog listing, to the course staff |
 | `enrollment_events` | `details` | ids and fixed reasons only |
 | `guardian_pairing_codes` | `code_hash` | keyed hash of a short-lived code, revoked with the account |
 | `infra_snapshots` | `payload` | allow-listed provider usage figures (I5a): no personal data, no keys |

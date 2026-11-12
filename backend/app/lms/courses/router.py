@@ -166,6 +166,26 @@ def transfer_ownership(course_id: uuid.UUID, data: TransferIn, ctx: AuthzContext
     return _staff_out(ctx, course)
 
 
+# --- step 3b S1 begin --- (CATALOG_AND_TEACHERS_DESIGN 2.3, 4.2: course staff ask for / leave the catalog list)
+@router.post("/{course_id}/listing/request", response_model=CourseStaffOut)
+def request_listing(course_id: uuid.UUID, request: Request, ctx: AuthzContext = Depends(get_authz)):
+    from app.lms.courses import listing
+
+    course = svc.load_course(ctx.db, course_id)
+    listing.request_listing(ctx.db, ctx, course, request=request)
+    return _staff_out(ctx, course)
+
+
+@router.post("/{course_id}/listing/withdraw", response_model=CourseStaffOut)
+def withdraw_listing(course_id: uuid.UUID, request: Request, ctx: AuthzContext = Depends(get_authz)):
+    from app.lms.courses import listing
+
+    course = svc.load_course(ctx.db, course_id)
+    listing.withdraw_listing(ctx.db, ctx, course, request=request)
+    return _staff_out(ctx, course)
+# --- step 3b S1 end ---
+
+
 @router.post("/{course_id}/join-code/regenerate", response_model=JoinCodeOut)
 def regenerate_join_code(course_id: uuid.UUID, ctx: AuthzContext = Depends(get_authz)):
     course = svc.load_course(ctx.db, course_id)

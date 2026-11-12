@@ -164,8 +164,9 @@ def _own_out(app: EnrollmentApplication, course: Course) -> sch.ApplicationOwnOu
 # ------------------------------------------------------------------ submit (applicant)
 
 def _catalog_course(db: Session, user_id: str, course_id: uuid.UUID) -> Course:
-    """The course as the catalog shows it (published, catalog-visible, listed, organization active), else 404."""
-    row = db.execute(scopes.catalog_courses(user_id).where(Course.id == course_id)).first()
+    """The course as its landing shows it (published, link access, not blocked, organization active; step 3b's
+    linkable scope), else 404."""
+    row = db.execute(scopes.catalog_courses(user_id, "linkable").where(Course.id == course_id)).first()
     if row is None:
         raise NotFound("Course not found", code="course_not_found")
     return row[0]
@@ -213,7 +214,7 @@ def _submit(db: Session, user: User, course_id: uuid.UUID, data: sch.Application
 
     _lock_course_like_join(db, course)
     if (course.deleted_at is not None or course.status != "published" or course.visibility != "catalog"
-            or course.enrollment_mode not in ids.FORM_MODES):
+            or course.listing == "blocked" or course.enrollment_mode not in ids.FORM_MODES):
         raise Conflict("This course does not take applications", code=ids.E_COURSE_NOT_OPEN)
     enr = db.execute(select(Enrollment.state).where(Enrollment.course_id == course.id,
                                                     Enrollment.user_id == user.id)).scalar()

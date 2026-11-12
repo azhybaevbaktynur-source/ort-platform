@@ -120,7 +120,7 @@ ENTRIES: list[Entry] = [
     *_refs("course_files", "created_by_id", "deleted_by_id"),
     *_refs("course_modules", "created_by_id", "deleted_by_id"),
     *_refs("courses", "owner_id", action="keep_tombstone"),
-    *_refs("courses", "deleted_by_id"),
+    *_refs("courses", "deleted_by_id", "listing_decided_by_id"),  # step 3b: the admin who decided the listing
     *_refs("data_requests", "user_id", "requested_by_id", action="keep_tombstone"),
     *_refs("data_requests", "handled_by_id"),
     *_refs("enrollment_accommodations", "set_by_id"),
@@ -193,6 +193,7 @@ NOT_PERSONAL: dict[tuple[str, str], str] = {
     ("enrollment_events", "details"): "ids and fixed reasons only",
     ("attempts", "submit_reason"): "a fixed code",
     ("activation_code_batches", "note"): "the admin's own note about a batch (e.g. the price)",
+    ("courses", "listing_note"): "the platform admin's note about a course's catalog listing, to the course staff",
     ("attempt_sections", "close_reason"): "a fixed code",
     ("policy_versions", "body_en"): "policy text",
     ("policy_versions", "body_ky"): "policy text",

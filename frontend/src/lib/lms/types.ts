@@ -141,6 +141,8 @@ export interface CourseStaffOut extends CourseStudentOut {
   enrollment_limit: number | null;
   visibility: Visibility;
   unlisted_by_admin: boolean;
+  /** Step 3b S1: the course's place in the platform catalog list (staff only; absent: older backend). */
+  listing?: CourseListingOut | null;
   active_student_count: number;
   owner: UserBrief;
   is_owner: boolean;
@@ -289,6 +291,17 @@ export interface AdminAttemptOut {
   item_count: number;
   saved_answers: number;
 }
+/** Step 3b S1 (CATALOG_AND_TEACHERS_DESIGN 2.3): `off` → `pending` → `listed` / `declined`; `blocked` by the admin. */
+export type ListingState = "off" | "pending" | "listed" | "declined" | "blocked";
+export interface CourseListingOut {
+  state: ListingState;
+  requested_at: string | null;
+  decided_at: string | null;
+  /** The platform admin's note (decline: required); course staff and the admin only. */
+  note: string | null;
+  /** Title, description, cover or mode edited after the last approval. */
+  content_changed: boolean;
+}
 export interface AdminCourseOut {
   id: string;
   title: LocalizedText;
@@ -297,6 +310,7 @@ export interface AdminCourseOut {
   visibility: Visibility;
   enrollment_mode: EnrollmentMode;
   unlisted_by_admin_at: string | null;
+  listing?: CourseListingOut | null;
   active_student_count: number;
   created_at: string;
   deleted_at: string | null;

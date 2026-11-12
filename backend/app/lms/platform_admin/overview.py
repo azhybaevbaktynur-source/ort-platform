@@ -78,7 +78,11 @@ def _compute(db: Session, now: datetime) -> dict:
                         Attempt.status.in_(_FINISHED), User.is_test_student.is_(False)).scalar_subquery())
     pending = (select(func.count()).select_from(TeacherRequest)
                .where(TeacherRequest.status == "pending").scalar_subquery())
-    u, a, s, p = db.execute(select(users_total, active, submitted, pending)).one()
+    from app.lms.courses import listing  # step 3b S1: pending listings; courses unlisted by a teacher revoke (D10)
+
+    catalog_pending, catalog_revoked = listing.overview_columns(since)
+    u, a, s, p, cp, cr = db.execute(select(users_total, active, submitted, pending, catalog_pending,
+                                           catalog_revoked)).one()
     reveals = access_admin.reveals_last_hour(db, now)
     return {
         "users_total": int(u or 0),
@@ -86,6 +90,8 @@ def _compute(db: Session, now: datetime) -> dict:
         "pro_active": access_admin.pro_summary(db, now=now)["active"],
         "attempts_submitted_7d": int(s or 0),
         "pending_teacher_requests": int(p or 0),
+        "catalog_pending": int(cp or 0),
+        "catalog_revoked_7d": int(cr or 0),
         "storage_level": usage.level(usage.stored_totals(db)[0]),
         "reveals_last_hour": reveals,
         "reveal_alert": reveals > access_admin.REVEAL_ALERT_PER_HOUR,

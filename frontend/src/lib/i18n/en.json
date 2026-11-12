@@ -694,6 +694,7 @@
           "full": "Storage: full"
         },
         "reveals": "Code reveals in the last hour",
+        "catalogRevoked": "Courses left the catalog because teacher access was revoked (7 days)",
         "health": "Health checks failing",
         "none": "All good, nothing needs attention",
         "database_one": "Database: {percent}% used ({count} more exam fits)",
