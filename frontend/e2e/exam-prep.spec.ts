@@ -81,12 +81,19 @@ test.describe("exam-prep page (ru)", () => {
       await shoot(page, "home-platform");
       await markPage(page);
       await card.getByRole("button", { name: t("catalog.join"), exact: true }).click();
-      // Student UI U4: the course page of an exam-prep course is its Тесты page for students
-      await page.waitForURL(new RegExp(`/${L}/courses/${cid}/tests$`));
+      // step 3a S2 (STUDENT_IA_DESIGN §3.3, §3.6): joining lands on the course Обзор: the countdown in the header, the
+      // course tabs with Обзор current
+      await page.waitForURL(new RegExp(`/${L}/courses/${cid}$`));
+      const tabs = page.getByRole("navigation", { name: t("course.tabs.label") });
+      await expect(tabs.getByRole("link", { name: t("course.tabs.overview"), exact: true })).toHaveAttribute("aria-current", "page");
+      await expect(page.getByRole("group", { name: new RegExp(`^${t("course.header.examIn")}: \\d+ `) })).toBeVisible();
       // PERFORMANCE_AUDIT S2: the shell shows the joined course without a page reload (the bootstrap is asked again)
       await expect(page.getByRole("navigation", { name: t("student.nav.label") }).getByRole("link", { name: t("student.nav.tests") }))
         .toHaveAttribute("href", `/${L}/courses/${cid}/tests`);
       expect(await samePage(page), "joining reloaded the page").toBe(true);
+      await tabs.getByRole("link", { name: t("course.tabs.tests"), exact: true }).click();
+      await page.waitForURL(new RegExp(`/${L}/courses/${cid}/tests$`));
+      await expect(tabs.getByRole("link", { name: t("course.tabs.tests"), exact: true })).toHaveAttribute("aria-current", "page");
 
       // ---- the Тесты page: title with the count, status chips, one card per test, nothing done yet
       const library = page.getByRole("region", { name: t("examPrep.library.title") });
@@ -100,7 +107,7 @@ test.describe("exam-prep page (ru)", () => {
       await statuses.getByRole("button", { name: t("examPrep.library.status.done"), exact: true }).click();
       await expect(library.getByText(t("examPrep.tests.emptyStatus"))).toBeVisible();
       await statuses.getByRole("button", { name: t("examPrep.tests.allStatuses"), exact: true }).click();
-      // U9 (review 2): no breadcrumbs and no "Покинуть курс" on Тесты (leaving is in the shell's exam sheet)
+      // U9 (review 2): no breadcrumbs and no "Покинуть курс" on Тесты (step 3a S2: leaving is on Обзор)
       await expect(page.getByRole("button", { name: t("courses.home.leave") })).toHaveCount(0);
       await expect(page.getByRole("navigation", { name: t("ui.breadcrumbs") })).toHaveCount(0);
       await shoot(page, "tests-new");
@@ -126,8 +133,7 @@ test.describe("exam-prep page (ru)", () => {
       await shoot(page, "home-prep-new");
 
       // ---- the course's Тесты page: "Начать" -> the lobby -> the ORT player -> the ORT result (all unchanged)
-      await page.goto(`/${L}/courses/${cid}`);
-      await page.waitForURL(new RegExp(`/${L}/courses/${cid}/tests$`));
+      await page.goto(`/${L}/courses/${cid}/tests`); // step 3a S2: the Тесты tab (the course page is Обзор)
       await first.getByRole("link", { name: t("examPrep.tests.start"), exact: true }).click();
       await page.waitForURL(new RegExp(`/courses/${cid}/assessments/${s.exam.id}$`));
       const exam = new OrtExam(page, L);
@@ -146,8 +152,7 @@ test.describe("exam-prep page (ru)", () => {
       await exam.assertResult(1, total);
 
       // ---- back on the course: the test is done with its best score and a "Результат" button; the "done" chip finds it
-      await page.goto(`/${L}/courses/${cid}`);
-      await page.waitForURL(new RegExp(`/${L}/courses/${cid}/tests$`));
+      await page.goto(`/${L}/courses/${cid}/tests`); // step 3a S2: the Тесты tab (the course page is Обзор)
       await expect(first).toContainText(t("examPrep.library.status.done"));
       await expect(first).toContainText(t("examPrep.library.best"));
       await expect(first.getByRole("link", { name: t("examPrep.tests.result"), exact: true })).toBeVisible();

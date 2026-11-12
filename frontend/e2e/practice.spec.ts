@@ -85,8 +85,13 @@ test.describe("practice walk (ru)", () => {
 
     // ---- student: start, answer wrongly, check
     const sp = await pageFor(browser, student);
+    // step 3a S2 (STUDENT_IA_DESIGN D6): a student's practice sets are the «Тренировки» section of the Тесты tab; the old
+    // URL leads there
     await sp.goto(`/${L}/courses/${course.id}/practice`);
-    await expect(sp.getByRole("heading", { name: SET })).toBeVisible();
+    await sp.waitForURL(new RegExp(`/courses/${course.id}/tests#practice$`));
+    const section = sp.locator("section#practice");
+    await expect(section.getByRole("heading", { level: 2, name: t("course.tests.practiceSection") })).toBeVisible();
+    await expect(section.getByRole("heading", { name: SET })).toBeVisible();
     await expect(sp.getByRole("button", { name: t("practice.new") })).toHaveCount(0);
     await sp.getByRole("button", { name: new RegExp(`^${t("practice.start")}`) }).click();
     await sp.waitForURL(/\/attempts\/[0-9a-f-]{36}/);
@@ -120,7 +125,7 @@ test.describe("practice walk (ru)", () => {
     await sp.waitForURL(/\/result/);
 
     // ---- retake
-    await sp.goto(`/${L}/courses/${course.id}/practice`);
+    await sp.goto(`/${L}/courses/${course.id}/tests#practice`);
     await expect(sp.getByText(t("practice.attempts", { n: 1 }))).toBeVisible();
     await sp.getByRole("button", { name: new RegExp(`^${t("practice.start")}`) }).click();
     await sp.waitForURL(/\/attempts\/[0-9a-f-]{36}$/);

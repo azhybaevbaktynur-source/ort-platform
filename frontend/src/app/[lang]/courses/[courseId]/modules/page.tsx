@@ -15,6 +15,8 @@ import { StudentModulesView } from "@/components/lms/modules/StudentModulesView"
 import { StudentSyllabus } from "@/components/lms/modules/StudentSyllabus";
 import { LoadingState } from "@/components/ui";
 import { isStaffCourse } from "@/lib/lms/types";
+import { ToCourseTab } from "@/components/lms/course/ToCourseTab"; // step 3a S2
+import { inCourseSpace } from "@/lib/lms/templates"; // step 3a S2
 
 export default function ModulesPage() {
   const { lang, t } = useTranslation();
@@ -29,5 +31,7 @@ export default function ModulesPage() {
   }, [staff, course.id, lang, router]);
 
   if (staff) return <LoadingState label={t("lms.common.loading")} />;
+  // step 3a S2 (§3.7): the syllabus is the Уроки tab (`#m-{id}` / `#module-{id}` kept)
+  if (inCourseSpace(course)) return <ToCourseTab courseId={course.id} path="/lessons" />;
   return role === "student" ? <StudentSyllabus /> : <StudentModulesView />;
 }

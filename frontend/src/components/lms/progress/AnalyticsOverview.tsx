@@ -121,7 +121,7 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
   const history = activity.days.filter((d) => d.answered > 0).length >= HISTORY_DAYS;
   // U9 (review 11): the calendar only after a week of active days
   const calendar = activity.heatmap.filter((d) => d.answered > 0).length >= HEATMAP_MIN_DAYS;
-  const practiceHref = course.features?.practice ? `/${lang}/courses/${courseId}/practice` : null;
+  const practiceHref = course.features?.practice ? `/${lang}/courses/${courseId}/tests#practice` : null; // step 3a S2
   const split = !!course.template?.section_keys?.length;
   const pct = (v: number | null) => (v === null ? "-" : `${Math.round(v)} %`);
 
@@ -152,7 +152,7 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
       )}
 
       {/* zero answers: the hero above is the whole story; "Пока мало данных" only once there is some data (one mascot, one action) */}
-      {!nothingYet && <WeakTopics topics={topics} ready={progress.weak_topics_ready} practiceHref={practiceHref} testsHref={`/${lang}/courses/${courseId}`} locked={LOCK_ANALYTICS} />}
+      {!nothingYet && <WeakTopics topics={topics} ready={progress.weak_topics_ready} practiceHref={practiceHref} testsHref={`/${lang}/courses/${courseId}/tests`} locked={LOCK_ANALYTICS} />}
       {/* U9 (review 11): the answers chart too needs history (a chart of one bar says nothing) */}
       {history && <ActivityBars data={activity} period={period} />}
       {!nothingYet && <TopicAccuracy topics={topics} split={split} locked={LOCK_ANALYTICS} />}

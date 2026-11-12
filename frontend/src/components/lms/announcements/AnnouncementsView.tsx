@@ -15,7 +15,7 @@ import { ContentError } from "@/components/lms/pages/ApiError";
 import { SafeHtml } from "@/components/lms/pages/SafeHtml";
 import { StudentPageHeader } from "@/components/lms/student/StudentPageHeader";
 import { pickLocalized } from "@/lib/lms/localized";
-import { isExamShellCourse } from "@/lib/lms/templates";
+import { inCourseSpace } from "@/lib/lms/templates";
 import { Badge, Button, ConfirmDialog, EmptyState, LinkButton, LoadingState, PageHeader, Pagination, toast } from "@/components/ui";
 
 type Row = AnnouncementStaffOut | AnnouncementStudentOut;
@@ -28,7 +28,7 @@ export function AnnouncementsView() {
   const base = `/${lang}/courses/${course.id}/announcements`;
   // G2 (TEACHER_TO_STUDENT_MAP S3): a student in the exam shell gets the student page header (the layout drops the
   // course header here), the course name as its subtitle
-  const studentShell = !canEdit && course.my_enrollment.role === "student" && isExamShellCourse(course);
+  const studentShell = !canEdit && inCourseSpace(course); // step 3a S2: every student course space
   const [items, setItems] = useState<Row[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,8 +96,7 @@ export function AnnouncementsView() {
   return (
     <div>
       {studentShell ? (
-        <StudentPageHeader title={t("announcements.title")} className="mb-6"
-          subtitle={pickLocalized(course.title, lang, course.default_language) || undefined} />
+        <StudentPageHeader title={t("announcements.title")} className="mb-6" />
       ) : (
         <PageHeader
           title={t("announcements.title")}

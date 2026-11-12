@@ -6978,6 +6978,11 @@
       "title": "Pro сабактарын ачыңыз",
       "body": "Pro курстун жабык модулдарын ачат: видео, конспекттер, файлдар жана тесттер. Алгачкы сабактар акысыз.",
       "action": "Баарын Pro менен ачуу"
+    },
+    "testsBar": {
+      "title": "Бул жердеги тесттердин бир бөлүгү акылуу",
+      "body": "Pro бардык акылуу тесттерди жана Pro сабактарын ачат. Акысыз тесттер сизде эле.",
+      "action": "Бардык сынактарды ачуу"
     }
   },
   "person": {
@@ -7316,6 +7321,52 @@
       "russian": "Орус тили",
       "english": "Англис тили",
       "literature": "Адабият"
+    }
+  },
+  "course": {
+    "tabs": {
+      "label": "Курстун өтмөктөрү",
+      "overview": "Жалпы маалымат",
+      "lessons": "Сабактар",
+      "tests": "Тесттер",
+      "assignments": "Тапшырмалар",
+      "analytics": "Аналитика",
+      "saved": "Сакталгандар"
+    },
+    "header": {
+      "progress": "{total} ичинен {done} өтүлдү",
+      "progressLabel": "Курс боюнча прогресс",
+      "examIn": "Сынакка чейин",
+      "target": "Максат",
+      "lastScore": "Акыркы балл",
+      "forExam": "Сынакка:",
+      "percent": "{percent} %"
+    },
+    "overview": {
+      "nextStep": "Кийинки кадам",
+      "latestResult": "Акыркы жыйынтык",
+      "allResults": "Бардык жыйынтыктар",
+      "allGrades": "Бардык баалар",
+      "announcements": "Кулактандыруулар",
+      "allAnnouncements": "Бардык кулактандыруулар",
+      "continueLesson": "Сабакты улантуу",
+      "allLessons": "Бардык сабактар",
+      "about": "Курс жөнүндө",
+      "teachers": "Мугалимдер",
+      "materials": "Материалдар",
+      "lessonCourses": "Сынакка даярдоочу сабак курстары",
+      "allLessonCourses": "Баары",
+      "ofTotal": "{total} ичинен {done}",
+      "modules": "Модулдар",
+      "lessons": "Сабактар",
+      "tests": "Тесттер",
+      "startLesson": "Сабакты баштоо"
+    },
+    "tests": {
+      "practiceSection": "Машыгуулар"
+    },
+    "analytics": {
+      "gradesSection": "Баалар"
     }
   }
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, TriangleAlert } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
+import { useRememberLobby } from "@/lib/lms/useLastPlace"; // step 3a S2
 import { useLmsMe } from "@/lib/lms/useLmsMe";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { Button, LoadingState, Skeleton, SkeletonText, cn } from "@/components/ui";
@@ -304,6 +305,7 @@ export function PlayerShell({ courseId, attemptId }: { courseId: string; attempt
     && !content.sections[0].key;
   const [quizTitle, setQuizTitle] = useState<string | null>(null);
   const assessmentId = state?.assessment_id;
+  useRememberLobby(lang, courseId, assessmentId); // step 3a S2: the last place is the lobby, never the attempt URL
   useEffect(() => {
     if (!hiddenSection || !assessmentId) return;
     let alive = true;

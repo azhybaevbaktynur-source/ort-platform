@@ -9,12 +9,14 @@
 // U9 (STUDENT_UI_REVIEW 2, 7, 8, 10): no score tiles (the numbers live on the home and in Аналитика), no breadcrumbs
 // and no "Покинуть курс" (the shell navigates; leaving is in its exam sheet), one lock signal pair on a paid card
 // ("Платный" chip and the gold pill); one blue primary (owner 2026-11-07: no violet accent, gold is the only accent).
-import React, { useCallback, useEffect, useId, useRef, useState } from "react";
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Clock, ListChecks, Lock } from "lucide-react";
+import { ClipboardList, Clock, ListChecks, Lock } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
-import { templateUi } from "@/lib/lms/templates";
+import { inCourseSpace, templateUi } from "@/lib/lms/templates";
+import { listAssignments } from "@/lib/lms/assignments"; // step 3a S2
+import type { AssignmentStudentOut } from "@/lib/lms/assignmentTypes";
 import {
   SOURCE_OTHER, listExamLibrary, wholeNumber, type LibraryCardOut, type LibraryStatus,
 } from "@/lib/lms/examPrep";
@@ -26,6 +28,11 @@ import {
 import { StudentPageHeader } from "@/components/lms/student/StudentPageHeader";
 import { fmtDuration } from "@/components/lms/home/format";
 import { useErrorText } from "@/components/lms/home/useErrorText";
+import { ProCallout } from "@/components/lms/access/ProCallout"; // step 3a S2
+import { PracticeList } from "@/components/lms/practice/PracticeList"; // step 3a S2 (D6)
+import { StudentAssignmentCard } from "@/components/lms/assignments/StudentAssignmentCard";
+import { useAssignmentErrorText } from "@/components/lms/assignments/assignmentUi";
+import { primaryAssignmentId, sortForStudent, studentAssignmentView } from "@/components/lms/assignments/studentAssignment";
 
 const STATUSES: LibraryStatus[] = ["not_started", "in_progress", "done"];
 const STATUS_TONE: Record<LibraryStatus, BadgeTone> = { not_started: "neutral", in_progress: "info", done: "success" };
@@ -144,7 +151,6 @@ function TestsLibrary() {
   const errorText = useErrorText();
   const headingId = useId();
   const base = `/${lang}/courses/${course.id}`;
-  const courseTitle = pickLocalized(course.title, lang, course.default_language) || t("courses.list.untitled");
 
   // the exam-prep page: sources and total. PERFORMANCE_AUDIT S3: through the SWR cache, so the "Начало работы"
   // checklist reading the same answer sends no second request
@@ -187,7 +193,9 @@ function TestsLibrary() {
   return (
     <div className="space-y-6">
       <section aria-labelledby={headingId} className="min-w-0 space-y-5">
-        <StudentPageHeader id={headingId} title={title} subtitle={courseTitle} />
+        {/* step 3a S2: the compact course header names the course; the Pro bar goes first under the tabs (§3.5) */}
+        {meta?.needs_pass && <ProCallout variant="tests" />}
+        <StudentPageHeader id={headingId} title={title} />
 
         {metaError && !meta ? <ErrorState variant="inline" message={errorText(metaError)} onRetry={() => void refreshMeta()} /> : null}
 
@@ -235,20 +243,102 @@ function TestsLibrary() {
         {error && items.length > 0 ? <ErrorState variant="inline" message={errorText(error)} onRetry={() => void load(cursor)} /> : null}
         <Pagination nextCursor={cursor} loading={loading} onLoadMore={() => void load(cursor)} />
       </section>
-
+      <PracticeSection />
     </div>
   );
 }
 
-/** `/courses/{c}/tests`: students of an exam-prep course get the library; anyone else goes to the course page. */
+/** Step 3a S2 (D6): the «Тренировки» section at the end of the Тесты tab (`#practice`), when practice is published. */
+function PracticeSection() {
+  const { course } = useCourse();
+  const shown = !!course.features?.practice;
+  useEffect(() => {
+    if (!shown || window.location.hash !== "#practice") return;
+    const id = window.setTimeout(() => document.getElementById("practice")?.scrollIntoView(), 300);
+    return () => window.clearTimeout(id);
+  }, [shown]);
+  if (!shown) return null;
+  return (
+    <section id="practice" className="scroll-mt-24 border-t border-slate-200 pt-6">
+      <PracticeList embedded />
+    </section>
+  );
+}
+
+/** Step 3a S2 (§3.2, D4): the Тесты (or Задания) tab of a course that is not an exam course: its assignments as cards
+ * in the library's grid (status, kind, due date, attempts, one primary action on the next one), then «Тренировки». */
+function AssignmentsTab() {
+  const { lang, t } = useTranslation();
+  const { course } = useCourse();
+  const errorText = useAssignmentErrorText();
+  const base = `/${lang}/courses/${course.id}`;
+  const [items, setItems] = useState<AssignmentStudentOut[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<unknown>(null);
+  const load = useCallback(async (next?: string | null) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const page = await listAssignments(course.id, { cursor: next, limit: 50 });
+      const rows = page.items as AssignmentStudentOut[];
+      setItems((p) => (next ? [...p, ...rows] : rows));
+      setCursor(page.next_cursor);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setLoading(false);
+    }
+  }, [course.id]);
+  useEffect(() => { void load(); }, [load]);
+  const rows = useMemo(() => {
+    const now = Date.now();
+    return sortForStudent(items).map((a) => ({ a, v: studentAssignmentView(a, now, false) }));
+  }, [items]);
+  const primaryId = primaryAssignmentId(rows);
+  const title = course.features?.hand_ins ? t("course.tabs.assignments") : t("course.tabs.tests");
+  return (
+    <div className="space-y-6">
+      <section className="min-w-0 space-y-5">
+        <StudentPageHeader title={title} />
+        {error && items.length === 0 ? <ErrorState message={errorText(error)} onRetry={() => void load()} retrying={loading} /> : null}
+        {loading && items.length === 0 && !error && (
+          <div role="status" aria-live="polite">
+            <span className="sr-only">{t("ui.loading")}</span>
+            <div aria-hidden="true" className={GRID}>{[0, 1, 2].map((i) => <Skeleton key={i} className="h-44 w-full rounded-card" />)}</div>
+          </div>
+        )}
+        {!loading && !error && items.length === 0 && (
+          <EmptyState mascot="reading" icon={<ClipboardList />} title={t("assignments.student.empty")} description={t("assignments.student.emptyHint")} />
+        )}
+        {rows.length > 0 && (
+          <ul className={cn(GRID, "[&>li]:flex [&>li]:flex-col")}>
+            {rows.map(({ a, v }) => (
+              <StudentAssignmentCard key={a.id} a={a} v={v} base={base} primary={a.id === primaryId}
+                title={pickLocalized(a.title, lang, course.default_language) || t("assignments.untitled")} />
+            ))}
+          </ul>
+        )}
+        {error && items.length > 0 ? <ErrorState variant="inline" message={errorText(error)} onRetry={() => void load(cursor)} /> : null}
+        <Pagination nextCursor={cursor} loading={loading} onLoadMore={() => void load(cursor)} />
+      </section>
+      <PracticeSection />
+    </div>
+  );
+}
+
+/** `/courses/{c}/tests`: the Тесты tab. Students of an exam-prep course get the library, students of any other course
+ * (step 3a S2) their assignments; anyone else goes to the course page. */
 export function TestsPage() {
   const { lang } = useTranslation();
   const router = useRouter();
   const { course } = useCourse();
   const examPrep = course.my_enrollment.role === "student" && templateUi(course).studentLayout === "exam_prep";
+  const general = !examPrep && inCourseSpace(course);
   useEffect(() => {
-    if (!examPrep) router.replace(`/${lang}/courses/${course.id}`);
-  }, [examPrep, lang, course.id, router]);
+    if (!examPrep && !general) router.replace(`/${lang}/courses/${course.id}`);
+  }, [examPrep, general, lang, course.id, router]);
+  if (general) return <AssignmentsTab />;
   if (!examPrep) return <TestsSkeleton />;
   return <TestsLibrary />;
 }

@@ -6,6 +6,8 @@ import { getActivity, getProgress, type ActivityDays, type ActivityOut, type Pro
 import { listMyCourses } from "./courses";
 import { homeBootstrap, onBootstrapHome } from "./bootstrap"; // PERFORMANCE_AUDIT P2
 import { getHome } from "./home";
+import { getModules } from "./modules"; // step 3a S2
+import { isStaffModules, type ModulesStudentOut } from "./modulesTypes";
 import type { HomeOut } from "./homeTypes";
 import type { CourseCard, PageOut } from "./types";
 import { peek, put, revalidate, useCached, type SwrOptions } from "./swr";
@@ -93,10 +95,12 @@ export function loadExamPrep(courseId: string): Promise<ExamPrepOut> {
 }
 
 /** The exam-prep page of a page that draws it: the cached answer at once, asked again on mount (one request at most). */
-export function useExamPrep(courseId: string) {
-  const key = examPrepKey(courseId);
-  const state = useCached<ExamPrepOut>(key, fetchExamPrep(courseId), EXAM_PREP_CACHE);
+export function useExamPrep(courseId: string | null) {
+  // step 3a S2: a null id (a course that is not an exam course) reads nothing and keeps the hook order
+  const key = courseId ? examPrepKey(courseId) : null;
+  const state = useCached<ExamPrepOut>(key, fetchExamPrep(courseId ?? ""), EXAM_PREP_CACHE);
   useEffect(() => {
+    if (!key || !courseId) return;
     pageLoad(key, fetchExamPrep(courseId), EXAM_PREP_CACHE).catch(() => { /* `useCached` reports a missing answer */ });
   }, [key, courseId]);
   return state;
@@ -136,6 +140,33 @@ export function prefetchExamPrep(courseId: string): void {
 export function prefetchAnalytics(courseId: string, days: ActivityDays = 30): void {
   intentLoad(progressKey(courseId, days), () => getProgress(courseId, { days }), ANALYTICS_CACHE);
   intentLoad(activityKey(courseId, days), () => getActivity(courseId, days), ANALYTICS_CACHE);
+}
+
+/* Step 3a S2 (STUDENT_IA_DESIGN §6.4): the student's modules of a course (Обзор: next lesson, header progress; the
+ * Уроки tab link prefetches it). Asked again on every mount, like the exam-prep page. A staff answer reads as empty. */
+const MODULES_CACHE: SwrOptions = { ttl: 15_000 };
+export const modulesKey = (courseId: string) => `modules:student:${courseId}`;
+const fetchModules = (courseId: string) => async (): Promise<ModulesStudentOut> => {
+  const out = await getModules(courseId);
+  return isStaffModules(out) ? { modules: [], up_next: null } : { modules: out.modules ?? [], up_next: out.up_next ?? null, progress: out.progress };
+};
+
+/** The student modules of a page that draws them (`enabled` false: no read, `data` stays null). */
+export function useStudentModules(courseId: string, enabled = true) {
+  const key = enabled ? modulesKey(courseId) : null;
+  const state = useCached<ModulesStudentOut>(key, fetchModules(courseId), MODULES_CACHE);
+  useEffect(() => {
+    if (!key) return;
+    pageLoad(key, fetchModules(courseId), MODULES_CACHE).catch(() => { /* `useCached` reports a missing answer */ });
+  }, [key, courseId]);
+  return state;
+}
+/** A fresh modules answer from another reader (the Уроки tab after a fact): every reader sees it. */
+export function putStudentModules(courseId: string, data: ModulesStudentOut): void {
+  put(modulesKey(courseId), data, MODULES_CACHE);
+}
+export function prefetchModules(courseId: string): void {
+  intentLoad(modulesKey(courseId), fetchModules(courseId), MODULES_CACHE);
 }
 
 /* Integration fix (S3 follow-up): the header's teaching sections prefetch like the student sidebar. "Мои курсы" reads

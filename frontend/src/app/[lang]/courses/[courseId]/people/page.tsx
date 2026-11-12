@@ -7,6 +7,8 @@ import { addStaff, changeEnrollmentRole, listPeople, removeEnrollment } from "@/
 import { useLmsMe } from "@/lib/lms/useLmsMe";
 import { isStaffCourse, type CourseRole, type RosterEntryOut, type StaffPublicOut } from "@/lib/lms/types";
 import { useCourse } from "@/components/lms/CourseContext";
+import { ToCourseTab } from "@/components/lms/course/ToCourseTab"; // step 3a S2
+import { inCourseSpace } from "@/lib/lms/templates"; // step 3a S2
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { JoinCodeDisplay } from "@/components/lms/JoinCodeDisplay";
 import { Disclosure } from "@/components/lms/admin/Disclosure";
@@ -75,7 +77,14 @@ function StaffList({ courseId }: { courseId: string }) {
   );
 }
 
+/** Step 3a S2 (§3.7, D10): students see the teachers on Обзор; observers and staff keep this page. */
 export default function PeoplePage() {
+  const { course } = useCourse();
+  if (inCourseSpace(course)) return <ToCourseTab courseId={course.id} path="" query={false} />;
+  return <PeoplePageBody />;
+}
+
+function PeoplePageBody() {
   const { lang, t } = useTranslation();
   const router = useRouter();
   const { course } = useCourse();

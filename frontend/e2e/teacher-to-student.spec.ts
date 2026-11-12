@@ -332,19 +332,28 @@ test.describe("teacher builds a lesson course, the student sees each step (ru)",
       const m2 = mods.find((m) => m.title.ru === M2)!;
       expect(m1.items.map((i) => i.kind)).toEqual(["url", "page", "file", "assignment"]);
 
-      // ---- the student: the УРОКИ row → the landing (18: the cover) → one-tap join → the overview (06)
+      // ---- the student: the УРОКИ row → the landing (18: the cover) → one-tap join → the course Обзор (step 3a S2),
+      // then its Уроки tab (06)
       await sp.goto(`/${L}/courses`);
       await nav.getByRole("link", { name: COURSE }).click();
       await sp.waitForURL(new RegExp(`/courses/catalog/${lc}$`));
       await expect(sp.getByRole("heading", { level: 1, name: COURSE })).toBeVisible();
       await studentShot(sp, "18-cover");
       await sp.getByRole("button", { name: t("catalog.join") }).click();
-      await sp.waitForURL(new RegExp(`${base}(/modules)?$`));
-      const hero = sp.locator('section[aria-labelledby="course-overview-title"]');
+      await sp.waitForURL(new RegExp(`${base}$`));
+      // Обзор: the full course header (cover, the course as h1, «К экзамену», the lesson progress), the course tabs
+      const hero = sp.locator("main header").first();
       await expect(hero.getByRole("heading", { level: 1, name: COURSE })).toBeVisible();
       await expect(hero.locator("img").first()).toHaveAttribute("src", coverUrl);
-      await expect(nav.getByRole("link", { name: COURSE })).toHaveAttribute("href", `${base}/modules`);
-      await expect(sp.getByRole("navigation", { name: t("courses.home.tabsLabel") })).toHaveCount(0); // exam shell, no course sidebar
+      await expect(hero).toContainText(t("course.header.forExam"));
+      await expect(hero.getByRole("progressbar", { name: t("course.header.progressLabel") })).toHaveAttribute("aria-valuemax", "6");
+      await expect(nav.getByRole("link", { name: COURSE })).toHaveAttribute("href", base);
+      await expect(sp.getByRole("navigation", { name: t("courses.home.tabsLabel") })).toHaveCount(0); // no course sidebar
+      const courseTabs = sp.getByRole("navigation", { name: t("course.tabs.label") });
+      await expect(courseTabs.getByRole("link", { name: t("course.tabs.overview"), exact: true })).toHaveAttribute("aria-current", "page");
+      await expect(sp.getByRole("link", { name: t("course.overview.allLessons") })).toHaveAttribute("href", `${base}/lessons`);
+      await courseTabs.getByRole("link", { name: t("course.tabs.lessons"), exact: true }).click();
+      await sp.waitForURL(new RegExp(`${base}/lessons$`));
       const v1Id = m1.items[0].id;
       const pg1Id = m1.items[1].id;
       const fileId = m1.items[2].id;
@@ -381,7 +390,7 @@ test.describe("teacher builds a lesson course, the student sees each step (ru)",
       const row = strip.getByRole("link", { name: new RegExp(V1) });
       await expect(row).toContainText(`${COURSE} · ${M1}`);
       await expect(row).toHaveAttribute("href", `${base}/modules/${m1.id}/items/${v1Id}`);
-      await expect(homeLessons.getByRole("link", { name: COURSE })).toHaveAttribute("href", `${base}/modules`);
+      await expect(homeLessons.getByRole("link", { name: COURSE })).toHaveAttribute("href", base); // step 3a S2: its Обзор
       await studentShot(sp, "g1-home-continue");
 
       // ---- 07 the video lesson: outline aside, click-to-load player, nothing fetched before the tap
@@ -425,13 +434,16 @@ test.describe("teacher builds a lesson course, the student sees each step (ru)",
       await expect.poll(() => done(fileId)).toBe(true);
 
       // ---- 15 / 11 the module test: the lobby in the exam shell, free, can start
-      await sp.goto(`${base}/modules`);
+      await sp.goto(`${base}/lessons`); // step 3a S2: the Уроки tab
       await sp.locator(`#module-${m1.id}`).getByRole("link", { name: new RegExp(QUIZ) }).click();
       await sp.waitForURL(new RegExp(`${base}/assessments/${aid}$`));
       await expect(sp.getByRole("heading", { level: 1, name: QUIZ })).toBeVisible();
       await expect(sp.getByRole("button", { name: t("assessments.lobby.start") })).toBeEnabled();
       await expect(nav).toBeVisible();
       await expect(sp.getByRole("navigation", { name: t("courses.home.tabsLabel") })).toHaveCount(0);
+      // step 3a S2 (§3.5): the lobby is inside the course space, its parent tab (Тесты) current
+      await expect(sp.getByRole("navigation", { name: t("course.tabs.label") }).getByRole("link", { name: t("course.tabs.tests"), exact: true }))
+        .toHaveAttribute("aria-current", "page");
       await studentShot(sp, "15-pro-test");
 
       // ---- 16 the Pro lesson by URL: the lock card, no player, no video id, no request
@@ -471,7 +483,7 @@ test.describe("teacher builds a lesson course, the student sees each step (ru)",
       await itemSwitch.click();
       await expect(itemSwitch).toHaveAttribute("aria-checked", "false");
       await teacherShot(tp, "12-unpublish-module");
-      await sp.goto(`${base}/modules`);
+      await sp.goto(`${base}/lessons`); // step 3a S2: the Уроки tab
       await expect(bar).toHaveAttribute("aria-valuemax", "5");
       const progress = (await api(student, "GET", `/courses/${lc}/modules`)).progress as { done: number; total: number };
       expect(progress.total).toBe(5);

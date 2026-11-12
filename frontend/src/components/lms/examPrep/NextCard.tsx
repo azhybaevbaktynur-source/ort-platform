@@ -29,7 +29,7 @@ export function NextCard({ next, courseId, className }: { next: ExamNextOut | nu
     : next.kind === "unlock" ? t("examPrep.next.unlockTitle") // S3: only paid tests remain
       : pickLocalized(next.title, lang) || t("assessments.untitled");
   const href = next.kind === "resume" && next.attempt_id ? `${base}/attempts/${next.attempt_id}`
-    : next.kind === "practice" ? `${base}/practice`
+    : next.kind === "practice" ? `${base}/tests#practice` // step 3a S2 (D6)
       : next.kind === "unlock" ? `/${lang}/pro`
         : `${base}/assessments/${next.assessment_id}`;
   return (
