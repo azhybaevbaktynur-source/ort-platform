@@ -126,14 +126,18 @@ test("student finds the course, opens the landing and applies", async ({ browser
   const page = await as(browser, data().student);
   await page.goto("/ru/courses/catalog");
   await uxShots(page, UX, "student-catalog", STUDENT);
+  // step 3a S4 (STUDENT_IA_DESIGN §2.4): the catalog opens on the ОРТ chip; a teacher's course is under «Курсы
+  // преподавателей», the list with the search
+  await page.locator("main").getByRole("link", { name: t("catalog.groups.teachers") }).click();
+  await expect(page).toHaveURL(/\/ru\/courses\/catalog\?exam=other$/);
   const search = async (p: Page) => {
     await p.locator("#catalog-q").fill("анкетой");
-    await expect(p.getByRole("link", { name: /ОРТ|ЖРТ|ORT/ })).toHaveCount(0);
+    await expect(p.locator("main ul").getByRole("link", { name: /ОРТ|ЖРТ|ORT/ })).toHaveCount(0);
   };
   await search(page);
   const card = page.locator("li", { has: page.getByRole("link", { name: "Курс с анкетой E2E" }) });
   await expect(card).toBeVisible();
-  await expect(page.getByRole("link", { name: /ОРТ/ })).toHaveCount(0); // the search (debounced) hides the ORT courses
+  await expect(page.locator("main ul").getByRole("link", { name: /ОРТ/ })).toHaveCount(0); // the cards only (S4: «ОРТ» is a chip)
   await expect(card.getByText(t("courses.card.byApplication"))).toBeVisible(); // F7c: a badge only when it matters
   await shot(page, "catalog-search");
   await uxShots(page, UX, "student-catalog-search", STUDENT, search);

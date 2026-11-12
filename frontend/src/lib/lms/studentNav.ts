@@ -64,7 +64,7 @@ export interface CourseRows<T extends CourseRowInput = CourseRowInput> {
   rows: CourseRow<T>[];
   /** «Все курсы (N)» → `/courses` when there are more rows than shown */
   all: { href: string; count: number; active: boolean } | null;
-  /** no course yet: «Выбрать курсы» → `chooseCoursesHref` (the catalog until S4; never for the test student) */
+  /** no course yet: «Выбрать курсы» → `chooseCoursesHref` (the choose step; never for the test student) */
   choose: { href: string; active: boolean } | null;
 }
 

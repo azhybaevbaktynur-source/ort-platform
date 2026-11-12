@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { E2E_DIR, seed, settle, signIn, tr, type SeedUser } from "./helpers";
-import { chooseCoursesHref } from "../src/lib/lms/chooseCourses"; // the catalog until S4
+import { chooseCoursesHref } from "../src/lib/lms/chooseCourses";
 
 /**
  * One course card everywhere (the hub, catalog, Teaching list), the last result with its maximum, and the hub order:

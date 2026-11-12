@@ -3,7 +3,7 @@ import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { api, seed, settle, signIn, tr, VIEWPORTS } from "./helpers";
 import { joinEightCourses } from "./hubCourses";
-import { chooseCoursesHref } from "../src/lib/lms/chooseCourses"; // the catalog until S4
+import { chooseCoursesHref } from "../src/lib/lms/chooseCourses";
 
 /**
  * Step 3a S3 (docs/phases/STUDENT_IA_DESIGN.md §2.2, §2.3, §7.1-§7.3): Главная `/home` is a hub only. With no course:

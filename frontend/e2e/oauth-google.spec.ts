@@ -60,6 +60,33 @@ test("new user: Google, then the age step and consent, lands signed in where the
   expect(who.displayName).toBe("Гугл Новый К.");
 });
 
+test("new user under 14: the privacy page, signed in, never sent to login", async ({ page }) => {
+  const email = `e2e-google-child-${rand()}@gmail.test`;
+  await nextGoogle({ email, name: "Гугл Ребёнок", sub: `child-${rand()}` });
+  await pressGoogle(page);
+  await expect(page.getByRole("heading", { name: t("auth.oauth.completeTitle") })).toBeVisible();
+  await page.getByRole("button", { name: t("privacy.age.under_14") }).click();
+  await page.getByRole("button", { name: t("auth.oauth.completeButton") }).click();
+  await expect(page).toHaveURL(/\/ru\/privacy$/);
+  await page.waitForLoadState("networkidle");
+  await expect(page).toHaveURL(/\/ru\/privacy$/);
+  expect((await me(page)).email).toBe(email);
+});
+
+test("new user 18+ without a redirect: the choose step (step 3a S4); nothing joined", async ({ page }) => {
+  const email = `e2e-google-choose-${rand()}@gmail.test`;
+  await nextGoogle({ email, name: "Гугл Выбор", sub: `choose-${rand()}` });
+  await pressGoogle(page);
+  await page.getByRole("button", { name: t("privacy.age.18_plus") }).click();
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: t("auth.oauth.completeButton") }).click();
+  await expect(page).toHaveURL(/\/ru\/courses\/choose\?first=1$/);
+  await expect(page.getByRole("heading", { level: 1, name: t("choose.title") })).toBeVisible();
+  const token = await page.evaluate(() => localStorage.getItem("ort_token"));
+  const home = await (await fetch(`${API}/api/v1/me/home`, { headers: { Authorization: `Bearer ${token}` } })).json();
+  expect(home.courses).toHaveLength(0);
+});
+
 test("existing password user with a verified email: linked, signed in, password still works", async ({ page }) => {
   const user = seed().oauth.linked;
   await nextGoogle({ email: user.email, name: "Someone Else", sub: `linked-${rand()}` });

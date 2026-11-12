@@ -9,7 +9,7 @@ import { KeyRound, Plus } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
 import { listHomeCourses } from "@/lib/lms/home";
-import { chooseCoursesHref } from "@/lib/lms/chooseCourses"; // until S4: the catalog
+import { chooseCoursesHref } from "@/lib/lms/chooseCourses";
 import type { HomeCourseOut } from "@/lib/lms/homeTypes";
 import { LMS_ME_STALE_EVENT } from "@/lib/lms/meStale";
 import { EmptyState, ErrorState, LinkButton, Pagination, Skeleton } from "@/components/ui";
