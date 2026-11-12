@@ -13,7 +13,7 @@
 //   touch. Which tabs exist is the server's (`courseTabs`, `CourseOut.features`).
 // - Pro bar: the tab that holds locked content draws `ProCallout variant="course"` first under the tabs (Уроки with a
 //   locked module, Тесты with a paid test and no pass, the lobby of a paid test); Обзор has the unlock card instead.
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/context";
 import { getCourseLanding, type CourseLandingOut } from "@/lib/lms/catalog";
@@ -32,6 +32,7 @@ import { CourseCardCover } from "./CourseCardCover";
 import { ExamCountdown, ExamGoalLine } from "./ExamHeaderBlock";
 
 const COURSE_CACHE: SwrOptions = { ttl: 60_000, storage: "session" };
+const FADE = "linear-gradient(to right, #000 calc(100% - 32px), transparent)";
 const LESSON_KINDS = new Set(["page", "file", "url"]);
 
 export function isExamCourse(course: CourseOut): boolean {
@@ -44,6 +45,17 @@ function CourseTabsNav({ course, tabs, className }: { course: CourseOut; tabs: C
   const exam = isExamCourse(course);
   const f = course.features;
   const activeKey = tabs.find((x) => x.active)?.key ?? null;
+  // more tabs to the right of the visible strip: the right edge fades out as a hint (a mask, no extra element)
+  const [more, setMore] = useState(false);
+  const measure = () => {
+    const nav = navRef.current;
+    if (nav) setMore(nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 4);
+  };
+  useEffect(() => {
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [tabs.length]);
   // the current tab is in view on a phone (scroll the strip, never the page)
   useEffect(() => {
     const nav = navRef.current;
@@ -53,6 +65,7 @@ function CourseTabsNav({ course, tabs, className }: { course: CourseOut; tabs: C
     const right = el.offsetLeft + el.offsetWidth + 16;
     if (left < nav.scrollLeft) nav.scrollLeft = Math.max(0, left);
     else if (right > nav.scrollLeft + nav.clientWidth) nav.scrollLeft = right - nav.clientWidth;
+    measure();
   }, [activeKey]);
   const prefetch = (tab: CourseTab) => () => {
     if (tab.key === "lessons" && f?.modules) prefetchModules(course.id);
@@ -67,9 +80,11 @@ function CourseTabsNav({ course, tabs, className }: { course: CourseOut; tabs: C
     if (!nav) return;
     if (el.offsetLeft < nav.scrollLeft) nav.scrollLeft = el.offsetLeft - 16;
     else if (el.offsetLeft + el.offsetWidth > nav.scrollLeft + nav.clientWidth) nav.scrollLeft = el.offsetLeft + el.offsetWidth - nav.clientWidth + 16;
+    measure();
   };
   return (
-    <nav ref={navRef} aria-label={t("course.tabs.label")} className={cn("relative -mx-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none]", className)}>
+    <nav ref={navRef} aria-label={t("course.tabs.label")} onScroll={measure}
+      style={more ? { WebkitMaskImage: FADE, maskImage: FADE } : undefined} className={cn("relative -mx-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none]", className)}>
       <ul className="flex min-w-max gap-1 px-1">
         {tabs.map((tab) => (
           <li key={tab.key}>
