@@ -5,8 +5,9 @@ import { seed, settle, signIn, tr, VIEWPORTS, type SeedUser } from "./helpers";
  * Phase 8c navigation walk (PHASE_8C_DESIGN 12, S4a): the course sidebar and everything built on it.
  *
  *  1. sidebar links, order and active states for a teacher (FB8-5 S1: five sections + "More", "Hidden" badges, Content tabs)
- *  2. phone drawer ("Course menu" button + sheet) for a student at 375 px
- *  3. auto-hide for students (Announcements and Files appear with published content; the "not available" page)
+ *  2. step 3a S2: a student at 375 px gets the course tabs (horizontal strip), never the "Course menu" sheet
+ *  3. auto-hide for students (step 3a S2: tabs from published content; Announcements and Files reached from Обзор
+ *     once published; the "not available" page before)
  *  4. redirects of the old URLs (section 4.2), query strings kept
  *  5. Student view: a real test-student session in this tab (banner, student sidebar, hand-ins and quizzes work and stay
  *     out of the staff lists, staff routes 403 `test_student_forbidden`), reset, a dead token returns to the teacher
@@ -63,8 +64,11 @@ async function open(browser: Browser, user: SeedUser, viewport: { width: number;
   return page;
 }
 
-/** The course sidebar (desktop side nav) in any role: same landmark name as the old tab bar. */
+/** The course sidebar (desktop side nav) of staff and read-only viewers: same landmark name as the old tab bar. */
 const sidebar = (page: Page) => page.getByRole("navigation", { name: t("courses.home.tabsLabel") });
+/** Step 3a S2: the course space tabs of a student (Student view too). */
+const courseTabs = (page: Page) => page.getByRole("navigation", { name: t("course.tabs.label") });
+const tab = (page: Page, key: string) => courseTabs(page).getByRole("link", { name: t(key), exact: true });
 /** One sidebar link by label; a staff link with a "hidden from students" mark carries the mark's text in its name. */
 const link = (page: Page, key: string) => sidebar(page).getByRole("link", { name: new RegExp(`^${esc(t(key))}(\\s|$)`) });
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -176,40 +180,39 @@ test.describe("course navigation (ru)", () => {
     await tp.context().close();
   });
 
-  // ---------------------------------------------------------------- 2. phone drawer, student
-  test("phone: the sidebar is a 'Course menu' sheet", async ({ browser }) => {
+  // ---------------------------------------------------------------- 2. phone, student (step 3a S2)
+  test("phone: a student gets the course tabs, no 'Course menu' sheet", async ({ browser }) => {
     const sp = await open(browser, nav().students.phone, VIEWPORTS.phone);
     await sp.goto(base());
-    const menu = sp.getByRole("button", { name: new RegExp(`^${t("courseNav.menu")}`) });
-    await expect(menu).toBeVisible();
-    await expect(menu).toContainText(t(LINKS.course)); // "Course menu · Course": the active link is named
-    await expect(menu).toHaveAttribute("aria-expanded", "false");
-    await expect(link(sp, LINKS.assignments)).toBeHidden(); // the side nav is for md and up
-    await menu.click();
-    await expect(menu).toHaveAttribute("aria-expanded", "true");
-    const sheet = sp.getByRole("dialog");
-    await expect(sheet.getByRole("link", { name: t(LINKS.assignments), exact: true })).toBeVisible();
-    // Esc closes the sheet and keeps the page
-    await sp.keyboard.press("Escape");
-    await expect(sp.getByRole("dialog")).toHaveCount(0);
-    await expect(menu).toHaveAttribute("aria-expanded", "false");
-    // choosing a link closes the sheet and the button names the new active link
-    await menu.click();
-    await sp.getByRole("dialog").getByRole("link", { name: t(LINKS.assignments), exact: true }).click();
-    await sp.waitForURL(new RegExp(`/courses/${nav().course_id}/assignments`));
-    await expect(sp.getByRole("dialog")).toHaveCount(0);
-    await expect(menu).toContainText(t(LINKS.assignments));
+    await expect(courseTabs(sp)).toBeVisible();
+    await expect(tab(sp, "course.tabs.overview")).toHaveAttribute("aria-current", "page");
+    await expect(sp.getByRole("button", { name: new RegExp(`^${t("courseNav.menu")}`) })).toHaveCount(0);
+    await expect(sidebar(sp)).toHaveCount(0);
+    // a tab is a link: the URL changes and the tab becomes current
+    await tab(sp, "course.tabs.tests").click();
+    await sp.waitForURL(new RegExp(`/courses/${nav().course_id}/tests$`));
+    await expect(tab(sp, "course.tabs.tests")).toHaveAttribute("aria-current", "page");
+    await expect(courseTabs(sp).locator('[aria-current="page"]')).toHaveCount(1);
+    // 44 px targets
+    const h = await tab(sp, "course.tabs.tests").evaluate((el) => el.getBoundingClientRect().height);
+    expect(h).toBeGreaterThanOrEqual(44);
     await noHorizontalScroll(sp);
     await sp.context().close();
   });
 
   // ---------------------------------------------------------------- 3. auto-hide for students
-  test("student: Announcements and Files appear only with published content; 'not available' page before", async ({ browser }) => {
+  test("student: tabs follow published content; Announcements and Files reached from Обзор once published; 'not available' page before", async ({ browser }) => {
     const sp = await open(browser, nav().students.sidebar);
     await sp.goto(base());
-    // before: Course, Assignments, Grades, Teachers (people) only
-    await expect(link(sp, LINKS.course)).toHaveAttribute("aria-current", "page");
-    expect(await linkNames(sp)).toEqual([t(LINKS.course), t(LINKS.assignments), t(LINKS.grades), t("courses.people.tabStudent"), t("progress.nav"), t("student.nav.saved")]);
+    // a published quiz, nothing else: Обзор · Тесты · Аналитика · Сохранённые; no course sidebar for students
+    await expect(tab(sp, "course.tabs.overview")).toHaveAttribute("aria-current", "page");
+    expect((await courseTabs(sp).getByRole("link").allInnerTexts()).map((x) => x.trim()))
+      .toEqual([t("course.tabs.overview"), t("course.tabs.tests"), t("course.tabs.analytics"), t("course.tabs.saved")]);
+    await expect(sidebar(sp)).toHaveCount(0);
+    // a tab without content opened by URL: the "not available" page inside the frame
+    await sp.goto(`${base()}/lessons`);
+    await expect(sp.getByText(t("courseNav.unavailable.title"))).toBeVisible();
+    await expect(courseTabs(sp)).toBeVisible();
     // opening a hidden area by URL: the "not available" page, no list
     for (const area of ["announcements", "files"]) {
       await sp.goto(`${base()}/${area}`);
@@ -218,17 +221,19 @@ test.describe("course navigation (ru)", () => {
       await sp.getByRole("link", { name: t("courseNav.unavailable.back") }).click();
       await sp.waitForURL(new RegExp(`/courses/${nav().course_id}/?$`));
     }
-    // a draft announcement changes nothing; posting it shows the link
+    // a draft announcement changes nothing; posting it shows the Обзор strip
     const ann = await api(nav().teacher, "POST", `/courses/${nav().course_id}/announcements`, { title: ANN_TITLE, body_md: "Текст объявления.", pinned: false, publish: false });
     await sp.goto(base());
-    await expect(link(sp, LINKS.announcements)).toHaveCount(0);
+    await expect(tab(sp, "course.tabs.overview")).toHaveAttribute("aria-current", "page");
+    await expect(sp.getByRole("link", { name: t("course.overview.allAnnouncements") })).toHaveCount(0);
     await api(nav().teacher, "POST", `/courses/${nav().course_id}/announcements/${ann.id}/publish`, {}, [200, 201, 204]);
     await sp.goto(base());
-    await expect(link(sp, LINKS.announcements)).toBeVisible();
-    await link(sp, LINKS.announcements).click();
+    await expect(sp.getByText(ANN_TITLE)).toBeVisible();
+    await sp.getByRole("link", { name: t("course.overview.allAnnouncements") }).click();
+    await sp.waitForURL(new RegExp(`/courses/${nav().course_id}/announcements$`));
     await expect(sp.getByRole("heading", { name: ANN_TITLE })).toBeVisible();
-    await expect(link(sp, LINKS.announcements)).toHaveAttribute("aria-current", "page");
-    // a published file shows Files
+    await expect(tab(sp, "course.tabs.overview")).toHaveAttribute("aria-current", "page"); // object page: parent tab
+    // a published file shows «Материалы» on Обзор
     const form = new FormData();
     form.append("file", new Blob([PDF], { type: "application/pdf" }), "nav.pdf");
     form.append("folder", "");
@@ -237,9 +242,8 @@ test.describe("course navigation (ru)", () => {
     const up = await fetch(`${seed().api}/api/v1/courses/${nav().course_id}/course-files`, { method: "POST", headers: { Authorization: `Bearer ${nav().teacher.token}` }, body: form });
     expect(up.status).toBe(201);
     await sp.goto(base());
-    await expect(link(sp, LINKS.files)).toBeVisible();
-    await expect(mark(link(sp, LINKS.files))).toHaveCount(0); // students get no "hidden" mark
-    await link(sp, LINKS.files).click();
+    await sp.getByRole("link", { name: t("course.overview.materials") }).click();
+    await sp.waitForURL(new RegExp(`/courses/${nav().course_id}/files$`));
     await expect(sp.getByText(FILE_TITLE, { exact: true })).toBeVisible();
     // staff now see both pages without the "Hidden" badge (FB8-5 S1, D-FB8-5-2)
     const tp = await open(browser, nav().teacher);
@@ -275,12 +279,21 @@ test.describe("course navigation (ru)", () => {
     await expect(tp).toHaveURL(new RegExp(`${c}/assignments/${quizAssignment}$`));
     await tp.context().close();
 
-    // students: /assessments goes to the quiz filter, /modules stays (their outline), the object URL is unchanged
+    // students (step 3a S2, STUDENT_IA_DESIGN §3.7): the old pages lead to the course tabs, query and fragment kept
     const sp = await open(browser, nav().students.sidebar);
-    await sp.goto(`/${L}${c}/assessments`);
-    await sp.waitForURL(new RegExp(`${c}/assignments\\?kind=quiz$`));
-    await sp.goto(`/${L}${c}/modules`);
-    await expect(sp).toHaveURL(new RegExp(`${c}/modules$`));
+    const went = async (from: string, to: RegExp) => {
+      await sp.goto(`/${L}${c}${from}`);
+      await sp.waitForURL((u) => to.test(u.pathname + u.search + u.hash));
+      await expect(courseTabs(sp)).toBeVisible();
+    };
+    await went("/assessments", new RegExp(`${c}/tests\\?kind=quiz$`));
+    await went("/assignments?x=1", new RegExp(`${c}/tests\\?x=1$`));
+    await went("/modules#m-1", new RegExp(`${c}/lessons#m-1$`));
+    await went("/progress", new RegExp(`${c}/analytics$`));
+    await went("/progress?tab=mistakes", new RegExp(`${c}/saved\\?tab=mistakes$`));
+    await went("/grades", new RegExp(`${c}/analytics#grades$`));
+    await went("/practice", new RegExp(`${c}/tests#practice$`));
+    await went("/people", new RegExp(`${c}$`));
     await sp.context().close();
 
     // ORT courses: ?new=1 goes to the Course page (exam list), which opens its create dialog
@@ -321,6 +334,9 @@ test.describe("course navigation (ru)", () => {
     await expect(banner.getByRole("button", { name: t("studentView.reset") })).toBeVisible();
     await expect(link(tp, LINKS.bank)).toHaveCount(0); // staff-only link (assistants have no Settings)
     await expect(tp.getByRole("button", { name: t("studentView.button") })).toHaveCount(0);
+    // step 3a S2: Student view opens the course Обзор with the student's tabs, no course sidebar
+    await expect(tab(tp, "course.tabs.overview")).toHaveAttribute("aria-current", "page");
+    await expect(sidebar(tp)).toHaveCount(0);
     const session = await tabSession(tp);
     expect(session.courseId).toBe(cid);
     const testStudent = { ...nav().students.assistant, token: session.token };

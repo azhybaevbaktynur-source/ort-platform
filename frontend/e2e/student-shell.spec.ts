@@ -66,10 +66,18 @@ test.describe("student shell (ru)", () => {
     const s = seed();
     await page.setViewportSize(VIEWPORTS.phone);
     await signIn(page, s.students["vis-phone-ru"]);
+    // step 3a S2: the course page is its Обзор (no redirect to Тесты): the bar and the course tabs, one navigation each
     await page.goto(`/${L}/courses/${s.course_id}`);
-    await page.waitForURL(new RegExp(`/${L}/courses/${s.course_id}/tests$`)); // U4: the course page redirects
     const bar = page.getByRole("navigation", { name: t("student.nav.tabBar") });
     await expect(bar).toBeVisible();
+    const tabs = page.getByRole("navigation", { name: t("course.tabs.label") });
+    await expect(tabs.getByRole("link", { name: t("course.tabs.overview"), exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("navigation", { name: t("courses.home.tabsLabel") })).toHaveCount(0);
+    await expect(page).toHaveURL(new RegExp(`/${L}/courses/${s.course_id}$`));
+    await settle(page);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+    await tabs.getByRole("link", { name: t("course.tabs.tests"), exact: true }).click();
+    await page.waitForURL(new RegExp(`/${L}/courses/${s.course_id}/tests$`));
     await expect(bar.getByRole("link", { name: t("student.nav.tests") })).toHaveAttribute("aria-current", "page");
     await settle(page);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);

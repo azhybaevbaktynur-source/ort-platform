@@ -17,10 +17,14 @@ const nav = (rest: string, features = { modules: true, practice: true }) =>
 
 // --- the exam's own links (unchanged) ---
 ok(nav("/courses").home?.active === true, "home active on /courses");
-ok(nav(`/courses/${exam}`).tests?.active === true, "tests active on the course page");
+ok(nav(`/courses/${exam}`).tests?.active === false, "step 3a S2: the course page is Обзор, not Тесты");
+ok(nav(`/courses/${exam}/tests`).tests?.active === true, "tests active on the Тесты tab");
 ok(nav(`/courses/${exam}/modules`).lessons?.active === true, "own Уроки active on the syllabus");
+ok(nav(`/courses/${exam}`).lessons?.href === `/ru/courses/${exam}/lessons`, "step 3a S2: Уроки is the Уроки tab");
+ok(nav(`/courses/${exam}/analytics`).analytics?.active === true && nav(`/courses/${exam}`).analytics?.href === `/ru/courses/${exam}/analytics`, "step 3a S2: Аналитика is the tab");
+ok(nav(`/courses/${exam}`).practice?.href === `/ru/courses/${exam}/tests#practice`, "step 3a S2: practice is the Тесты tab section");
 ok(nav(`/courses/${exam}/modules`, { modules: false, practice: true }).lessons === null, "own Уроки hidden without lessons");
-ok(nav(`/courses/${exam}/lessons`).lessons?.active === false, "own Уроки not active on Все уроки");
+ok(nav(`/courses/${exam}/lessons`).lessons?.active === true, "step 3a S2: own Уроки active on the Уроки tab (lesson courses at its end)");
 ok(nav("/courses/lc1/modules").lessons?.active === false, "own Уроки not active inside a lesson course");
 ok(studentNavLinks({ lang: "ru", rest: "/courses", tab: null, courseId: null, features: null }).tests === null, "no exam: no tests link");
 ok(courseIdOfPath("/courses/catalog/lc1") === null, "catalog landing is not a course path");
@@ -30,7 +34,7 @@ const row = (id: string, enrolled: boolean, progress: { done: number; total: num
 const rows = [row("lc1", true, { done: 2, total: 6 }), row("lc2", false), row("lc3", true, { done: 0, total: 0 }), row("lc4", true, null)];
 const r = lessonCourseLinks({ lang: "ru", rest: "/courses/lc1/modules/i1", examId: exam, rows });
 ok(r.rows.length === 4 && r.all === null, "four rows, no Все уроки");
-ok(r.rows[0].href === "/ru/courses/lc1/modules", "enrolled row opens the overview");
+ok(r.rows[0].href === "/ru/courses/lc1", "enrolled row opens the course Обзор");
 ok(r.rows[1].href === "/ru/courses/catalog/lc2", "not enrolled row opens the catalog landing");
 ok(r.rows[0].active && !r.rows[1].active, "row active inside its lesson course only");
 ok(r.rows[0].progress?.done === 2 && r.rows[0].progress?.total === 6, "enrolled row has the ring");

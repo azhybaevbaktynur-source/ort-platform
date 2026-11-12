@@ -13,7 +13,11 @@ import { StatusBadge } from "@/components/lms/course/CourseCard";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { StaffCourseBar } from "@/components/lms/course/StaffCourseUi"; // Phase 6b S5c
 import { useDeclareArea, useDeclareStudentCourse } from "@/components/lms/LmsShell"; // Phase 6b integration; Student UI U2
-import { isExamShellCourse } from "@/lib/lms/templates"; // Student UI U2; TEACHER_TO_STUDENT_MAP §2.5
+import { courseTabs } from "@/lib/lms/courseTabs"; // step 3a S2
+import { templateUi } from "@/lib/lms/templates"; // step 3a S2
+import { useRememberPlace } from "@/lib/lms/useLastPlace"; // step 3a S2
+import { CourseFrame } from "@/components/lms/course/CourseFrame"; // step 3a S2
+import { useLessonCourseRows } from "@/components/lms/home/LessonCourses"; // step 3a S2
 import { invalidate, put, useCached, type SwrOptions } from "@/lib/lms/swr"; // PERFORMANCE_AUDIT S2
 import { useLmsMe } from "@/lib/lms/useLmsMe"; // fix round 1b
 import { hidesLearning } from "@/lib/lms/shellKind"; // fix round 1b
@@ -123,24 +127,15 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
   const staffFrame = staff && (role === "teacher" || role === "assistant") && !course.my_enrollment.read_only;
   // students (and org admins reading the course) opening an area whose link is hidden get the "not available" page
   const hidden = hiddenAreaFor(course, courseNavRole(course), pathname);
-  // --- Student UI U2 (STUDENT_UI_DESIGN §2.2): inside an exam-prep course the student shell's sidebar navigates, so
-  // the course sidebar is not shown. SF-1 (STUDENT_UI_FIX_PLAN §2.1): the lobby, the result and the review are
-  // here too, in a reading column without course header or breadcrumbs ---
-  // TEACHER_TO_STUDENT_MAP §2.5: a lesson course attached to an exam (`exam_course_id`) is in the same shell
-  if (!staffFrame && role === "student" && isExamShellCourse(course)) {
-    const examPage = attemptsPage || /^\/[^/]+\/courses\/[^/]+\/assessments\/[^/]+$/.test(pathname);
-    // Student UI U4 (§3.2) / U6 (§3.3) / U7 (§3.5): Тесты, Аналитика and the lesson pages have their own title (course
-    // name as subtitle); the course page only redirects there
-    const ownTitle = examPage || pathname === base || pathname === `${base}/tests` || pathname === `${base}/progress`
-      || pathname === `${base}/modules` || pathname.startsWith(`${base}/modules/`)
-      || pathname === `${base}/saved` || pathname === `${base}/practice` // U8: Сохранённые, Практика
-      || pathname === `${base}/lessons` // TEACHER_TO_STUDENT_MAP §2.4: "Все уроки"
-      || pathname === `${base}/announcements`; // G2 (S3): the announcements list has the student page header
-    const body = hidden ? <AreaUnavailable courseId={course.id} /> : children;
+  // --- Step 3a S2 (STUDENT_IA_DESIGN §3): every course is one course space for its students (Student view's test
+  // student too): `CourseFrame` (full header on Обзор, compact on the other tabs and object pages, tabs with the parent
+  // tab current), never the course sidebar. Exam courses and lesson courses are no special case any more. A tab whose
+  // content is not published opened by URL shows `AreaUnavailable` inside the frame, as announcements and files do.
+  // Read-only viewers (an org or platform admin reading a course) keep the frame below. ---
+  if (!staffFrame && role === "student" && !course.my_enrollment.read_only) {
     return (
       <CourseContext.Provider value={ctx}>
-        {ownTitle ? null : <StudentCourseHeader course={course} breadcrumbs={false} />}
-        {examPage ? <div className="mx-auto w-full max-w-[880px]">{body}</div> : body}
+        <StudentCourseSpace course={course} pathname={pathname} hiddenArea={!!hidden}>{children}</StudentCourseSpace>
       </CourseContext.Provider>
     );
   }
@@ -174,4 +169,27 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
     </CourseContext.Provider>
   );
   // --- Phase 8c S1 end ---
+}
+
+/**
+ * Step 3a S2: a student's course space. Exam courses learn whether lesson courses are attached (the Уроки tab); the
+ * lobby, the result and the review keep their 880 px reading column; every navigation writes the last place (§2.5).
+ */
+function StudentCourseSpace({ course, pathname, hiddenArea, children }: {
+  course: CourseOut; pathname: string; hiddenArea: boolean; children: React.ReactNode;
+}) {
+  const { t } = useTranslation();
+  const exam = templateUi(course).studentLayout === "exam_prep";
+  const lessonRows = useLessonCourseRows(exam ? course.id : null);
+  const lessonCourses = exam ? (lessonRows === null ? null : lessonRows.length > 0) : false;
+  const tabs = courseTabs(course, pathname, t, { lessonCourses });
+  useRememberPlace(pathname, !tabs.hidden && !hiddenArea);
+  const reading = /^\/[^/]+\/courses\/[^/]+\/(assessments\/[^/]+|attempts\/[^/]+\/result)$/.test(pathname);
+  const body = tabs.hidden || hiddenArea ? <AreaUnavailable courseId={course.id} /> : children;
+  return (
+    <>
+      <CourseFrame course={course} tabs={tabs} />
+      {reading ? <div className="mx-auto w-full max-w-[880px]">{body}</div> : body}
+    </>
+  );
 }

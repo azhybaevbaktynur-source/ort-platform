@@ -6978,6 +6978,11 @@
       "title": "Unlock the Pro lessons",
       "body": "Pro opens the locked modules of this course: videos, pages, files and tests. The first lessons stay free.",
       "action": "Unlock all with Pro"
+    },
+    "testsBar": {
+      "title": "Some tests here are paid",
+      "body": "Pro opens every paid test and the Pro lessons. The free tests are already yours.",
+      "action": "Unlock all exams"
     }
   },
   "person": {
@@ -7316,6 +7321,52 @@
       "russian": "Russian language",
       "english": "English",
       "literature": "Literature"
+    }
+  },
+  "course": {
+    "tabs": {
+      "label": "Course tabs",
+      "overview": "Overview",
+      "lessons": "Lessons",
+      "tests": "Tests",
+      "assignments": "Assignments",
+      "analytics": "Analytics",
+      "saved": "Saved"
+    },
+    "header": {
+      "progress": "{done} of {total} done",
+      "progressLabel": "Course progress",
+      "examIn": "Until the exam",
+      "target": "Target",
+      "lastScore": "Last score",
+      "forExam": "For the exam:",
+      "percent": "{percent}%"
+    },
+    "overview": {
+      "nextStep": "Next step",
+      "latestResult": "Latest result",
+      "allResults": "All results",
+      "allGrades": "All grades",
+      "announcements": "Announcements",
+      "allAnnouncements": "All announcements",
+      "continueLesson": "Continue the lesson",
+      "allLessons": "All lessons",
+      "about": "About the course",
+      "teachers": "Teachers",
+      "materials": "Materials",
+      "lessonCourses": "Lesson courses for the exam",
+      "allLessonCourses": "All",
+      "ofTotal": "{done} of {total}",
+      "modules": "Modules",
+      "lessons": "Lessons",
+      "tests": "Tests",
+      "startLesson": "Start the lesson"
+    },
+    "tests": {
+      "practiceSection": "Practice"
+    },
+    "analytics": {
+      "gradesSection": "Grades"
     }
   }
 }

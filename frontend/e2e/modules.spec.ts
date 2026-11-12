@@ -125,7 +125,7 @@ async function addInline(page: Page, module: string, kind: "page" | "link" | "he
 }
 
 async function studentModules(page: Page, cid: string) {
-  await page.goto(`/${L}/courses/${cid}/modules`);
+  await page.goto(`/${L}/courses/${cid}/lessons`); // step 3a S2: the syllabus is the Уроки tab
   await expect(page.getByRole("heading", { name: M1, exact: true })).toBeVisible();
   await settle(page);
   // F5b (COURSE_LESSONS_DESIGN 7.1): only the current module opens; the walk reads every module's rows
@@ -262,9 +262,11 @@ test.describe("modules walk (ru)", () => {
     }
     await settle(tp);
 
-    // ---- student: the course home is the modules view; M1 open, M2 opens tomorrow, M3 waits for M2
+    // ---- student: the Уроки tab (step 3a S2; the course page is Обзор); M1 open, M2 opens tomorrow, M3 waits for M2
     const sp = await open(browser, md.student);
     await sp.goto(base);
+    await sp.getByRole("navigation", { name: t("course.tabs.label") }).getByRole("link", { name: t("course.tabs.lessons"), exact: true }).click();
+    await sp.waitForURL(new RegExp(`${base}/lessons$`));
     await expect(sp.getByRole("heading", { name: M1, exact: true })).toBeVisible();
     await settle(sp);
     await expect(badge(sp, M1, "unlocked")).toBeVisible();
@@ -299,11 +301,12 @@ test.describe("modules walk (ru)", () => {
     await sp.waitForURL(new RegExp(`/modules/[0-9a-f-]{36}/items/[0-9a-f-]{36}$`));
     await expect(sp.getByRole("heading", { name: PAGE_TITLE })).toBeVisible();
     await expect(sp.locator(".katex").first()).toBeVisible();
-    // 8a UX / 8c: the Course link of the sidebar stays active on a lesson (design 2.2); the breadcrumb leads back
-    await expect(sidebar(sp).getByRole("link", { name: t("courses.home.tab"), exact: true })).toHaveAttribute("aria-current", "page");
+    // step 3a S2: the Уроки tab stays current on a lesson (§3.5); the breadcrumb leads back
+    await expect(sp.getByRole("navigation", { name: t("course.tabs.label") }).getByRole("link", { name: t("course.tabs.lessons"), exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(sidebar(sp)).toHaveCount(0);
     await expect.poll(async () => (await api(md.student, "GET", `/courses/${cid}/modules`)).modules[0].state).toBe("completed");
     await sp.getByRole("link", { name: t("modules.overview.syllabusTitle"), exact: true }).click();
-    await sp.waitForURL(new RegExp(`/courses/${cid}/modules$`));
+    await sp.waitForURL(new RegExp(`/courses/${cid}/lessons$`));
     await studentModules(sp, cid);
     await expect(badge(sp, M1, "completed")).toBeVisible();
     // ---- the PDF downloads through the authenticated content route (from the file lesson's page)
@@ -404,12 +407,13 @@ test.describe("modules walk (ru)", () => {
     await sp.goto(base);
     await expect(sp.getByRole("heading", { name: PAGE_TITLE })).toBeVisible();
     await expect(sp.locator(".katex").first()).toBeVisible();
-    // and back to modules (the screenshots below start from the modules home)
+    // and back to modules (the screenshots below start from the modules home; step 3a S2: Обзор, its lessons teaser)
     await tp.getByRole("combobox", { name: t("courses.homeKind.label") }).selectOption("modules");
     await homeSection.getByRole("button", { name: t("lms.common.save") }).click();
     await expect.poll(async () => (await api(md.teacher, "GET", `/courses/${cid}`)).home_kind).toBe("modules");
     await sp.goto(base);
-    await expect(sp.getByRole("heading", { name: M1, exact: true })).toBeVisible();
+    await expect(sp.getByRole("link", { name: t("course.overview.allLessons") })).toBeVisible();
+    await expect(sp.getByRole("heading", { name: PAGE_TITLE })).toHaveCount(0);
     await tp.context().close();
     await sp.context().close();
   });
@@ -436,8 +440,7 @@ test.describe("modules walk (ru)", () => {
     try {
       // before: the ORT student's sidebar has no Files / Announcements (auto-hide), the home lists the exams
       const sp = await open(browser, ortStudent);
-      await sp.goto(base);
-      await sp.waitForURL(`${base}/tests`); // Student UI U4: the course page redirects to the Тесты page
+      await sp.goto(`${base}/tests`); // step 3a S2: the Тесты tab (the course page is Обзор)
       await expect(sp.getByRole("heading", { name: "ОРТ E2E", exact: true }).first()).toBeVisible();
       // Student UI U2/U4: inside an exam-prep course the student shell navigates (no course sidebar); without modules
       // it has no Видеоуроки link, and Files / Announcements stay hidden from the student (auto-hide)
@@ -449,10 +452,10 @@ test.describe("modules walk (ru)", () => {
         await sp.goto(`${base}/${area}`);
         await expect(sp.getByText(t("courseNav.unavailable.title"))).toBeVisible();
       }
-      await sp.goto(base);
-      await sp.waitForURL(`${base}/tests`);
+      await sp.goto(`${base}/tests`);
       const course0 = await api(ortStudent, "GET", `/courses/${cid}`);
       expect(course0.home_kind).toBe("assignments");
+      // step 3a S1: `tests` and `hand_ins` for every course (published ORT exams, no hand-in)
       expect(course0.features).toEqual({ modules: false, files: false, announcements: false, practice: false, tests: true, hand_ins: false });
       await review(sp, "ort-student-course-home-before");
       // the home kind is locked on ORT courses
@@ -492,8 +495,7 @@ test.describe("modules walk (ru)", () => {
       await sp.goto(`${base}/files`);
       await expect(sp.getByText("Правила ОРТ").first()).toBeVisible();
       await expect(sp.getByText(t("courseNav.unavailable.title"))).toHaveCount(0);
-      await sp.goto(base);
-      await sp.waitForURL(`${base}/tests`);
+      await sp.goto(`${base}/tests`);
       await expect(sp.getByRole("navigation", { name: t("student.nav.label") }).getByRole("link", { name: t("student.nav.lessons") })).toBeVisible();
       // Exam prep S2 (owner 2026-11-06): ORT students open the exam-prep page; the module is a source of the test library
       // and the exam card opens the same lobby (the Modules page below keeps the module view)
@@ -505,7 +507,7 @@ test.describe("modules walk (ru)", () => {
       await expect(examCard.getByRole("link", { name: t("examPrep.tests.start"), exact: true })).toHaveAttribute("href", `${base}/assessments/${s.exam.id}`);
       await expect(lib.getByRole("heading", { name: "ОРТ E2E staff", exact: true })).toHaveCount(0);
       await review(sp, "ort-student-course-home-with-structure");
-      await sp.goto(`${base}/modules`);
+      await sp.goto(`${base}/lessons`);
       await expect(badge(sp, "Пробный ОРТ", "locked")).toBeVisible();
       await expect(badge(sp, "Подготовка", "completed")).toHaveCount(0); // UX rework: no requirement, so no state badge
       // 8a UX M6: the exam row inside the locked module is open (gating-exempt) and says where it lives (F5b: open the

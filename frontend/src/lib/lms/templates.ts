@@ -111,6 +111,14 @@ export function isExamShellCourse(course: Pick<CourseOut, "template" | "exam_cou
   return !!course && (templateUi(course).studentLayout === "exam_prep" || course.exam_course_id != null);
 }
 
+/**
+ * Step 3a S2 (STUDENT_IA_DESIGN §3): a student of the course (Student view's test student too, never a read-only
+ * viewer) sees it as a course space: `CourseFrame` (header + tabs) above every page, the page's own title is its h1.
+ */
+export function inCourseSpace(course: Pick<CourseOut, "my_enrollment"> | null | undefined): boolean {
+  return !!course && course.my_enrollment.role === "student" && !course.my_enrollment.read_only;
+}
+
 /** `templateUi` of the course of the current course route (today's behaviour outside a course). */
 export function useTemplateUi(): TemplateUi {
   const ctx = useContext(CourseContext);

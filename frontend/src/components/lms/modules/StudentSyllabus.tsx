@@ -15,14 +15,14 @@ import { ArrowRight, CheckCircle2, ChevronDown, Circle, CircleDot, Lock, PartyPo
 import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
 import { getModules, recordView, setDone } from "@/lib/lms/modules";
-import { isExamShellCourse } from "@/lib/lms/templates";
+import { inCourseSpace } from "@/lib/lms/templates";
 import { isStaffModules, type ItemStudentOut, type ModuleStudentOut, type ModulesStudentOut } from "@/lib/lms/modulesTypes";
 import { useCourse } from "@/components/lms/CourseContext";
 import { CourseCardCover } from "@/components/lms/course/CourseCardCover";
 import { fmtDayMonthTime } from "@/components/lms/home/format";
 import { LeaveCourseLink } from "@/components/lms/home/LeaveCourseLink";
 import { Checkbox, EmptyState, ErrorState, GoldPill, LinkButton, LoadingState, Mascot, cn, focusRing } from "@/components/ui";
-import { STUDENT_SUBTITLE, STUDENT_TITLE } from "@/components/lms/student/StudentPageHeader";
+import { STUDENT_SUBTITLE, STUDENT_TITLE, StudentPageHeader } from "@/components/lms/student/StudentPageHeader";
 import { ExternalIcon, ItemKindIcon, ModuleStateBadge, useItemKindText, useLockReasonText, useModuleErrorText, useRequirementText } from "./moduleUi";
 import {
   courseProgress, formatDuration, isAccessLocked, isDone, isExempt, isLocked, lessonHref, lessonList, nextOpen, overviewState, type LessonRef,
@@ -256,8 +256,10 @@ function ModuleSection({ mod, number, lessons, open, onToggle, ctx }: {
 }
 
 /** The banner: cover, the course (exam-prep: its h1) and the one primary action; under it "Пройдено N из M". */
-function Hero({ lessons, data, base, examPrep, track }: {
+function Hero({ lessons, data, base, examPrep, track, cover = true }: {
   lessons: LessonRef[]; data: ModulesStudentOut; base: string; examPrep: boolean; track: boolean;
+  /** step 3a S2: the Уроки tab has no cover (the course header on Обзор has it) */
+  cover?: boolean;
 }) {
   const { lang, t } = useTranslation();
   const { course } = useCourse();
@@ -304,7 +306,7 @@ function Hero({ lessons, data, base, examPrep, track }: {
 
   return (
     <section aria-labelledby="course-overview-title" className="overflow-hidden rounded-card border border-slate-200 bg-white">
-      <CourseCardCover courseId={course.id} platform={course.is_platform_course} coverUrl={course.cover_url} className="aspect-[16/9] sm:aspect-[3/1] lg:aspect-[5/1]" />
+      {cover && <CourseCardCover courseId={course.id} platform={course.is_platform_course} coverUrl={course.cover_url} className="aspect-[16/9] sm:aspect-[3/1] lg:aspect-[5/1]" />}
       <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div className="min-w-0">
           {examPrep ? (
@@ -363,8 +365,9 @@ function AboutCard({ modules, lessons, durationS }: { modules: number; lessons: 
       </div>
       {description && <p className="mt-2 line-clamp-6 whitespace-pre-line break-words text-sm leading-6 text-slate-700">{description}</p>}
       <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3 lg:grid-cols-1 lg:gap-0 lg:divide-y lg:divide-slate-100">
-        {rows.map(([k, v]) => (
-          <div key={k} className="min-w-0 lg:flex lg:items-baseline lg:justify-between lg:gap-3 lg:py-2">
+        {/* keyed by position: a label is empty while its dictionary part loads (two rows would share the key "") */}
+        {rows.map(([k, v], i) => (
+          <div key={i} className="min-w-0 lg:flex lg:items-baseline lg:justify-between lg:gap-3 lg:py-2">
             <dt className="break-words text-xs leading-4 text-slate-600 lg:text-sm lg:leading-5">{k}</dt>
             <dd className="mt-0.5 break-words text-base font-semibold leading-6 text-slate-900 lg:mt-0 lg:text-right">{v}</dd>
           </div>
@@ -374,7 +377,8 @@ function AboutCard({ modules, lessons, durationS }: { modules: number; lessons: 
   );
 }
 
-export function StudentSyllabus() {
+/** `after`: step 3a S2, the Уроки tab's last section (the lesson courses of an exam). */
+export function StudentSyllabus({ after = null }: { after?: React.ReactNode } = {}) {
   const { lang, t } = useTranslation();
   const { course } = useCourse();
   const errorText = useModuleErrorText();
@@ -452,34 +456,27 @@ export function StudentSyllabus() {
     },
   };
 
-  const examPrep = isExamShellCourse(course); // TEACHER_TO_STUDENT_MAP §2.5: attached lesson courses too
-  // TEACHER_TO_STUDENT_MAP §2.5: a lesson course attached to an exam is named by its own title (the overview's empty state)
+  // step 3a S2 (STUDENT_IA_DESIGN §3.2): for a student this is the Уроки tab of the course space: the tab's title is the
+  // page's h1 (the compact course header is no heading), the banner has no cover, leaving lives on Обзор; the lesson
+  // courses of an exam follow (`after`). Read-only viewers keep the overview under the course header.
+  const space = inCourseSpace(course);
   const lessonCourse = course.exam_course_id != null;
   const early = error && !data
     ? <ErrorState message={errorText(error)} onRetry={() => void load()} retrying={loading} />
     : !data
       ? <LoadingState rows={4} />
       : data.modules.length === 0
-        ? lessonCourse
+        ? (after ? null : lessonCourse
           ? <EmptyState mascot="reading" title={t("modules.overview.emptyTitle")} description={t("modules.overview.emptyBody")} />
-          : <EmptyState mascot="reading" title={t("modules.emptyStudentTitle")} description={t("modules.emptyStudentBody")} />
+          : <EmptyState mascot="reading" title={t("modules.emptyStudentTitle")} description={t("modules.emptyStudentBody")} />)
         : null;
-  // exam-prep courses: the course layout shows no course header here, the banner names the page
-  if (early || !data) {
+  const tabTitle = space ? <StudentPageHeader title={t("course.tabs.lessons")} /> : null;
+  if (early || !data || data.modules.length === 0) {
     return (
-      <div className="flex w-full flex-col gap-4">
-        {examPrep && (lessonCourse ? (
-          <header>
-            <p className="text-sm font-medium leading-5 text-brand-700">{t("student.nav.lessons")}</p>
-            <h1 className={cn(STUDENT_TITLE, "mt-0.5")}>{pickLocalized(course.title, lang, course.default_language) || t("courses.list.untitled")}</h1>
-          </header>
-        ) : (
-          <header>
-            <h1 className={STUDENT_TITLE}>{t("student.nav.lessons")}</h1>
-            <p className={STUDENT_SUBTITLE}>{pickLocalized(course.title, lang, course.default_language)}</p>
-          </header>
-        ))}
+      <div className="flex w-full flex-col gap-4 lg:gap-6">
+        {tabTitle}
         {early}
+        {after}
       </div>
     );
   }
@@ -487,8 +484,9 @@ export function StudentSyllabus() {
   const isOpen = (id: string) => openIds?.has(id) ?? false;
   return (
     <div className="flex w-full flex-col gap-4 lg:gap-6">
+      {tabTitle}
       {data.modules.some((m) => m.access_locked) && <ProCallout variant="course" />}
-      <Hero lessons={lessons} data={data} base={base} examPrep={examPrep} track={!readOnly} />
+      <Hero lessons={lessons} data={data} base={base} examPrep={false} track={!readOnly} cover={!space} />
       {course.status === "concluded" && (
         <p role="status" className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-base leading-6 text-slate-700 sm:text-sm">{t("courses.home.concludedNotice")}</p>
       )}
@@ -517,7 +515,8 @@ export function StudentSyllabus() {
           <AboutCard modules={data.modules.length} lessons={lessons} durationS={duration_s} />
         </aside>
       </div>
-      {!readOnly && !examPrep && <LeaveCourseLink />}
+      {after}
+      {!readOnly && !space && <LeaveCourseLink />}
     </div>
   );
 }

@@ -105,8 +105,11 @@ test.describe("free and paid exams (ru)", () => {
       await expect(admin.getByRole("switch", { name: t("access.admin.exams.paidToggle", { title: "ОРТ S3 бесплатный" }) })).not.toBeChecked();
       await shoot(admin, "admin-exams");
 
-      // ---- student: the paid test is locked on the Тесты page (U4: the course page redirects there), the free one is not
+      // ---- student: the paid test is locked on the Тесты tab, the free one is not (step 3a S2: the course opens on
+      // Обзор, its gold unlock card says some tests need a pass; the Тесты tab is a link of the course tabs)
       await student.goto(`/${L}/courses/${acc.course_id}`);
+      await expect(student.getByRole("heading", { name: t("home.prep.unlock.title") })).toBeVisible();
+      await student.getByRole("navigation", { name: t("course.tabs.label") }).getByRole("link", { name: t("course.tabs.tests"), exact: true }).click();
       await student.waitForURL(new RegExp(`/${L}/courses/${acc.course_id}/tests$`));
       const library = student.getByRole("region", { name: t("examPrep.library.title") });
       const paidCard = library.locator("li").filter({ has: student.getByRole("heading", { name: "ОРТ S3 платный", exact: true }) });

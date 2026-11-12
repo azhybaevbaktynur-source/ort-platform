@@ -5,11 +5,13 @@
 import React from "react";
 import { Lock } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
-import { LinkButton, cn } from "@/components/ui";
+import { GoldPill, LinkButton, cn } from "@/components/ui";
 
-export function ProCallout({ className, variant = "lobby" }: { className?: string; variant?: "lobby" | "course" }) {
+/** `tests` (step 3a S2): the Pro bar under the course tabs on Тесты while some tests need a pass; its action is the gold
+ * pill, so the tab keeps one primary button (on its next test). */
+export function ProCallout({ className, variant = "lobby" }: { className?: string; variant?: "lobby" | "course" | "tests" }) {
   const { lang, t } = useTranslation();
-  const k = variant === "course" ? "access.courseBar" : "access.lobby";
+  const k = variant === "course" ? "access.courseBar" : variant === "tests" ? "access.testsBar" : "access.lobby";
   return (
     <section aria-labelledby={`pro-callout-${variant}`}
       className={cn("flex flex-col gap-3 rounded-2xl border border-gold-300 bg-gold-50 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5", className)}>
@@ -20,7 +22,9 @@ export function ProCallout({ className, variant = "lobby" }: { className?: strin
           <p className="mt-1 text-sm leading-5 text-slate-700">{t(`${k}.body`)}</p>
         </div>
       </div>
-      <LinkButton href={`/${lang}/pro`} className="w-full shrink-0 sm:w-auto">{t(`${k}.action`)}</LinkButton>
+      {variant === "tests"
+        ? <GoldPill href={`/${lang}/pro`} className="w-full justify-center sm:w-auto sm:shrink-0">{t(`${k}.action`)}</GoldPill>
+        : <LinkButton href={`/${lang}/pro`} className="w-full shrink-0 sm:w-auto">{t(`${k}.action`)}</LinkButton>}
     </section>
   );
 }

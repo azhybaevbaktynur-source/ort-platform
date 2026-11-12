@@ -18,7 +18,7 @@ import { EmptyState, ErrorState, SectionTag, Skeleton, TabPanel, Tabs, cn, focus
 import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
 import { listSaved, type SavedOut } from "@/lib/lms/progress";
-import { templateUi } from "@/lib/lms/templates";
+import { inCourseSpace, templateUi } from "@/lib/lms/templates";
 
 type Tab = "saved" | "mistakes";
 type Shown = SavedOut & { item: NonNullable<SavedOut["item"]> };
@@ -120,8 +120,9 @@ function SavedTabs() {
   return (
     <div className="space-y-5">
       {/* exam-prep courses drop the course header here, so the course name is the subtitle */}
+      {/* step 3a S2: the compact course header names the course */}
       <StudentPageHeader title={t("student.saved.title")}
-        subtitle={templateUi(course).studentLayout === "exam_prep" ? pickLocalized(course.title, lang, course.default_language) : undefined} />
+        subtitle={templateUi(course).studentLayout === "exam_prep" && !inCourseSpace(course) ? pickLocalized(course.title, lang, course.default_language) : undefined} />
       <Tabs id={id} label={t("student.saved.tabsLabel")} value={tab} onChange={choose}
         items={[{ id: "saved", label: t("student.saved.tabs.saved") }, { id: "mistakes", label: t("student.saved.tabs.mistakes") }]} />
       <TabPanel tabsId={id} value="saved" hidden={tab !== "saved"}>

@@ -14,7 +14,8 @@ import { StudentModulesView } from "@/components/lms/modules/StudentModulesView"
 import { StudentSyllabus } from "@/components/lms/modules/StudentSyllabus"; // F5b
 import { PageView } from "@/components/lms/pages/PageView"; // Phase 8a S4a (home_kind = page)
 import { CourseLoadingSkeleton } from "@/components/lms/home/StudentCourseFrame";
-import { isExamShellCourse, templateUi } from "@/lib/lms/templates";
+import { inCourseSpace } from "@/lib/lms/templates";
+import { CourseOverview } from "@/components/lms/course/CourseOverview"; // step 3a S2
 
 export default function CourseHomePage() {
   const { lang, t } = useTranslation();
@@ -48,12 +49,11 @@ export default function CourseHomePage() {
   // --- Phase 6 S6b begin --- (student view: next assessment, latest result, about; UX S5)
   // --- UX rework B (PUR-4): `page` shows the chosen page, then the modules below it; otherwise published modules are
   // the home whatever `home_kind` says, ORT included (its exam rows open the same lobby); without them, today's home.
+  // Step 3a S2 (STUDENT_IA_DESIGN §3.3): every student course opens on its Обзор, ORT included (no redirect to Тесты
+  // any more); Student view opens here too. Read-only viewers (org or platform admins reading a course) keep the page
+  // they had: the course page, the modules, or the assignments home.
+  if (inCourseSpace(course)) return <CourseOverview />;
   if (course.my_enrollment.role === "student") {
-    // Exam prep S2 (owner 2026-11-06): the course template chooses the exam-prep layout (ORT first); Student view too.
-    // Student UI U4 (STUDENT_UI_DESIGN §3.2): its students land on the Тесты page; the home is the dashboard (U3).
-    if (templateUi(course).studentLayout === "exam_prep") return <ToTests courseId={course.id} />;
-    // TEACHER_TO_STUDENT_MAP §2.5: a lesson course attached to an exam opens on its overview (empty state without lessons)
-    if (isExamShellCourse(course)) return <StudentSyllabus />;
     if (course.home_kind === "page" && course.home_page_id) {
       return (
         <div className="space-y-6">
@@ -62,7 +62,6 @@ export default function CourseHomePage() {
         </div>
       );
     }
-    // F5b (COURSE_LESSONS_DESIGN L1): a course with lessons opens on the course overview
     if (course.features?.modules) return <StudentSyllabus />;
     return <StudentCourseHome />;
   }
@@ -116,7 +115,8 @@ export default function CourseHomePage() {
   );
 }
 
-/** Student UI U4: `/courses/{c}` of an exam-prep course is `/courses/{c}/tests` for its students (client-side, replace). */
+/** Student UI U4: `/courses/{c}` of an exam-prep course was `/courses/{c}/tests` for its students. Step 3a S2: unused
+ * (the course page is Обзор); deleted in S5. */
 function ToTests({ courseId }: { courseId: string }) {
   const { lang } = useTranslation();
   const router = useRouter();

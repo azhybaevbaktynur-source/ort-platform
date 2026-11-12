@@ -8,7 +8,7 @@ import { seed, settle, signIn, tr, VIEWPORTS, type SeedUser } from "./helpers";
  * course lessons. The platform admin adds three modules to the seeded ORT course (exam-prep, a platform course):
  * "Видеоуроки E2E" (a YouTube lesson with "mark as done", a Vimeo lesson, a page lesson, a plain link, a lookalike
  * host; with durations), "Закрытый модуль E2E" behind it (prerequisite) and "Pro модуль E2E" (`access_tier = paid`;
- * the ORT modules student has no pass). The student opens "Уроки" from the sidebar: the overview (cover banner, "Начать
+ * the ORT modules student has no pass). The student opens "Уроки" from the sidebar: the Уроки tab (step 3a S2; banner, "Начать
  * курс" from up_next, "Пройдено N из M", the syllabus with the current module open, About), the Pro module shows the
  * gold chip and the unlock link and reveals no address (no href, no video id, no request), the locked lessons say why.
  * The lesson page: the outline aside, the click-to-load player (**no request reaches YouTube or Vimeo before the
@@ -135,11 +135,14 @@ test.describe("course lessons (ru)", () => {
       await expect(lessonsLink).toBeVisible();
       await expect(nav.getByRole("link", { name: t("student.nav.tests"), exact: true })).toHaveCount(1);
       await lessonsLink.click();
-      await page.waitForURL(new RegExp(`${base}/modules$`));
+      // step 3a S2: the syllabus is the course's Уроки tab
+      await page.waitForURL(new RegExp(`${base}/lessons$`));
+      await expect(page.getByRole("navigation", { name: t("course.tabs.label") }).getByRole("link", { name: t("course.tabs.lessons"), exact: true }))
+        .toHaveAttribute("aria-current", "page");
       await expect(lessonsLink).toHaveAttribute("aria-current", "page");
       await expect(nav.getByRole("link", { name: M1, exact: true })).toHaveCount(0);
 
-      // ---- the overview: banner (one h1: the course), "Начать курс" to the first lesson, "Пройдено 0 из 8", About
+      // ---- the Уроки tab: one h1 (the tab), the banner with "Начать курс" to the first lesson, "Пройдено 0 из 8", About
       await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
       await expect(page.getByText(t("modules.overview.nextUp", { title: V1 }))).toBeVisible();
       const cta = page.getByRole("link", { name: t("modules.syllabus.start"), exact: true });
@@ -191,7 +194,7 @@ test.describe("course lessons (ru)", () => {
       await page.goto(`${base}/modules/${m2.id}/items/${v3.id}`);
       await expect(page.getByText(t("modules.lesson.lockedTitle"))).toBeVisible();
       await expect(page.getByText(t("modules.reason.prerequisite", { title: M1 }))).toBeVisible();
-      await expect(page.getByRole("link", { name: t("modules.overview.toSyllabus") })).toHaveAttribute("href", `${base}/modules`);
+      await expect(page.getByRole("link", { name: t("modules.overview.toSyllabus") })).toHaveAttribute("href", `${base}/lessons`);
       await expect(page.getByRole("button", { name: t("modules.lesson.play", { title: V3 }) })).toHaveCount(0);
       expect(await page.content()).not.toContain(YT);
       await widths(page, "locked-module");
@@ -207,7 +210,7 @@ test.describe("course lessons (ru)", () => {
       expect(thirdParty, "no request to YouTube / Vimeo on the overview or a locked lesson").toEqual([]);
 
       // ---- the lesson: the outline aside, the player card, nothing fetched before the tap
-      await page.goto(`${base}/modules`);
+      await page.goto(`${base}/lessons`);
       await page.getByRole("link", { name: t("modules.syllabus.start"), exact: true }).click();
       await page.waitForURL(new RegExp(`/modules/${m1.id}/items/${v1.id}$`));
       await expect(page.getByRole("heading", { level: 1, name: V1 })).toBeVisible();
@@ -256,7 +259,7 @@ test.describe("course lessons (ru)", () => {
       await expect(page.getByText(PG_TEXT)).toBeVisible();
 
       // ---- the overview counts it: "Продолжить курс" to the first lesson not done (the plain link)
-      await page.goto(`${base}/modules`);
+      await page.goto(`${base}/lessons`);
       await expect(bar).toHaveAttribute("aria-valuenow", "3");
       const cont = page.getByRole("link", { name: t("modules.syllabus.continue"), exact: true });
       await expect(cont).toHaveAttribute("href", `${base}/modules/${m1.id}/items/${link.id}`);
@@ -273,7 +276,7 @@ test.describe("course lessons (ru)", () => {
       await expect(page.getByRole("heading", { level: 1, name: V2 })).toBeVisible();
       // the phone breadcrumb names the module and leads back to it in the syllabus
       await expect(page.getByRole("navigation", { name: t("modules.overview.breadcrumbLabel") }).getByRole("link", { name: M1 }))
-        .toHaveAttribute("href", `${base}/modules#module-${m1.id}`);
+        .toHaveAttribute("href", `${base}/lessons#module-${m1.id}`);
       const summary =page.locator("summary").filter({ hasText: t("modules.overview.outlineTitle") });
       await expect(summary).toBeVisible();
       await expect(page.getByRole("navigation", { name: t("modules.overview.outlineTitle") })).toBeHidden();
@@ -282,7 +285,7 @@ test.describe("course lessons (ru)", () => {
       await expect(page.getByRole("navigation", { name: t("modules.lesson.pagerLabel") }).getByRole("link", { name: new RegExp(t("modules.lesson.next")) })).toBeInViewport();
       await settle(page);
       await noHorizontalScroll(page);
-      await page.goto(`${base}/modules`);
+      await page.goto(`${base}/lessons`);
       await expect(page.getByRole("heading", { name: M1 })).toBeVisible();
       await settle(page);
       await noHorizontalScroll(page);
@@ -308,7 +311,7 @@ test.describe("course lessons (ru)", () => {
       await signIn(page, student);
       const hero = page.locator('section[aria-labelledby="course-overview-title"]');
       const open = async () => {
-        await page.goto(`${base}/modules`);
+        await page.goto(`${base}/lessons`);
         await expect(hero).toBeVisible();
         await settle(page);
       };
@@ -320,12 +323,14 @@ test.describe("course lessons (ru)", () => {
         expect(await hero.locator("p:empty").count()).toBe(0);
       };
 
-      // a published module without any row: "no lessons yet", no action, no bar
+      // a published module without any row: an exam course has no lesson yet (F5a L7: `features.modules` needs one), so
+      // step 3a S2 hides its Уроки tab and the URL shows "not available" inside the course frame; no banner, no bar
       const empty = await api(admin, "POST", `/courses/${cid}/modules`, { title: { ru: "Пустой модуль E2E" }, published: true });
       created.push(empty.id);
-      await open();
-      await only(t("modules.overview.emptyTitle"));
-      await expect(hero.getByRole("link")).toHaveCount(0);
+      await page.goto(`${base}/lessons`);
+      await expect(page.getByText(t("courseNav.unavailable.title"))).toBeVisible();
+      await expect(page.getByRole("navigation", { name: t("course.tabs.label") }).getByRole("link", { name: t("course.tabs.lessons"), exact: true })).toHaveCount(0);
+      await expect(hero).toHaveCount(0);
       await expect(page.getByRole("progressbar")).toHaveCount(0);
       await api(admin, "DELETE", `/courses/${cid}/modules/${created.pop()}`);
 

@@ -27,7 +27,9 @@ function sectionsOf(s: PracticeSetOut): string[] {
   return ORT_SECTIONS.filter((k) => used.has(k));
 }
 
-export function PracticeList() {
+/** `embedded`: step 3a S2, the «Тренировки» section of the Тесты tab (`#practice`): an h2 title, no primary button
+ * (the tab's primary is on its tests). */
+export function PracticeList({ embedded = false }: { embedded?: boolean } = {}) {
   const { lang, t } = useTranslation();
   const router = useRouter();
   const { course } = useCourse();
@@ -94,11 +96,13 @@ export function PracticeList() {
 
   // §5.1 e (students): one primary button, on the set to continue (else the first open one); the rest secondary
   const startable = items.filter((s) => s.status === "published" && !s.locked);
-  const primaryId = (startable.find((s) => s.open_attempt_id) ?? startable.find((s) => !s.my_attempts) ?? startable[0])?.id ?? null;
+  const primaryId = embedded ? null : (startable.find((s) => s.open_attempt_id) ?? startable.find((s) => !s.my_attempts) ?? startable[0])?.id ?? null;
 
   return (
     <div className={cn(!canEdit && "space-y-5")}>
-      {canEdit ? <PageHeader title={t("practice.title")} primaryAction={newButton} /> : (
+      {canEdit ? <PageHeader title={t("practice.title")} primaryAction={newButton} /> : embedded ? (
+        <h2 className="text-lg font-semibold leading-7 text-slate-900">{t("course.tests.practiceSection")}</h2>
+      ) : (
         <StudentPageHeader title={t("practice.title")}
           subtitle={examPrep ? pickLocalized(course.title, lang, course.default_language) : undefined} />
       )}
@@ -116,7 +120,7 @@ export function PracticeList() {
                 </div>
               )}
               <div className="min-w-0">
-                <h2 className="break-words text-base font-semibold leading-6 text-slate-900">{name(s)}</h2>
+                {React.createElement(embedded ? "h3" : "h2", { className: "break-words text-base font-semibold leading-6 text-slate-900" }, name(s))}
                 <p className="mt-1 text-sm leading-5 text-slate-600">
                   {[
                     t("practice.questions", { n: s.item_count }),

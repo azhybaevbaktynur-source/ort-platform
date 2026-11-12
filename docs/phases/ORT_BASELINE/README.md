@@ -119,3 +119,12 @@ owner. Never to make a failing run green without looking.
   `PHASE_8B_screens/general-player/{scrolling-top,one-per-page}-phone-ru.png` changed for the same reason (Inter is
   narrower, the card header fits one line); pairs in `STUDENT_UI_FIX_screens/general-player-review/`. Known artifact:
   the phone `result-*` element shots include the fixed student tab bar over the card's last rows.
+- 2026-11-13: `lobby-*`, `result-*` and `review-*` (phone/desktop × ru/ky, 12 images) re-recorded for step 3a S2
+  (STUDENT_IA_DESIGN §3.5, §3.6): the lobby, the result and the review sit inside the ORT course space under the
+  compact course header (title line + tabs Обзор · Тесты · Аналитика · Сохранённые, Тесты current). Only the lobby
+  differed beyond the 0.5 % threshold (the header above it); `result-*` and `review-*` were within it and are
+  re-recorded with the same frame. Look only: `ort.spec.ts` and every DOM assertion of `ort-visual.spec.ts` pass
+  unchanged; the player screens, `review-page`, `section-end`, `submit`, `passage`, `comparison`, `flagged-palette`,
+  `player-loading` and every `teacher-*` image match the committed baselines unchanged (not re-recorded). Before/after
+  pairs in `docs/phases/STUDENT_IA_screens/ort/` (`<name>-before.png` / `<name>-after.png`); awaiting the
+  orchestrator's review.
