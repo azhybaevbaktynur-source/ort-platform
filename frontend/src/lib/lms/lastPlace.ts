@@ -14,6 +14,8 @@
  * Dependency-free on purpose (checked by `lastPlace.check.ts` with a standalone `tsc`).
  */
 
+import { chooseCoursesHref } from "./chooseCourses";
+
 export type PlaceKind = "overview" | "lessons" | "tests" | "analytics" | "saved" | "lesson" | "lobby" | "assignment";
 
 export interface LastPlace {
@@ -149,11 +151,38 @@ export function lessonStepHref(lang: string, courseId: string, step: StepLink): 
   return step.module_id && step.item_id ? `${base}/modules/${step.module_id}/items/${step.item_id}` : null;
 }
 
+/** `HomeNextStepOut` as far as a link needs it (structural). */
+export interface NextStepIn {
+  kind: string;
+  attempt_id?: string | null;
+  assessment_id?: string | null;
+  assignment_id?: string | null;
+  module_id?: string | null;
+  item_id?: string | null;
+  item_kind?: string | null;
+  link?: StepLink["link"];
+}
+
+/** Where a course's next step goes (the hub card's one button), and its label key (`home.hub.step.*`). */
+export function nextStepLink(lang: string, courseId: string, step: NextStepIn | null | undefined): { href: string; label: string } {
+  const base = `/${lang}/courses/${courseId}`;
+  if (step?.kind === "resume_test" && step.attempt_id) return { href: `${base}/attempts/${step.attempt_id}`, label: "home.hub.step.resume_test" };
+  if (step?.kind === "continue_lesson") {
+    const href = lessonStepHref(lang, courseId, { module_id: step.module_id, item_id: step.item_id, kind: step.item_kind, link: step.link });
+    if (href) return { href, label: "home.hub.step.continue_lesson" };
+  }
+  if (step?.kind === "start") {
+    if (step.assessment_id) return { href: `${base}/assessments/${step.assessment_id}`, label: "home.hub.step.start" };
+    if (step.assignment_id) return { href: `${base}/assignments/${step.assignment_id}`, label: "home.hub.step.startAssignment" };
+  }
+  return { href: base, label: "home.hub.step.open" };
+}
+
 /** A course of the student, as far as «Продолжить» needs it (`HomeCourseOut`). */
 export interface ContinueCourse {
   id: string;
   student_layout?: string;
-  next_step?: ({ kind: string; attempt_id?: string | null; item_kind?: string | null } & StepLink) | null;
+  next_step?: NextStepIn | null;
 }
 
 /** The server parts of the fallback (`HomeOut`; absent in the phone bar, which has only the bootstrap's courses). */
@@ -162,7 +191,7 @@ export interface ContinueHome {
   modules_next?: ({ course_id: string } & StepLink)[];
 }
 
-export type ContinueKind = "place" | "resume" | "lesson" | "overview" | "choose";
+export type ContinueKind = "place" | "resume" | "lesson" | "step" | "overview" | "choose";
 
 export interface ContinueTarget {
   kind: ContinueKind;
@@ -173,6 +202,8 @@ export interface ContinueTarget {
   placeKind?: PlaceKind;
   /** `resume` only: the attempt in progress */
   attemptId?: string;
+  /** `step` only: the label key of the course's next step (`home.hub.step.*`) */
+  stepLabel?: string;
 }
 
 /**
@@ -184,7 +215,18 @@ export interface ContinueTarget {
 export function continueTarget(lang: string, place: LastPlace | null, courses: ContinueCourse[], home: ContinueHome | null = null): ContinueTarget {
   const mine = new Set(courses.map((c) => c.id));
   const base = (id: string) => `/${lang}/courses/${id}`;
-  if (place && mine.has(place.courseId)) return { kind: "place", href: placeHref(lang, place), courseId: place.courseId, placeKind: place.kind };
+  // a course's Обзор stands for the course's own next step when it has one (Начать тест / Продолжить тест /
+  // Продолжить урок): «Продолжить» is then the real next step, the one the course card shows
+  const stepOf = (id: string): ContinueTarget | null => {
+    const step = courses.find((c) => c.id === id)?.next_step;
+    if (!step || step.kind === "open") return null;
+    const link = nextStepLink(lang, id, step);
+    return link.href === base(id) ? null : { kind: "step", href: link.href, courseId: id, stepLabel: link.label };
+  };
+  if (place && mine.has(place.courseId)) {
+    if (place.kind === "overview") { const s = stepOf(place.courseId); if (s) return s; }
+    return { kind: "place", href: placeHref(lang, place), courseId: place.courseId, placeKind: place.kind };
+  }
   const attempt = home
     ? home.in_progress.find((r) => mine.has(r.course_id))
     : courses.map((c) => (c.next_step?.kind === "resume_test" && c.next_step.attempt_id ? { attempt_id: c.next_step.attempt_id, course_id: c.id } : null))
@@ -199,8 +241,8 @@ export function continueTarget(lang: string, place: LastPlace | null, courses: C
     if (href) return { kind: "lesson", href, courseId: r.course_id };
   }
   const exam = courses.find((c) => c.student_layout === "exam_prep") ?? courses[0];
-  if (exam) return { kind: "overview", href: base(exam.id), courseId: exam.id };
-  return { kind: "choose", href: `/${lang}/courses/choose`, courseId: null };
+  if (exam) return stepOf(exam.id) ?? { kind: "overview", href: base(exam.id), courseId: exam.id };
+  return { kind: "choose", href: chooseCoursesHref(lang), courseId: null };
 }
 
 /** The «Мои курсы» order (§2.5): the recent ids still in the list first, then the rest in the list's order. */

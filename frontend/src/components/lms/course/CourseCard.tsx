@@ -66,7 +66,7 @@ function Progress({ done, total }: { done: number; total: number }) {
   );
 }
 
-export function CourseCard({ course, href, headingLevel = 3, badges, progress, nextDue, action }: {
+export function CourseCard({ course, href, headingLevel = 3, badges, progress, nextDue, action, coverClassName }: {
   course: CourseCardData;
   /** where the card leads; null: a card that opens nothing (a course in the trash) */
   href: string | null;
@@ -77,6 +77,8 @@ export function CourseCard({ course, href, headingLevel = 3, badges, progress, n
   progress?: { done: number; total: number } | null;
   nextDue?: string | null;
   action?: React.ReactNode;
+  /** step 3a S3: the hub's compact cover on phones ("max-sm:h-24") */
+  coverClassName?: string;
 }) {
   const { lang, t } = useTranslation();
   const uiLang = lang as Lang;
@@ -93,7 +95,7 @@ export function CourseCard({ course, href, headingLevel = 3, badges, progress, n
   const Heading = headingLevel === 2 ? "h2" : headingLevel === 4 ? "h4" : "h3";
   return (
     <li className="group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
-      <CourseCardCover card courseId={course.id} coverUrl={course.cover_url} platform={course.is_platform_course} />
+      <CourseCardCover card courseId={course.id} coverUrl={course.cover_url} platform={course.is_platform_course} className={coverClassName} />
       <div className="flex flex-1 flex-col gap-2 px-4 py-3">
         {(badges || course.has_paid_tests) && (
           <div className="flex flex-wrap items-center gap-2">

@@ -35,7 +35,6 @@ async function linksIn(scope: Locator, from: string, into: Map<string, Found>) {
     if (!r.href.startsWith("/ru/") && r.href !== "/ru") continue; // external, mailto, the skip link
     const key = norm(r.href);
     if (/\/attempts\//.test(key) || /\/(login|logout)$/.test(key)) continue;
-    if (key === "/ru/courses/choose") continue; // step 3a S3: the choose step is linked already; S4 adds the page (remove this skip then)
     if (!into.has(key)) into.set(key, { href: key, from, current: r.current, brand: r.label.includes(t("common.appName")) });
   }
 }

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { E2E_DIR, seed, settle, signIn, tr, type SeedUser } from "./helpers";
+import { chooseCoursesHref } from "../src/lib/lms/chooseCourses"; // the catalog until S4
 
 /**
  * One course card everywhere (the hub, catalog, Teaching list), the last result with its maximum, and the hub order:
@@ -214,7 +215,7 @@ test.describe("course cards", () => {
     await ep.goto("/ru/home");
     // step 3a S3 (§2.2): the platform courses moved to the choose step; the empty hub has «Выбрать курсы» and the code
     await expect(ep.getByText(t("home.hub.emptyTitle"))).toBeVisible();
-    await expect(ep.locator("main#main").getByRole("link", { name: t("home.hub.choose") })).toHaveAttribute("href", "/ru/courses/choose");
+    await expect(ep.locator("main#main").getByRole("link", { name: t("home.hub.choose") })).toHaveAttribute("href", chooseCoursesHref("ru"));
     await expect(ep.locator("main#main").getByRole("link", { name: t("home.hub.join") })).toHaveAttribute("href", "/ru/courses/join");
     await look(ep, "dashboard-empty-375");
     await ep.context().close();

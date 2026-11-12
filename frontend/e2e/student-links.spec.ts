@@ -108,7 +108,6 @@ test.describe("student link audit (ru)", () => {
       expect(links.length, `no links on ${from}`).toBeGreaterThan(0);
       for (const href of links) {
         if (visited.has(href) || PUBLIC.has(href.split("?")[0])) continue;
-        if (href === `/${L}/courses/choose`) continue; // step 3a S3: linked already, the page comes with S4 (remove then)
         visited.add(href);
         await page.goto(href);
         await loaded(page);

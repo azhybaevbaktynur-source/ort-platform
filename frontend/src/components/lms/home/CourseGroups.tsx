@@ -11,8 +11,8 @@ import { ArrowRight, CalendarClock, Trophy } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { examDayStart } from "@/components/ui/Countdown";
 import { groupCourses } from "@/lib/lms/examFamilies";
-import type { HomeCourseOut, HomeNextStepOut } from "@/lib/lms/homeTypes";
-import { lessonStepHref } from "@/lib/lms/lastPlace";
+import type { HomeCourseOut } from "@/lib/lms/homeTypes";
+import { nextStepLink } from "@/lib/lms/lastPlace";
 import { pickLocalized } from "@/lib/lms/localized";
 import { LinkButton, cn, focusRing } from "@/components/ui";
 import { CourseCard } from "@/components/lms/course/CourseCard";
@@ -22,20 +22,6 @@ import { useGradeListText } from "@/components/lms/results/GradeBadge";
  * the same grid as the old home's (`ExamPrepHome`, deleted in S5). */
 const HOME_CARD_GRID = "grid gap-4 grid-cols-[repeat(auto-fill,minmax(min(100%,256px),360px))]";
 
-/** Where the card's one button goes, and its label key (`home.hub.step.*`). */
-export function nextStepLink(lang: string, courseId: string, step: HomeNextStepOut | null | undefined): { href: string; label: string } {
-  const base = `/${lang}/courses/${courseId}`;
-  if (step?.kind === "resume_test" && step.attempt_id) return { href: `${base}/attempts/${step.attempt_id}`, label: "home.hub.step.resume_test" };
-  if (step?.kind === "continue_lesson") {
-    const href = lessonStepHref(lang, courseId, { module_id: step.module_id, item_id: step.item_id, kind: step.item_kind, link: step.link });
-    if (href) return { href, label: "home.hub.step.continue_lesson" };
-  }
-  if (step?.kind === "start") {
-    if (step.assessment_id) return { href: `${base}/assessments/${step.assessment_id}`, label: "home.hub.step.start" };
-    if (step.assignment_id) return { href: `${base}/assignments/${step.assignment_id}`, label: "home.hub.step.startAssignment" };
-  }
-  return { href: base, label: "home.hub.step.open" };
-}
 
 /** «До экзамена 30 дн.» / «Экзамен сегодня»; nothing without a date or after the exam day. */
 function ExamCountdown({ date }: { date: string }) {
@@ -53,7 +39,10 @@ function ExamCountdown({ date }: { date: string }) {
   );
 }
 
-export function HubCourseCard({ course, examTitle, headingLevel }: { course: HomeCourseOut; examTitle?: string | null; headingLevel: 3 | 4 }) {
+/** `compact`: the hub's lower cover on phones (96 px instead of 150; «Мои курсы» and the catalog keep theirs). */
+export function HubCourseCard({ course, examTitle, headingLevel, compact = false }: {
+  course: HomeCourseOut; examTitle?: string | null; headingLevel: 3 | 4; compact?: boolean;
+}) {
   const { lang, t } = useTranslation();
   const gradeText = useGradeListText();
   const step = nextStepLink(lang, course.id, course.next_step);
@@ -62,7 +51,7 @@ export function HubCourseCard({ course, examTitle, headingLevel }: { course: Hom
       labels: course.last_result.labels, scheme_type: course.last_result.scheme_type })
     : "";
   return (
-    <CourseCard course={course} href={`/${lang}/courses/${course.id}`} headingLevel={headingLevel} progress={course.progress} nextDue={course.next_due_at}
+    <CourseCard course={course} href={`/${lang}/courses/${course.id}`} headingLevel={headingLevel} progress={course.progress} nextDue={course.next_due_at} coverClassName={compact ? "max-sm:h-24" : undefined}
       action={(
         <div className="space-y-2">
           {examTitle && <p className="break-words text-sm leading-5 text-slate-600">{t("home.hub.card.forExam", { exam: examTitle })}</p>}
@@ -101,12 +90,12 @@ export function CourseGroups({ courses, cap, level }: { courses: HomeCourseOut[]
         const id = `group-${g.key}`;
         return (
           <section key={g.key} id={cap ? undefined : g.key} aria-labelledby={id} className="min-w-0 scroll-mt-24">
-            <H id={id} className="mb-2 text-base font-semibold uppercase leading-6 tracking-wide text-slate-700">
+            <H id={id} className="mb-2 text-base font-semibold leading-6 text-slate-800">
               {t(`home.hub.groups.${g.key}`)}
-              {cap && g.courses.length > 1 ? <>{" "}<span className="font-medium normal-case text-slate-500">({g.courses.length})</span></> : null}
+              {" "}<span className="font-medium text-slate-500">({g.courses.length})</span>
             </H>
             <ul className={HOME_CARD_GRID}>
-              {shown.map((c) => <HubCourseCard key={c.id} course={c} examTitle={examTitle(c)} headingLevel={level === 2 ? 3 : 4} />)}
+              {shown.map((c) => <HubCourseCard key={c.id} course={c} examTitle={examTitle(c)} headingLevel={level === 2 ? 3 : 4} compact={!!cap} />)}
             </ul>
             {cap && g.courses.length > shown.length && (
               <Link href={`/${lang}/courses#${g.key}`}

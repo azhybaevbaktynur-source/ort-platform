@@ -3,6 +3,7 @@ import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { api, seed, settle, signIn, tr, VIEWPORTS } from "./helpers";
 import { joinEightCourses } from "./hubCourses";
+import { chooseCoursesHref } from "../src/lib/lms/chooseCourses"; // the catalog until S4
 
 /**
  * Step 3a S3 (docs/phases/STUDENT_IA_DESIGN.md §2.2, §2.3, §7.1-§7.3): Главная `/home` is a hub only. With no course:
@@ -47,16 +48,16 @@ test.describe("student hub (ru)", () => {
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Айгерим"); // the first word of the display name
     await expect(page.getByText(t("home.hub.emptyTitle"))).toBeVisible();
     const main = page.locator("main#main");
-    await expect(main.getByRole("link", { name: t("home.hub.choose") })).toHaveAttribute("href", `/${L}/courses/choose`);
+    await expect(main.getByRole("link", { name: t("home.hub.choose") })).toHaveAttribute("href", chooseCoursesHref(L));
     await expect(main.getByRole("link", { name: t("home.hub.join") })).toHaveAttribute("href", `/${L}/courses/join`);
     await expect(page.getByRole("heading", { level: 2, name: t("home.todo.title") })).toHaveCount(0);
     await expect(continueCard(page)).toHaveCount(0);
-    await expect(sidebar(page).getByRole("link", { name: t("student.nav.chooseCourses") })).toHaveAttribute("href", `/${L}/courses/choose`);
+    await expect(sidebar(page).getByRole("link", { name: t("student.nav.chooseCourses") })).toHaveAttribute("href", chooseCoursesHref(L));
     await expect(sidebar(page).getByRole("link", { name: t("student.nav.home") })).toHaveAttribute("aria-current", "page");
     await noOverflowAndShoot(page, "hub-empty");
     await page.setViewportSize(VIEWPORTS.phone);
     const bar = page.getByRole("navigation", { name: t("student.nav.tabBar") });
-    await expect(bar.getByRole("link", { name: t("student.nav.continue") })).toHaveAttribute("href", `/${L}/courses/choose`);
+    await expect(bar.getByRole("link", { name: t("student.nav.continue") })).toHaveAttribute("href", chooseCoursesHref(L));
   });
 
   test("one course: the continue card (Обзор, then the last place), one group, the to-do", async ({ page }) => {
@@ -66,11 +67,13 @@ test.describe("student hub (ru)", () => {
     await signIn(page, user);
     await page.goto(`/${L}/home`);
     const card = continueCard(page);
-    await expect(card.getByRole("link", { name: t("home.hub.open") })).toHaveAttribute("href", `/${L}/courses/${s.course_id}`);
-    await expect(card).toContainText(t("home.hub.overview"));
+    // a fresh student: the course's next step, not its Обзор: the hub's main button starts the test
+    const startTest = card.getByRole("link", { name: t("home.hub.step.start") });
+    await expect(startTest).toHaveAttribute("href", new RegExp(`^/${L}/courses/${s.course_id}/assessments/[^/]+$`));
+    await expect(card).not.toContainText(t("home.hub.overview"));
     await expect(card.getByRole("link").first()).toHaveClass(/bg-brand-600/); // the page's one primary button
     const courses = page.getByRole("region", { name: t("home.hub.coursesTitle") });
-    await expect(courses.getByRole("heading", { level: 3 })).toHaveText([t("home.hub.groups.ort")]);
+    await expect(courses.getByRole("heading", { level: 3 })).toHaveText([`${t("home.hub.groups.ort")} (1)`]);
     await expect(courses.getByRole("listitem")).toHaveCount(1);
     await expect(page.getByRole("heading", { level: 2, name: t("home.todo.title") })).toBeVisible();
     // no test list, no results list, no statistics on the hub
@@ -98,20 +101,26 @@ test.describe("student hub (ru)", () => {
     try {
       await api(s.admin, "POST", `/courses/${hub.maths}/announcements`, { title: "Разбор задач в субботу", body_md: "Встречаемся в 18:00.", publish: true });
       const homeAnswer = await api(user, "GET", "/me/home");
-      const newestExam = (homeAnswer.courses as { id: string; student_layout?: string }[]).find((c) => c.student_layout === "exam_prep")!.id;
+      type Step = { kind: string; assessment_id: string | null; assignment_id: string | null } | null;
+      const exam = (homeAnswer.courses as { id: string; student_layout?: string; next_step?: Step }[]).find((c) => c.student_layout === "exam_prep")!;
+      const newestExam = exam.id;
+      // the newest exam course's Обзор stands for its next step when it has one (a test to start)
+      const fallback3 = exam.next_step?.kind === "start" && exam.next_step.assessment_id
+        ? { href: `/${L}/courses/${newestExam}/assessments/${exam.next_step.assessment_id}`, name: t("home.hub.step.start") }
+        : { href: `/${L}/courses/${newestExam}`, name: t("home.hub.open") };
 
       await page.setViewportSize(VIEWPORTS.desktop);
       await signIn(page, user);
       await page.goto(`/${L}/home`);
       const courses = page.getByRole("region", { name: t("home.hub.coursesTitle") });
       await expect(courses.getByRole("heading", { level: 3 })).toHaveText([
-        `${t("home.hub.groups.ort")} (5)`, `${t("home.hub.groups.nct")} (2)`, t("home.hub.groups.other"),
+        `${t("home.hub.groups.ort")} (5)`, `${t("home.hub.groups.nct")} (2)`, `${t("home.hub.groups.other")} (1)`,
       ]);
       const ort = page.getByRole("region", { name: new RegExp(`^${t("home.hub.groups.ort")}`) });
       await expect(ort.getByRole("listitem")).toHaveCount(4);
       await expect(ort.getByRole("link", { name: t("home.hub.allInGroup.ort", { n: 5 }) })).toHaveAttribute("href", `/${L}/courses#ort`);
       await expect(page.getByRole("region", { name: new RegExp(`^${t("home.hub.groups.nct")}`) }).getByRole("listitem")).toHaveCount(2);
-      await expect(courses.getByRole("link", { name: t("home.hub.addCourse") })).toHaveAttribute("href", `/${L}/courses/choose`);
+      await expect(courses.getByRole("link", { name: t("home.hub.addCourse") })).toHaveAttribute("href", chooseCoursesHref(L));
       // the sidebar: 6 rows + «Все курсы (8)»
       const all = sidebar(page).getByRole("link", { name: t("student.nav.allCourses", { n: 8 }) });
       await expect(all).toHaveAttribute("href", `/${L}/courses`);
@@ -121,7 +130,7 @@ test.describe("student hub (ru)", () => {
 
       // continue fallback 3: nothing remembered, no attempt, no lesson state: the newest exam course's Обзор
       const card = continueCard(page);
-      await expect(card.getByRole("link", { name: t("home.hub.open") })).toHaveAttribute("href", `/${L}/courses/${newestExam}`);
+      await expect(card.getByRole("link", { name: fallback3.name })).toHaveAttribute("href", fallback3.href);
       // fallback 2: the next lesson (the module states are stored once the student opened the course)
       await page.goto(`/${L}/courses/${hub.maths}/lessons`);
       await expect(page.getByRole("navigation", { name: t("course.tabs.label") })).toBeVisible();
@@ -149,7 +158,8 @@ test.describe("student hub (ru)", () => {
       await expect(page.getByRole("navigation", { name: t("course.tabs.label") })).toBeVisible();
       await sidebar(page).getByRole("link", { name: t("student.nav.home") }).click();
       await page.waitForURL(new RegExp(`/${L}/home$`));
-      await expect(card.getByRole("link", { name: t("home.hub.open") })).toHaveAttribute("href", `/${L}/courses/${hub.teacher}`);
+      // (its Обзор stands for the course's next step when it has one: either way the button stays in that course)
+      await expect(card.getByRole("link")).toHaveAttribute("href", new RegExp(`^/${L}/courses/${hub.teacher}(/|$)`));
       const hrefs = await sidebar(page).locator("a[href]").evaluateAll((els) => els.map((e) => e.getAttribute("href") ?? ""));
       const courseRows = hrefs.filter((h) => /^\/ru\/courses\/[^/]+/.test(h) && !h.startsWith("/ru/courses/catalog"));
       expect(courseRows[0], "the course opened last is the first row").toBe(`/${L}/courses/${hub.teacher}`);
@@ -163,7 +173,7 @@ test.describe("student hub (ru)", () => {
       await expect(page.locator("main#main section#ort").getByRole("listitem")).toHaveCount(5);
       await expect(page.locator("main#main section#nct").getByRole("listitem")).toHaveCount(2);
       await expect(page.locator("main#main section#other").getByRole("listitem")).toHaveCount(1);
-      await expect(page.locator("main#main").getByRole("link", { name: t("courses.mine.addCourse") })).toHaveAttribute("href", `/${L}/courses/choose`);
+      await expect(page.locator("main#main").getByRole("link", { name: t("courses.mine.addCourse") })).toHaveAttribute("href", chooseCoursesHref(L));
       await expect(page.locator("main#main").getByRole("link", { name: t("courses.mine.join") })).toHaveAttribute("href", `/${L}/courses/join`);
       // the lesson course attached to the exam names it
       await expect(page.locator("main#main section#ort")).toContainText(`${t("home.hub.card.forExam", { exam: "" }).trim()}`);

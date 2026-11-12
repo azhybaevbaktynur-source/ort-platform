@@ -9,6 +9,7 @@ import { KeyRound, Plus } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
 import { listHomeCourses } from "@/lib/lms/home";
+import { chooseCoursesHref } from "@/lib/lms/chooseCourses"; // until S4: the catalog
 import type { HomeCourseOut } from "@/lib/lms/homeTypes";
 import { LMS_ME_STALE_EVENT } from "@/lib/lms/meStale";
 import { EmptyState, ErrorState, LinkButton, Pagination, Skeleton } from "@/components/ui";
@@ -62,7 +63,7 @@ export function MyCourses() {
 
   const actions = testStudent ? undefined : (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <LinkButton href={`/${lang}/courses/choose`} leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />}>{t("courses.mine.addCourse")}</LinkButton>
+      <LinkButton href={chooseCoursesHref(lang)} leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />}>{t("courses.mine.addCourse")}</LinkButton>
       <LinkButton href={`/${lang}/courses/join`} variant="link" leftIcon={<KeyRound aria-hidden="true" className="h-4 w-4" />}>{t("courses.mine.join")}</LinkButton>
     </div>
   );
@@ -80,7 +81,7 @@ export function MyCourses() {
         <EmptyState mascot="hello" title={t("home.hub.emptyTitle")} description={t("home.hub.emptyBody")}
           action={testStudent ? undefined : (
             <>
-              <LinkButton size="lg" href={`/${lang}/courses/choose`}>{t("home.hub.choose")}</LinkButton>
+              <LinkButton size="lg" href={chooseCoursesHref(lang)}>{t("home.hub.choose")}</LinkButton>
               <LinkButton size="lg" variant="secondary" href={`/${lang}/courses/join`}>{t("home.hub.join")}</LinkButton>
             </>
           )} />

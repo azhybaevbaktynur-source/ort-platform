@@ -125,8 +125,18 @@ ok(continueTarget("ru", null, courses, { in_progress: [], modules_next: [] }).hr
 ok(continueTarget("ru", null, [courses[0]], { in_progress: [] }).href === "/ru/courses/t1", "no exam course: the newest course's Обзор");
 ok(continueTarget("ru", null, courses).href === "/ru/courses/e2/attempts/att", "phone bar (no home): a course's resume step");
 ok(continueTarget("ru", null, courses.filter((c) => c.id !== "e2")).href === "/ru/courses/l1/modules/m/items/i", "phone bar: a course's next lesson");
+// a course's Обзор stands for its own next step (the hub's main button is the real next step)
+const withStart = courses.map((c) => (c.id === "e1" ? { ...c, next_step: { kind: "start", assessment_id: "q7" } } : c));
+const step = continueTarget("ru", null, withStart, { in_progress: [], modules_next: [] });
+ok(step.kind === "step" && step.href === "/ru/courses/e1/assessments/q7" && step.stepLabel === "home.hub.step.start",
+  "fallback 3 with a test to start: the test's lobby, «Начать тест»");
+const placedOverview = continueTarget("ru", at("e1", "/ru/courses/e1", "overview"), withStart, home);
+ok(placedOverview.kind === "step" && placedOverview.href === "/ru/courses/e1/assessments/q7", "a remembered Обзор: the course's next step");
+ok(continueTarget("ru", at("t1", "/ru/courses/t1", "overview"), courses, home).kind === "place", "a remembered Обзор of a course with nothing to do: the Обзор");
+ok(continueTarget("ru", at("e1", "/ru/courses/e1/tests", "tests"), withStart, home).href === "/ru/courses/e1/tests", "a remembered tab stays the tab");
+
 const none = continueTarget("ky", null, []);
-ok(none.kind === "choose" && none.href === "/ky/courses/choose" && none.courseId === null, "no courses: the choose step");
+ok(none.kind === "choose" && none.href === "/ky/courses/catalog" && none.courseId === null, "no courses: the choose step (the catalog until S4)");
 
 if (failed) {
   console.error(`${failed} check(s) failed`);

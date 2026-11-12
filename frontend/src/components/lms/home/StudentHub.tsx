@@ -17,6 +17,7 @@ import type { HomeCourseOut, HomeOut } from "@/lib/lms/homeTypes";
 import { continueTarget, type ContinueTarget } from "@/lib/lms/lastPlace";
 import { useLastPlaceRead } from "@/lib/lms/useLastPlace";
 import { HUB_GROUP_MAX } from "@/lib/lms/examFamilies";
+import { chooseCoursesHref } from "@/lib/lms/chooseCourses"; // until S4: the catalog
 import { pickLocalized } from "@/lib/lms/localized";
 import { LMS_ME_STALE_EVENT } from "@/lib/lms/meStale";
 import type { ActivityOut } from "@/lib/lms/progress";
@@ -44,29 +45,35 @@ function Greeting({ mascot = true }: { mascot?: boolean }) {
   );
 }
 
-/** What the continue card says about its target: the course, the place and the button label. */
+/** What the continue card says about its target: the course, the place, the button label and where it goes. */
 function useContinueText(target: ContinueTarget, courses: HomeCourseOut[], home: HomeOut | null) {
   const { lang, t } = useTranslation();
   const course = courses.find((c) => c.id === target.courseId);
   const courseTitle = course ? pickLocalized(course.title, lang, course.default_language) || t("courses.list.untitled") : "";
+  const href = target.href;
+  // a course's Обзор stood for the course's own next step (`continueTarget`): its title and its label
+  if (target.kind === "step" && target.stepLabel) {
+    const title = course?.next_step?.title ? pickLocalized(course.next_step.title, lang) : "";
+    return { courseTitle, place: title || t(target.stepLabel), action: t(target.stepLabel), href };
+  }
   const attempt = home?.in_progress.find((r) => r.attempt_id === target.attemptId)
     ?? (target.kind === "place" && target.placeKind === "lobby" ? home?.in_progress.find((r) => r.course_id === target.courseId) : undefined);
   if (target.kind === "resume") {
     const title = attempt ? pickLocalized(attempt.assessment_title, lang) : "";
-    return { courseTitle, place: [title, t("home.hub.inProgress")].filter(Boolean).join(" · "), action: t("home.hub.continueTest") };
+    return { courseTitle, place: [title, t("home.hub.inProgress")].filter(Boolean).join(" · "), action: t("home.hub.continueTest"), href };
   }
   if (target.kind === "lesson") {
     const row = home?.modules_next?.find((r) => r.course_id === target.courseId)
       ?? (course?.next_step?.kind === "continue_lesson" ? { title: course.next_step.title, module_title: undefined } : undefined);
     const place = [row?.module_title ? pickLocalized(row.module_title, lang) : "", row?.title ? pickLocalized(row.title, lang) : ""].filter(Boolean).join(" · ");
-    return { courseTitle, place: place || t("home.hub.place.lesson"), action: t("home.hub.continueLesson") };
+    return { courseTitle, place: place || t("home.hub.place.lesson"), action: t("home.hub.continueLesson"), href };
   }
   if (target.kind === "place" && target.placeKind) {
     const action = target.placeKind === "lesson" ? t("home.hub.continueLesson")
       : target.placeKind === "lobby" && attempt ? t("home.hub.continueTest") : t("home.hub.open");
-    return { courseTitle, place: t(`home.hub.place.${target.placeKind}`), action };
+    return { courseTitle, place: t(`home.hub.place.${target.placeKind}`), action, href };
   }
-  return { courseTitle, place: t("home.hub.overview"), action: t("home.hub.open") };
+  return { courseTitle, place: t("home.hub.overview"), action: t("home.hub.open"), href };
 }
 
 /** The one «Продолжить» card: the page's only primary button; the quiet streak line below it. */
@@ -81,7 +88,7 @@ function ContinueCard({ target, courses, home, streak }: { target: ContinueTarge
           <p className="break-words text-lg font-semibold leading-7 text-slate-900">{text.courseTitle}</p>
           <p className="mt-0.5 break-words text-sm leading-5 text-slate-700">{text.place}</p>
         </div>
-        <LinkButton href={target.href} size="lg" className="w-full shrink-0 sm:w-auto" rightIcon={<ArrowRight aria-hidden="true" className="h-5 w-5" />}>
+        <LinkButton href={text.href} size="lg" className="w-full shrink-0 sm:w-auto" rightIcon={<ArrowRight aria-hidden="true" className="h-5 w-5" />}>
           {text.action}
         </LinkButton>
       </div>
@@ -150,7 +157,7 @@ function EmptyHub() {
     <EmptyState mascot="hello" title={t("home.hub.emptyTitle")} description={t("home.hub.emptyBody")}
       action={(
         <>
-          <LinkButton size="lg" href={`/${lang}/courses/choose`} leftIcon={<Sparkles aria-hidden="true" className="h-5 w-5" />}>{t("home.hub.choose")}</LinkButton>
+          <LinkButton size="lg" href={chooseCoursesHref(lang)} leftIcon={<Sparkles aria-hidden="true" className="h-5 w-5" />}>{t("home.hub.choose")}</LinkButton>
           <LinkButton size="lg" variant="secondary" href={`/${lang}/courses/join`} leftIcon={<KeyRound aria-hidden="true" className="h-5 w-5" />}>{t("home.hub.join")}</LinkButton>
         </>
       )} />
@@ -216,7 +223,7 @@ export function StudentHub() {
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
               <h2 id="hub-courses" className="text-lg font-semibold leading-7 text-slate-900">{t("home.hub.coursesTitle")}</h2>
               {!testStudent && (
-                <Link href={`/${lang}/courses/choose`}
+                <Link href={chooseCoursesHref(lang)}
                   className={cn("inline-flex min-h-11 items-center gap-1 rounded text-sm font-medium text-brand-700 hover:underline", focusRing)}>
                   <Plus aria-hidden="true" className="h-4 w-4" />{t("home.hub.addCourse")}
                 </Link>

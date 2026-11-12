@@ -4,6 +4,7 @@
  * `/courses`, Каталог `/courses/catalog`, then the «Мои курсы» rows (recent first, 6 + «Все курсы (N)»; none: «Выбрать
  * курсы»). Dependency-free (structural types; `lastPlace.ts` is dependency-free too), checked by `studentNav.check.ts`.
  */
+import { chooseCoursesHref } from "./chooseCourses";
 import { courseRowHref, recentFirst, type LastPlace } from "./lastPlace";
 
 export type StudentNavKey = "home" | "courses" | "catalog";
@@ -63,7 +64,7 @@ export interface CourseRows<T extends CourseRowInput = CourseRowInput> {
   rows: CourseRow<T>[];
   /** «Все курсы (N)» → `/courses` when there are more rows than shown */
   all: { href: string; count: number; active: boolean } | null;
-  /** no course yet: «Выбрать курсы» → `/courses/choose` (never for the test student) */
+  /** no course yet: «Выбрать курсы» → `chooseCoursesHref` (the catalog until S4; never for the test student) */
   choose: { href: string; active: boolean } | null;
 }
 
@@ -84,7 +85,8 @@ export function courseRows<T extends CourseRowInput>({ lang, rest, courses, rece
   const viewed = courseIdOfPath(rest);
   if (!loaded) return { rows: [], all: null, choose: null };
   if (courses.length === 0) {
-    return { rows: [], all: null, choose: testStudent ? null : { href: `/${lang}/courses/choose`, active: rest === "/courses/choose" } };
+    const href = chooseCoursesHref(lang);
+    return { rows: [], all: null, choose: testStudent ? null : { href, active: href === `/${lang}${rest}` } };
   }
   const ordered = recentFirst(courses, recent);
   // the viewed course stays visible even when it is not among the first rows

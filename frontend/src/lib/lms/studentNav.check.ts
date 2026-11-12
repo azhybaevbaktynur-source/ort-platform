@@ -50,7 +50,7 @@ const placed = rows("/home", 3, ["c2"], { place: { courseId: "c2", path: "/ru/co
 ok(placed.rows[0].href === "/ru/courses/c2/analytics" && placed.rows[1].href === "/ru/courses/c0", "the last place's course opens its last tab");
 
 const zero = rows("/home", 0);
-ok(zero.rows.length === 0 && zero.choose?.href === "/ru/courses/choose", "no courses: «Выбрать курсы»");
+ok(zero.rows.length === 0 && zero.choose?.href === "/ru/courses/catalog", "no courses: «Выбрать курсы» (the catalog until S4)");
 ok(rows("/home", 0, [], { testStudent: true }).choose === null, "the test student: no «Выбрать курсы»");
 ok(rows("/home", 0, [], { loaded: false }).choose === null && rows("/home", 3, [], { loaded: false }).rows.length === 0, "not loaded: nothing yet");
 
