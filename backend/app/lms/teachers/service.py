@@ -102,7 +102,8 @@ def has_student_enrollments(user: User) -> bool:
 
 def approved_notice(user: User):
     """Owner feedback 2026-11-08 (item 2): the home's "application approved" line for an approved teacher, from the same
-    rule (`home.service._teacher_application`), so it also reaches a teacher whose /courses has no Learning tab."""
+    rule (`home.service._teacher_application`), for the Teaching list (fix round 2026-11-12 1e: every approved teacher's,
+    whatever student enrolments they have; people who teach never see the student home)."""
     from sqlalchemy.orm import object_session
 
     from app.lms.core import clock

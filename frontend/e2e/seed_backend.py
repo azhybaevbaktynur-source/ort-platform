@@ -872,6 +872,25 @@ def seed_teacher_notice(api: Api, log: Path, admin_tok: str) -> dict:
 # --- Fix round 2026-11-12 1c end ---
 
 
+# --- Fix round 2026-11-12 1e begin ---
+def seed_teacher_enrolled(api: Api, log: Path, admin_tok: str, ort_course_id: str) -> dict:
+    """A teacher who still has a student enrolment (the owner's old account): joined ORT (Russian) as a student, then
+    applied and was approved through the admin API, then made one published course. Owner decision 2026-11-12: student
+    and teacher are separate, so this person gets exactly the teacher-only design and checks the course through Student
+    view (header-areas.spec.ts). Nobody closes their "approved" line."""
+    u = register(api, log, "e2e-teacher-enrolled@example.com", "Учитель Со Старой Записью")
+    api.call("POST", f"/courses/{ort_course_id}/join", u["token"], {})
+    rid = api.call("POST", "/me/teacher-requests", u["token"], {"applicant_name": u["name"], **APPLICATION})["id"]
+    api.call("POST", f"/platform/teacher-requests/{rid}/approve", admin_tok, {"note": None})
+    title = "Курс учителя 1e"
+    c = api.call("POST", "/courses", u["token"], {"title": {"ru": title, "ky": title, "en": title},
+                                                 "languages": ["ru", "ky", "en"], "default_language": "ru"})
+    api.call("POST", f"/courses/{c['id']}/publish", u["token"], {})
+    u["profile"] = profile(api, u["token"])
+    return {**u, "course_id": c["id"], "course_title": title}
+# --- Fix round 2026-11-12 1e end ---
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--api", required=True)
@@ -970,6 +989,7 @@ def main() -> int:
     item3 = seed_item3(api, log, tok, cid)  # TEACHER_TO_STUDENT_MAP S5 (after every ORT and every other row)
     oauth = seed_oauth(api, log, tok, root)  # item 3 social sign-in (people only, no courses)
     teacher_notice = seed_teacher_notice(api, log, tok)  # fix round 2026-11-12 1c (one person, no courses)
+    teacher_enrolled = seed_teacher_enrolled(api, log, tok, cid)  # fix round 2026-11-12 1e (joins ORT, one course)
 
     seed = {
         "quiz_editor": quiz_editor,
@@ -988,6 +1008,7 @@ def main() -> int:
         "item3": item3,
         "oauth": oauth,
         "teacher_notice": teacher_notice,
+        "teacher_enrolled": teacher_enrolled,
         "mfa_admin": mfa_admin,
         "gate_admin": extra_admins["gate"], "shots_admin": extra_admins["shots"],
         "api": args.api, "course_id": cid, "bank_id": bank_id, "exam": exam, "staff_exam": staff_exam,

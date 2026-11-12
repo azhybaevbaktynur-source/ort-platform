@@ -18,7 +18,8 @@ def _me(user: User) -> MeOut:
         is_platform_admin=bool(user.is_platform_admin), teacher_status=user.teacher_status,
         can_create_courses=service.can_create_courses(user), is_teacher=service.is_teacher(user),
         admin_organizations=service.admin_organizations(user), is_guardian=has_active_link(user),
-        has_student_enrollments=learns, teacher_application=None if learns else service.approved_notice(user),
+        # fix round 2026-11-12 1e: the Teaching list shows the line for every approved teacher, enrolments or not
+        has_student_enrollments=learns, teacher_application=service.approved_notice(user),
     )
 
 
