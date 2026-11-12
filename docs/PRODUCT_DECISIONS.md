@@ -651,3 +651,11 @@ Replaces "ORT must not change" (2026-10-24, section A above, and its second roun
 - **Must change:** ORT is no longer a separate interface. Test-taking and course-taking are one platform with one student interface: an ORT course is a course that contains tests and lessons, shown with the same navigation, layout and course pages as any other course. ORT pages, navigation, layout and placement may all change to achieve this. ORT screenshot baselines are re-approved when a layout change is deliberate.
 - Round plan and triage: `phases/FIX_ROUND_2026-11-12.md`.
 
+### Owner 2026-11-12: teachers and students are separate accounts
+
+Owner: "We already decided that student and teacher will be separate. A teacher who is also a student will open a new student account. We do not need that. We have Student view to check how courses look; we need that function in the teacher page."
+
+- A person who teaches never gets the Learning area (no «Учёба», no student home, no Pro in the menu), whatever student enrolments they have. Existing student enrolments of teachers stay in the database untouched; only the interface ignores them (removing them would be a data change for the owner to approve).
+- Teachers check the student experience with Student view, reachable from the Teaching list and the course page.
+- Consequences: slice 1e builds this; slice 1b's per-role link check has no "teacher who is also a student" role; step 3b decides what the catalog offers a teacher (Student view instead of «Записаться»).
+
