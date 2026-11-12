@@ -5,7 +5,8 @@
 // primary button), the last / target scores, the streak strip, the short gold unlock card while some tests need a pass
 // and no result exists, the sections of the latest result, then the platform courses to join and the student's other
 // courses. U9 (STUDENT_UI_REVIEW): no course grids; switching, the catalog, the code and leaving live in the shell's
-// exam sheet. Three reads in parallel (`/me/home` by the caller, the exam-prep page and the last 7 days of activity).
+// exam sheet. Three reads in parallel (`/me/home` by the caller, the exam-prep page and the last 7 days of activity);
+// PERFORMANCE_AUDIT P2: on a fresh load of the home all three come inside the shell's bootstrap (one request).
 // PERFORMANCE_AUDIT S3: the exam-prep page through the SWR cache (`pageData.ts`; drawn at once on a repeat visit); while
 // it loads the page's frames are drawn with skeletons only where its numbers go.
 import React, { useEffect, useState } from "react";
@@ -14,8 +15,8 @@ import { ChevronRight, Pencil, Target, TrendingUp, Trophy } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
 import { wholeNumber, type ExamGoalOut, type ExamPrepOut } from "@/lib/lms/examPrep";
-import { putExamPrep, useExamPrep } from "@/lib/lms/pageData"; // PERFORMANCE_AUDIT S3
-import { getActivity, type ActivityOut } from "@/lib/lms/progress";
+import { loadHomeActivity, putExamPrep, useExamPrep } from "@/lib/lms/pageData"; // PERFORMANCE_AUDIT S3, P2
+import type { ActivityOut } from "@/lib/lms/progress";
 import type { HomeOut } from "@/lib/lms/homeTypes";
 import type { LocalizedText } from "@/lib/lms/types";
 import { pickLocalized } from "@/lib/lms/localized";
@@ -311,14 +312,15 @@ export function ExamPrepHome({ courseId, courseTitle, home, homeError, side }: {
   const [activityState, setActivityState] = useState<"loading" | "ok" | "failed">("loading");
 
   useEffect(() => {
-    const ctl = new AbortController();
+    let alive = true;
     setActivity(null);
     setActivityState("loading");
-    getActivity(courseId, 7, ctl.signal).then(
-      (a) => { if (!ctl.signal.aborted) { setActivity(a); setActivityState("ok"); } },
-      () => { if (!ctl.signal.aborted) setActivityState("failed"); },
+    // PERFORMANCE_AUDIT P2: from the shell's bootstrap on a fresh load of the home, else its own request
+    loadHomeActivity(courseId).then(
+      (a) => { if (alive) { setActivity(a); setActivityState("ok"); } },
+      () => { if (alive) setActivityState("failed"); },
     );
-    return () => ctl.abort();
+    return () => { alive = false; };
   }, [courseId]);
 
   // U8: the "Начало работы" checklist (sidebar pill and sheet) reads the goal and results from this page's answer

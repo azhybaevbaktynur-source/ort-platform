@@ -7,7 +7,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_serializer
 
 IN_PROGRESS_MAX = 3
 NEXT_UP_MAX = 3
@@ -217,7 +217,9 @@ PLATFORM_COURSE_KEYS = frozenset(HomePlatformCourseOut.model_fields)  # Exam pre
 if TYPE_CHECKING:  # resolved by `home.bootstrap` (model_rebuild): these modules import this one
     from app.lms.access.schemas import MyAccessOut
     from app.lms.courses.lesson_courses import LessonCourseOut
+    from app.lms.exam_prep.schemas import ExamPrepOut  # PERFORMANCE_AUDIT P2
     from app.lms.privacy.schemas import NeedOut
+    from app.lms.progress.schemas import ActivityOut  # PERFORMANCE_AUDIT P2
     from app.lms.teachers.schemas import MeOut
 
 
@@ -241,8 +243,25 @@ class BootstrapOut(BaseModel):
     pending_invitations: int  # the count of `GET /me/invitations` (0 in Student view)
     privacy: Optional[PrivacyBannerOut] = None  # null in Student view
     student: Optional[BootstrapStudentOut] = None  # null for a person who teaches and learns nowhere
+    # --- PERFORMANCE_AUDIT P2 begin --- (`?include=home`: the student home's own reads in the same answer; the three
+    # keys are left out of the answer unless asked, so the default answer stays the same)
+    home: Optional[HomeOut] = None  # `GET /me/home`; only with `student`
+    # exam course id -> `GET /courses/{id}/exam-prep` / `.../my/activity?days=7`, for the home's exam course (at most one)
+    exam_prep: Optional[dict[str, ExamPrepOut]] = None
+    activity: Optional[dict[str, ActivityOut]] = None
+
+    @model_serializer(mode="wrap")
+    def _home_only_when_asked(self, handler):
+        out = handler(self)
+        if self.home is None:
+            for k in BOOTSTRAP_HOME_KEYS:
+                out.pop(k, None)
+        return out
+    # --- PERFORMANCE_AUDIT P2 end ---
 
 
-BOOTSTRAP_KEYS = frozenset(BootstrapOut.model_fields)
+BOOTSTRAP_HOME_KEYS = frozenset({"home", "exam_prep", "activity"})  # PERFORMANCE_AUDIT P2
+BOOTSTRAP_KEYS = frozenset(BootstrapOut.model_fields) - BOOTSTRAP_HOME_KEYS
+BOOTSTRAP_HOME_ACTIVITY_DAYS = 7  # the home's streak strip (`ExamPrepHome`)
 BOOTSTRAP_COURSES_LIMIT = 50
 # --- PERFORMANCE_AUDIT S2 end ---
