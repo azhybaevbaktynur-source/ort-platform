@@ -15,6 +15,9 @@ COURSE_POLICIES: dict[tuple[str, str], str] = {
     ("POST", f"{_B}/{{course_id}}/restore"): "course:owner_restore",
     ("POST", f"{_B}/{{course_id}}/transfer-ownership"): "course:course.transfer+owner",
     ("POST", f"{_B}/{{course_id}}/join-code/regenerate"): "course:roster.manage",
+    # step 3b S1 (CATALOG_AND_TEACHERS_DESIGN 4.2): the catalog listing; + 20 requests a day per person
+    ("POST", f"{_B}/{{course_id}}/listing/request"): "course:roster.manage",
+    ("POST", f"{_B}/{{course_id}}/listing/withdraw"): "course:roster.manage",
     ("POST", f"{_B}/{{course_id}}/leave"): "course:course.leave",
     ("GET", f"{_B}/{{course_id}}/people"): "course:course.read",
     ("POST", f"{_B}/{{course_id}}/staff"): "course:roster.manage",

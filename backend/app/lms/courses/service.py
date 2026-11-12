@@ -264,8 +264,6 @@ def update_course(db: Session, ctx: AuthzContext, course: Course, data: CourseUp
         limit = fields["enrollment_limit"]
         if limit is not None and limit < active_student_count(db, course.id):
             raise Conflict("Limit is below the current number of students", code="limit_below_current")
-    if fields.get("visibility") == "catalog" and course.unlisted_by_admin_at is not None:
-        raise Conflict("Unlisted by an administrator", code="unlisted_by_admin")
     if "enrollment_mode" in fields or "visibility" in fields:  # --- Phase 9 S1 --- (design 4.6 mode rules)
         _check_enrollment_mode(db, course, fields.get("enrollment_mode", course.enrollment_mode),
                                fields.get("visibility", course.visibility), course.template_key)
@@ -309,6 +307,9 @@ def update_course(db: Session, ctx: AuthzContext, course: Course, data: CourseUp
             raise ValidationFailed("Exam date out of range", code="exam_date_invalid")
         exam_layout.apply_exam_date(course, value)
     # --- Exam prep S2 end ---
+    from app.lms.courses import listing as course_listing  # step 3b S1: link access and the catalog listing
+
+    course_listing.apply_course_update(db, ctx, course, fields, title=title, description=description)
     course.title, course.description = title, description
     course.languages, course.default_language = languages, default_language
     course.starts_at, course.ends_at = starts, ends
@@ -651,15 +652,12 @@ def regenerate_join_code(db: Session, ctx: AuthzContext, course: Course) -> Cour
 
 def set_unlisted(db: Session, actor: User, course: Course, *, unlisted: bool, reason: Optional[str],
                  request: Optional[Request] = None) -> Course:
+    """Step 3b S1: «Снять с каталога» / «Вернуть» are the listing's block / relist (`courses.listing`)."""
+    from app.lms.courses import listing as course_listing
+
     if unlisted:
-        course.visibility = "private"
-        course.unlisted_by_admin_at = utcnow()
-    else:
-        course.unlisted_by_admin_at = None
-    audit.record(db, actor=actor, action="course.unlist" if unlisted else "course.relist",
-                 target_type="course", target_id=str(course.id), reason=reason, request=request)
-    db.commit()
-    return course
+        return course_listing.block(db, actor, course, reason, request=request)
+    return course_listing.relist(db, actor, course, reason, request=request)
 
 
 def admin_courses_query() -> Select:

@@ -4,7 +4,8 @@ from app.lms.enrollments.schemas import MyEnrollmentOut, RosterEntryOut, StaffPu
 from tests.lms.s3_support import api, clean_rate_limits, db, enroll, make_course, make_user, teacher  # noqa: F401
 
 FORBIDDEN = {"join_code", "enrollment_limit", "email", "user_id", "enrollment_mode", "visibility",
-             "active_student_count", "owner", "is_owner", "unlisted_by_admin", "invite_token_hash"}
+             "active_student_count", "owner", "is_owner", "unlisted_by_admin", "invite_token_hash",
+             "listing", "listing_note"}  # step 3b: the catalog listing is staff-only
 
 
 def walk_keys(obj):
@@ -37,7 +38,8 @@ def test_declared_key_sets():
         "join_code", "enrollment_mode", "enrollment_limit", "visibility", "unlisted_by_admin",
         "active_student_count", "owner", "is_owner", "created_at", "updated_at", "published_at", "concluded_at",
         "sandbox_for_template_id",  # Phase 8b S5 (staff only)
-        "can_import_roster"}  # Accounts (staff only)
+        "can_import_roster",  # Accounts (staff only)
+        "listing"}  # step 3b S1: the catalog listing (staff only)
     assert set(StaffPublicOut.model_fields) == {"display_name", "role"}
     assert set(MyEnrollmentOut.model_fields) == {"id", "course_id", "role", "state", "activated_at"}
     assert set(JoinOut.model_fields) == {"course", "enrollment", "already_enrolled"}

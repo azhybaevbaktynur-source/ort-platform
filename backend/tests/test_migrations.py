@@ -398,3 +398,82 @@ def test_0033_exam_family_backfill_on_pg(alembic_engine):
         _upgrade(cfg, conn, "0033_course_exam_family")
         assert families(conn) == expected
     engine.dispose()
+
+
+def test_0034_course_listing_backfill_on_pg(alembic_engine):
+    """Step 3b S1 (CATALOG_AND_TEACHERS_DESIGN 4.1): on the production-like fixture (migrated through 0033) a course
+    unlisted by the admin becomes `blocked` (decided then), the platform tree's catalog courses `listed` (decided at
+    `published_at`, draft or not), a published catalog teacher course `pending` (requested at `published_at`), a draft
+    catalog teacher course and a private course stay `off`; `unlisted_by_admin_at` is gone. Down: it comes back from
+    `blocked`, `listed` / `pending` keep link access; up again: the same states."""
+    import uuid
+    from datetime import datetime, timezone
+
+    from alembic import command
+
+    from app.db.migrate import _config
+    from tests.test_migration_0008 import ADMIN_COURSE, NOBODY_COURSE, ORT_KY, ORT_RU, OTHER_COURSE
+    from tests.test_migration_0014 import _migrate
+    from tests.test_migration_0015 import _upgrade
+
+    engine = _migrate(TEST_URL)[0]
+    cfg = _config(TEST_URL)
+    draft_teacher = uuid.UUID("00000000-0000-4000-8000-0000000003b1")
+    pub = datetime(2026, 10, 1, 8, 0, tzinfo=timezone.utc)
+    blocked_at = datetime(2026, 11, 6, 9, 30, tzinfo=timezone.utc)
+    ids = {k: str(v) for k, v in zip("abcdef", (ORT_KY, ORT_RU, OTHER_COURSE, NOBODY_COURSE, ADMIN_COURSE,
+                                                 draft_teacher))}
+
+    def states(conn) -> dict:
+        return {str(r[0]): tuple(r[1:]) for r in conn.execute(text(
+            "SELECT id, listing, listing_requested_at, listing_decided_at, visibility FROM courses "
+            "WHERE id IN (:a, :b, :c, :d, :e, :f)"), ids)}
+
+    expected = {
+        str(ORT_KY): ("listed", None, pub, "catalog"),          # platform, published
+        str(ORT_RU): ("listed", None, None, "catalog"),         # platform, draft: listed, no published_at
+        str(OTHER_COURSE): ("pending", pub, None, "catalog"),   # teacher course in the catalog today (D2)
+        str(NOBODY_COURSE): ("blocked", None, blocked_at, "private"),  # unlisted by the admin
+        str(ADMIN_COURSE): ("off", None, None, "private"),      # private platform course
+        str(draft_teacher): ("off", None, None, "catalog"),     # draft teacher course with link access
+    }
+    with engine.connect() as conn:
+        cfg.attributes["connection"] = conn
+        _upgrade(cfg, conn, "0033_course_exam_family")
+        upd = text("UPDATE courses SET status = :s, visibility = :v, published_at = :p, unlisted_by_admin_at = :u "
+                   "WHERE id = :id")
+        for cid, s, v, p, u in ((ORT_KY, "published", "catalog", pub, None), (ORT_RU, "draft", "catalog", None, None),
+                                (OTHER_COURSE, "published", "catalog", pub, None),
+                                (NOBODY_COURSE, "published", "private", pub, blocked_at),
+                                (ADMIN_COURSE, "published", "private", pub, None)):
+            conn.execute(upd, {"id": str(cid), "s": s, "v": v, "p": p, "u": u})
+        conn.execute(text("CREATE TEMP TABLE c3b1 AS SELECT * FROM courses WHERE id = :o"), {"o": str(OTHER_COURSE)})
+        conn.execute(text("UPDATE c3b1 SET id = :n, join_code = 'DRAFT3B1', status = 'draft', published_at = NULL"),
+                     {"n": str(draft_teacher)})
+        conn.execute(text("INSERT INTO courses SELECT * FROM c3b1"))
+        conn.execute(text("DROP TABLE c3b1"))
+        conn.commit()
+        total = conn.execute(text("SELECT count(*) FROM courses")).scalar()
+        _upgrade(cfg, conn, "0034_course_listing")
+        assert states(conn) == expected
+        assert conn.execute(text("SELECT count(*) FROM courses WHERE listing <> 'off'")).scalar() == 4
+        insp = inspect(conn)
+        cols = {c["name"]: c for c in insp.get_columns("courses")}
+        assert "unlisted_by_admin_at" not in cols and not cols["listing"]["nullable"]
+        assert cols["listing_note"]["type"].length == 500
+        idx = {i["name"]: i["column_names"] for i in insp.get_indexes("courses")}
+        assert idx["ix_courses_listing_published_at"] == ["listing", "published_at"]
+        with pytest.raises(Exception):
+            conn.execute(text("UPDATE courses SET listing = 'maybe' WHERE id = :a"), {"a": ids["a"]})
+        conn.rollback()
+        command.downgrade(cfg, "0033_course_exam_family")
+        conn.commit()
+        rows = {str(r[0]): (r[1], r[2]) for r in conn.execute(text(
+            "SELECT id, visibility, unlisted_by_admin_at FROM courses WHERE id IN (:a, :b, :c, :d, :e, :f)"), ids)}
+        assert rows[str(NOBODY_COURSE)] == ("private", blocked_at)
+        assert rows[str(OTHER_COURSE)] == ("catalog", None) and rows[str(ORT_KY)] == ("catalog", None)
+        assert "listing" not in {c["name"] for c in inspect(conn).get_columns("courses")}
+        assert conn.execute(text("SELECT count(*) FROM courses")).scalar() == total
+        _upgrade(cfg, conn, "0034_course_listing")
+        assert states(conn) == expected
+    engine.dispose()

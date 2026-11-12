@@ -52,7 +52,12 @@ async def test_builder_settings_apply_decide_flow(db, api):
     assert r.status_code == 200, r.text
     assert r.json()["enrollment_mode"] == "form_review" and r.json()["visibility"] == "catalog"
 
-    # Catalog card and landing (CatalogView, CourseLanding).
+    # Catalog card and landing (CatalogView, CourseLanding); step 3b: the platform admin approved the listing.
+    from app.lms.courses.models import Course
+
+    db.expire_all()
+    db.get(Course, course.id).listing = "listed"
+    db.commit()
     s = make_user(db)
     r = await api.call(s, "GET", "/catalog/courses", params={"mode": "form_review"})
     card = next(c for c in r.json()["items"] if c["id"] == str(course.id))

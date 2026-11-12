@@ -166,7 +166,8 @@ def test_encode_cover_refuses_other_types(raw):
 
 async def test_owner_uploads_a_cover_and_every_output_shows_it(db, local_storage, api):
     t, s = teacher(db), make_user(db)
-    c = make_course(db, t, status="published", visibility="catalog", enrollment_mode="open", published_at=utcnow())
+    c = make_course(db, t, status="published", visibility="catalog", enrollment_mode="open", published_at=utcnow(),
+                    listing="listed")
     enroll(db, c, s)
     r = await put_cover(t, c.id, photo(2000, 2000), focus={"focus_x": 0.5, "focus_y": 0.25})
     assert r.status_code == 200, r.text
@@ -353,7 +354,7 @@ def _content(db, c, t):
 
 async def test_counts_on_every_card(db, api):
     t, s = teacher(db), make_user(db)
-    c = make_course(db, t, status="published", visibility="catalog", enrollment_mode="open",
+    c = make_course(db, t, status="published", visibility="catalog", enrollment_mode="open", listing="listed",
                     published_at=utcnow() - timedelta(minutes=1))
     _content(db, c, t)
     enroll(db, c, s)
@@ -410,8 +411,10 @@ async def test_course_out_carries_platform_flag(db, api):
 async def test_has_paid_tests_only_for_published_paid_tests_of_platform_courses(db, api):
     """F7: the quiet "Pro" mark of a platform course card: a published (versioned, live, not practice) paid test."""
     owner = teacher(db)
-    paid = platform_course(db, owner, visibility="catalog", enrollment_mode="open", published_at=utcnow())
-    free = platform_course(db, owner, visibility="catalog", enrollment_mode="open", published_at=utcnow())
+    paid = platform_course(db, owner, visibility="catalog", enrollment_mode="open", published_at=utcnow(),
+                           listing="listed")
+    free = platform_course(db, owner, visibility="catalog", enrollment_mode="open", published_at=utcnow(),
+                           listing="listed")
     published(db, paid, owner, access_tier="paid")
     published(db, free, owner)                                            # free
     published(db, free, owner, access_tier="paid", is_practice=True)      # practice is not a test
@@ -428,7 +431,7 @@ async def test_has_paid_tests_only_for_published_paid_tests_of_platform_courses(
 
 def test_catalog_page_of_24_is_still_two_statements(db):
     t, viewer = teacher(db), make_user(db)
-    courses = [make_course(db, t, status="published", visibility="catalog", enrollment_mode="open",
+    courses = [make_course(db, t, status="published", visibility="catalog", enrollment_mode="open", listing="listed",
                            published_at=utcnow() - timedelta(minutes=100 - i)) for i in range(24)]
     for i, c in enumerate(courses[:6]):
         published(db, c, t)

@@ -37,9 +37,9 @@ def sandbox_world(db):
     S, X = make_user(db), make_user(db)
     t = make_template(db, owner_scope="organization", organization_id=org.id, created_by_id=TA.id)
     regular = make_course(db, TA, organization_id=org.id, status="published", visibility="catalog",
-                          enrollment_mode="open", published_at=utcnow())
+                          enrollment_mode="open", published_at=utcnow(), listing="listed")
     enroll(db, regular, S, "student")
-    sandbox = make_course(db, TA, organization_id=org.id, status="published", visibility="catalog",
+    sandbox = make_course(db, TA, organization_id=org.id, status="published", visibility="catalog", listing="listed",
                           enrollment_mode="open", published_at=utcnow(), sandbox_for_template_id=t.id,
                           title={"en": "Sandbox of the template"})
     enroll(db, sandbox, S, "student")
