@@ -151,17 +151,18 @@ export function CatalogView() {
   const landing = (c: CatalogCourseOut) => `/${lang}/courses/catalog/${c.id}`;
 
   const action = (c: CatalogCourseOut) => {
+    // no single main action on the catalog: every card button is secondary (step 3a S6)
     if (teaches) {
       const staff = isActiveMember(c) && (c.my_enrollment?.role === "teacher" || c.my_enrollment?.role === "assistant");
       // owner 2026-11-12: Student view only on the course page itself
-      return staff ? <LinkButton fullWidth href={`/${lang}/courses/${c.id}`}>{t("catalog.open")}</LinkButton> : null;
+      return staff ? <LinkButton fullWidth variant="secondary" href={`/${lang}/courses/${c.id}`}>{t("catalog.open")}</LinkButton> : null;
     }
     if (isActiveMember(c)) {
-      return <LinkButton fullWidth href={`/${lang}/courses/${c.id}`}>{t("catalog.open")}</LinkButton>;
+      return <LinkButton fullWidth variant="secondary" href={`/${lang}/courses/${c.id}`}>{t("catalog.open")}</LinkButton>;
     }
     if (c.enrollment_mode === "open") {
       return (
-        <Button fullWidth loading={joining === c.id} disabled={joining !== null && joining !== c.id} onClick={() => void join(c)}>
+        <Button fullWidth variant="secondary" loading={joining === c.id} disabled={joining !== null && joining !== c.id} onClick={() => void join(c)}>
           {t("catalog.join")}
         </Button>
       );
@@ -176,7 +177,7 @@ export function CatalogView() {
       );
     }
     if (isFormMode(c.enrollment_mode) && c.has_active_form) {
-      return <LinkButton fullWidth href={`${landing(c)}/apply`}>{t("catalog.apply")}</LinkButton>;
+      return <LinkButton fullWidth variant="secondary" href={`${landing(c)}/apply`}>{t("catalog.apply")}</LinkButton>;
     }
     // --- Phase 9 S4 end ---
     return (

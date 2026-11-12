@@ -3645,10 +3645,10 @@
       },
       "addCourse": "Add a course",
       "emptyTitle": "You have no courses yet",
-      "emptyBody": "Choose an exam and subjects, and we will pick the courses",
+      "emptyBody": "Choose an exam and subjects, and we will pick the courses for you.",
       "choose": "Choose courses",
       "join": "Join with code",
-      "todoEmpty": "Nothing yet",
+      "todoEmpty": "Nothing to do yet.",
       "announcement": "Announcement",
       "inProgress": "Test in progress",
       "overview": "Course overview",
@@ -7339,7 +7339,7 @@
   "exam": {
     "family": {
       "ort": "ORT",
-      "nct": "NTC"
+      "nct": "NCT"
     },
     "subject": {
       "math": "Mathematics",
