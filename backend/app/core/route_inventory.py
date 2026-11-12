@@ -227,3 +227,9 @@ from app.lms.infra.policies import INFRA_POLICIES  # noqa: E402
 
 ROUTE_POLICIES.update(INFRA_POLICIES)
 # --- I5a infrastructure panel end ---
+
+# --- Fix round 2026-11-12 D2 begin --- (DB_STORAGE_REVIEW 5: maintenance)
+from app.lms.maintenance.router import MAINTENANCE_POLICIES  # noqa: E402
+
+ROUTE_POLICIES.update(MAINTENANCE_POLICIES)
+# --- Fix round 2026-11-12 D2 end ---

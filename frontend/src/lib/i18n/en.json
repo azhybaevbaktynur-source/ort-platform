@@ -7253,6 +7253,46 @@
       "unknown": "unknown",
       "next": "next plan: {plan}",
       "unverified": "unverified"
+    },
+    "maintenance": {
+      "title": "Database cleanup",
+      "subtitle": "Every day at 04:30 UTC a scheduled run removes what is no longer needed: expired codes and links, staff preview attempts, test students of Student view and accounts never verified for 90 days. Students' results, grades and the audit log are never deleted.",
+      "check": "Check (no deleting)",
+      "apply": "Clean up",
+      "lastRun": "Last run {when}",
+      "neverRun": "Not run yet. Press \"Check\" to see what would be removed.",
+      "totalFound": "{n} found",
+      "totalDone": "{n} removed or cleared",
+      "measured": "measured",
+      "failed": "Not completed: {tasks}. The next run tries again.",
+      "rateLimited": "Too many manual runs. Try again later.",
+      "confirmTitle": "Clean up the database?",
+      "confirmEffect": "What the check finds is deleted or cleared now: staff preview attempts, removed test students, accounts never verified for 90 days, expired codes. Students' results, grades and the audit log are not touched. This cannot be undone.",
+      "mode": {
+        "dryRun": "check, nothing deleted",
+        "applied": "cleanup"
+      },
+      "trigger": {
+        "token": "scheduled",
+        "admin": "by hand",
+        "fallback": "backup run"
+      },
+      "task": {
+        "attempt_sweep": "Expired attempts finished",
+        "application_purge": "Application answers cleared",
+        "phone_purge": "Applicants' phone numbers cleared",
+        "code_note_purge": "Buyer names on old codes cleared",
+        "user_tokens": "Expired reset links and email codes",
+        "pairing_codes": "Unused parent pairing codes",
+        "email_changes": "Expired email changes",
+        "rate_limits": "Expired rate-limit counters",
+        "unverified_accounts": "Unverified accounts older than 90 days",
+        "preview_attempts": "Staff preview attempts",
+        "test_student_attempts": "Test student attempts",
+        "test_student_files": "Files of removed test students",
+        "retired_test_students": "Removed test students",
+        "measure_storage": "Database size measured"
+      }
     }
   }
 }

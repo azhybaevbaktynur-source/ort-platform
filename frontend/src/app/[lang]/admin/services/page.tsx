@@ -9,6 +9,7 @@ import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
 import { ServiceCard, ago } from "@/components/lms/admin/infra/ServiceCard";
 import { CapacityCard } from "@/components/lms/admin/infra/CapacityCard";
 import { CostCard } from "@/components/lms/admin/infra/CostCard";
+import { MaintenanceCard } from "@/components/lms/admin/infra/MaintenanceCard";
 import { LoadError, OrgError } from "@/components/lms/org/OrgUi";
 import { Button, LoadingState, PageHeader, STAFF_WIDTH } from "@/components/ui";
 
@@ -77,6 +78,7 @@ export default function AdminServicesPage() {
             <CapacityCard capacity={data.capacity} />
             <CostCard costs={data.costs} />
           </div>
+          <MaintenanceCard />
           <div className="grid gap-4 md:grid-cols-2 min-[1700px]:grid-cols-3" data-testid="infra-cards">
             {data.cards.map((c) => <ServiceCard key={c.provider} card={c} />)}
           </div>

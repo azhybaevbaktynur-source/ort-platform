@@ -150,3 +150,10 @@ from app.lms.infra.router import router as _infra_router  # noqa: E402
 
 api_router.include_router(_infra_router, prefix="/platform", tags=["Platform Admin"])
 # --- I5a infrastructure panel end ---
+# --- Fix round 2026-11-12 D2 begin --- (DB_STORAGE_REVIEW 5: daily maintenance, token route and the admin's button)
+from app.lms.maintenance.router import admin_router as _maintenance_admin_router  # noqa: E402
+from app.lms.maintenance.router import internal_router as _maintenance_internal_router  # noqa: E402
+
+api_router.include_router(_maintenance_internal_router, prefix="/internal", tags=["Internal"])
+api_router.include_router(_maintenance_admin_router, prefix="/platform", tags=["Platform Admin"])
+# --- Fix round 2026-11-12 D2 end ---
