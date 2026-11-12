@@ -91,6 +91,45 @@ test.describe("student home (ru)", () => {
     await expect(page.locator('section[aria-labelledby="home-lesson-courses"]')).toHaveCount(0);
   });
 
+  // PERFORMANCE_AUDIT P2: a fresh load of the exam-prep home is one API round: the shell's bootstrap carries `/me/home`,
+  // the exam-prep page and the 7-day activity (`?include=home`); none of them is asked again, on a cold load or a reload
+  test("P2: a fresh load of the home is one API round (the bootstrap brings the home)", async ({ page }) => {
+    const s = seed();
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await signIn(page, s.access!.home_student);
+    const api = `${s.api}/api/v1/`;
+    type Seen = { path: string; start: number; end: number };
+    let seen: Seen[] = [];
+    const byReq = new Map<object, Seen>();
+    page.on("request", (r) => {
+      if (!r.url().startsWith(api) || r.method() === "OPTIONS") return;
+      const row = { path: r.url().slice(api.length - 1), start: Date.now(), end: Infinity };
+      byReq.set(r, row);
+      seen.push(row);
+    });
+    const finish = (r: object) => { const row = byReq.get(r); if (row) row.end = Date.now(); };
+    page.on("requestfinished", finish);
+    page.on("requestfailed", finish);
+    const next = page.getByRole("region", { name: t("examPrep.next.title") });
+    const streak = page.getByRole("region", { name: t("progress.analytics.tiles.streak") });
+    for (const load of ["cold", "reload"] as const) {
+      seen = [];
+      if (load === "cold") await page.goto(`/${L}/courses`); else await page.reload();
+      await expect(next).toContainText("ОРТ S3 бесплатный");
+      await expect(streak).toBeVisible();
+      const content = Date.now();
+      await settle(page);
+      const boots = seen.filter((r) => r.path.startsWith("/me/bootstrap"));
+      expect(boots.map((r) => r.path), `${load}: one bootstrap, with the home`).toEqual([expect.stringContaining("include=home")]);
+      const own = seen.filter((r) => /^\/me\/home(\?|$)|\/exam-prep(\?|$)|\/my\/activity/.test(r.path)).map((r) => r.path);
+      expect(own, `${load}: the home asked nothing of its own`).toEqual([]);
+      // one round before the first content: nothing that started before it waited for another API answer
+      const before = seen.filter((r) => r.start <= content);
+      const chained = before.filter((r) => before.some((o) => o !== r && o.end <= r.start)).map((r) => r.path);
+      expect(chained, `${load}: requests asked after another API answer, before the first content`).toEqual([]);
+    }
+  });
+
   test("lesson courses of the exam: once, in «Уроки»; the «Продолжить урок» strip", async ({ page }) => {
     const s = seed();
     const admin = s.admin;

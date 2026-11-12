@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -30,5 +30,9 @@ def my_home_courses(cursor: Optional[str] = None, limit: int = 24, user: User = 
 
 
 @router.get("/me/bootstrap", response_model=BootstrapOut)
-def my_bootstrap(user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
-    return boot.bootstrap(db, user)
+def my_bootstrap(include: Optional[str] = Query(None, max_length=40), course: Optional[str] = Query(None, max_length=64),
+                 user: User = Depends(get_lms_user), db: Session = Depends(get_db)):
+    """PERFORMANCE_AUDIT P2: `include=home` adds the student home's reads (`home`, `exam_prep`, `activity`) for the exam
+    course `course` (else the first); without it the answer is the shell's alone, unchanged."""
+    wanted = {p.strip() for p in (include or "").split(",")}
+    return boot.bootstrap(db, user, include_home="home" in wanted, course=course)
