@@ -277,3 +277,43 @@ Owner questions (answers go to `PRODUCT_DECISIONS.md`):
    is a third; `choice_order` (25 B) and `client_ts` could move into `response`, and `correctness`/`score` could be
    `smallint`/`numeric(5,2)`, for maybe −20 %. Not now: the player and the ORT scoring parity depend on this shape and
    the Free plan's ceiling moves by less than one exam.
+
+## D2. Maintenance route and daily workflow (built 2026-11-12)
+
+What shipped (`backend/app/lms/maintenance/`: `tasks.py`, `service.py`, `router.py`; runbook
+`docs/runbooks/MAINTENANCE.md`): `POST /internal/maintenance?dry_run=1|0` (token `X-Sweep-Token` = `ATTEMPT_SWEEP_TOKEN`,
+404 otherwise, dry run unless `dry_run=0`), `GET /platform/maintenance` and `POST /platform/maintenance/run` (platform
+admin, dry run unless `apply`, audited `maintenance.run`, 12 per hour), the "Очистка базы" block on the Services page,
+`platform_settings` key `maintenance.last_run`, `.github/workflows/maintenance.yml` (daily `30 4 * * *`, two tries,
+`dry_run=0`, skips with a notice while `SWEEP_TOKEN` is unset, one issue on failure), and the overview fallback (safe
+tasks 1-3, production only, once per 12 h per process, only when no applied run in 24 h; task 7 is left out there
+because the overview re-measures on its own).
+
+Owner rules (PRODUCT_DECISIONS "Owner 2026-11-12: storage retention answers"; constants in `tasks.py`), all ON:
+- Q-S1: never-verified accounts after 90 days, when nothing points at them but their own sign-up consent (generic guard
+  over every foreign key to `users.id`, plus no audit row naming them); the sign-up consent goes with the account.
+- Q-S2: staff preview attempts at any age once not in progress; in-progress ones after 24 h (never one being taken).
+- Q-S3: test-student attempts by the same rule, with their synthetic grade rows (attempt grade, grade events, the quiz
+  submission that kept them, the course-total cache); retired (removed by a reset, more than 1 h ago) test students go
+  with enrollments, submissions, progress rows, enrollment events, exam goals and erased file rows, after
+  `sweep_retired_files(apply=True)`. The course's active test student keeps its enrollment and user.
+- Audit log: kept (no task).
+Each task is bounded (500 rows, 100 accounts), one transaction, `FOR UPDATE SKIP LOCKED` on PostgreSQL, idempotent.
+
+Dry run on the production copy (Neon branch `triage-2026-11-12`, alembic `0032`, read-only sessions, nothing
+committed), which predicts the first production run:
+
+| task | due | task | due |
+|---|---|---|---|
+| attempt_sweep | 0 | unverified_accounts | 0 |
+| application_purge | 0 | preview_attempts | 4 |
+| phone_purge | 0 | test_student_attempts | 1 |
+| code_note_purge | 0 | test_student_files | 0 |
+| user_tokens | 3 | retired_test_students | 2 (of 9 test students; 7 are active) |
+| pairing_codes | 4 | measure_storage | measured |
+| email_changes | 0 | rate_limits | 83 |
+
+Apply was verified on the same copy inside one transaction that was then rolled back: the counts above were handled,
+a second pass found 0, and every protected kind of §6 was unchanged (real attempts 10, their items 1,059 and sections 38,
+real submissions 6, attempt grades 7, course grades 9, audit rows 58, consent records 14, data requests 2, real
+enrollment events 41, assessment versions 10, question versions 480, teacher requests 2, real users 13).

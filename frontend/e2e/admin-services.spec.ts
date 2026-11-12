@@ -243,3 +243,40 @@ test("database capacity: ok keeps the writes-stop sentence and shows no advice",
   await expect(cap).toContainText(t("infra.capacity.source.database_estimate"));
   await page.unrouteAll({ behavior: "ignoreErrors" });
 });
+
+// DB_STORAGE_REVIEW 5 (slice D2): the cleanup block runs against the scratch backend (only the provider cards are
+// mocked): a check is a dry run, the cleanup asks first; both show the per-task counts and the last-run line.
+test("database cleanup: check, then clean up after the confirmation", async ({ page }) => {
+  await mock(page, infra([OK_NEON]));
+  await page.goto("/ru/admin/services");
+  const block = page.getByTestId("infra-maintenance");
+  await expect(block.getByRole("heading", { name: t("infra.maintenance.title") })).toBeVisible();
+  await expect(block).toContainText(t("infra.maintenance.subtitle"));
+  const check = block.getByRole("button", { name: t("infra.maintenance.check") });
+  await expect(check).toBeEnabled();
+  await check.click();
+  const last = block.getByTestId("maintenance-last-run");
+  await expect(last).toContainText(t("infra.maintenance.mode.dryRun"));
+  await expect(last).toContainText(t("infra.maintenance.trigger.admin"));
+  const counts = block.getByTestId("maintenance-counts");
+  await expect(counts.locator("[data-task]")).toHaveCount(14);
+  await expect(counts.locator('[data-task="preview_attempts"]')).toContainText(t("infra.maintenance.task.preview_attempts"));
+  await expect(counts.locator('[data-task="measure_storage"]')).toContainText(t("infra.maintenance.measured"));
+  await shots(page, "04-services-maintenance");
+
+  await block.getByRole("button", { name: t("infra.maintenance.apply") }).click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog).toContainText(t("infra.maintenance.confirmTitle"));
+  await expect(dialog).toContainText(t("infra.maintenance.confirmEffect"));
+  await dialog.getByRole("button", { name: t("ui.cancel") }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(last).toContainText(t("infra.maintenance.mode.dryRun"));
+  await block.getByRole("button", { name: t("infra.maintenance.apply") }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: t("infra.maintenance.apply") }).click();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await expect(last).toContainText(t("infra.maintenance.mode.applied"));
+  await expect(block.getByTestId("maintenance-errors")).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByTestId("maintenance-last-run")).toContainText(t("infra.maintenance.mode.applied"));
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+});
