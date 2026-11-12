@@ -38,8 +38,12 @@ def summary(admin: User = Depends(require_platform_admin), db: Session = Depends
 
 
 @router.get("/overview", response_model=OverviewOut)
-def overview(admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
-    """FB8-5 S4: the overview page's numbers; 60 s per-process cache (`platform_admin/overview.py`)."""
+def overview(background: BackgroundTasks, admin: User = Depends(require_platform_admin), db: Session = Depends(get_db)):
+    """FB8-5 S4: the overview page's numbers; 60 s per-process cache (`platform_admin/overview.py`). D2: the safe
+    maintenance tasks run after the response when the daily schedule was skipped (`maintenance/service.py`)."""
+    from app.lms.maintenance import service as maintenance
+
+    maintenance.maybe_schedule(background)
     return overview_service.overview(db)
 
 

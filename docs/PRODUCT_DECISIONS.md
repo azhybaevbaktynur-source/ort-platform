@@ -668,3 +668,9 @@ Owner: "We already decided that student and teacher will be separate. A teacher 
 - Q-S4: the owner asked whether the audit log matters. Agent answer: yes, keep it: it is the only record of who approved teachers, changed roles, disabled accounts, ran grade overrides, used admin tools and handled privacy requests; it is what answers "who did this?" after a dispute or a stolen admin account, and it is under 1 MB. Decision pending the owner's reply; default: keep, revisit if it passes 50 MB (then 3 years with export).
 - Q-S5 (Neon backups, numbered Q-S6 in the review): keep only the two newest backup branches. 2026-11-12: deleted `backup-2026-11-07-before-pro-0025`, `backup-2026-11-07-before-covers-0026`, `backup-2026-11-08-before-exam-link-0027`; kept `backup-2026-11-09-before-identities-infra-0031`, `backup-2026-11-12-before-notice-0032`. After each new backup the oldest is deleted.
 
+- D2 agent decisions (2026-11-12, `backend/app/lms/maintenance/tasks.py`): a never-verified account's own sign-up
+  consent rows go with it (they are the only rows the Q-S1 guard allows; any other consent, enrollment, audit row naming
+  the account or any other reference keeps it); a test student retired less than 1 h ago waits for the next run (a
+  request of the old session may still be in flight); deleting a test student's attempt also deletes its synthetic
+  grade rows and the quiz submission that kept it, and drops that enrollment's course-total cache; the overview fallback
+  runs only in production and only the safe tasks 1-3.
