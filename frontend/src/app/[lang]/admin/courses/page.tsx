@@ -12,6 +12,7 @@ import { useAdminCrumbs } from "@/components/lms/admin/AdminShell";
 import { useCursorList, useDebounced } from "@/components/lms/admin/useCursorList";
 import { MoreError, useTableState } from "@/components/lms/admin/ListParts";
 import { CourseStatusBadge, SystemAccountBadge } from "@/components/lms/org/OrgUi";
+import { LISTING_TONE } from "@/lib/lms/listing";
 
 export default function AdminCoursesPage() {
   const { lang, t } = useTranslation();
@@ -41,12 +42,16 @@ export default function AdminCoursesPage() {
     { key: "students", header: t("platformAdmin.courses.students"), align: "right", cell: (c) => c.active_student_count },
     {
       key: "flags", header: t("platformAdmin.courses.flags"),
-      cell: (c) => (!c.deleted_at && !c.unlisted_by_admin_at) ? <span className="text-slate-500">—</span> : (
-        <span className="inline-flex flex-wrap justify-end gap-1 sm:justify-start">
-          {c.deleted_at && <Badge tone="danger">{t("platformAdmin.courses.deleted")}</Badge>}
-          {c.unlisted_by_admin_at && <Badge tone="warning">{t("platformAdmin.courses.unlisted")}</Badge>}
-        </span>
-      ),
+      // step 3b S2: the catalog listing state (anything but `off`) next to the trash flag
+      cell: (c) => {
+        const listing = c.listing && c.listing.state !== "off" ? c.listing.state : null;
+        return (!c.deleted_at && !listing) ? <span className="text-slate-500">—</span> : (
+          <span className="inline-flex flex-wrap justify-end gap-1 sm:justify-start">
+            {c.deleted_at && <Badge tone="danger">{t("platformAdmin.courses.deleted")}</Badge>}
+            {listing && <Badge tone={LISTING_TONE[listing]}>{t(`catalog.listing.states.${listing}`)}</Badge>}
+          </span>
+        );
+      },
     },
   ];
   const filtered = !!(q || deleted);

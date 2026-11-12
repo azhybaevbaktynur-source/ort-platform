@@ -203,7 +203,7 @@ export function CatalogView() {
 
   return (
     <div className="w-full">
-      <PageHeader title={t("catalog.title")} description={t("catalog.subtitle")}
+      <PageHeader title={t("catalog.title")} description={teaches ? t("catalog.previewNote") : t("catalog.subtitle")}
         breadcrumbs={studentFrame ? undefined : [{ label: t("lms.nav.myCourses"), href: `/${lang}/courses` }, { label: t("catalog.title") }]}
         secondaryActions={teaches ? undefined : <LinkButton variant="secondary" href={`/${lang}/courses/join`} leftIcon={<KeyRound className="h-4 w-4" aria-hidden="true" />}>{t("home.primary.join")}</LinkButton>} />
 

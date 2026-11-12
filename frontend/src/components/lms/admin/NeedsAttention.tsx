@@ -4,7 +4,7 @@
 // one line says everything is fine.
 import React from "react";
 import Link from "next/link";
-import { BookX, CheckCircle2, ChevronRight, Database, HardDrive, KeyRound, ShieldAlert, UserCheck } from "lucide-react";
+import { BookPlus, BookX, CheckCircle2, ChevronRight, Database, HardDrive, KeyRound, ShieldAlert, UserCheck } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { lmsErrorKey } from "@/components/lms/ErrorMessage";
 import type { PlatformOverviewDatabase } from "@/lib/lms/admin";
@@ -21,6 +21,8 @@ export interface AttentionInput {
   database?: PlatformOverviewDatabase | null;
   /** Step 3b S1, owner D10: courses that left the catalog in 7 days because their teacher was revoked (overview). */
   catalogRevoked?: number | null;
+  /** Step 3b S2: courses waiting for a catalog decision (overview `catalog_pending`; Admin → Каталог). */
+  catalogPending?: number | null;
   /** FIX_ROUND_2026-11-12 1a: the shell's summary failed (after its retries); only this card shows it, with a retry. */
   summaryError?: { code?: string } | null;
   onRetry?: () => void;
@@ -34,7 +36,7 @@ interface Row {
   badge: React.ReactNode;
 }
 
-export function NeedsAttention({ pending, storageLevel, reveals, failedChecks, database, catalogRevoked, summaryError, onRetry }: AttentionInput) {
+export function NeedsAttention({ pending, storageLevel, reveals, failedChecks, database, catalogRevoked, catalogPending, summaryError, onRetry }: AttentionInput) {
   const { lang, t } = useTranslation();
   const base = `/${lang}/admin`;
   const rows: Row[] = [];
@@ -56,6 +58,10 @@ export function NeedsAttention({ pending, storageLevel, reveals, failedChecks, d
         : t("platformAdmin.overview.attention.database", { percent, count: fits }),
       href: `${base}/services`,
       badge: <Badge tone={db.level === "critical" ? "danger" : "warning"}>{percent}%</Badge> });
+  }
+  if (catalogPending && catalogPending > 0) {
+    rows.push({ id: "catalogPending", icon: <BookPlus />, text: t("platformAdmin.overview.attention.catalogPending"),
+      href: `${base}/catalog`, badge: <Badge tone="info">{catalogPending}</Badge> });
   }
   if (catalogRevoked && catalogRevoked > 0) {
     rows.push({ id: "catalogRevoked", icon: <BookX />, text: t("platformAdmin.overview.attention.catalogRevoked"),

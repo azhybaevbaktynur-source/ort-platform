@@ -300,15 +300,16 @@ async def test_state_machine_and_every_409(db, api, mails):
     assert str(c.id) not in await catalog_ids(api, make_user(db))
     # block from any state; staff cannot request; relist
     r = await admin_post("unlist", {"reason": "spam"})
-    assert r.status_code == 200 and r.json()["listing"]["state"] == "blocked" and r.json()["unlisted_by_admin_at"]
+    assert r.status_code == 200 and r.json()["listing"]["state"] == "blocked"
     assert (await admin_post("unlist", {})).status_code == 409
     r = await staff("request")
     assert r.status_code == 409 and code(r) == "listing_blocked"
     assert (await staff("withdraw")).status_code == 409
     assert (await admin_post("listing/approve")).status_code == 409
-    assert (await api.call(t, "GET", f"/courses/{c.id}")).json()["unlisted_by_admin"] is True
+    r = await api.call(t, "GET", f"/courses/{c.id}")
+    assert r.json()["listing"]["state"] == "blocked" and "unlisted_by_admin" not in r.json()
     r = await admin_post("relist", {})
-    assert r.status_code == 200 and r.json()["listing"]["state"] == "listed" and r.json()["unlisted_by_admin_at"] is None
+    assert r.status_code == 200 and r.json()["listing"]["state"] == "listed"
     assert (await admin_post("relist", {})).status_code == 409
     actions = [a for (a,) in db.execute(select(AdminAuditLog.action).where(
         AdminAuditLog.target_id == str(c.id)).order_by(AdminAuditLog.created_at))]

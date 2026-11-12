@@ -44,6 +44,11 @@ export const transferOwnership = (id: string, newOwnerUserId: string) =>
     method: "POST",
     body: { new_owner_user_id: newOwnerUserId },
   });
+/** Step 3b (CATALOG_AND_TEACHERS_DESIGN 2.3): course staff ask for the catalog list, or leave it (`pending` / `listed` → `off`). */
+export const requestListing = (id: string) =>
+  lmsFetch<CourseStaffOut>(`/courses/${enc(id)}/listing/request`, { method: "POST" });
+export const withdrawListing = (id: string) =>
+  lmsFetch<CourseStaffOut>(`/courses/${enc(id)}/listing/withdraw`, { method: "POST" });
 export const regenerateJoinCode = (id: string) =>
   lmsFetch<JoinCodeOut>(`/courses/${enc(id)}/join-code/regenerate`, { method: "POST" });
 export const joinByCode = (code: string) => thenMeStale(lmsFetch<JoinOut>("/courses/join", { method: "POST", body: { code } }));

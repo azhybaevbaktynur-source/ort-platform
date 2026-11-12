@@ -909,6 +909,52 @@ def seed_hub(api: Api, log: Path, ort_course_id: str) -> dict:
 # --- Step 3a S3 end ---
 
 
+# --- Step 3b S2 begin --- (frontend/e2e/catalog-listing.spec.ts: the «Каталог платформы» block and Admin → Каталог;
+# one independent teacher, written after every other row)
+def seed_catalog_listing(api: Api, log: Path, admin_tok: str) -> dict:
+    """An approved teacher with four published courses: two ready for the catalog (open by link, a description and a
+    published lesson; nothing requested yet), one incomplete (private, no description, no content) and one already
+    blocked by the platform admin; and a student in no course."""
+    teacher = register(api, log, "e2e-listing-teacher@example.com", "Асель Каталогова")
+    tp = profile(api, teacher["token"])
+    api.call("POST", f"/platform/users/{tp['id']}/teacher-status", admin_tok, {"status": "approved"})
+    teacher["profile"] = profile(api, teacher["token"])
+    tok = teacher["token"]
+
+    def course(title: dict, description, *, link: bool, lesson: bool) -> str:
+        body = {"title": title, "languages": ["ru", "ky", "en"], "default_language": "ru", "enrollment_mode": "open"}
+        if description:
+            body["description"] = description
+        c = api.call("POST", "/courses", tok, body)
+        if lesson:
+            api.call("POST", f"/courses/{c['id']}/modules", tok,
+                     {"title": {"ru": "Введение", "ky": "Киришүү", "en": "Introduction"}, "published": True})
+        api.call("POST", f"/courses/{c['id']}/publish", tok, {})
+        if link:
+            api.call("PATCH", f"/courses/{c['id']}", tok, {"visibility": "catalog"})
+        return c["id"]
+
+    ready = course(tri("Геометрия для всех E2E", "Баары үчүн геометрия E2E", "Geometry for everyone E2E"),
+                   tri("Планиметрия с нуля: фигуры, площади, углы", "Нөлдөн планиметрия", "Plane geometry from scratch"),
+                   link=True, lesson=True)
+    declined = course(tri("Химия с нуля E2E", "Нөлдөн химия E2E", "Chemistry from scratch E2E"),
+                      tri("Основы химии для 9 класса", "9-класс үчүн химиянын негиздери", "Chemistry basics for grade 9"),
+                      link=True, lesson=True)
+    incomplete = course(tri("Черновик истории E2E", "Тарых черновиги E2E", "History draft E2E"), None,
+                        link=False, lesson=False)
+    blocked = course(tri("Снятый курс E2E", "Алынган курс E2E", "Removed course E2E"),
+                     tri("Курс, который сняли с каталога", "Каталогдон алынган курс", "A course removed from the catalog"),
+                     link=True, lesson=True)
+    api.call("POST", f"/courses/{blocked}/listing/request", tok, {})
+    api.call("POST", f"/platform/courses/{blocked}/listing/approve", admin_tok, {})
+    api.call("POST", f"/platform/courses/{blocked}/unlist", admin_tok, {"reason": "e2e"})
+    student = register(api, log, "e2e-listing-student@example.com", "Данияр Каталогов")
+    student["profile"] = profile(api, student["token"])
+    return {"teacher": teacher, "student": student, "ready_id": ready, "declined_id": declined,
+            "incomplete_id": incomplete, "blocked_id": blocked}
+# --- Step 3b S2 end ---
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--api", required=True)
@@ -1012,9 +1058,11 @@ def main() -> int:
     login_student = register(api, log, "e2e-login-student@example.com", "Login Student", keep_password=True)
     login_student["profile"] = profile(api, login_student["token"])
     hub = seed_hub(api, log, cid)  # step 3a S3 (people only; after every other row)
+    catalog_listing = seed_catalog_listing(api, log, tok)  # step 3b S2 (after every other row)
 
     seed = {
         "hub": hub,
+        "catalog_listing": catalog_listing,
         "quiz_editor": quiz_editor,
         "modules": modules,
         "scrolling": scrolling,

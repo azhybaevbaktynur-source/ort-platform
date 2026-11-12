@@ -194,7 +194,7 @@ export default function NewCoursePage() {
                 <Input id="enroll-limit" type="number" min={1} max={10000} label={t("courses.create.limit")} value={limit} disabled={busy}
                   onChange={(e) => setLimit(e.target.value)} placeholder={t("courses.create.limitPlaceholder")} />
               </div>
-              <Switch id="new-visibility" label={t("enrollmentForm.settings.catalog")} checked={catalog} disabled={busy}
+              <Switch id="new-visibility" label={t("catalog.listing.linkAccess")} checked={catalog} disabled={busy}
                 hint={t("courses.create.catalogHint")} onChange={setCatalog} />
             </div>
           </Card>

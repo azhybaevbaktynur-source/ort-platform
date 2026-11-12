@@ -133,7 +133,7 @@ test("create: one main language, a translation on request, the live card, the co
   await page.keyboard.press("End");
   await expect(frame).toHaveAttribute("aria-valuenow", "100");
   await expect(preview(page).locator("img")).toHaveCSS("object-position", "100% 50%");
-  await page.getByRole("switch", { name: t("enrollmentForm.settings.catalog") }).click();
+  await page.getByRole("switch", { name: t("catalog.listing.linkAccess") }).click();
   await shots(page, "create-filled");
 
   await page.getByRole("button", { name: t("courses.create.submit") }).click();
