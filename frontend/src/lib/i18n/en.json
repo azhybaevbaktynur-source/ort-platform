@@ -214,6 +214,7 @@
       "invalid_cursor": "The list expired. Reload the page.",
       "account_disabled": "Your account is disabled.",
       "network": "Cannot reach the server. Check your connection.",
+      "server_starting": "The server is starting, a few more seconds…",
       "unknown": "Something went wrong. Please try again.",
       "bank_not_found": "Question bank not found.",
       "question_not_found": "Question not found.",

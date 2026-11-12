@@ -12,9 +12,9 @@ import { useAdminSummary } from "@/components/lms/admin/AdminShell";
 import { MetricsRow } from "@/components/lms/admin/MetricsRow";
 import { NeedsAttention } from "@/components/lms/admin/NeedsAttention";
 import { HealthLine, failedHealthChecks, usePlatformHealth } from "@/components/lms/admin/HealthLine";
+import { CardBoundary } from "@/components/lms/admin/CardBoundary";
 import { RecentExamsCard, useAccessOverview } from "@/components/lms/access/AdminAccessUi";
-import { lmsErrorKey } from "@/components/lms/ErrorMessage";
-import { ErrorState, LinkButton, PageHeader, STAFF_WIDTH, cn } from "@/components/ui";
+import { LinkButton, PageHeader, STAFF_WIDTH, cn } from "@/components/ui";
 
 function useOverview(enabled: boolean) {
   const [data, setData] = useState<PlatformOverviewOut | null>(null);
@@ -36,7 +36,7 @@ export default function AdminOverviewPage() {
   // two); an admin who must set up two-step login gets them refused like the summary and is sent to the security page
   const ready = error?.code !== "mfa_enrollment_required";
   const overview = useOverview(ready);
-  const { data: access } = useAccessOverview(ready);
+  const access = useAccessOverview(ready);
   const { health, failed } = usePlatformHealth(ready);
 
   return (
@@ -47,34 +47,43 @@ export default function AdminOverviewPage() {
           { id: "audit", label: t("platformAdmin.overview.menu.auditLog") },
         ] }]}
         onOverflow={(id) => router.push(id === "health" ? `${base}/health` : `${base}/audit-log`)} />
-      {error && pending === null
-        ? <ErrorState variant="inline" message={t(lmsErrorKey(error.code))} onRetry={refresh} />
-        : (
-          <div className="space-y-4">
-            <MetricsRow data={overview.data} error={overview.error} onRetry={() => void overview.reload()} />
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-              <NeedsAttention pending={pending} storageLevel={storageLevel}
-                reveals={overview.data ? { count: overview.data.reveals_last_hour, alert: overview.data.reveal_alert } : null}
-                failedChecks={health ? failedHealthChecks(health) : null} />
-              <section aria-labelledby="quick-actions-title" className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
-                <h2 id="quick-actions-title" className="text-base font-semibold text-slate-900">{t("platformAdmin.overview.quick.title")}</h2>
-                <div className="mt-3 flex flex-wrap gap-2 lg:flex-col lg:items-stretch">
-                  <LinkButton href={`/${lang}/courses/new`} variant="secondary" size="sm" leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />}>
-                    {t("platformAdmin.overview.quick.newCourse")}
-                  </LinkButton>
-                  <LinkButton href={`${base}/access`} variant="secondary" size="sm" leftIcon={<UserPlus aria-hidden="true" className="h-4 w-4" />}>
-                    {t("platformAdmin.overview.quick.grantPro")}
-                  </LinkButton>
-                  <LinkButton href={`${base}/access/vouchers`} variant="secondary" size="sm" leftIcon={<KeyRound aria-hidden="true" className="h-4 w-4" />}>
-                    {t("platformAdmin.overview.quick.codes")}
-                  </LinkButton>
-                </div>
-              </section>
-            </div>
-            <HealthLine health={health} failed={failed} />
-            <RecentExamsCard data={access} compact />
-          </div>
-        )}
+      {/* FIX_ROUND_2026-11-12 1a: no page-level gate; each card loads, fails and retries alone (CardBoundary for a
+          card that crashes while drawing), and the summary's failure shows only inside "Needs attention" */}
+      <div className="space-y-4">
+        <CardBoundary onRetry={() => void overview.reload()} resetKey={overview.data}>
+          <MetricsRow data={overview.data} error={overview.error} onRetry={() => void overview.reload()} />
+        </CardBoundary>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <CardBoundary resetKey={pending}>
+            <NeedsAttention pending={pending} storageLevel={storageLevel}
+              reveals={overview.data ? { count: overview.data.reveals_last_hour, alert: overview.data.reveal_alert } : null}
+              failedChecks={health ? failedHealthChecks(health) : null}
+              summaryError={ready ? error : null} onRetry={refresh} />
+          </CardBoundary>
+          <CardBoundary>
+            <section aria-labelledby="quick-actions-title" className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
+              <h2 id="quick-actions-title" className="text-base font-semibold text-slate-900">{t("platformAdmin.overview.quick.title")}</h2>
+              <div className="mt-3 flex flex-wrap gap-2 lg:flex-col lg:items-stretch">
+                <LinkButton href={`/${lang}/courses/new`} variant="secondary" size="sm" leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />}>
+                  {t("platformAdmin.overview.quick.newCourse")}
+                </LinkButton>
+                <LinkButton href={`${base}/access`} variant="secondary" size="sm" leftIcon={<UserPlus aria-hidden="true" className="h-4 w-4" />}>
+                  {t("platformAdmin.overview.quick.grantPro")}
+                </LinkButton>
+                <LinkButton href={`${base}/access/vouchers`} variant="secondary" size="sm" leftIcon={<KeyRound aria-hidden="true" className="h-4 w-4" />}>
+                  {t("platformAdmin.overview.quick.codes")}
+                </LinkButton>
+              </div>
+            </section>
+          </CardBoundary>
+        </div>
+        <CardBoundary resetKey={health}>
+          <HealthLine health={health} failed={failed} />
+        </CardBoundary>
+        <CardBoundary onRetry={() => void access.reload()} resetKey={access.data}>
+          <RecentExamsCard data={access.data} error={access.error} onRetry={() => void access.reload()} compact />
+        </CardBoundary>
+      </div>
     </div>
   );
 }

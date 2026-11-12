@@ -95,4 +95,94 @@ test("admin overview: reveal alert and failing checks appear in Needs attention"
   await page.unroute("**/api/v1/platform/overview");
   await page.getByRole("button", { name: t("ui.retry") }).click();
   await expect(page.getByTestId("overview-metrics")).toBeVisible();
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+});
+
+// FIX_ROUND_2026-11-12 1a: one failing call never replaces the overview; only its own card shows an inline error.
+const SUMMARY = "**/api/v1/platform/summary";
+const RENDER_502 = "<!DOCTYPE html><html><head><title>502 Bad Gateway</title></head><body>Bad Gateway</body></html>";
+
+/** The cards that do not depend on the failing call, and the page error that must never appear. */
+async function expectOtherCards(page: Page, { metrics = true, attention = true, recent = true } = {}): Promise<void> {
+  if (metrics) await expect(page.getByTestId("overview-metrics").getByText(t("platformAdmin.overview.metrics.users"))).toBeVisible();
+  for (const key of ["newCourse", "grantPro", "codes"]) {
+    await expect(page.getByRole("link", { name: t(`platformAdmin.overview.quick.${key}`) })).toBeVisible();
+  }
+  await expect(page.getByTestId("health-line")).toContainText(t("adminHealth.title"));
+  if (attention) {
+    await expect(page.getByTestId("needs-attention").getByRole("link", { name: new RegExp(t("platformAdmin.overview.pendingRequests")) })).toBeVisible();
+  }
+  if (recent) await expect(page.getByTestId("recent-exams").getByRole("heading", { name: t("access.admin.recent.title") })).toBeVisible();
+  await expect(page.getByText(t("mascot.error.title"), { exact: true })).toHaveCount(0); // the page's error boundary
+}
+
+test("admin overview: the summary down (502 HTML while the server wakes) shows only inside Needs attention", async ({ page }) => {
+  await page.setViewportSize(VIEWPORTS.desktop);
+  await signIn(page, seed().admin);
+  let calls = 0;
+  await page.route(SUMMARY, (route) => {
+    calls += 1;
+    return route.fulfill({ status: 502, contentType: "text/html", body: RENDER_502 });
+  });
+  await page.goto("/ru/admin");
+  await expect(page.getByRole("heading", { level: 1, name: t("platformAdmin.overview.title") })).toBeVisible();
+  await expectOtherCards(page, { attention: false });
+
+  // the shell retries (1.5 s, 4 s, 8 s), then the card alone says the server is starting, with its own retry
+  const attention = page.getByTestId("needs-attention");
+  await expect(attention.getByRole("alert")).toContainText(t("lms.errors.server_starting"), { timeout: 40_000 });
+  expect(calls).toBe(4);
+  await expect(page.getByRole("button", { name: t("ui.retry") })).toHaveCount(1);
+  await expectOtherCards(page, { attention: false });
+  await shots(page, "04-summary-down");
+
+  await page.unroute(SUMMARY);
+  await attention.getByRole("button", { name: t("ui.retry") }).click();
+  await expect(attention.getByRole("link", { name: new RegExp(t("platformAdmin.overview.pendingRequests")) })).toBeVisible();
+  await expect(attention.getByRole("alert")).toHaveCount(0);
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+});
+
+test("admin overview: the recent exams call failing errors only that card", async ({ page }) => {
+  await page.setViewportSize(VIEWPORTS.desktop);
+  await signIn(page, seed().admin);
+  await page.route("**/api/v1/platform/access/overview", (route) => route.fulfill({ status: 500, contentType: "application/json", body: '{"detail":"boom"}' }));
+  await page.goto("/ru/admin");
+  const recent = page.getByTestId("recent-exams");
+  await expect(recent.getByRole("alert")).toContainText(t("lms.errors.unknown"));
+  await expectOtherCards(page, { recent: false });
+  await expect(page.getByRole("button", { name: t("ui.retry") })).toHaveCount(1);
+
+  await page.unroute("**/api/v1/platform/access/overview");
+  await recent.getByRole("button", { name: t("ui.retry") }).click();
+  await expect(recent.getByRole("alert")).toHaveCount(0);
+  await expect(recent.locator("li").or(recent.getByText(t("access.admin.recent.empty"))).first()).toBeVisible();
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+});
+
+test("admin overview: a card that crashes while drawing errors alone (malformed metrics answer)", async ({ page }) => {
+  await page.setViewportSize(VIEWPORTS.desktop);
+  await signIn(page, seed().admin);
+  await page.route("**/api/v1/platform/overview", (route) => route.fulfill({ status: 200, contentType: "application/json",
+    body: JSON.stringify({ users_total: null, active_students_7d: null, pro_active: null, attempts_submitted_7d: null }) }));
+  await page.goto("/ru/admin");
+  await expect(page.getByRole("heading", { level: 1, name: t("platformAdmin.overview.title") })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: t("lms.errors.unknown") })).toHaveCount(1);
+  await expect(page.getByTestId("overview-metrics")).toHaveCount(0);
+  await expectOtherCards(page, { metrics: false });
+
+  await page.unroute("**/api/v1/platform/overview");
+  await page.getByRole("button", { name: t("ui.retry") }).click();
+  await expect(page.getByTestId("overview-metrics").getByText(t("platformAdmin.overview.metrics.users"))).toBeVisible();
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+});
+
+test("admin overview: the health check failing leaves the page whole", async ({ page }) => {
+  await page.setViewportSize(VIEWPORTS.desktop);
+  await signIn(page, seed().admin);
+  await page.route("**/api/v1/platform/health", (route) => route.fulfill({ status: 500, contentType: "text/plain", body: "Internal Server Error" }));
+  await page.goto("/ru/admin");
+  await expect(page.getByTestId("health-line")).toContainText(t("adminHealth.unavailable"));
+  await expectOtherCards(page);
+  await page.unrouteAll({ behavior: "ignoreErrors" });
 });

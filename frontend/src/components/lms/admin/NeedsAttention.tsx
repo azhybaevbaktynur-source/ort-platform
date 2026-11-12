@@ -6,7 +6,8 @@ import React from "react";
 import Link from "next/link";
 import { CheckCircle2, ChevronRight, HardDrive, KeyRound, ShieldAlert, UserCheck } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
-import { Badge, Card, Skeleton, cn, focusRing } from "@/components/ui";
+import { lmsErrorKey } from "@/components/lms/ErrorMessage";
+import { Badge, Card, ErrorState, Skeleton, cn, focusRing } from "@/components/ui";
 
 export interface AttentionInput {
   /** Pending teacher requests (the shell's live summary); null while loading. */
@@ -15,6 +16,9 @@ export interface AttentionInput {
   reveals: { count: number; alert: boolean } | null;
   /** Failed health checks; null while the check runs or when it failed to answer. */
   failedChecks: number | null;
+  /** FIX_ROUND_2026-11-12 1a: the shell's summary failed (after its retries); only this card shows it, with a retry. */
+  summaryError?: { code?: string } | null;
+  onRetry?: () => void;
 }
 
 interface Row {
@@ -25,7 +29,7 @@ interface Row {
   badge: React.ReactNode;
 }
 
-export function NeedsAttention({ pending, storageLevel, reveals, failedChecks }: AttentionInput) {
+export function NeedsAttention({ pending, storageLevel, reveals, failedChecks, summaryError, onRetry }: AttentionInput) {
   const { lang, t } = useTranslation();
   const base = `/${lang}/admin`;
   const rows: Row[] = [];
@@ -45,10 +49,13 @@ export function NeedsAttention({ pending, storageLevel, reveals, failedChecks }:
     rows.push({ id: "health", icon: <ShieldAlert />, text: t("platformAdmin.overview.attention.health"),
       href: `${base}/health`, badge: <Badge tone="danger">{failedChecks}</Badge> });
   }
-  const loading = pending === null && storageLevel === null;
+  const loaded = pending !== null || storageLevel !== null;
+  const failed = !loaded && !!summaryError; // a value loaded before stays shown
   return (
     <Card title={t("platformAdmin.overview.attention.title")} headingLevel={2} data-testid="needs-attention">
-      {loading ? <Skeleton className="h-6 w-2/3" /> : rows.length === 0 ? (
+      {failed && <ErrorState variant="inline" message={t(lmsErrorKey(summaryError?.code))} onRetry={onRetry}
+        className={rows.length > 0 ? "mb-3" : undefined} />}
+      {failed && rows.length === 0 ? null : !loaded && !failed ? <Skeleton className="h-6 w-2/3" /> : rows.length === 0 ? (
         <p className="flex items-center gap-2 text-sm text-slate-700">
           <CheckCircle2 aria-hidden="true" className="h-4 w-4 text-success-700" />
           {t("platformAdmin.overview.attention.none")}
