@@ -126,6 +126,15 @@ export function loadHomeActivity(courseId: string): Promise<ActivityOut> {
   return pageLoad(HOME_ACTIVITY_KEY, viaBootstrap(HOME_ACTIVITY_KEY, () => getActivity(courseId, HOME_ACTIVITY_DAYS)), ANALYTICS_CACHE);
 }
 
+/**
+ * Step 3a S3 (OPEN Q2): the hub's «Серия N дней» reads the bootstrap's cross-course activity only (there is no other
+ * cross-course read): call after `loadHome()` answered (the bootstrap that carried the home landed it by then). Any
+ * age is fine (a quiet line); null when this tab never had it.
+ */
+export function peekHomeActivity(): ActivityOut | null {
+  return peek<ActivityOut>(HOME_ACTIVITY_KEY)?.value ?? null;
+}
+
 /** Аналитика's two reads (a prefetch asked moments ago stands for them). */
 export function loadAnalytics(courseId: string, days: ActivityDays): Promise<[ProgressOut, ActivityOut]> {
   return Promise.all([

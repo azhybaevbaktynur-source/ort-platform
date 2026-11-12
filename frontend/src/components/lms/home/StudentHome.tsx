@@ -275,7 +275,8 @@ export function StudentHome() {
   // else the first exam-prep course of the home's answer
   // (PERFORMANCE_AUDIT S2: once the shell knows the student's exam courses, a course just left is not taken from an
   // older home answer)
-  const prepCourse = shell?.current
+  // step 3a S3: no longer routed (the hub is `/home`, `StudentHub`); kept until S5 deletes it
+  const prepCourse = shell?.courses.find((c) => c.student_layout === "exam_prep")
     ?? (shell?.loaded ? null : data?.courses.find((c) => c.student_layout === "exam_prep"))
     ?? null;
   if (prepCourse) {

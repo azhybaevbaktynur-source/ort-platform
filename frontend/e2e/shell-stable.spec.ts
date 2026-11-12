@@ -46,7 +46,7 @@ const CASES: Case[] = [
   },
   {
     who: "student", frame: "student", user: () => seed().students["flow-ru"],
-    urls: () => ["/ru/courses", `/ru/courses/${seed().course_id}/tests`],
+    urls: () => ["/ru/home", "/ru/courses", `/ru/courses/${seed().course_id}/tests`], // step 3a S3: the hub
   },
   { who: "admin", frame: "header", user: () => seed().admin, urls: () => ["/ru/admin", "/ru/courses"] },
 ];

@@ -4,9 +4,10 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 import { E2E_DIR, seed, settle, signIn, tr, type SeedUser } from "./helpers";
 
 /**
- * One course card everywhere (dashboard, catalog, Teaching list), grades with their maximum, and the dashboard order:
- * cards left, side lists right. Once the student joins ORT it is the exam-prep home (Student UI U3, U9: no course
- * grid): to-do and grades, then the other courses as one compact list. Screenshots only with UX_SCREENS_DIR set.
+ * One course card everywhere (the hub, catalog, Teaching list), the last result with its maximum, and the hub order:
+ * cards left, «К выполнению» right. Step 3a S3: the hub `/home` groups the cards (ОРТ · НЦТ · Другие курсы); once the
+ * student joins ORT its card heads the ОРТ group and, on a phone, the to-do follows the courses. Screenshots only with
+ * UX_SCREENS_DIR set.
  */
 const OUT = process.env.UX_SCREENS_DIR ? path.resolve(process.env.UX_SCREENS_DIR) : null;
 const t = (key: string, vars: Record<string, string | number> = {}) => tr("ru", key, vars);
@@ -74,12 +75,11 @@ async function look(page: Page, name: string) {
   }
 }
 
-const courses = (page: Page) => page.locator('section[aria-labelledby="home-courses"]');
+// step 3a S3: the hub's sections
+const courses = (page: Page) => page.locator('section[aria-labelledby="hub-courses"]');
 const todo = (page: Page) => page.locator('section[aria-labelledby="home-todo"]');
-const grades = (page: Page) => page.locator('section[aria-labelledby="home-results"]');
-const sections = (page: Page) => page.locator('section[aria-labelledby="home-sections"]'); // Student UI U3
-const card = (page: Page, title: string) => courses(page).locator("li", { has: page.getByRole("link", { name: title }) });
-const otherCourses = (page: Page) => page.locator('section[aria-labelledby="home-other-courses"]'); // U9
+const group = (page: Page, key: string) => page.locator(`section[aria-labelledby="group-${key}"]`);
+const card = (page: Page, title: string) => courses(page).locator("li", { has: page.getByRole("link", { name: title, exact: true }) });
 
 test.describe("course cards", () => {
   test.describe.configure({ mode: "serial" });
@@ -132,8 +132,8 @@ test.describe("course cards", () => {
   test("desktop: cards on the left, side lists on the right, every field on the card", async ({ browser }) => {
     test.setTimeout(120_000);
     const page = await open(browser, student, 1440, 900);
-    await page.goto("/ru/courses");
-    await expect(courses(page).getByRole("link", { name: WITH_ALL })).toBeVisible();
+    await page.goto("/ru/home");
+    await expect(courses(page).getByRole("link", { name: WITH_ALL, exact: true })).toBeVisible();
     await look(page, "dashboard-1440");
 
     const main = card(page, WITH_ALL);
@@ -152,14 +152,8 @@ test.describe("course cards", () => {
     const row = (await api(student, "GET", "/me/home")).courses.find((c: { title: { ru?: string } }) => c.title.ru === WITH_ALL);
     expect(row.organization_display_name).toBeNull();
 
-    // the platform course carries no teacher or organization line (F7c; the stored organization name is English)
-    const ort = page.getByRole("region", { name: t("home.platform.title") })
-      .locator("li", { has: page.locator(`a[href="/ru/courses/catalog/${seed().course_id}"]`) });
-    await expect(ort).not.toContainText(t("common.appName"));
-    await expect(ort).not.toContainText("Platform");
-
-    // a zero has its maximum
-    await expect(grades(page).getByText("0 / 10", { exact: true })).toBeVisible();
+    // a zero has its maximum (the card's last result line; step 3a S3: no results list on the hub)
+    await expect(main).toContainText(t("home.hub.card.lastResult", { value: "0 / 10" }));
 
     // the side lists sit right of the cards; cards of one row are equally high
     const left = (await courses(page).boundingBox())!;
@@ -170,23 +164,21 @@ test.describe("course cards", () => {
     await page.context().close();
   });
 
-  test("phone, after joining ORT: to-do and grades, then the other courses, no sideways scroll", async ({ browser }) => {
+  test("phone, after joining ORT: the ОРТ group first, then the other courses, then the to-do; no sideways scroll", async ({ browser }) => {
     test.setTimeout(120_000);
     await api(student, "POST", `/courses/${seed().course_id}/join`, {}); // the platform's ORT course
     const page = await open(browser, student, 375, 812);
-    await page.goto("/ru/courses");
-    await expect(otherCourses(page).getByRole("link", { name: WITH_ALL })).toBeVisible();
+    await page.goto("/ru/home");
+    await expect(group(page, "other").getByRole("link", { name: WITH_ALL, exact: true })).toBeVisible();
     await look(page, "dashboard-375");
-    // Student UI U3 / U9 (exam-prep home without a result): no sections card and no course grid; to-do, grades, then
-    // the other courses (the ORT course is the shell's exam, not in that list)
-    await expect(sections(page)).toHaveCount(0);
-    await expect(courses(page)).toHaveCount(0);
-    await expect(otherCourses(page).locator(`a[href="/ru/courses/${seed().course_id}"]`)).toHaveCount(0);
+    // step 3a S3: the ORT course is a card of the ОРТ group (no exam-prep home, no sections card on the hub)
+    await expect(group(page, "ort").locator(`a[href="/ru/courses/${seed().course_id}"]`).first()).toBeVisible();
+    await expect(group(page, "other").locator(`a[href="/ru/courses/${seed().course_id}"]`)).toHaveCount(0);
+    const o = (await group(page, "ort").boundingBox())!;
+    const d = (await group(page, "other").boundingBox())!;
     const b = (await todo(page).boundingBox())!;
-    const c = (await grades(page).boundingBox())!;
-    const d = (await otherCourses(page).boundingBox())!;
-    expect(b.y + b.height).toBeLessThanOrEqual(c.y);
-    expect(c.y + c.height).toBeLessThanOrEqual(d.y);
+    expect(o.y + o.height).toBeLessThanOrEqual(d.y);
+    expect(d.y + d.height).toBeLessThanOrEqual(b.y);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
     await page.context().close();
   });
@@ -209,25 +201,21 @@ test.describe("course cards", () => {
     }
   });
 
-  test("the Teaching list uses the card; an empty dashboard offers the platform courses", async ({ browser }) => {
+  test("the Teaching list uses the card; an empty hub offers the choose step and the code", async ({ browser }) => {
     test.setTimeout(120_000);
     const tp = await open(browser, teacher(), 1440, 900);
-    await tp.goto("/ru/courses?view=teaching");
+    await tp.goto("/ru/courses");
     await expect(tp.getByRole("link", { name: WITH_ALL })).toBeVisible();
     await expect(tp.locator("li", { has: tp.getByRole("link", { name: WITH_ALL }) })).toContainText(t("courses.status.published"));
     await look(tp, "teaching-1440");
     await tp.context().close();
 
     const ep = await open(browser, empty, 375, 812);
-    await ep.goto("/ru/courses");
-    // Exam prep S2 UX review: with platform courses (the seeded ORT courses) they carry the action, and the code and
-    // the catalog are one quiet line instead of the mascot empty state (which stays when nothing is offered)
-    await expect(ep.getByRole("region", { name: t("home.platform.title") })).toBeVisible();
-    await expect(ep.getByRole("region", { name: t("home.platform.title") }).getByRole("button", { name: t("catalog.join") }).first()).toBeVisible();
-    await expect(ep.getByText(t("home.platform.haveCode"))).toBeVisible();
-    await expect(ep.locator('img[src*="/mascot/hello"]')).toHaveCount(0);
-    await expect(ep.getByRole("link", { name: t("home.primary.join") })).toBeVisible();
-    await expect(ep.getByRole("link", { name: t("home.openCatalog") })).toBeVisible();
+    await ep.goto("/ru/home");
+    // step 3a S3 (§2.2): the platform courses moved to the choose step; the empty hub has «Выбрать курсы» and the code
+    await expect(ep.getByText(t("home.hub.emptyTitle"))).toBeVisible();
+    await expect(ep.locator("main#main").getByRole("link", { name: t("home.hub.choose") })).toHaveAttribute("href", "/ru/courses/choose");
+    await expect(ep.locator("main#main").getByRole("link", { name: t("home.hub.join") })).toHaveAttribute("href", "/ru/courses/join");
     await look(ep, "dashboard-empty-375");
     await ep.context().close();
   });

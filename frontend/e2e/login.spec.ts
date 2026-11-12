@@ -4,7 +4,7 @@ import { seed, tr, watchCsp } from "./helpers";
 /**
  * PERFORMANCE_AUDIT P3 (§10.2 item 3): the sign-in starts the shell's bootstrap before the route change to the first
  * page, so that page finds it running or answered. A password student in no course (`seed.login_student`) signs in on
- * /ru/login: `/me/bootstrap?include=home` starts before the address becomes /ru/courses, is asked once (the home and
+ * /ru/login: `/me/bootstrap?include=home` starts before the address becomes /ru/home (step 3a S3: the hub), is asked once (the home and
  * the shell share it), and the home asks none of its own reads (`/me/home`). The time from the click to the home's first
  * content is written to the test's annotations and stdout ("submit-to-content"); `P3_API_DELAY_MS` delays every API
  * request for that measurement.
@@ -25,7 +25,7 @@ test("P3: the sign-in starts the bootstrap before the route change, and it is as
       const orig = history[k];
       history[k] = function (this: History, ...args: Parameters<History["pushState"]>) {
         const r = orig.apply(this, args);
-        if (w.__homeAt === undefined && /^\/ru\/courses\/?$/.test(location.pathname)) w.__homeAt = performance.now();
+        if (w.__homeAt === undefined && /^\/ru\/home\/?$/.test(location.pathname)) w.__homeAt = performance.now();
         return r;
       };
     }
@@ -49,11 +49,11 @@ test("P3: the sign-in starts the bootstrap before the route change, and it is as
     document.addEventListener("submit", () => { (window as Window & { __submitAt?: number }).__submitAt = performance.now(); }, true);
   });
   await page.getByRole("button", { name: t("auth.signInButton") }).click();
-  // first content: the home's "От платформы" heading painted, read every frame (the page's own clock)
+  // first content: the hub's empty state painted (a student in no course), read every frame (the page's own clock)
   const shown = await page.waitForFunction((title) => (document.body?.innerText.includes(title) ? performance.now() : 0),
-    t("home.platform.title"), { polling: "raf", timeout: 30_000 });
-  await expect(page).toHaveURL(new RegExp(`/${L}/courses$`));
-  await expect(page.getByRole("region", { name: t("home.platform.title") })).toBeVisible();
+    t("home.hub.emptyTitle"), { polling: "raf", timeout: 30_000 });
+  await expect(page).toHaveURL(new RegExp(`/${L}/home$`));
+  await expect(page.getByText(t("home.hub.emptyTitle"))).toBeVisible();
   const submitAt = await page.evaluate(() => (window as Window & { __submitAt?: number }).__submitAt ?? 0);
   const ms = Math.round((await shown.jsonValue()) - submitAt);
   test.info().annotations.push({ type: "submit-to-content", description: `${ms} ms` });

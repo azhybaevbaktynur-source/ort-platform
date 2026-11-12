@@ -34,16 +34,16 @@ export function splitPath(href: string): { rest: string; view: string | null } {
 
 /** The frame a fully loaded page of this URL must have for this role (never `neutral` once the account is known). */
 export function expectedFrame(role: Role, href: string): ShellKind {
-  const { rest, view } = splitPath(href);
+  const { rest } = splitPath(href);
   const me = ROLE_ME[role];
   // a learner's course page declares Learning; nobody else's declaration changes the frame
-  return shellKindFor({ rest, view, declared: learnsHere(me) ? "learning" : null, me });
+  return shellKindFor({ rest, declared: learnsHere(me) ? "learning" : null, me });
 }
 
 /** The header area a fully loaded page of this URL must highlight for this role. */
 export function expectedArea(role: Role, href: string): ShellArea {
-  const { rest, view } = splitPath(href);
-  return activeAreaFor(rest, view, null, ROLE_ME[role]);
+  const { rest } = splitPath(href);
+  return activeAreaFor(rest, null, ROLE_ME[role]);
 }
 
 /** Pro in the account menu: only for people who learn. */

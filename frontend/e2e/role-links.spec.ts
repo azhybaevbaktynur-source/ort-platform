@@ -15,7 +15,7 @@ import { expectedArea, expectedFrame, expectsLearning, expectsPro, type Role } f
 const t = (key: string) => tr("ru", key);
 
 /** The signed-in app's routes (LmsShell); any other page (help, policies) only has to load without an error. */
-const LMS_ROUTE = /^\/ru\/(courses|admin|org|grading-schemes|exam-templates|invitations|parent|privacy|pro)(\/|\?|$)/;
+const LMS_ROUTE = /^\/ru\/(home|courses|admin|org|grading-schemes|exam-templates|invitations|parent|privacy|pro)(\/|\?|$)/; // step 3a S3: /home
 
 interface Found { href: string; from: string; current: boolean; brand: boolean }
 
@@ -35,6 +35,7 @@ async function linksIn(scope: Locator, from: string, into: Map<string, Found>) {
     if (!r.href.startsWith("/ru/") && r.href !== "/ru") continue; // external, mailto, the skip link
     const key = norm(r.href);
     if (/\/attempts\//.test(key) || /\/(login|logout)$/.test(key)) continue;
+    if (key === "/ru/courses/choose") continue; // step 3a S3: the choose step is linked already; S4 adds the page (remove this skip then)
     if (!into.has(key)) into.set(key, { href: key, from, current: r.current, brand: r.label.includes(t("common.appName")) });
   }
 }
@@ -129,15 +130,15 @@ async function walk(page: Page, role: Role, user: SeedUser, entries: string[]): 
 }
 
 const ENTRY = {
-  student: () => { const s = seed(); return { user: s.access!.student, entries: ["/ru/courses", `/ru/courses/${s.access!.course_id}`, "/ru/courses/catalog", "/ru/pro", "/ru/privacy"] }; },
-  teacher: () => { const s = seed(); return { user: s.course_nav.teacher, entries: ["/ru/courses", `/ru/courses/${s.course_nav.course_id}`, "/ru/courses/catalog", `/ru/courses/catalog/${s.course_id}`, "/ru/pro"] }; },
+  student: () => { const s = seed(); return { user: s.access!.student, entries: ["/ru/home", "/ru/courses", `/ru/courses/${s.access!.course_id}`, "/ru/courses/catalog", "/ru/pro", "/ru/privacy"] }; },
+  teacher: () => { const s = seed(); return { user: s.course_nav.teacher, entries: ["/ru/courses", "/ru/home", `/ru/courses/${s.course_nav.course_id}`, "/ru/courses/catalog", `/ru/courses/catalog/${s.course_id}`, "/ru/pro"] }; },
   teacher_enrolled: () => {
     const s = seed();
     const u = s.teacher_enrolled;
-    return { user: u, entries: ["/ru/courses", "/ru/courses?view=learning", `/ru/courses/${u.course_id}`, `/ru/courses/${s.course_id}`, "/ru/courses/catalog", "/ru/courses/join", "/ru/pro"] };
+    return { user: u, entries: ["/ru/courses", "/ru/home", "/ru/courses?view=learning", `/ru/courses/${u.course_id}`, `/ru/courses/${s.course_id}`, "/ru/courses/catalog", "/ru/courses/join", "/ru/pro"] };
   },
-  org_admin: () => { const s = seed(); return { user: s.org_admin.org_admin, entries: ["/ru/courses", `/ru/org/${s.org_admin.organization_id}`, `/ru/courses/${s.org_admin.maths_course_id}`, "/ru/pro"] }; },
-  platform_admin: () => { const s = seed(); return { user: s.admin, entries: ["/ru/courses", "/ru/admin", "/ru/org", `/ru/courses/${s.course_id}`, "/ru/pro"] }; },
+  org_admin: () => { const s = seed(); return { user: s.org_admin.org_admin, entries: ["/ru/courses", "/ru/home", `/ru/org/${s.org_admin.organization_id}`, `/ru/courses/${s.org_admin.maths_course_id}`, "/ru/pro"] }; },
+  platform_admin: () => { const s = seed(); return { user: s.admin, entries: ["/ru/courses", "/ru/home", "/ru/admin", "/ru/org", `/ru/courses/${s.course_id}`, "/ru/pro"] }; },
 } satisfies Record<Role, () => { user: SeedUser; entries: string[] }>;
 
 for (const role of Object.keys(ENTRY) as Role[]) {

@@ -1,55 +1,58 @@
 /**
- * Dependency-free check of the student shell's links (STUDENT_UI_DESIGN §2.2) and the УРОКИ group's lesson-course rows
- * (TEACHER_TO_STUDENT_MAP §2.4).
+ * Dependency-free check of the student frame's links (step 3a S3, STUDENT_IA_DESIGN §2.1, §2.5): the three global
+ * links (no course id in any of them) and the «Мои курсы» rows.
  * Run: cd frontend && npx tsc --outDir /tmp/agy_snav --module commonjs --target es2020 --skipLibCheck \
- *   src/lib/lms/studentNav.ts src/lib/lms/studentNav.check.ts && node /tmp/agy_snav/studentNav.check.js
+ *   src/lib/lms/lastPlace.ts src/lib/lms/studentNav.ts src/lib/lms/studentNav.check.ts && node /tmp/agy_snav/studentNav.check.js
  */
-import { LESSON_ROWS_MAX, courseIdOfPath, lessonCourseLinks, studentNavLinks } from "./studentNav";
+import { COURSE_ROWS_MAX, courseIdOfPath, courseRows, studentNavLinks } from "./studentNav";
 
 let failed = 0;
 function ok(cond: boolean, msg: string) {
   if (!cond) { failed++; console.error("FAIL", msg); } else console.log("ok  ", msg);
 }
 
-const exam = "ex1";
-const nav = (rest: string, features = { modules: true, practice: true }) =>
-  studentNavLinks({ lang: "ru", rest, tab: null, courseId: exam, features });
+// --- the global links ---
+const nav = (rest: string, testStudent = false) => studentNavLinks({ lang: "ru", rest, testStudent });
+ok(nav("/home").home.active && nav("/home").home.href === "/ru/home", "Главная is /home, active there");
+ok(!nav("/courses").home.active && nav("/courses").courses.active && nav("/courses").courses.href === "/ru/courses", "Мои курсы is /courses");
+ok(nav("/courses/catalog/c1").catalog?.active === true && nav("/courses/catalog").catalog?.href === "/ru/courses/catalog", "Каталог active on a landing");
+ok(!nav("/courses/c1/tests").courses.active && !nav("/courses/c1/tests").home.active, "inside a course: no global link is current");
+ok(nav("/home", true).catalog === null, "the test student has no Каталог");
+for (const l of [nav("/courses/c1").home, nav("/courses/c1").courses, nav("/courses/c1").catalog!]) {
+  ok(!/\/courses\/c1/.test(l.href), `no course id in the global ${l.key} link`);
+}
 
-// --- the exam's own links (unchanged) ---
-ok(nav("/courses").home?.active === true, "home active on /courses");
-ok(nav(`/courses/${exam}`).tests?.active === false, "step 3a S2: the course page is Обзор, not Тесты");
-ok(nav(`/courses/${exam}/tests`).tests?.active === true, "tests active on the Тесты tab");
-ok(nav(`/courses/${exam}/modules`).lessons?.active === true, "own Уроки active on the syllabus");
-ok(nav(`/courses/${exam}`).lessons?.href === `/ru/courses/${exam}/lessons`, "step 3a S2: Уроки is the Уроки tab");
-ok(nav(`/courses/${exam}/analytics`).analytics?.active === true && nav(`/courses/${exam}`).analytics?.href === `/ru/courses/${exam}/analytics`, "step 3a S2: Аналитика is the tab");
-ok(nav(`/courses/${exam}`).practice?.href === `/ru/courses/${exam}/tests#practice`, "step 3a S2: practice is the Тесты tab section");
-ok(nav(`/courses/${exam}/modules`, { modules: false, practice: true }).lessons === null, "own Уроки hidden without lessons");
-ok(nav(`/courses/${exam}/lessons`).lessons?.active === true, "step 3a S2: own Уроки active on the Уроки tab (lesson courses at its end)");
-ok(nav("/courses/lc1/modules").lessons?.active === false, "own Уроки not active inside a lesson course");
-ok(studentNavLinks({ lang: "ru", rest: "/courses", tab: null, courseId: null, features: null }).tests === null, "no exam: no tests link");
 ok(courseIdOfPath("/courses/catalog/lc1") === null, "catalog landing is not a course path");
+ok(courseIdOfPath("/courses/choose") === null, "the choose step is not a course path");
+ok(courseIdOfPath("/courses/c1/tests") === "c1", "a course tab names its course");
 
-// --- lesson-course rows ---
-const row = (id: string, enrolled: boolean, progress: { done: number; total: number } | null = null) => ({ id, enrolled, progress });
-const rows = [row("lc1", true, { done: 2, total: 6 }), row("lc2", false), row("lc3", true, { done: 0, total: 0 }), row("lc4", true, null)];
-const r = lessonCourseLinks({ lang: "ru", rest: "/courses/lc1/modules/i1", examId: exam, rows });
-ok(r.rows.length === 4 && r.all === null, "four rows, no Все уроки");
-ok(r.rows[0].href === "/ru/courses/lc1", "enrolled row opens the course Обзор");
-ok(r.rows[1].href === "/ru/courses/catalog/lc2", "not enrolled row opens the catalog landing");
-ok(r.rows[0].active && !r.rows[1].active, "row active inside its lesson course only");
-ok(r.rows[0].progress?.done === 2 && r.rows[0].progress?.total === 6, "enrolled row has the ring");
-ok(r.rows[1].progress === null, "not enrolled: no ring");
-ok(r.rows[2].progress === null && r.rows[3].progress === null, "nothing to finish: no ring");
-ok(lessonCourseLinks({ lang: "ru", rest: "/courses/catalog/lc2", examId: exam, rows }).rows[1].active, "row active on its landing");
-ok(lessonCourseLinks({ lang: "ru", rest: "/courses", examId: null, rows }).rows.length === 0, "no exam: no rows");
-ok(lessonCourseLinks({ lang: "ru", rest: "/courses", examId: exam, rows: null }).rows.length === 0, "not loaded: no rows");
+// --- the «Мои курсы» rows ---
+const mk = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `c${i}`, progress: i === 0 ? { done: 2, total: 5 } : i === 1 ? { done: 0, total: 0 } : null }));
+const rows = (rest: string, n: number, recent: string[] = [], extra: Partial<Parameters<typeof courseRows>[0]> = {}) =>
+  courseRows({ lang: "ru", rest, courses: mk(n), recent, place: null, loaded: true, ...extra });
 
-const many = Array.from({ length: LESSON_ROWS_MAX + 1 }, (_, i) => row(`m${i}`, false));
-const m = lessonCourseLinks({ lang: "ru", rest: `/courses/${exam}/lessons`, examId: exam, rows: many });
-ok(m.rows.length === LESSON_ROWS_MAX, `capped at ${LESSON_ROWS_MAX} rows`);
-ok(m.all?.href === `/ru/courses/${exam}/lessons` && m.all.active, "Все уроки link, active on its page");
-ok(lessonCourseLinks({ lang: "ru", rest: "/courses", examId: exam, rows: many.slice(0, LESSON_ROWS_MAX) }).all === null,
-  `exactly ${LESSON_ROWS_MAX}: no Все уроки`);
+const one = rows("/courses/c0/tests", 1);
+ok(one.rows.length === 1 && one.all === null && one.choose === null, "one course: one row");
+ok(one.rows[0].active && one.rows[0].href === "/ru/courses/c0", "the viewed course's row is current; no place: Обзор");
+ok(one.rows[0].progress?.done === 2, "a row with something to finish has the ring");
+ok(rows("/home", 2).rows[1].progress === null, "nothing to finish: no ring");
+
+const eight = rows("/home", 8, ["c5", "c7"]);
+ok(eight.rows.length === COURSE_ROWS_MAX, `capped at ${COURSE_ROWS_MAX} rows`);
+ok(eight.rows[0].course.id === "c5" && eight.rows[1].course.id === "c7" && eight.rows[2].course.id === "c0", "recent first, then the home's order");
+ok(eight.all?.count === 8 && eight.all.href === "/ru/courses" && !eight.all.active, "«Все курсы (8)» → /courses");
+ok(rows("/courses", 8).all?.active === true, "«Все курсы» current on /courses");
+ok(rows("/home", COURSE_ROWS_MAX).all === null, `exactly ${COURSE_ROWS_MAX}: no «Все курсы»`);
+const deep = rows("/courses/c7/saved", 8);
+ok(deep.rows.some((r) => r.course.id === "c7" && r.active) && deep.rows.length === COURSE_ROWS_MAX, "the viewed course is shown even past the cap");
+
+const placed = rows("/home", 3, ["c2"], { place: { courseId: "c2", path: "/ru/courses/c2/analytics", kind: "analytics", at: 1 } });
+ok(placed.rows[0].href === "/ru/courses/c2/analytics" && placed.rows[1].href === "/ru/courses/c0", "the last place's course opens its last tab");
+
+const zero = rows("/home", 0);
+ok(zero.rows.length === 0 && zero.choose?.href === "/ru/courses/choose", "no courses: «Выбрать курсы»");
+ok(rows("/home", 0, [], { testStudent: true }).choose === null, "the test student: no «Выбрать курсы»");
+ok(rows("/home", 0, [], { loaded: false }).choose === null && rows("/home", 3, [], { loaded: false }).rows.length === 0, "not loaded: nothing yet");
 
 if (failed) {
   console.error(`${failed} failed`);

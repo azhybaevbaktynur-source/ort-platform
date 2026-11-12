@@ -85,23 +85,20 @@ function deliverHome(parts: BootstrapHomeParts): void {
 // one combined request per page load, the first on the home (a client navigation back to the home asks its own reads)
 let homeAsked = false;
 let homeRequest: Promise<BootstrapOut> | null = null;
-// the exam course this device remembers (`useStudentShellData`'s CURRENT_KEY): the server takes it when it is one of
-// the student's exam courses, else the first, as the shell does
-const CURRENT_COURSE_KEY = "ort_student_course";
+/** Step 3a S3: the home is the hub `/home` (was `/courses`). */
+const HOME_PATH = /^\/(en|ky|ru)\/home\/?$/;
 
 function onHome(): boolean {
   if (typeof window === "undefined") return false;
-  return /^\/(en|ky|ru)\/courses\/?$/.test(window.location.pathname);
-}
-
-function rememberedCourse(): string | undefined {
-  try { return window.localStorage.getItem(CURRENT_COURSE_KEY) ?? undefined; } catch { return undefined; }
+  return HOME_PATH.test(window.location.pathname);
 }
 
 function fetchBoot(withHome: boolean): Promise<BootstrapOut> {
   if (!withHome) return lmsFetch<BootstrapOut>("/me/bootstrap");
   homeAsked = true;
-  const p = lmsFetch<BootstrapWithHome>("/me/bootstrap", { params: { include: "home", course: rememberedCourse() } }).then((b) => {
+  // step 3a S3: no `course` (there is no "current course"): the server takes the newest exam course, the one the
+  // getting-started checklist reads (`gettingStarted.tsx`), so its exam-prep answer lands in the cache from here
+  const p = lmsFetch<BootstrapWithHome>("/me/bootstrap", { params: { include: "home" } }).then((b) => {
     const { home, exam_prep, activity, ...shell } = b;
     if (home) deliverHome({ home, exam_prep: exam_prep ?? {}, activity: activity ?? {} });
     return shell;
@@ -131,7 +128,7 @@ export function homeBootstrap(): Promise<BootstrapOut> | null {
 /**
  * PERFORMANCE_AUDIT P3: sign-in has just stored the token (password, the two-step code, Google): ask the bootstrap now,
  * before the route change to `dest`, so the first page finds it running or cached (`swr` shares one request per key;
- * the page's own `useCached` waits for this one). Only for the app's pages under `/courses`; with the home's reads
+ * the page's own `useCached` waits for this one). Only for the app's pages under `/courses` and `/home`; with the home's reads
  * when `dest` is the home, unless the login answer says the person runs the platform (the server leaves the student
  * parts out for anyone who teaches and answers only `me` under the two-step gate, whatever is asked).
  */
@@ -139,8 +136,8 @@ export function prefetchBootstrap(dest: string, isPlatformAdmin: boolean): void 
   if (typeof window === "undefined") return;
   let path: string;
   try { path = new URL(dest, window.location.origin).pathname; } catch { return; }
-  if (!/^\/(en|ky|ru)\/courses(\/|$)/.test(path)) return;
-  const home = /^\/(en|ky|ru)\/courses\/?$/.test(path);
+  if (!/^\/(en|ky|ru)\/(courses|home)(\/|$)/.test(path)) return;
+  const home = HOME_PATH.test(path);
   revalidate(BOOTSTRAP_KEY, () => fetchBoot(home && !isPlatformAdmin), BOOTSTRAP_OPTIONS).catch(() => undefined);
   if (home) homeAsked = true; // this page load's request for the home is the one above
 }

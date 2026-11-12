@@ -26,7 +26,9 @@ import { useErrorText } from "./useErrorText";
 /** Step 3a S2: `examId` null asks nothing (a course that is not an exam course) and gives []. */
 export function useLessonCourseRows(examId: string | null): LessonCourseOut[] | null {
   const shell = useStudentShellDataContext();
-  const fromShell = !!examId && !!shell && shell.current?.id === examId;
+  // step 3a S3: the bootstrap's rows of this exam (no "current course" any more), else one request
+  const shellRows = examId && shell ? shell.lessonCoursesOf(examId) : null;
+  const fromShell = !!shellRows;
   const [own, setOwn] = useState<{ examId: string; rows: LessonCourseOut[] } | null>(null);
   useEffect(() => {
     if (fromShell || !examId) return;
@@ -38,7 +40,7 @@ export function useLessonCourseRows(examId: string | null): LessonCourseOut[] | 
     return () => ctl.abort();
   }, [examId, fromShell]);
   if (!examId) return [];
-  if (fromShell && shell) return shell.lessonCourses;
+  if (shellRows) return shellRows;
   return own?.examId === examId ? own.rows : null;
 }
 

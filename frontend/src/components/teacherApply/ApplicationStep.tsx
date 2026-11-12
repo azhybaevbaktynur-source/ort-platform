@@ -106,7 +106,7 @@ export function ApplicationStep({ onSubmitted }: { onSubmitted: () => void }) {
     return (
       <Panel icon={<GraduationCap />} tone="success" title={t("teacherApply.approved.title")}>
         <p>{t("teacherApply.approved.body")}</p>
-        <LinkButton href={`${home}?view=teaching`} size="lg" className="w-full sm:w-auto">{t("teacherApply.approved.link")}</LinkButton>
+        <LinkButton href={home} size="lg" className="w-full sm:w-auto">{t("teacherApply.approved.link")}</LinkButton>
       </Panel>
     );
   }

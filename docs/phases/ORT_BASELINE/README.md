@@ -128,3 +128,11 @@ owner. Never to make a failing run green without looking.
   `player-loading` and every `teacher-*` image match the committed baselines unchanged (not re-recorded). Before/after
   pairs in `docs/phases/STUDENT_IA_screens/ort/` (`<name>-before.png` / `<name>-after.png`); awaiting the
   orchestrator's review.
+- 2026-11-13: `lobby-*`, `result-*` and `review-*` (phone/desktop × ru/ky, 12 images) re-recorded for step 3a S3
+  (STUDENT_IA_DESIGN §2.1): the global frame only. Desktop: the sidebar is Главная · Мои курсы · Каталог plus the
+  «Мои курсы» rows (no exam switcher, no per-course Тесты/Аналитика/Сохранённые links); phone: the bottom bar is
+  Главная · Курсы · Продолжить · Каталог · Ещё (tighter slot gutters). The diffs are inside the sidebar / bar only;
+  the page bodies are unchanged. Look only: `ort.spec.ts` and every DOM assertion of `ort-visual.spec.ts` pass
+  unchanged; the player screens, `section-end`, `submit`, `passage`, `comparison`, `flagged-palette`,
+  `player-loading` and every `teacher-*` image match the committed baselines (not re-recorded). Before/after pairs in
+  `docs/phases/STUDENT_IA_screens/ort/s3/`; awaiting the orchestrator's review.

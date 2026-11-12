@@ -1,12 +1,14 @@
 "use client";
 
-// Phase 6b S6b: /[lang]/courses is the student home (PHASE_6_DESIGN 8.4). Owner decision 2026-11-12 (fix round 1e):
+// Phase 6b S6b: /[lang]/courses was the student home (PHASE_6_DESIGN 8.4). Owner decision 2026-11-12 (fix round 1e):
 // student and teacher are separate accounts, so for everyone who teaches it is the Teaching list only (no Learning, no
 // tabs, no "Join with code", whatever student enrolments the account still has); each course card enters Student view.
-// The catalog moved to /courses/catalog (old links to /courses#catalog are redirected there).
-import React, { Suspense, useCallback, useEffect, useState } from "react";
+// Step 3a S3 (STUDENT_IA_DESIGN §2.3, §3.7): for people who learn it is «Мои курсы» (grouped cards, `MyCourses`); the
+// hub moved to /home. The `?view=` machinery is gone: old links redirect (`?view=learning` -> /home for learners,
+// any other `?view=` -> /courses), and /courses#catalog -> /courses/catalog.
+import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { LayoutGrid, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
@@ -14,39 +16,39 @@ import { listMyCourses } from "@/lib/lms/courses";
 import { loadTeachingCourses } from "@/lib/lms/pageData";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
 import { useCachedMe } from "@/lib/lms/meCache"; // PERFORMANCE_AUDIT S1
-import { hidesLearning, teaches } from "@/lib/lms/shellKind";
+import { teaches } from "@/lib/lms/shellKind";
 import type { CourseCard as CourseCardDto } from "@/lib/lms/types";
 import { COURSE_GRID, CourseCard, StatusBadge } from "@/components/lms/course/CourseCard";
-import { StudentHome } from "@/components/lms/home/StudentHome";
+import { MyCourses } from "@/components/lms/home/MyCourses"; // step 3a S3
 import { TeacherApplicationNotice } from "@/components/lms/home/TeacherApplicationNotice";
 import { useErrorText } from "@/components/lms/home/useErrorText";
 import {
   Badge, EmptyState, ErrorState, LinkButton, LoadingState, PageHeader, Pagination, cn, focusRing,
 } from "@/components/ui";
 
-/** Phase 6b integration: the header links to `?view=teaching`; without Learning, `?view=learning` opens Teaching. */
-function ViewSync({ noLearning }: { noLearning: boolean }) {
-  const view = useSearchParams().get("view");
-  const { lang } = useTranslation();
-  const router = useRouter();
-  useEffect(() => { // owner feedback 2026-11-08 (item 2), decision 2026-11-12 (1e)
-    if (noLearning && view === "learning") router.replace(`/${lang}/courses?view=teaching`, { scroll: false });
-  }, [noLearning, view, lang, router]);
-  return null;
-}
-
-/** Old anchor links (`/courses#catalog`, e.g. in the header) open the catalog page. */
-function useCatalogHashRedirect() {
+/**
+ * Step 3a S3 (§3.7): old links. `?view=learning` opens the hub for people who learn (the Teaching list for people who
+ * teach); any other `?view=` is dropped (the rest of the query kept); `#catalog` opens the catalog page.
+ */
+function useLegacyRedirects(hasTeaching: boolean, known: boolean) {
   const { lang } = useTranslation();
   const router = useRouter();
   useEffect(() => {
+    if (!known) return;
     const check = () => {
-      if (window.location.hash === "#catalog") router.replace(`/${lang}/courses/catalog`);
+      if (window.location.hash === "#catalog") { router.replace(`/${lang}/courses/catalog`); return; }
+      const params = new URLSearchParams(window.location.search);
+      const view = params.get("view");
+      if (view === null) return;
+      if (view === "learning" && !hasTeaching) { router.replace(`/${lang}/home`); return; }
+      params.delete("view");
+      const qs = params.toString();
+      router.replace(`/${lang}/courses${qs ? `?${qs}` : ""}${window.location.hash}`, { scroll: false });
     };
     check();
     window.addEventListener("hashchange", check);
     return () => window.removeEventListener("hashchange", check);
-  }, [lang, router]);
+  }, [hasTeaching, known, lang, router]);
 }
 
 function TeachingList() {
@@ -126,17 +128,16 @@ export default function CoursesPage() {
   const cachedMe = useCachedMe();
   const me = fresh ?? cachedMe; // PERFORMANCE_AUDIT S1: the cached answer first, the profile only as a fallback
   const { userProfile } = useAuth();
-  useCatalogHashRedirect();
 
   // UX F4 / Phase 6 S8 (UX S1): the Teaching list for people who teach (the same rule as the shell's areas). Until
   // MeOut loads (and nothing is cached), the cached profile decides.
   const hasTeaching = me ? teaches(me)
     : !!userProfile && (userProfile.teacher_status === "approved" || !!userProfile.is_platform_admin);
-  if (!hasTeaching) return <StudentHome />;
+  useLegacyRedirects(hasTeaching, !!me || !!userProfile);
+  if (!hasTeaching) return <MyCourses />;
 
   return (
     <div>
-      <Suspense fallback={null}><ViewSync noLearning={hidesLearning(me)} /></Suspense>
       <PageHeader title={t("courses.list.title")}
         badge={me?.teacher_status === "pending" ? <Badge tone="warning">{t("courses.list.requestPending")}</Badge> : undefined}
         primaryAction={me?.can_create_courses

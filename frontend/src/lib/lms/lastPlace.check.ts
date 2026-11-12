@@ -4,7 +4,8 @@
  *   src/lib/lms/lastPlace.ts src/lib/lms/lastPlace.check.ts && node /tmp/agy_place/lastPlace.check.js
  */
 import {
-  RECENT_MAX, lastPlaceKey, lobbyPlace, placeOfPath, readLastPlace, readRecentCourses, recentCoursesKey, writePlace,
+  RECENT_MAX, continueTarget, courseRowHref, lastPlaceKey, lessonStepHref, lobbyPlace, placeHref, placeOfPath, readLastPlace,
+  readRecentCourses, recentCoursesKey, recentFirst, writePlace, type LastPlace,
   type PlaceStorage,
 } from "./lastPlace";
 
@@ -86,6 +87,46 @@ g.setItem(recentCoursesKey("u1"), JSON.stringify({ a: 1 }));
 ok(readLastPlace(g, "u1") === null && readRecentCourses(g, "u1").length === 0, "garbage is ignored");
 writePlace(g, "u1", placeOfPath("/ru/courses/c1"), 1);
 ok(readRecentCourses(g, "u1").join(",") === "c1", "a write repairs a garbage list");
+
+// --- step 3a S3: the readers ---
+const at = (courseId: string, path: string, kind: LastPlace["kind"]): LastPlace => ({ courseId, path, kind, at: 1 });
+ok(placeHref("ky", { path: "/ru/courses/c1/tests" }) === "/ky/courses/c1/tests", "the place opens in the current language");
+ok(courseRowHref("ru", "c1", at("c1", "/ru/courses/c1/saved", "saved")) === "/ru/courses/c1/saved", "row: the remembered tab");
+ok(courseRowHref("ru", "c1", at("c1", "/ru/courses/c1/modules/m/items/i", "lesson")) === "/ru/courses/c1/lessons", "row: a lesson reopens Уроки");
+ok(courseRowHref("ru", "c1", at("c1", "/ru/courses/c1/assessments/a", "lobby")) === "/ru/courses/c1/tests", "row: a lobby reopens Тесты");
+ok(courseRowHref("ru", "c2", at("c1", "/ru/courses/c1/saved", "saved")) === "/ru/courses/c2", "row of another course: Обзор");
+ok(courseRowHref("ru", "c2", null) === "/ru/courses/c2", "row without a place: Обзор");
+ok(recentFirst([{ id: "a" }, { id: "b" }, { id: "c" }], ["c", "x", "a", "c"]).map((c) => c.id).join() === "c,a,b",
+  "recent first (unknown and repeated ids ignored), then the list's order");
+
+const lessonStep = { kind: "page", module_id: "m1", item_id: "i1", link: null };
+ok(lessonStepHref("ru", "c1", lessonStep) === "/ru/courses/c1/modules/m1/items/i1", "a lesson opens the lesson page");
+ok(lessonStepHref("ru", "c1", { kind: "assignment", module_id: "m1", item_id: "i1", link: { assignment_kind: "quiz", assessment_id: "q1" } })
+  === "/ru/courses/c1/assessments/q1", "a quiz item opens its lobby");
+ok(lessonStepHref("ru", "c1", { kind: "assignment", module_id: "m1", item_id: "i1", link: { assignment_kind: "text", assignment_id: "h1" } })
+  === "/ru/courses/c1/assignments/h1", "a hand-in item opens its page");
+ok(lessonStepHref("ru", "c1", { kind: "page" }) === null, "no ids: no link");
+
+const courses = [
+  { id: "t1", student_layout: "general", next_step: { kind: "open" } },
+  { id: "e1", student_layout: "exam_prep", next_step: { kind: "start" } },
+  { id: "l1", student_layout: "general", next_step: { kind: "continue_lesson", module_id: "m", item_id: "i", item_kind: "page" } },
+  { id: "e2", student_layout: "exam_prep", next_step: { kind: "resume_test", attempt_id: "att" } },
+];
+const home = { in_progress: [{ attempt_id: "h-att", course_id: "e1" }], modules_next: [{ course_id: "l1", module_id: "m9", item_id: "i9", kind: "page" }] };
+const place = at("t1", "/ru/courses/t1/tests", "tests");
+ok(continueTarget("ru", place, courses, home).href === "/ru/courses/t1/tests" && continueTarget("ru", place, courses, home).kind === "place",
+  "continue: the remembered place first");
+ok(continueTarget("ru", at("gone", "/ru/courses/gone", "overview"), courses, home).kind === "resume", "a place of a course left: the server fallback");
+ok(continueTarget("ru", null, courses, home).href === "/ru/courses/e1/attempts/h-att", "fallback 1: the in-progress attempt (the home's)");
+ok(continueTarget("ru", null, courses, { in_progress: [], modules_next: home.modules_next }).href === "/ru/courses/l1/modules/m9/items/i9",
+  "fallback 2: the first next lesson");
+ok(continueTarget("ru", null, courses, { in_progress: [], modules_next: [] }).href === "/ru/courses/e1", "fallback 3: the newest exam course's Обзор");
+ok(continueTarget("ru", null, [courses[0]], { in_progress: [] }).href === "/ru/courses/t1", "no exam course: the newest course's Обзор");
+ok(continueTarget("ru", null, courses).href === "/ru/courses/e2/attempts/att", "phone bar (no home): a course's resume step");
+ok(continueTarget("ru", null, courses.filter((c) => c.id !== "e2")).href === "/ru/courses/l1/modules/m/items/i", "phone bar: a course's next lesson");
+const none = continueTarget("ky", null, []);
+ok(none.kind === "choose" && none.href === "/ky/courses/choose" && none.courseId === null, "no courses: the choose step");
 
 if (failed) {
   console.error(`${failed} check(s) failed`);
