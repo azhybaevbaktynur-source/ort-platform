@@ -121,11 +121,6 @@ export function loadHome(): Promise<HomeOut> {
   return pageLoad(HOME_KEY, viaBootstrap(HOME_KEY, () => getHome()), HOME_CACHE);
 }
 
-/** P2: the home's streak strip: the bootstrap's 7-day activity over all courses; alone, the course's `my/activity?days=7`. */
-export function loadHomeActivity(courseId: string): Promise<ActivityOut> {
-  return pageLoad(HOME_ACTIVITY_KEY, viaBootstrap(HOME_ACTIVITY_KEY, () => getActivity(courseId, HOME_ACTIVITY_DAYS)), ANALYTICS_CACHE);
-}
-
 /**
  * Step 3a S3 (OPEN Q2): the hub's «Серия N дней» reads the bootstrap's cross-course activity only (there is no other
  * cross-course read): call after `loadHome()` answered (the bootstrap that carried the home landed it by then). Any

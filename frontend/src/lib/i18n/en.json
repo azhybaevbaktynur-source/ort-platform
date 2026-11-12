@@ -3527,18 +3527,11 @@
     "results": {
       "title": "Recent grades"
     },
-    "courses": {
-      "title": "My courses",
-      "emptyTitle": "You are not in any course yet.",
-      "emptyBody": "Join with a code from your teacher, or choose a course in the catalog.",
-      "showAll": "Show all ({n})"
-    },
     "openCatalog": "Open the catalog",
     "catalogEmpty": {
       "title": "No open courses yet.",
       "body": "Have a code from your teacher? Join with it."
     },
-    "personalBest": "Personal best",
     "due": "Due {date}",
     "dueSoon": "Due soon: {date}",
     "until": "Open until {date}",
@@ -3597,14 +3590,8 @@
         "void": "Cancelled"
       }
     },
-    "announcements": {
-      "title": "Announcements",
-      "all": "All announcements"
-    },
-    "dashboard": "Dashboard",
     "todo": {
       "title": "To do",
-      "empty": "You are all caught up. No new assignments right now.",
       "due": "Due {date}",
       "overdue": "Overdue",
       "inProgress": "Attempt in progress"
@@ -3618,11 +3605,6 @@
       "applyLink": "Apply",
       "dismiss": "Close message"
     },
-    "platform": {
-      "title": "From the platform",
-      "subtitle": "Exam prep courses. Join with one tap.",
-      "haveCode": "Have a code from your teacher?"
-    },
     "greeting": {
       "morning": "Good morning, {name}",
       "afternoon": "Good afternoon, {name}",
@@ -3632,28 +3614,9 @@
       "eveningPlain": "Good evening!"
     },
     "prep": {
-      "streak": {
-        "days": "{count} days in a row",
-        "days_one": "{count} day in a row",
-        "days_few": "{count} days in a row",
-        "days_many": "{count} days in a row",
-        "days_other": "{count} days in a row",
-        "none": "Answer at least one question today to start a streak.",
-        "week": "Last 7 days",
-        "dayActive": "{day}: studied",
-        "dayIdle": "{day}: no study"
-      },
-      "score": {
-        "title": "Scores"
-      },
       "unlock": {
         "title": "Unlock all exams",
         "body": "The free tests are already yours. A pass opens the other exams and practice."
-      },
-      "addCourse": "Find a course in the catalog",
-      "otherCourses": "Other courses",
-      "continueLesson": {
-        "title": "Continue lesson"
       },
       "lessonCourses": {
         "subtitle": "Lesson courses for this exam."
@@ -6590,8 +6553,7 @@
       "title": "Sections",
       "subtitle": "From your latest result",
       "score": "{raw} of {possible}",
-      "empty": "Sections appear after your first released result.",
-      "fewAnswers": "Too few answers to rate this section"
+      "empty": "Sections appear after your first released result."
     },
     "next": {
       "title": "Next step",
@@ -7177,9 +7139,7 @@
       "joinByCode": "Join with code"
     },
     "switcher": {
-      "label": "My exams",
-      "add": "Add an exam",
-      "open": "Exam: {name}. Change"
+      "label": "My exams"
     },
     "account": {
       "title": "Account"

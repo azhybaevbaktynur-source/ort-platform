@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n/context";
 import { leaveCourse } from "@/lib/lms/courses";
@@ -13,7 +13,6 @@ import { StudentCourseHome } from "@/components/lms/home/StudentCourseHome"; // 
 import { StudentModulesView } from "@/components/lms/modules/StudentModulesView"; // Phase 8a S4a
 import { StudentSyllabus } from "@/components/lms/modules/StudentSyllabus"; // F5b
 import { PageView } from "@/components/lms/pages/PageView"; // Phase 8a S4a (home_kind = page)
-import { CourseLoadingSkeleton } from "@/components/lms/home/StudentCourseFrame";
 import { inCourseSpace } from "@/lib/lms/templates";
 import { CourseOverview } from "@/components/lms/course/CourseOverview"; // step 3a S2
 
@@ -113,15 +112,4 @@ export default function CourseHomePage() {
         confirmLabel={t("courses.home.leave")} onConfirm={leave} onCancel={() => setLeaving(false)} />
     </div>
   );
-}
-
-/** Student UI U4: `/courses/{c}` of an exam-prep course was `/courses/{c}/tests` for its students. Step 3a S2: unused
- * (the course page is Обзор); deleted in S5. */
-function ToTests({ courseId }: { courseId: string }) {
-  const { lang } = useTranslation();
-  const router = useRouter();
-  useEffect(() => {
-    router.replace(`/${lang}/courses/${courseId}/tests${window.location.search}`);
-  }, [router, lang, courseId]);
-  return <CourseLoadingSkeleton />;
 }

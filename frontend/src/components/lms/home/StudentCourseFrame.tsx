@@ -9,8 +9,8 @@ import { pickLocalized } from "@/lib/lms/localized";
 import { isStaffCourse, type CourseOut } from "@/lib/lms/types";
 import { PageHeader, Skeleton } from "@/components/ui";
 
-/** `breadcrumbs`: false inside the student shell of an exam-prep course (U9, review 2: the sidebar navigates). */
-export function StudentCourseHeader({ course, breadcrumbs = true }: { course: CourseOut; breadcrumbs?: boolean }) {
+/** Step 3a S5: only read-only viewers (an org or platform admin reading a course) get it; students have `CourseFrame`. */
+export function StudentCourseHeader({ course }: { course: CourseOut }) {
   const { lang, t } = useTranslation();
   const title = pickLocalized(course.title, lang, course.default_language) || t("courses.list.untitled");
   // Phase 9 UX: an org admin reading a course of their organization (no enrollment, staff serializer) goes back to
@@ -20,7 +20,7 @@ export function StudentCourseHeader({ course, breadcrumbs = true }: { course: Co
     ? { label: course.organization_name as string, href: `/${lang}/org/${course.organization_id}/courses/${course.id}` }
     : { label: t("lms.nav.myCourses"), href: `/${lang}/courses` };
   return (
-    <PageHeader title={title} className="mb-4" breadcrumbs={breadcrumbs ? [parent, { label: title }] : undefined} />
+    <PageHeader title={title} className="mb-4" breadcrumbs={[parent, { label: title }]} />
   );
 }
 
