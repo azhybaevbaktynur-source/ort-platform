@@ -2607,7 +2607,13 @@
     "resultCountMore_one": "{count} course shown, more below",
     "resultCountMore_few": "{count} courses shown, more below",
     "resultCountMore_many": "{count} courses shown, more below",
-    "resultCountMore_other": "{count} courses shown, more below"
+    "resultCountMore_other": "{count} courses shown, more below",
+    "groups": {
+      "label": "Course groups",
+      "teachers": "Teachers' courses",
+      "pick": "Find courses for me",
+      "mainCourse": "Main course"
+    }
   },
   "storage": {
     "nav": "Storage",
@@ -7432,6 +7438,41 @@
     },
     "analytics": {
       "gradesSection": "Grades"
+    }
+  },
+  "choose": {
+    "title": "Choose your courses",
+    "subtitle": "Tick the courses you want to start with. You can add others later.",
+    "step1": "1 · Exam",
+    "step2": "2 · Courses: {family}",
+    "step2Only": "Courses: {family}",
+    "familyHint": {
+      "ort": "National school-leaving test",
+      "nct": "Subject tests"
+    },
+    "courses": "{count} courses",
+    "courses_one": "{count} course",
+    "courses_few": "{count} courses",
+    "courses_many": "{count} courses",
+    "courses_other": "{count} courses",
+    "haveCode": "I have a code from a teacher",
+    "enrol": "Join ({count})",
+    "pickOne": "Tick at least one course.",
+    "skip": "Skip",
+    "back": "Back",
+    "alreadyIn": "You are already in this course",
+    "noneTitle": "No courses to choose yet",
+    "noneBody": "Platform courses are coming soon. If you have a code from a teacher, join with it.",
+    "errors": {
+      "title": "Could not join",
+      "notChoosable": "Some courses are closed for joining right now. We refreshed the list: please choose again.",
+      "partly": "We added you to {count} courses. The others are closed for joining right now: we refreshed the list.",
+      "partly_one": "We added you to {count} course. The others are closed for joining right now: we refreshed the list.",
+      "partly_few": "We added you to {count} courses. The others are closed for joining right now: we refreshed the list.",
+      "partly_many": "We added you to {count} courses. The others are closed for joining right now: we refreshed the list.",
+      "partly_other": "We added you to {count} courses. The others are closed for joining right now: we refreshed the list.",
+      "consent": "You can join once a parent consents. Open Privacy to send the request.",
+      "consentLink": "Open Privacy"
     }
   }
 }

@@ -9,6 +9,7 @@ import { AuthError, storedSessionProfile, useAuth } from "@/lib/auth-context";
 import { takeOAuthBind } from "@/components/auth/ProviderButtons";
 import { prefetchBootstrap } from "@/lib/lms/bootstrap";
 import { safeRedirect } from "@/lib/safeRedirect";
+import { chooseCoursesHref } from "@/lib/lms/chooseCourses";
 import { AuthAlert, AuthSplit, AuthTitle } from "@/components/auth/AuthSplit";
 import { AgeRow } from "@/components/auth/AgeRow";
 import { MfaStep } from "@/components/auth/MfaStep";
@@ -56,11 +57,13 @@ function OAuthCallback() {
   const policyState = useOwnPolicies(needsPolicies);
   const { policies } = policyState;
 
-  const goOn = (ageBand?: AgeBand | null, parent = false) => {
+  /** `created`: the profile step just made the account (step 3a S4: a new account gets the choose step, as sign-up). */
+  const goOn = (ageBand?: AgeBand | null, parent = false, created = false) => {
     if (ageBand === "under_14") router.replace(`/${lang}/privacy`);
     else if (parent) router.replace(`/${lang}/parent`);
     else {
-      const dest = redirectRef.current || `/${lang}/home`; // step 3a S3: the hub
+      // step 3a S3: an existing account lands on the hub; S4: `?redirect=` wins, then a new account's choose step
+      const dest = redirectRef.current || (created ? `${chooseCoursesHref(lang)}?first=1` : `/${lang}/home`);
       prefetchBootstrap(dest, !!storedSessionProfile()?.is_platform_admin); // PERFORMANCE_AUDIT P3
       router.replace(dest);
     }
@@ -132,7 +135,7 @@ function OAuthCallback() {
         policyVersionIds: needsPolicies ? ownPolicyIds(policies ?? []) : [],
         displayName: displayName.trim(),
       });
-      goOn(band, asParent);
+      goOn(band, asParent, true);
     } catch (err) {
       if (err instanceof AuthError && err.code === "mfa_required" && typeof err.details.challenge === "string") {
         setChallenge(err.details.challenge);
