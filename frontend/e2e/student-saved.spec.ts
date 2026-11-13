@@ -4,7 +4,7 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 import { seed, settle, signIn, tr, type SeedUser } from "./helpers";
 
 /**
- * Student UI U8 (docs/phases/STUDENT_UI_DESIGN.md §3.4, §3.6, §5.1): Сохранённые (flagged questions and the mistakes
+ * Student UI U8 (docs/phases/STUDENT_UI_DESIGN.md §3.4, §3.6, §5.1): Повторение (flagged questions and the mistakes
  * notebook, `/progress?tab=mistakes` redirects there), the history-only analytics cards, the "Начало работы" checklist
  * (sidebar pill, phone "More", home card), the practice list and /pro in the student shell, at 375, 1440 and 1920 px
  * in ru; fails on sideways page scroll. One student without flags, one who takes the seeded ORT exam through the API and
@@ -81,12 +81,12 @@ test.describe("student saved, checklist, practice, unlock (ru)", () => {
       await page.goto(savedUrl());
       await expect(page.getByRole("heading", { level: 1, name: t("student.saved.title") })).toBeVisible();
       await expect(page.getByText(t("student.saved.empty"))).toBeVisible();
-      // step 3a S2: Сохранённые is a tab of the course space
+      // step 3a S2: Повторение is a tab of the course space
       await expect(page.getByRole("navigation", { name: t("course.tabs.label") }).getByRole("link", { name: t("course.tabs.saved"), exact: true }))
         .toHaveAttribute("aria-current", "page");
       const nav = w >= 1024 ? page.getByRole("navigation", { name: t("student.nav.label") }) : null;
       if (nav) {
-        // step 3a S3: no global Сохранённые link; the course's «Мои курсы» row is current
+        // step 3a S3: no global Повторение link; the course's «Мои курсы» row is current
         await expect(nav.locator(`a[href^="/ru/courses/${seed().course_id}"]`)).toHaveAttribute("aria-current", "page");
         await expect(nav.getByRole("link", { name: t("student.nav.saved") })).toHaveCount(0);
         await expect(nav.getByRole("link", { name: t("student.nav.mistakes") })).toHaveCount(0);

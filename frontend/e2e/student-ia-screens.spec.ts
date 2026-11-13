@@ -4,7 +4,7 @@ import { api, seed, settle, signIn } from "./helpers";
 
 /**
  * Step 3a S2 (docs/phases/STUDENT_IA_DESIGN.md §3, §7.4, §7.5): screenshots of the course space for the orchestrator's
- * UX check (ru, 375 and 1440): the exam course Обзор, Тесты, Аналитика, Сохранённые and the lobby; a lesson course
+ * UX check (ru, 375 and 1440): the exam course Обзор, Тесты, Аналитика, Повторение and the lobby; a lesson course
  * attached to the exam (Обзор, Уроки, Задания, a lesson page). Not compared with a baseline. Runs only with
  * `STUDENT_IA_SHOTS=<dir>` and in its own run (it publishes the seed's lesson course "Мастеркласс E2E" and links it to
  * the exam, which teacher-to-student.spec.ts does itself): `npx playwright test e2e/student-ia-screens.spec.ts`.
