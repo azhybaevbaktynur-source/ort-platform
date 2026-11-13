@@ -157,7 +157,10 @@ class Settings(BaseSettings):
     # Empty = pick automatically from whichever credentials are set.
     # Note: Render free instances block outbound SMTP ports, so use an HTTP API (Resend/Brevo) there.
     EMAIL_PROVIDER: str = ""
-    EMAIL_FROM: str = ""             # e.g. "noreply@yourdomain.kg" (must be verified with the provider)
+    # Sender (docs/runbooks/EMAIL_DOMAIN.md). Address from env only: EMAIL_FROM, else the legacy SMTP_FROM_EMAIL, else
+    # SMTP_USER; no built-in domain default, so an unconfigured server refuses to send instead of using a domain nobody
+    # verified. Read through email_service.sender_address().
+    EMAIL_FROM: str = ""             # e.g. "noreply@<domain>" (must be verified with the provider)
     EMAIL_FROM_NAME: str = "Platform"  # default = per-language platform name in auth emails; any other value overrides
     RESEND_API_KEY: str = ""
     BREVO_API_KEY: str = ""
@@ -176,7 +179,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
-    SMTP_FROM_EMAIL: str = "noreply@ort.kg"
+    SMTP_FROM_EMAIL: str = ""  # legacy alias of EMAIL_FROM (used only when EMAIL_FROM is empty); prefer EMAIL_FROM
     FRONTEND_URL: str = "http://localhost:3000"
 
     # --- Phase 5 S1 begin ---

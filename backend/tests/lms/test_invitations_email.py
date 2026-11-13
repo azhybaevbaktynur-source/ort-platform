@@ -127,6 +127,7 @@ def test_smtp_headers(monkeypatch):
 
     monkeypatch.setattr(settings, "EMAIL_PROVIDER", "smtp")
     monkeypatch.setattr(settings, "EMAIL_FROM", "noreply@platform.example")
+    monkeypatch.setattr(settings, "EMAIL_FROM_NAME", "Default Name")
     monkeypatch.setattr(email_service.smtplib, "SMTP", FakeSMTP)
     assert email_service.send_email("t@example.com", "S", "T", "H", from_name="Aida via Platform",
                                     reply_to="aida@school.example")
@@ -134,7 +135,8 @@ def test_smtp_headers(monkeypatch):
     assert "From: Aida via Platform <noreply@platform.example>" in sent["msg"]
     assert "Reply-To: aida@school.example" in sent["msg"]
     assert email_service.send_email("t@example.com", "S", "T", "H")
-    assert "From: noreply@platform.example" in sent["msg"] and "Reply-To" not in sent["msg"]
+    # EMAIL_DOMAIN runbook: the default SMTP From carries EMAIL_FROM_NAME like the HTTP providers do
+    assert "From: Default Name <noreply@platform.example>" in sent["msg"] and "Reply-To" not in sent["msg"]
 
 
 def test_console_logs_sender_and_reply_to(monkeypatch, caplog):

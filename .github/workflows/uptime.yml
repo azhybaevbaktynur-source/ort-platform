@@ -19,9 +19,11 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 8
+    # Hosts: repository variables API_ORIGIN / WEB_ORIGIN (Settings -> Secrets and variables -> Actions -> Variables)
+    # when set, else today's addresses (docs/runbooks/CUSTOM_DOMAIN.md).
     env:
-      API_URL: https://ort-platform-w77q.onrender.com/health
-      WEB_URL: https://ort-platform-nu.vercel.app/ru/login
+      API_URL: ${{ vars.API_ORIGIN || 'https://ort-platform-w77q.onrender.com' }}/health
+      WEB_URL: ${{ vars.WEB_ORIGIN || 'https://ort-platform-nu.vercel.app' }}/ru/login
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Check API and frontend

@@ -24,7 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      API_URL: https://ort-platform-w77q.onrender.com/api/v1/internal/maintenance?dry_run=0
+      # Host: repository variable API_ORIGIN when set, else today's address (docs/runbooks/CUSTOM_DOMAIN.md)
+      API_URL: ${{ vars.API_ORIGIN || 'https://ort-platform-w77q.onrender.com' }}/api/v1/internal/maintenance?dry_run=0
       SWEEP_TOKEN: ${{ secrets.SWEEP_TOKEN }}
       GH_TOKEN: ${{ github.token }}
     steps:

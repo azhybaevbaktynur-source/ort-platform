@@ -50,8 +50,14 @@ def active_provider() -> str:
     return "console"
 
 
-def _sender_address() -> str:
-    return settings.EMAIL_FROM or settings.SMTP_FROM_EMAIL or settings.SMTP_USER
+def sender_address() -> str:
+    """The one place the From address comes from (every provider, every email; docs/runbooks/EMAIL_DOMAIN.md): env only,
+    EMAIL_FROM, else the legacy SMTP_FROM_EMAIL, else SMTP_USER. Empty = not configured: send_email refuses to send."""
+    for value in (settings.EMAIL_FROM, settings.SMTP_FROM_EMAIL, settings.SMTP_USER):
+        value = _header_safe(value)
+        if value:
+            return value
+    return ""
 
 
 # --- Phase 6 S3 begin --- (sender display name and Reply-To for invitation emails, PHASE_6_DESIGN 7)
@@ -60,11 +66,19 @@ def _header_safe(value: Optional[str]) -> str:
     return re.sub(r'[\r\n"<>\\]', " ", value or "").strip()
 
 
+def sender_name(from_name: Optional[str] = None) -> str:
+    """The display name: a per-email name (invitations, auth emails in the reader's language) or EMAIL_FROM_NAME."""
+    return _header_safe(settings.EMAIL_FROM_NAME if from_name is None else from_name)
+
+
 def _from_header(from_name: Optional[str]) -> str:
     """Default (no from_name): exactly the previous format. A custom name is quoted (it may hold commas)."""
+    name = sender_name(from_name)
+    if not name:
+        return sender_address()
     if from_name is None:
-        return f"{settings.EMAIL_FROM_NAME} <{_sender_address()}>"
-    return f'"{_header_safe(from_name)}" <{_sender_address()}>'
+        return f"{name} <{sender_address()}>"
+    return f'"{name}" <{sender_address()}>'
 
 
 def _clean_reply_to(reply_to: Optional[str]) -> Optional[str]:
@@ -96,8 +110,7 @@ def _send_resend(to_email: str, subject: str, text: str, html: str, from_name: O
 def _send_brevo(to_email: str, subject: str, text: str, html: str, from_name: Optional[str] = None,
                 reply_to: Optional[str] = None) -> None:
     payload = {
-        "sender": {"name": settings.EMAIL_FROM_NAME if from_name is None else _header_safe(from_name),
-                   "email": _sender_address()},
+        "sender": {"name": sender_name(from_name), "email": sender_address()},
         "to": [{"email": to_email}],
         "subject": subject,
         "textContent": text,
@@ -118,8 +131,9 @@ def _send_smtp(to_email: str, subject: str, text: str, html: str, from_name: Opt
                reply_to: Optional[str] = None) -> None:
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    sender = _sender_address()
-    msg["From"] = sender if from_name is None else formataddr((_header_safe(from_name), sender), charset="utf-8")
+    sender = sender_address()
+    name = sender_name(from_name)
+    msg["From"] = formataddr((name, sender), charset="utf-8") if name else sender
     msg["To"] = to_email
     if reply_to:
         msg["Reply-To"] = reply_to
@@ -161,7 +175,7 @@ def send_email(to_email: str, subject: str, text: str, html: str, *, from_name: 
         # Never log the value itself: a key pasted into the wrong variable would end up in the logs
         logger.error("EMAIL_PROVIDER is not one of resend/brevo/smtp/console; no email sent")
         return False
-    if not _sender_address():
+    if not sender_address():
         logger.error("EMAIL_FROM is not set; cannot send email via %s", provider)
         return False
     try:

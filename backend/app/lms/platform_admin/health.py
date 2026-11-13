@@ -86,10 +86,10 @@ def _migrations(db: Session, dialect: str) -> MigrationsHealth:
 
 
 def _email() -> EmailHealth:
-    from app.services.email_service import active_provider
+    from app.services.email_service import active_provider, sender_address
 
     provider = active_provider()
-    sender = bool(settings.EMAIL_FROM or settings.SMTP_FROM_EMAIL or settings.SMTP_USER)
+    sender = bool(sender_address())
     configured = {
         "resend": bool(settings.RESEND_API_KEY) and sender,
         "brevo": bool(settings.BREVO_API_KEY) and sender,
