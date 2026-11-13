@@ -540,11 +540,7 @@ async def test_exams_and_choose_refuse_courses_that_are_not_listed(db, api):
         db.commit()
         s = make_user(db)
         assert str(c.id) not in exam_ids((await api.call(s, "GET", "/catalog/exams")).json()), state
-        r = await api.call(s, "POST", "/catalog/choose", json={"course_ids": [str(c.id)]})
-        assert r.status_code == 422 and code(r) == "course_not_choosable", state
     fresh(db, c).listing = "listed"
     db.commit()
     s = make_user(db)
     assert str(c.id) in exam_ids((await api.call(s, "GET", "/catalog/exams")).json())
-    r = await api.call(s, "POST", "/catalog/choose", json={"course_ids": [str(c.id)]})
-    assert r.status_code == 200 and r.json()["joined"] == [str(c.id)]

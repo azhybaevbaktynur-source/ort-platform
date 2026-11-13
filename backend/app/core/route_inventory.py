@@ -238,6 +238,5 @@ ROUTE_POLICIES.update(MAINTENANCE_POLICIES)
 ROUTE_POLICIES.update({
     ("GET", "/api/v1/catalog/exams"): "authenticated",  # listed open platform courses by exam family; teachers read it
     # people who teach 403 `teacher_cannot_enroll`; test students 403; 5 a minute per user; joins through `_join`
-    ("POST", "/api/v1/catalog/choose"): "authenticated+ratelimit",
 })
 # --- STUDENT_IA_DESIGN 6.3 end ---

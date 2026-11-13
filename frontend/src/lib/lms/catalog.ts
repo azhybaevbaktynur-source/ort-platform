@@ -95,12 +95,6 @@ export interface ExamFamilyOut {
 
 export const listExams = () => lmsFetch<ExamFamilyOut[]>("/catalog/exams");
 
-/** `POST /catalog/choose`: joins up to 20 open platform courses; already enrolled ones are `skipped`. */
-export const chooseCourses = (courseIds: string[]) =>
-  thenMeStale(lmsFetch<{ joined: string[]; skipped: string[] }>("/catalog/choose", {
-    method: "POST", body: { course_ids: courseIds },
-  }));
-
 export const getCourseLanding = (courseId: string) => lmsFetch<CourseLandingOut>(`/catalog/courses/${enc(courseId)}`);
 
 /** Open-mode courses only; any other course answers the same 404 as a bad join code. */
