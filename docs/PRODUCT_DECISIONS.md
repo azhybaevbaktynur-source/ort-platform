@@ -723,3 +723,19 @@ listed state too. Approving re-checks the preconditions at decision time. The OR
 to any listing change. The D10 sweep (revoking a teacher's access) covers courses the teacher owns or that sit in their
 personal organization. Platform courses have no request button; they are in the catalog while their page is open by link.
 The system account that owns the ORT courses is shown as «Платформа».
+
+## Owner round 2026-11-13, items 6 and 7: domain and email readiness (nothing live changed)
+
+**Sender from env only.** One helper (`email_service.sender_address()` / `sender_name()`) gives every provider and every
+email the same From: `EMAIL_FROM`, else the legacy `SMTP_FROM_EMAIL`, else `SMTP_USER`; name `EMAIL_FROM_NAME` (default
+= per-language platform name). The made-up default `SMTP_FROM_EMAIL="noreply@ort.kg"` is now empty: with no sender
+configured nothing is sent (logged, Services shows email not configured) instead of using a domain nobody verified. The
+live sender is set in Render's env, so production is unchanged. SMTP's default From now carries the name like Brevo and
+Resend. Runbook: `runbooks/EMAIL_DOMAIN.md`.
+
+**Domain layout when the owner picks one** (`runbooks/CUSTOM_DOMAIN.md`): site on the apex `<domain>` (www redirects),
+backend on `api.<domain>` (Render custom domain, DNS only, Render subdomain kept as fallback), images on `img.<domain>`
+(R2 custom domain, r2.dev stays enabled; stored page/announcement image URLs rewritten once by SQL), DNS on Cloudflare,
+`noreply@`/`support@` as in the email runbook. Uptime and maintenance workflows read the hosts from repository variables
+`API_ORIGIN`/`WEB_ORIGIN` (fallback today's hosts). A support address, when it exists, comes from one
+`NEXT_PUBLIC_SUPPORT_EMAIL`; the product shows none today.
