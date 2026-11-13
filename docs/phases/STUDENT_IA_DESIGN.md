@@ -907,3 +907,11 @@ the catalog header's one button.
 | Other learner links to `/courses` | Pro page «К моим курсам», the invitations empty state «Назад», «Покинуть курс» on the Обзор → `/home` (`/home` sends people who teach to `/courses`) | V14 walk: no link to `/ru/courses` on a student page |
 | Dead keys | removed now with their components: `choose.*`, `courses.mine.*`, `catalog.groups.pick`, `home.hub.{choose,join}`, `student.nav.{chooseCourses,courses,joinByCode}`, `courses.notFound.join`; the dead helpers of `chooseCourses.ts` and their checks too (V3). S10 keeps the backend removal, `catalog.ts chooseCourses` and the S5 leftovers | nothing reads them after S7 |
 | `/courses` while `me` is unknown | neutral loading state (V2), no profile guess | as `/home` |
+
+### 10.7 S10 as built (2026-11-13)
+
+| Item | As built |
+|---|---|
+| Backend | `POST /catalog/choose`, `choose_courses`, `CATALOG_CHOOSE_1M`, the inventory row and `test_catalog_choose.py` removed (the listing test keeps its `GET /catalog/exams` assertions). `GET /catalog/exams` stays. |
+| Frontend | `chooseCourses` removed from `lib/lms/catalog.ts`; `lib/lms/chooseCourses.ts` stays (it holds `defaultFamily` and `subjectSections`, used by `CatalogView`). |
+| Dead keys | removed (en, ky, ru): `progress.{tabsLabel,tabs,tiles,trend,sections,topics}`, `progress.analytics.topics.empty`, `progress.analytics.mistakes.emptyOpenHint`, `courses.list.{becomeTeacher,becomeTeacherText,emptyLearning}`, `home.course.emptyHint`, `catalog.joining`. `student.nav.*` are all still used (nav.ts, e2e) and stay. |

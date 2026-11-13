@@ -375,11 +375,8 @@
       "title": "My courses",
       "create": "Create course",
       "trash": "Deleted courses",
-      "becomeTeacher": "Become a teacher",
-      "becomeTeacherText": "Want to run your own courses? Ask for teacher access.",
       "requestPending": "Teacher request under review",
       "emptyTeaching": "You are not teaching any courses yet.",
-      "emptyLearning": "You have not joined any courses yet. Use a code from your teacher.",
       "untitled": "Untitled course"
     },
     "create": {
@@ -2642,7 +2639,6 @@
     "title": "Course catalog",
     "subtitle": "Courses open to every student on the platform.",
     "join": "Join",
-    "joining": "Joining…",
     "open": "Open",
     "needsCode": "Join with a code from your teacher",
     "closed": "Enrollment is closed",
@@ -3720,7 +3716,6 @@
     "course": {
       "nextTitle": "What to do next",
       "noAssessments": "Your teacher has not added assignments yet. Check back later.",
-      "emptyHint": "Your teacher will add them here.",
       "allAssessments": "All assignments",
       "latestTitle": "Latest result",
       "allGrades": "All grades"
@@ -6074,34 +6069,13 @@
   "progress": {
     "nav": "My progress",
     "title": "Progress",
-    "tabsLabel": "Progress sections",
-    "tabs": {
-      "overview": "Overview",
-      "mistakes": "Mistakes"
-    },
-    "tiles": {
-      "current": "Current",
-      "goal": "Goal",
-      "attempts": "Attempts",
-      "mistakes": "Open mistakes",
-      "openNotebook": "Open notebook"
-    },
     "goal": {
       "label": "Goal, %",
       "save": "Save",
       "clear": "Remove",
       "invalid": "Enter a number from 1 to 100."
     },
-    "trend": "Recent results",
-    "sections": "By section",
     "empty": "No results yet.",
-    "topics": {
-      "title": "Weakest topics",
-      "topic": "Topic",
-      "section": "Section",
-      "accuracy": "Correct",
-      "questions": "Questions"
-    },
     "mistakes": {
       "filter": "Mistakes filter",
       "open": "Open",
@@ -6187,12 +6161,7 @@
         "other": "Other topics",
         "all": "Accuracy by topic",
         "subtitle": "Accuracy by topic",
-        "meter": "{topic}: accuracy",
-        "empty": {
-          "math": "Topics appear after your first answers in mathematics.",
-          "language": "Topics appear after your first answers in the language sections.",
-          "other": "Topics appear after your first answers."
-        }
+        "meter": "{topic}: accuracy"
       },
       "activity": {
         "title": "Activity",
@@ -6248,7 +6217,6 @@
         "hint": "Set the percent of correct answers you are aiming for."
       },
       "mistakes": {
-        "emptyOpenHint": "When you get a question wrong in a test, it will appear here so you can fix it.",
         "emptyFixedHint": "Questions you answer right after a mistake move here."
       },
       "lowData": "Not enough data",

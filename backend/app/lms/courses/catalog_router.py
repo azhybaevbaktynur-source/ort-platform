@@ -1,7 +1,6 @@
 """Course catalog (prefix /catalog, PHASE_5_DESIGN 5 / P5-5; Phase 9 S4: search, filters, landing, PHASE_9_DESIGN
 4.6). Joining one course is POST /courses/{id}/join, applying is POST /courses/{id}/applications. STUDENT_IA_DESIGN 6.3
-(step 3a S1): the `exam` filter, the choose step's `GET /catalog/exams` and `POST /catalog/choose` (several open platform
-courses at once, through the join service)."""
+(step 3a S1): the `exam` filter, and the catalog's `GET /catalog/exams`."""
 from __future__ import annotations
 
 import uuid
@@ -9,7 +8,7 @@ from datetime import datetime
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel
 from sqlalchemy import and_, case, or_, select
 from sqlalchemy.orm import Session
 
@@ -186,24 +185,6 @@ def exam_families(db: Session, user_id: str) -> list[ExamFamilyOut]:
 @router.get("/exams", response_model=list[ExamFamilyOut])
 def list_exams(ctx: AuthzContext = Depends(get_authz)):
     return exam_families(ctx.db, ctx.user.id)
-
-
-class ChooseIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    course_ids: list[uuid.UUID] = Field(min_length=1, max_length=20)
-
-
-class ChooseOut(BaseModel):
-    joined: list[uuid.UUID]
-    skipped: list[uuid.UUID]  # already enrolled
-
-
-@router.post("/choose", response_model=ChooseOut)
-def choose(data: ChooseIn, ctx: AuthzContext = Depends(get_authz)):
-    from app.lms.enrollments import service as enr_svc
-
-    joined, skipped = enr_svc.choose_courses(ctx.db, ctx.user, data.course_ids)
-    return ChooseOut(joined=joined, skipped=skipped)
 # --- STUDENT_IA_DESIGN 6.3 / 4 end ---
 
 
