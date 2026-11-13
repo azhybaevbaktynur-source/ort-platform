@@ -9,7 +9,7 @@
 import React from "react";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3, BookOpen, Bookmark, ClipboardList, Dumbbell, FolderOpen, GraduationCap, Library, Megaphone, Settings,
+  BarChart3, BookOpen, ClipboardList, Dumbbell, Flag, FolderOpen, GraduationCap, Library, Megaphone, Settings,
   TrendingUp, Users,
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
@@ -28,7 +28,7 @@ const ICONS: Record<CourseNavKey, React.ReactNode> = {
   files: <FolderOpen />,
   practice: <Dumbbell />,
   progress: <TrendingUp />,
-  saved: <Bookmark />,
+  saved: <Flag />, // S9: «Повторение» = flagged questions, as the Аналитика tile
   analytics: <BarChart3 />,
 };
 

@@ -97,6 +97,9 @@ export interface CourseCard {
   lessons_count?: number;
   /** F7a: the platform organization's course: no teacher or organization line */
   is_platform_course?: boolean;
+  /** S9: the card's subject / family mark (absent: older backend) */
+  exam_family?: ExamFamily | null;
+  subject?: ExamSubject | null;
 }
 
 /** F7a: `POST /courses/{id}/cover` (multipart `file`, optional `focus_x` / `focus_y` 0..1); `DELETE` clears it. */

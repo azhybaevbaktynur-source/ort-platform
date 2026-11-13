@@ -142,3 +142,12 @@ owner. Never to make a failing run green without looking.
   `section-end`, `flagged-palette`, `teacher-*`, desktop result) matches the committed baselines (not re-recorded).
   Before/after pairs (`*-expected.png` / `*-actual.png`) in `docs/phases/STUDENT_IA_screens/s7-ort/`; awaiting the
   orchestrator's review.
+- 2026-11-13: `lobby-desktop-{ru,ky}`, `lobby-phone-ru` and `review-desktop-{ru,ky}` (5 images) re-recorded for step 3a
+  S9 (STUDENT_IA_DESIGN v3 V11) together with S8's tab rename: the frame only. The ORT row in the sidebar shows the
+  `Award` mark instead of the brand cap, and the compact header's last tab reads «Повторение» (was «Сохранённые»). Every
+  one was within the 0.5 % threshold (largest 0.066 %); each diff (pixelmatch bounding box) lies in the sidebar row icon
+  or the tab line, and the exam area is unchanged. Every other student image matches exactly (zero differing pixels).
+  `teacher-*` desktop images differ by 0.08–0.22 % in the AppHeader only (no «Учёба» area for people who teach, and
+  «Организация» has a chevron). That drift comes from earlier rounds, is not S9's, and is not re-recorded here. Before/after pairs
+  (`<name>-before.png` / `<name>-after.png`) in `docs/phases/STUDENT_IA_screens/s9-ort/`; awaiting the orchestrator's
+  review.

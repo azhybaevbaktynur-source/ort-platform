@@ -903,9 +903,11 @@ def seed_hub(api: Api, log: Path, ort_course_id: str) -> dict:
     one = register(api, log, "e2e-hub-one@example.com", "Бакыт Пробный")
     api.call("POST", f"/courses/{ort_course_id}/join", one["token"], {})
     many = register(api, log, "e2e-hub-many@example.com", "Нурия Образцова")
-    for u in (empty, one, many):
+    # step 3a S9 (student-shell.spec.ts): the course marks; the spec joins its own subject courses
+    icons = register(api, log, "e2e-hub-icons@example.com", "Эрмек Значков")
+    for u in (empty, one, many, icons):
         u["profile"] = profile(api, u["token"])
-    return {"empty": empty, "one": one, "many": many}
+    return {"empty": empty, "one": one, "many": many, "icons": icons}
 # --- Step 3a S3 end ---
 
 

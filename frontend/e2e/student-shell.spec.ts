@@ -1,6 +1,7 @@
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { seed, settle, signIn, tr, VIEWPORTS } from "./helpers";
+import { api, seed, settle, signIn, tr, VIEWPORTS } from "./helpers";
+import { gradientPng } from "./png";
 
 /**
  * Step 3a S3, S7 (docs/phases/STUDENT_IA_DESIGN.md §2.1, v3 V1, V5, V6): the global frame. One navigation: the sidebar
@@ -135,6 +136,104 @@ test.describe("student frame (ru)", () => {
     await page.keyboard.press("Escape");
     await expect(sheet).toBeHidden();
     await expect(more).toBeFocused();
+  });
+
+  test("course marks: a subject icon per course, the cover thumbnail, never the brand cap (S9)", async ({ page }) => {
+    test.setTimeout(240_000);
+    const s = seed();
+    const user = s.hub.icons;
+    const ort = await api(s.admin, "GET", `/courses/${s.course_id}`);
+    const made: string[] = [];
+    const mk = async (title: string, patch: Record<string, unknown>) => {
+      const c = await api(s.admin, "POST", "/courses", {
+        title: { ru: title }, languages: ["ru"], default_language: "ru", organization_id: ort.organization_id, enrollment_mode: "open",
+      });
+      made.push(c.id);
+      await api(s.admin, "POST", `/courses/${c.id}/publish`);
+      await api(s.admin, "PATCH", `/courses/${c.id}`, { enrollment_mode: "open", visibility: "catalog", ...patch });
+      return c.id as string;
+    };
+    try {
+      // fake titles; joined oldest first, so the newest join (the covered course) is the top row
+      const kyrgyz = await mk("ОРТ: Кыргыз тили", { exam_family: "ort", subject: "kyrgyz" });
+      const chemistry = await mk("НЦТ: Химия", { exam_family: "nct", subject: "chemistry" });
+      const history = await mk("ОРТ: История", { exam_family: "ort", subject: "history" });
+      const physics = await mk("ОРТ: Физика", { exam_family: "ort", subject: "physics" });
+      const form = new FormData();
+      form.append("file", new Blob([new Uint8Array(gradientPng(640, 360))], { type: "image/png" }), "cover.png");
+      const up = await fetch(`${s.api}/api/v1/courses/${physics}/cover`, { method: "POST", headers: { Authorization: `Bearer ${s.admin.token}` }, body: form });
+      expect(up.status, await up.clone().text()).toBeLessThan(300);
+      await api(user, "POST", "/courses/join", { code: s.modules.join_code });
+      await api(user, "POST", `/courses/${s.course_id}/join`, {});
+      for (const id of [kyrgyz, chemistry, history, physics]) await api(user, "POST", `/courses/${id}/join`, {});
+      const marks: [string, string][] = [
+        [s.course_id, "award"], [s.modules.course_id, "book-open"], [kyrgyz, "languages"], [chemistry, "flask-conical"],
+        [history, "landmark"], [physics, "cover"],
+      ];
+
+      await page.setViewportSize(VIEWPORTS.desktop);
+      await signIn(page, user);
+      await page.goto(`/${L}/home`);
+      const nav = sidebar(page);
+      for (const [id, key] of marks) {
+        const row = nav.locator(`a[href^="/${L}/courses/${id}"]`);
+        await expect(row.locator("[data-icon]"), `sidebar row ${key}`).toHaveAttribute("data-icon", key);
+      }
+      // the thumbnail: 24 × 24, the same URL as the card's cover
+      const thumb = nav.locator(`a[href^="/${L}/courses/${physics}"] img`);
+      await expect(thumb).toHaveAttribute("alt", "");
+      await expect.poll(() => thumb.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true);
+      expect(await thumb.evaluate((i) => [i.getBoundingClientRect().width, i.getBoundingClientRect().height])).toEqual([24, 24]);
+      // no course row and no default cover uses the brand's graduation cap
+      await expect(page.locator("main svg.lucide-graduation-cap")).toHaveCount(0);
+      await expect(nav.locator(`a[href^="/${L}/courses/"] svg.lucide-graduation-cap`)).toHaveCount(0);
+      // the hub cards: the default cover draws the same mark, a covered course its picture
+      const card = (id: string) => page.locator("main li").filter({ has: page.locator(`a[href="/${L}/courses/${id}"]`) }).first();
+      for (const [id, key] of marks) {
+        if (key === "cover") await expect(card(id).locator("img").first()).toBeVisible();
+        else await expect(card(id).locator(`[data-icon="${key}"]`), `hub card ${key}`).toHaveCount(1);
+      }
+      const shot = async (name: string) => {
+        if (!process.env.S9_SHOTS) return;
+        await settle(page);
+        await page.screenshot({ path: path.join(process.env.S9_SHOTS, `${name}.png`), fullPage: true, animations: "disabled", caret: "hide" });
+      };
+      for (const width of [1440, 1920]) {
+        await page.setViewportSize({ width, height: 900 });
+        await shot(`home-${width}-ru`);
+      }
+      // the catalog's cards (НЦТ chip): chemistry's flask
+      await page.goto(`/${L}/courses/catalog?exam=nct`);
+      const catalogCard = page.locator("main li").filter({ has: page.locator(`a[href*="${chemistry}"]`) }).first();
+      await expect(catalogCard.locator('[data-icon="flask-conical"]')).toHaveCount(1);
+      for (const width of [1440, 1920]) {
+        await page.setViewportSize({ width, height: 900 });
+        await shot(`catalog-nct-${width}-ru`);
+      }
+      await page.goto(`/${L}/courses/catalog?exam=ort`);
+      await expect(page.locator("main").getByText("ОРТ: История").first()).toBeVisible();
+      await shot("catalog-ort-1920-ru");
+
+      // phone: the «Ещё» sheet's rows carry the same marks
+      await page.setViewportSize(VIEWPORTS.phone);
+      await page.goto(`/${L}/home`);
+      await shot("home-375-ru");
+      await bar(page).getByRole("button", { name: t("student.nav.more") }).click();
+      const sheet = page.getByRole("dialog", { name: t("student.nav.more") });
+      await expect(sheet).toBeVisible();
+      for (const [id, key] of marks) {
+        await expect(sheet.locator(`a[href^="/${L}/courses/${id}"] [data-icon]`), `sheet row ${key}`).toHaveAttribute("data-icon", key);
+      }
+      if (process.env.S9_SHOTS) {
+        await settle(page);
+        await page.screenshot({ path: path.join(process.env.S9_SHOTS, "more-sheet-375-ru.png"), animations: "disabled", caret: "hide" });
+      }
+      await page.keyboard.press("Escape");
+      await page.goto(`/${L}/courses/catalog?exam=ort`);
+      await shot("catalog-ort-375-ru");
+    } finally {
+      for (const id of made) await api(s.admin, "DELETE", `/courses/${id}`);
+    }
   });
 
   test("people who teach keep the AppHeader, also on /home", async ({ page }) => {

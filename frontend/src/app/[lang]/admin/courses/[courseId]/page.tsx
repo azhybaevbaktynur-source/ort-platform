@@ -187,7 +187,7 @@ export default function AdminCourseDetailPage() {
 
       {/* F7b: platform courses take their cover from a platform admin */}
       {!isDeleted && course.is_platform_course && (
-        <CourseCoverSection className="mb-6" courseId={course.id} title={courseTitle} platform coverUrl={course.cover_url}
+        <CourseCoverSection className="mb-6" courseId={course.id} title={courseTitle} examFamily={course.exam_family} subject={course.subject} coverUrl={course.cover_url}
           onChanged={(url) => setCourse((c) => (c ? { ...c, cover_url: url } : c))} />
       )}
 

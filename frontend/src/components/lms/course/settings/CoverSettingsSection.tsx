@@ -18,7 +18,7 @@ export function CoverSettingsSection({ course, onSaved }: { course: CourseStaffO
   const courseName = pickLocalized(course.title, lang, course.default_language) || t("courses.list.untitled");
   return (
     <SectionLayout preview={<CoursePreview course={cardDataOf(course)} cover={pending} />}>
-      <CourseCoverSection courseId={course.id} title={courseName} platform={!!course.is_platform_course} previews={false}
+      <CourseCoverSection courseId={course.id} title={courseName} examFamily={course.exam_family} subject={course.subject} previews={false}
         onPreview={onPreview} coverUrl={course.cover_url} onChanged={(url) => onSaved({ ...course, cover_url: url })} />
     </SectionLayout>
   );

@@ -74,7 +74,7 @@ export function LessonCourses({ rows, grid, title, subtitle, headingId = "home-l
               course={{
                 id: r.id, title: r.title, languages: [], default_language: lang as Lang,
                 is_platform_course: r.is_platform_course, cover_url: r.cover_url, lessons_count: r.lessons_count,
-                has_paid_tests: r.has_paid_modules,
+                has_paid_tests: r.has_paid_modules, exam_family: r.exam_family, subject: r.subject,
               }}
               action={!r.enrolled && !staff ? (
                 <>

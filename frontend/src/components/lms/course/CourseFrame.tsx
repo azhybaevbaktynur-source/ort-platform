@@ -144,7 +144,7 @@ function FullHeader({ course, tabs }: { course: CourseOut; tabs: CourseTab[] }) 
   const progressText = progress ? t("course.header.progress", { done: progress.done, total: progress.total }) : "";
   return (
     <header className="mb-5 overflow-hidden rounded-card border border-slate-200 bg-white sm:mb-6">
-      <CourseCardCover courseId={course.id} platform={course.is_platform_course} coverUrl={course.cover_url}
+      <CourseCardCover courseId={course.id} examFamily={course.exam_family} subject={course.subject} coverUrl={course.cover_url}
         className="aspect-auto h-[120px] lg:h-[160px]" />
       <div className="flex flex-col gap-4 px-4 pb-2 pt-4 sm:px-5 sm:pt-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 space-y-2">
