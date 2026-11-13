@@ -1,13 +1,13 @@
 /**
  * Step 3a S3 (docs/phases/STUDENT_IA_DESIGN.md §2.1, §2.5): the links of the student frame. The global frame is about
- * the person, a course space about one course (S2), so no global link carries a course id: Главная `/home`, Мои курсы
- * `/courses`, Каталог `/courses/catalog`, then the «Мои курсы» rows (recent first, 6 + «Все курсы (N)»; none: «Выбрать
- * курсы»). Dependency-free (structural types; `lastPlace.ts` is dependency-free too), checked by `studentNav.check.ts`.
+ * the person, a course space about one course (S2), so no global link carries a course id. S7 (v3, V1, V7, V8): Главная
+ * `/home` and Каталог `/courses/catalog` (no «Мои курсы» page any more), then the «Мои курсы» rows (recent first, 6 +
+ * «Все курсы (N)» → `/home#courses`; no course: no rows, the shell hides the group). Dependency-free (structural types;
+ * `lastPlace.ts` is dependency-free too), checked by `studentNav.check.ts`.
  */
-import { chooseCoursesHref } from "./chooseCourses";
 import { courseRowHref, recentFirst, type LastPlace } from "./lastPlace";
 
-export type StudentNavKey = "home" | "courses" | "catalog";
+export type StudentNavKey = "home" | "catalog";
 
 export interface StudentNavLink {
   key: StudentNavKey;
@@ -28,17 +28,16 @@ function under(rest: string, prefix: string): boolean {
   return rest === prefix || rest.startsWith(`${prefix}/`);
 }
 
-/** The three global links in sidebar order; `catalog` is null for the test student (Student view). */
+/** The two global links in sidebar order; `catalog` is null for the test student (Student view). */
 export function studentNavLinks({ lang, rest, testStudent = false }: {
   lang: string;
   /** Path without the language prefix (`/courses/abc/tests`). */
   rest: string;
   testStudent?: boolean;
-}): { home: StudentNavLink; courses: StudentNavLink; catalog: StudentNavLink | null } {
+}): { home: StudentNavLink; catalog: StudentNavLink | null } {
   const base = `/${lang}`;
   return {
     home: { key: "home", href: `${base}/home`, active: rest === "/home" },
-    courses: { key: "courses", href: `${base}/courses`, active: rest === "/courses" },
     catalog: testStudent ? null : { key: "catalog", href: `${base}/courses/catalog`, active: under(rest, "/courses/catalog") },
   };
 }
@@ -62,32 +61,25 @@ export interface CourseRow<T extends CourseRowInput = CourseRowInput> {
 
 export interface CourseRows<T extends CourseRowInput = CourseRowInput> {
   rows: CourseRow<T>[];
-  /** «Все курсы (N)» → `/courses` when there are more rows than shown */
-  all: { href: string; count: number; active: boolean } | null;
-  /** no course yet: «Выбрать курсы» → `chooseCoursesHref` (the choose step; never for the test student) */
-  choose: { href: string; active: boolean } | null;
+  /** «Все курсы (N)» → `/home#courses` (the hub's «Мои курсы» section) when there are more courses than rows */
+  all: { href: string; count: number } | null;
 }
 
 /**
  * The student's courses as sidebar rows (§2.1, §2.5): the recent ids first, then the home's order (newest enrolment
  * first); a row opens the course's last tab when the last place names it, else Обзор; the viewed course's row is
- * active. `loaded` false: nothing yet (no «Выбрать курсы» flash).
+ * active. No course, or `loaded` false: no rows (the shell hides the group; v3 V8, no «Выбрать курсы» row).
  */
-export function courseRows<T extends CourseRowInput>({ lang, rest, courses, recent, place, loaded, testStudent = false }: {
+export function courseRows<T extends CourseRowInput>({ lang, rest, courses, recent, place, loaded }: {
   lang: string;
   rest: string;
   courses: T[];
   recent: string[];
   place: LastPlace | null;
   loaded: boolean;
-  testStudent?: boolean;
 }): CourseRows<T> {
   const viewed = courseIdOfPath(rest);
-  if (!loaded) return { rows: [], all: null, choose: null };
-  if (courses.length === 0) {
-    const href = chooseCoursesHref(lang);
-    return { rows: [], all: null, choose: testStudent ? null : { href, active: href === `/${lang}${rest}` } };
-  }
+  if (!loaded || courses.length === 0) return { rows: [], all: null };
   const ordered = recentFirst(courses, recent);
   // the viewed course stays visible even when it is not among the first rows
   let shown = ordered.slice(0, COURSE_ROWS_MAX);
@@ -99,6 +91,6 @@ export function courseRows<T extends CourseRowInput>({ lang, rest, courses, rece
     active: c.id === viewed,
     progress: c.progress && c.progress.total > 0 ? c.progress : null,
   }));
-  const all = courses.length > COURSE_ROWS_MAX ? { href: `/${lang}/courses`, count: courses.length, active: rest === "/courses" } : null;
-  return { rows, all, choose: null };
+  const all = courses.length > COURSE_ROWS_MAX ? { href: `/${lang}/home#courses`, count: courses.length } : null;
+  return { rows, all };
 }

@@ -896,3 +896,14 @@ the catalog header's one button.
 | Installed app start page | `manifest.ts` `start_url: "/ru/"` → the landing (`[lang]/page.tsx`, CTA → `/courses`) | `start_url: "/ru/home"`: signed-in learner → hub; signed-out → login with redirect; teacher → Teaching | moved (N8); `pwa.spec.ts:83` updated |
 | Per-role link check | `lib/lms/roleLinks.check.ts` fixed table + `e2e/role-links.spec.ts` `ENTRY` per role (desktop + 375) | table gains `/home`, `/courses/choose`, `/courses/c1/{lessons,analytics,saved}` per role; `ENTRY.student` gains `/ru/home`, `/ru/courses/choose`; the walk also opens the «Мои курсы» rows and the «Продолжить» slot. v3 (V14): rows `/ru/courses/catalog?welcome=1` and `/ru/home#courses`; `/ru/courses` and `/ru/courses/choose` stay as redirect entries; the student walk asserts no link to `/ru/courses` and «Войти по коду» only on the catalog | kept, extended |
 | Student view entry links | `StaffCourseBar` button, `CourseLanding` for a teacher | unchanged | kept |
+
+### 10.6 S7 as built (2026-11-13; what the implementation added to the rows above)
+
+| Item | As built | Why |
+|---|---|---|
+| `/courses/choose` for people who teach and the test student | people who teach → `/courses` (Teaching list), the test student → `/home` (no catalog in Student view); learners → `/courses/catalog[?welcome=1]` | the old step did the same (Teaching list / the course); the catalog is not theirs |
+| Welcome line for people who teach / the test student | not shown, even with `?welcome=1` (their catalog is the read-only preview); the header «Войти по коду» is hidden for the test student too | the line asks them to join, which they cannot |
+| Course not found | «Назад к моим курсам» → `/home` for learners (`/courses` for people who teach); «Войти по коду» replaced by «В каталог» (`courses.notFound.catalog`; the old second catalog link merged into it) | no learner link to `/courses`; one code button (V5) |
+| Other learner links to `/courses` | Pro page «К моим курсам», the invitations empty state «Назад», «Покинуть курс» on the Обзор → `/home` (`/home` sends people who teach to `/courses`) | V14 walk: no link to `/ru/courses` on a student page |
+| Dead keys | removed now with their components: `choose.*`, `courses.mine.*`, `catalog.groups.pick`, `home.hub.{choose,join}`, `student.nav.{chooseCourses,courses,joinByCode}`, `courses.notFound.join`; the dead helpers of `chooseCourses.ts` and their checks too (V3). S10 keeps the backend removal, `catalog.ts chooseCourses` and the S5 leftovers | nothing reads them after S7 |
+| `/courses` while `me` is unknown | neutral loading state (V2), no profile guess | as `/home` |

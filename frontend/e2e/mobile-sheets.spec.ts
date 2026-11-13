@@ -75,7 +75,7 @@ test.describe("phone sheets keep sign out visible (ru)", () => {
     });
   }
 
-  // step 3a S3: no exam sheet any more; the «Ещё» sheet carries the «Мои курсы» rows and «Войти по коду»
+  // step 3a S3: no exam sheet any more; the «Ещё» sheet carries the «Мои курсы» rows (S7, V5: no «Войти по коду»)
   test("student: the More sheet's course rows fit the short viewport", async ({ page }) => {
     const s = seed();
     const user = s.students["vis-desktop-ru"];
@@ -87,7 +87,7 @@ test.describe("phone sheets keep sign out visible (ru)", () => {
     const dialog = page.getByRole("dialog", { name: t("student.nav.more") });
     await inView(page, dialog, "More sheet");
     await inView(page, dialog.locator(`a[href^="/${L}/courses/${s.course_id}"]`), "More: the course row");
-    await expect(dialog.getByRole("link", { name: t("student.nav.joinByCode") })).toHaveAttribute("href", `/${L}/courses/join`);
+    await expect(dialog.locator(`a[href="/${L}/courses/join"]`)).toHaveCount(0);
     await shot(page, "student-more-rows");
   });
 

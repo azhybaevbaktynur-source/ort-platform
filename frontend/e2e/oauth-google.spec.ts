@@ -73,15 +73,16 @@ test("new user under 14: the privacy page, signed in, never sent to login", asyn
   expect((await me(page)).email).toBe(email);
 });
 
-test("new user 18+ without a redirect: the choose step (step 3a S4); nothing joined", async ({ page }) => {
+test("new user 18+ without a redirect: the catalog with the welcome line (step 3a S7); nothing joined", async ({ page }) => {
   const email = `e2e-google-choose-${rand()}@gmail.test`;
   await nextGoogle({ email, name: "Гугл Выбор", sub: `choose-${rand()}` });
   await pressGoogle(page);
   await page.getByRole("button", { name: t("privacy.age.18_plus") }).click();
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: t("auth.oauth.completeButton") }).click();
-  await expect(page).toHaveURL(/\/ru\/courses\/choose\?first=1$/);
-  await expect(page.getByRole("heading", { level: 1, name: t("choose.title") })).toBeVisible();
+  await expect(page).toHaveURL(/\/ru\/courses\/catalog\?welcome=1$/);
+  await expect(page.getByRole("heading", { level: 1, name: t("catalog.title") })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: t("catalog.welcome") })).toBeVisible();
   const token = await page.evaluate(() => localStorage.getItem("ort_token"));
   const home = await (await fetch(`${API}/api/v1/me/home`, { headers: { Authorization: `Bearer ${token}` } })).json();
   expect(home.courses).toHaveLength(0);

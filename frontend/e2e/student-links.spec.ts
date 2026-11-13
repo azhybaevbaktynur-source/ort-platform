@@ -95,10 +95,10 @@ test.describe("student link audit (ru)", () => {
     await signIn(page, user);
 
     const pages = [
-      `/${L}/home`, `/${L}/courses`, `${c}/tests`, `${c}/progress`, // step 3a S3: the hub and «Мои курсы»
+      `/${L}/home`, `/${L}/courses`, `${c}/tests`, `${c}/progress`, // step 3a S7: /courses redirects to the hub
       `${c}/saved`, `${c}/saved?tab=mistakes`, `${c}/modules`,
       `${c}/practice`, `/${L}/pro`, `${c}/attempts/${attemptId}/result`,
-      `/${L}/courses/choose?first=1`, `/${L}/courses/catalog`, // step 3a S4: the choose step and the catalog chips
+      `/${L}/courses/choose?first=1`, `/${L}/courses/catalog?welcome=1`, // step 3a S7: the old step redirects; the catalog
     ];
     const visited = new Set<string>();
     for (const from of pages) {

@@ -136,7 +136,7 @@ ok(continueTarget("ru", at("t1", "/ru/courses/t1", "overview"), courses, home).k
 ok(continueTarget("ru", at("e1", "/ru/courses/e1/tests", "tests"), withStart, home).href === "/ru/courses/e1/tests", "a remembered tab stays the tab");
 
 const none = continueTarget("ky", null, []);
-ok(none.kind === "choose" && none.href === "/ky/courses/choose" && none.courseId === null, "no courses: the choose step");
+ok(none.kind === "catalog" && none.href === "/ky/courses/catalog" && none.courseId === null, "no courses: the catalog (v3 V8)");
 
 if (failed) {
   console.error(`${failed} check(s) failed`);

@@ -136,3 +136,9 @@ owner. Never to make a failing run green without looking.
   unchanged; the player screens, `section-end`, `submit`, `passage`, `comparison`, `flagged-palette`,
   `player-loading` and every `teacher-*` image match the committed baselines (not re-recorded). Before/after pairs in
   `docs/phases/STUDENT_IA_screens/ort/s3/`; awaiting the orchestrator's review.
+- 2026-11-13: `lobby-*` (4), `review-*` (4) and `result-phone-{ru,ky}` re-recorded for step 3a S7 (STUDENT_IA_DESIGN v3
+  V1, V6): the student frame only, the sidebar without the «Мои курсы» link (Главная · Каталог, then the course rows)
+  and the phone bar Главная · Продолжить · Каталог · Ещё; page bodies unchanged. Every other image (player, `submit`,
+  `section-end`, `flagged-palette`, `teacher-*`, desktop result) matches the committed baselines (not re-recorded).
+  Before/after pairs (`*-expected.png` / `*-actual.png`) in `docs/phases/STUDENT_IA_screens/s7-ort/`; awaiting the
+  orchestrator's review.

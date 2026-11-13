@@ -16,11 +16,16 @@ const STAFF: Role[] = ["teacher", "teacher_enrolled", "org_admin", "platform_adm
 
 // --- the student: every personal URL in the student frame, the Learning area ---
 const studentRows: Row[] = [
+  // step 3a S7 (STUDENT_IA_DESIGN v3 V1, V3, V14): /courses and /courses/choose are redirect-only pages for a learner
+  // (to /home and to the catalog); they must redirect inside the student frame
   ["/ru/courses", "student", "learning"],
-  ["/ru/courses?view=learning", "student", "learning"], // step 3a S3: the page sends a learner on to /home
-  // step 3a S3 (STUDENT_IA_DESIGN §2.1): the hub and the choose step
+  ["/ru/courses?view=learning", "student", "learning"],
+  ["/ru/courses#ort", "student", "learning"],
   ["/ru/home", "student", "learning"],
+  ["/ru/home#courses", "student", "learning"],
   ["/ru/courses/choose", "student", "learning"],
+  ["/ru/courses/choose?first=1", "student", "learning"],
+  ["/ru/courses/catalog?welcome=1", "student", "learning"],
   ["/ru/courses/c1", "student", "learning"],
   ["/ru/courses/c1/tests", "student", "learning"],
   // step 3a S2: the course tabs (STUDENT_IA_DESIGN §3.2) and the lobby
@@ -47,9 +52,11 @@ for (const [href, frame, area] of studentRows) {
 const staffRows: Row[] = [
   ["/ru/courses", "app", "teaching"],
   ["/ru/courses?view=teaching", "app", "teaching"],
-  // step 3a S3: the hub and the choose step are never a student frame for people who teach (their home area)
+  // step 3a S3, S7: the hub, the old choose step and the catalog welcome are never a student frame for people who teach
   ["/ru/home", "app", "teaching"],
+  ["/ru/home#courses", "app", "teaching"],
   ["/ru/courses/choose", "app", "teaching"],
+  ["/ru/courses/catalog?welcome=1", "app", "teaching"],
   ["/ru/courses?view=learning", "app", "teaching"],
   ["/ru/courses/c1", "app", "teaching"],
   ["/ru/courses/c1/people", "app", "teaching"],

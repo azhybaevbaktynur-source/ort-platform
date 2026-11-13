@@ -210,7 +210,7 @@ export default function ProPage() {
         </div>
       )}
       <div className="mt-6">
-        <LinkButton variant="link" href={`/${lang}/courses`}>{t("access.unlock.back")}</LinkButton>
+        <LinkButton variant="link" href={`/${lang}/home`}>{t("access.unlock.back")}</LinkButton>
       </div>
     </div>
   );

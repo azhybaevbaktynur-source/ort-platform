@@ -101,9 +101,9 @@ test("sign-up 18+: age first, policies required, then the home page without a ba
   });
   await page.getByRole("button", { name: tr("ru", "auth.signUpButton") }).click();
   await verify(page, "ru", email);
-  // step 3a S4: a new account gets the skippable choose step, then the hub
-  await expect(page).toHaveURL(/\/ru\/courses\/choose\?first=1$/);
-  await page.getByRole("link", { name: tr("ru", "choose.skip") }).click();
+  // step 3a S7: a new account lands in the catalog with the welcome line; the hub is one tap away
+  await expect(page).toHaveURL(/\/ru\/courses\/catalog\?welcome=1$/);
+  await page.goto("/ru/home");
   await expect(page).toHaveURL(/\/ru\/home/);
   await settle(page);
   await expect(page.getByRole("link", { name: tr("ru", "privacy.banner.age") })).toHaveCount(0);
@@ -121,7 +121,7 @@ test("sign-up 14-17 in Kyrgyz", async ({ browser }) => {
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: tr("ky", "auth.signUpButton") }).click();
   await verify(page, "ky", email);
-  await expect(page).toHaveURL(/\/ky\/courses\/choose\?first=1$/); // step 3a S4: the choose step
+  await expect(page).toHaveURL(/\/ky\/courses\/catalog\?welcome=1$/); // step 3a S7: the catalog welcome
   expect((await apiAs(page, "GET", "/me/privacy")).body).toMatchObject({ age_band: "14_17", consent_state: "ok" });
   await page.context().close();
 });
@@ -241,7 +241,7 @@ test("my data: download, delete request with password, admin runs and rejects", 
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: tr("ru", "auth.signUpButton") }).click();
   await verify(page, "ru", email);
-  await expect(page).toHaveURL(/\/ru\/courses\/choose\?first=1$/); // step 3a S4: the choose step
+  await expect(page).toHaveURL(/\/ru\/courses\/catalog\?welcome=1$/); // step 3a S7: the catalog welcome
 
   await page.goto("/ru/privacy");
   await expect(page.getByText("Айгүл Родитель")).toBeVisible();
