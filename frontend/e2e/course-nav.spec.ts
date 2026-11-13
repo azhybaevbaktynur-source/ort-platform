@@ -204,7 +204,7 @@ test.describe("course navigation (ru)", () => {
   test("student: tabs follow published content; Announcements and Files reached from Обзор once published; 'not available' page before", async ({ browser }) => {
     const sp = await open(browser, nav().students.sidebar);
     await sp.goto(base());
-    // a published quiz, nothing else: Обзор · Тесты · Аналитика · Сохранённые; no course sidebar for students
+    // a published quiz, nothing else: Обзор · Тесты · Аналитика · Повторение; no course sidebar for students
     await expect(tab(sp, "course.tabs.overview")).toHaveAttribute("aria-current", "page");
     expect((await courseTabs(sp).getByRole("link").allInnerTexts()).map((x) => x.trim()))
       .toEqual([t("course.tabs.overview"), t("course.tabs.tests"), t("course.tabs.analytics"), t("course.tabs.saved")]);

@@ -739,3 +739,33 @@ backend on `api.<domain>` (Render custom domain, DNS only, Render subdomain kept
 `noreply@`/`support@` as in the email runbook. Uptime and maintenance workflows read the hosts from repository variables
 `API_ORIGIN`/`WEB_ORIGIN` (fallback today's hosts). A support address, when it exists, comes from one
 `NEXT_PUBLIC_SUPPORT_EMAIL`; the product shows none today.
+
+## Owner 2026-11-13: student area without redundancy (`phases/STUDENT_IA_DESIGN.md` v3, §0)
+
+Verbatim brief: `phases/FIX_ROUND_2026-11-12.md` "Owner round 2026-11-13 (after 3a/3b, verbatim)", items 2–4. Decisions
+V1–V16 in the design; the ones that change what was built:
+
+- **No learner «Мои курсы» page or menu item.** `/courses` for a person who learns redirects to `/home` (`#ort`/`#nct`/
+  `#other` → `/home#courses`); the sidebar is Главная · Каталог, then the «Мои курсы» list (6 recent rows, «Все курсы (N)»
+  → `/home#courses`; hidden with 0 courses). Teachers keep `/courses` as their Teaching list; no "both" case (teachers
+  never get Learning, owner 2026-11-12).
+- **The catalog is the one way to add a course.** `/courses/choose` and «Подобрать курсы» are removed (`/courses/choose`
+  redirects to the catalog); «Добавить курс» on the hub opens the catalog; the hub's empty state has one button «Открыть
+  каталог». A new account (sign-up or a new Google account) lands on `/courses/catalog?welcome=1` with a one-sentence
+  welcome line and a «×»; "new" is the query parameter only, nothing stored, `?redirect=`/under-14/parent keep
+  precedence. `POST /catalog/choose` is removed (S10); `GET /catalog/exams` stays for the chips.
+- **«Войти по коду» has one button**, the catalog header's; the «Ещё» sheet, hub, `/courses`, choose-step and
+  not-found copies go; the by-code course landing keeps its contextual «Ввести код»; `/courses/join` stays for
+  teacher-code links.
+- **Phone bar** Главная · Продолжить · Каталог · Ещё (four items; «Курсы» went with its page); «Ещё» = course rows,
+  getting started, Pro, install, other areas, account; «Продолжить» with 0 courses → the catalog.
+- **Hub group caps** stay (4 cards); «Все курсы ОРТ (N)» expands in place instead of linking to `/courses#ort`.
+- **«Сохранённые» → «Повторение»** (ky «Кайталоо», en «Review»), inner tabs «Отмеченные» · «Ошибки», new empty-state
+  texts; the URL `/courses/{c}/saved`, tab key and `?tab=mistakes` are unchanged (labels only). The Аналитика tile
+  «Сохранено» becomes «Отмечено».
+- **Course icons from `courses.subject`**, frontend mapping only (no migration, registry unchanged): math `Sigma`, physics
+  `Atom`, chemistry `FlaskConical`, biology `Dna`, history `Landmark`, geography `Globe`, kyrgyz/russian/english
+  `Languages`, literature `BookText`; main course ОРТ `Award`, НЦТ `ClipboardCheck`, teacher course `BookOpen`; a 24 px
+  cover thumbnail in the sidebar rows when the course has a cover; the default cover's mark is the same icon. The
+  graduation cap stays the brand mark only; no course uses it.
+- Slices S7 navigation (Opus), S8 Повторение strings (Sonnet), S9 icons (Opus), S10 cleanup (Sonnet); no migration.

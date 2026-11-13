@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { Bookmark, Flame, ListChecks, Target } from "lucide-react";
+import { Flag, Flame, ListChecks, Target } from "lucide-react";
 import { ErrorState, LinkButton, Mascot, Skeleton, StatTile, cn } from "@/components/ui";
 import { useErrorText } from "@/components/lms/home/useErrorText";
 import { useCourse } from "@/components/lms/CourseContext";
@@ -54,7 +54,7 @@ function Loading({ period, saved }: { period: ActivityDays; saved: string | null
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile icon={<ListChecks />} label={t("progress.analytics.tiles.answered")} value={<NumberSkeleton />} hint={inPeriod} />
         <StatTile icon={<Target />} label={t("progress.analytics.tiles.accuracy")} value={<NumberSkeleton />} hint={inPeriod} />
-        <StatTile icon={<Bookmark />} label={t("progress.analytics.tiles.saved")}
+        <StatTile icon={<Flag />} label={t("progress.analytics.tiles.saved")}
           value={saved === null ? <NumberSkeleton /> : <span className="tabular-nums">{saved}</span>} hint={t("progress.analytics.tiles.savedHint")} />
         <StatTile icon={<Flame />} label={t("progress.analytics.tiles.streak")} value={<NumberSkeleton />} />
       </div>
@@ -133,7 +133,7 @@ export function AnalyticsOverview({ courseId, period, examPrep = false }: { cour
         <StatTile icon={<Target />} label={t("progress.analytics.tiles.accuracy")}
           value={<span className="tabular-nums">{graded > 0 ? `${toPercent(activity.totals.accuracy)} %` : "-"}</span>}
           hint={graded > 0 ? t("progress.analytics.tiles.accuracyHint", { correct: correctText, total: graded }) : t(`progress.analytics.period.in.d${period}`)} />
-        <StatTile icon={<Bookmark />} label={t("progress.analytics.tiles.saved")} value={<span className="tabular-nums">{saved ?? "-"}</span>}
+        <StatTile icon={<Flag />} label={t("progress.analytics.tiles.saved")} value={<span className="tabular-nums">{saved ?? "-"}</span>}
           hint={t("progress.analytics.tiles.savedHint")} />
         <StatTile icon={<Flame />} label={t("progress.analytics.tiles.streak")}
           value={<span className="whitespace-nowrap">{t("progress.analytics.tiles.streakValue", { count: activity.streak_current })}</span>}

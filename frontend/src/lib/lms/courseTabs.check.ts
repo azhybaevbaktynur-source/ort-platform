@@ -35,10 +35,10 @@ ok(tabOfPath("/ru/courses/c10", base) === null, "a longer id is not this course"
 
 // visibility (design §3.2 examples)
 ok(keys(course({})) === "overview", "nothing published: Обзор only");
-ok(keys(course({ tests: true })) === "overview,tests,analytics,saved", "only tests: Обзор · Тесты · Аналитика · Сохранённые");
+ok(keys(course({ tests: true })) === "overview,tests,analytics,saved", "only tests: Обзор · Тесты · Аналитика · Повторение");
 ok(keys(course({ modules: true })) === "overview,lessons", "only lessons: Обзор · Уроки");
 ok(keys(course({ modules: true, tests: true })) === "overview,lessons,tests,analytics,saved", "both: all five");
-ok(keys(course({ hand_ins: true })) === "overview,tests,analytics", "only hand-ins: Задания · Аналитика, no Сохранённые");
+ok(keys(course({ hand_ins: true })) === "overview,tests,analytics", "only hand-ins: Задания · Аналитика, no Повторение");
 ok(keys(course({ practice: true })) === "overview,tests", "only practice: Тесты (its #practice section)");
 ok(keys(course({}), { lessonCourses: true }) === "overview,lessons", "exam with lesson courses: Уроки");
 ok(keys(course({}), { lessonCourses: false }) === "overview", "exam without lesson courses: no Уроки");

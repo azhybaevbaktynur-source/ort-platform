@@ -1,10 +1,14 @@
 # One student interface: hub + course spaces (fix round 2026-11-12, step 3a)
 
-**Status**: design v2 (architect on Fable, 2026-11-13), replaces the v1 design of 2026-11-12 after the owner's final
-direction (`FIX_ROUND_2026-11-12.md`, "Owner final direction on the step 3 designs (2026-11-13, verbatim)"). Base:
-`lms` fc962cf, alembic head `0032_teacher_notice_dismissed`. Rules: AGENTS.md §6.9 (ORT exam rules fixed; ORT is a
-normal course); owner 2026-11-12: teachers and students are separate accounts, so this design is for people who learn
-(`learnsHere(me)`) and for Student view; the teacher interface changes only where §5 says.
+**Status**: design **v3** (architect on Fable, 2026-11-13 evening): v2 plus the owner's review of the built 3a
+(`FIX_ROUND_2026-11-12.md`, "Owner round 2026-11-13 (after 3a/3b, verbatim)", items 2–4): no learner «Мои курсы» page,
+the catalog as the one way to add a course, «Сохранённые» → «Повторение», subject icons. §0 holds the v3 decisions and
+slices S7–S10; the sections below are corrected in place where v2 is now wrong (marked "v3"). v2 (same day) replaced
+the v1 design of 2026-11-12 after the owner's final direction ("Owner final direction on the step 3 designs
+(2026-11-13, verbatim)"). Base of v3: `lms` 1209fc6, alembic head `0034_course_listing`, 3a S1–S6 and 3b S1–S4
+deployed. Rules: AGENTS.md §6.9 (ORT exam rules fixed; ORT is a normal course); owner 2026-11-12: teachers and students
+are separate accounts, so this design is for people who learn (`learnsHere(me)`) and for Student view; the teacher
+interface changes only where §5 says.
 
 Before-screenshots (production code, student account, ru): `docs/phases/STUDENT_IA_screens/before/01-home-1440.png` …
 `08-ort-lessons-1440.png`.
@@ -17,7 +21,127 @@ switcher, no automatic landing in ORT; global menu Главная · Мои ку
 the sidebar; the last course and tab remembered; phone bar Главная · Курсы · Продолжить · Каталог · Ещё; catalog
 grouped by exam and subject; a skippable "choose your courses" step after sign-up; exam family and subject on platform
 courses with the smallest data change; a student sees only what the teacher published and Режим ученика shows exactly
-that.
+that. **v3 corrections to this paragraph:** the global menu is Главная · Каталог (no «Мои курсы» item or page: the
+hub shows the courses, the sidebar lists them); the catalog is the only way to add a course (no choose step); the phone
+bar is Главная · Продолжить · Каталог · Ещё; the fifth tab is «Повторение».
+
+## 0. v3 changes (owner 2026-11-13, items 2–4 of "Owner round 2026-11-13 (after 3a/3b, verbatim)")
+
+Owner's words, condensed: (2) home already shows my courses and the sidebar lists them again → remove the «Мои курсы»
+menu item and page (redirect to `/home`); sidebar Главная, Каталог, then my courses; one way to add a course = the
+catalog (remove `/courses/choose` and «Подобрать курсы»; «Добавить курс» opens the catalog; a new student lands in the
+catalog with a short welcome line); «Войти по коду» only in the catalog, one button; phone bar to the same structure
+(architect decides); update the per-role link check and the "nothing lost" table. (3) Rename the course tab
+«Сохранённые» → «Повторение» (ky «Кайталоо», en «Review»), inner tabs «Отмеченные» and «Ошибки», new empty state text.
+(4) Every course uses the same graduation cap in the sidebar and on default covers → a subject icon from
+`courses.subject` (math, language, chemistry, biology, physics, history, general) or a small cover thumbnail; review
+other student icons for the same sameness.
+
+**No migration.** Everything is frontend plus the removal of one dead backend endpoint (V9). Verified against the code
+on 2026-11-13 (`StudentShell.tsx`, `studentNav.ts`, `StudentHub.tsx`, `MyCourses.tsx`, `courses/page.tsx`,
+`CatalogView.tsx`, `ChooseCourses.tsx`, `chooseCourses.ts`, `lastPlace.ts`, `courseTabs.ts`, `CourseCardCover.tsx`,
+`CourseFrame.tsx`, `CourseGroups.tsx`, `SavedPage.tsx`, `register/page.tsx`, `oauth-callback/page.tsx`,
+`roleLinks.check.ts`, `e2e/role-links.spec.ts`, `backend/app/lms/courses/exam_families.py`, `catalog_router.py`).
+
+### 0.1 Decisions V1–V16 (recommendations in effect; the orchestrator continues with them)
+
+| # | Decision | Choice and why |
+|---|---|---|
+| V1 | Learner «Мои курсы» page and menu item | **Removed.** `/courses` for a person who learns redirects to `/home` (`router.replace`; the hash is mapped: `/courses#ort`, `#nct`, `#other` → `/home#courses`; every query is dropped, including the old `?view=learning`). Sidebar menu: **Главная · Каталог**; then the **«Мои курсы» list** (the group label `student.nav.myCourses` stays as the list's heading, not as a link). `MyCourses.tsx` is deleted; the hub shows the same cards |
+| V2 | Teacher side and "both" | **Unchanged.** `/courses` stays the Teaching list for everyone who teaches (`teaches(me)`; owner 2026-11-12: people who teach never get Learning, with a leftover student enrolment or not), so there is no "both" case: `hidesLearning = teaches(me)` decides. The test student (Student view) is a learner → `/home`. `courses/page.tsx` keeps its role branch: `hasTeaching` → `TeachingList` as today, else the redirect; until `me` (fresh or cached) is known the page shows the neutral loading state, exactly as `/home` does for teachers today. `lms.nav.myCourses` (teacher breadcrumbs) stays |
+| V3 | One way to add a course | **The catalog** `/courses/catalog`. `/courses/choose` → `/courses/catalog` (`?first=1` → `?welcome=1`, other queries dropped; the route's `page.tsx` stays as a redirect stub so old links work). Deleted: `ChooseCourses.tsx`, `choose.*` keys, `chooseCoursesHref`, `defaultChecked`, `idsToJoin`, `joinedOfRefusal`, `mainLanguageFor` (+ their checks); kept: `defaultFamily`, `subjectSections` (the catalog's chips and sections use them; the file may keep its name). «Подобрать курсы» (`catalog.groups.pick`, `CatalogView.tsx:229-232`) goes. «Добавить курс» on the hub (`StudentHub.tsx:226`) → `/courses/catalog` |
+| V4 | New student after sign-up | `register/page.tsx:58` and `oauth-callback/page.tsx:66` (`created`) push **`/courses/catalog?welcome=1`** instead of the choose step; `?redirect=` (invites, teacher code, catalog landing), under-14 (→ `/privacy`) and parent (→ `/parent`) keep precedence (N7). **"New" = the query parameter, nothing stored**: `CatalogView` (it already reads `useSearchParams`) shows the welcome line (`catalog.welcome`, one sentence under the title in a soft brand-tinted strip, `role="status"`) while `?welcome=1` is in the URL, with a quiet «×» (`catalog.welcomeClose`) that `router.replace`s the URL without the parameter; every chip and card link drops it, so the line goes away on the first navigation. A reload keeps it, which is harmless. No DB column, no `localStorage`. The default chip for a student with 0 courses is ОРТ (N9), so the new student sees the ORT main courses first |
+| V5 | «Войти по коду» | **One button**: the catalog header's secondary action (`CatalogView.tsx:208`, `home.primary.join`, on every width; hidden for the test student and for people who teach, as today). Removed: the «Ещё» sheet row (`StudentShell.tsx:386-391`), the hub empty state button (`StudentHub.tsx:161`), `MyCourses.tsx:67,85` and `ChooseCourses.tsx:189,208` (go with their files), the catalog's own empty-state duplicate (`CatalogView.tsx:255`: the header button is on the same page), the course not-found link (`courses/[courseId]/layout.tsx:78` → «В каталог», `/courses/catalog`). Kept, contextual and inside the catalog: the landing's «Ввести код» for a by-code course (`CourseLanding.tsx:160`). `/courses/join` stays (teacher-code sign-up links `?redirect=/courses/join?code=…` land there). Help text `landing.help.joinCode.a` names the catalog («Откройте «Каталог», нажмите «Войти по коду»…») instead of «Мои курсы» |
+| V6 | Phone bottom bar | **Главная · Продолжить · Каталог · Ещё** (four items; «Курсы» went with its page, the relative order stays). «Ещё» sheet, top to bottom: the «Мои курсы» rows (6 + «Все курсы (N)»), «Начало работы», the Pro pill, «Установить приложение», other areas, the account panel; «Выйти» in the footer. No «Войти по коду» (V5). Test student: Главная · Продолжить · Ещё (no Каталог, as today). D8 (five items) is superseded by the owner's item 2 |
+| V7 | «Все курсы (N)» and the group caps | The sidebar's 7th row «Все курсы (N)» → **`/home#courses`** (the hub's «Мои курсы» section gets `id="courses"`, `scroll-mt`). A hub group with more than 4 cards keeps the cap (N10), but «Все курсы ОРТ (N)» becomes an **in-place expand** (`<button aria-expanded>`, client state only, label unchanged, «Свернуть» collapses); when `courses_total` exceeds the courses known (the bootstrap holds up to 50) the first expand loads the rest once through `GET /me/home/courses` (`listHomeCourses`, kept). No `/courses#family` anchors any more. The hub stays the one list |
+| V8 | Home with 0 courses | Greeting, then the empty state: mascot «hello», «У вас пока нет курсов», «Откройте каталог, выберите экзамен и запишитесь на курс.», **one** primary button «Открыть каталог» → `/courses/catalog`; no «Войти по коду» (the catalog has it); the to-do block hidden. Test student: title and body, no button. Sidebar with 0 courses: the «Мои курсы» group is **hidden** (Каталог is the item right above; no «Выбрать курсы» row). «Продолжить» in the bar with 0 courses → `/courses/catalog` (`continueTarget` kind `catalog`; test student: `/home`, as today) |
+| V9 | Dead backend parts | `POST /catalog/choose` (router `catalog_router.py:201`, `enrollments/service.py:157-…` `choose_courses`, `ratelimit.CATALOG_CHOOSE_1M`, the `route_inventory.py:241` row, `tests/lms/test_catalog_choose.py`, frontend `catalog.ts chooseCourses`) is **removed in S10**, after S7 has deployed a frontend that no longer calls it (an old tab's bundle could otherwise hit a 404 mid-step). `GET /catalog/exams` **stays**: the catalog's family chips read it (`CatalogView.tsx:72`); `GET /catalog/courses?exam=` stays; `tests/lms/test_catalog_exams.py` stays. Nothing in the bootstrap is dead: `student.courses` feeds the sidebar, the hub and «Продолжить» |
+| V10 | «Сохранённые» → «Повторение» | **Labels only.** The URL `/courses/{c}/saved`, the tab key `saved`, `PlaceKind` `saved`, `?tab=mistakes` and the inner tab ids `saved`/`mistakes` stay (a URL rename needs a redirect, `tabOfPath`, `lastPlace`, e2e and ORT baseline work for no user gain; the segment is a technical name, as `/analytics` is for Аналитика). Exact strings in §0.3 |
+| V11 | Course icon | One helper `courseMark({exam_family, subject})` in `lib/lms/courseIcon.tsx` (lucide, as the whole app): a **subject icon** when `subject` is set, else by family (ORT main → `Award`, НЦТ main → `ClipboardCheck`, no family → `BookOpen`). The registry's ten subjects map onto the owner's seven classes in the frontend only (§0.4); **no migration, no registry change**: `kyrgyz`/`russian`/`english` are the owner's "language", `literature` and `geography` get their own marks, `null` subject is the owner's "general" (the exam's main course, or a teacher course). The brand mark (`GraduationCap`: student sidebar brand, phone top bar, `AppHeader`, `PublicFooter`) stays the brand's: **no course uses the cap any more** |
+| V12 | Cover thumbnail | A course with `cover_url` shows a **24 × 24 px thumbnail** (`h-6 w-6 rounded-md object-cover`, `alt=""`, `loading="lazy"`, `draggable={false}`) in place of the icon in the sidebar rows and the «Ещё» rows; `onError` falls back to the icon. Same URL as the card's cover (1280 × 720 WebP on R2), so the browser cache serves it; no new size on the server (an R2 variant would mean more objects and a resize step, rule 6.5). The default cover (`CourseCardCover` without an image) keeps its tinted gradient and replaces the cap/book mark with `courseMark`, so hub cards, catalog cards, the Обзор header strip and the settings preview all show the subject |
+| V13 | Other repeated student icons | Reviewed (§0.4): brand cap = ORT rows (fixed by V11); `FlaskConical` stood for НЦТ and is now chemistry's (НЦТ main → `ClipboardCheck`); the Аналитика tile «Сохранено» (`progress.analytics.tiles.saved`, `Bookmark`) → «Отмечено» with a `Flag` icon, matching Повторение; kept as states, not identities: hub cards' `CalendarClock` (countdown) and `Trophy` (last result), test cards' `ListChecks`/`Clock`/`Lock`, syllabus `PlayCircle`/`CheckCircle2`/`Circle`/`Lock`, practice `Dumbbell`; empty states keep their mascot poses (`hello`, `thinking`, `celebrating`, `reading`) |
+| V14 | Per-role link check | `roleLinks.check.ts`: the rows `/ru/courses` and `/ru/courses/choose` stay for every role (the pages must redirect inside the right frame), new rows `/ru/courses/catalog?welcome=1` (student `student/learning`; staff `app/teaching`) and `/ru/home#courses`; `role-links.spec.ts`: `ENTRY.student` gains `/ru/courses/catalog?welcome=1`, the case "every role opens the choose step" becomes "… lands in the catalog (learner, with the welcome line) / on Teaching (people who teach)", and the walk adds two assertions for the student: no link to `/ru/courses` on any student page (the entry itself redirects) and «Войти по коду» found only on `/ru/courses/catalog`; `studentNav.check.ts`, `lastPlace.check.ts`, `shellKind.check.ts` updated (no `choose` kind, two menu links, four bar items) |
+| V15 | Old links | `/courses` (learner) → `/home`; `/courses?view=learning` → `/home`; `/courses#ort|#nct|#other` → `/home#courses`; `/courses/choose[?first=1]` → `/courses/catalog[?welcome=1]`; §3.7 otherwise unchanged |
+| V16 | Models | S7 Opus (navigation, redirects, bar, hub expand, link check), S8 Sonnet (Повторение strings and empty states), S9 Opus (icon helper, cover mark, sidebar thumbnail), S10 Sonnet (removals) — §0.5 |
+
+### 0.2 Frame after v3 (replaces the sidebar table, the phone bar and the empty states of §2.1–§2.3)
+
+- **Sidebar**: brand → `/home` · **Главная** `/home` · **Каталог** `/courses/catalog` · group **Мои курсы** (up to 6
+  recent rows, each a thumbnail or `courseMark` + title + progress ring; then «Все курсы (N)» → `/home#courses`; the group
+  is hidden with 0 courses) · bottom unchanged («Начало работы», Pro pill, install, other areas, account). The test
+  student: Главная and the course row only.
+- **Phone**: top bar title «Главная» on `/home`, «Каталог» on the catalog, the course title inside a course, else the app
+  name; bottom bar **Главная · Продолжить · Каталог · Ещё**; «Ещё» as in V6.
+- **Hub**: unchanged except «Добавить курс» → the catalog, the in-place group expand (V7), the empty state (V8) and the
+  `id="courses"` anchor.
+- **Catalog**: the chips and sections of §2.4, the one «Войти по коду» button in the header, the welcome line when
+  `?welcome=1` (V4); no «Подобрать курсы».
+
+### 0.3 Повторение: exact strings (S8; parity script)
+
+| Key | ru | ky | en | Note |
+|---|---|---|---|---|
+| `course.tabs.saved` | Повторение | Кайталоо | Review | tab label |
+| `student.saved.title` | Повторение | Кайталоо | Review | page `<h1>` of the tab |
+| `home.hub.place.saved` | Повторение | Кайталоо | Review | continue card place |
+| `student.saved.tabsLabel` | Разделы повторения | Кайталоонун бөлүмдөрү | Review sections | inner `Tabs` label |
+| `student.saved.tabs.saved` | Отмеченные | Белгиленгендер | Flagged | inner tab (id `saved` stays) |
+| `student.saved.tabs.mistakes` | Ошибки | Каталар | Mistakes | unchanged |
+| `student.saved.empty` | Пока нет отмеченных вопросов | Белгиленген суроолор азырынча жок | No flagged questions yet | empty title |
+| `student.saved.emptyHint` | Отмечайте вопросы флажком во время теста — они появятся здесь, и вы сможете повторить их после. | Тест учурунда суроолорду желекче менен белгилеңиз — алар ушул жерде чыгат, кийин кайталап аласыз. | Flag questions during a test and they will appear here for you to review afterwards. | empty body |
+| `progress.mistakes.emptyOpen` | Открытых ошибок нет. Неверные ответы из тестов появятся здесь — их можно будет повторить. | Ачык каталар жок. Тесттердеги туура эмес жооптор ушул жерде чыгат — аларды кайталай аласыз. | No open mistakes. Wrong answers from tests will appear here for you to review. | Ошибки, filter «Открытые» |
+| `progress.mistakes.emptyFixed` | unchanged | | | |
+| `progress.analytics.tiles.saved` | Отмечено | Белгиленген | Flagged | Аналитика tile (V13); its hint stays unless it says «сохранённых» |
+
+New keys of S7: `catalog.welcome` «Добро пожаловать! Выберите экзамен и запишитесь на курс.» / «Кош келиңиз! Сынакты
+тандап, курска жазылыңыз.» / «Welcome! Pick your exam and join a course.»; `catalog.welcomeClose` «Скрыть» / «Жашыруу» /
+«Hide»; `home.hub.openCatalog` «Открыть каталог» / «Каталогду ачуу» / «Open the catalog»; `home.hub.emptyBody` (new
+text) «Откройте каталог, выберите экзамен и запишитесь на курс.» / «Каталогду ачып, сынакты тандап, курска жазылыңыз.»
+/ «Open the catalog, pick your exam and join a course.»; `home.hub.collapseGroup` «Свернуть» / «Жыйноо» / «Show fewer»;
+`courses.notFound.catalog` «В каталог» / «Каталогго» / «To the catalog»; `landing.help.joinCode.a` reworded to the
+catalog. Removed in S10: `choose.*`, `courses.mine.*`, `home.hub.{choose,join}`, `catalog.groups.pick`,
+`student.nav.{chooseCourses,courses,joinByCode}`, plus the S5 leftovers still present in the dictionaries
+(`student.nav.{saved,tests,lessons,practice,analytics,mistakes,allLessons,lessonsGroup,practiceGroup}`) when `grep`
+finds no use.
+
+### 0.4 Icons (S9; lucide-react, already the app's icon set)
+
+| `subject` (registry) | Owner's class | Icon | Note |
+|---|---|---|---|
+| `math` | math | `Sigma` | |
+| `physics` | physics | `Atom` | |
+| `chemistry` | chemistry | `FlaskConical` | was the НЦТ family icon in the sidebar |
+| `biology` | biology | `Dna` | |
+| `history` | history | `Landmark` | |
+| `geography` | (not in the owner's list) | `Globe` | |
+| `kyrgyz`, `russian`, `english` | language | `Languages` | |
+| `literature` | language | `BookText` | a book, not a tongue |
+| `null`, `exam_family = ort` | general (main course) | `Award` | the golden certificate; never the brand cap |
+| `null`, `exam_family = nct` | general (main course) | `ClipboardCheck` | |
+| `null`, no family | general (teacher course) | `BookOpen` | as today's default cover mark |
+
+Where the mark appears: sidebar rows and «Ещё» rows (20 px icon, or the 24 px thumbnail when `cover_url`); the default
+cover of `CourseCardCover` (hub cards, catalog cards, the Teaching list's cards, the Обзор header strip, the settings
+preview: the one quiet 48 px mark bottom right, tint unchanged); nowhere on the compact header or the tabs. Data: every
+card DTO already carries `exam_family` and `subject` (`HomeCourseOut`, `CatalogCardOut`, `CourseOut`, S1); the
+teacher's `CourseCard` DTO is checked in S9 and falls back to `BookOpen` when a field is missing. `courseIcon.check.ts`
+asserts the table and the fallbacks. The brand mark `GraduationCap` stays in `StudentShell.tsx:298,330`, `AppHeader.tsx:67`,
+`PublicFooter.tsx:33`; `CourseSidebar.tsx:24` (staff «Оценки» icon) and the admin stat tiles are staff screens, out of scope.
+
+### 0.5 Slices S7–S10 (each deploys alone; order S7 → S8 → S9 → S10; S8 and S9 are independent of each other)
+
+Every slice: `tsc`, parity script, SQLite suite, the e2e specs named, screens at 375 / 1440 / 1920 in ru checked by the
+orchestrator (§6.9 UX check), `role-links.spec.ts` + `roleLinks.check.ts` green, ORT parity/exam-rule tests unchanged,
+ORT pixel baselines zero diff (no slice touches the player, lobby, result or review).
+
+| # | Slice (model) | Content | Tests | Deployable alone because |
+|---|---|---|---|---|
+| S7 | Navigation without redundancy (Opus) | `/courses` learner redirect with the hash map (V1), `MyCourses.tsx` deleted, `/courses/choose` redirect stub and `ChooseCourses.tsx` deleted (V3), sign-up and Google new-account → `/courses/catalog?welcome=1` + the welcome line and its «×» (V4), `studentNav.ts` (two menu links, no `choose`, `all` → `/home#courses`), `StudentShell` (menu, four-item bar, «Ещё» without the code row, titles), `lastPlace.continueTarget` 0 courses → catalog (V8), hub «Добавить курс» → catalog, empty hub with one button, `id="courses"`, group expand + `listHomeCourses` when incomplete (V7), catalog without «Подобрать курсы» and without the empty-state code button (V5), not-found page → catalog, help text, `roleLinks.check.ts` + `role-links.spec.ts` (V14), new keys of §0.3 | `student-home.spec.ts` (0 courses → one button to the catalog; «Добавить курс» → catalog; expand/collapse; `/courses#ort` → `/home#courses`), `student-shell.spec.ts` (two menu items, four bar items, «Ещё» rows without «Войти по коду», group hidden with 0 courses), `choose-courses.spec.ts` rewritten as `catalog-welcome.spec.ts` (sign-up → catalog with the line; «×» removes it; a chip removes it; `?redirect=` precedence; under-14 → privacy; Google `created` → catalog; teacher → Teaching), `student-links.spec.ts`, `mobile-sheets.spec.ts`, `header-areas.spec.ts`, `role-links.spec.ts`, `pwa.spec.ts`, `perf-waterfall.spec.ts` (home still one round); checks `studentNav.check.ts`, `lastPlace.check.ts`, `roleLinks.check.ts`, `shellKind.check.ts` | every old URL redirects; the backend is untouched |
+| S8 | Повторение (Sonnet) | the strings of §0.3 in en/ky/ru, `SavedPage` and `MistakesList` empty states (texts only), the Аналитика tile label + `Flag` icon, `TEACHER_TO_STUDENT_MAP.md` §0 wording | parity script, `student-saved.spec.ts`, `student-analytics.spec.ts`, `course-nav.spec.ts` (tab label assertions), screens 375/1440 | text only |
+| S9 | Icons (Opus) | `lib/lms/courseIcon.tsx` (`courseMark`) + `courseIcon.check.ts`, `CourseCardCover` takes `exam_family`/`subject` (callers pass them; `platform` prop goes), sidebar and «Ещё» rows: thumbnail or `courseMark` (V12), `FAMILY_ICON` removed from `StudentShell.tsx` | `student-shell.spec.ts` (a row shows the thumbnail when the seed course has a cover; subject icon `data-icon` attribute per seeded subject), `course-cards.spec.ts`, `catalog-apply.spec.ts`; ORT baselines: lobby/result/review compact headers have no cover → zero diff; the Обзор full header has no baseline | visual only; `courseMark` falls back to today's `BookOpen` |
+| S10 | Cleanup (Sonnet; `grep -rl` before each deletion) | backend `POST /catalog/choose` + `choose_courses` + `CATALOG_CHOOSE_1M` + the inventory row + `test_catalog_choose.py`; frontend `catalog.ts chooseCourses`, the dead functions of `chooseCourses.ts` and their checks, the removed keys of §0.3; docs (`HANDOFF_NEXT_AGENT.md`, `PRODUCT_DECISIONS.md` as-built note, `FIX_ROUND_2026-11-12.md` results rows) | SQLite suite (route inventory test), `tsc`, parity, `nav.check.ts`, all e2e | removals only |
+
+**Rollback**: every slice is a revert (no data changed, every old URL still exists); S10 re-adds code.
 
 ## 1. Problems today, and what stays
 
@@ -62,19 +186,19 @@ bar. The frame is the same on every page, inside courses too; only the player ha
 | Block | Content | Rule |
 |---|---|---|
 | Brand | app name → `/home` | |
-| Menu | **Главная** `/home` · **Мои курсы** `/courses` · **Каталог** `/courses/catalog` | the three global items; `aria-current` from the path |
-| **Мои курсы** list | up to **6** course rows, **recent first** (§2.5), each: icon by family (ОРТ/НЦТ/other), title, right side the progress ring (`done/total`) when the course has one; the row of the course being viewed is `aria-current`; a row opens the course's **last opened tab** (§2.5), else Обзор | with more than 6 courses the 7th row is «Все курсы (N)» → `/courses`; with 0 courses the block shows one row «Выбрать курсы» → `/courses/choose` |
+| Menu | **Главная** `/home` · **Каталог** `/courses/catalog` (v3: the «Мои курсы» item is gone, V1) | the two global items; `aria-current` from the path |
+| **Мои курсы** list | up to **6** course rows, **recent first** (§2.5), each: v3: the cover thumbnail or the subject/family mark `courseMark` (§0.4, V11–V12), title, right side the progress ring (`done/total`) when the course has one; the row of the course being viewed is `aria-current`; a row opens the course's **last opened tab** (§2.5), else Обзор | with more than 6 courses the 7th row is «Все курсы (N)» → v3: `/home#courses` (V7); with 0 courses the group is hidden (v3, V8; was a «Выбрать курсы» row) |
 | Bottom | «Начало работы» pill (getting-started, per student), **Pro** gold pill (`AccessPill`: «Открыть все экзамены» / «Pro до …»), «Установить приложение», other areas (parent), account button (sheet: name, language, Конфиденциальность, Выйти) | unchanged components; the test student has no Pro, install, Каталог or «Выбрать курсы» |
 
 Pinned vs recent (owner: "pinned or recent first"): **recent first, no pin control in v1** (decision N3, §8): recent
 order already puts the courses a student works in at the top; a pin needs one more control and a server field.
 
-**Phone bottom bar**: **Главная** `/home` · **Курсы** `/courses` · **Продолжить** (→ the last place, §2.5) · **Каталог**
-`/courses/catalog` · **Ещё** (sheet). «Продолжить» is a link whose target is computed on the client: the remembered
-last place, else the server fallback of §2.5, else `/courses/choose` (0 courses). «Ещё» sheet, top to bottom: the «Мои
-курсы» rows (same 6 + «Все курсы»), «Начало работы», Pro pill, «Войти по коду» → `/courses/join`, «Установить
-приложение», other areas, the account panel (name, language, Конфиденциальность), «Выйти» in the footer. The test
-student's «Ещё» has only the course rows, «Начало работы» and the account panel.
+**Phone bottom bar** (v3, V6): **Главная** `/home` · **Продолжить** (→ the last place, §2.5) · **Каталог**
+`/courses/catalog` · **Ещё** (sheet); the v2 «Курсы» item went with its page. «Продолжить» is a link whose target is
+computed on the client: the remembered last place, else the server fallback of §2.5, else `/courses/catalog` (0 courses;
+v3). «Ещё» sheet, top to bottom: the «Мои курсы» rows (same 6 + «Все курсы»), «Начало работы», Pro pill, «Установить
+приложение», other areas, the account panel (name, language, Конфиденциальность), «Выйти» in the footer; v3: no «Войти
+по коду» row (V5). The test student's «Ещё» has only the course rows, «Начало работы» and the account panel.
 
 **Frame rules (`shellKind.ts`)**: `areaFromUrl`: `/home`, `/courses/choose` are Learning; `/courses` is `homeArea(me)` for
 people who teach and Learning for learners (`coursesDefault` goes; `urlAreaFor` already sends a URL no staff area claims
@@ -82,7 +206,8 @@ to the person's home area, so `/home` for a teacher opens the Teaching list thro
 student frame). `isPlayerRoute` unchanged. The fixed table in `lib/lms/roleLinks.check.ts` gains `/home`,
 `/courses/choose`, `/courses/c1/lessons`, `/courses/c1/analytics`, `/courses/c1/saved` for `student` (learning) and for
 `teacher`/`org_admin`/`platform_admin` (app/teaching); `e2e/role-links.spec.ts` `ENTRY.student` gains `/ru/home` and
-`/ru/courses/choose`.
+`/ru/courses/choose`. v3: `/courses` (learner) and `/courses/choose` are redirect-only pages, kept in both tables; new
+rows `/ru/courses/catalog?welcome=1` and `/ru/home#courses` (V14).
 
 ### 2.2 Главная `/home` (hub only)
 
@@ -99,39 +224,42 @@ Order (desktop two columns 1fr + 320 px; phone one column):
    attached to an exam sits in its exam's group). Each card (`CourseCard`, extended): cover, title, provider line,
    progress bar + «3 из 5», exam courses a **small countdown** («до экзамена 30 дн.»; «Сегодня»; nothing without a
    date) and the last result line («Последний балл 132 / 245»), and one **next-step button** (`next_step`, §6.2: Продолжить
-   тест / Продолжить урок / Начать тест / Открыть курс). A group shows up to 4 cards, then «Все курсы ОРТ (N)» →
-   `/courses#ort`. The groups header has a quiet «Добавить курс» → `/courses/choose`.
+   тест / Продолжить урок / Начать тест / Открыть курс). A group shows up to 4 cards, then «Все курсы ОРТ (N)», v3: an
+   in-place expand (V7; was a link to `/courses#ort`). The groups header has a quiet «Добавить курс» → v3:
+   `/courses/catalog` (V3; was the choose step). The section carries `id="courses"` (the sidebar's «Все курсы (N)» target).
 4. **К выполнению** (side column; phone: after the courses): today's `TodoList` from `HomeOut.todo` across courses
    (in-progress attempts first, then due dates, overdue flagged), each row named with its course; plus announcement
    rows (OPEN Q1). Empty: «Пока ничего». «Все задания» is not needed: the list is complete (TODO_MAX rows, newest first).
 5. Notices that exist today and stay on the home: pending invitations banner, pending catalog applications line,
    teacher-application notice, privacy banner (unchanged components).
 
-With **0 courses**: the greeting, then the empty state (mascot «hello», «У вас пока нет курсов», buttons «Выбрать курсы»
-→ `/courses/choose`, «Войти по коду» → `/courses/join`), and the to-do block hidden. With **1 course**: the continue card
+With **0 courses** (v3, V8): the greeting, then the empty state (mascot «hello», «У вас пока нет курсов», «Откройте
+каталог, выберите экзамен и запишитесь на курс.», one button «Открыть каталог» → `/courses/catalog`; v2 had «Выбрать
+курсы» and «Войти по коду»), and the to-do block hidden. With **1 course**: the continue card
 and one card in one group; the page is short and reads as "here is your course". With **10 courses**: three groups of up
 to 4 cards (+ «Все курсы …»), the to-do list aside. No test list, no results list, no statistics on this page.
 
 Data: `GET /me/bootstrap?include=home` (one round, as today) with the `HomeCourseOut` additions of §6.2; the 7-day
 activity in the bootstrap becomes cross-course (§6.2).
 
-### 2.3 Мои курсы `/courses`
+### 2.3 Мои курсы `/courses` (v3: removed for learners, V1–V2)
 
-Title «Мои курсы», header actions «Добавить курс» (→ choose step) and the quiet «Войти по коду». Groups as on the
-home (ОРТ / НЦТ / Другие курсы, anchors `#ort`, `#nct`, `#other`), every active student course as a card (same card as the
-home, all of them, paginated by `GET /me/home/courses`). Lesson courses attached to an exam appear in the exam's group with
-the line «К экзамену: ОРТ (на русском)». `/courses` stays the **Teaching list** for people who teach (unchanged
-`TeachingList`); the `?view=` machinery, `ViewSync` and the `#catalog` redirect go (P7).
+v2 built a grouped «Мои курсы» page here (S3); the owner found it a copy of the hub and the sidebar. **v3**: for a person
+who learns `/courses` redirects to `/home` (`#ort`/`#nct`/`#other` → `/home#courses`, queries dropped); `MyCourses.tsx`
+is deleted; `GET /me/home/courses` stays for the hub's group expand (V7). `/courses` stays the **Teaching list** for
+people who teach (unchanged `TeachingList`); the `?view=` machinery, `ViewSync` and the `#catalog` redirect went in S3/S5
+(P7), and `?view=learning` now simply joins the general learner redirect.
 
 ### 2.4 Каталог `/courses/catalog` (grouping; 3b adds the listing rule)
 
 Chips under the title: **ОРТ · НЦТ · Курсы преподавателей** (only families with at least one listed course; the default
 chip is the family of the student's newest exam course, else ОРТ). A family view shows its platform courses grouped by
 **subject** (section headers «Основной курс», «Математика», «Физика», …; the main course first; both languages side by
-side with a language tag). «Курсы преподавателей» is today's paginated list (teacher courses have no family). A quiet
-link «Подобрать курсы» opens the choose step. Query: `GET /catalog/courses?exam=ort` (§6.3), the scope of 3b
-(`listing = 'listed'`) applies on top. Landing `/courses/catalog/{id}` unchanged; «Записаться» lands on the course
-Overview (never on a list).
+side with a language tag). «Курсы преподавателей» is today's paginated list (teacher courses have no family). v3: no
+«Подобрать курсы» link (the choose step is gone, V3); the header keeps the **one** «Войти по коду» button of the whole
+student area (V5); with `?welcome=1` (a new account, V4) a one-sentence welcome line with a quiet «×» sits under the
+title. Query: `GET /catalog/courses?exam=ort` (§6.3), the scope of 3b (`listing = 'listed'`) applies on top. Landing
+`/courses/catalog/{id}` unchanged; «Записаться» lands on the course Overview (never on a list).
 
 ### 2.5 Fast access: recent courses, last place, «Продолжить»
 
@@ -181,7 +309,7 @@ home's order (newest enrolment first). A course row opens `/courses/{c}` + the r
 | lessons | Уроки / Сабактар / Lessons | `/courses/{c}/lessons` | `features.modules` (exam course: a lesson exists; general: a published module) **or** attached lesson courses exist (`lesson_courses` non-empty) | today's `StudentSyllabus` (its banner removed: the header has it; «Продолжить» stays as the first row's CTA), then the section «Курсы с уроками к экзамену» (`LessonCourses` cards) for exam courses (D5) |
 | tests | Тесты / Тесттер / Tests, **or** Задания / Тапшырмалар / Assignments when `features.hand_ins` (a published non-quiz assignment; glossary `UX_GUIDELINES.md` §5) (D4) | `/courses/{c}/tests` | `features.tests` (a published, live assessment or assignment visible to students) | exam courses: today's `TestsPage` (`TestLibrary`, status chips, source chips); other courses: the assignments list in the same card grid (`StudentAssignmentCard` → `TestLibrary` card shape, percent instead of a scaled score; hand-ins keep their kind badge). Section **«Тренировки»** (`#practice`) at the end when `features.practice` (D6): today's practice list |
 | analytics | Аналитика / Аналитика / Analytics | `/courses/{c}/analytics` | `features.tests` or `features.hand_ins` | block **«Оценки»** (`#grades`, today's `StudentGrades`: released grades, feedback, course total) when `features.hand_ins` or the course is not an exam course and has graded work; then today's `AnalyticsOverview` (sections, weak topics, activity, heatmap, streak; `examPrep` for exam courses; score history) when `features.tests`. The mistakes link goes to the Сохранённые tab `?tab=mistakes` (D3: no Оценки tab) |
-| saved | Сохранённые / Сакталгандар / Saved | `/courses/{c}/saved` | `features.tests` | today's `SavedPage` (tabs Сохранённые · Ошибки; `?tab=mistakes`), this course only |
+| saved | v3: **Повторение / Кайталоо / Review** (owner item 3; was Сохранённые) | `/courses/{c}/saved` (URL and key unchanged, V10) | `features.tests` | today's `SavedPage` (inner tabs v3 **Отмеченные · Ошибки**; `?tab=mistakes`; strings §0.3), this course only |
 
 Empty-tab rules: a tab is hidden until its flag is true; a hidden tab opened by URL shows `AreaUnavailable` («Пока
 недоступно … Назад к курсу») inside the frame, as today for announcements/files. A shown tab whose list is empty shows
@@ -258,8 +386,10 @@ still match pixel-for-pixel. Backend `test_ort_parity.py`, `test_ort_e2e_api.py`
 
 | Old | New |
 |---|---|
+| `/courses` (v3, V1) | `/home` for learners (`#ort`/`#nct`/`#other` → `/home#courses`, queries dropped); the Teaching list for people who teach, as today |
 | `/courses?view=learning` | `/home` (learners); `/courses` (people who teach, as today) |
 | `/courses?view=teaching`, `/courses#catalog` | `/courses`, `/courses/catalog` |
+| `/courses/choose`, `/courses/choose?first=1` (v3, V3) | `/courses/catalog`, `/courses/catalog?welcome=1` |
 | `/courses/{c}` (exam course, was `ToTests` → `/tests`) | stays: it is Обзор now |
 | `/courses/{c}/tests` | kept (the Тесты tab of every course) |
 | `/courses/{c}/assignments` (students) | `/courses/{c}/tests` (staff keep `/assignments`) |
@@ -284,9 +414,14 @@ replaces it. The four student course homes: one Обзор. `ToTests`. `isExamSh
 `?tab=` reading in `LmsShell` (only the switcher used it). The home's «От платформы» join cards: «Добавить курс» → the
 choose step. The global Тесты/Аналитика/Сохранённые pages of the v1 design: not built (owner point 3).
 
-## 4. Choose your courses `/courses/choose`
+## 4. Choose your courses `/courses/choose` (v3: removed, V3–V4; kept below as the record of what S4 built)
 
-Where it sits: `register/page.tsx` pushes `/courses/choose?first=1` instead of `/courses` on success, **after** the
+**v3**: the owner wants one way to add a course, the catalog. After sign-up (and a new Google account) the student lands
+on `/courses/catalog?welcome=1` with the welcome line; `?redirect=`, under-14 and parent keep their precedence exactly as
+described below; `/courses/choose` redirects to the catalog; nothing is auto-enrolled (3c D2 still holds: no enrolment
+without a tap, now the catalog's «Записаться»). The rest of this section is v2 history.
+
+Where it sat: `register/page.tsx` pushed `/courses/choose?first=1` instead of `/courses` on success, **after** the
 existing branches keep their precedence: `?redirect=` (invite links, teacher-code sign-up `/courses/join?code=…`, a
 catalog landing) wins; under-14 → `/privacy` (nothing works until a parent consents; afterwards the student reaches the
 step from the home's «Выбрать курсы»); parent accounts → `/parent`. Google sign-in (`oauth-callback`) follows the same
@@ -389,7 +524,8 @@ change**: two columns, one index, one backfill, and every reader filters or orde
   as join): each id must be a listed, published platform course with `enrollment_mode = open`; joins through the
   existing join service (same enrollment events, limits, consent gate); already enrolled → `skipped`; answer `{joined:
   [ids], skipped: [ids]}`; rate limit 5/min per user (`core/ratelimit.py`). Tests: `tests/lms/test_catalog_choose.py`
-  (teacher 403, closed course 422, limit, idempotent, test student 403, consent gate).
+  (teacher 403, closed course 422, limit, idempotent, test student 403, consent gate). **v3: dead once the choose step is
+  gone; removed in S10 (V9).** `GET /catalog/exams` stays (the catalog's chips).
 
 **Reused endpoints:** `GET /me/bootstrap?include=home`, `GET /me/home`, `GET /me/home/courses`, `GET /courses/{c}`,
 `GET /courses/{c}/exam-prep` + `/library`, `GET /courses/{c}/modules` (student), `GET /courses/{c}/assignments`,
@@ -412,12 +548,13 @@ above the fold.
 `courseTabs.check.ts` like `nav.check.ts`), `course/CourseOverview.tsx`, `course/ExamHeaderBlock.tsx` (countdown + goal),
 `lib/lms/courseProgress.ts`, `lib/lms/lastPlace.ts` (dependency-free read/write of the two keys + `continueTarget(place,
 home)`; `lastPlace.check.ts`), `app/[lang]/home/page.tsx` (`StudentHub.tsx`: `ContinueCard`, `CourseGroups`,
-`TodoList`), `app/[lang]/courses/choose/page.tsx` (`ChooseCourses.tsx`), `home/CourseCard.tsx` (countdown, last result,
-next-step button), `lib/lms/studentNav.ts` (global links + «Мои курсы» rows), `StudentShell.tsx` (no switcher, no exam
-sheet; course rows; «Ещё» content; «Продолжить» slot), `courses/page.tsx` (`MyCourses` grouped for learners),
-`courses/catalog/page.tsx` (family chips, subject sections), `courses/[courseId]/layout.tsx` (student branch =
-`CourseFrame` + last-place hook; staff branch unchanged), `lib/lms/examFamilies.ts` (labels, group order; mirrors the
-backend registry keys).
+`TodoList`), `app/[lang]/courses/choose/page.tsx` (`ChooseCourses.tsx`; v3: a redirect stub, the component deleted),
+`home/CourseCard.tsx` (countdown, last result, next-step button), `lib/lms/studentNav.ts` (global links + «Мои курсы»
+rows; v3: two links, no `choose`), `StudentShell.tsx` (no switcher, no exam sheet; course rows; «Ещё» content;
+«Продолжить» slot; v3: four-item bar), `courses/page.tsx` (v3: learner redirect; `MyCourses` deleted),
+`courses/catalog/page.tsx` (family chips, subject sections; v3: welcome line), `courses/[courseId]/layout.tsx` (student
+branch = `CourseFrame` + last-place hook; staff branch unchanged), `lib/lms/examFamilies.ts` (labels, group order;
+mirrors the backend registry keys), v3: `lib/lms/courseIcon.tsx` (`courseMark`, §0.4).
 
 ### 6.6 i18n (en, ky, ru; parity script)
 New: `student.nav.{home,myCourses,catalog,continue,courses,allCourses,chooseCourses,addCourse}`,
@@ -433,6 +570,11 @@ emptyTitle,emptyBody,choose}`, `courses.mine.{title,join,addCourse}`, `catalog.g
 `exam_family_forbidden`. Removed after S5: `student.switcher.*`, `student.nav.{lessonsGroup,practiceGroup,allLessons,
 mistakes,tests,lessons,practice,analytics,saved}`, `home.prep.{otherCourses,addCourse,lessonCourses.subtitle}`,
 `student.lessonCourses.*`, `courses.home.tab`, `home.platform.*` (join cards); `courseNav.menu` stays (staff drawer).
+v3 (§0.3): new `catalog.welcome`, `catalog.welcomeClose`, `home.hub.openCatalog`, `home.hub.collapseGroup`,
+`courses.notFound.catalog`; changed `course.tabs.saved`, `student.saved.*`, `home.hub.place.saved`, `home.hub.emptyBody`,
+`progress.mistakes.emptyOpen`, `progress.analytics.tiles.saved`, `landing.help.joinCode.a`; removed in S10 `choose.*`,
+`courses.mine.*`, `home.hub.{choose,join}`, `catalog.groups.pick`, `student.nav.{chooseCourses,courses,joinByCode}` (and
+the S5 leftovers above, still present in the dictionaries on 2026-11-13).
 
 ### 6.7 Accessibility
 One `<h1>` per page; tabs are links in a `<nav>` with `aria-current`, 44 px targets, visible focus, scrollable on
@@ -442,6 +584,10 @@ landmark; the choose step's checkboxes are a `fieldset` per subject with a `lege
 error states exist (`UX_GUIDELINES.md` §5).
 
 ## 7. Layouts (ru; 1440 and 375; 1920 = 1440 with wider gutters, content max 1200 px)
+
+v3 reading note for every sketch: the sidebar menu has no «Мои курсы» line (Главная, Каталог, then the МОИ КУРСЫ rows
+with a thumbnail or subject mark); the phone bar is ⌂ ▶ ▦ ⋯ (Главная · Продолжить · Каталог · Ещё); the fifth tab reads
+«Повторение»; «Все курсы ОРТ (5) →» expands in place; §7.3 and §7.6 are superseded as noted there.
 
 ### 7.1 Home with 1 course
 ```
@@ -493,7 +639,8 @@ error states exist (`UX_GUIDELINES.md` §5).
                                                                    └──────────────────────┘
 ```
 
-### 7.3 Home with 0 courses
+### 7.3 Home with 0 courses (v3, V8: body «Откройте каталог, выберите экзамен и запишитесь на курс.», one button
+«Открыть каталог»; no «Войти по коду», no sidebar «Выбрать курсы» row (the group is hidden); bar ▶ → the catalog)
 ```
 1440                                                              375
 ┌ sidebar ─┬────────────────────────────────────────────────────┐ ┌──────────────────────┐
@@ -563,7 +710,8 @@ error states exist (`UX_GUIDELINES.md` §5).
 A teacher course without an exam link: the same, without the «К экзамену» line; in the «Другие курсы» group.
 ```
 
-### 7.6 Choose your courses `/courses/choose?first=1`
+### 7.6 Choose your courses `/courses/choose?first=1` (v3: removed; the new account lands on the catalog of §2.4 with
+the welcome line «Добро пожаловать! Выберите экзамен и запишитесь на курс.» [×] under the title; kept as v2 history)
 ```
 1440                                                              375
 ┌ sidebar ─┬────────────────────────────────────────────────────┐ ┌──────────────────────┐
@@ -597,7 +745,7 @@ A teacher course without an exam link: the same, without the «К экзамен
 | D5 | Lesson courses attached to an exam | **Stay separate courses**, listed in the related exam's Уроки tab |
 | D6 | Practice sets | **Inside the Тесты tab** |
 | D7 | Lobby, result and review | **Inside the course layout**; the player full-screen |
-| D8 | Phone bar | **Главная · Курсы · Продолжить · Каталог · Ещё** (point 4) |
+| D8 | Phone bar | **Главная · Курсы · Продолжить · Каталог · Ещё** (point 4); v3: the owner's item 2 removes «Курсы» → Главная · Продолжить · Каталог · Ещё (V6) |
 | D9 | Countdown | **On the course card and on the course's Обзор tab** |
 | D10 | Teachers | **Names on Обзор** (no People tab for students) |
 | 1–7 | Hub-only home; course spaces with content-driven tabs; no global pages or switcher; sidebar course list, remembered last course/tab, phone bar; catalog grouped by exam/subject and the choose step; exam family + subject with the smallest change; teacher control and Режим ученика | as in the verbatim brief |
@@ -608,14 +756,14 @@ A teacher course without an exam link: the same, without the «К экзамен
 |---|---|---|
 | N1 | Exam family / subject storage | Two nullable columns + registry in code (§6.1); every grouping query filters by plain columns, НЦТ needs no template to get its first course |
 | N2 | Remember last course and tab | `localStorage` per user + the server fallback on the home (§2.5); no write per page view, no migration, Student view separated by the user id in the key |
-| N3 | Sidebar order | Recent first, no pin control in v1; «Все курсы» after 6 rows |
+| N3 | Sidebar order | Recent first, no pin control in v1; «Все курсы» after 6 rows (v3: → `/home#courses`, V7) |
 | N4 | Аналитика tab URL | `/courses/{c}/analytics`, shared with the staff statistics page by role branch; `/progress` and `/grades` redirect (bookmarks keep working, label = URL) |
 | N5 | Аналитика visibility | Shown when the course has tests or hand-ins; a lessons-only course shows its progress in the header and Уроки tab, no Аналитика |
 | N6 | Course card next step | Derived from the home's existing statements (in-progress attempt → next lesson → next assignment → open), never a per-course `exam_prep.page()`: ten cards stay one round |
-| N7 | Choose step after sign-up | `?redirect=` (invites, teacher code, catalog landing) and the under-14 consent branch keep precedence; the step is not stored as "seen": the empty home is the reminder |
+| N7 | Choose step after sign-up | `?redirect=` (invites, teacher code, catalog landing) and the under-14 consent branch keep precedence; the step is not stored as "seen": the empty home is the reminder. v3: the step is gone; the same precedence leads a new account to `/courses/catalog?welcome=1` (V4) |
 | N8 | Installed app start page | `manifest.start_url` → `/ru/home` (signed-out → login with `?redirect=`; a teacher → Teaching by `urlAreaFor`); `pwa.spec.ts` updated |
 | N9 | Catalog default chip | The family of the student's newest exam course, else ОРТ; teacher courses under «Курсы преподавателей» (no family) |
-| N10 | Home group caps | 4 cards per group + «Все курсы … (N)» → `/courses#family`; keeps the hub short on a phone with 10 courses |
+| N10 | Home group caps | 4 cards per group + «Все курсы … (N)» → `/courses#family`; keeps the hub short on a phone with 10 courses. v3: the link becomes an in-place expand (V7), the cap stays |
 
 **OPEN Q** (recommended answers in effect; the orchestrator continues with them):
 
@@ -627,6 +775,8 @@ A teacher course without an exam link: the same, without the «К экзамен
 | OPEN Q4 | ORT subject courses: built from the ORT template (exam-prep header: countdown and target per course) or as general platform courses with `exam_family='ort'` + `subject` | **From the ORT template** (`ort_subject` presets exist; countdown/target/section bars come free); the owner sets family and subject in settings. The design works either way |
 
 ## 9. Slices (each deploys alone; safest first; Opus unless noted)
+
+S1–S6 are deployed (`FIX_ROUND_2026-11-12.md` results); the v3 slices S7–S10 are in §0.5.
 
 Every slice: `tsc`, parity script, SQLite suite, the e2e specs named, screenshots at 375 / 1440 / 1920 in ru checked by
 the orchestrator, `role-links.spec.ts` + `roleLinks.check.ts` green, ORT parity/exam-rule tests unchanged.
@@ -644,10 +794,13 @@ Order S1 → S2 → S3 → S4 → S5 → S6; each is one merge commit (`lms`, th
 the commit). **Rollback:** S1's downgrade drops the two columns (no reader depends on them before S3); S2/S3/S4 revert
 restores the previous frame because no data changed and every old URL still exists; S5 is removals (revert = restore).
 
-## 10. "Nothing lost" table (owner's check; verified against the code on 2026-11-13)
+## 10. "Nothing lost" table (owner's check; verified against the code on 2026-11-13; v3 rows marked)
 
 Legend: **kept** = same place or same URL; **moved** = new place, old link redirects; **removed on purpose** = with the
-reason. OPEN Q rows carry the recommended answer, in effect.
+reason. OPEN Q rows carry the recommended answer, in effect. v3 (owner item 2) removes three things built by S3/S4 and
+the table says where each went: the learner «Мои курсы» page → the hub (same cards, `/courses` redirects); the choose
+step → the catalog (same courses, grouped by subject; `/courses/choose` redirects); the extra «Войти по коду» copies →
+the catalog header's one button.
 
 ### 10.1 Today's student pages and features
 
@@ -661,7 +814,9 @@ reason. OPEN Q rows carry the recommended answer, in effect.
 | Home: streak | `ExamPrepHome.tsx:58-76` `StreakCard` (newest exam course's 7-day activity) | continue card line «Серия N дней» (cross-course) | moved; **OPEN Q2** |
 | Home: latest results side list | `StudentHome.tsx:108` «Результаты» (`HomeOut.latest_results`) | course cards: last result line; course Аналитика: full list | **removed on purpose** (owner point 1); **OPEN Q3** |
 | Home: announcements side list | `StudentHome.tsx:129-145` (newest three across courses) | to-do rows of kind announcement + course Обзор strip | moved; **OPEN Q1** |
-| Home: «От платформы» join cards | `ExamPrepHome.tsx:92` `PlatformCourses` (`HomeOut.platform_courses`) | «Добавить курс» → `/courses/choose` | moved (owner point 5: the choose step is the one place to pick platform courses) |
+| Home: «От платформы» join cards | `ExamPrepHome.tsx:92` `PlatformCourses` (`HomeOut.platform_courses`) | «Добавить курс» → v3: `/courses/catalog` (ОРТ chip: the platform courses by subject) | moved (owner 2026-11-13: the catalog is the one place to add a course) |
+| v3: «Мои курсы» page `/courses` (S3) | grouped cards, «Добавить курс», «Войти по коду», anchors `#ort`… | `/home` (the same `CourseGroups`, expand in place), `/courses` → `/home`, `#family` → `/home#courses` | **removed on purpose** (owner item 2: a copy of the hub and the sidebar) |
+| v3: choose step `/courses/choose` (S4) | exam cards → courses by subject with checkboxes, «Записаться (N)», «Пропустить» | the catalog's family chips and subject sections (`/courses/catalog?exam=ort`), one «Записаться» per card; new accounts land there with a welcome line | **removed on purpose** (owner item 2: one way to add a course); `/courses/choose` redirects |
 | Home: lesson courses cards | `ExamPrepHome.tsx:91` `LessonCourses`, sidebar УРОКИ group (`StudentShell.tsx:113-136`) | the exam's Уроки tab (end section) + the exam's group on `/home` and `/courses` | moved (D5) |
 | Home: «Другие курсы» | `ExamPrepHome.tsx:281-296` | `/home` and `/courses` group «Другие курсы» | kept |
 | Home: course cards (non-exam student) | `StudentHome.tsx:41-82` `CourseCards` + «Показать все» | `/home` grouped cards, `/courses` full list | kept |
@@ -671,7 +826,7 @@ reason. OPEN Q rows carry the recommended answer, in effect.
 | Exam player | `/courses/{c}/attempts/{id}` `PLAYER_FRAME` (`shellKind.isPlayerRoute`, `layout.tsx:98`) | unchanged, full-screen | kept |
 | Result and review | `/courses/{c}/attempts/{id}/result` (exam branch column; general: `StudentCourseHeader` + no sidebar) | same URL inside the course space, compact header | kept (D7); baselines re-recorded |
 | Analytics: weak topics, activity, heatmap, streak | `/courses/{c}/progress` (`progress/AnalyticsOverview.tsx`, `PeriodPicker`) | Аналитика tab `/courses/{c}/analytics`; `/progress` redirects | moved (D2: per course) |
-| Saved questions and mistakes | `/courses/{c}/saved` (`progress/SavedPage.tsx`, tabs; `?tab=mistakes`) | Сохранённые tab, same URL | kept |
+| Saved questions and mistakes | `/courses/{c}/saved` (`progress/SavedPage.tsx`, tabs; `?tab=mistakes`) | v3: **Повторение** tab (inner tabs Отмеченные · Ошибки), same URL | kept (renamed, owner item 3) |
 | Practice | `/courses/{c}/practice` (sidebar «Практика», phone bar slot) | Тесты tab section «Тренировки» `#practice`; redirect | moved (D6) |
 | Lessons: syllabus | `/courses/{c}/modules` (`modules/StudentSyllabus.tsx`; sidebar «Уроки») | Уроки tab `/courses/{c}/lessons`; redirect, `#m-{id}` kept | moved |
 | Lessons: lesson / video page | `/courses/{c}/modules/{m}/items/{i}` (`LessonView`, outline aside, pager) | same URL, compact header (Уроки active) | kept |
@@ -685,7 +840,7 @@ reason. OPEN Q rows carry the recommended answer, in effect.
 | ORT course page | `/courses/{c}` → `ToTests` → `/tests` (`page.tsx:54`) | Обзор with countdown, target, last result, section bars | moved (P5 fixed) |
 | Teachers (People) | `/courses/{c}/people` (students, `CourseSidebar`) | Обзор «О курсе» names | moved (D10); observers keep the page |
 | Catalog | `/courses/catalog` (`CatalogView`), landing `/courses/catalog/{id}`, apply `/apply` | same URLs; family chips + subject sections (§2.4); «Записаться» → Обзор | kept + grouping |
-| Join by code | `/courses/join` (`JoinCodeForm`; links on the home, exam sheet, not-found page) | same page; links: «Ещё», `/courses` header, `/home` empty state, choose step | kept |
+| Join by code | `/courses/join` (`JoinCodeForm`; links on the home, exam sheet, not-found page) | same page; v3: **one** link, the catalog header's «Войти по коду» (plus the by-code landing's «Ввести код»); the «Ещё», hub, `/courses`, choose-step and not-found copies are gone; teacher-code sign-up links (`?redirect=/courses/join?code=…`) still land on the page | kept (one entry, owner item 2) |
 | Pro page | `/pro` (`pro/page.tsx`: plans, comparison, how to pay); sidebar `AccessPill`, «Ещё», account row | same page; sidebar pill, «Ещё», global menu item | kept |
 | Pro locks | `ProChip`/lock on test cards, `UnlockCard` on the home, `ProCallout`, `ProLockCard` on lessons, module gold chip | the same components per course: Тесты/Уроки Pro bar, lobby, lesson lock card, Обзор unlock card | kept |
 | Gift codes | `/unlock` (`redeemCode`, linked from `/pro`) | unchanged | kept |
@@ -693,7 +848,7 @@ reason. OPEN Q rows carry the recommended answer, in effect.
 | Install app | `InstallItem` sidebar / «Ещё» (`pwa`) | same | kept |
 | Account, language, privacy, logout | account sheet (`AccountPanel`: name, language, `/privacy` link, «Выйти»); «Ещё» footer | same sheet from the sidebar button and «Ещё» | kept |
 | Leave course | exam sheet «Покинуть» (`ExamSheetBody`), general `LeaveCourseLink` on the course home | Обзор quiet link «Покинуть курс» (`LeaveCourseDialog`) | kept |
-| Course cover | card cover, syllabus banner | card + Обзор full header | kept |
+| Course cover | card cover, syllabus banner | card + Обзор full header; v3: a 24 px thumbnail in the sidebar/«Ещё» rows; the default cover's mark is the subject icon (§0.4) | kept (+ icons, owner item 4) |
 | Target score edit | `ScoreTiles` goal dialog on the home | Обзор goal strip ✎ (same `PUT /my/goal`) | moved |
 | Exam switcher | `StudentShell.tsx:235-296` | — | **removed on purpose** (owner point 3) |
 | Global Тесты / Аналитика / Сохранённые | v1 design only (never built); today's per-exam sidebar links | course tabs | **removed on purpose** (owner points 2–3) |
@@ -702,9 +857,9 @@ reason. OPEN Q rows carry the recommended answer, in effect.
 
 | State | Today | New | Note |
 |---|---|---|---|
-| No courses yet | `/courses` empty state (`StudentHome.tsx:180-186`: «Войти по коду», «Каталог»); sidebar Главная · Каталог | `/home` empty state «Выбрать курсы» + «Войти по коду»; sidebar «Выбрать курсы» row; phone «Продолжить» → choose step; `/courses` the same empty state | kept + the choose step |
+| No courses yet | `/courses` empty state (`StudentHome.tsx:180-186`: «Войти по коду», «Каталог»); sidebar Главная · Каталог | v3: `/home` empty state with one button «Открыть каталог» (the catalog holds «Войти по коду»); sidebar Главная · Каталог, no course group; phone «Продолжить» → the catalog | kept (the catalog is the entry, as before 3a) |
 | One course | exam switcher without chips, exam sidebar | continue card + one card; sidebar one row; the course's own tabs | kept |
-| Many courses | chips for exam courses; others at the bottom of the home | groups ОРТ / НЦТ / Другие (4 cards + «Все»), sidebar 6 recent + «Все курсы», `/courses` full | kept (owner point 1) |
+| Many courses | chips for exam courses; others at the bottom of the home | groups ОРТ / НЦТ / Другие (4 cards + «Все …» v3: expands in place), sidebar 6 recent + «Все курсы (N)» → `/home#courses` | kept (owner point 1) |
 | Course with only tests | ORT: Тесты, Аналитика, Сохранённые links; general: Задания, Оценки | Обзор · Тесты · Аналитика · Сохранённые | kept |
 | Course with only lessons | sidebar «Уроки» (exam) / `CourseSidebar` «Уроки» | Обзор · Уроки | kept (N5) |
 | Both | all links | all five tabs | kept |
@@ -718,7 +873,7 @@ reason. OPEN Q rows carry the recommended answer, in effect.
 | Role | Today | New | Note |
 |---|---|---|---|
 | Student | student frame (`shellKindFor` = `student`) | the frame of §2 | kept |
-| Teacher in Режим ученика | test student = real user with `learnsHere`; the student frame; `enterStudentView` → `/courses/{c}` (ORT → `/tests`); no Pro, install | the same frame; Student view opens Обзор; no Каталог, Pro, «Войти по коду», install, choose step; `/home` shows the one course | kept (owner point 7) |
+| Teacher in Режим ученика | test student = real user with `learnsHere`; the student frame; `enterStudentView` → `/courses/{c}` (ORT → `/tests`); no Pro, install | the same frame; Student view opens Обзор; no Каталог, Pro, «Войти по коду», install; `/home` shows the one course; v3: bar Главная · Продолжить · Ещё, `/courses` → `/home` | kept (owner point 7) |
 | Teacher who is not a student | never the Learning frame (`hidesLearning`), `/pro` and the catalog in the app frame, Student view button on the course page, leftover enrolment → «Этот курс открывается только в аккаунте ученика» | unchanged; `/home` and `/courses/choose` resolve to Teaching through `urlAreaFor` | kept |
 | Org / platform admin reading a course | read-only course view in the app frame, `/people` | unchanged | kept |
 | Parent / guardian | `/parent` area, other-areas links | unchanged (other areas in the sidebar and «Ещё») | kept |
@@ -737,7 +892,7 @@ reason. OPEN Q rows carry the recommended answer, in effect.
 
 | Item | Today | New | Note |
 |---|---|---|---|
-| Old links and bookmarks | `/courses?view=…`, `/courses/{c}/modules`, `/progress`, `/grades`, `/practice`, `/people`, `/assignments` | the redirect table §3.7 (query and hash kept) | kept |
+| Old links and bookmarks | `/courses?view=…`, `/courses/{c}/modules`, `/progress`, `/grades`, `/practice`, `/people`, `/assignments` | the redirect table §3.7 (query and hash kept); v3 adds `/courses` (learner) → `/home`, `/courses#family` → `/home#courses`, `/courses/choose[?first=1]` → `/courses/catalog[?welcome=1]` | kept |
 | Installed app start page | `manifest.ts` `start_url: "/ru/"` → the landing (`[lang]/page.tsx`, CTA → `/courses`) | `start_url: "/ru/home"`: signed-in learner → hub; signed-out → login with redirect; teacher → Teaching | moved (N8); `pwa.spec.ts:83` updated |
-| Per-role link check | `lib/lms/roleLinks.check.ts` fixed table + `e2e/role-links.spec.ts` `ENTRY` per role (desktop + 375) | table gains `/home`, `/courses/choose`, `/courses/c1/{lessons,analytics,saved}` per role; `ENTRY.student` gains `/ru/home`, `/ru/courses/choose`; the walk also opens the «Мои курсы» rows and the «Продолжить» slot | kept, extended |
+| Per-role link check | `lib/lms/roleLinks.check.ts` fixed table + `e2e/role-links.spec.ts` `ENTRY` per role (desktop + 375) | table gains `/home`, `/courses/choose`, `/courses/c1/{lessons,analytics,saved}` per role; `ENTRY.student` gains `/ru/home`, `/ru/courses/choose`; the walk also opens the «Мои курсы» rows and the «Продолжить» slot. v3 (V14): rows `/ru/courses/catalog?welcome=1` and `/ru/home#courses`; `/ru/courses` and `/ru/courses/choose` stay as redirect entries; the student walk asserts no link to `/ru/courses` and «Войти по коду» only on the catalog | kept, extended |
 | Student view entry links | `StaffCourseBar` button, `CourseLanding` for a teacher | unchanged | kept |

@@ -45,7 +45,7 @@ export function MistakesList({ courseId }: { courseId: string }) {
       {!error && items === null && <div className="space-y-3"><Skeleton className="h-40 w-full" /><Skeleton className="h-40 w-full" /></div>}
       {!error && items !== null && items.length === 0 && (
         <EmptyState mascot={status === "open" ? "celebrating" : "reading"} title={t(status === "open" ? "progress.mistakes.emptyOpen" : "progress.mistakes.emptyFixed")}
-          description={t(status === "open" ? "progress.analytics.mistakes.emptyOpenHint" : "progress.analytics.mistakes.emptyFixedHint")} />
+          description={status === "open" ? undefined : t("progress.analytics.mistakes.emptyFixedHint")} />
       )}
       {items !== null && items.length > 0 && (
         <ul className="space-y-6">

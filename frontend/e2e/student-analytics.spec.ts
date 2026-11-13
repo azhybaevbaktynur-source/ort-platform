@@ -106,7 +106,7 @@ async function walk(browser: Browser, user: SeedUser, name: string, check: (page
     if (name === "analytics-data") {
       await page.goto(legacy);
       await page.waitForURL(new RegExp(`/courses/${seed().course_id}/analytics$`));
-      // U8: the notebook moved to Сохранённые; the old link still lands there
+      // U8: the notebook moved to Повторение; the old link still lands there
       await page.goto(`${legacy}?tab=mistakes`);
       await page.waitForURL(new RegExp(`/courses/${seed().course_id}/saved\\?tab=mistakes$`));
       await expect(page.getByRole("tab", { name: tr("ru", "student.saved.tabs.mistakes") })).toHaveAttribute("aria-selected", "true");

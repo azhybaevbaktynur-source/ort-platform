@@ -3809,7 +3809,7 @@
         "lessons": "Lessons",
         "tests": "Tests",
         "analytics": "Analytics",
-        "saved": "Saved",
+        "saved": "Review",
         "lesson": "Lesson",
         "lobby": "Test",
         "assignment": "Assignment"
@@ -6110,7 +6110,7 @@
       "filter": "Mistakes filter",
       "open": "Open",
       "fixed": "Fixed",
-      "emptyOpen": "No open mistakes.",
+      "emptyOpen": "No open mistakes. Wrong answers from tests will appear here for you to review.",
       "emptyFixed": "No fixed mistakes yet.",
       "viewAttempt": "View attempt"
     },
@@ -6133,7 +6133,7 @@
         "answered": "Questions answered",
         "accuracy": "Accuracy",
         "accuracyHint": "{correct} of {total} correct",
-        "saved": "Saved",
+        "saved": "Flagged",
         "savedHint": "flagged questions",
         "streak": "Streak",
         "streakValue": "{count} days",
@@ -7277,7 +7277,7 @@
       "label": "Student menu",
       "home": "Home",
       "analytics": "Analytics",
-      "saved": "Saved",
+      "saved": "Review",
       "lessonsGroup": "Lessons",
       "lessons": "Lessons",
       "practiceGroup": "Practice",
@@ -7304,16 +7304,16 @@
       "title": "Account"
     },
     "saved": {
-      "title": "Saved",
-      "tabsLabel": "Saved sections",
+      "title": "Review",
+      "tabsLabel": "Review sections",
       "tabs": {
-        "saved": "Saved",
+        "saved": "Flagged",
         "mistakes": "Mistakes"
       },
       "open": "Open",
       "question": "Question {n}",
-      "empty": "Flag questions during a test and they will appear here",
-      "emptyHint": "An easy way to come back to hard questions after the test.",
+      "empty": "No flagged questions yet",
+      "emptyHint": "Flag questions during a test and they will appear here for you to review afterwards.",
       "hiddenOnPage": "Questions from tests whose results are not open yet will appear later."
     },
     "gettingStarted": {
@@ -7521,7 +7521,7 @@
       "tests": "Tests",
       "assignments": "Assignments",
       "analytics": "Analytics",
-      "saved": "Saved"
+      "saved": "Review"
     },
     "header": {
       "progress": "{done} of {total} done",
