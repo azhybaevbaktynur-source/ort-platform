@@ -87,10 +87,13 @@ def enforce_ip(monkeypatch):
     monkeypatch.setattr(settings, "RATE_LIMIT_PROXY_HOPS", 2)
 
 
+FROZEN_NOON_UTC = 1768478400  # 2026-01-15 12:00 UTC, not the real clock: a 24 h window near midnight rolled over in CI
+
+
 @pytest.fixture
 def frozen(monkeypatch):
-    """The window never rolls over during a test."""
-    t = {"now": ratelimit._now()}
+    """A fixed clock at noon UTC: every window (10 min ... 24 h) has room to step forward without rolling over."""
+    t = {"now": FROZEN_NOON_UTC}
     monkeypatch.setattr(ratelimit, "_now", lambda: t["now"])
     return t
 
