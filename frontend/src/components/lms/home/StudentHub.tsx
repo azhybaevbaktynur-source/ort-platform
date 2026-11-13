@@ -7,17 +7,19 @@
 // Q1); the notices that live on the home. No test list, results list or statistics. One API round on a fresh load: the
 // shell's `GET /me/bootstrap?include=home` carries `/me/home` and the activity (`pageData.ts`, P2). A student sees only
 // what the server sends.
-import React, { useCallback, useEffect, useState } from "react";
+// Step 3a S7 (v3 V3, V7, V8): «Добавить курс» opens the catalog; the «Мои курсы» section is `#courses` (the sidebar's
+// «Все курсы (N)» target) and a capped group expands in place; with no course, one button «Открыть каталог».
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Flame, KeyRound, Megaphone, Plus, Sparkles } from "lucide-react";
+import { ArrowRight, Compass, Flame, Megaphone, Plus } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth-context";
 import { loadHome, peekHomeActivity } from "@/lib/lms/pageData";
+import { listHomeCourses } from "@/lib/lms/home";
 import type { HomeCourseOut, HomeOut } from "@/lib/lms/homeTypes";
 import { continueTarget, type ContinueTarget } from "@/lib/lms/lastPlace";
 import { useLastPlaceRead } from "@/lib/lms/useLastPlace";
 import { HUB_GROUP_MAX } from "@/lib/lms/examFamilies";
-import { chooseCoursesHref } from "@/lib/lms/chooseCourses";
 import { pickLocalized } from "@/lib/lms/localized";
 import { LMS_ME_STALE_EVENT } from "@/lib/lms/meStale";
 import type { ActivityOut } from "@/lib/lms/progress";
@@ -151,29 +153,55 @@ function HubSkeleton() {
   );
 }
 
-function EmptyHub() {
+/** No course yet (V8): one way on, the catalog (it holds «Войти по коду»); the test student gets no button. */
+function EmptyHub({ testStudent }: { testStudent: boolean }) {
   const { lang, t } = useTranslation();
   return (
     <EmptyState mascot="hello" title={t("home.hub.emptyTitle")} description={t("home.hub.emptyBody")}
-      action={(
-        <>
-          <LinkButton size="lg" href={chooseCoursesHref(lang)} leftIcon={<Sparkles aria-hidden="true" className="h-5 w-5" />}>{t("home.hub.choose")}</LinkButton>
-          <LinkButton size="lg" variant="secondary" href={`/${lang}/courses/join`} leftIcon={<KeyRound aria-hidden="true" className="h-5 w-5" />}>{t("home.hub.join")}</LinkButton>
-        </>
+      action={testStudent ? undefined : (
+        <LinkButton size="lg" href={`/${lang}/courses/catalog`} leftIcon={<Compass aria-hidden="true" className="h-5 w-5" />}>{t("home.hub.openCatalog")}</LinkButton>
       )} />
   );
+}
+
+/** Pages of `GET /me/home/courses` read for one expand (50 courses a page; far more than anyone has). */
+const ALL_PAGES_MAX = 20;
+
+/** Every student course, all pages (V7: the first expand of a group when the bootstrap's list is not complete). */
+async function loadAllCourses(): Promise<HomeCourseOut[]> {
+  const out: HomeCourseOut[] = [];
+  let cursor: string | null = null;
+  for (let i = 0; i < ALL_PAGES_MAX; i++) {
+    const page = await listHomeCourses(cursor, 50);
+    out.push(...page.items);
+    cursor = page.next_cursor;
+    if (!cursor) break;
+  }
+  return out;
 }
 
 export function StudentHub() {
   const { lang, t } = useTranslation();
   const errorText = useErrorText();
   const shell = useStudentShellDataContext();
-  const testStudent = !!useAuth().userProfile?.is_test_student; // Student view: no choose step
+  const testStudent = !!useAuth().userProfile?.is_test_student; // Student view: no catalog
   const { place } = useLastPlaceRead();
   const [home, setHome] = useState<HomeOut | null>(null);
   const [activity, setActivity] = useState<ActivityOut | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
+  // V7: every course, read once on the first expand of a group when the list in hand is not complete
+  const [allCourses, setAllCourses] = useState<HomeCourseOut[] | null>(null);
+  const [loadingAll, setLoadingAll] = useState(false);
+  const askedAll = useRef(false);
+  const needAll = useCallback(() => {
+    if (askedAll.current) return;
+    askedAll.current = true;
+    setLoadingAll(true);
+    loadAllCourses().then(setAllCourses)
+      .catch(() => { askedAll.current = false; }) // the cards in hand stay; the next expand tries again
+      .finally(() => setLoadingAll(false));
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -190,7 +218,7 @@ export function StudentHub() {
   useEffect(() => { void load(); }, [load]);
   // PERFORMANCE_AUDIT S2: joining or leaving a course reads the hub again (no page reload)
   useEffect(() => {
-    const stale = () => { void load(); };
+    const stale = () => { askedAll.current = false; setAllCourses(null); void load(); };
     window.addEventListener(LMS_ME_STALE_EVENT, stale);
     return () => window.removeEventListener(LMS_ME_STALE_EVENT, stale);
   }, [load]);
@@ -198,9 +226,16 @@ export function StudentHub() {
   // the cards: the home's list when it holds every course (fresh), else the bootstrap's (up to 50, known at once from
   // its cache, so the groups draw before `/me/home` answers on a repeat visit)
   const homeComplete = !!home && home.courses.length >= home.courses_total;
-  const courses: HomeCourseOut[] | null = homeComplete ? home!.courses : shell?.loaded ? shell.courses : home?.courses ?? null;
+  const courses: HomeCourseOut[] | null = allCourses ?? (homeComplete ? home!.courses : shell?.loaded ? shell.courses : home?.courses ?? null);
   const known = courses !== null;
   const empty = known && courses!.length === 0 && (!home || home.courses_total === 0);
+  // until `/me/home` answers, the bootstrap's list stands for every course (it holds up to 50)
+  const complete = allCourses !== null || !home || (courses?.length ?? 0) >= home.courses_total;
+  // V7: `/home#courses` (the sidebar's «Все курсы (N)», old `/courses#ort` links) scrolls once the section is drawn
+  const showsCourses = known && !empty;
+  useEffect(() => {
+    if (showsCourses && window.location.hash === "#courses") document.getElementById("courses")?.scrollIntoView({ block: "start" });
+  }, [showsCourses]);
 
   const notices = home ? (
     <>
@@ -212,24 +247,24 @@ export function StudentHub() {
   let body: React.ReactNode;
   if (!known && error) body = <ErrorState message={errorText(error)} onRetry={() => void load()} retrying={loading} />;
   else if (!known) body = <HubSkeleton />;
-  else if (empty) body = <EmptyHub />;
+  else if (empty) body = <EmptyHub testStudent={testStudent} />;
   else {
     const target = continueTarget(lang, place, courses!, home ? { in_progress: home.in_progress, modules_next: home.modules_next } : null);
     body = (
       <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
         <div className="min-w-0 space-y-6">
           <ContinueCard target={target} courses={courses!} home={home} streak={activity?.streak_current ?? 0} />
-          <section aria-labelledby="hub-courses" className="min-w-0 space-y-3">
+          <section id="courses" aria-labelledby="hub-courses" className="min-w-0 scroll-mt-20 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
               <h2 id="hub-courses" className="text-lg font-semibold leading-7 text-slate-900">{t("home.hub.coursesTitle")}</h2>
               {!testStudent && (
-                <Link href={chooseCoursesHref(lang)}
+                <Link href={`/${lang}/courses/catalog`}
                   className={cn("inline-flex min-h-11 items-center gap-1 rounded text-sm font-medium text-brand-700 hover:underline", focusRing)}>
                   <Plus aria-hidden="true" className="h-4 w-4" />{t("home.hub.addCourse")}
                 </Link>
               )}
             </div>
-            <CourseGroups courses={courses!} cap={HUB_GROUP_MAX} level={3} />
+            <CourseGroups courses={courses!} cap={HUB_GROUP_MAX} level={3} complete={complete} onNeedAll={needAll} loadingAll={loadingAll} />
           </section>
         </div>
         <div className="min-w-0 space-y-6">

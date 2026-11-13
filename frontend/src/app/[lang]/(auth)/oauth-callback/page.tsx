@@ -9,7 +9,6 @@ import { AuthError, storedSessionProfile, useAuth } from "@/lib/auth-context";
 import { takeOAuthBind } from "@/components/auth/ProviderButtons";
 import { prefetchBootstrap } from "@/lib/lms/bootstrap";
 import { safeRedirect } from "@/lib/safeRedirect";
-import { chooseCoursesHref } from "@/lib/lms/chooseCourses";
 import { AuthAlert, AuthSplit, AuthTitle } from "@/components/auth/AuthSplit";
 import { AgeRow } from "@/components/auth/AgeRow";
 import { MfaStep } from "@/components/auth/MfaStep";
@@ -57,13 +56,13 @@ function OAuthCallback() {
   const policyState = useOwnPolicies(needsPolicies);
   const { policies } = policyState;
 
-  /** `created`: the profile step just made the account (step 3a S4: a new account gets the choose step, as sign-up). */
+  /** `created`: the profile step just made the account (step 3a S7: a new account lands in the catalog, as sign-up). */
   const goOn = (ageBand?: AgeBand | null, parent = false, created = false) => {
     if (ageBand === "under_14") router.replace(`/${lang}/privacy`);
     else if (parent) router.replace(`/${lang}/parent`);
     else {
-      // step 3a S3: an existing account lands on the hub; S4: `?redirect=` wins, then a new account's choose step
-      const dest = redirectRef.current || (created ? `${chooseCoursesHref(lang)}?first=1` : `/${lang}/home`);
+      // step 3a S3: an existing account lands on the hub; `?redirect=` wins, then (S7, V4) a new account's catalog welcome
+      const dest = redirectRef.current || (created ? `/${lang}/courses/catalog?welcome=1` : `/${lang}/home`);
       prefetchBootstrap(dest, !!storedSessionProfile()?.is_platform_admin); // PERFORMANCE_AUDIT P3
       router.replace(dest);
     }

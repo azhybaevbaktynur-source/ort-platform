@@ -31,7 +31,7 @@ export function LeaveCourseDialog({ courseId, courseTitle, open, onCancel, onLef
       await leaveCourse(courseId);
       setBusy(false);
       if (onLeft) onLeft();
-      else router.push(`/${lang}/courses`);
+      else router.push(`/${lang}/home`); // step 3a S7: the hub (no learner /courses page)
     } catch (e) {
       setError(e);
       setBusy(false);

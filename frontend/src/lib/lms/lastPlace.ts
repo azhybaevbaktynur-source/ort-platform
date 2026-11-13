@@ -14,8 +14,6 @@
  * Dependency-free on purpose (checked by `lastPlace.check.ts` with a standalone `tsc`).
  */
 
-import { chooseCoursesHref } from "./chooseCourses";
-
 export type PlaceKind = "overview" | "lessons" | "tests" | "analytics" | "saved" | "lesson" | "lobby" | "assignment";
 
 export interface LastPlace {
@@ -191,12 +189,12 @@ export interface ContinueHome {
   modules_next?: ({ course_id: string } & StepLink)[];
 }
 
-export type ContinueKind = "place" | "resume" | "lesson" | "step" | "overview" | "choose";
+export type ContinueKind = "place" | "resume" | "lesson" | "step" | "overview" | "catalog";
 
 export interface ContinueTarget {
   kind: ContinueKind;
   href: string;
-  /** null only for `choose` (no course yet) */
+  /** null only for `catalog` (no course yet) */
   courseId: string | null;
   /** `place` only: what the remembered page is */
   placeKind?: PlaceKind;
@@ -209,7 +207,7 @@ export interface ContinueTarget {
 /**
  * «Продолжить» (STUDENT_IA_DESIGN §2.2, §2.5): the remembered last place when its course is still one of the student's;
  * else the server fallback: the in-progress attempt, else the first next lesson, else the newest exam course's Обзор
- * (else the newest course's); with no course at all, the choose step. `courses` is in the home's order (newest
+ * (else the newest course's); with no course at all, the catalog (S7, V8). `courses` is in the home's order (newest
  * enrolment first). Without `home` (the phone bar) the courses' own `next_step` stands for the same two rows.
  */
 export function continueTarget(lang: string, place: LastPlace | null, courses: ContinueCourse[], home: ContinueHome | null = null): ContinueTarget {
@@ -242,7 +240,7 @@ export function continueTarget(lang: string, place: LastPlace | null, courses: C
   }
   const exam = courses.find((c) => c.student_layout === "exam_prep") ?? courses[0];
   if (exam) return stepOf(exam.id) ?? { kind: "overview", href: base(exam.id), courseId: exam.id };
-  return { kind: "choose", href: chooseCoursesHref(lang), courseId: null };
+  return { kind: "catalog", href: `/${lang}/courses/catalog`, courseId: null };
 }
 
 /** The «Мои курсы» order (§2.5): the recent ids still in the list first, then the rest in the list's order. */

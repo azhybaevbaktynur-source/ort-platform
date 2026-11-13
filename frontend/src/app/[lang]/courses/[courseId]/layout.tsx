@@ -73,11 +73,10 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
         <h1 className="text-xl font-bold text-slate-900">{t("courses.notFound.title")}</h1>
         <p className="mt-2 text-sm text-slate-600">{t("courses.notFound.body")}</p>
         <div className="mt-5 flex flex-wrap justify-center gap-3 text-sm font-medium">
-          <Link href={`/${lang}/courses`} className="rounded-xl bg-brand-600 px-4 py-2 text-white hover:bg-brand-700">{t("courses.home.backToList")}</Link>
-          {/* fix round 1b: people who teach cannot join as students */}
-          {!teaches && <Link href={`/${lang}/courses/join`} className="rounded-xl border border-slate-200 px-4 py-2 text-slate-700 hover:bg-slate-50">{t("courses.notFound.join")}</Link>}
-          {/* --- Phase 6 S6b: the catalog has its own page --- */}
-          <Link href={`/${lang}/courses/catalog`} className="rounded-xl border border-slate-200 px-4 py-2 text-slate-700 hover:bg-slate-50">{t("lms.nav.catalog")}</Link>
+          {/* step 3a S7 (V1, V5): people who learn go back to the hub (no «Мои курсы» page); «Войти по коду» lives only in
+              the catalog, so the second way on is «В каталог» */}
+          <Link href={`/${lang}/${teaches ? "courses" : "home"}`} className="rounded-xl bg-brand-600 px-4 py-2 text-white hover:bg-brand-700">{t("courses.home.backToList")}</Link>
+          <Link href={`/${lang}/courses/catalog`} className="rounded-xl border border-slate-200 px-4 py-2 text-slate-700 hover:bg-slate-50">{t("courses.notFound.catalog")}</Link>
         </div>
       </div>
     );
@@ -86,7 +85,7 @@ export default function CourseLayout({ children }: { children: React.ReactNode }
     return bare(
       <div className="space-y-4">
         <ErrorMessage error={error} onRetry={reload} />
-        <Link href={`/${lang}/courses`} className="text-sm font-medium text-brand-700 hover:underline">{t("courses.home.backToList")}</Link>
+        <Link href={`/${lang}/${teaches ? "courses" : "home"}`} className="text-sm font-medium text-brand-700 hover:underline">{t("courses.home.backToList")}</Link>
       </div>
     );
   }

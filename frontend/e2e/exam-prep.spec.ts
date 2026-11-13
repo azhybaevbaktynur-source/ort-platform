@@ -199,9 +199,8 @@ test.describe("exam-prep page (ru)", () => {
       await markPage(page);
       await page.getByRole("button", { name: t("courses.home.leave"), exact: true }).click();
       await page.getByRole("alertdialog", { name: t("courses.home.leaveTitle") }).getByRole("button", { name: t("courses.home.leave"), exact: true }).click();
-      await page.waitForURL(new RegExp(`/${L}/courses$`));
-      // «Мои курсы» reads itself again: the course is gone (cards and the «Ещё» rows)
-      await expect(page.getByRole("heading", { level: 1, name: t("courses.mine.title") })).toBeVisible();
+      await page.waitForURL(new RegExp(`/${L}/home$`)); // step 3a S7: the hub (no «Мои курсы» page)
+      // the hub reads itself again: the course is gone (cards and the «Ещё» rows)
       await expect(page.locator(`main#main a[href^="/${L}/courses/${cid}"]`)).toHaveCount(0);
       expect(await samePage(page), "leaving reloaded the page").toBe(true);
     } finally {

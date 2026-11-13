@@ -8,14 +8,18 @@
 // listed courses, from `GET /catalog/exams`; `?exam=` in the URL; the default chip is the family of the student's
 // newest exam course, else ОРТ). A family view lists its courses by subject section (`GET /catalog/courses?exam=`:
 // main courses first); «Курсы преподавателей» is the list with search and filters (`exam=other`: no family). Without
-// any family the page is the plain list as before. A quiet «Подобрать курсы» opens the choose step.
+// any family the page is the plain list as before.
+// Step 3a S7 (v3 V3-V5): the catalog is the one way to add a course and holds the one «Войти по коду» button of the
+// student area (header; not for the test student or people who teach); no «Подобрать курсы». A new account lands here
+// with `?welcome=1`: a one-sentence welcome line with «×» (nothing stored; every chip and card link drops the parameter).
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { KeyRound, Sparkles } from "lucide-react";
+import { KeyRound, X } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
+import { useAuth } from "@/lib/auth-context";
 import { isActiveMember, isFormMode, joinOpenCourse, listCatalog, listExams, type CatalogCourseOut, type CatalogFilters as Filters } from "@/lib/lms/catalog";
-import { chooseCoursesHref, defaultFamily, subjectSections } from "@/lib/lms/chooseCourses";
+import { defaultFamily, subjectSections } from "@/lib/lms/chooseCourses";
 import { EXAM_SUBJECTS } from "@/lib/lms/types";
 import { Badge, Button, EmptyState, ErrorState, LinkButton, PageHeader, Pagination, Skeleton, cn, focusRing } from "@/components/ui";
 import { COURSE_GRID, CourseCard } from "@/components/lms/course/CourseCard";
@@ -55,12 +59,38 @@ const asView = (v: string | null): ExamView | null => (v === "ort" || v === "nct
 /** A family view shows the whole family at once (≤ 50 listed courses by design); a cursor still follows. */
 const FAMILY_PAGE = 48;
 
+/** S7 (V4): the new account's welcome line while `?welcome=1` is in the URL; «×» replaces the URL without it. */
+function WelcomeLine() {
+  const { lang, t } = useTranslation();
+  const router = useRouter();
+  const params = useSearchParams();
+  if (params.get("welcome") !== "1") return null;
+  const close = () => {
+    const next = new URLSearchParams(params.toString());
+    next.delete("welcome");
+    const qs = next.toString();
+    router.replace(`/${lang}/courses/catalog${qs ? `?${qs}` : ""}`, { scroll: false });
+  };
+  return (
+    <div role="status" className="mb-4 flex items-start gap-2 rounded-card border border-brand-100 bg-brand-50 py-2 pl-4 pr-1 text-brand-900">
+      <p className="min-w-0 flex-1 py-1.5 text-sm font-medium leading-6 sm:text-base">{t("catalog.welcome")}</p>
+      <button type="button" onClick={close} aria-label={t("catalog.welcomeClose")} title={t("catalog.welcomeClose")}
+        className={cn("inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-control text-brand-800 hover:bg-brand-100 sm:h-9 sm:w-9", focusRing)}>
+        <X aria-hidden="true" className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
 export function CatalogView() {
   const { lang, t } = useTranslation();
   const router = useRouter();
   const errorText = useErrorText();
   // fix round 1b (owner decision 2026-11-12): people who teach never join as students; Student view where they teach
   const teaches = hidesLearning(useLmsMe().me);
+  // S7 (V5): the one «Войти по коду» of the student area; never for people who teach or the test student
+  const testStudent = !!useAuth().userProfile?.is_test_student;
+  const learner = !teaches && !testStudent;
   // step 3a S3: a global page of the student frame (sidebar Каталог): no breadcrumbs there
   const shell = useStudentShellDataContext();
   const studentFrame = !!shell;
@@ -205,32 +235,25 @@ export function CatalogView() {
     <div className="w-full">
       <PageHeader title={t("catalog.title")} description={teaches ? t("catalog.previewNote") : t("catalog.subtitle")}
         breadcrumbs={studentFrame ? undefined : [{ label: t("lms.nav.myCourses"), href: `/${lang}/courses` }, { label: t("catalog.title") }]}
-        secondaryActions={teaches ? undefined : <LinkButton variant="secondary" href={`/${lang}/courses/join`} leftIcon={<KeyRound className="h-4 w-4" aria-hidden="true" />}>{t("home.primary.join")}</LinkButton>} />
+        secondaryActions={!learner ? undefined : <LinkButton variant="secondary" href={`/${lang}/courses/join`} leftIcon={<KeyRound className="h-4 w-4" aria-hidden="true" />}>{t("home.primary.join")}</LinkButton>} />
 
-      {/* step 3a S4: the family chips and the quiet way to the choose step */}
-      {(chips.length > 0 || !teaches) && (
-        <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-          {chips.length > 0 && (
-            <div role="group" aria-label={t("catalog.groups.label")} className="flex flex-wrap gap-2">
-              {chips.map((k) => {
-                const on = k === view;
-                return (
-                  <Link key={k} href={`/${lang}/courses/catalog?exam=${k}`} replace scroll={false} aria-current={on ? "page" : undefined}
-                    className={cn("inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold transition-colors sm:min-h-9",
-                      on ? "border-brand-600 bg-brand-600 text-white" : "border-slate-300 bg-white text-slate-700 hover:border-brand-400 hover:text-brand-700",
-                      focusRing)}>
-                    {chipLabel(k)}
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-          {!teaches && (
-            <Link href={chooseCoursesHref(lang)}
-              className={cn("inline-flex min-h-11 items-center gap-1.5 rounded text-sm font-semibold text-brand-700 hover:underline sm:min-h-0", focusRing)}>
-              <Sparkles aria-hidden="true" className="h-4 w-4" />{t("catalog.groups.pick")}
-            </Link>
-          )}
+      {/* a new learner's line only (never on the teacher's read-only preview) */}
+      {learner && <WelcomeLine />}
+
+      {/* step 3a S4: the family chips (S7: no «Подобрать курсы») */}
+      {chips.length > 0 && (
+        <div role="group" aria-label={t("catalog.groups.label")} className="mb-4 flex flex-wrap gap-2">
+          {chips.map((k) => {
+            const on = k === view;
+            return (
+              <Link key={k} href={`/${lang}/courses/catalog?exam=${k}`} replace scroll={false} aria-current={on ? "page" : undefined}
+                className={cn("inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold transition-colors sm:min-h-9",
+                  on ? "border-brand-600 bg-brand-600 text-white" : "border-slate-300 bg-white text-slate-700 hover:border-brand-400 hover:text-brand-700",
+                  focusRing)}>
+                {chipLabel(k)}
+              </Link>
+            );
+          })}
         </div>
       )}
 
@@ -251,8 +274,8 @@ export function CatalogView() {
         <EmptyState mascot="thinking" title={t("catalog.noResults.title")} description={t("catalog.noResults.body")}
           action={<Button variant="secondary" onClick={() => setFilters({})}>{t("ui.resetFilters")}</Button>} />
       ) : (
-        <EmptyState mascot="thinking" title={t("home.catalogEmpty.title")} description={t("home.catalogEmpty.body")}
-          action={teaches ? undefined : <LinkButton href={`/${lang}/courses/join`}>{t("home.primary.join")}</LinkButton>} />
+        // S7 (V5): no second «Войти по коду» here; the header's button is on the same page
+        <EmptyState mascot="thinking" title={t("home.catalogEmpty.title")} description={t("home.catalogEmpty.body")} />
       ))}
       {items.length > 0 && familyView && (
         // step 3a S4: the family by subject section, the main course first (both languages, each with its tag)

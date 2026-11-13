@@ -5,27 +5,28 @@ import { api, E2E_DIR, seed, settle, signIn, tr, VIEWPORTS, type SeedUser } from
 import { ortKyrgyzId } from "./hubCourses";
 
 /**
- * Step 3a S4 (docs/phases/STUDENT_IA_DESIGN.md §2.4, §4, §7.6, decisions N7, N9): the choose step after sign-up and the
- * catalog's family chips, in a real browser against the scratch backend.
+ * Step 3a S7 (docs/phases/STUDENT_IA_DESIGN.md v3 V3, V4, V5, V14, V15; was `choose-courses.spec.ts` of S4): a new
+ * account lands in the catalog with the welcome line, and the catalog's family chips, in a real browser against the
+ * scratch backend.
  *
- * - sign-up -> «Выберите курсы» (the UI language's main course pre-checked) -> «Пропустить» -> the empty hub, nothing
- *   joined; the catalog landing's «Записаться» lands on the course Обзор;
- * - pick two -> the hub, whose «Продолжить» opens the first chosen course; the step again: joined courses checked and
- *   disabled, «Назад» instead of «Пропустить»; a refused choice in plain words;
- * - a teacher never sees the step (the Teaching list), nor does Student view's test student (the course);
- * - `?redirect=` wins over the step (a teacher-code sign-up lands on the join page);
+ * - sign-up -> `/courses/catalog?welcome=1`: the line (`role="status"`), ОРТ first, the one «Войти по коду» in the
+ *   header; «×» and a chip remove the line; nothing joined; old `/courses/choose[?first=1]` links redirect; the landing's
+ *   «Записаться» lands on the course Обзор;
+ * - under 14 -> the privacy page; `?redirect=` -> its target (a teacher-code sign-up lands on the join page);
+ * - people who teach: `/courses/choose` -> Teaching, no welcome line or code button in the catalog; Student view's test
+ *   student -> the hub;
  * - the catalog: ОРТ · НЦТ · Курсы преподавателей, subject sections, `?exam=` in the URL; read-only for a teacher.
+ * Google's new account (`created`) -> the catalog welcome is in `oauth-google.spec.ts`.
  *
  * The ORT and НЦТ subject courses are made here (fake titles) and deleted afterwards, so other specs see the seed's
- * catalog. Screens for the orchestrator's UX check (ru, 375 and 1440) when `STUDENT_IA_S4_SHOTS=<dir>` is set.
+ * catalog. Screens for the orchestrator's UX check (ru, 375 and 1440) when `STUDENT_IA_S7_SHOTS=<dir>` is set.
  */
 
 const L = "ru";
 const t = (key: string, vars: Record<string, string | number> = {}) => tr(L, key, vars);
-const OUT = process.env.STUDENT_IA_S4_SHOTS;
+const OUT = process.env.STUDENT_IA_S7_SHOTS;
 const PASSWORD = `e2e-${Math.random().toString(36).slice(2)}-pass`;
 const rand = () => Math.random().toString(36).slice(2, 8);
-const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 interface Made { maths: string; physics: string; chemistry: string; nctBiology: string; ortRu: string; ortKy: string; ortRuTitle: string; ortKyTitle: string }
 let made: Made;
@@ -105,7 +106,7 @@ async function apiAs(page: Page, p: string) {
   }, [seed().api.replace(/\/+$/, ""), p] as const);
 }
 
-const box = (page: Page, title: string) => page.getByRole("checkbox", { name: new RegExp(esc(title)) });
+const welcome = (page: Page) => page.getByRole("status").filter({ hasText: t("catalog.welcome") });
 
 test.describe.configure({ mode: "serial" });
 
@@ -138,40 +139,41 @@ test.afterAll(async () => {
   for (const id of toDelete) await api(seed().admin, "DELETE", `/courses/${id}`);
 });
 
-test("sign-up: the choose step with the main course pre-checked, «Пропустить» -> the empty hub, nothing joined", async ({ browser }) => {
+test("sign-up: the catalog with the welcome line; «×» and a chip remove it; nothing joined; «Записаться» → Обзор", async ({ browser }) => {
   test.setTimeout(180_000);
   const page = await fresh(browser);
-  await signUp(page, `e2e-choose-skip-${rand()}@example.com`);
-  await expect(page).toHaveURL(new RegExp(`/${L}/courses/choose\\?first=1$`));
-  await expect(page.getByRole("heading", { level: 1, name: t("choose.title") })).toBeVisible();
-  // step 1: ОРТ and НЦТ, ОРТ chosen (the student has no exam course yet)
-  const families = page.getByRole("radiogroup", { name: t("choose.step1") });
-  await expect(families.getByRole("radio")).toHaveCount(2);
-  await expect(families.getByRole("radio", { name: new RegExp(`^${t("exam.family.ort")}`) })).toBeChecked();
-  await expect(page.getByRole("link", { name: t("choose.haveCode") })).toHaveAttribute("href", `/${L}/courses/join`);
-  // step 2: the ru main course pre-checked, the other language's and the subjects unchecked
-  await expect(page.getByRole("heading", { name: t("choose.step2", { family: t("exam.family.ort") }) })).toBeVisible();
-  for (const name of [t("catalog.groups.mainCourse"), t("exam.subject.math"), t("exam.subject.physics"), t("exam.subject.chemistry")]) {
-    await expect(page.getByRole("heading", { level: 3, name, exact: true })).toBeVisible();
-  }
-  await expect(box(page, made.ortRuTitle)).toBeChecked();
-  await expect(box(page, made.ortKyTitle)).not.toBeChecked();
-  await expect(box(page, "ОРТ: Математика E2E")).not.toBeChecked();
-  await expect(page.getByRole("button", { name: t("choose.enrol", { count: 1 }) })).toBeEnabled();
-  await shot(page, "choose-step");
+  await signUp(page, `e2e-welcome-${rand()}@example.com`);
+  await expect(page).toHaveURL(new RegExp(`/${L}/courses/catalog\\?welcome=1$`));
+  await expect(page.getByRole("heading", { level: 1, name: t("catalog.title") })).toBeVisible();
+  await expect(welcome(page)).toBeVisible();
+  // N9: a student with no course sees ОРТ first; the one «Войти по коду» is the header's
+  const chips = page.getByRole("group", { name: t("catalog.groups.label") });
+  await expect(chips.getByRole("link", { name: t("exam.family.ort") })).toHaveAttribute("aria-current", "page");
+  const main = page.locator("main#main");
+  await expect(main.getByRole("link", { name: t("home.primary.join") })).toHaveCount(1);
+  await expect(main.getByRole("link", { name: t("home.primary.join") })).toHaveAttribute("href", `/${L}/courses/join`);
+  await expect(main.locator(`a[href="/${L}/courses/choose"]`)).toHaveCount(0); // no «Подобрать курсы»
+  await shot(page, "catalog-welcome");
   await noSideScroll(page);
-  // НЦТ: its own courses, none pre-checked (no main course); the press needs a tick
-  await families.getByRole("radio", { name: new RegExp(`^${t("exam.family.nct")}`) }).check();
-  await expect(box(page, "НЦТ: Биология E2E")).not.toBeChecked();
-  await expect(box(page, made.ortRuTitle)).toHaveCount(0);
-  await expect(page.getByRole("button", { name: t("choose.enrol", { count: 0 }) })).toBeDisabled();
-  await expect(page.getByText(t("choose.pickOne"))).toBeVisible();
-
   await page.setViewportSize(VIEWPORTS.desktop);
-  await page.getByRole("link", { name: t("choose.skip") }).click();
-  await expect(page).toHaveURL(new RegExp(`/${L}/home$`));
-  await expect(page.getByText(t("home.hub.emptyTitle"))).toBeVisible();
-  expect((await apiAs(page, "/me/home")).courses).toHaveLength(0); // no enrolment without a tap
+  expect((await apiAs(page, "/me/home")).courses).toHaveLength(0); // nothing joined without a tap
+
+  // «×» replaces the URL without the parameter
+  await page.getByRole("button", { name: t("catalog.welcomeClose") }).click();
+  await expect(page).toHaveURL(new RegExp(`/${L}/courses/catalog$`));
+  await expect(welcome(page)).toHaveCount(0);
+  // a reload keeps it while the parameter is there; any chip drops it
+  await page.goto(`/${L}/courses/catalog?welcome=1`);
+  await expect(welcome(page)).toBeVisible();
+  await chips.getByRole("link", { name: t("exam.family.nct") }).click();
+  await expect(page).toHaveURL(new RegExp(`/${L}/courses/catalog\\?exam=nct$`));
+  await expect(welcome(page)).toHaveCount(0);
+
+  // the old choose step's links redirect (V15)
+  await page.goto(`/${L}/courses/choose?first=1`);
+  await page.waitForURL(new RegExp(`/${L}/courses/catalog\\?welcome=1$`));
+  await page.goto(`/${L}/courses/choose?x=1`);
+  await page.waitForURL(new RegExp(`/${L}/courses/catalog$`));
 
   // the catalog landing's «Записаться» lands on the course Обзор
   await page.goto(`/${L}/courses/catalog/${made.physics}`);
@@ -182,75 +184,57 @@ test("sign-up: the choose step with the main course pre-checked, «Пропус�
   await page.context().close();
 });
 
-test("pick two: the hub's «Продолжить» opens the first chosen course; the step again: joined ones disabled; a refusal in plain words", async ({ browser }) => {
-  test.setTimeout(180_000);
-  const page = await fresh(browser);
-  await signUp(page, `e2e-choose-two-${rand()}@example.com`);
-  await expect(page).toHaveURL(new RegExp(`/${L}/courses/choose\\?first=1$`));
-  await box(page, "ОРТ: Математика E2E").check();
-  const sent = page.waitForRequest((r) => r.url().endsWith("/catalog/choose") && r.method() === "POST");
-  await page.getByRole("button", { name: t("choose.enrol", { count: 2 }) }).click();
-  expect((await sent).postDataJSON()).toEqual({ course_ids: [made.ortRu, made.maths] }); // the main course first
-  await expect(page).toHaveURL(new RegExp(`/${L}/home$`));
-  const mine = ((await apiAs(page, "/me/home")).courses as { id: string }[]).map((c) => c.id).sort();
-  expect(mine).toEqual([made.ortRu, made.maths].sort());
-  const cont = page.getByRole("region", { name: t("home.hub.continue") });
-  await expect(cont.getByRole("link")).toHaveAttribute("href", new RegExp(`^/${L}/courses/${made.ortRu}(/|$)`));
-
-  // the step again (from «Добавить курс»): joined courses checked and disabled, «Назад», no «Пропустить»
-  await page.goto(`/${L}/courses/choose`);
-  await expect(box(page, made.ortRuTitle)).toBeChecked();
-  await expect(box(page, made.ortRuTitle)).toBeDisabled();
-  await expect(box(page, "ОРТ: Математика E2E")).toBeDisabled();
-  await expect(page.getByText(t("choose.alreadyIn"))).toHaveCount(2);
-  await expect(page.getByRole("button", { name: t("choose.back") })).toBeVisible();
-  await expect(page.getByRole("link", { name: t("choose.skip") })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: t("choose.enrol", { count: 0 }) })).toBeDisabled(); // nothing pre-checked now
-
-  // a course closed meanwhile: the server's refusal (422 course_not_choosable) in plain words, the list read again
-  await page.route("**/api/v1/catalog/choose", (r) => r.fulfill({ status: 422, json: { error: { code: "course_not_choosable",
-    message: "These courses cannot be chosen", details: [{ loc: ["course_ids"], msg: "course_not_choosable", course_id: made.physics }] } } }));
-  await box(page, "ОРТ: Физика E2E").check();
-  await page.getByRole("button", { name: t("choose.enrol", { count: 1 }) }).click();
-  await expect(page.getByText(t("choose.errors.notChoosable"))).toBeVisible();
-  await shot(page, "choose-error");
-  await page.unroute("**/api/v1/catalog/choose");
+test("sign-up under 14: the privacy page wins over the catalog", async ({ browser }) => {
+  test.setTimeout(120_000);
+  const page = await fresh(browser, VIEWPORTS.phone);
+  await page.route("**/me/guardians", (r) => r.fulfill({ json: [] }));
+  await page.goto(`/${L}/register`);
+  await page.getByRole("button", { name: t("privacy.age.under_14") }).click();
+  const email = `e2e-welcome-child-${rand()}@example.com`;
+  await page.getByLabel(t("auth.displayName")).fill("Бала Пробный");
+  await page.getByLabel(t("auth.email")).fill(email);
+  await page.getByLabel(t("auth.password")).fill(PASSWORD);
+  await page.getByRole("button", { name: t("auth.signUpButton") }).click();
+  await expect(page.getByRole("heading", { name: t("auth.verify.title") })).toBeVisible();
+  await page.getByLabel(t("auth.verify.codeLabel")).fill(await emailCode(email));
+  await page.getByRole("button", { name: t("auth.verify.button") }).click();
+  await expect(page).toHaveURL(new RegExp(`/${L}/privacy$`));
   await page.context().close();
 });
 
-test("a teacher never sees the step (the Teaching list); Student view's test student neither (the course)", async ({ browser }) => {
+test("people who teach: /courses/choose → Teaching, no welcome line or code button; Student view's test student → the hub", async ({ browser }) => {
   test.setTimeout(180_000);
   const s = seed();
-  const u = await registerApi(`e2e-choose-teacher-${rand()}@example.com`, "Бектур Учитель");
+  const u = await registerApi(`e2e-welcome-teacher-${rand()}@example.com`, "Бектур Учитель");
   await api(s.admin, "POST", `/platform/users/${u.profile.id}/teacher-status`, { status: "approved" });
   u.profile = await api(u, "GET", "/auth/me");
-  const course = await api(u, "POST", "/courses", { title: { ru: "Курс выбора E2E" }, languages: ["ru"], default_language: "ru" });
+  const course = await api(u, "POST", "/courses", { title: { ru: "Курс каталога E2E" }, languages: ["ru"], default_language: "ru" });
   await api(u, "POST", `/courses/${course.id}/publish`);
   teacher = { ...u, course_id: course.id };
 
   const page = await fresh(browser);
   await signIn(page, teacher);
-  const asked: string[] = [];
-  page.on("request", (r) => { if (r.url().includes("/catalog/choose")) asked.push(r.url()); });
-  await page.goto(`/${L}/courses/choose`);
+  await page.goto(`/${L}/courses/choose?first=1`);
   await page.waitForURL(new RegExp(`/${L}/courses$`));
-  await expect(page.getByRole("heading", { name: t("choose.title") })).toHaveCount(0);
-  expect(asked).toEqual([]);
+  await expect(page.getByRole("heading", { level: 1, name: t("courses.list.title") })).toBeVisible();
+  await page.goto(`/${L}/courses/catalog?welcome=1`);
+  await expect(page.getByRole("heading", { level: 1, name: t("catalog.title") })).toBeVisible();
+  await expect(welcome(page)).toHaveCount(0);
+  await expect(page.locator("main#main").getByRole("link", { name: t("home.primary.join") })).toHaveCount(0);
 
-  // Student view: the test student is sent to the course
+  // Student view: the test student has no catalog; the old step leads to the hub
   await page.goto(`/${L}/courses/${course.id}`);
   await page.getByRole("button", { name: t("studentView.button") }).click();
   await expect(page.getByRole("status").filter({ hasText: t("studentView.banner") })).toBeVisible();
   await page.goto(`/${L}/courses/choose`);
-  await page.waitForURL(new RegExp(`/${L}/courses/${course.id}$`));
-  await expect(page.getByRole("heading", { name: t("choose.title") })).toHaveCount(0);
+  await page.waitForURL(new RegExp(`/${L}/home$`));
   await page.context().close();
 });
 
-test("?redirect= wins over the step: a teacher-code sign-up lands on the join page", async ({ browser }) => {
+test("?redirect= wins over the catalog: a teacher-code sign-up lands on the join page", async ({ browser }) => {
   test.setTimeout(120_000);
   const page = await fresh(browser, VIEWPORTS.phone);
-  await signUp(page, `e2e-choose-code-${rand()}@example.com`, `/${L}/register?redirect=${encodeURIComponent(`/${L}/courses/join?code=E2EJOIN1`)}`);
+  await signUp(page, `e2e-welcome-code-${rand()}@example.com`, `/${L}/register?redirect=${encodeURIComponent(`/${L}/courses/join?code=E2EJOIN1`)}`);
   await expect(page).toHaveURL(new RegExp(`/${L}/courses/join\\?code=E2EJOIN1$`));
   await page.context().close();
 });
@@ -271,7 +255,7 @@ test("the catalog: family chips, subject sections, ?exam= in the URL; read-only 
   const first = main.getByRole("region", { name: t("catalog.groups.mainCourse") });
   await expect(first.locator(`a[href="/${L}/courses/catalog/${made.ortRu}"]`)).toHaveCount(1);
   await expect(first.locator(`a[href="/${L}/courses/catalog/${made.ortKy}"]`)).toHaveCount(1);
-  await expect(main.getByRole("link", { name: t("catalog.groups.pick") })).toHaveAttribute("href", `/${L}/courses/choose`);
+  await expect(welcome(page)).toHaveCount(0); // no `?welcome=1`: no line
   await expect(page.locator("#catalog-q")).toHaveCount(0); // a family view has no search
   await shot(page, "catalog-ort");
   await noSideScroll(page);
@@ -287,13 +271,12 @@ test("the catalog: family chips, subject sections, ?exam= in the URL; read-only 
   await expect(main.locator(`a[href="/${L}/courses/catalog/${made.maths}"]`)).toHaveCount(0);
   await page.context().close();
 
-  // a teacher: the chips, no join buttons, no «Подобрать курсы»
+  // a teacher: the chips, no join buttons
   const tp = await fresh(browser);
   await signIn(tp, teacher);
   await tp.goto(`/${L}/courses/catalog?exam=ort`);
   await expect(tp.getByRole("group", { name: t("catalog.groups.label") })).toBeVisible();
   await expect(tp.locator("main").locator(`a[href="/${L}/courses/catalog/${made.maths}"]`)).toHaveCount(1);
   await expect(tp.getByRole("button", { name: t("catalog.join"), exact: true })).toHaveCount(0);
-  await expect(tp.getByRole("link", { name: t("catalog.groups.pick") })).toHaveCount(0);
   await tp.context().close();
 });

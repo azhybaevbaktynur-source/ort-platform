@@ -1,20 +1,19 @@
 "use client";
 
-// Step 3a S3 (STUDENT_IA_DESIGN §2.2, §2.3, §7.1-§7.3): the student's courses grouped ОРТ · НЦТ · Другие курсы on the
-// hub (4 cards per group + «Все курсы … (N)» → `/courses#family`) and on «Мои курсы» (every card, anchors `#ort`,
-// `#nct`, `#other`). Each card (`HubCourseCard`): cover, title, provider, progress, for exam courses a small countdown,
-// the last result line and one next-step button from the server's `next_step` (no client-side visibility rule: the
-// server sends only what the student may open).
-import React from "react";
-import Link from "next/link";
-import { ArrowRight, CalendarClock, Trophy } from "lucide-react";
+// Step 3a S3 (STUDENT_IA_DESIGN §2.2, §7.1-§7.3): the student's courses grouped ОРТ · НЦТ · Другие курсы on the hub
+// (4 cards per group; S7 v3 V7: «Все курсы … (N)» expands the group in place, «Свернуть» collapses it; the «Мои курсы»
+// page and its `/courses#family` anchors are gone). Each card (`HubCourseCard`): cover, title, provider, progress, for
+// exam courses a small countdown, the last result line and one next-step button from the server's `next_step` (no
+// client-side visibility rule: the server sends only what the student may open).
+import React, { useState } from "react";
+import { ArrowRight, CalendarClock, ChevronDown, ChevronUp, Trophy } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { examDayStart } from "@/components/ui/Countdown";
 import { groupCourses } from "@/lib/lms/examFamilies";
 import type { HomeCourseOut } from "@/lib/lms/homeTypes";
 import { nextStepLink } from "@/lib/lms/lastPlace";
 import { pickLocalized } from "@/lib/lms/localized";
-import { LinkButton, cn, focusRing } from "@/components/ui";
+import { LinkButton, Spinner, cn, focusRing } from "@/components/ui";
 import { CourseCard } from "@/components/lms/course/CourseCard";
 import { useGradeListText } from "@/components/lms/results/GradeBadge";
 
@@ -39,7 +38,7 @@ function ExamCountdown({ date }: { date: string }) {
   );
 }
 
-/** `compact`: the hub's lower cover on phones (96 px instead of 150; «Мои курсы» and the catalog keep theirs). */
+/** `compact`: the hub's lower cover on phones (96 px instead of 150; the catalog keeps its own). */
 export function HubCourseCard({ course, examTitle, headingLevel, compact = false }: {
   course: HomeCourseOut; examTitle?: string | null; headingLevel: 3 | 4; compact?: boolean;
 }) {
@@ -71,11 +70,25 @@ export function HubCourseCard({ course, examTitle, headingLevel, compact = false
 }
 
 /**
- * The grouped cards. `cap`: cards per group (the hub; then «Все курсы … (N)» → `/courses#family`); none: every card
- * (`/courses`). `level`: the heading level of the group titles (cards one below).
+ * The grouped cards. `cap`: cards per group, then «Все курсы … (N)», a button that shows the rest in place (client
+ * state only); none: every card. `level`: the heading level of the group titles (cards one below). `complete` false:
+ * the list holds fewer courses than the student has (the bootstrap holds up to 50), so the first expand asks
+ * `onNeedAll` once (`loadingAll` while it runs).
  */
-export function CourseGroups({ courses, cap, level }: { courses: HomeCourseOut[]; cap?: number; level: 2 | 3 }) {
+export function CourseGroups({ courses, cap, level, complete = true, onNeedAll, loadingAll = false }: {
+  courses: HomeCourseOut[]; cap?: number; level: 2 | 3; complete?: boolean; onNeedAll?: () => void; loadingAll?: boolean;
+}) {
   const { lang, t } = useTranslation();
+  const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
+  const toggle = (key: string) => {
+    const next = new Set(open);
+    if (next.has(key)) next.delete(key);
+    else {
+      next.add(key);
+      if (!complete) onNeedAll?.();
+    }
+    setOpen(next);
+  };
   const groups = groupCourses(courses);
   const byId = new Map(courses.map((c) => [c.id, c]));
   const examTitle = (c: HomeCourseOut) => {
@@ -86,23 +99,27 @@ export function CourseGroups({ courses, cap, level }: { courses: HomeCourseOut[]
   return (
     <div className="space-y-6">
       {groups.map((g) => {
-        const shown = cap ? g.courses.slice(0, cap) : g.courses;
+        const expanded = open.has(g.key);
+        const capped = !!cap && g.courses.length > cap;
+        const shown = cap && !expanded ? g.courses.slice(0, cap) : g.courses;
         const id = `group-${g.key}`;
+        const listId = `group-${g.key}-list`;
         return (
-          <section key={g.key} id={cap ? undefined : g.key} aria-labelledby={id} className="min-w-0 scroll-mt-24">
+          <section key={g.key} aria-labelledby={id} className="min-w-0">
             <H id={id} className="mb-2 text-base font-semibold leading-6 text-slate-800">
               {t(`home.hub.groups.${g.key}`)}
               {" "}<span className="font-medium text-slate-500">({g.courses.length})</span>
             </H>
-            <ul className={HOME_CARD_GRID}>
+            <ul id={listId} className={HOME_CARD_GRID} aria-busy={(expanded && loadingAll) || undefined}>
               {shown.map((c) => <HubCourseCard key={c.id} course={c} examTitle={examTitle(c)} headingLevel={level === 2 ? 3 : 4} compact={!!cap} />)}
             </ul>
-            {cap && g.courses.length > shown.length && (
-              <Link href={`/${lang}/courses#${g.key}`}
+            {(capped || (expanded && !!cap)) && (
+              <button type="button" aria-expanded={expanded} aria-controls={listId} onClick={() => toggle(g.key)}
                 className={cn("mt-2 inline-flex min-h-11 items-center gap-1 rounded text-sm font-medium text-brand-700 hover:underline", focusRing)}>
-                {t(`home.hub.allInGroup.${g.key}`, { n: g.courses.length })}
-                <ArrowRight aria-hidden="true" className="h-4 w-4" />
-              </Link>
+                {expanded ? t("home.hub.collapseGroup") : t(`home.hub.allInGroup.${g.key}`, { n: g.courses.length })}
+                {expanded && loadingAll ? <Spinner className="h-4 w-4" />
+                  : expanded ? <ChevronUp aria-hidden="true" className="h-4 w-4" /> : <ChevronDown aria-hidden="true" className="h-4 w-4" />}
+              </button>
             )}
           </section>
         );

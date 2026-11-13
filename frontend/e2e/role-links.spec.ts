@@ -11,6 +11,8 @@ import { expectedArea, expectedFrame, expectsLearning, expectsPro, type Role } f
  * Menu contents: Pro only for students; no «Учёба» for anyone who teaches (owner decision 2026-11-12: teachers and
  * students are separate accounts; `teacher_enrolled` is a teacher with a leftover student enrolment).
  * Read-only: no link that writes is followed (attempt pages are skipped; actions are buttons, never clicked here).
+ * Step 3a S7 (STUDENT_IA_DESIGN v3 V14): on every page the student lands on, no link to `/ru/courses` (the old «Мои
+ * курсы»; the entry itself redirects to the hub) and «Войти по коду» (`/ru/courses/join`) only on the catalog.
  */
 const t = (key: string) => tr("ru", key);
 
@@ -60,6 +62,19 @@ async function collect(page: Page, from: string, into: Map<string, Found>) {
   }
 }
 
+/** Step 3a S7 (V1, V5): the student's page rules, on the page as it landed (frame and content). */
+async function studentPageRules(page: Page, label: string, landed: string, problems: string[]) {
+  const hrefs = await page.locator("a[href]").evaluateAll((els) => els.map((a) => a.getAttribute("href") || ""));
+  const paths = hrefs.filter((h) => h.startsWith("/ru/")).map((h) => norm(h));
+  if (paths.some((h) => h === "/ru/courses" || h.startsWith("/ru/courses?"))) problems.push(`${label}: a link to /ru/courses on ${landed}`);
+  const code = paths.filter((h) => h === "/ru/courses/join" || h.startsWith("/ru/courses/join?"));
+  const inCatalog = landed === "/ru/courses/catalog" || landed.startsWith("/ru/courses/catalog?") || landed.startsWith("/ru/courses/catalog/");
+  if (code.length > 0 && !inCatalog) problems.push(`${label}: «Войти по коду» on ${landed}`);
+  if ((landed === "/ru/courses/catalog" || landed.startsWith("/ru/courses/catalog?")) && code.length !== 1) {
+    problems.push(`${label}: ${code.length} «Войти по коду» links on the catalog, expected 1`);
+  }
+}
+
 /** Opens a URL and waits until the frame is decided and the network is quiet. */
 async function open(page: Page, url: string) {
   await page.goto(url);
@@ -101,15 +116,20 @@ async function walk(page: Page, role: Role, user: SeedUser, entries: string[]): 
   for (const entry of entries) {
     failed.length = 0;
     await open(page, entry);
-    await check(`entry ${entry}`);
+    const landed = await check(`entry ${entry}`);
     for (const f of failed) problems.push(`entry ${entry}: API ${f}`);
+    if (role === "student") await studentPageRules(page, `entry ${entry}`, landed, problems);
     await collect(page, norm(page.url()), links);
   }
+  // step 3a S7 (V5): no menu, sheet or sidebar carries «Войти по коду» any more (the catalog's page header does)
+  const code = links.get("/ru/courses/join");
+  if (role === "student" && code && !code.from.startsWith("/ru/courses/catalog")) problems.push(`«Войти по коду» in a menu (from ${code.from})`);
   for (const link of links.values()) {
     failed.length = 0;
     await open(page, link.href);
     const landed = await check(`link ${link.href} (from ${link.from})`);
     for (const f of failed) problems.push(`link ${link.href}: API ${f}`);
+    if (role === "student") await studentPageRules(page, `link ${link.href}`, landed, problems);
     if (landed === link.from && norm(link.href) === link.from && !link.current && !link.brand) {
       problems.push(`link ${link.href} (from ${link.from}): a dead link to its own page`);
     }
@@ -128,9 +148,10 @@ async function walk(page: Page, role: Role, user: SeedUser, entries: string[]): 
   return { problems, links };
 }
 
-// step 3a S4: every role opens the choose step; people who teach land on their Teaching list (never the step)
+// step 3a S7 (V14): every role opens the old choose step and «Мои курсы»: a learner lands in the catalog (with the
+// welcome line) and on the hub, people who teach on their Teaching list
 const ENTRY = {
-  student: () => { const s = seed(); return { user: s.access!.student, entries: ["/ru/home", "/ru/courses", "/ru/courses/choose", `/ru/courses/${s.access!.course_id}`, "/ru/courses/catalog", "/ru/pro", "/ru/privacy"] }; },
+  student: () => { const s = seed(); return { user: s.access!.student, entries: ["/ru/home", "/ru/courses", "/ru/courses/choose", "/ru/courses/catalog?welcome=1", `/ru/courses/${s.access!.course_id}`, "/ru/courses/catalog", "/ru/pro", "/ru/privacy"] }; },
   teacher: () => { const s = seed(); return { user: s.course_nav.teacher, entries: ["/ru/courses", "/ru/home", "/ru/courses/choose", `/ru/courses/${s.course_nav.course_id}`, "/ru/courses/catalog", `/ru/courses/catalog/${s.course_id}`, "/ru/pro"] }; },
   teacher_enrolled: () => {
     const s = seed();

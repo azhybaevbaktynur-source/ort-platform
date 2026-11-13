@@ -3,7 +3,7 @@
 import React, { useId, useState } from "react";
 import Link from "next/link";
 import {
-  BookOpen, Compass, Download, Ellipsis, FlaskConical, GraduationCap, House, KeyRound, LayoutGrid, LogOut, PlayCircle, Settings, Sparkles,
+  BookOpen, Compass, Download, Ellipsis, FlaskConical, GraduationCap, House, LayoutGrid, LogOut, PlayCircle, Settings,
 } from "lucide-react";
 import { useTranslation, type Language } from "@/lib/i18n/context";
 import { inter } from "@/lib/fonts";
@@ -29,12 +29,12 @@ import { GettingStartedSheet, ProgressRing, useGettingStarted, type GettingStart
  * Student UI U2, step 3a S3 (docs/phases/STUDENT_IA_DESIGN.md §2.1): the global frame of people who learn (and of the
  * test student in Student view). The frame is about the person; a course space (S2, `CourseFrame`) is about one
  * course, so no global link carries a course id and there is no exam switcher or "current course".
- * - from 1024 px: a 264 px teal sidebar: brand → /home; Главная · Мои курсы · Каталог; the «Мои курсы» rows (recent
- *   first, 6 + «Все курсы (N)»; none: «Выбрать курсы»; a row opens the course's last tab, else Обзор); at the bottom
- *   Начало работы, the Pro pill, install, other areas and the account button;
- * - below: a 56 px top bar (brand, page title, account) and the bottom bar Главная · Курсы · Продолжить · Каталог · Ещё.
- * The test student has no Каталог, Pro, «Войти по коду», install or choose step. `LmsShell` keeps one tree for both
- * frames; only the player is full-screen. Inter applies inside `STUDENT_FRAME` only.
+ * - from 1024 px: a 264 px teal sidebar: brand → /home; Главная · Каталог (S7 v3: no «Мои курсы» page, V1); the «Мои
+ *   курсы» rows (recent first, 6 + «Все курсы (N)» → /home#courses; none: the group is hidden; a row opens the course's
+ *   last tab, else Обзор); at the bottom Начало работы, the Pro pill, install, other areas and the account button;
+ * - below: a 56 px top bar (brand, page title, account) and the bottom bar Главная · Продолжить · Каталог · Ещё (V6).
+ * «Войти по коду» lives only in the catalog's header (V5). The test student has no Каталог, Pro or install.
+ * `LmsShell` keeps one tree for both frames; only the player is full-screen. Inter applies inside `STUDENT_FRAME` only.
  */
 
 /** Classes of the frame's root: Inter (scoped here), the "Sky and teal" palette (§1.1: `.student-theme` re-points the
@@ -56,13 +56,12 @@ export interface StudentShellProps {
   accountLinks: (AppHeaderLink & { icon?: React.ReactNode })[];
   onLanguageChange: (lang: Language) => void;
   onLogout: () => void;
-  /** The student-view test student: no Каталог, Pro, «Войти по коду», install or choose step. */
+  /** The student-view test student: no Каталог, Pro or install. */
   testStudent: boolean;
 }
 
 const ICONS: Record<StudentNavKey, React.ReactNode> = {
   home: <House />,
-  courses: <LayoutGrid />,
   catalog: <Compass />,
 };
 
@@ -95,12 +94,12 @@ function useNav(props: StudentShellProps) {
   const { place, recent } = useLastPlaceRead();
   const links = studentNavLinks({ lang, rest, testStudent });
   const label: Record<StudentNavKey, string> = {
-    home: t("student.nav.home"), courses: t("student.nav.myCourses"), catalog: t("student.nav.catalog"),
+    home: t("student.nav.home"), catalog: t("student.nav.catalog"),
   };
   const item = (l: StudentNavLink | null): SidebarNavItem[] =>
     l ? [{ key: l.key, href: l.href, label: label[l.key], icon: ICONS[l.key], active: l.active }] : [];
   const groups = courseGroups(data.courses);
-  const rows = courseRows({ lang, rest, courses: data.courses, recent, place, loaded: data.loaded, testStudent });
+  const rows = courseRows({ lang, rest, courses: data.courses, recent, place, loaded: data.loaded });
   const courseItems: SidebarNavItem[] = [
     ...rows.rows.map((r): SidebarNavItem => {
       const progressText = r.progress ? t("course.header.progress", { done: r.progress.done, total: r.progress.total }) : null;
@@ -113,16 +112,15 @@ function useNav(props: StudentShellProps) {
         ) : undefined,
       };
     }),
-    ...(rows.all ? [{ key: "all-courses", href: rows.all.href, label: t("student.nav.allCourses", { n: rows.all.count }), icon: <LayoutGrid />, active: rows.all.active }] : []),
-    ...(rows.choose ? [{ key: "choose-courses", href: rows.choose.href, label: t("student.nav.chooseCourses"), icon: <Sparkles />, active: rows.choose.active }] : []),
+    ...(rows.all ? [{ key: "all-courses", href: rows.all.href, label: t("student.nav.allCourses", { n: rows.all.count }), icon: <LayoutGrid /> }] : []),
   ];
   const coursesGroup: SidebarNavGroup | null = courseItems.length > 0
     ? { key: "my-courses", label: t("student.nav.myCourses"), items: courseItems }
     : null;
   // «Продолжить» (phone bar): the last place, else a course's resume or next lesson, else the newest exam course; no
-  // course: the choose step (the test student: the hub)
+  // course: the catalog (S7, V8; the test student: the hub)
   const target = continueTarget(lang, place, data.courses);
-  const continueHref = !data.loaded ? `/${lang}/home` : target.kind === "choose" && testStudent ? `/${lang}/home` : target.href;
+  const continueHref = !data.loaded ? `/${lang}/home` : target.kind === "catalog" && testStudent ? `/${lang}/home` : target.href;
   return { links, label, item, coursesGroup, continueHref };
 }
 
@@ -262,9 +260,7 @@ function usePageTitle(props: StudentShellProps): string {
   const title = useCourseTitle();
   const { rest, data } = props;
   if (rest === "/home") return t("student.nav.home");
-  if (rest === "/courses") return t("student.nav.myCourses");
   if (rest === "/courses/catalog" || rest.startsWith("/courses/catalog/")) return t("student.nav.catalog");
-  if (rest === "/courses/choose") return t("student.nav.chooseCourses"); // step 3a S4
   const id = courseIdOfPath(rest);
   const c = id ? data.courses.find((x) => x.id === id) : undefined;
   return c ? title(c) : t("common.appName");
@@ -276,7 +272,7 @@ export function StudentChrome(props: StudentShellProps) {
   const { data, user, testStudent } = props;
   const nav = useNav(props);
   const groups: SidebarNavGroup[] = [
-    { key: "main", items: [...nav.item(nav.links.home), ...nav.item(nav.links.courses), ...nav.item(nav.links.catalog)] },
+    { key: "main", items: [...nav.item(nav.links.home), ...nav.item(nav.links.catalog)] },
     ...(nav.coursesGroup ? [nav.coursesGroup] : []),
   ];
   const intent = usePrefetchIntent(props); // PERFORMANCE_AUDIT S3
@@ -348,7 +344,7 @@ export function StudentChrome(props: StudentShellProps) {
   );
 }
 
-/** Phone bottom bar (Главная · Курсы · Продолжить · Каталог · Ещё) and its «Ещё» sheet. */
+/** Phone bottom bar (Главная · Продолжить · Каталог · Ещё; S7 v3 V6) and its «Ещё» sheet. */
 export function StudentTabBar(props: StudentShellProps) {
   const { lang, t } = useTranslation();
   const nav = useNav(props);
@@ -364,13 +360,13 @@ export function StudentTabBar(props: StudentShellProps) {
   const here = `/${lang}${rest}`;
   const items: TabBarItem[] = [
     { key: "home", href: links.home.href, label: t("student.nav.home"), icon: <House />, active: links.home.active && !more },
-    { key: "courses", href: links.courses.href, label: t("student.nav.courses"), icon: <LayoutGrid />, active: links.courses.active && !more },
-    // a link whose target is decided on the client; current when it leads to this very page
-    { key: "continue", href: nav.continueHref, label: t("student.nav.continue"), icon: <PlayCircle />, active: nav.continueHref.split(/[?#]/)[0] === here && !more },
+    // a link whose target is decided on the client; current when it leads to this very page, unless another item of
+    // the bar already is (S7: with no course it leads to the catalog, whose own item is then current)
+    { key: "continue", href: nav.continueHref, label: t("student.nav.continue"), icon: <PlayCircle />,
+      active: nav.continueHref.split(/[?#]/)[0] === here && !links.home.active && !links.catalog?.active && !more },
     ...(links.catalog ? [{ key: "catalog", href: links.catalog.href, label: t("student.nav.catalog"), icon: <Compass />, active: links.catalog.active && !more }] : []),
     { key: "more", label: t("student.nav.more"), icon: <Ellipsis />, onClick: () => setMore(true), expanded: more, controls: moreId },
   ];
-  const row = cn("flex min-h-11 w-full items-center gap-3 rounded-control px-3 text-left text-sm leading-5 text-slate-800 hover:bg-slate-100", focusRing, "focus-visible:ring-offset-0");
   return (
     <>
       <div className="contents" onTouchStart={intent} onPointerOver={intent} onFocus={intent}>
@@ -383,12 +379,6 @@ export function StudentTabBar(props: StudentShellProps) {
           {/* U8: the checklist sheet opens after "More" closed (one modal at a time) */}
           <GettingStartedPill state={start} tone="light" onOpen={() => { close(); setStartOpen(true); }} />
           {!testStudent && <div className="px-3"><AccessPill data={data} onNavigate={close} /></div>}
-          {!testStudent && (
-            <Link href={`/${lang}/courses/join`} onClick={close} aria-current={rest === "/courses/join" ? "page" : undefined} className={row}>
-              <KeyRound aria-hidden="true" className="h-5 w-5 shrink-0 text-slate-500" />
-              <span className="min-w-0 flex-1 break-words">{t("student.nav.joinByCode")}</span>
-            </Link>
-          )}
           {!testStudent && <InstallItem tone="light" onNavigate={close} />}
           <OtherAreas areas={props.otherAreas} tone="light" onNavigate={close} />
           <div className="border-t border-slate-100 pt-3"><AccountPanel props={props} onNavigate={close} /></div>

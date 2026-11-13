@@ -52,8 +52,9 @@ export function homeArea(me: ShellMe): ShellArea {
 
 /**
  * Area of a URL. Step 3a S3 (STUDENT_IA_DESIGN §2.1): `/home`, `/courses` and `/courses/choose` claim no staff area
- * (`?view=` is gone; old `?view=` links redirect on the `/courses` page), so for people who learn they are Learning and
- * for people who teach `urlAreaFor` gives their home area (`/courses` is the Teaching list, `/home` lands there too).
+ * (`?view=` is gone), so for people who learn they are Learning and for people who teach `urlAreaFor` gives their home
+ * area (`/courses` is the Teaching list, `/home` lands there too). S7 (v3): for a learner `/courses` and
+ * `/courses/choose` are only redirects (to `/home` and to the catalog), drawn inside the student frame.
  */
 export function areaFromUrl(rest: string): ShellArea {
   if (rest === "/admin" || rest.startsWith("/admin/")) return "platform";

@@ -2,7 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { E2E_DIR, seed, settle, signIn, tr, type SeedUser } from "./helpers";
-import { chooseCoursesHref } from "../src/lib/lms/chooseCourses";
 
 /**
  * One course card everywhere (the hub, catalog, Teaching list), the last result with its maximum, and the hub order:
@@ -202,7 +201,7 @@ test.describe("course cards", () => {
     }
   });
 
-  test("the Teaching list uses the card; an empty hub offers the choose step and the code", async ({ browser }) => {
+  test("the Teaching list uses the card; an empty hub offers the catalog", async ({ browser }) => {
     test.setTimeout(120_000);
     const tp = await open(browser, teacher(), 1440, 900);
     await tp.goto("/ru/courses");
@@ -213,10 +212,10 @@ test.describe("course cards", () => {
 
     const ep = await open(browser, empty, 375, 812);
     await ep.goto("/ru/home");
-    // step 3a S3 (§2.2): the platform courses moved to the choose step; the empty hub has «Выбрать курсы» and the code
+    // step 3a S7 (V8): the empty hub has one button, the catalog (which holds «Войти по коду»)
     await expect(ep.getByText(t("home.hub.emptyTitle"))).toBeVisible();
-    await expect(ep.locator("main#main").getByRole("link", { name: t("home.hub.choose") })).toHaveAttribute("href", chooseCoursesHref("ru"));
-    await expect(ep.locator("main#main").getByRole("link", { name: t("home.hub.join") })).toHaveAttribute("href", "/ru/courses/join");
+    await expect(ep.locator("main#main").getByRole("link", { name: t("home.hub.openCatalog") })).toHaveAttribute("href", "/ru/courses/catalog");
+    await expect(ep.locator("main#main").locator('a[href="/ru/courses/join"]')).toHaveCount(0);
     await look(ep, "dashboard-empty-375");
     await ep.context().close();
   });

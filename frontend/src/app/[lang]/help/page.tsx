@@ -11,7 +11,8 @@ import { LANDING_INNER } from "@/components/landing/roles";
 export default function HelpPage() {
   const { lang, t } = useTranslation();
   const entries: { key: string; text: string; link?: { href: string; label: string } }[] = [
-    { key: "joinCode", text: t("landing.help.joinCode.a", { courses: t("landing.myCourses"), join: t("courses.join.title") }) },
+    // step 3a S7 (V5): «Войти по коду» is a button in the catalog's header
+    { key: "joinCode", text: t("landing.help.joinCode.a", { catalog: t("student.nav.catalog"), join: t("home.primary.join") }) },
     { key: "catalog", text: t("landing.help.catalog.a", { catalog: t("catalog.title") }) },
     { key: "forgot", text: t("landing.help.forgot.a", { link: t("auth.forgotPassword") }),
       link: { href: `/${lang}/forgot-password`, label: t("landing.help.forgot.link") } },
