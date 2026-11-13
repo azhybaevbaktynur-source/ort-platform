@@ -56,6 +56,7 @@ export function cardDataOf(course: CourseStaffOut, over: Partial<CourseCardData>
     id: course.id, title: course.title, description: course.description, languages: course.languages,
     default_language: course.default_language, owner_display_name: course.owner_display_name,
     organization_display_name: null, is_platform_course: course.is_platform_course, cover_url: course.cover_url ?? null,
+    exam_family: course.exam_family, subject: course.subject,
     ...over,
   };
 }

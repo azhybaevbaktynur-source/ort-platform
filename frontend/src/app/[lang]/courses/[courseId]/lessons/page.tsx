@@ -93,7 +93,7 @@ function LessonCoursesPage() {
               course={{
                 id: r.id, title: r.title, languages: [], default_language: course.default_language,
                 is_platform_course: r.is_platform_course, cover_url: r.cover_url, lessons_count: r.lessons_count,
-                has_paid_tests: r.has_paid_modules,
+                has_paid_tests: r.has_paid_modules, exam_family: r.exam_family, subject: r.subject,
               }} />
           ))}
         </ul>

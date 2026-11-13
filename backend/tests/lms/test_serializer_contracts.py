@@ -23,7 +23,8 @@ def test_declared_key_sets():
                                             "default_language", "status", "my_role",
                                             "owner_display_name", "starts_at", "ends_at", "deleted_at",
                                             # F7a: cover and the card's meta line (public course facts)
-                                            "cover_url", "tests_count", "lessons_count", "is_platform_course"}
+                                            "cover_url", "tests_count", "lessons_count", "is_platform_course",
+                                            "exam_family", "subject"}  # S9: the card's subject mark
     assert set(CourseStudentOut.model_fields) == {"id", "title", "description", "languages", "default_language",
                                                   "status", "starts_at", "ends_at", "owner_display_name",
                                                   "my_enrollment", "organization_id", "organization_name",

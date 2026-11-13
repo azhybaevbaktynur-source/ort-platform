@@ -120,8 +120,9 @@ export interface Seed {
   /** Item 3 social sign-in (oauth-google.spec.ts): a password student, a disabled student, a platform admin. */
   oauth: { linked: SeedUser & { password: string }; disabled: SeedUser; admin: SeedUser & { password: string } };
   shots_admin: SeedUser & { password: string };
-  /** Step 3a S3: the hub's people: in no course, in ORT (Russian) only, and one the specs join to eight courses. */
-  hub: { empty: SeedUser; one: SeedUser; many: SeedUser };
+  /** Step 3a S3: the hub's people: in no course, in ORT (Russian) only, and one the specs join to eight courses;
+   * S9: `icons`, in no course (student-shell.spec.ts joins its subject courses). */
+  hub: { empty: SeedUser; one: SeedUser; many: SeedUser; icons: SeedUser };
   /** Step 3b S2: an independent teacher's courses for the catalog listing walk (catalog-listing.spec.ts). */
   catalog_listing: {
     teacher: SeedUser; student: SeedUser;

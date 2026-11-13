@@ -50,6 +50,9 @@ export interface CourseCardData {
   lessons_count?: number;
   /** F7: a platform course with a published paid test: a quiet gold "Pro" mark */
   has_paid_tests?: boolean;
+  /** S9: the default cover's subject / family mark (absent: the book) */
+  exam_family?: string | null;
+  subject?: string | null;
 }
 
 function Progress({ done, total }: { done: number; total: number }) {
@@ -95,7 +98,7 @@ export function CourseCard({ course, href, headingLevel = 3, badges, progress, n
   const Heading = headingLevel === 2 ? "h2" : headingLevel === 4 ? "h4" : "h3";
   return (
     <li className="group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
-      <CourseCardCover card courseId={course.id} coverUrl={course.cover_url} platform={course.is_platform_course} className={coverClassName} />
+      <CourseCardCover card courseId={course.id} coverUrl={course.cover_url} examFamily={course.exam_family} subject={course.subject} className={coverClassName} />
       <div className="flex flex-1 flex-col gap-2 px-4 py-3">
         {(badges || course.has_paid_tests) && (
           <div className="flex flex-wrap items-center gap-2">

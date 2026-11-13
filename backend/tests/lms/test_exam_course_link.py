@@ -25,7 +25,8 @@ from tests.lms.org_support import make_org
 from tests.lms.s3_support import api, clean_rate_limits, db  # noqa: F401
 
 LESSON_KEYS = {"id", "title", "cover_url", "is_platform_course", "lessons_count", "duration_s", "enrolled",
-               "is_staff", "progress", "has_paid_modules", "next_item"}
+               "is_staff", "progress", "has_paid_modules", "next_item",
+               "exam_family", "subject"}  # STUDENT_IA_DESIGN 0.4 (S9): the card's subject mark
 
 
 class W:

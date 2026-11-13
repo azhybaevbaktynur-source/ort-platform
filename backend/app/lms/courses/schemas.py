@@ -197,6 +197,8 @@ class CourseCard(BaseModel):
     lessons_count: int = 0                # lessons of published modules (F5a L2)
     is_platform_course: bool = False      # the platform organization's tree: no teacher or organization line
     # --- F7a end ---
+    exam_family: Optional[str] = None     # STUDENT_IA_DESIGN 0.4 (S9): the card's subject/family mark
+    subject: Optional[str] = None
 
 
 class CourseStudentOut(BaseModel):
@@ -312,6 +314,7 @@ def course_card(course, my_role: Optional[str], owner_display_name: Optional[str
         owner_display_name=owner_display_name or "—", starts_at=course.starts_at, ends_at=course.ends_at,
         deleted_at=course.deleted_at, cover_url=x.cover_url, tests_count=x.tests_count,
         lessons_count=x.lessons_count, is_platform_course=x.is_platform_course,
+        exam_family=course.exam_family, subject=course.subject,
     )
 
 

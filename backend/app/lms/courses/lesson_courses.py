@@ -42,6 +42,8 @@ class LessonCourseOut(BaseModel):
     progress: Optional[HomeProgressOut] = None  # enrolled only; null without a requirement (as the home card)
     has_paid_modules: bool
     next_item: Optional[ItemLinkOut] = None  # enrolled only: the first item not done (the home's "continue")
+    exam_family: Optional[str] = None  # STUDENT_IA_DESIGN 0.4 (S9): the card's subject/family mark
+    subject: Optional[str] = None
 
 
 def require_member(ctx: AuthzContext, course: Course) -> None:
@@ -102,7 +104,7 @@ def lesson_courses(db: Session, exam: Course, user_id: str) -> list[LessonCourse
     rows = db.execute(
         select(Course.id, Course.title, Asset.sha256, _lessons_agg(func.count(ModuleItem.id)),
                _lessons_agg(func.coalesce(func.sum(ModuleItem.duration_s), 0)), Organization.path,
-               paid, enrolled, staff)
+               paid, enrolled, staff, Course.exam_family, Course.subject)
         .outerjoin(Asset, and_(Asset.id == Course.cover_asset_id, Asset.erased_at.is_(None)))
         .outerjoin(Organization, Organization.id == Course.organization_id)
         .where(Course.exam_course_id == exam.id, Course.status == "published", Course.deleted_at.is_(None))
@@ -113,7 +115,7 @@ def lesson_courses(db: Session, exam: Course, user_id: str) -> list[LessonCourse
     next_items = ({n.course_id: n.link for n in _modules_next(db, user_id, course_ids=mine, max_out=len(mine))}
                   if mine else {})
     out = []
-    for cid, title, sha, lessons, duration, path, has_paid, is_enrolled, is_staff in rows:
+    for cid, title, sha, lessons, duration, path, has_paid, is_enrolled, is_staff, family, subject in rows:
         done_total = progress.get(cid) if is_enrolled else None
         platform = is_platform_path(path)
         out.append(LessonCourseOut(
@@ -122,5 +124,5 @@ def lesson_courses(db: Session, exam: Course, user_id: str) -> list[LessonCourse
             is_staff=bool(is_staff),
             progress=HomeProgressOut(done=done_total[0], total=done_total[1]) if done_total else None,
             has_paid_modules=bool(has_paid) and platform,
-            next_item=next_items.get(cid) if is_enrolled else None))
+            next_item=next_items.get(cid) if is_enrolled else None, exam_family=family, subject=subject))
     return out

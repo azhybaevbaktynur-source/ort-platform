@@ -3,14 +3,13 @@
 import React, { useId, useState } from "react";
 import Link from "next/link";
 import {
-  BookOpen, Compass, Download, Ellipsis, FlaskConical, GraduationCap, House, LayoutGrid, LogOut, PlayCircle, Settings,
+  Compass, Download, Ellipsis, GraduationCap, House, LayoutGrid, LogOut, PlayCircle, Settings,
 } from "lucide-react";
 import { useTranslation, type Language } from "@/lib/i18n/context";
 import { inter } from "@/lib/fonts";
 import { fmtPassEnd } from "@/lib/lms/access";
 import type { HomeCourseOut } from "@/lib/lms/homeTypes";
 import { pickLocalized } from "@/lib/lms/localized";
-import { courseGroups, type CourseGroupKey } from "@/lib/lms/examFamilies";
 import { continueTarget } from "@/lib/lms/lastPlace";
 import { useLastPlaceRead } from "@/lib/lms/useLastPlace";
 import { courseIdOfPath, courseRows, studentNavLinks, type StudentNavKey, type StudentNavLink } from "@/lib/lms/studentNav";
@@ -23,6 +22,7 @@ import { TabBar, TAB_BAR_SPACE, type TabBarItem } from "@/components/ui/TabBar";
 import { cn, focusRing } from "@/components/ui/utils";
 import type { AppHeaderArea, AppHeaderLink } from "@/components/ui/AppHeader";
 import type { StudentShellData } from "./useStudentShellData";
+import { CourseRowMark } from "./CourseRowMark"; // S9 (V12)
 import { GettingStartedSheet, ProgressRing, useGettingStarted, type GettingStartedState } from "./gettingStarted"; // U8
 
 /*
@@ -65,13 +65,6 @@ const ICONS: Record<StudentNavKey, React.ReactNode> = {
   catalog: <Compass />,
 };
 
-/** The row icon by exam family (ОРТ / НЦТ / other). */
-const FAMILY_ICON: Record<CourseGroupKey, React.ReactNode> = {
-  ort: <GraduationCap />,
-  nct: <FlaskConical />,
-  other: <BookOpen />,
-};
-
 const LANGS: Language[] = ["en", "ky", "ru"];
 
 function initials(name: string): string {
@@ -98,13 +91,14 @@ function useNav(props: StudentShellProps) {
   };
   const item = (l: StudentNavLink | null): SidebarNavItem[] =>
     l ? [{ key: l.key, href: l.href, label: label[l.key], icon: ICONS[l.key], active: l.active }] : [];
-  const groups = courseGroups(data.courses);
   const rows = courseRows({ lang, rest, courses: data.courses, recent, place, loaded: data.loaded });
   const courseItems: SidebarNavItem[] = [
     ...rows.rows.map((r): SidebarNavItem => {
       const progressText = r.progress ? t("course.header.progress", { done: r.progress.done, total: r.progress.total }) : null;
       return {
-        key: `course:${r.course.id}`, href: r.href, label: title(r.course), icon: FAMILY_ICON[groups.get(r.course.id) ?? "other"], active: r.active,
+        key: `course:${r.course.id}`, href: r.href, label: title(r.course), active: r.active,
+        // S9 (V11-V12): the cover thumbnail, else the subject / family mark; never the brand cap
+        icon: <CourseRowMark course={r.course} />,
         badge: r.progress && progressText ? (
           <span title={progressText} className="inline-flex">
             <ProgressRing done={r.progress.done} total={r.progress.total} /><span className="sr-only">{progressText}</span>

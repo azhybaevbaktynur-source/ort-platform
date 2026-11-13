@@ -24,7 +24,7 @@ export interface CourseGroup<T> {
   courses: T[];
 }
 
-/** Course id -> its group, for every course of the list (the sidebar rows' icon). */
+/** Course id -> its group, for every course of the list (a lesson course without a family follows its exam). */
 export function courseGroups(courses: GroupableCourse[]): Map<string, CourseGroupKey> {
   const byId = new Map(courses.map((c) => [c.id, c]));
   const groupOf = (c: GroupableCourse): CourseGroupKey => {

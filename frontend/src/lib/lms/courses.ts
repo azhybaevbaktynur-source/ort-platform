@@ -98,6 +98,9 @@ export interface LessonCourseOut {
   next_item: ItemLinkOut | null;
   /** optional (a later backend may add it) */
   is_staff?: boolean;
+  /** S9: the card's subject / family mark (absent: older backend) */
+  exam_family?: string | null;
+  subject?: string | null;
 }
 export const listLessonCourses = (examCourseId: string, signal?: AbortSignal) =>
   lmsFetch<LessonCourseOut[]>(`/courses/${enc(examCourseId)}/lesson-courses`, { signal });

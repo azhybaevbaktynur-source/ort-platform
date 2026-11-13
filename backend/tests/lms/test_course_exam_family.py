@@ -113,3 +113,22 @@ async def test_created_ort_template_course_gets_the_family(db, api):
     assert (r.json()["exam_family"], r.json()["subject"]) == ("ort", None)
     r = await api.call(t, "POST", "/courses", json={**body, "organization_id": str(school.id)})
     assert r.status_code == 201 and r.json()["exam_family"] is None
+
+
+async def test_course_cards_carry_family_and_subject(db, api):
+    """S9 (STUDENT_IA_DESIGN 0.4): the Teaching list's card and the lesson-course card carry both fields, so every
+    course card draws the subject mark instead of a fallback."""
+    from tests.lms.test_exam_course_link import link
+
+    w = world(db)
+    w.lc.exam_family, w.lc.subject = "ort", "chemistry"
+    db.commit()
+    own = make_course(db, w.teacher, title={"en": "Mine"}, status="published")
+    items = (await api.call(w.admin, "GET", "/courses", params={"as": "teaching"})).json()["items"]
+    card = {x["id"]: x for x in items}[str(w.lc.id)]
+    assert (card["exam_family"], card["subject"]) == ("ort", "chemistry")
+    mine = (await api.call(w.teacher, "GET", "/courses", params={"as": "teaching"})).json()["items"]
+    assert [(x["id"], x["exam_family"], x["subject"]) for x in mine] == [(str(own.id), None, None)]
+    link(db, w.lc, w.exam)
+    rows = (await api.call(w.s, "GET", f"/courses/{w.exam.id}/lesson-courses")).json()
+    assert [(x["exam_family"], x["subject"]) for x in rows] == [("ort", "chemistry")]

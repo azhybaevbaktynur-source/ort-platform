@@ -16,12 +16,13 @@ import { CoverErrorView, FocusPicker, checkCoverFile, coverCodeError, type Cover
 
 interface Pending { file: File; url: string; width: number; height: number }
 
-export function CourseCoverSection({ courseId, title, platform = false, coverUrl, onChanged, className, previews = true, onPreview }: {
+export function CourseCoverSection({ courseId, title, examFamily, subject, coverUrl, onChanged, className, previews = true, onPreview }: {
   courseId: string;
   /** the course title in the viewer's language (the remove dialog names it) */
   title: string;
-  /** a platform course: the default cover draws the platform mark, as on its cards */
-  platform?: boolean;
+  /** S9: the default cover's subject / family mark, as on its cards */
+  examFamily?: string | null;
+  subject?: string | null;
   coverUrl: string | null | undefined;
   onChanged: (coverUrl: string | null) => void;
   className?: string;
@@ -128,7 +129,7 @@ export function CourseCoverSection({ courseId, title, platform = false, coverUrl
           <div className="max-w-[360px]">
             <p className="mb-2 text-sm font-medium text-slate-700">{coverUrl ? t("courses.cover.current") : t("courses.cover.default")}</p>
             <div data-testid="cover-current" data-cover-url={coverUrl ?? ""}>
-              <CourseCardCover card courseId={courseId} platform={platform} coverUrl={coverUrl} className="rounded-xl border border-slate-200" />
+              <CourseCardCover card courseId={courseId} examFamily={examFamily} subject={subject} coverUrl={coverUrl} className="rounded-xl border border-slate-200" />
             </div>
           </div>
         )}
