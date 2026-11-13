@@ -57,7 +57,8 @@ ok(kind("/courses/new", teacherOnly) === "app" && kind("/courses/trash", null) =
 ok(kind("/courses/join", teacherOnly) === "app" && kind("/courses/join", student) === "student", "/courses/join: the person decides");
 
 // --- fix round 1b: URLs no staff area claims (Pro, Privacy, the catalog, invitations, anything new) ---
-// step 3a S3: /home (the hub) and /courses/choose (the choose step) are Learning for learners, the home area otherwise
+// step 3a S3: /home (the hub) and /courses/choose (S7: a redirect to the catalog) are Learning for learners, the home
+// area otherwise
 for (const rest of ["/home", "/courses/choose", "/pro", "/privacy", "/courses/catalog", "/courses/catalog/c1", "/courses/catalog/c1/apply", "/courses/join", "/invitations", "/courses/become-teacher", "/something-new"]) {
   ok(kind(rest, student) === "student", `student on ${rest}: student`);
   ok(kind(rest, teacherOnly) === "app" && urlAreaFor(rest, teacherOnly) === "teaching", `teacher on ${rest}: app, Teaching`);

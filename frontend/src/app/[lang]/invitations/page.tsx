@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { MailOpen } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { useLmsMe } from "@/lib/lms/useLmsMe";
+import { hidesLearning } from "@/lib/lms/shellKind";
 import {
   INVITATIONS_CHANGED_EVENT, acceptInvitation, invitationTarget, listMyInvitations, rememberAccepted, type MyInvitationOut,
 } from "@/lib/lms/invitations";
@@ -16,7 +17,9 @@ import { Button, EmptyState, LinkButton, LoadingState, PageHeader } from "@/comp
 /** Invitations for my email, with Accept (the same route as the emailed link). `PendingInvitationsBanner` links here. */
 export default function MyInvitationsPage() {
   const { lang, t } = useTranslation();
-  const { reload: reloadMe } = useLmsMe();
+  const { me, reload: reloadMe } = useLmsMe();
+  // step 3a S7: people who learn go back to the hub (no learner /courses page), people who teach to their list
+  const backHref = `/${lang}/${hidesLearning(me) ? "courses" : "home"}`;
   const router = useRouter();
   const [invitations, setInvitations] = useState<MyInvitationOut[] | null>(null);
   const [loadError, setLoadError] = useState<unknown>(null);
@@ -57,7 +60,7 @@ export default function MyInvitationsPage() {
         : !invitations ? <LoadingState label={t("lms.common.loading")} />
         : invitations.length === 0 ? (
           <EmptyState mascot="hello" title={t("invitations.mine.empty")} description={t("invitations.mine.emptyBody")}
-            action={<LinkButton variant="secondary" href={`/${lang}/courses`}>{t("teacherOnly.back")}</LinkButton>} />
+            action={<LinkButton variant="secondary" href={backHref}>{t("teacherOnly.back")}</LinkButton>} />
         ) : (
           <ul className="space-y-3">
             {invitations.map((i) => {

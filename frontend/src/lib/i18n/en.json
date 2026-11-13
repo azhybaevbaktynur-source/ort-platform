@@ -569,7 +569,7 @@
     "notFound": {
       "title": "Course not found",
       "body": "This course doesn't exist, was removed, or you are not enrolled in it. Ask your teacher for a join code or find it in the catalog.",
-      "join": "Join with code"
+      "catalog": "To the catalog"
     },
     "homeKind": {
       "title": "Course home",
@@ -641,11 +641,6 @@
     "notYours": {
       "title": "This course opens only in a student account",
       "body": "You teach on the platform, so student courses do not open here. To see a course you teach the way a student does, use Student view on the Teaching list."
-    },
-    "mine": {
-      "title": "My courses",
-      "join": "Join with code",
-      "addCourse": "Add a course"
     }
   },
   "teacherRequest": {
@@ -2617,7 +2612,7 @@
       "intro": "Answers to the most common questions.",
       "joinCode": {
         "q": "How do I join a course with a code?",
-        "a": "Ask your teacher for the code. Log in, open \"{courses}\", choose \"{join}\" and enter it."
+        "a": "Ask your teacher for the code. Log in, open \"{catalog}\", press \"{join}\" and enter the code."
       },
       "catalog": {
         "q": "Where can I find a course?",
@@ -2716,7 +2711,6 @@
     "groups": {
       "label": "Course groups",
       "teachers": "Teachers' courses",
-      "pick": "Find courses for me",
       "mainCourse": "Main course"
     },
     "listing": {
@@ -2766,7 +2760,9 @@
       "offLink": "The course is not shown in the catalog. Students come through the link to the course page.",
       "offHidden": "The course is not shown in the catalog and its page is not open by link."
     },
-    "previewNote": "This is the catalog as students see it. You teach, so you cannot join from here."
+    "previewNote": "This is the catalog as students see it. You teach, so you cannot join from here.",
+    "welcome": "Welcome! Pick your exam and join a course.",
+    "welcomeClose": "Hide"
   },
   "storage": {
     "nav": "Storage",
@@ -3797,9 +3793,7 @@
       },
       "addCourse": "Add a course",
       "emptyTitle": "You have no courses yet",
-      "emptyBody": "Choose an exam and subjects, and we will pick the courses for you.",
-      "choose": "Choose courses",
-      "join": "Join with code",
+      "emptyBody": "Open the catalog, pick your exam and join a course.",
       "todoEmpty": "Nothing to do yet.",
       "announcement": "Announcement",
       "inProgress": "Test in progress",
@@ -3826,7 +3820,9 @@
         "examToday": "The exam is today",
         "lastResult": "Last score {value}",
         "forExam": "For the exam: {exam}"
-      }
+      },
+      "openCatalog": "Open the catalog",
+      "collapseGroup": "Show fewer"
     }
   },
   "shell": {
@@ -7291,11 +7287,8 @@
       "tabBar": "Main sections",
       "allLessons": "All lessons",
       "myCourses": "My courses",
-      "courses": "Courses",
       "continue": "Continue",
-      "allCourses": "All courses ({n})",
-      "chooseCourses": "Choose courses",
-      "joinByCode": "Join with code"
+      "allCourses": "All courses ({n})"
     },
     "switcher": {
       "label": "My exams"
@@ -7557,41 +7550,6 @@
     },
     "analytics": {
       "gradesSection": "Grades"
-    }
-  },
-  "choose": {
-    "title": "Choose your courses",
-    "subtitle": "Tick the courses you want to start with. You can add others later.",
-    "step1": "1 · Exam",
-    "step2": "2 · Courses: {family}",
-    "step2Only": "Courses: {family}",
-    "familyHint": {
-      "ort": "National school-leaving test",
-      "nct": "Subject tests"
-    },
-    "courses": "{count} courses",
-    "courses_one": "{count} course",
-    "courses_few": "{count} courses",
-    "courses_many": "{count} courses",
-    "courses_other": "{count} courses",
-    "haveCode": "I have a code from a teacher",
-    "enrol": "Join ({count})",
-    "pickOne": "Tick at least one course.",
-    "skip": "Skip",
-    "back": "Back",
-    "alreadyIn": "You are already in this course",
-    "noneTitle": "No courses to choose yet",
-    "noneBody": "Platform courses are coming soon. If you have a code from a teacher, join with it.",
-    "errors": {
-      "title": "Could not join",
-      "notChoosable": "Some courses are closed for joining right now. We refreshed the list: please choose again.",
-      "partly": "We added you to {count} courses. The others are closed for joining right now: we refreshed the list.",
-      "partly_one": "We added you to {count} course. The others are closed for joining right now: we refreshed the list.",
-      "partly_few": "We added you to {count} courses. The others are closed for joining right now: we refreshed the list.",
-      "partly_many": "We added you to {count} courses. The others are closed for joining right now: we refreshed the list.",
-      "partly_other": "We added you to {count} courses. The others are closed for joining right now: we refreshed the list.",
-      "consent": "You can join once a parent consents. Open Privacy to send the request.",
-      "consentLink": "Open Privacy"
     }
   }
 }

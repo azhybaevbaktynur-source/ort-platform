@@ -3,16 +3,16 @@ import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { api, seed, settle, signIn, tr, VIEWPORTS } from "./helpers";
 import { joinEightCourses } from "./hubCourses";
-import { chooseCoursesHref } from "../src/lib/lms/chooseCourses";
 
 /**
- * Step 3a S3 (docs/phases/STUDENT_IA_DESIGN.md §2.2, §2.3, §7.1-§7.3): Главная `/home` is a hub only. With no course:
- * the greeting and the empty state («Выбрать курсы», «Войти по коду»), no to-do; the sidebar's «Выбрать курсы» row and
- * the phone bar's «Продолжить» lead to the choose step. With one course: the «Продолжить» card (the course's Обзор,
- * then the remembered last place), one group with one card, «К выполнению». With eight courses: groups ОРТ · НЦТ ·
- * Другие курсы (4 cards + «Все курсы ОРТ (5)»), the continue fallback order (exam Обзор → next lesson → in-progress
- * attempt; a remembered place first), the to-do with an announcement row, «Мои курсы» `/courses` with every card.
- * The hub is one API round on a fresh load (P2). Screens at 375 / 1440 / 1920 (ru) go to $U3_SHOTS when set.
+ * Step 3a S3, S7 (docs/phases/STUDENT_IA_DESIGN.md §2.2, §7.1-§7.3, v3 V1, V3, V7, V8): Главная `/home` is a hub only.
+ * With no course: the greeting and the empty state with one button «Открыть каталог», no to-do, no «Мои курсы» group in
+ * the sidebar; the phone bar's «Продолжить» leads to the catalog. With one course: the «Продолжить» card (the course's
+ * Обзор, then the remembered last place), one group with one card, «К выполнению». With eight courses: groups ОРТ · НЦТ
+ * · Другие курсы (4 cards + «Все курсы ОРТ (5)», which expands in place and «Свернуть» collapses), «Добавить курс» →
+ * the catalog, the continue fallback order (exam Обзор → next lesson → in-progress attempt; a remembered place first),
+ * the to-do with an announcement row; the sidebar's «Все курсы (8)» and old `/courses#ort` links land on
+ * `/home#courses`. The hub is one API round on a fresh load (P2). Screens at 375 / 1440 / 1920 (ru) go to $U3_SHOTS.
  */
 
 const L = "ru" as const;
@@ -40,7 +40,7 @@ async function forgetPlace(page: Page, userId: string) {
 }
 
 test.describe("student hub (ru)", () => {
-  test("no course: the empty state, «Выбрать курсы» everywhere, no to-do", async ({ page }) => {
+  test("no course: the empty state with one button to the catalog, no to-do, no course group", async ({ page }) => {
     const s = seed();
     await page.setViewportSize(VIEWPORTS.desktop);
     await signIn(page, s.hub.empty);
@@ -48,16 +48,19 @@ test.describe("student hub (ru)", () => {
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Айгерим"); // the first word of the display name
     await expect(page.getByText(t("home.hub.emptyTitle"))).toBeVisible();
     const main = page.locator("main#main");
-    await expect(main.getByRole("link", { name: t("home.hub.choose") })).toHaveAttribute("href", chooseCoursesHref(L));
-    await expect(main.getByRole("link", { name: t("home.hub.join") })).toHaveAttribute("href", `/${L}/courses/join`);
+    await expect(main.getByText(t("home.hub.emptyBody"))).toBeVisible();
+    await expect(main.getByRole("link", { name: t("home.hub.openCatalog") })).toHaveAttribute("href", `/${L}/courses/catalog`);
+    await expect(main.locator(`a[href="/${L}/courses/join"]`)).toHaveCount(0); // one way on: «Войти по коду» is in the catalog
     await expect(page.getByRole("heading", { level: 2, name: t("home.todo.title") })).toHaveCount(0);
     await expect(continueCard(page)).toHaveCount(0);
-    await expect(sidebar(page).getByRole("link", { name: t("student.nav.chooseCourses") })).toHaveAttribute("href", chooseCoursesHref(L));
+    // the sidebar: Главная · Каталог, no «Мои курсы» group with no course
+    await expect(sidebar(page).getByText(t("student.nav.myCourses"), { exact: true })).toHaveCount(0);
+    await expect(sidebar(page).getByRole("link", { name: t("student.nav.catalog") })).toHaveAttribute("href", `/${L}/courses/catalog`);
     await expect(sidebar(page).getByRole("link", { name: t("student.nav.home") })).toHaveAttribute("aria-current", "page");
     await noOverflowAndShoot(page, "hub-empty");
     await page.setViewportSize(VIEWPORTS.phone);
     const bar = page.getByRole("navigation", { name: t("student.nav.tabBar") });
-    await expect(bar.getByRole("link", { name: t("student.nav.continue") })).toHaveAttribute("href", chooseCoursesHref(L));
+    await expect(bar.getByRole("link", { name: t("student.nav.continue") })).toHaveAttribute("href", `/${L}/courses/catalog`);
   });
 
   test("one course: the continue card (Обзор, then the last place), one group, the to-do", async ({ page }) => {
@@ -93,7 +96,7 @@ test.describe("student hub (ru)", () => {
     await expect(sidebar(page).getByRole("link", { name: /ОРТ/ })).toHaveAttribute("href", `/${L}/courses/${s.course_id}/tests`);
   });
 
-  test("eight courses: groups, the continue fallback order, the to-do, «Мои курсы»", async ({ page }) => {
+  test("eight courses: groups (expand in place), the continue fallback order, the to-do, «Все курсы» → #courses", async ({ page }) => {
     test.setTimeout(240_000);
     const s = seed();
     const user = s.hub.many;
@@ -118,12 +121,22 @@ test.describe("student hub (ru)", () => {
       ]);
       const ort = page.getByRole("region", { name: new RegExp(`^${t("home.hub.groups.ort")}`) });
       await expect(ort.getByRole("listitem")).toHaveCount(4);
-      await expect(ort.getByRole("link", { name: t("home.hub.allInGroup.ort", { n: 5 }) })).toHaveAttribute("href", `/${L}/courses#ort`);
+      // V7: «Все курсы ОРТ (5)» expands the group in place; «Свернуть» collapses it
+      const expand = ort.getByRole("button", { name: t("home.hub.allInGroup.ort", { n: 5 }) });
+      await expect(expand).toHaveAttribute("aria-expanded", "false");
+      await expand.click();
+      await expect(ort.getByRole("listitem")).toHaveCount(5);
+      const collapse = ort.getByRole("button", { name: t("home.hub.collapseGroup") });
+      await expect(collapse).toHaveAttribute("aria-expanded", "true");
+      await expect(page).toHaveURL(new RegExp(`/${L}/home$`));
+      await collapse.click();
+      await expect(ort.getByRole("listitem")).toHaveCount(4);
       await expect(page.getByRole("region", { name: new RegExp(`^${t("home.hub.groups.nct")}`) }).getByRole("listitem")).toHaveCount(2);
-      await expect(courses.getByRole("link", { name: t("home.hub.addCourse") })).toHaveAttribute("href", chooseCoursesHref(L));
-      // the sidebar: 6 rows + «Все курсы (8)»
+      await expect(courses.getByRole("link", { name: t("home.hub.addCourse") })).toHaveAttribute("href", `/${L}/courses/catalog`);
+      await expect(page.locator("section#courses")).toHaveCount(1);
+      // the sidebar: 6 rows + «Все курсы (8)» → the hub's «Мои курсы» section
       const all = sidebar(page).getByRole("link", { name: t("student.nav.allCourses", { n: 8 }) });
-      await expect(all).toHaveAttribute("href", `/${L}/courses`);
+      await expect(all).toHaveAttribute("href", `/${L}/home#courses`);
       // the to-do across courses, with the announcement row
       const todo = page.locator('section[aria-labelledby="home-todo"]');
       await expect(todo.getByRole("link", { name: /Разбор задач в субботу/ })).toHaveAttribute("href", `/${L}/courses/${hub.maths}/announcements`);
@@ -166,18 +179,15 @@ test.describe("student hub (ru)", () => {
       expect(courseRows.length).toBe(6);
       await noOverflowAndShoot(page, "hub-eight");
 
-      // «Мои курсы»: every card, grouped, with the anchors; the header actions
+      // «Все курсы (8)»: the hub's «Мои курсы» section; the old «Мои курсы» page and its anchors lead there too (V1, V15)
       await all.click();
-      await page.waitForURL(new RegExp(`/${L}/courses$`));
-      await expect(page.getByRole("heading", { level: 1, name: t("courses.mine.title") })).toBeVisible();
-      await expect(page.locator("main#main section#ort").getByRole("listitem")).toHaveCount(5);
-      await expect(page.locator("main#main section#nct").getByRole("listitem")).toHaveCount(2);
-      await expect(page.locator("main#main section#other").getByRole("listitem")).toHaveCount(1);
-      await expect(page.locator("main#main").getByRole("link", { name: t("courses.mine.addCourse") })).toHaveAttribute("href", chooseCoursesHref(L));
-      await expect(page.locator("main#main").getByRole("link", { name: t("courses.mine.join") })).toHaveAttribute("href", `/${L}/courses/join`);
-      // the lesson course attached to the exam names it
-      await expect(page.locator("main#main section#ort")).toContainText(`${t("home.hub.card.forExam", { exam: "" }).trim()}`);
-      await noOverflowAndShoot(page, "my-courses-eight");
+      await page.waitForURL(new RegExp(`/${L}/home#courses$`));
+      await expect(page.locator("section#courses")).toBeInViewport();
+      for (const old of ["/courses", "/courses?view=learning", "/courses#nct", "/courses#ort"]) {
+        await page.goto(`/${L}${old}`);
+        await page.waitForURL(new RegExp(`/${L}/home${old.includes("#") ? "#courses" : ""}$`));
+      }
+      await expect(page.locator("section#courses")).toBeInViewport();
     } finally {
       await hub.cleanup();
     }

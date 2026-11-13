@@ -3,10 +3,10 @@ import { expect, test, type Page } from "@playwright/test";
 import { seed, settle, signIn, tr, VIEWPORTS } from "./helpers";
 
 /**
- * Step 3a S3 (docs/phases/STUDENT_IA_DESIGN.md §2.1): the global frame. One navigation: the sidebar has Главная · Мои
- * курсы · Каталог (no course id in any of them, no exam switcher) and the «Мои курсы» rows; inside every course page
- * there is no second sidebar (the course tabs navigate the course); the phone bar Главная · Курсы · Продолжить ·
- * Каталог · Ещё is on every page; «Продолжить» leads to the last place; the «Ещё» sheet opens and closes with Esc
+ * Step 3a S3, S7 (docs/phases/STUDENT_IA_DESIGN.md §2.1, v3 V1, V5, V6): the global frame. One navigation: the sidebar
+ * has Главная · Каталог (no course id in either, no exam switcher) and the «Мои курсы» rows; inside every course page
+ * there is no second sidebar (the course tabs navigate the course); the phone bar Главная · Продолжить · Каталог · Ещё
+ * is on every page (the «Ещё» sheet has no «Войти по коду»); «Продолжить» leads to the last place; the «Ещё» sheet opens and closes with Esc
  * (focus back on its button); nothing scrolls sideways at 375 px; people who teach keep the AppHeader, also on /home.
  * Read-only: no data changes.
  */
@@ -24,7 +24,7 @@ async function oneNavigation(page: Page, where: string) {
 }
 
 test.describe("student frame (ru)", () => {
-  test("desktop sidebar: three global links, the course rows, no switcher; one navigation in a course", async ({ page }) => {
+  test("desktop sidebar: two global links, the course rows, no switcher; one navigation in a course", async ({ page }) => {
     const s = seed();
     await page.setViewportSize(VIEWPORTS.desktop);
     await signIn(page, s.students["vis-desktop-ru"]);
@@ -33,7 +33,10 @@ test.describe("student frame (ru)", () => {
     await expect(nav).toBeVisible();
     await expect(nav.getByRole("link", { name: t("student.nav.home") })).toHaveAttribute("aria-current", "page");
     await expect(nav.getByRole("link", { name: t("student.nav.home") })).toHaveAttribute("href", `/${L}/home`);
-    await expect(nav.getByRole("link", { name: t("student.nav.myCourses") })).toHaveAttribute("href", `/${L}/courses`);
+    // step 3a S7 (v3 V1): no «Мои курсы» link; the group label heads the course rows
+    await expect(nav.locator(`a[href="/${L}/courses"]`)).toHaveCount(0);
+    await expect(nav.getByRole("link", { name: t("student.nav.myCourses"), exact: true })).toHaveCount(0);
+    await expect(nav.getByText(t("student.nav.myCourses"), { exact: true })).toBeVisible();
     await expect(nav.getByRole("link", { name: t("student.nav.catalog") })).toHaveAttribute("href", `/${L}/courses/catalog`);
     for (const key of ["student.nav.tests", "student.nav.analytics", "student.nav.saved", "student.nav.practice", "student.nav.lessonsGroup"]) {
       await expect(nav.getByText(t(key), { exact: true }), `no global ${key}`).toHaveCount(0);
@@ -85,10 +88,13 @@ test.describe("student frame (ru)", () => {
       const nav = sidebar(page);
       await expect(nav).toBeVisible();
       await settle(page);
-      const boxes = (await nav.getByRole("link").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; }))).slice(0, 3);
-      expect(boxes.length).toBe(3);
-      const gaps = boxes.slice(1).map((b, i) => b.top - boxes[i].bottom);
-      for (const g of gaps) expect(Math.abs(g - gaps[0])).toBeLessThanOrEqual(1);
+      // step 3a S7 (v3 V1): two global links (Главная · Каталог), then the «Мои курсы» group; the rows of one group
+      // keep one rhythm (the gap between the two links is the list's own item gap, 0-8 px)
+      const boxes = (await nav.getByRole("link").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; }))).slice(0, 2);
+      expect(boxes.length).toBe(2);
+      const gap = boxes[1].top - boxes[0].bottom;
+      expect(gap).toBeGreaterThanOrEqual(0);
+      expect(gap).toBeLessThanOrEqual(8);
       if (process.env.F1_SHOTS) await nav.screenshot({ path: path.join(process.env.F1_SHOTS, `sidebar-${width}.png`) });
     }
   });
@@ -102,9 +108,8 @@ test.describe("student frame (ru)", () => {
       await page.goto(url);
       const b = bar(page);
       await expect(b, url).toBeVisible();
-      for (const key of ["student.nav.home", "student.nav.courses", "student.nav.continue", "student.nav.catalog"]) {
-        await expect(b.getByRole("link", { name: t(key), exact: true }), `${url}: ${key}`).toBeVisible();
-      }
+      // step 3a S7 (v3 V6): Главная · Продолжить · Каталог · Ещё
+      await expect(b.getByRole("link"), url).toHaveText([t("student.nav.home"), t("student.nav.continue"), t("student.nav.catalog")]);
       await expect(b.getByRole("button", { name: t("student.nav.more") })).toBeVisible();
       await oneNavigation(page, url);
       await settle(page);
@@ -125,7 +130,7 @@ test.describe("student frame (ru)", () => {
     const sheet = page.getByRole("dialog", { name: t("student.nav.more") });
     await expect(sheet).toBeVisible();
     await expect(sheet.locator(`a[href^="${c}"]`)).toHaveCount(1); // the «Мои курсы» row
-    await expect(sheet.getByRole("link", { name: t("student.nav.joinByCode") })).toHaveAttribute("href", `/${L}/courses/join`);
+    await expect(sheet.locator(`a[href="/${L}/courses/join"]`)).toHaveCount(0); // V5: «Войти по коду» only in the catalog
     await expect(sheet.getByRole("button", { name: t("common.logout") })).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(sheet).toBeHidden();
@@ -148,11 +153,13 @@ test.describe("student frame (ru)", () => {
     await page.waitForURL(new RegExp(`/${L}/courses$`));
   });
 
-  test("old links: ?view=learning opens the hub for a learner, #catalog the catalog", async ({ page }) => {
+  test("old links: /courses and ?view=learning open the hub for a learner, #catalog the catalog", async ({ page }) => {
     const s = seed();
     await page.setViewportSize(VIEWPORTS.desktop);
     await signIn(page, s.students["vis-desktop-ru"]);
     await page.goto(`/${L}/courses?view=learning`);
+    await page.waitForURL(new RegExp(`/${L}/home$`));
+    await page.goto(`/${L}/courses`);
     await page.waitForURL(new RegExp(`/${L}/home$`));
     await page.goto(`/${L}/courses#catalog`);
     await page.waitForURL(new RegExp(`/${L}/courses/catalog$`));

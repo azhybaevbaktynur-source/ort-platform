@@ -10,7 +10,6 @@ import { ProviderButtons } from "@/components/auth/ProviderButtons";
 import { Button } from "@/components/ui";
 import { useAuth, RegisterResult } from "@/lib/auth-context";
 import { safeRedirect } from "@/lib/safeRedirect";
-import { chooseCoursesHref } from "@/lib/lms/chooseCourses";
 import { useBackendWarmup, useSlowHint } from "@/lib/useBackendWarmup";
 import { VerifyEmailStep, authErrorMessage } from "@/components/auth/VerifyEmailStep";
 import { PolicyAcceptField, SignUpEmailInput, SignUpNameInput, SignUpPasswordInput, useOwnPolicies } from "@/components/auth/SignUpFields";
@@ -54,8 +53,8 @@ function RegisterForm() {
     } else if (redirectParam) {
       router.push(redirectParam);
     } else {
-      // step 3a S4 (STUDENT_IA_DESIGN §4, decision N7): the skippable choose step; nothing is joined without a tap
-      router.push(`${chooseCoursesHref(lang)}?first=1`);
+      // step 3a S7 (STUDENT_IA_DESIGN V4, N7): a new account lands in the catalog with the welcome line
+      router.push(`/${lang}/courses/catalog?welcome=1`);
     }
   };
 
