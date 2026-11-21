@@ -130,6 +130,8 @@ export interface Seed {
   };
   /** Lesson course requests (lesson-course.spec.ts): an approved teacher and a student in no course. */
   lesson_course: { teacher: SeedUser; student: SeedUser };
+  /** Lesson videos (lesson-video.spec.ts): an approved teacher, a student and an outsider, all in no course. */
+  lesson_video: { teacher: SeedUser; student: SeedUser; outsider: SeedUser };
   /** PERFORMANCE_AUDIT P3: a password student in no course (login.spec.ts). */
   login_student: SeedUser & { password: string };
   /** TEACHER_TO_STUDENT_MAP S5: the lesson course "Мастеркласс E2E" (platform organization, draft, open enrollment in
