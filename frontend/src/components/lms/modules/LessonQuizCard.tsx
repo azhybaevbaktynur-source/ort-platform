@@ -172,8 +172,10 @@ export function LessonQuizCard({ item, lessonUrl, primary, readOnly, onOpen }: {
           <ListChecks className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t("modules.lesson.quiz.eyebrow")}</p>
-          <h2 id={`quiz-${item.id}`} className="break-words text-lg font-semibold leading-7 text-slate-900">{title}</h2>
+          {/* the lesson's h1 already names the quiz: the card heading says what it is, the title stays for screen readers */}
+          <h2 id={`quiz-${item.id}`} className="text-lg font-semibold leading-7 text-slate-900">
+            {t("modules.lesson.quiz.eyebrow")}<span className="sr-only">: {title}</span>
+          </h2>
           <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm leading-5 text-slate-600">
             {questions > 0 && <span className="tabular-nums">{t("modules.lesson.quiz.questions", { count: questions })}</span>}
             {best !== null && <span className="tabular-nums">{t("modules.lesson.quiz.best", { percent: best })}</span>}

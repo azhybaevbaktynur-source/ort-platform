@@ -197,7 +197,8 @@ export function StudentResult({ courseId, attemptId }: { courseId: string; attem
 
   const grade = result?.grade ?? null;
   const scaled = !!result && isScaledResult(result, grade, ui.resultView);
-  const hasReview = !!review && review.items.length > 0;
+  // «Разобрать ошибки» only when there is something to review (not on a full score)
+  const hasReview = !!review && review.items.some((it) => it.correctness !== "correct");
   const nextHref = next && next.assessment_id ? `/${lang}/courses/${courseId}/assessments/${next.assessment_id}` : `/${lang}/courses/${courseId}/tests`;
   const reviewMistakes = () => {
     setOnlyMistakes(true);
