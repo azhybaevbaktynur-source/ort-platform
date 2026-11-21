@@ -140,7 +140,8 @@ async def test_locked_items_carry_no_destination(db, api, frozen_clock):
     assert items[0]["link"] is None and items[1]["link"] is None
     assert items[0]["title"] == {}  # the url fallback title is withheld too
     assert items[2]["link"] == {"page_id": None, "file_id": None, "assignment_id": None, "assessment_id": None,
-                                "assignment_kind": "text", "url": None}  # the kind only (row icon)
+                                "assignment_kind": "text", "url": None,
+                                "placement": None}  # the kind only (row icon)
     frozen_clock.t = FUTURE
     items = (await api.call(w.S, "GET", f"{C(w)}/modules")).json()["modules"][0]["items"]
     assert items[0]["link"]["url"] == "https://secret.example/answers"

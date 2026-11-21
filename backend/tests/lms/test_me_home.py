@@ -430,7 +430,7 @@ async def test_exam_prep_course_carries_menu_features(db, api):
     make_module(db, own, t)  # a general course: a published module is its «Уроки»
     rows = {x["id"]: x for x in (await home(api, s))["courses"]}
     none = {"modules": False, "files": False, "announcements": False, "practice": False, "tests": False,
-            "hand_ins": False}
+            "hand_ins": False, "lesson_quizzes": False}
     assert rows[str(ort.id)]["features"] == none
     assert rows[str(own.id)]["features"] == {**none, "modules": True}
     m = make_module(db, ort, t)

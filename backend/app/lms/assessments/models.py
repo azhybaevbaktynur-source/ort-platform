@@ -96,9 +96,13 @@ class Assessment(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
     # --- S3 access --- (docs/phases/S3_ACCESS_DESIGN.md 1-2: `paid` needs a pass, in platform courses only; elsewhere
     # the column is ignored. New tests of platform courses start `paid` (builder); migration 0022 set the rest `free`)
     access_tier: Mapped[str] = mapped_column(String(8), nullable=False, default="free", server_default="free")
+    # --- lesson placement --- (docs/phases/LESSON_COURSE_REQUESTS.md C1: a `lesson` quiz is never listed as a test)
+    placement: Mapped[str] = mapped_column(String(16), nullable=False, default="tests", server_default="tests")
 
     __table_args__ = (
         CheckConstraint("NOT is_practice OR preset = 'none'", name="practice_preset_none"),
+        CheckConstraint("placement IN ('tests','lesson')", name="placement_valid"),
+        CheckConstraint("placement = 'tests' OR (preset = 'none' AND NOT is_practice)", name="placement_lesson_plain"),
         CheckConstraint("access_tier IN ('free','paid')", name="access_tier_valid"),  # S3 access
         CheckConstraint("preset IN ('none','ort_main','ort_subject')", name="preset_valid"),
         CheckConstraint("grade_release IN ('auto','manual')", name="grade_release_valid"),
