@@ -191,8 +191,10 @@ function PageLessonBody({ pageId, onOpen }: { pageId: string; onOpen: () => void
   }, [course.id, pageId]);
   if (error) return <ErrorState variant="inline" message={errorText(error)} />;
   if (!page) return <LoadingState rows={3} />;
+  // a body split into screen cards (`section.lesson-card`, server renderer) brings its own cards: no outer card
+  const cards = page.body_html.includes('<section class="lesson-card"');
   return (
-    <article className="min-w-0 rounded-card border border-slate-200 bg-white p-4 sm:p-6">
+    <article className={cn("min-w-0", !cards && "rounded-card border border-slate-200 bg-white p-4 sm:p-6")}>
       <SafeHtml html={page.body_html} />
     </article>
   );
