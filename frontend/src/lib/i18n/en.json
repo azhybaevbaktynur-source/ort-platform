@@ -5622,7 +5622,7 @@
       "video": {
         "speed": "Speed",
         "captions": "Captions",
-        "captionsHint": "Turn captions on with the player's button.",
+        "captionsHint": "Captions can be turned on in the player menu.",
         "loading": "Loading the video",
         "error": "The video could not be loaded. Check your connection and try again.",
         "watched": "Mark as watched"

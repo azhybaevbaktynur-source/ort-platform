@@ -459,7 +459,11 @@ export function VideoDialog({ open, module, courseId, editLang, defaultLang, onA
     try {
       const name = title.trim() || file.name.replace(/\.mp4$/i, "").slice(0, 300);
       const out = await uploadCourseVideo(courseId, { file, title: name }, setProgress);
-      await addItem(courseId, module.id, { kind: "video", video_id: out.id, published: true });
+      // a file already in the course keeps its stored name: the name typed here still titles this item
+      await addItem(courseId, module.id, {
+        kind: "video", video_id: out.id, published: true,
+        ...(out.title !== name ? { title_override: { [editLang || defaultLang || lang]: name } } : {}),
+      });
       onAdded();
     } catch (e) {
       setError(e);
