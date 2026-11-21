@@ -45,7 +45,7 @@ import { UnlockCard } from "./UnlockCard";
 
 const CARD = "rounded-card border border-slate-200 bg-white p-4 sm:p-5";
 const BLOCK_TITLE = "text-sm font-semibold uppercase leading-5 tracking-wide text-slate-600";
-const LESSON_KINDS = new Set(["page", "file", "url"]);
+const LESSON_KINDS = new Set(["page", "file", "url", "video"]);
 
 function BlockLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
@@ -152,7 +152,7 @@ function LessonsTeaser({ next, done, total, base }: { next: LessonRef | null; do
         <Link href={lessonHref(base, next)}
           className={cn("flex min-h-11 items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 hover:border-brand-200 hover:bg-brand-50", focusRing)}>
           <span aria-hidden="true" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-brand-700">
-            {next.item.kind === "url" ? <PlayCircle className="h-4 w-4" /> : <ItemKindIcon kind={next.item.kind} assignmentKind={next.item.link?.assignment_kind} />}
+            {next.item.kind === "url" || next.item.kind === "video" ? <PlayCircle className="h-4 w-4" /> : <ItemKindIcon kind={next.item.kind} assignmentKind={next.item.link?.assignment_kind} />}
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-xs font-medium leading-4 text-brand-700">{t("course.overview.continueLesson")}</span>

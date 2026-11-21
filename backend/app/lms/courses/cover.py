@@ -86,7 +86,7 @@ def _lessons_count():
             .where(CourseModule.course_id == Course.id, CourseModule.deleted_at.is_(None),
                    CourseModule.published.is_(True), ModuleItem.deleted_at.is_(None),
                    ModuleItem.published.is_(True), ModuleItem.kind.in_(module_ids.LESSON_KINDS),
-                   or_(ModuleItem.kind == "url",
+                   or_(ModuleItem.kind.in_(("url", "video")),
                        and_(ModuleItem.kind == "page", Page.published.is_(True), Page.deleted_at.is_(None)),
                        and_(ModuleItem.kind == "file", CourseFile.published.is_(True),
                             CourseFile.deleted_at.is_(None))))

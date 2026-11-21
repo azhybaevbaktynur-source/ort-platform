@@ -31,7 +31,7 @@ import { rememberLessonModules } from "./lessonNav";
 import { ProChip } from "./ProLockCard";
 import { ProCallout } from "@/components/lms/access/ProCallout";
 
-const LESSON_KINDS = new Set(["page", "file", "url"]);
+const LESSON_KINDS = new Set(["page", "file", "url", "video"]);
 
 interface RowCtx {
   base: string;
@@ -68,7 +68,7 @@ export function StatusIcon({ locked, done, current = false }: { locked: boolean;
 export function KindMeta({ item, locked, className }: { item: ItemStudentOut; locked: boolean; className?: string }) {
   const { t } = useTranslation();
   const kindText = useItemKindText();
-  const video = item.kind === "url" && !!item.video;
+  const video = (item.kind === "url" && !!item.video) || item.kind === "video";
   const kind = video ? t("modules.syllabus.video") : kindText(item.kind, item.link?.assignment_kind ?? null);
   const duration = formatDuration(item.duration_s, t);
   // a locked url row carries no `video` (the server strips it), so its kind is unknown: a Pro row (and a locked url

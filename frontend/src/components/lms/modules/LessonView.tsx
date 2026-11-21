@@ -6,13 +6,14 @@
 // current module open) and in a collapsible under it on phones; a sticky bar holds "Назад" and "Следующий урок" (a
 // locked next shows its lock and is disabled). The view fact is recorded when the student reaches the content: video
 // on the play tap, page on open, file on the download click, link on the open click (idempotent on the server).
+// LESSON_VIDEOS V4: a hosted `video` item plays in `LessonVideo`; its view fact is sent at 90 % or by «Просмотрено».
 // Data: the student's evaluated outline (`GET /courses/{c}/modules`). A locked row comes without address, video, page
 // or file id, so this page renders the lock card only: the Pro card with "Открыть доступ" or the module reasons with
 // "К программе". The facts routes refuse locked items (403 / 423) on the server.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronLeft, Download, ExternalLink, Lock } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronLeft, Download, Eye, ExternalLink, Lock } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/context";
 import { pickLocalized } from "@/lib/lms/localized";
 import { getModules, recordView, setDone } from "@/lib/lms/modules";
@@ -31,6 +32,7 @@ import { formatDuration, isAccessLocked, isDone, isLessonQuiz, isLocked, lessonH
 import { LessonQuizCard } from "./LessonQuizCard"; // lesson course requests C3
 import { rememberLessonModules } from "./lessonNav";
 import { VideoPlayer } from "./VideoPlayer";
+import { LessonVideo } from "./LessonVideo"; // LESSON_VIDEOS V4
 import { KindMeta, StatusIcon, viewOnOpen } from "./StudentSyllabus";
 import { ProChip, ProLockCard } from "./ProLockCard";
 import { ProCallout } from "@/components/lms/access/ProCallout";
@@ -286,6 +288,20 @@ export function LessonView({ moduleId, itemId }: { moduleId: string; itemId: str
       setBusy(false);
     }
   };
+  /** LESSON_VIDEOS V4: «Просмотрено» sends the view fact (the player sends it by itself at 90 %). */
+  const markWatched = async () => {
+    setBusy(true);
+    setActionError(null);
+    viewed.current = true;
+    try {
+      replaceModule(await recordView(course.id, mod.id, item.id));
+      void load(true);
+    } catch (e) {
+      setActionError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
   const download = async () => {
     if (!item.link?.file_id) return;
     setBusy(true);
@@ -321,6 +337,9 @@ export function LessonView({ moduleId, itemId }: { moduleId: string; itemId: str
     body = <LessonQuizCard key={item.id} item={item} lessonUrl={lessonRoute(base, mod.id, item.id)} primary={bodyPrimary} readOnly={readOnly} onOpen={markViewed} />;
   } else if (item.kind === "url" && item.video) {
     body = <VideoPlayer key={item.id} video={item.video} title={title} onPlay={markViewed} />;
+  } else if (item.kind === "video" && item.video_file) {
+    body = <LessonVideo key={item.id} courseId={course.id} moduleId={mod.id} itemId={item.id} title={title}
+      durationS={item.video_file.duration_s} onWatched={readOnly ? undefined : markViewed} />;
   } else if (item.kind === "page" && item.link?.page_id) {
     body = <PageLessonBody key={item.link.page_id} pageId={item.link.page_id} onOpen={markViewed} />;
   } else if (item.kind === "url" && item.link?.url) {
@@ -346,6 +365,12 @@ export function LessonView({ moduleId, itemId }: { moduleId: string; itemId: str
     );
   }
 
+  // LESSON_VIDEOS V4: «Просмотрено», the view fact by hand (the player sends it by itself at 90 %)
+  const watchedButton = !locked && !done && !readOnly && item.kind === "video" && item.video_file ? (
+    <Button variant="secondary" className="w-full sm:w-auto" onClick={() => void markWatched()} loading={busy} leftIcon={<Eye aria-hidden="true" className="h-4 w-4" />}>
+      {t("modules.lesson.video.watched")}
+    </Button>
+  ) : null;
   let doneRow: React.ReactNode = null;
   if (lessonQuiz && done) {
     doneRow = null; // the quiz card shows ✓
@@ -365,9 +390,13 @@ export function LessonView({ moduleId, itemId }: { moduleId: string; itemId: str
           {t("modules.lesson.markDone")}
         </Button>
       );
+    } else if (req.type === "view" && watchedButton) {
+      doneRow = watchedButton;
     } else {
       doneRow = <p className="text-sm leading-5 text-slate-600">{reqText(req.type, req.threshold)}</p>;
     }
+  } else if (watchedButton) {
+    doneRow = watchedButton;
   } else if (!locked && done) {
     doneRow = <p className="inline-flex items-center gap-2 text-sm font-medium text-success-800"><CheckCircle2 aria-hidden="true" className="h-4 w-4" />{t("modules.lesson.done")}</p>;
   }

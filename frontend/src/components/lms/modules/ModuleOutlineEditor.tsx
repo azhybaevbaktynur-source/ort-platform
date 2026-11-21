@@ -40,7 +40,7 @@ import { templateUi } from "@/lib/lms/templates";
 import { duplicateModule } from "@/lib/lms/unsorted";
 import { useCourse } from "@/components/lms/CourseContext";
 import {
-  Badge, Button, ConfirmDialog, EmptyState, ErrorState, LoadingState, LockToggle, Switch, cn, focusRing, toast,
+  Badge, Button, ConfirmDialog, Dialog, EmptyState, ErrorState, LoadingState, LockToggle, Switch, cn, focusRing, toast,
 } from "@/components/ui";
 import { fmtShortDateTime } from "@/components/lms/home/format";
 import { CreateAssessmentDialog } from "@/components/lms/assessments/CreateAssessmentDialog";
@@ -51,6 +51,7 @@ import { DurationChip, MoveButtons, parseMinutes, useDurationText } from "./Edit
 import { InlineForm, type InlineValues } from "./InlineForm";
 import { OutlineMenu, type MenuGroup } from "./OutlineMenu";
 import { ProgressDrawer } from "./ProgressDrawer";
+import { LessonVideo } from "./LessonVideo";
 
 type DialogState =
   | null
@@ -67,6 +68,7 @@ type DialogState =
   | { kind: "progress" }
   | { kind: "publishWarn"; module: ModuleStaffOut; names: string }
   | { kind: "video"; module: ModuleStaffOut }
+  | { kind: "preview"; item: ItemStaffOut }
   | { kind: "pro"; module: ModuleStaffOut };
 
 /** The one inline form that is open: a new module, a rename, or an add at the end of a module. */
@@ -497,6 +499,7 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
     else if (id === "down") moveItemTo(m, ii, ii + 1);
     else if (id === "move") setDialog({ kind: "moveItem", item });
     else if (id === "delete") setDialog({ kind: "deleteItem", item });
+    else if (id === "open" && item.kind === "video") setDialog({ kind: "preview", item }); // LESSON_VIDEOS V4
     else if (id === "open") {
       const href = itemHref(item);
       if (href) router.push(href);
@@ -733,7 +736,12 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
                             <>
                               <div className="min-w-0 flex-1 py-1.5 pl-2 sm:flex sm:items-center sm:gap-3">
                                 <div className="min-w-0 sm:shrink" title={language ? `${iname} · ${language}` : iname}>
-                                  {href ? (
+                                  {it.kind === "video" ? (
+                                    <button type="button" onClick={() => setDialog({ kind: "preview", item: it })}
+                                      className={cn(titleCls, "max-w-full rounded text-left hover:text-brand-700 hover:underline", focusRing)}>
+                                      {iname}<span className="sr-only">{`, ${t("modules.editor.videoPreview")}`}</span>
+                                    </button>
+                                  ) : href ? (
                                     <Link href={href} className={cn(titleCls, "rounded hover:text-brand-700 hover:underline", focusRing)}>{iname}</Link>
                                   ) : it.kind === "url" && it.url ? (
                                     <a href={it.url} target="_blank" rel="noopener noreferrer" className={cn(titleCls, "rounded hover:text-brand-700 hover:underline", focusRing)}>
@@ -761,6 +769,10 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
                               ) : it.duration_s ? (
                                 <span className="shrink-0 px-1 text-sm text-slate-600">{durationText(it.duration_s)}</span>
                               ) : null)}
+                              {/* LESSON_VIDEOS V4: a hosted video's length comes from the file (read-only) */}
+                              {it.kind === "video" && it.duration_s ? (
+                                <span className="shrink-0 px-1 text-sm tabular-nums text-slate-600">{durationText(it.duration_s)}</span>
+                              ) : null}
                               {canEdit && (
                                 <div className="flex shrink-0 items-center">
                                   <MoveButtons name={iname} first={ii === 0} last={ii === items.length - 1} onMove={(dir) => moveItemBy(m, ii, dir)} />
@@ -770,7 +782,7 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
                                     id: "item", items: [
                                       // Phase 8c UX M4, M6: Publish first, then Open, settings, requirement, moves; Remove last
                                       { id: "publish", label: it.published ? t("modules.editor.unpublish") : t("modules.editor.publish"), disabled: !!busy },
-                                      ...(it.kind !== "header" ? [{ id: "open", label: it.target?.assignment_kind === "quiz" ? t("modules.editor.editQuiz") : t("modules.editor.openTarget") }] : []),
+                                      ...(it.kind !== "header" ? [{ id: "open", label: it.target?.assignment_kind === "quiz" ? t("modules.editor.editQuiz") : it.kind === "video" ? t("modules.editor.videoPreview") : t("modules.editor.openTarget") }] : []),
                                       { id: "rename", label: t("coursePage.rename") },
                                       { id: "edit", label: t("modules.editor.editItem"), description: language ?? undefined },
                                       ...(it.kind !== "header" ? [{ id: "requirement", label: t("modules.editor.setRequirement"), description: reqLine ?? undefined }] : []),
@@ -927,6 +939,13 @@ export function ModuleOutlineEditor({ refreshKey = 0, onChanged, onModules, afte
       {d?.kind === "video" && (
         <VideoDialog open module={d.module} courseId={course.id} editLang={editLang} defaultLang={course.default_language}
           onAdded={() => { closeDialog(); void load(); onChanged?.(); }} onClose={closeDialog} />
+      )}
+      {d?.kind === "preview" && (
+        <Dialog open onClose={closeDialog} size="lg" title={itemName(d.item)} description={t("modules.editor.videoPreview")}
+          footer={<Button variant="secondary" onClick={closeDialog}>{t("modules.editor.videoPreviewClose")}</Button>}>
+          <LessonVideo courseId={course.id} moduleId={d.item.module_id} itemId={d.item.id} title={itemName(d.item)}
+            durationS={d.item.duration_s} remember={false} />
+        </Dialog>
       )}
       {d?.kind === "pro" && (
         <ConfirmDialog open busy={busy === `pro-${d.module.id}`} title={t("modules.editor.proConfirmTitle")} object={moduleName(d.module)}

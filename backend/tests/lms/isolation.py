@@ -96,8 +96,10 @@ def reset_lms_state() -> None:
         )
         from app.lms.pages.models import Page
 
+        from app.lms.course_videos.models import CourseVideo  # lesson videos (0036): after items, before assets
+
         for model in (ItemRequirementStatus, ModuleProgress, ItemProgress, ItemCompletionRequirement,
-                      ModulePrerequisite, ModuleItem, CourseModule, CourseFile, Announcement):
+                      ModulePrerequisite, ModuleItem, CourseVideo, CourseModule, CourseFile, Announcement):
             conn.execute(delete(model.__table__))
         conn.execute(update(Course.__table__).values(home_page_id=None))
         conn.execute(delete(Page.__table__))

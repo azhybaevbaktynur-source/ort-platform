@@ -99,6 +99,11 @@ api_router.include_router(_pages_router, prefix="/courses", tags=["Pages"])
 api_router.include_router(_course_files_router, prefix="/courses", tags=["Course Files"])
 api_router.include_router(_announcements_router, prefix="/courses", tags=["Announcements"])
 # --- Phase 8a S3 end ---
+# --- Lesson videos begin --- (docs/phases/LESSON_VIDEOS.md V2, V3)
+from app.lms.course_videos.router import router as _course_videos_router  # noqa: E402
+
+api_router.include_router(_course_videos_router, prefix="/courses", tags=["Course Videos"])
+# --- Lesson videos end ---
 # --- Phase 10 S0 begin --- (empty routers; the slices add routes)
 from app.lms.analytics.router import router as _analytics_router  # noqa: E402
 from app.lms.practice.router import router as _practice_router  # noqa: E402

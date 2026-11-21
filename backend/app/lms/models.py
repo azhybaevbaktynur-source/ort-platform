@@ -36,6 +36,7 @@ from app.lms.quiz_editor.models import QuestionDraft  # noqa: F401,E402
 # --- Phase 8a S1 begin ---
 from app.lms.pages.models import Page  # noqa: F401,E402
 from app.lms.course_files.models import CourseFile  # noqa: F401,E402
+from app.lms.course_videos.models import CourseVideo  # noqa: F401,E402  (lesson videos, 0036)
 from app.lms.announcements.models import Announcement  # noqa: F401,E402
 from app.lms.modules.models import (  # noqa: F401,E402
     CourseModule, ItemCompletionRequirement, ItemProgress, ItemRequirementStatus, ModuleItem, ModulePrerequisite,

@@ -16,7 +16,7 @@ export interface LessonModuleLink {
 
 const KEY = "ort_lesson_modules";
 const MAX = 5;
-const LESSON_KINDS = new Set(["page", "url", "file"]);
+const LESSON_KINDS = new Set(["page", "url", "file", "video"]);
 let memory: Record<string, LessonModuleLink[]> | null = null;
 const listeners = new Set<() => void>();
 const loading = new Set<string>();

@@ -3,7 +3,8 @@
 import type { AssignmentKind, AssignmentStaffOut } from "./assignmentTypes";
 import type { LocalizedText } from "./types";
 
-export type ItemKind = "page" | "file" | "assignment" | "url" | "header";
+/** `video`: an MP4 hosted on the platform (LESSON_VIDEOS V1); YouTube / Vimeo stay `url`. */
+export type ItemKind = "page" | "file" | "assignment" | "url" | "header" | "video";
 export type RequirementType = "view" | "mark_done" | "submit" | "min_score" | "min_percent";
 export type ModuleState = "locked" | "unlocked" | "started" | "completed";
 export type CompletionMode = "all" | "any";
@@ -18,7 +19,7 @@ export type ItemLockedReason = "module" | "access_required";
 export const DURATION_S_MIN = 60;
 export const DURATION_S_MAX = 36000;
 
-export const ITEM_KINDS: ItemKind[] = ["page", "file", "assignment", "url", "header"];
+export const ITEM_KINDS: ItemKind[] = ["page", "file", "assignment", "url", "header", "video"];
 export const THRESHOLD_REQUIREMENTS: RequirementType[] = ["min_score", "min_percent"];
 
 /** Requirement types allowed for an item kind (service rule `requirement_kind_mismatch`; a header has none). */
@@ -51,6 +52,8 @@ export interface ItemIn {
   file_id?: string;
   assignment_id?: string;
   url?: string;
+  /** LESSON_VIDEOS V2: a `video` item's course video */
+  video_id?: string;
   title_override?: LocalizedText | null;
   indent?: number;
   published?: boolean;
@@ -65,6 +68,8 @@ export interface ItemUpdateIn {
   indent?: number;
   published?: boolean;
   url?: string;
+  /** LESSON_VIDEOS V2: replace a video item's file (same item, progress kept) */
+  video_id?: string;
   /** F5a: `null` clears; page / file / url only */
   duration_s?: number | null;
 }
@@ -113,6 +118,8 @@ export interface ItemStaffOut {
   file_id: string | null;
   assignment_id: string | null;
   url: string | null;
+  /** LESSON_VIDEOS V1 (absent on an older backend) */
+  video_id?: string | null;
   requirement: RequirementStaffOut | null;
   target: ItemTargetOut | null;
   warnings: ModuleWarningOut[];
@@ -180,6 +187,35 @@ export interface VideoOut {
   id: string;
 }
 
+/** LESSON_VIDEOS V3: what a student row says about its hosted video. */
+export interface VideoFileOut {
+  duration_s: number;
+  has_captions: boolean;
+}
+
+/** LESSON_VIDEOS V2: a course video (`POST/GET /courses/{c}/videos`). Not the U7 `VideoOut` above. */
+export interface CourseVideoOut {
+  id: string;
+  title: string;
+  size_bytes: number;
+  sha256: string;
+  duration_s: number;
+  width: number;
+  height: number;
+  has_captions: boolean;
+  created_at: string;
+}
+
+/** LESSON_VIDEOS V3: `GET …/items/{i}/play`, a short-lived address (R2 presigned or the dev stream with a token). */
+export interface VideoPlayOut {
+  url: string;
+  expires_at: string;
+  duration_s: number;
+  width: number;
+  height: number;
+  captions_url: string | null;
+}
+
 export interface ItemStudentOut {
   id: string;
   kind: ItemKind;
@@ -192,6 +228,8 @@ export interface ItemStudentOut {
   due_at?: string | null;
   /** U7: set on unlocked url items that are YouTube / Vimeo videos (absent on an older backend) */
   video?: VideoOut | null;
+  /** LESSON_VIDEOS V3: a platform-hosted video, on unlocked `video` rows only (play it through `/play`) */
+  video_file?: VideoFileOut | null;
   /** F5a: lesson length; done decided by the server (also on locked rows); why the row is locked */
   duration_s?: number | null;
   done?: boolean;
@@ -266,4 +304,5 @@ export interface CourseFilePickOut {
 export const MODULE_ERROR_CODES = [
   "module_locked", "prerequisite_invalid", "prerequisite_order", "requirement_kind_mismatch", "url_invalid",
   "limit_reached", "order_incomplete", "home_page_invalid", "template_locked",
+  "video_invalid", "video_in_use", "captions_invalid", "item_locked",
 ] as const;

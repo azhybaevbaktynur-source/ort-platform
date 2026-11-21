@@ -29,6 +29,8 @@ _GRADING = re.compile(rf"(?:{_GRADING.pattern})|^/api/v1/courses/[^/]+/assignmen
 # --- Phase 8a S3 begin --- (PHASE_8A_DESIGN 5.3: course file uploads stream with their own cap, FILE_MAX_UPLOAD_BYTES)
 _EXEMPT = re.compile(rf"(?:{_EXEMPT.pattern})|^/api/v1/courses/[^/]+/course-files/?$")
 # --- Phase 8a S3 end ---
+# Lesson videos (LESSON_VIDEOS V2): MP4 uploads stream with their own cap, LMS_VIDEO_MAX_BYTES
+_EXEMPT = re.compile(rf"(?:{_EXEMPT.pattern})|^/api/v1/courses/[^/]+/videos/?$")
 
 
 class _TooLarge(Exception):

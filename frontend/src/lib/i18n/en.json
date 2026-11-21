@@ -5274,7 +5274,8 @@
       "file": "File",
       "assignment": "Assignment",
       "url": "Link",
-      "header": "Header"
+      "header": "Header",
+      "video": "Video"
     },
     "reason": {
       "unlockAt": "Opens {date}",
@@ -5393,9 +5394,24 @@
         "name": "Title",
         "nameHint": "Optional. Without a title the link is shown.",
         "minutes": "Duration, min",
-        "minutesHint": "Optional, 1 to 600."
+        "minutesHint": "Optional, 1 to 600.",
+        "source": "Video source",
+        "sourceFile": "MP4 file",
+        "sourceLink": "YouTube or Vimeo",
+        "file": "Video file",
+        "chooseFile": "Choose file",
+        "fileHint": "MP4 (H.264), up to 50 MB. The video is stored on the platform: students watch it here and get no link to the file.",
+        "fileNameHint": "Optional. Without a title the file name is used.",
+        "fileRequired": "Choose an MP4 file.",
+        "notMp4": "The file must be an MP4.",
+        "tooBig": "The file is larger than 50 MB. Compress the video and try again.",
+        "upload": "Upload",
+        "uploading": "Uploading: {percent}%",
+        "uploadingLabel": "Video upload"
       },
-      "proFirstHint": "This is the first module: free students will have no preview."
+      "proFirstHint": "This is the first module: free students will have no preview.",
+      "videoPreview": "Watch the video",
+      "videoPreviewClose": "Close"
     },
     "settings": {
       "editTitle": "Module settings",
@@ -5504,7 +5520,11 @@
       "limit_reached": "The limit is reached: up to 100 modules per course and 200 items per module.",
       "order_incomplete": "The list changed meanwhile. Reload the page and try again.",
       "home_page_invalid": "This page cannot be the course home. Choose a page of this course.",
-      "template_locked": "The course template fixes this setting."
+      "template_locked": "The course template fixes this setting.",
+      "video_invalid": "This is not a supported MP4 file. Use H.264 video with AAC audio (or no audio).",
+      "video_in_use": "This video is used in a lesson. Remove the lesson from the module first.",
+      "captions_invalid": "The captions file must be WebVTT (start with WEBVTT).",
+      "item_locked": "This lesson is locked for now."
     },
     "availableInAssignments": "Available from Assignments",
     "syllabus": {
@@ -5598,6 +5618,14 @@
         "resume": "Continue",
         "accessCode": "This quiz needs an access code. Enter it on the quiz page.",
         "toLobby": "Open the quiz page"
+      },
+      "video": {
+        "speed": "Speed",
+        "captions": "Captions",
+        "captionsHint": "Captions can be turned on in the player menu.",
+        "loading": "Loading the video",
+        "error": "The video could not be loaded. Check your connection and try again.",
+        "watched": "Mark as watched"
       }
     }
   },

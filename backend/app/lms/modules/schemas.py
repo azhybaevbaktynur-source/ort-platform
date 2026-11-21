@@ -22,7 +22,7 @@ from app.lms.core.types import localized_text
 from app.lms.modules import ids
 
 ModuleTitle = localized_text(ids.MODULE_TITLE_MAX)
-ItemKind = Literal["page", "file", "assignment", "url", "header"]
+ItemKind = Literal["page", "file", "assignment", "url", "header", "video"]  # video: LESSON_VIDEOS V1
 RequirementType = Literal["view", "mark_done", "submit", "min_score", "min_percent"]
 ModuleState = Literal["locked", "unlocked", "started", "completed"]
 CompletionMode = Literal["all", "any"]
@@ -36,7 +36,8 @@ AccessTier = Literal["free", "paid"]                      # F5a: Pro module
 ItemLockedReason = Literal["module", "access_required"]   # F5a
 DurationS = Optional[Annotated[int, Field(ge=ids.DURATION_S_MIN, le=ids.DURATION_S_MAX)]]  # F5a: seconds
 
-_TARGET_FIELDS = {"page": "page_id", "file": "file_id", "assignment": "assignment_id", "url": "url"}
+_TARGET_FIELDS = {"page": "page_id", "file": "file_id", "assignment": "assignment_id", "url": "url",
+                  "video": "video_id"}
 
 
 class _In(BaseModel):
@@ -109,6 +110,7 @@ class ItemIn(_In):
     file_id: Optional[uuid.UUID] = None
     assignment_id: Optional[uuid.UUID] = None
     url: Optional[str] = Field(default=None, min_length=1, max_length=ids.URL_MAX)
+    video_id: Optional[uuid.UUID] = None  # LESSON_VIDEOS V2: a live video of this course (404 `video_not_found`)
     title_override: Optional[ModuleTitle] = None
     indent: int = Field(default=0, ge=0, le=ids.INDENT_MAX)
     published: bool = False
@@ -131,17 +133,19 @@ class ItemIn(_In):
 
 
 class ItemUpdateIn(_In):
-    """`PATCH _C/modules/{mid}/items/{iid}`: the target and kind never change (delete and add instead); `url` only on
-    a `url` item (service). `title_override: null` clears the override."""
+    """`PATCH _C/modules/{mid}/items/{iid}`: the kind never changes (delete and add instead); `url` only on a `url`
+    item, `video_id` only on a `video` item (replaces the file; same item, progress facts kept) (service).
+    `title_override: null` clears the override."""
     title_override: Optional[ModuleTitle] = None
     indent: Optional[int] = Field(default=None, ge=0, le=ids.INDENT_MAX)
     published: Optional[bool] = None
     url: Optional[str] = Field(default=None, min_length=1, max_length=ids.URL_MAX)
     duration_s: DurationS = None  # F5a: `null` clears; page / file / url only (service)
+    video_id: Optional[uuid.UUID] = None  # LESSON_VIDEOS V2
 
     @model_validator(mode="after")
     def _not_null(self):
-        for f in ("indent", "published", "url"):
+        for f in ("indent", "published", "url", "video_id"):
             if f in self.model_fields_set and getattr(self, f) is None:
                 raise ValueError(f"{f} cannot be null")
         return self
@@ -214,6 +218,7 @@ class ItemStaffOut(BaseModel):
     file_id: Optional[uuid.UUID] = None
     assignment_id: Optional[uuid.UUID] = None
     url: Optional[str] = None
+    video_id: Optional[uuid.UUID] = None      # LESSON_VIDEOS V1
     requirement: Optional[RequirementStaffOut] = None
     target: Optional[ItemTargetOut] = None    # None for url and header
     warnings: list[WarningOut] = []
@@ -283,6 +288,12 @@ class VideoOut(BaseModel):
     id: str
 
 
+class VideoFileOut(BaseModel):
+    """LESSON_VIDEOS V3: a platform-hosted video item (unlocked rows only); the client asks `.../play` for the URL."""
+    duration_s: int
+    has_captions: bool = False
+
+
 class ItemStudentOut(BaseModel):
     id: uuid.UUID
     kind: ItemKind
@@ -296,6 +307,7 @@ class ItemStudentOut(BaseModel):
     duration_s: Optional[int] = None  # F5a
     done: bool = False                # F5a: decided on the server (design 4); also on a locked row
     locked_reason: Optional[ItemLockedReason] = None  # F5a: why `locked` (a module rule wins over the Pro tier)
+    video_file: Optional[VideoFileOut] = None  # LESSON_VIDEOS V3: `video` items only, never on a locked row
 
 
 class ModuleStudentOut(BaseModel):

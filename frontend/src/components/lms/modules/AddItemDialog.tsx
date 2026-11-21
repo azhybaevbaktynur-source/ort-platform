@@ -15,7 +15,7 @@ import { useTranslation } from "@/lib/i18n/context";
 import { cleanLocalized, pickLocalized } from "@/lib/lms/localized";
 import { listAssignments } from "@/lib/lms/assignments";
 import type { AssignmentStaffOut, AssignmentStaffSummaryOut } from "@/lib/lms/assignmentTypes";
-import { addItem, listCourseFilesForPicker, listPagesForPicker } from "@/lib/lms/modules";
+import { addItem, listCourseFilesForPicker, listPagesForPicker, uploadCourseVideo } from "@/lib/lms/modules";
 import type { ItemIn, ItemStaffOut, ModuleStaffOut, RequirementType } from "@/lib/lms/modulesTypes";
 import { withFrom } from "@/lib/lms/nav";
 import type { CourseFileStaffOut } from "@/lib/lms/pagesTypes";
@@ -390,9 +390,14 @@ export function PlaceInModuleDialog({ open, target, modules, courseId, defaultLa
 // ---------------------------------------------------------------- F5c: "+ Видео" (COURSE_LESSONS_DESIGN §6)
 
 const PROVIDER_NAME = { youtube: "YouTube", vimeo: "Vimeo" } as const;
+/** LESSON_VIDEOS V2: the server refuses bigger files (413); this check only saves a long upload. */
+export const VIDEO_MAX_BYTES = 50 * 1024 * 1024;
+const isMp4 = (f: File) => f.type === "video/mp4" || /\.mp4$/i.test(f.name);
 
-/** A video lesson is a `url` item: address, optional title (in the language the teacher works in) and minutes. The hint
- * under the address is a client-side guess (`parseVideo`); the server decides whether students get the player. */
+/** LESSON_VIDEOS V4: "Файл MP4" (default) uploads the file with a progress bar (`POST /courses/{c}/videos`), then adds a
+ * `video` item; the server reads the duration. "YouTube или Vimeo" is the U7 `url` item: address, optional title (in
+ * the language the teacher works in) and minutes; the hint under the address is a client-side guess (`parseVideo`), the
+ * server decides whether students get the player. */
 export function VideoDialog({ open, module, courseId, editLang, defaultLang, onAdded, onClose }: {
   open: boolean;
   module: ModuleStaffOut;
@@ -405,6 +410,12 @@ export function VideoDialog({ open, module, courseId, editLang, defaultLang, onA
   const { lang, t } = useTranslation();
   const errorText = useModuleErrorText();
   const formId = useId();
+  const sourceName = useId();
+  const fileId = useId();
+  // LESSON_VIDEOS V4: an MP4 stored on the platform (default) or a YouTube / Vimeo link (U7)
+  const [source, setSource] = useState<"file" | "link">("file");
+  const [file, setFile] = useState<File | null>(null);
+  const [progress, setProgress] = useState(0);
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [minutes, setMinutes] = useState("");
@@ -422,10 +433,10 @@ export function VideoDialog({ open, module, courseId, editLang, defaultLang, onA
   const hint = !address || !urlOk
     ? t("modules.editor.video.urlHint")
     : video ? t("modules.editor.video.detected", { provider: PROVIDER_NAME[video.provider] }) : t("modules.editor.video.notDetected");
+  const fileProblem = !file ? "fileRequired" : !isMp4(file) ? "notMp4" : file.size > VIDEO_MAX_BYTES ? "tooBig" : null;
+  const fileError = touched && source === "file" && fileProblem ? t(`modules.editor.video.${fileProblem}`) : undefined;
 
-  const submit = async (ev: React.FormEvent) => {
-    ev.preventDefault();
-    setTouched(true);
+  const submitLink = async () => {
     if (!urlOk || seconds === undefined) return;
     setBusy(true);
     setError(null);
@@ -440,30 +451,102 @@ export function VideoDialog({ open, module, courseId, editLang, defaultLang, onA
       setBusy(false);
     }
   };
+  const submitFile = async () => {
+    if (!file || fileProblem) return;
+    setBusy(true);
+    setError(null);
+    setProgress(0);
+    try {
+      const name = title.trim() || file.name.replace(/\.mp4$/i, "").slice(0, 300);
+      const out = await uploadCourseVideo(courseId, { file, title: name }, setProgress);
+      // a file already in the course keeps its stored name: the name typed here still titles this item
+      await addItem(courseId, module.id, {
+        kind: "video", video_id: out.id, published: true,
+        ...(out.title !== name ? { title_override: { [editLang || defaultLang || lang]: name } } : {}),
+      });
+      onAdded();
+    } catch (e) {
+      setError(e);
+      setBusy(false);
+    }
+  };
+  const submit = async (ev: React.FormEvent) => {
+    ev.preventDefault();
+    setTouched(true);
+    await (source === "file" ? submitFile() : submitLink());
+  };
+  const shownError = error && (error as { code?: string }).code === "payload_too_large" ? t("modules.editor.video.tooBig") : error ? errorText(error) : null;
 
   return (
     <Dialog open={open} onClose={onClose} busy={busy} size="md" title={t("modules.editor.video.title")} description={moduleName}
       footer={(
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>{t("lms.common.cancel")}</Button>
-          <Button type="submit" form={formId} loading={busy}>{t("modules.add.submit")}</Button>
+          <Button type="submit" form={formId} loading={busy}>{source === "file" ? t("modules.editor.video.upload") : t("modules.add.submit")}</Button>
         </>
       )}>
       <form id={formId} onSubmit={(e) => void submit(e)} noValidate className="space-y-4">
-        <div>
-          <Input type="url" inputMode="url" label={t("modules.editor.video.url")} placeholder="https://" value={url} disabled={busy}
-            autoFocus error={urlError} onChange={(e) => setUrl(e.target.value)} />
-          {!urlError && (
-            <p aria-live="polite" data-video-hint={video ? video.provider : "none"}
-              className={video ? "mt-1 text-sm leading-5 text-success-700" : "mt-1 text-sm leading-5 text-slate-600"}>{hint}</p>
-          )}
-        </div>
-        <Input label={t("modules.editor.video.name")} hint={t("modules.editor.video.nameHint")} value={title} maxLength={200} disabled={busy}
-          onChange={(e) => setTitle(e.target.value)} />
-        <Input type="number" inputMode="numeric" min={1} max={600} step={1} containerClassName="sm:w-48"
-          label={t("modules.editor.video.minutes")} hint={t("modules.editor.video.minutesHint")} value={minutes} disabled={busy}
-          error={minutesError} onChange={(e) => setMinutes(e.target.value)} />
-        {error ? <p role="alert" className="rounded-xl border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-800">{errorText(error)}</p> : null}
+        <fieldset>
+          <legend className="mb-1 text-sm font-medium leading-6 text-slate-800">{t("modules.editor.video.source")}</legend>
+          <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+            {(["file", "link"] as const).map((k) => (
+              <label key={k} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-slate-200 px-3 py-2 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
+                <input type="radio" name={sourceName} className="h-4 w-4 shrink-0 accent-brand-600" checked={source === k} disabled={busy}
+                  onChange={() => { setSource(k); setTouched(false); setError(null); }} />
+                {k === "file" ? <Upload aria-hidden="true" className="h-5 w-5 shrink-0 text-slate-600" /> : <ItemKindIcon kind="url" className="h-5 w-5 text-slate-600" />}
+                <span className="text-base leading-6 text-slate-900 sm:text-sm">{t(k === "file" ? "modules.editor.video.sourceFile" : "modules.editor.video.sourceLink")}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        {source === "file" ? (
+          <>
+            <div>
+              <label htmlFor={fileId} className="text-sm font-medium text-slate-800">{t("modules.editor.video.file")}</label>
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <input id={fileId} type="file" accept="video/mp4,.mp4" disabled={busy} autoFocus
+                  aria-describedby={`${fileId}-hint${file ? ` ${fileId}-name` : ""}`} aria-invalid={fileError ? true : undefined}
+                  onChange={(ev) => { setFile(ev.target.files?.[0] ?? null); setError(null); }}
+                  className="peer sr-only" />
+                <label htmlFor={fileId} aria-hidden="true"
+                  className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50 peer-focus-visible:ring-2 peer-focus-visible:ring-brand-600 peer-focus-visible:ring-offset-2 peer-disabled:cursor-not-allowed peer-disabled:opacity-60">
+                  <Upload aria-hidden="true" className="h-4 w-4" />{t("modules.editor.video.chooseFile")}
+                </label>
+                {file && <span id={`${fileId}-name`} className="min-w-0 break-all text-sm text-slate-700">{file.name}</span>}
+              </div>
+              <p id={`${fileId}-hint`} className="mt-1 text-sm leading-5 text-slate-600">{t("modules.editor.video.fileHint")}</p>
+              {fileError && <p role="alert" className="mt-1 text-sm text-danger-700">{fileError}</p>}
+            </div>
+            <Input label={t("modules.editor.video.name")} hint={t("modules.editor.video.fileNameHint")} value={title} maxLength={300} disabled={busy}
+              onChange={(e) => setTitle(e.target.value)} />
+            {busy && (
+              <div>
+                <p className="mb-1 text-sm leading-5 text-slate-700">{t("modules.editor.video.uploading", { percent: Math.round(progress * 100) })}</p>
+                <div role="progressbar" aria-label={t("modules.editor.video.uploadingLabel")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}
+                  className="h-2 overflow-hidden rounded-full bg-slate-200">
+                  <div className="h-full bg-brand-600 transition-[width]" style={{ width: `${Math.round(progress * 100)}%` }} />
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div>
+              <Input type="url" inputMode="url" label={t("modules.editor.video.url")} placeholder="https://" value={url} disabled={busy}
+                autoFocus error={urlError} onChange={(e) => setUrl(e.target.value)} />
+              {!urlError && (
+                <p aria-live="polite" data-video-hint={video ? video.provider : "none"}
+                  className={video ? "mt-1 text-sm leading-5 text-success-700" : "mt-1 text-sm leading-5 text-slate-600"}>{hint}</p>
+              )}
+            </div>
+            <Input label={t("modules.editor.video.name")} hint={t("modules.editor.video.nameHint")} value={title} maxLength={200} disabled={busy}
+              onChange={(e) => setTitle(e.target.value)} />
+            <Input type="number" inputMode="numeric" min={1} max={600} step={1} containerClassName="sm:w-48"
+              label={t("modules.editor.video.minutes")} hint={t("modules.editor.video.minutesHint")} value={minutes} disabled={busy}
+              error={minutesError} onChange={(e) => setMinutes(e.target.value)} />
+          </>
+        )}
+        {shownError ? <p role="alert" className="rounded-xl border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-800">{shownError}</p> : null}
       </form>
     </Dialog>
   );

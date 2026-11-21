@@ -970,6 +970,23 @@ def seed_lesson_course(api: Api, log: Path, admin_tok: str) -> dict:
 # --- lesson course requests end ---
 
 
+# --- lesson videos begin --- (frontend/e2e/lesson-video.spec.ts; people only, the spec builds its courses)
+def seed_lesson_video(api: Api, log: Path, admin_tok: str) -> dict:
+    """An approved teacher, a student (joins the spec's courses), and an outsider in no course
+    (docs/phases/LESSON_VIDEOS.md integration walk)."""
+    teacher = register(api, log, "e2e-lv-teacher@example.com", "Video Teacher")
+    tp = profile(api, teacher["token"])
+    api.call("POST", f"/platform/users/{tp['id']}/teacher-status", admin_tok, {"status": "approved"})
+    teacher["profile"] = profile(api, teacher["token"])
+    out = {"teacher": teacher}
+    for key, name in (("student", "Video Student"), ("outsider", "Video Outsider")):
+        u = register(api, log, f"e2e-lv-{key}@example.com", name)
+        u["profile"] = profile(api, u["token"])
+        out[key] = u
+    return out
+# --- lesson videos end ---
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--api", required=True)
@@ -1075,11 +1092,13 @@ def main() -> int:
     hub = seed_hub(api, log, cid)  # step 3a S3 (people only; after every other row)
     catalog_listing = seed_catalog_listing(api, log, tok)  # step 3b S2 (after every other row)
     lesson_course = seed_lesson_course(api, log, tok)  # lesson course requests (people only; after every other row)
+    lesson_video = seed_lesson_video(api, log, tok)  # lesson videos (people only; after every other row)
 
     seed = {
         "hub": hub,
         "catalog_listing": catalog_listing,
         "lesson_course": lesson_course,
+        "lesson_video": lesson_video,
         "quiz_editor": quiz_editor,
         "modules": modules,
         "scrolling": scrolling,

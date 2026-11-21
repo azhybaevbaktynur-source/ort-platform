@@ -74,6 +74,8 @@ TEST_STUDENT_ROUTES: frozenset[tuple[str, str]] = frozenset({
     ("POST", f"{_G}/submissions/files"),
     ("POST", f"{_I}/done"),
     ("POST", f"{_I}/view"),
+    ("GET", f"{_I}/play"),          # LESSON_VIDEOS V3: a platform-hosted lesson video
+    ("GET", f"{_I}/captions.vtt"),
     # own attempts
     ("GET", _T),
     ("GET", f"{_T}/content"),

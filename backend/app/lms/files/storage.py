@@ -21,12 +21,13 @@ from app.lms.files.models import AssetBlob
 logger = logging.getLogger(__name__)
 
 IMMUTABLE_CACHE = "public, max-age=31536000, immutable"
-_KEY_RE = re.compile(r"^(img|priv)/([0-9a-f]{64})\.(webp|pdf)$")
+_KEY_RE = re.compile(r"^(img|priv)/([0-9a-f]{64})\.(webp|pdf|mp4|vtt)$")  # mp4/vtt: lesson videos, captions
 SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 def blob_key(sha256: str, visibility: str = "public", extension: str = "webp") -> str:
-    """Storage key of a stored blob: public `img/{sha}.webp`, private `priv/{sha}.webp`, PDF files `priv/{sha}.pdf`."""
+    """Storage key of a stored blob: public `img/{sha}.webp`, private `priv/{sha}.webp`, PDF files `priv/{sha}.pdf`,
+    lesson videos `priv/{sha}.mp4` and their captions `priv/{sha}.vtt`."""
     return f"{'priv' if visibility == 'private' else 'img'}/{sha256}.{extension}"
 
 
@@ -51,6 +52,12 @@ class BlobStorage(ABC):
 
     @abstractmethod
     def get(self, key: str) -> Optional[bytes]: ...
+
+    def get_range(self, key: str, start: int, length: int) -> Optional[bytes]:
+        """`length` bytes from offset `start` (fewer at the end). Drivers that can read a slice override this, so a
+        video range request never loads the whole blob (LESSON_VIDEOS V3 dev stream)."""
+        data = self.get(key)
+        return None if data is None else data[start:start + length]
 
     def delete(self, key: str) -> int:
         """Remove a blob (orphan cleanup only); returns the bytes really removed (0: nothing deleted). Drivers that
@@ -172,6 +179,14 @@ class LocalBlobStorage(BlobStorage):
         except FileNotFoundError:
             return None
 
+    def get_range(self, key: str, start: int, length: int) -> Optional[bytes]:
+        try:
+            with open(self._path(key), "rb") as fh:
+                fh.seek(start)
+                return fh.read(length)
+        except FileNotFoundError:
+            return None
+
 
 class DbBlobStorage(BlobStorage):
     """Blobs in `asset_blobs`. Uses its own connection and commits immediately, so the blob survives
@@ -223,6 +238,15 @@ class DbBlobStorage(BlobStorage):
         with self._engine().connect() as conn:
             row = conn.execute(select(t.c.data).where(t.c.key == _check_key(key))).first()
         return None if row is None else bytes(row[0])
+
+    def get_range(self, key: str, start: int, length: int) -> Optional[bytes]:
+        from sqlalchemy import LargeBinary, func
+
+        t = AssetBlob.__table__
+        with self._engine().connect() as conn:
+            row = conn.execute(select(func.substr(t.c.data, start + 1, length, type_=LargeBinary))
+                               .where(t.c.key == _check_key(key))).first()
+        return None if row is None else bytes(row[0] or b"")
 
 
 class R2StorageService(BlobStorage):

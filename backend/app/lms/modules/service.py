@@ -177,6 +177,30 @@ def _check_target(db: Session, course: Course, data: sch.ItemIn) -> None:
 
         if db.execute(scopes.one(course.id, data.assignment_id)).scalar_one_or_none() is None:
             raise handins.assignment_not_found()
+    elif data.kind == "video":
+        _live_video(db, course, data.video_id)
+
+
+def _live_video(db: Session, course: Course, video_id: uuid.UUID):
+    """LESSON_VIDEOS V2: a live video of this course (404 `video_not_found`)."""
+    from app.lms.course_videos import service as video_svc
+
+    return video_svc.load(db, course, video_id)
+
+
+def video_item_duration(duration_s: Optional[int]) -> Optional[int]:
+    """The video's duration stored on its item (`module_items.duration_s`, so SQL lesson aggregates see it) when it
+    fits the column's range; the read models use the video's own value either way."""
+    if duration_s is not None and ids.DURATION_S_MIN <= duration_s <= ids.DURATION_S_MAX:
+        return duration_s
+    return None
+
+
+def item_duration(r: ev_mod.ItemRow) -> Optional[int]:
+    """A row's lesson length: a video item's is its file's (LESSON_VIDEOS V3), others the typed `duration_s`."""
+    if r.kind == "video":
+        return r.video_duration_s
+    return r.item.duration_s
 
 
 def _limit(what: str, maximum: int) -> ValidationFailed:
@@ -237,7 +261,7 @@ def lesson_exists(course_id_expr):
             .where(CourseModule.course_id == course_id_expr, CourseModule.deleted_at.is_(None),
                    CourseModule.published.is_(True), ModuleItem.deleted_at.is_(None),
                    ModuleItem.published.is_(True), ModuleItem.kind.in_(ids.LESSON_KINDS),
-                   or_(ModuleItem.kind == "url",
+                   or_(ModuleItem.kind.in_(("url", "video")),  # a video cannot be deleted while an item uses it
                        and_(ModuleItem.kind == "page", Page.published.is_(True), Page.deleted_at.is_(None)),
                        and_(ModuleItem.kind == "file", CourseFile.published.is_(True),
                             CourseFile.deleted_at.is_(None))))
@@ -430,13 +454,16 @@ def add_item(db: Session, ctx: AuthzContext, course: Course, module_id: uuid.UUI
     _check_duration(data.kind, data.duration_s)
     url = _check_url(data.url) if data.kind == "url" else None
     _check_target(db, course, data)
+    duration_s = data.duration_s
+    if data.kind == "video":
+        duration_s = video_item_duration(_live_video(db, course, data.video_id).duration_s)
     items = _live_items(db, m.id)
     if len(items) >= ids.ITEMS_PER_MODULE_MAX:
         raise _limit("items", ids.ITEMS_PER_MODULE_MAX)
     it = ModuleItem(module_id=m.id, kind=data.kind, position=len(items) + 1, indent=data.indent,
                     title_override=dict(data.title_override) if data.title_override else None,
                     published=data.published, page_id=data.page_id, file_id=data.file_id,
-                    assignment_id=data.assignment_id, url=url, duration_s=data.duration_s)
+                    assignment_id=data.assignment_id, url=url, duration_s=duration_s, video_id=data.video_id)
     db.add(it)
     db.flush()
     _place(items, it, data.position)
@@ -460,6 +487,13 @@ def update_item(db: Session, ctx: AuthzContext, course: Course, module_id: uuid.
         if it.kind != "url":
             raise _invalid("url only on a link item", "validation_failed", [{"loc": ["url"], "msg": "not a url item"}])
         it.url = _check_url(data.url)
+    if "video_id" in fields:  # LESSON_VIDEOS V2: replace the file; the item (and its facts) stays
+        if it.kind != "video":
+            raise _invalid("video_id only on a video item", "validation_failed",
+                           [{"loc": ["video_id"], "msg": "not a video item"}])
+        video = _live_video(db, course, data.video_id)
+        it.video_id = video.id
+        it.duration_s = video_item_duration(video.duration_s)
     if "title_override" in fields:
         it.title_override = dict(data.title_override) if data.title_override else None
     if "indent" in fields:
@@ -663,9 +697,9 @@ def item_staff_out(r: ev_mod.ItemRow) -> sch.ItemStaffOut:
     return sch.ItemStaffOut(
         id=it.id, module_id=it.module_id, kind=it.kind, position=it.position, indent=it.indent,
         title_override=it.title_override, published=bool(it.published), page_id=it.page_id, file_id=it.file_id,
-        assignment_id=it.assignment_id, url=it.url,
+        assignment_id=it.assignment_id, url=it.url, video_id=it.video_id,
         requirement=sch.RequirementStaffOut(type=r.req_type, threshold=_f(r.threshold)) if r.req_type else None,
-        target=target, warnings=_item_warnings(r), duration_s=it.duration_s)
+        target=target, warnings=_item_warnings(r), duration_s=item_duration(r))
 
 
 def _module_staff_out(st: ev_mod.Structure, m: CourseModule) -> sch.ModuleStaffOut:
@@ -686,7 +720,7 @@ def _module_staff_out(st: ev_mod.Structure, m: CourseModule) -> sch.ModuleStaffO
         sequential=bool(m.sequential), completion_mode=m.completion_mode, rules_version=m.rules_version,
         prerequisites=list(st.prereqs.get(m.id, [])), items=[item_staff_out(r) for r in st.items.get(m.id, [])],
         warnings=warnings, deleted_at=_utc(m.deleted_at), access_tier=m.access_tier or "free",
-        duration_s=sum(r.item.duration_s or 0 for r in visible),
+        duration_s=sum(item_duration(r) or 0 for r in visible),
         lessons_count=sum(1 for r in visible if r.kind in ids.LESSON_KINDS))
 
 
@@ -783,10 +817,15 @@ def _item_student_out(course: Course, ie: ev_mod.ItemEval, *, evaluated: bool,
     if r.kind == "url" and not locked:
         parsed = parse_video(r.item.url)
         video = sch.VideoOut(**parsed) if parsed else None
+    # LESSON_VIDEOS V3: a platform-hosted video; the URL comes only from `.../play`, never on a locked row
+    video_file = None
+    if r.kind == "video" and not locked and r.video_duration_s is not None:
+        video_file = sch.VideoFileOut(duration_s=r.video_duration_s, has_captions=r.video_has_captions)
     return sch.ItemStudentOut(id=r.id, kind=r.kind, title=title, indent=r.item.indent,
                               locked=locked, requirement=req, link=link, due_at=_utc(due), video=video,
-                              duration_s=r.item.duration_s if r.kind != "header" else None,
-                              done=item_done(ie, mem) if evaluated else False, locked_reason=reason)
+                              duration_s=item_duration(r) if r.kind != "header" else None,
+                              done=item_done(ie, mem) if evaluated else False, locked_reason=reason,
+                              video_file=video_file)
 
 
 def module_student_out(st: ev_mod.Structure, me: ev_mod.ModuleEval, *, evaluated: bool = True,
@@ -1044,7 +1083,8 @@ def duplicate_module(db: Session, ctx: AuthzContext, course: Course, module_id: 
         new = ModuleItem(module_id=copy.id, kind=it.kind, position=it.position, indent=it.indent,
                          title_override=dict(it.title_override) if it.title_override else None,
                          published=bool(it.published), page_id=it.page_id, file_id=it.file_id,
-                         assignment_id=it.assignment_id, url=it.url, duration_s=it.duration_s)
+                         assignment_id=it.assignment_id, url=it.url, duration_s=it.duration_s,
+                         video_id=it.video_id)
         db.add(new)
         db.flush()
         req = reqs.get(it.id)
