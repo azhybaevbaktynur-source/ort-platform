@@ -776,3 +776,9 @@ the exam library, home to-do or the student's grades; it opens inside the lesson
 lesson. This replaces COURSE_LESSONS_DESIGN L7 («a test placed in a module appears in both») for lesson quizzes only.
 Option letters show as А Б В Г Д for ru/ky content (data stays A–E). Lesson pages get Noto Sans, 18 px, a 40 rem column
 and seven Markdown-driven components. Detail: `docs/phases/LESSON_COURSE_REQUESTS.md`.
+
+## 2026-11-22: lesson videos on the platform (content studio request R8, owner's question)
+Paid-module videos are MP4 files in the private R2 bucket, played through 20-minute signed URLs for users who may see
+the module (no shareable link; not DRM). YouTube/Vimeo links stay for free videos. Limits: 50 MB per file, 3 GB of
+live videos per course, the R2 free-tier guard for everything. Possible future cost: R2 read operations beyond
+10 M/month (~$0.36 per million) at thousands of daily viewers; nothing paid is enabled. Detail: `docs/phases/LESSON_VIDEOS.md`.

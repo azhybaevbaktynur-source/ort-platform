@@ -71,5 +71,20 @@ over 50 MB or a non-MP4 is refused; Range requests return 206 on the dev stream;
 | `lv-a-backend` | migration 0036, `course_videos` package (or inside `course_files`), MP4 probe, routes + route inventory, module item kind, play/captions/stream endpoints, settings, tests |
 | `lv-b-frontend` | CSP, video player in `LessonView`, staff outline + upload, types, i18n |
 
-## Results
-(filled in when deployed)
+## Results (2026-11-22)
+Branch `lesson-videos` (slices `lv-a-backend`, `lv-b-frontend`, e2e `lv-e2e`), migration `0036_course_videos`.
+- Routes as V2/V3 plus `GET /courses/{c}/videos/{v}/stream?token=` (dev/test drivers only; 404 on R2). Errors: 422
+  `video_invalid`/`captions_invalid`, 413 `payload_too_large`/`course_videos_quota`, 411 `length_required`, 507
+  `storage_full`, 409 `video_in_use`, 403 `item_locked` (`details.reason` module | access_required), 403
+  `video_token_invalid`, 416. A student gets 404 (not 403) for an unpublished item.
+- Security review (Fable, read-only): authz of `/play` mirrors the syllabus; token HMAC domain-separated, bound to
+  video + exp. Fixed: per-course cap `LMS_VIDEO_COURSE_MAX_BYTES` = 3 GB (videos are outside the 200 MB per-user asset
+  quota, so one course could otherwise fill R2), ftyp brand scan bounded, no dev stream on R2. Left: CSP admits any
+  `*.r2.cloudflarestorage.com` host (not an exfil path).
+- Frontend: `LessonVideo` (speed, captions via an authenticated fetch → blob URL, so CSP `media-src` has `blob:`),
+  position memory, URL refresh before expiry, view fact at 90 % or «Просмотрено»; staff «Видео» dialog uploads MP4 with
+  progress. Item `duration_s` is stored only for 60–36000 s; the API reports the video's own duration.
+- Checks: SQLite + PG suites, `alembic check`, migration tests, tsc, parity, `next build`, `e2e/lesson-video.spec.ts`
+  (3 runs; fixture `e2e/fixtures/lesson-video.mp4`, 20 s), `lessons.spec.ts`, `lesson-course.spec.ts`.
+  Screens: `LESSON_VIDEOS_screens/`.
+- Open: home «next» card does not list video items; CI Chromium may not play H.264 (playback steps skip there).
