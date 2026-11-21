@@ -256,7 +256,9 @@ function useNextAssignment(enabled: boolean) {
     if (!enabled) return;
     setError(null);
     try {
-      setItems((await listAssignments(course.id, { limit: 50 })).items as AssignmentStudentOut[]);
+      // lesson course requests C2/C3: the server leaves lesson quizzes out of this list (they live in Уроки); kept out
+      // here too, so «Следующий шаг» and «Тестов: N» never count one
+      setItems(((await listAssignments(course.id, { limit: 50 })).items as AssignmentStudentOut[]).filter((a) => a.placement !== "lesson"));
     } catch (e) {
       setError(e);
     }

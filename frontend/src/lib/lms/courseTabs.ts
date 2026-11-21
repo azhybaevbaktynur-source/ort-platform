@@ -20,12 +20,16 @@ export interface CourseTabsCourse {
   id: string;
   features?: {
     modules: boolean; files: boolean; announcements: boolean; practice?: boolean; tests?: boolean; hand_ins?: boolean;
+    lesson_quizzes?: boolean;
   } | null;
 }
 
 export interface CourseTabsOptions {
   /** Exam courses: lesson courses attached to the exam exist (true / false), or not known yet (null). */
   lessonCourses?: boolean | null;
+  /** The parent tab an object page declares for itself (lesson course requests C3: the lobby and the result of a lesson
+   * quiz belong to Уроки, which the path alone cannot tell); null / absent: the tab of the path. */
+  parent?: CourseTabKey | null;
 }
 
 export interface CourseTab {
@@ -64,6 +68,14 @@ export function tabOfPath(pathname: string, base: string): CourseTabKey | null {
   return "overview";
 }
 
+/** Lesson course requests C3: a validated `?return=` that leads back into this course's Уроки (`/lessons`, `/modules`,
+ * a lesson page under them): the attempt was started from a lesson. */
+export function isLessonReturn(ret: string | null | undefined, base: string): boolean {
+  if (!ret) return false;
+  const path = ret.split(/[?#]/, 1)[0];
+  return under(path, `${base}/lessons`) || under(path, `${base}/modules`);
+}
+
 /** The URL of each tab (relative to the course base). */
 const TAB_PATH: Record<CourseTabKey, string> = {
   overview: "", lessons: "/lessons", tests: "/tests", analytics: "/analytics", saved: "/saved",
@@ -80,8 +92,9 @@ export function shownTabs(course: CourseTabsCourse, opts: CourseTabsOptions = {}
     lessons: !!f.modules || opts.lessonCourses === true,
     // practice sets live in the Тесты tab (#practice, D6), so a course with only practice still reaches them
     tests: tests || handIns || !!f.practice,
-    analytics: tests || handIns,
-    saved: tests,
+    // lesson course requests C3 (R3): lesson quizzes feed Аналитика and Повторение, never Тесты
+    analytics: tests || handIns || !!f.lesson_quizzes,
+    saved: tests || !!f.lesson_quizzes,
   };
 }
 
@@ -89,7 +102,8 @@ export function courseTabs(course: CourseTabsCourse, pathname: string, t: T, opt
   const lang = (pathname.match(LANG_RE) || [])[1] || "ru";
   const base = `/${lang}/courses/${course.id}`;
   const shown = shownTabs(course, opts);
-  const active = tabOfPath(pathname, base);
+  const path = tabOfPath(pathname, base);
+  const active = path !== null && opts.parent ? opts.parent : path;
   const testsLabel = course.features?.hand_ins ? t("course.tabs.assignments") : t("course.tabs.tests");
   const label: Record<CourseTabKey, string> = {
     overview: t("course.tabs.overview"),

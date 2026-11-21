@@ -482,7 +482,7 @@ def feature_columns(course_id, now: datetime) -> list:
     from app.lms.assignments.scopes import visible_condition
     from app.lms.course_files.models import CourseFile
     from app.lms.exam_prep.service import _visible_test
-    from app.lms.modules.models import CourseModule
+    from app.lms.modules.models import CourseModule, ModuleItem
     from app.lms.modules.service import lesson_exists
 
     return [
@@ -501,10 +501,20 @@ def feature_columns(course_id, now: datetime) -> list:
         # (practice quizzes are mirrored too: they are `practice`, not tests)
         exists().where(_visible_test(course_id)).label("f_exam_tests"),
         exists().where(Assignment.course_id == course_id, Assignment.kind == "quiz", visible_condition(),
-                       Assessment.id == Assignment.assessment_id, Assessment.is_practice.is_(False)
+                       Assessment.id == Assignment.assessment_id, Assessment.is_practice.is_(False),
+                       Assessment.placement != "lesson"  # LESSON_COURSE_REQUESTS C2: a lesson quiz is not a test
                        ).label("f_quizzes"),
         exists().where(Assignment.course_id == course_id, Assignment.kind != "quiz", visible_condition()
                        ).label("f_hand_ins"),
+        # C2: a published live lesson quiz held by a published live item of a published live module
+        select(ModuleItem.id).join(CourseModule, CourseModule.id == ModuleItem.module_id)
+        .join(Assignment, Assignment.id == ModuleItem.assignment_id)
+        .join(Assessment, Assessment.id == Assignment.assessment_id)
+        .where(CourseModule.course_id == course_id, CourseModule.deleted_at.is_(None),
+               CourseModule.published.is_(True), ModuleItem.deleted_at.is_(None), ModuleItem.published.is_(True),
+               Assignment.course_id == course_id, Assignment.kind == "quiz", visible_condition(),
+               Assessment.placement == "lesson")
+        .exists().label("f_lesson_quizzes"),
     ]
 
 
@@ -514,7 +524,8 @@ def features_out(row, exam_prep: bool):
     return CourseFeaturesOut(
         modules=bool(row.f_lessons if exam_prep else row.f_modules), files=bool(row.f_files),
         announcements=bool(row.f_news), practice=bool(row.f_practice),
-        tests=bool(row.f_exam_tests if exam_prep else row.f_quizzes), hand_ins=bool(row.f_hand_ins))
+        tests=bool(row.f_exam_tests if exam_prep else row.f_quizzes), hand_ins=bool(row.f_hand_ins),
+        lesson_quizzes=bool(row.f_lesson_quizzes))
 # --- Phase 8a S3 end ---
 
 

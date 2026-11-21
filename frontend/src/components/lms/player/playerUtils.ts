@@ -1,3 +1,4 @@
+import { optionLabel } from "@/lib/lms/optionLabel";
 import type { StudentChoiceOut } from "@/lib/lms/contentTypes";
 import type {
   AttemptContent, AttemptItemState, AttemptState, StudentPassage, StudentQuestion,
@@ -62,7 +63,8 @@ export function orderedChoices(q: StudentQuestion, order: string[] | null): Stud
   return out;
 }
 
-export const letter = (i: number) => String.fromCharCode(65 + (i % 26));
+/** Display letter of the i-th option; ru/ky content shows Cyrillic (R5, `optionLabel`). */
+export const letter = (i: number, language?: string | null) => optionLabel(i, language);
 
 export function formatClock(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds));

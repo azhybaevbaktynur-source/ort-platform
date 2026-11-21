@@ -92,7 +92,12 @@ function Row({ item, courseId }: { item: MyGradeOut; courseId: string }) {
 }
 
 /** Student "My grades" page: states and numbers exactly as the server sends them. */
-export function StudentGrades({ courseId }: { courseId: string }) {
+export function StudentGrades({ courseId, onRows }: {
+  courseId: string;
+  /** Lesson course requests C3: told the number of grade rows once they are loaded (the Аналитика tab hides an empty
+   * «Оценки» block). */
+  onRows?: (n: number) => void;
+}) {
   const { lang, t } = useTranslation();
   const text = useGradeText();
   const [data, setData] = useState<MyGradesOut | null>(null);
@@ -106,6 +111,8 @@ export function StudentGrades({ courseId }: { courseId: string }) {
     }
   }, [courseId]);
   useEffect(() => { void load(); }, [load]);
+  const rows = data ? data.items.length : null;
+  useEffect(() => { if (rows !== null) onRows?.(rows); }, [rows, onRows]);
 
   if (error && !data) return <SchemeError error={error} onRetry={() => void load()} />;
   if (!data) return <p role="status" className="text-sm text-slate-500">{t("lms.common.loading")}</p>;

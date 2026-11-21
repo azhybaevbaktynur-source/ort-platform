@@ -96,6 +96,8 @@ export interface AssessmentStaffSummaryOut {
   available_from: string | null;
   available_until: string | null;
   deleted_at: string | null;
+  /** Lesson course requests C1: where a student finds the quiz (absent on an older backend = "tests"). */
+  placement?: AssessmentPlacement;
 }
 
 export interface LastResult {
@@ -170,6 +172,9 @@ export interface LobbySectionOut {
   item_count: number;
 }
 
+/** Lesson course requests C1: `tests` (Тесты, grades) or `lesson` (inside a lesson page only, practice). */
+export type AssessmentPlacement = "tests" | "lesson";
+
 export interface AssessmentLobbyOut {
   id: string;
   title: LocalizedText;
@@ -191,6 +196,8 @@ export interface AssessmentLobbyOut {
   /** S3 access */
   access_tier?: "free" | "paid";
   locked?: boolean;
+  /** Lesson course requests C1 (absent on an older backend = "tests") */
+  placement?: AssessmentPlacement;
 }
 
 /** GET /assessments/{a} returns the staff or lobby shape depending on the caller's role. */
@@ -205,10 +212,14 @@ export interface AssessmentCreateIn {
   preset: AssessmentPreset;
   languages: Lang[];
   subject_key?: string;
+  /** Lesson course requests C1 (default "tests"; `lesson` only for a plain, non-practice quiz) */
+  placement?: AssessmentPlacement;
 }
 
 export interface AssessmentUpdateIn extends AssessmentGradingUpdate {
   draft_rev: number;
+  /** Lesson course requests C1 */
+  placement?: AssessmentPlacement;
   title?: LocalizedText;
   description?: LocalizedText | null;
   languages?: Lang[];

@@ -128,6 +128,8 @@ export interface Seed {
     teacher: SeedUser; student: SeedUser;
     ready_id: string; declined_id: string; incomplete_id: string; blocked_id: string;
   };
+  /** Lesson course requests (lesson-course.spec.ts): an approved teacher and a student in no course. */
+  lesson_course: { teacher: SeedUser; student: SeedUser };
   /** PERFORMANCE_AUDIT P3: a password student in no course (login.spec.ts). */
   login_student: SeedUser & { password: string };
   /** TEACHER_TO_STUDENT_MAP S5: the lesson course "Мастеркласс E2E" (platform organization, draft, open enrollment in

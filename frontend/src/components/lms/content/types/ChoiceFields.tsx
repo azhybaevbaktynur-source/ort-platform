@@ -9,6 +9,7 @@ import { RichTextField } from "../RichTextField";
 import { inputCls, labelCls } from "../ui";
 import { btnSmall } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { nextChoiceId, type ChoiceForm, type QuestionForm } from "./formModel";
+import { optionLabel } from "@/lib/lms/optionLabel";
 
 /** single_choice and multiple_answers: choices with letters as ids, mark correct, reorder, optional images. */
 export function ChoiceFields({
@@ -104,7 +105,7 @@ export function ChoiceFields({
                       aria-label={t("quizEditor.card.markCorrect", { letter: c.id })}
                       aria-invalid={correctBad && i === 0 ? true : undefined} aria-describedby={correctBad ? errId : undefined}
                       onChange={() => (multi ? toggleMulti(c.id) : onChange({ correctSingle: c.id }))} />
-                    <span aria-hidden="true" className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-700">{c.id}</span>
+                    <span aria-hidden="true" className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-700">{optionLabel(c.id, form.language)}</span>
                   </label>
                   <div className="min-w-0 flex-1">
                     <RichTextField rows={1} autoGrow smartPreview toolbarOnFocus value={c.text} disabled={disabled}
@@ -185,7 +186,7 @@ export function ChoiceFields({
           return (
             <li key={c.id} className={`rounded-xl border p-3 ${checked ? "border-emerald-300 bg-emerald-50/40" : "border-slate-200"}`}>
               <div className="mb-2 flex items-center gap-3">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-700">{c.id}</span>
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-700">{optionLabel(c.id, form.language)}</span>
                 <label className="flex items-center gap-1.5 text-sm text-slate-700">
                   <input type={multi ? "checkbox" : "radio"} name="correct-choice" disabled={disabled} checked={checked}
                     onChange={() => (multi ? toggleMulti(c.id) : onChange({ correctSingle: c.id }))} />

@@ -659,7 +659,7 @@ def item_staff_out(r: ev_mod.ItemRow) -> sch.ItemStaffOut:
     if it.kind in ids.TARGET_KINDS:
         target = sch.ItemTargetOut(title=r.target_title, published=r.target_published, deleted=r.target_deleted,
                                    language=r.language, assignment_kind=r.assignment_kind,
-                                   assessment_id=r.assessment_id)
+                                   assessment_id=r.assessment_id, placement=r.placement)
     return sch.ItemStaffOut(
         id=it.id, module_id=it.module_id, kind=it.kind, position=it.position, indent=it.indent,
         title_override=it.title_override, published=bool(it.published), page_id=it.page_id, file_id=it.file_id,
@@ -721,7 +721,7 @@ def _link(r: ev_mod.ItemRow) -> Optional[sch.ItemLinkOut]:
         return sch.ItemLinkOut(file_id=it.file_id)
     if it.kind == "assignment":
         return sch.ItemLinkOut(assignment_id=it.assignment_id, assessment_id=r.assessment_id,
-                               assignment_kind=r.assignment_kind)
+                               assignment_kind=r.assignment_kind, placement=r.placement)
     if it.kind == "url":
         return sch.ItemLinkOut(url=it.url)
     return None

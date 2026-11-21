@@ -35,6 +35,7 @@ class QuizCreateIn(_In):
     exam_template_id: Optional[uuid.UUID] = None
     exam_template_version_id: Optional[uuid.UUID] = None
     parameters: Optional[dict] = None
+    placement: Literal["tests", "lesson"] = "tests"  # LESSON_COURSE_REQUESTS C1 (builder: 422 placement_not_allowed)
 
     @model_validator(mode="after")
     def _v(self):
@@ -162,6 +163,7 @@ class AssignmentStaffSummaryOut(BaseModel):
     position: int
     deleted_at: Optional[datetime] = None
     counts: AssignmentCountsOut
+    placement: Optional[str] = None  # quiz: its assessment's tests | lesson; null for hand-ins (LESSON_COURSE_REQUESTS C1)
 
 
 class AssignmentStaffOut(AssignmentStaffSummaryOut):
@@ -240,6 +242,7 @@ class AssignmentStudentOut(BaseModel):
     attempts_left: Optional[int] = None        # quiz only; null = unlimited or not applicable
     submitted_at: Optional[datetime] = None    # latest hand-in
     late: bool = False
+    placement: Optional[str] = None            # quiz: tests | lesson; null for hand-ins (LESSON_COURSE_REQUESTS C1)
 
 
 class AssignmentStudentDetailOut(AssignmentStudentOut):

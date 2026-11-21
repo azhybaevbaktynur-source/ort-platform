@@ -957,6 +957,19 @@ def seed_catalog_listing(api: Api, log: Path, admin_tok: str) -> dict:
 # --- Step 3b S2 end ---
 
 
+# --- lesson course requests begin --- (frontend/e2e/lesson-course.spec.ts; people only, the spec builds its courses)
+def seed_lesson_course(api: Api, log: Path, admin_tok: str) -> dict:
+    """An approved teacher and one student in no course (docs/phases/LESSON_COURSE_REQUESTS.md integration walk)."""
+    teacher = register(api, log, "e2e-lc-teacher@example.com", "Lesson Teacher")
+    tp = profile(api, teacher["token"])
+    api.call("POST", f"/platform/users/{tp['id']}/teacher-status", admin_tok, {"status": "approved"})
+    teacher["profile"] = profile(api, teacher["token"])
+    student = register(api, log, "e2e-lc-student@example.com", "Lesson Student")
+    student["profile"] = profile(api, student["token"])
+    return {"teacher": teacher, "student": student}
+# --- lesson course requests end ---
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--api", required=True)
@@ -1061,10 +1074,12 @@ def main() -> int:
     login_student["profile"] = profile(api, login_student["token"])
     hub = seed_hub(api, log, cid)  # step 3a S3 (people only; after every other row)
     catalog_listing = seed_catalog_listing(api, log, tok)  # step 3b S2 (after every other row)
+    lesson_course = seed_lesson_course(api, log, tok)  # lesson course requests (people only; after every other row)
 
     seed = {
         "hub": hub,
         "catalog_listing": catalog_listing,
+        "lesson_course": lesson_course,
         "quiz_editor": quiz_editor,
         "modules": modules,
         "scrolling": scrolling,

@@ -73,6 +73,8 @@ export interface AssignmentStaffSummaryOut {
   position: number;
   deleted_at: string | null;
   counts: AssignmentCounts;
+  /** Lesson course requests C1: the quiz's placement (null for hand-ins; absent on an older backend) */
+  placement?: "tests" | "lesson" | null;
 }
 
 export interface AssignmentStaffOut extends AssignmentStaffSummaryOut {
@@ -144,6 +146,8 @@ export interface AssignmentStudentOut {
   /** latest hand-in */
   submitted_at?: string | null;
   late?: boolean;
+  /** Lesson course requests C1: the quiz's placement (null for hand-ins; absent on an older backend) */
+  placement?: "tests" | "lesson" | null;
 }
 
 export interface AssignmentStudentDetailOut extends AssignmentStudentOut {

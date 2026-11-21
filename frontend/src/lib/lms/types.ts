@@ -485,6 +485,8 @@ export interface CourseFeaturesOut {
    * «Задания» (a visible non-quiz assignment), for every course (optional: older backend). */
   tests?: boolean;
   hand_ins?: boolean;
+  /** Lesson course requests C2: a published lesson quiz in a published module (optional: older backend). */
+  lesson_quizzes?: boolean;
 }
 
 export interface CourseStudentOut {

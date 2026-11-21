@@ -5,9 +5,16 @@
 // Phase 8c UX m5: auto-render is loaded once per page (`preloadKatexAutoRender`, called when an editor with a preview
 // mounts). Once loaded, typesetting runs before paint; while it loads, a body with "$" stays invisible, so phones
 // never flash raw LaTeX.
-import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
+// Lesson course requests R6 / C6: the body uses Noto Sans (`noto.variable`, read by `.page-body` in globals.css).
+// «Проверь себя» answers are native <details> (no JS needed to open them); the server writes the closed summary text
+// («Показать ответ» / «Жоопту көрсөт»), and this component swaps it for `pages.view.hideAnswer` while the answer is
+// open and back when it closes. Printing opens every <details> (CSS `::details-content`, plus `beforeprint` where
+// that selector is not supported).
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "katex/dist/katex.min.css";
 import { cn } from "@/components/ui";
+import { useTranslation } from "@/lib/i18n/context";
+import { noto } from "@/lib/fonts";
 
 type AutoRender = (el: HTMLElement, opts: Record<string, unknown>) => void;
 let autoRender: AutoRender | null = null;
@@ -59,10 +66,41 @@ export function SafeHtml({ html, className }: { html: string; className?: string
       .finally(() => { if (!cancelled) setPending(false); });
     return () => { cancelled = true; };
   }, [html]);
+  const { t } = useTranslation();
+  const hideText = t("pages.view.hideAnswer");
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // `toggle` does not bubble: listen in the capture phase on the body
+    const onToggle = (e: Event) => {
+      const d = e.target;
+      if (!(d instanceof HTMLDetailsElement) || d.classList.contains("why") || !d.closest(".callout--check")) return;
+      const summary = d.querySelector(":scope > summary") as HTMLElement | null;
+      if (!summary) return;
+      if (summary.dataset.closedText === undefined) summary.dataset.closedText = summary.textContent ?? "";
+      summary.textContent = d.open ? hideText : summary.dataset.closedText;
+    };
+    // print: open closed answers for the printout, close them again afterwards (browsers without ::details-content)
+    const printOpened: HTMLDetailsElement[] = [];
+    const supportsDetailsContent = typeof CSS !== "undefined" && CSS.supports?.("selector(::details-content)");
+    const beforePrint = () => {
+      if (supportsDetailsContent) return;
+      el.querySelectorAll("details:not([open])").forEach((d) => { (d as HTMLDetailsElement).open = true; printOpened.push(d as HTMLDetailsElement); });
+    };
+    const afterPrint = () => { printOpened.splice(0).forEach((d) => { d.open = false; }); };
+    el.addEventListener("toggle", onToggle, true);
+    window.addEventListener("beforeprint", beforePrint);
+    window.addEventListener("afterprint", afterPrint);
+    return () => {
+      el.removeEventListener("toggle", onToggle, true);
+      window.removeEventListener("beforeprint", beforePrint);
+      window.removeEventListener("afterprint", afterPrint);
+    };
+  }, [hideText]);
   return (
     <div
       ref={ref}
-      className={cn("page-body max-w-none", pending && "invisible", className)}
+      className={cn("page-body", noto.variable, pending && "invisible", className)}
       dangerouslySetInnerHTML={inner}
     />
   );

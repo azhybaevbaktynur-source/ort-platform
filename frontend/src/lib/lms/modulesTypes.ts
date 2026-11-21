@@ -97,6 +97,8 @@ export interface ItemTargetOut {
   language?: string | null;
   assignment_kind?: AssignmentKind | null;
   assessment_id?: string | null;
+  /** Lesson course requests C1: a quiz target's placement */
+  placement?: "tests" | "lesson" | null;
 }
 
 export interface ItemStaffOut {
@@ -168,6 +170,8 @@ export interface ItemLinkOut {
   assessment_id?: string | null;
   assignment_kind?: AssignmentKind | null;
   url?: string | null;
+  /** Lesson course requests C1/C3: a quiz with `lesson` opens inside the lesson page, never the lobby */
+  placement?: "tests" | "lesson" | null;
 }
 
 /** Student UI U7 (§4.4): an allowlisted YouTube / Vimeo url item; the player URL is built from `id` only. */

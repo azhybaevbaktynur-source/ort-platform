@@ -2291,6 +2291,9 @@
     "actions": {
       "reviewMistakes": "Review mistakes",
       "nextTest": "Next test"
+    },
+    "lesson": {
+      "backToLesson": "Back to the lesson"
     }
   },
   "schemes": {
@@ -5116,6 +5119,7 @@
       "empty": "The preview appears here as you type. Write formulas between dollar signs, for example $x^2$."
     },
     "view": {
+      "hideAnswer": "Hide answer",
       "edit": "Edit",
       "variants": "Language",
       "updated": "Updated {date}",
@@ -5579,7 +5583,22 @@
       "fileBody": "A file for this lesson.",
       "prevShort": "Back",
       "positionShort": "{n}/{total}",
-      "nextShort": "Next"
+      "nextShort": "Next",
+      "quiz": {
+        "eyebrow": "Lesson quiz",
+        "questions": "{count} questions",
+        "questions_one": "{count} question",
+        "questions_few": "{count} questions",
+        "questions_many": "{count} questions",
+        "questions_other": "{count} questions",
+        "best": "Best result: {percent}%",
+        "done": "Done",
+        "start": "Start",
+        "again": "Try again",
+        "resume": "Continue",
+        "accessCode": "This quiz needs an access code. Enter it on the quiz page.",
+        "toLobby": "Open the quiz page"
+      }
     }
   },
   "courseNav": {

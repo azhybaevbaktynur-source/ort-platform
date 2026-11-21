@@ -477,3 +477,36 @@ def test_0034_course_listing_backfill_on_pg(alembic_engine):
         _upgrade(cfg, conn, "0034_course_listing")
         assert states(conn) == expected
     engine.dispose()
+
+
+def test_0035_assessment_placement_on_pg(alembic_engine):
+    """LESSON_COURSE_REQUESTS C1: every existing assessment becomes `tests` (server default, NOT NULL); the checks
+    refuse an unknown value and a lesson preset / practice quiz; down drops the column, up again restores it."""
+    from alembic import command
+
+    from app.db.migrate import _config
+    from tests.test_migration_0014 import _migrate
+    from tests.test_migration_0015 import _upgrade
+
+    engine = _migrate(TEST_URL)[0]
+    cfg = _config(TEST_URL)
+    with engine.connect() as conn:
+        cfg.attributes["connection"] = conn
+        _upgrade(cfg, conn, "0034_course_listing")
+        n = conn.execute(text("SELECT count(*) FROM assessments")).scalar()
+        _upgrade(cfg, conn, "0035_assessment_placement")
+        col = {c["name"]: c for c in inspect(conn).get_columns("assessments")}["placement"]
+        assert not col["nullable"] and col["type"].length == 16
+        assert conn.execute(text("SELECT count(*) FROM assessments WHERE placement = 'tests'")).scalar() == n
+        if n:
+            for sql in ("UPDATE assessments SET placement = 'maybe'",
+                        "UPDATE assessments SET placement = 'lesson', is_practice = true, preset = 'none'"):
+                with pytest.raises(Exception):
+                    conn.execute(text(sql))
+                conn.rollback()
+        command.downgrade(cfg, "0034_course_listing")
+        conn.commit()
+        assert "placement" not in {c["name"] for c in inspect(conn).get_columns("assessments")}
+        _upgrade(cfg, conn, "0035_assessment_placement")
+        assert conn.execute(text("SELECT count(*) FROM assessments WHERE placement = 'tests'")).scalar() == n
+    engine.dispose()

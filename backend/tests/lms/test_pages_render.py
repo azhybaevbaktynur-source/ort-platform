@@ -25,7 +25,9 @@ FORBIDDEN = (
     re.compile(r"<input", re.I), re.compile(r"<!--"),
 )
 ALLOWED_TAGS = {"p", "h2", "h3", "h4", "ul", "ol", "li", "strong", "em", "u", "s", "a", "img", "br", "hr",
-                "blockquote", "code", "pre", "table", "thead", "tbody", "tr", "th", "td", "sup", "sub"}
+                "blockquote", "code", "pre", "table", "thead", "tbody", "tr", "th", "td", "sup", "sub",
+                # lesson components (LESSON_COURSE_REQUESTS C5), created by the server only
+                "section", "aside", "figure", "figcaption", "details", "summary", "div"}
 
 
 @pytest.mark.parametrize("case", CASES, ids=[c["name"] for c in CASES])
