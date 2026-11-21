@@ -208,6 +208,7 @@ class Settings(BaseSettings):
     # --- Phase 8a S1 end ---
     # --- Lesson videos begin --- (docs/phases/LESSON_VIDEOS.md V2, V3)
     LMS_VIDEO_MAX_BYTES: int = 52_428_800  # one MP4 upload (50 MiB; 413 payload_too_large)
+    LMS_VIDEO_COURSE_MAX_BYTES: int = 3_000_000_000  # live videos of one course (413 course_videos_quota; security review)
     LMS_VIDEO_URL_TTL_S: int = 1200        # playback URL lifetime: R2 presign / dev stream token `exp`
     # --- Lesson videos end ---
     # --- Phase 8b S1 begin --- (exam template preview, docs/phases/PHASE_8B_DESIGN.md 5.1, P8B-2)

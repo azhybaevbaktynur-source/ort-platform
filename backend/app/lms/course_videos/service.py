@@ -156,6 +156,16 @@ def upload(db: Session, ctx: AuthzContext, course_id: uuid.UUID, raw: bytes, *, 
     if existing is not None:
         db.commit()
         return existing, True
+    # security review (2026-11-22): a per-course byte cap, so one course cannot fill the shared R2 free tier
+    from sqlalchemy import func
+
+    used = db.execute(select(func.coalesce(func.sum(CourseVideo.size_bytes), 0)).where(
+        CourseVideo.course_id == course.id, CourseVideo.deleted_at.is_(None))).scalar_one()
+    cap = settings.LMS_VIDEO_COURSE_MAX_BYTES
+    if int(used) + len(raw) > cap:
+        db.rollback()
+        raise PayloadTooLarge("The course has no room for more videos", code="course_videos_quota",
+                              details={"used": int(used), "max": cap})
     asset, _dup = files_svc.ingest_private_media(db, ctx.user, raw, course_id=course.id, mime=ids.VIDEO_MIME,
                                                  extension=ids.VIDEO_EXT, filename=filename)
     row = CourseVideo(course_id=course.id, asset_id=asset.id, title=title_, size_bytes=len(raw), sha256=sha,
@@ -324,6 +334,8 @@ def stream_video(db: Session, course_id: uuid.UUID, video_id: uuid.UUID, token: 
     from fastapi.responses import StreamingResponse
 
     stream.check_token(video_id, token)
+    if settings.LMS_STORAGE_DRIVER == "r2":
+        raise not_found()  # security review: R2 plays through presigned URLs only (a range here would read the whole blob)
     row = db.execute(select(Asset.storage_key, Asset.bytes).join(CourseVideo, CourseVideo.asset_id == Asset.id)
                      .where(CourseVideo.id == video_id, CourseVideo.course_id == course_id,
                             CourseVideo.deleted_at.is_(None))).first()

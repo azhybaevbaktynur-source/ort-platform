@@ -139,7 +139,8 @@ def probe(data: bytes) -> Mp4Info:
     if kind != b"ftyp":
         raise Mp4Invalid("ftyp is not the first box")
     _need(s, e, 8, "ftyp")
-    brands = {bytes(buf[s:s + 4])} | {bytes(buf[i:i + 4]) for i in range(s + 8, e - 3, 4)}
+    # security review: brands are read from the first 256 bytes only (a huge ftyp cannot cost CPU)
+    brands = {bytes(buf[s:s + 4])} | {bytes(buf[i:i + 4]) for i in range(s + 8, min(e, s + 256) - 3, 4)}
     if not brands & MP4_BRANDS:
         raise Mp4Invalid("no MP4 brand")
     moov = None

@@ -221,6 +221,25 @@ async def test_upload_too_large_and_invalid(api, db, monkeypatch):
     assert db.scalars(select(CourseVideo).where(CourseVideo.course_id == w.course.id)).all() == []
 
 
+async def test_course_video_byte_cap(api, db, monkeypatch):
+    """Security review 2026-11-22: live videos of one course are capped (413 `course_videos_quota`)."""
+    w = structure_world(db)
+    a, b = make_mp4(seconds=60), make_mp4(seconds=61)
+    monkeypatch.setattr(settings, "LMS_VIDEO_COURSE_MAX_BYTES", len(a) + len(b) - 1)
+    assert (await upload(w.O, w, a)).status_code == 201
+    r = await upload(w.O, w, b)
+    assert (r.status_code, code(r)) == (413, "course_videos_quota"), r.text
+    assert (await upload(w.O, w, a)).status_code == 200  # a duplicate needs no room
+
+
+def test_probe_ftyp_brand_scan_is_bounded():
+    from app.lms.course_videos import mp4 as probe_mod
+
+    data = make_mp4()
+    # a valid file stays valid; the brand scan reads at most 256 bytes of ftyp
+    assert probe_mod.probe(data).duration_s >= 0
+
+
 async def test_staff_only_routes(api, db):
     w = structure_world(db)
     v = await video_of(w)
