@@ -16,8 +16,8 @@ REAPPLY_RATE_PER_HOUR = 10     # per user (7.1)
 PROGRESS_RATE_PER_HOUR = 600   # per user, shared `progress_limit` for view + done (6.6)
 
 # ------------------------------------------------------------------ enumerations (CHECKs in models.py / 0012)
-ITEM_KINDS = ("page", "file", "assignment", "url", "header")
-TARGET_KINDS = ("page", "file", "assignment")      # items whose target has its own published/deleted state
+ITEM_KINDS = ("page", "file", "assignment", "url", "header", "video")  # video: LESSON_VIDEOS V1 (0036)
+TARGET_KINDS = ("page", "file", "assignment", "video")  # items whose target has its own published/deleted state
 REQUIREMENT_TYPES = ("view", "mark_done", "submit", "min_score", "min_percent")
 ASSIGNMENT_ONLY_REQUIREMENTS = ("submit", "min_score", "min_percent")  # else 422 `requirement_kind_mismatch`
 THRESHOLD_REQUIREMENTS = ("min_score", "min_percent")
@@ -28,8 +28,9 @@ HOME_KINDS = ("modules", "page", "assignments")
 MODULE_TIERS = ("free", "paid")    # F5a: course_modules.access_tier (CHECK in models.py / 0024)
 DURATION_S_MIN = 60                # F5a: module_items.duration_s, seconds (1..600 minutes in the editor)
 DURATION_S_MAX = 36000
-LESSON_KINDS = ("page", "file", "url")  # F5a L2: a lesson; `assignment` items are tests (steps, not lessons)
-DURATION_KINDS = LESSON_KINDS           # items that take a duration (422 on header / assignment)
+LESSON_KINDS = ("page", "file", "url", "video")  # F5a L2: a lesson; `assignment` items are tests (steps, not lessons)
+# items that take a typed duration (422 on header / assignment / video: a video item's duration is its file's)
+DURATION_KINDS = ("page", "file", "url")
 DEFAULT_HOME_KIND = "assignments"  # server default of courses.home_kind: today's layout
 
 # Submission states that satisfy `submit` / `min_*` (6.2 step 4)

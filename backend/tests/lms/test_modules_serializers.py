@@ -14,7 +14,7 @@ from tests.lms.s3_support import api, clean_rate_limits, db  # noqa: F401
 MODULE_KEYS = {"id", "title", "state", "unlock_at", "sequential", "completion_mode", "current_position",
                "lock_reasons", "items", "access_tier", "access_locked", "done", "total", "duration_s"}  # + F5a
 ITEM_KEYS = {"id", "kind", "title", "indent", "locked", "requirement", "link", "due_at", "video",
-             "duration_s", "done", "locked_reason"}  # + F5a
+             "duration_s", "done", "locked_reason", "video_file"}  # + F5a, + LESSON_VIDEOS V3
 REQ_KEYS = {"type", "threshold", "met", "best_score_percent"}
 LINK_KEYS = {"page_id", "file_id", "assignment_id", "assessment_id", "assignment_kind", "url",
              "placement"}  # LESSON_COURSE_REQUESTS C1

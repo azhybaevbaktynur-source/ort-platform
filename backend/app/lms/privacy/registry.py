@@ -118,6 +118,7 @@ ENTRIES: list[Entry] = [
     *_refs("bank_questions", "deleted_by_id"),
     *_refs("consent_records", "user_id", "granted_by_id", action="keep_tombstone"),
     *_refs("course_files", "created_by_id", "deleted_by_id"),
+    *_refs("course_videos", "created_by_id", "deleted_by_id"),  # lesson videos (0036)
     *_refs("course_modules", "created_by_id", "deleted_by_id"),
     *_refs("courses", "owner_id", action="keep_tombstone"),
     *_refs("courses", "deleted_by_id", "listing_decided_by_id"),  # step 3b: the admin who decided the listing

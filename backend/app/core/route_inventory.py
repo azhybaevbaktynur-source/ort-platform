@@ -112,6 +112,11 @@ ROUTE_POLICIES.update(PAGE_POLICIES)
 ROUTE_POLICIES.update(COURSE_FILE_POLICIES)
 ROUTE_POLICIES.update(ANNOUNCEMENT_POLICIES)
 # --- Phase 8a S1 end ---
+# --- Lesson videos begin --- (docs/phases/LESSON_VIDEOS.md V2, V3; the dev stream is `public`: HMAC token)
+from app.lms.course_videos.policies import COURSE_VIDEO_POLICIES  # noqa: E402
+
+ROUTE_POLICIES.update(COURSE_VIDEO_POLICIES)
+# --- Lesson videos end ---
 # --- Phase 10 S0 begin --- (empty dicts; S1..S6 fill them)
 from app.lms.analytics.policies import ANALYTICS_POLICIES  # noqa: E402
 from app.lms.practice.policies import PRACTICE_POLICIES  # noqa: E402

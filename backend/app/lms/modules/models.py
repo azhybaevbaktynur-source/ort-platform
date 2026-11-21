@@ -35,14 +35,14 @@ def _in(col: str, values) -> str:
 
 
 def _target(kind: str, present: Optional[str]) -> str:
-    cols = ("page_id", "file_id", "assignment_id", "url")
+    cols = ("page_id", "file_id", "assignment_id", "url", "video_id")
     parts = [f"kind = '{kind}'"] + [f"{c} IS NOT NULL" if c == present else f"{c} IS NULL" for c in cols]
     return "(" + " AND ".join(parts) + ")"
 
 
 ITEM_TARGET_CHECK = " OR ".join((
     _target("page", "page_id"), _target("file", "file_id"), _target("assignment", "assignment_id"),
-    _target("url", "url"), _target("header", None),
+    _target("url", "url"), _target("header", None), _target("video", "video_id"),
 ))
 
 
@@ -105,6 +105,8 @@ class ModuleItem(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
     url: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
     deleted_by_id: Mapped[Optional[str]] = _user()
     duration_s: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # F5a (0024): lesson length
+    # LESSON_VIDEOS V1 (0036): a platform-hosted lesson video; `duration_s` mirrors the video's when in range
+    video_id: Mapped[Optional[uuid.UUID]] = _fk("course_videos.id", nullable=True)
 
     __table_args__ = (
         CheckConstraint(_in("kind", ITEM_KINDS), name="kind_valid"),
@@ -116,6 +118,7 @@ class ModuleItem(UUIDPKMixin, TimestampMixin, SoftDeleteMixin, Base):
         Index("ix_module_items_assignment_id", "assignment_id"),
         Index("ix_module_items_page_id", "page_id"),
         Index("ix_module_items_file_id", "file_id"),
+        Index("ix_module_items_video_id", "video_id"),
     )
 
 

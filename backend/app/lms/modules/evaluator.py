@@ -34,6 +34,7 @@ from sqlalchemy.orm import Session
 from app.lms.assessments.models import Assessment
 from app.lms.assignments.models import Assignment
 from app.lms.course_files.models import CourseFile
+from app.lms.course_videos.models import CourseVideo
 from app.lms.courses.models import Course
 from app.lms.grading.models import Submission
 from app.lms.modules import ids
@@ -78,6 +79,8 @@ class ItemRow:
     preset: Optional[str] = None               # quiz assignment: the assessment's preset (8a UX M6, gating exemption)
     placement: Optional[str] = None            # quiz assignment: `tests` | `lesson` (LESSON_COURSE_REQUESTS C1)
     due_at: Optional[datetime] = None          # assignment: its due date; a quiz's assessment is the truth (UX rework)
+    video_duration_s: Optional[int] = None     # video (LESSON_VIDEOS V3): the file's duration
+    video_has_captions: bool = False           # video
 
     @property
     def id(self) -> uuid.UUID:
@@ -149,19 +152,21 @@ def load_structure(db: Session, course: Course, *, include_deleted: bool = False
                CourseFile.title, CourseFile.published, CourseFile.deleted_at,
                Assignment.title, Assignment.published, Assignment.deleted_at, Assignment.kind,
                Assignment.assessment_id, Assignment.points_possible, Assessment.preset, Assignment.due_at,
-               Assessment.due_at, Assessment.placement)
+               Assessment.due_at, Assessment.placement,
+               CourseVideo.title, CourseVideo.deleted_at, CourseVideo.duration_s, CourseVideo.captions_asset_id)
         .join(CourseModule, CourseModule.id == ModuleItem.module_id)
         .outerjoin(ItemCompletionRequirement, ItemCompletionRequirement.item_id == ModuleItem.id)
         .outerjoin(Page, Page.id == ModuleItem.page_id)
         .outerjoin(CourseFile, CourseFile.id == ModuleItem.file_id)
         .outerjoin(Assignment, Assignment.id == ModuleItem.assignment_id)
         .outerjoin(Assessment, Assessment.id == Assignment.assessment_id)
+        .outerjoin(CourseVideo, CourseVideo.id == ModuleItem.video_id)
         .where(CourseModule.course_id == course.id, ModuleItem.deleted_at.is_(None))
         .order_by(ModuleItem.module_id, ModuleItem.position, ModuleItem.id)
         .execution_options(populate_existing=True)
     ).all()
     for (it, rtype, thr, p_title, p_lang, p_pub, p_del, f_title, f_pub, f_del, a_title, a_pub, a_del, a_kind,
-         a_assessment, a_points, a_preset, a_due, q_due, a_placement) in rows:
+         a_assessment, a_points, a_preset, a_due, q_due, a_placement, v_title, v_del, v_dur, v_caps) in rows:
         row = ItemRow(item=it, req_type=rtype, threshold=thr)
         if it.kind == "page":
             row.target_published, row.target_deleted = bool(p_pub), p_del is not None
@@ -177,6 +182,10 @@ def load_structure(db: Session, course: Course, *, include_deleted: bool = False
             row.preset = a_preset
             row.placement = a_placement if a_kind == "quiz" else None
             row.due_at = q_due if a_kind == "quiz" else a_due
+        elif it.kind == "video":  # no publish state of its own: live = visible
+            row.target_published, row.target_deleted = True, v_del is not None
+            row.target_title = {course.default_language: v_title} if v_title is not None else None
+            row.video_duration_s, row.video_has_captions = v_dur, v_caps is not None
         items.setdefault(it.module_id, []).append(row)
     return Structure(course=course, modules=live, prereqs=prereqs, items=items, deleted_modules=deleted)
 

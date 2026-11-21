@@ -86,9 +86,15 @@ def _clean_filename(name: Optional[str]) -> Optional[str]:
     return base or None
 
 
+# Lesson videos and their captions (LESSON_VIDEOS V1): staff-only course media with their own size caps, counted by
+# the R2 free-tier guard; they never use up the owner's image/PDF quota.
+QUOTA_EXEMPT_MIMES = ("video/mp4", "text/vtt")
+
+
 def _used_bytes(db: Session, owner_id: str) -> int:
     return int(db.scalar(
-        select(func.coalesce(func.sum(Asset.bytes), 0)).where(Asset.owner_id == owner_id)  # deleted assets still count
+        select(func.coalesce(func.sum(Asset.bytes), 0))
+        .where(Asset.owner_id == owner_id, Asset.mime.notin_(QUOTA_EXEMPT_MIMES))  # deleted assets still count
     ) or 0)
 
 
@@ -371,6 +377,37 @@ def ingest_file(db: Session, actor: User, raw: bytes, *, course_id, filename: Op
         original_filename=_clean_filename(filename),
     )
     return _add_asset(db, asset, actor.id, dedup, "private")
+
+
+def ingest_private_media(db: Session, actor: User, raw: bytes, *, course_id, mime: str, extension: str,
+                         filename: Optional[str] = None) -> tuple[Asset, bool]:
+    """LESSON_VIDEOS V1: an already validated lesson video (`video/mp4`, `mp4`) or captions file (`text/vtt`, `vtt`),
+    stored as-is under `priv/{sha}.{ext}` as a private `file` asset (same row type as course files, so dedup, the
+    storage guard `usage.store_blob` -> 507 `storage_full`, and orphan handling are shared). No per-user quota
+    (`QUOTA_EXEMPT_MIMES`). Returns (asset, deduplicated). Does NOT commit."""
+    if mime not in QUOTA_EXEMPT_MIMES:
+        raise ValueError("not a lesson media type")
+    sha = hashlib.sha256(raw).hexdigest()
+    maybe_sweep_orphans(db)
+    existing = _find(db, actor.id, sha, "private")
+    if existing is not None and existing.mime == mime:
+        if existing.deleted_at is not None:
+            existing.restore()
+            db.flush()
+        return existing, True
+    if existing is not None:  # the same bytes as another kind of private asset: never mix the two
+        raise FileInvalid("This file is already stored as another type")
+    if settings.LMS_STORAGE_DRIVER.lower() == "r2" and not settings.R2_PRIVATE_BUCKET:
+        raise Conflict("Private storage is not configured", code="private_storage_unavailable")
+    key = blob_key(sha, "private", extension)
+    _check_global_db_cap(db, key, len(raw))
+    usage.store_blob(db, key, raw, mime)  # exists check, then atomic reservation (507)
+    asset = Asset(
+        owner_id=actor.id, course_id=course_id, kind="file", visibility="private", source_sha256=sha, sha256=sha,
+        storage_key=key, mime=mime, extension=extension, bytes=len(raw), source_bytes=len(raw),
+        original_filename=_clean_filename(filename),
+    )
+    return _add_asset(db, asset, actor.id, sha, "private")
 
 
 def resolve_image_refs(db: Session, actor: User, ids: Iterable[uuid.UUID], *,

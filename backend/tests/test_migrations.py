@@ -510,3 +510,40 @@ def test_0035_assessment_placement_on_pg(alembic_engine):
         _upgrade(cfg, conn, "0035_assessment_placement")
         assert conn.execute(text("SELECT count(*) FROM assessments WHERE placement = 'tests'")).scalar() == n
     engine.dispose()
+
+
+def test_0036_course_videos_on_pg(alembic_engine):
+    """LESSON_VIDEOS V1: `course_videos` and `module_items.video_id` are added; existing items are untouched and the
+    widened checks accept them; the kind check knows `video` and a video item needs its `video_id`; down drops both,
+    up again restores them."""
+    from alembic import command
+
+    from app.db.migrate import _config
+    from tests.test_migration_0014 import _migrate
+    from tests.test_migration_0015 import _upgrade
+
+    engine = _migrate(TEST_URL)[0]
+    cfg = _config(TEST_URL)
+    with engine.connect() as conn:
+        cfg.attributes["connection"] = conn
+        _upgrade(cfg, conn, "0035_assessment_placement")
+        n = conn.execute(text("SELECT count(*) FROM module_items")).scalar()
+        _upgrade(cfg, conn, "0036_course_videos")
+        assert "course_videos" in inspect(conn).get_table_names()
+        col = {c["name"]: c for c in inspect(conn).get_columns("module_items")}["video_id"]
+        assert col["nullable"]
+        assert conn.execute(text("SELECT count(*) FROM module_items WHERE video_id IS NULL")).scalar() == n
+        defs = dict(conn.execute(text(
+            "SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = 'module_items'::regclass "
+            "AND contype = 'c'")).all())
+        assert "'video'" in defs["ck_module_items_kind_valid"]
+        assert "video_id IS NOT NULL" in defs["ck_module_items_item_target_matches_kind"]
+        uq = {i["name"]: i for i in inspect(conn).get_indexes("course_videos")}["uq_course_videos_course_sha_live"]
+        assert uq["unique"]
+        command.downgrade(cfg, "0035_assessment_placement")
+        conn.commit()
+        assert "course_videos" not in inspect(conn).get_table_names()
+        assert "video_id" not in {c["name"] for c in inspect(conn).get_columns("module_items")}
+        _upgrade(cfg, conn, "0036_course_videos")
+        assert "course_videos" in inspect(conn).get_table_names()
+    engine.dispose()
