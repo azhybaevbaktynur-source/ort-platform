@@ -87,4 +87,8 @@ Branch `lesson-videos` (slices `lv-a-backend`, `lv-b-frontend`, e2e `lv-e2e`), m
 - Checks: SQLite + PG suites, `alembic check`, migration tests, tsc, parity, `next build`, `e2e/lesson-video.spec.ts`
   (3 runs; fixture `e2e/fixtures/lesson-video.mp4`, 20 s), `lessons.spec.ts`, `lesson-course.spec.ts`.
   Screens: `LESSON_VIDEOS_screens/`.
+- Production check (content studio, 2026-11-22): a real 223 s, 5.45 MB, 1280×720 video with captions uploaded;
+  staff `/play` gave an R2 signed URL; a ranged GET returned 206 `video/mp4`; captions 200; re-upload deduped. A HEAD on
+  the signed URL is 403 (signed for GET only; browsers use GET). Student-mode playback and the non-Pro 403 wait for
+  the owner's UI check.
 - Open: home «next» card does not list video items; CI Chromium may not play H.264 (playback steps skip there).
