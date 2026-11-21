@@ -1,17 +1,20 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ListChecks } from "lucide-react";
+import { ArrowRight, ChevronDown, ListChecks } from "lucide-react";
 import { BackLink } from "@/components/lms/BackLink";
 import { useTranslation } from "@/lib/i18n/context";
-import { useRememberLobby } from "@/lib/lms/useLastPlace"; // step 3a S2
+import { useRememberLobby, useRememberPlace } from "@/lib/lms/useLastPlace"; // step 3a S2
 import { getAttempt, getAttemptResult, getAttemptReview } from "@/lib/lms/attempts";
 import type { AttemptResultOut, AttemptState, Correctness, ReviewItemOut, ReviewOut } from "@/lib/lms/attemptTypes";
 import { getAssessment } from "@/lib/lms/assessments";
 import { getExamPrep, type ExamNextOut } from "@/lib/lms/examPrep";
 import { LmsApiError } from "@/lib/lms/client";
 import { pickLocalized } from "@/lib/lms/localized";
-import { isExamPrepStudent, useTemplateUi } from "@/lib/lms/templates";
+import { inCourseSpace, isExamPrepStudent, useTemplateUi } from "@/lib/lms/templates";
+import { isLessonReturn } from "@/lib/lms/courseTabs"; // lesson course requests C3
+import { useDeclareParentTab } from "@/components/lms/course/ParentTab"; // lesson course requests C3
+import { useQuizLesson } from "./useQuizLesson"; // lesson course requests C3
 import { useCourse } from "@/components/lms/CourseContext";
 import { ErrorMessage } from "@/components/lms/ErrorMessage";
 import { Button, LinkButton, LoadingState, cn, focusRing } from "@/components/ui";
@@ -43,6 +46,8 @@ export function StudentResult({ courseId, attemptId }: { courseId: string; attem
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState("");
+  // lesson course requests C3: the quiz's placement (undefined: not known yet; null: unknown, e.g. the request failed)
+  const [placement, setPlacement] = useState<string | null | undefined>(undefined);
   const [next, setNext] = useState<ExamNextOut | null | undefined>(undefined);
   const [onlyMistakes, setOnlyMistakes] = useState(false);
 
@@ -84,18 +89,33 @@ export function StudentResult({ courseId, attemptId }: { courseId: string; attem
 
   // The test's title for the header (best effort: the page works without it)
   const assessmentId = state?.assessment_id ?? null;
-  useRememberLobby(lang, courseId, assessmentId); // step 3a S2: the result remembers its lobby
   useEffect(() => {
     if (!assessmentId) return;
     let live = true;
     getAssessment(courseId, assessmentId)
-      .then((a) => { if (live) setTitle(pickLocalized(a.title, lang, course.default_language)); })
-      .catch(() => { /* no title */ });
+      .then((a) => {
+        if (!live) return;
+        setTitle(pickLocalized(a.title, lang, course.default_language));
+        setPlacement(a.placement ?? "tests");
+      })
+      .catch(() => { if (live) setPlacement(null); /* no title */ });
     return () => { live = false; };
   }, [courseId, assessmentId, lang, course.default_language]);
 
+  // Lesson course requests C3 (R2): a quiz placed in a lesson (or started from one: `return` into Уроки) belongs to
+  // Уроки: the frame marks Уроки, «Следующий урок» leads on, the back link returns to the lesson, and the last place is
+  // the lesson, never the lobby
+  const courseBase = `/${lang}/courses/${courseId}`;
+  const lessonReturn = isLessonReturn(returnPath, courseBase);
+  const lessonQuiz = lessonReturn || placement === "lesson";
+  useDeclareParentTab(lessonQuiz ? "lessons" : null);
+  const quizLesson = useQuizLesson(courseId, lessonQuiz && !state?.is_preview ? assessmentId : null, returnPath);
+  const lessonPage = quizLesson?.lessonHref ?? (lessonReturn ? returnPath : null);
+  useRememberLobby(lang, courseId, placement !== undefined && !lessonQuiz ? assessmentId : null); // step 3a S2: the result remembers its lobby
+  useRememberPlace(lessonPage ?? "", lessonQuiz && !!lessonPage && inCourseSpace(course) && !state?.is_preview);
+
   // "Next test" (exam-prep students, graded attempts): the exam-prep page's own suggestion
-  const wantsNext = examPrep && !!state && !state.is_preview && !state.is_practice && state.status !== "in_progress";
+  const wantsNext = examPrep && !lessonQuiz && !!state && !state.is_preview && !state.is_practice && state.status !== "in_progress";
   useEffect(() => {
     if (!wantsNext) return;
     let live = true;
@@ -126,11 +146,14 @@ export function StudentResult({ courseId, attemptId }: { courseId: string; attem
   const lobby = `/${lang}/courses/${courseId}/assessments${state ? `/${state.assessment_id}` : ""}`;
   // Phase 8b S3 (PHASE_8B_DESIGN 7.2): a validated `?return=` (template preview) replaces the back link. SF-1: an
   // exam-prep student goes back to Тесты; other students to the test's lobby.
-  const backLink = returnPath
-    ? <BackLink href={returnPath}>{t(state?.is_preview ? "examTemplates.preview.backToTemplate" : "player.scrolling.back")}</BackLink>
-    : examPrep
-      ? <BackLink href={`/${lang}/courses/${courseId}/tests`}>{t("results.backToTests")}</BackLink>
-      : <BackLink href={lobby}>{t("results.back")}</BackLink>;
+  // C3: a lesson quiz goes back to its lesson.
+  const backLink = lessonQuiz && lessonPage
+    ? <BackLink href={lessonPage}>{t("results.lesson.backToLesson")}</BackLink>
+    : returnPath
+      ? <BackLink href={returnPath}>{t(state?.is_preview ? "examTemplates.preview.backToTemplate" : "player.scrolling.back")}</BackLink>
+      : examPrep
+        ? <BackLink href={`/${lang}/courses/${courseId}/tests`}>{t("results.backToTests")}</BackLink>
+        : <BackLink href={lobby}>{t("results.back")}</BackLink>;
 
   if (loading && !state) return <LoadingState label={t("lms.common.loading")} rows={2} />;
   if (error && !state) return <div className="space-y-3">{backLink}<ErrorMessage error={error} onRetry={() => void load()} /></div>;
@@ -204,7 +227,17 @@ export function StudentResult({ courseId, attemptId }: { courseId: string; attem
           <SectionBreakdown result={result} grade={scaled ? grade : null} />
         </section>
       )}
-      {(hasReview || wantsNext) && (
+      {lessonQuiz && quizLesson && (
+        // C3: «Следующий урок» is the primary step (a locked or missing next: back to the syllabus); the back link above
+        // returns to the lesson; the review stays
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          {quizLesson.nextHref
+            ? <LinkButton href={quizLesson.nextHref} rightIcon={<ArrowRight aria-hidden="true" />}>{t("modules.lesson.next")}</LinkButton>
+            : <LinkButton href={quizLesson.syllabusHref} variant="secondary">{t("modules.overview.toSyllabus")}</LinkButton>}
+          {hasReview && <Button variant="secondary" leftIcon={<ListChecks aria-hidden="true" />} onClick={reviewMistakes}>{t("results.actions.reviewMistakes")}</Button>}
+        </div>
+      )}
+      {!(lessonQuiz && quizLesson) && (hasReview || wantsNext) && (
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           {hasReview && <Button leftIcon={<ListChecks aria-hidden="true" />} onClick={reviewMistakes}>{t("results.actions.reviewMistakes")}</Button>}
           {wantsNext && <LinkButton variant="secondary" href={nextHref}>{t("results.actions.nextTest")}</LinkButton>}

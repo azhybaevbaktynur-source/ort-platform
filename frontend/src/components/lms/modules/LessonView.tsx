@@ -27,7 +27,8 @@ import { STUDENT_TITLE } from "@/components/lms/student/StudentPageHeader";
 import { SafeHtml } from "@/components/lms/pages/SafeHtml";
 import { Button, EmptyState, ErrorState, LinkButton, LoadingState, buttonClasses, cn, focusRing } from "@/components/ui";
 import { useLockReasonText, useModuleErrorText, useRequirementText } from "./moduleUi";
-import { formatDuration, isAccessLocked, isDone, isLocked, lessonHref, lessonList, type LessonRef } from "./lessons";
+import { formatDuration, isAccessLocked, isDone, isLessonQuiz, isLocked, lessonHref, lessonList, lessonRoute, type LessonRef } from "./lessons";
+import { LessonQuizCard } from "./LessonQuizCard"; // lesson course requests C3
 import { rememberLessonModules } from "./lessonNav";
 import { VideoPlayer } from "./VideoPlayer";
 import { KindMeta, StatusIcon, viewOnOpen } from "./StudentSyllabus";
@@ -216,13 +217,14 @@ export function LessonView({ moduleId, itemId }: { moduleId: string; itemId: str
   const lessons = useMemo(() => lessonList(data?.modules ?? []), [data]);
   const current = lessons.find((l) => l.item.id === itemId && l.mod.id === moduleId) ?? null;
   const locked = current ? isLocked(current.mod, current.item) : false;
-  const forward = !!current && !locked && current.item.kind === "assignment";
+  // lesson course requests C3: a quiz placed in the lesson stays here (its card below); other assignments go to the lobby
+  const forward = !!current && !locked && current.item.kind === "assignment" && !isLessonQuiz(current.item);
 
   const replaceModule = useCallback((next: ModuleStudentOut) => {
     setData((cur) => (cur ? { ...cur, modules: cur.modules.map((m) => (m.id === next.id ? next : m)) } : cur));
   }, [setData]);
 
-  // assignments have their own route (the lobby)
+  // assignments have their own route (the lobby), lesson quizzes excepted
   useEffect(() => {
     if (forward && current) router.replace(lessonHref(base, current));
   }, [forward, current, base, router]);
@@ -297,7 +299,8 @@ export function LessonView({ moduleId, itemId }: { moduleId: string; itemId: str
   };
 
   // the body's own action is the page's primary until the lesson is done; then "Следующий урок" is
-  const bodyPrimary = !done && (item.kind === "file" || (item.kind === "url" && !item.video));
+  const lessonQuiz = isLessonQuiz(item);
+  const bodyPrimary = !done && (item.kind === "file" || (item.kind === "url" && !item.video) || lessonQuiz);
   let body: React.ReactNode;
   if (accessLocked) {
     body = <ProLockCard />;
@@ -312,6 +315,8 @@ export function LessonView({ moduleId, itemId }: { moduleId: string; itemId: str
         <LinkButton href={(examPrep ? `${base}/lessons` : `${base}/modules`)} variant="secondary" className="mt-4 w-full sm:w-auto">{t("modules.overview.toSyllabus")}</LinkButton>
       </div>
     );
+  } else if (lessonQuiz) {
+    body = <LessonQuizCard key={item.id} item={item} lessonUrl={lessonRoute(base, mod.id, item.id)} primary={bodyPrimary} readOnly={readOnly} onOpen={markViewed} />;
   } else if (item.kind === "url" && item.video) {
     body = <VideoPlayer key={item.id} video={item.video} title={title} onPlay={markViewed} />;
   } else if (item.kind === "page" && item.link?.page_id) {
@@ -340,7 +345,9 @@ export function LessonView({ moduleId, itemId }: { moduleId: string; itemId: str
   }
 
   let doneRow: React.ReactNode = null;
-  if (req && !locked) {
+  if (lessonQuiz && done) {
+    doneRow = null; // the quiz card shows ✓
+  } else if (req && !locked) {
     if (met) {
       doneRow = (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">

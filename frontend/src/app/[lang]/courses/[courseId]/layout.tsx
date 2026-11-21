@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
 import { useStaffDictionary, useTranslation } from "@/lib/i18n/context";
@@ -17,6 +17,7 @@ import { courseTabs } from "@/lib/lms/courseTabs"; // step 3a S2
 import { templateUi } from "@/lib/lms/templates"; // step 3a S2
 import { useRememberPlace } from "@/lib/lms/useLastPlace"; // step 3a S2
 import { CourseFrame } from "@/components/lms/course/CourseFrame"; // step 3a S2
+import { ParentTabContext, type ParentTabDecl } from "@/components/lms/course/ParentTab"; // lesson course requests C3
 import { useLessonCourseRows } from "@/components/lms/home/LessonCourses"; // step 3a S2
 import { invalidate, put, useCached, type SwrOptions } from "@/lib/lms/swr"; // PERFORMANCE_AUDIT S2
 import { useLmsMe } from "@/lib/lms/useLmsMe"; // fix round 1b
@@ -181,14 +182,17 @@ function StudentCourseSpace({ course, pathname, hiddenArea, children }: {
   const exam = templateUi(course).studentLayout === "exam_prep";
   const lessonRows = useLessonCourseRows(exam ? course.id : null);
   const lessonCourses = exam ? (lessonRows === null ? null : lessonRows.length > 0) : false;
-  const tabs = courseTabs(course, pathname, t, { lessonCourses });
+  // lesson course requests C3: the parent tab a lesson quiz's lobby or result declares (only for its own path)
+  const [declared, setDeclared] = useState<ParentTabDecl | null>(null);
+  const parent = declared && declared.path === pathname ? declared.tab : null;
+  const tabs = courseTabs(course, pathname, t, { lessonCourses, parent });
   useRememberPlace(pathname, !tabs.hidden && !hiddenArea);
   const reading = /^\/[^/]+\/courses\/[^/]+\/(assessments\/[^/]+|attempts\/[^/]+\/result)$/.test(pathname);
   const body = tabs.hidden || hiddenArea ? <AreaUnavailable courseId={course.id} /> : children;
   return (
-    <>
+    <ParentTabContext.Provider value={setDeclared}>
       <CourseFrame course={course} tabs={tabs} />
       {reading ? <div className="mx-auto w-full max-w-[880px]">{body}</div> : body}
-    </>
+    </ParentTabContext.Provider>
   );
 }

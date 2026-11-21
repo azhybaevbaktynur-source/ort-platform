@@ -2291,6 +2291,9 @@
     "actions": {
       "reviewMistakes": "Каталарды талдоо",
       "nextTest": "Кийинки тест"
+    },
+    "lesson": {
+      "backToLesson": "Сабакка кайтуу"
     }
   },
   "schemes": {
@@ -5579,7 +5582,22 @@
       "fileBody": "Бул сабактын файлы.",
       "prevShort": "Артка",
       "positionShort": "{n}/{total}",
-      "nextShort": "Кийинки"
+      "nextShort": "Кийинки",
+      "quiz": {
+        "eyebrow": "Сабактын тести",
+        "questions": "{count} суроо",
+        "questions_one": "{count} суроо",
+        "questions_few": "{count} суроо",
+        "questions_many": "{count} суроо",
+        "questions_other": "{count} суроо",
+        "best": "Эң жакшы жыйынтык: {percent}%",
+        "done": "Өтүлдү",
+        "start": "Баштоо",
+        "again": "Дагы бир жолу",
+        "resume": "Улантуу",
+        "accessCode": "Бул тест үчүн кирүү коду керек. Аны тесттин барагында жазыңыз.",
+        "toLobby": "Тесттин барагын ачуу"
+      }
     }
   },
   "courseNav": {

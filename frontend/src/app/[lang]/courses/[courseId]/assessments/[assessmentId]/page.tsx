@@ -20,6 +20,7 @@ import { fmtDateTime, fmtPoints } from "@/components/lms/assessments/format";
 import { MyAttemptsPanel } from "@/components/lms/home/MyAttemptsPanel"; // Phase 6 S6b
 import { LockedState, isModuleLocked } from "@/components/lms/pages/ApiError"; // Phase 8a fix1
 import { ProCallout } from "@/components/lms/access/ProCallout"; // F6b Pro
+import { useDeclareParentTab } from "@/components/lms/course/ParentTab"; // lesson course requests C3
 
 export default function AssessmentPage() {
   const { lang, t } = useTranslation();
@@ -45,8 +46,13 @@ export default function AssessmentPage() {
     }
   }, [course.id, aid]);
   useEffect(() => { void load(); }, [load]);
+  // lesson course requests C3: the lobby of a lesson quiz (reached from its card) belongs to Уроки and leads back there
+  const lessonQuiz = !!data && !isStaffAssessment(data) && data.placement === "lesson";
+  useDeclareParentTab(lessonQuiz ? "lessons" : null);
   // SF-1: an exam-prep student goes back to Тесты; other students to the course's list of assignments
-  const backLink = isExamPrepStudent(course)
+  const backLink = lessonQuiz
+    ? <BackLink href={`/${lang}/courses/${course.id}/${inCourseSpace(course) ? "lessons" : "modules"}`}>{t("modules.overview.toSyllabus")}</BackLink>
+    : isExamPrepStudent(course)
     ? <BackLink href={`/${lang}/courses/${course.id}/tests`}>{t("results.backToTests")}</BackLink>
     // G11: a lesson course attached to an exam (or a reader of an exam course) goes back to the syllabus (Уроки tab)
     : templateUi(course).studentLayout === "exam_prep" || course.exam_course_id != null

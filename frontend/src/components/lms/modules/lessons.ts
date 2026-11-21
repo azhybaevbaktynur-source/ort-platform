@@ -37,11 +37,17 @@ export function lessonRoute(base: string, moduleId: string, itemId: string): str
   return `${base}/modules/${moduleId}/items/${itemId}`;
 }
 
+/** Lesson course requests C3: a quiz placed in the lesson (`link.placement = "lesson"`) opens inside the lesson page. */
+export function isLessonQuiz(item: Pick<ItemStudentOut, "kind" | "link">): boolean {
+  return item.kind === "assignment" && item.link?.placement === "lesson";
+}
+
 /** Where a row opens from the overview CTA, the outline and the prev / next links: an assignment its own route (the
- * lobby); every lesson (video, link, page, file) and every locked row the lesson page (F5b: pages render inline). */
+ * lobby); every lesson (video, link, page, file), every lesson quiz (C3) and every locked row the lesson page (F5b:
+ * pages render inline). */
 export function lessonHref(base: string, ref: LessonRef): string {
   const { mod, item } = ref;
-  if (!isLocked(mod, item) && item.kind === "assignment") {
+  if (!isLocked(mod, item) && item.kind === "assignment" && !isLessonQuiz(item)) {
     const href = itemHref(base, item.kind, item.link);
     if (href) return href;
   }
