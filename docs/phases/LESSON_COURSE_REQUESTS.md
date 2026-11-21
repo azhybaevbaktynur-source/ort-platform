@@ -87,5 +87,25 @@ Contrast ≥ 4.5:1. Mobile 360 px: no page scroll; tables and display math scrol
 | `lc-c-lessons` (frontend) | R2, R3, R4 client, C3 | `LessonView`, result page, `courseTabs`, analytics tab, types for features/placement, i18n keys it adds |
 | `lc-d-display` (frontend) | R5, R6 CSS, R7, C4, C6 | player, previews, review card, `globals.css` `.page-body`, `lib/fonts.ts`, `SafeHtml`, `PageView`, i18n keys it adds |
 
-## Results
-(filled in when deployed)
+## Results (2026-11-22)
+Merged on branch `lesson-course` (slices `lc-a-placement`, `lc-b-renderer`, `lc-c-lessons`, `lc-d-display`, e2e `lc-e2e`).
+- R1/C1–C2: migration `0035_assessment_placement`; `placement` on assessment, assignment, lobby and module item outputs;
+  `features.lesson_quizzes`. Also excluded: course card `tests_count`/paid flag (`courses/cover.py`), exam-prep resume.
+  Not filtered: the student `GET /courses/{c}/assessments` list and home `modules_next` links (no test listing there).
+  Locked syllabus rows carry no `link.placement`. A placement-only PATCH needs no new version.
+- R2/R3: `LessonQuizCard` in the lesson body (start without lobby, `?return=` the lesson); result page declares its
+  parent tab (`course/ParentTab.tsx`) as Уроки from the return path or the placement; «Следующий урок» primary.
+  Tabs: Повторение = tests ∨ lesson_quizzes, Аналитика = tests ∨ hand_ins ∨ lesson_quizzes.
+- R4: student «Оценки» rows and total leave lesson quizzes out; the block hides when it has no rows (and analytics is shown).
+- R5: `lib/lms/optionLabel.ts` (А Б В Г Д for ru/ky) in player, previews and review (new letter badge). aria-labels in
+  previews stay Latin (e2e selectors). ORT player screenshots now show Cyrillic letters by design.
+- R6: renderer components as C5 (a `Разбор` also gets a `callout__label` paragraph); author HTML for the new tags is
+  stripped; Noto Sans on `.page-body`; «Скрыть ответ» swapped by `SafeHtml` on toggle (interface language); details
+  print open. Pages that already used `---` now show screen cards (announcements too).
+- R7: preview tab shows the title once; images centred. Optional Markdown in quiz explanations: not done.
+- Fixed on the way: the review drew a correct pick red when the answer key is hidden (since 2026-10-22); «Разобрать
+  ошибки» hidden on a full score; the lesson quiz card no longer repeats the page title.
+- Checks: SQLite + PG suites, `alembic check`, migration tests, tsc, i18n parity, `*.check.ts`, `next build`,
+  `e2e/lesson-course.spec.ts` (2 runs), `lessons.spec.ts`, `bluebook-player.spec.ts`. Screens: `LESSON_COURSE_screens/`.
+- Open: Kyrgyz labels need a native check (`pages/ids.py`); on phones the Повторение tab sits at the edge of the
+  scrolling tab row; no staff UI switch for `placement` yet (API only).

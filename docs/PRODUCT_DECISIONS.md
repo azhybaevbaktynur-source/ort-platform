@@ -769,3 +769,10 @@ V1–V16 in the design; the ones that change what was built:
   cover thumbnail in the sidebar rows when the course has a cover; the default cover's mark is the same icon. The
   graduation cap stays the brand mark only; no course uses it.
 - Slices S7 navigation (Opus), S8 Повторение strings (Sonnet), S9 icons (Opus), S10 cleanup (Sonnet); no migration.
+
+## 2026-11-22: lesson quizzes and lesson page design (content studio requests R1–R7, owner-approved)
+A quiz has a placement: `tests` (default, unchanged) or `lesson`. A lesson quiz lives only inside Уроки: never in Тесты,
+the exam library, home to-do or the student's grades; it opens inside the lesson page and its result leads to the next
+lesson. This replaces COURSE_LESSONS_DESIGN L7 («a test placed in a module appears in both») for lesson quizzes only.
+Option letters show as А Б В Г Д for ru/ky content (data stays A–E). Lesson pages get Noto Sans, 18 px, a 40 rem column
+and seven Markdown-driven components. Detail: `docs/phases/LESSON_COURSE_REQUESTS.md`.
