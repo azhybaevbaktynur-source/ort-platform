@@ -147,7 +147,7 @@ async def test_features_follow_published_rows(api, db):
         return res.json()["features"]
 
     none = {"modules": False, "files": False, "announcements": False, "practice": False,
-            "tests": False, "hand_ins": False}  # step 3a S1: `tests_features` in test_course_features.py
+            "tests": False, "hand_ins": False, "lesson_quizzes": False}  # step 3a S1: `tests_features` in test_course_features.py
     assert await features(w.S) == none
     make_module(db, w.course, w.O, published=False)
     make_course_file(db, w.course, w.O, published=False)

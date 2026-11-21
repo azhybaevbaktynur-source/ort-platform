@@ -32,6 +32,7 @@ class CourseFeaturesOut(BaseModel):
     # STUDENT_IA_DESIGN 6.2.1: the course space's «Тесты» and «Задания» tabs, for every course
     tests: bool = False  # a published live test (exam-prep courses) or a visible quiz assignment (others)
     hand_ins: bool = False  # a visible non-quiz assignment
+    lesson_quizzes: bool = False  # LESSON_COURSE_REQUESTS C2: a visible lesson quiz in a published live module item
 # --- Phase 8a S1 end ---
 
 

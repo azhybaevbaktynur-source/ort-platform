@@ -22,6 +22,7 @@ ScorePolicy = Literal["highest", "latest", "first", "average"]
 Navigation = Literal["free", "section_forward_only"]
 ResultsPolicy = Literal["never", "after_submit", "after_close"]
 GradeRelease = Literal["auto", "manual"]
+Placement = Literal["tests", "lesson"]  # LESSON_COURSE_REQUESTS C1: a `lesson` quiz is never listed as a test
 
 
 class _In(BaseModel):
@@ -44,6 +45,7 @@ class AssessmentCreateIn(_In):
     preset: Preset = "none"
     languages: list[Lang] = Field(min_length=1, max_length=3)
     subject_key: Optional[str] = Field(default=None, max_length=40)
+    placement: Placement = "tests"  # C1: `lesson` only for a plain quiz (builder: 422 `placement_not_allowed`)
     # --- Phase 7b S2 begin --- (PHASE_7B_DESIGN 9.1: create from an exam template; `preset` must stay 'none',
     # checked in the builder as 422 `preset_template_exclusive`; `subject_key` only with ort_subject, unchanged)
     exam_template_id: Optional[uuid.UUID] = None
@@ -87,6 +89,7 @@ class AssessmentUpdateIn(_In):
     due_at: Optional[datetime] = None
     grade_release: Optional[GradeRelease] = None
     omit_from_total: Optional[bool] = None
+    placement: Optional[Placement] = None  # C1: no new version needed; `lesson` also sets omit_from_total
     # --- Phase 7a S4 begin --- (PHASE_7A_DESIGN 2.7, 3.8): string sets, null clears, absent = unchanged. Stored only
     # as a bcrypt hash; never serialized (staff see `has_access_code`, students `requires_access_code`).
     access_code: Optional[str] = Field(default=None, max_length=64, repr=False)
@@ -126,7 +129,8 @@ class AssessmentUpdateIn(_In):
         if self.allowed_attempts == 0:
             raise ValueError("allowed_attempts must be -1 or 1..100")
         for f in ("title", "shuffle_items", "shuffle_choices", "score_policy", "navigation", "results_policy",
-                  "show_correct_answers", "allowed_attempts", "languages", "grade_release", "omit_from_total"):
+                  "show_correct_answers", "allowed_attempts", "languages", "grade_release", "omit_from_total",
+                  "placement"):
             if f in self.model_fields_set and getattr(self, f) is None:
                 raise ValueError(f"{f} cannot be null")
         return self
@@ -383,6 +387,7 @@ class AssessmentStaffSummaryOut(BaseModel):
     available_until: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
     has_access_code: bool = False  # --- Phase 7a S4 --- (2.7: the hash itself is never serialized)
+    placement: str = "tests"  # LESSON_COURSE_REQUESTS C1
     # --- Phase 7b S2 --- (list rows carry the template reference too, so pickers can offer template exams only)
     exam_template: Optional["ExamTemplateRefOut"] = None
 
@@ -498,6 +503,7 @@ class AssessmentStudentSummaryOut(BaseModel):
     scheme: Optional[SchemeStudentRefOut] = None
     access_tier: str = "free"  # S3 access: `paid` needs a pass in a platform course
     locked: bool = False  # S3 access: the caller needs a pass to start it
+    placement: str = "tests"  # LESSON_COURSE_REQUESTS C1
 
 
 class LobbySectionOut(BaseModel):
@@ -528,6 +534,7 @@ class AssessmentLobbyOut(BaseModel):
     requires_access_code: bool = False  # --- Phase 7a S4 --- (3.8: a student must enter the code at start)
     access_tier: str = "free"  # S3 access
     locked: bool = False  # S3 access: start refused with `access_required`; the page links to the unlock page
+    placement: str = "tests"  # LESSON_COURSE_REQUESTS C1
 
 
 # Exact key sets, asserted by the contract tests.

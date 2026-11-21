@@ -16,7 +16,8 @@ MODULE_KEYS = {"id", "title", "state", "unlock_at", "sequential", "completion_mo
 ITEM_KEYS = {"id", "kind", "title", "indent", "locked", "requirement", "link", "due_at", "video",
              "duration_s", "done", "locked_reason"}  # + F5a
 REQ_KEYS = {"type", "threshold", "met", "best_score_percent"}
-LINK_KEYS = {"page_id", "file_id", "assignment_id", "assessment_id", "assignment_kind", "url"}
+LINK_KEYS = {"page_id", "file_id", "assignment_id", "assessment_id", "assignment_kind", "url",
+             "placement"}  # LESSON_COURSE_REQUESTS C1
 FORBIDDEN = ("rules_version", "warnings", "created_by_id", "deleted_at", "body_md", "evaluated_rules_version",
              "published", "position", "title_override")
 
@@ -78,7 +79,7 @@ async def test_student_payload_is_an_allow_list(db, api):
     assert by_id[str(w.f_item.id)]["link"]["file_id"] == str(w.f_item.file_id)
     assert by_id[str(w.q_item.id)]["link"] == {"page_id": None, "file_id": None, "assignment_id": str(w.quiz.id),
                                                "assessment_id": str(w.quiz.assessment_id),
-                                               "assignment_kind": "quiz", "url": None}
+                                               "assignment_kind": "quiz", "url": None, "placement": "tests"}
     assert by_id[str(w.u_item.id)]["title"] == {"en": "Reading"}
     assert by_id[str(w.h_item.id)]["link"] is None and by_id[str(w.h_item.id)]["requirement"] is None
     assert body["up_next"]["item_id"] == str(w.p_item.id)

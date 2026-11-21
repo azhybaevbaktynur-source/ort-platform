@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Optional
 
-from sqlalchemy import Select, and_, select
+from sqlalchemy import Select, and_, exists, select
 
 from app.lms.assignments.models import Assignment, AssignmentRubricCriterion, AssignmentSubmission
 
@@ -31,7 +31,11 @@ def visible_condition():
 
 
 def student_list(course_id: uuid.UUID) -> Select:
-    return select(Assignment).where(Assignment.course_id == course_id, visible_condition())
+    """LESSON_COURSE_REQUESTS C2: a lesson quiz (`placement = 'lesson'`) lives in its lesson, not in this list."""
+    from app.lms.assessments.models import Assessment
+
+    lesson = exists().where(Assessment.id == Assignment.assessment_id, Assessment.placement == "lesson")
+    return select(Assignment).where(Assignment.course_id == course_id, visible_condition(), ~lesson)
 
 
 def one(course_id: uuid.UUID, assignment_id: uuid.UUID, *, include_deleted: bool = False) -> Select:

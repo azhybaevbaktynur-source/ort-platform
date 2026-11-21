@@ -119,6 +119,7 @@ def _assignment_rows(db: Session, course_id: uuid.UUID, *, staff: bool, late_pol
         _pick(Q.due_at, A.due_at).label("due_at"), Q.results_policy,
         _pick(Q.available_until, A.available_until).label("available_until"),
         vid.label("grading_scheme_version_id"), _pick(V.points_possible, A.points_possible).label("points_possible"),
+        Q.placement,  # LESSON_COURSE_REQUESTS C2: `my_grades` leaves lesson quizzes out (null for hand-ins)
     ]
     stmt = (select(*cols).select_from(A).outerjoin(Q, Q.id == A.assessment_id)
             .outerjoin(V, V.id == Q.published_version_id))
@@ -450,6 +451,14 @@ def my_grades(db: Session, ctx: AuthzContext, course: Course, *, now: datetime) 
     if enr.role == "student":  # the cache holds students only (staff may open "my grades" too)
         write_course_grades(db, [_course_grade_row(course.id, enr.id, all_t, rel_t,
                                                    map_total(course_v, all_t.current_percent), now)])
+    # LESSON_COURSE_REQUESTS C2: lesson quizzes are practice inside a lesson, not grades; the student's rows and total
+    # leave them out (the cache above and the staff gradebook keep every column)
+    lesson = {a.id for a in assignments if a.placement == "lesson"}
+    if lesson:
+        assignments = [a for a in assignments if a.id not in lesson]
+        subs = [s for s in subs if s.assignment_id not in lesson]
+        rel_t = compute_totals(course, categories, assignments,
+                               {enr.id: [s for s in subs if s.assignment_id in visible]}, released_only=True)[enr.id]
     by_assignment = {s.assignment_id: s for s in subs}
     # Phase 6 S6a: one statement only when some quiz has no submission and is not past due
     started = started_assessment_ids(db, enr.id, [a.assessment_id for a in assignments

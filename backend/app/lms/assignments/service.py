@@ -151,6 +151,11 @@ def _create_quiz(db: Session, ctx: AuthzContext, course: Course, data: sch.Assig
         try:
             a = _inst.instantiate(db, ctx, course, version, q.parameters or {}, title=data.title,
                                   description=data.description, languages=list(q.languages))
+            if q.placement == "lesson":  # LESSON_COURSE_REQUESTS C1: a template exam is preset none
+                a.placement, a.omit_from_total = "lesson", True
+                from app.lms.assignments import sync as _sync
+
+                _sync.mirror_from_assessment(db, a)
             if later:  # update_assessment commits the assessment, its sections and assignment with these settings
                 builder.update_assessment(db, ctx, course, a.id, asch.AssessmentUpdateIn(
                     draft_rev=a.draft_rev, **{QUIZ_FIELDS[f]: v for f, v in later.items()}))
@@ -177,7 +182,7 @@ def _create_quiz(db: Session, ctx: AuthzContext, course: Course, data: sch.Assig
         tpl.assert_not_locked(course, tpl_fields.LOCK_SCHEME_VERSION, preset=preset, actor_id=ctx.user.id)
     a = builder.create_assessment(db, ctx, course, asch.AssessmentCreateIn(
         title=data.title, description=data.description, preset=preset, languages=list(q.languages),
-        subject_key=q.subject_key))  # commits, with its quiz assignment (sync.ensure_quiz_assignment)
+        subject_key=q.subject_key, placement=q.placement))  # commits, with its quiz assignment (ensure_quiz_assignment)
     if later:
         builder.update_assessment(db, ctx, course, a.id, asch.AssessmentUpdateIn(
             draft_rev=a.draft_rev, **{QUIZ_FIELDS[f]: v for f, v in later.items()}))
@@ -370,8 +375,17 @@ def counts(db: Session, ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, sch.Assignm
     return out
 
 
-def _summary_fields(a: Assignment, c: sch.AssignmentCountsOut) -> dict:
-    return dict(
+def _placements(db: Session, rows: list[Assignment]) -> dict:
+    """assignment id -> its quiz assessment's `placement` (LESSON_COURSE_REQUESTS C1); hand-ins are absent (null)."""
+    quiz = {a.assessment_id: a.id for a in rows if a.kind == "quiz" and a.assessment_id is not None}
+    if not quiz:
+        return {}
+    return {quiz[x]: p for x, p in db.execute(select(Assessment.id, Assessment.placement)
+                                              .where(Assessment.id.in_(list(quiz))))}
+
+
+def _summary_fields(a: Assignment, c: sch.AssignmentCountsOut, placement: Optional[str] = None) -> dict:
+    return dict(placement=placement,
         id=a.id, course_id=a.course_id, kind=a.kind, assessment_id=a.assessment_id, title=a.title or {},
         points_possible=_f(a.points_possible), due_at=utc(a.due_at), available_from=utc(a.available_from),
         available_until=utc(a.available_until), category_id=a.category_id,
@@ -388,7 +402,8 @@ def criterion_out(c: AssignmentRubricCriterion) -> sch.RubricCriterionOut:
 
 def staff_summaries(db: Session, rows: list[Assignment]) -> list[sch.AssignmentStaffSummaryOut]:
     cs = counts(db, [a.id for a in rows])
-    return [sch.AssignmentStaffSummaryOut(**_summary_fields(a, cs[a.id])) for a in rows]
+    pl = _placements(db, rows)
+    return [sch.AssignmentStaffSummaryOut(**_summary_fields(a, cs[a.id], pl.get(a.id))) for a in rows]
 
 
 def staff_out(db: Session, a: Assignment) -> sch.AssignmentStaffOut:
@@ -406,7 +421,8 @@ def staff_out(db: Session, a: Assignment) -> sch.AssignmentStaffOut:
         warnings.append({"code": "rubric_total_mismatch", "rubric_total": float(total),
                          "points_possible": float(a.points_possible)})
     return sch.AssignmentStaffOut(
-        **_summary_fields(a, counts(db, [a.id])[a.id]), description=a.description, assessment=brief,
+        **_summary_fields(a, counts(db, [a.id])[a.id], x.placement if brief is not None else None),
+        description=a.description, assessment=brief,
         rubric=[criterion_out(c) for c in crit], rubric_total=float(total), warnings=warnings)
 
 
@@ -438,6 +454,7 @@ class _Mine:
         self.open: dict = {}
         self.attempted: dict = {}
         self.results_visible: set = set()  # assignment ids whose grade the caller may see now (security review 7a)
+        self.placement: dict = _placements(db, rows)  # LESSON_COURSE_REQUESTS C1 (org admins too)
         if enrollment is None or not ids:
             return
         self.accommodation = db.get(EnrollmentAccommodation, enrollment.id)
@@ -519,7 +536,7 @@ def _student_item(a: Assignment, mine: _Mine, now: datetime, cls=sch.AssignmentS
         due_at=eff.due_at, available_from=eff.available_from, available_until=eff.available_until,
         position=a.position, status=status, attempts_left=mine.attempts_left(a) if mine.enrollment else None,
         submitted_at=utc(latest.submitted_at) if latest else None, late=bool(latest and latest.late_seconds),
-        **extra)
+        placement=mine.placement.get(a.id), **extra)
 
 
 def _student_enrollment(db: Session, ctx: AuthzContext, course: Course) -> Optional[Enrollment]:

@@ -54,7 +54,8 @@ def _tests_count():
     return (select(func.count(Assessment.id))
             .where(Assessment.course_id == Course.id, Assessment.deleted_at.is_(None),
                    Assessment.status == "published", Assessment.is_practice.is_(False),
-                   Assessment.published_version_id.isnot(None))
+                   Assessment.published_version_id.isnot(None),
+                   Assessment.placement != "lesson")  # LESSON_COURSE_REQUESTS C2: a lesson quiz is not a test
             .correlate(Course).scalar_subquery())
 
 
@@ -65,7 +66,8 @@ def _has_paid_tests():
     return (select(Assessment.id)
             .where(Assessment.course_id == Course.id, Assessment.deleted_at.is_(None),
                    Assessment.status == "published", Assessment.is_practice.is_(False),
-                   Assessment.published_version_id.isnot(None), Assessment.access_tier == "paid")
+                   Assessment.published_version_id.isnot(None), Assessment.access_tier == "paid",
+                   Assessment.placement != "lesson")  # C2
             .correlate(Course).exists())
 
 
