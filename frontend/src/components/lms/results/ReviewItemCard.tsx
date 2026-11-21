@@ -10,6 +10,8 @@ import type { Correctness, ReviewItemOut, StudentQuestion } from "@/lib/lms/atte
 import { fmtPoints } from "@/components/lms/assessments/format";
 import type { PassageDisplay } from "@/lib/lms/blocks";
 import type { StudentQuestionOut } from "@/lib/lms/contentTypes";
+import { OptionBadge } from "@/components/lms/player/ItemView";
+import { optionLabel } from "@/lib/lms/optionLabel";
 
 // Design-system Badge with an icon, so colour is never the only signal (S7b, cross-cutting).
 const TONE: Record<Correctness, BadgeTone> = {
@@ -110,7 +112,7 @@ export function ReviewItemCard({
 
       {(q.type === "single_choice" || q.type === "multiple_answers") && (
         <ul className="space-y-2">
-          {(q.data.choices ?? []).map((c) => {
+          {(q.data.choices ?? []).map((c, i) => {
             const picked = q.type === "single_choice" ? resp.choice_id === c.id : asArr(resp.choice_ids).includes(c.id);
             const correct = key ? (q.type === "single_choice" ? key.correct === c.id : asArr(key.correct).includes(c.id)) : false;
             const cls = correct ? "border-emerald-400 bg-emerald-50" : picked ? "border-red-300 bg-red-50" : "border-slate-200 bg-white";
@@ -119,6 +121,8 @@ export function ReviewItemCard({
                 <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center" aria-hidden="true">
                   {correct ? <Check className="h-4 w-4 text-emerald-700" /> : picked ? <X className="h-4 w-4 text-red-700" /> : null}
                 </span>
+                {/* R5: the same letter badge as the player (payload order), in the attempt's content language. */}
+                <OptionBadge on={false} square={q.type === "multiple_answers"}>{optionLabel(i, q.language)}</OptionBadge>
                 <span className="min-w-0 flex-1">
                   {c.text ? <MathRenderer content={c.text} className="text-base text-slate-900" /> : null}
                   {c.image_url ? (

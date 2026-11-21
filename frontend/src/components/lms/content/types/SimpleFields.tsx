@@ -7,6 +7,7 @@ import { RichTextField } from "../RichTextField";
 import { inputCls, labelCls } from "../ui";
 import { btnSmall } from "@/components/lms/course/staffUi"; // Phase 6b S5c
 import { blankNumeric, type QuestionForm } from "./formModel";
+import { optionLabel } from "@/lib/lms/optionLabel";
 
 type Props = { form: QuestionForm; onChange: (patch: Partial<QuestionForm>) => void; disabled?: boolean };
 
@@ -41,7 +42,7 @@ export function ComparisonFields({ form, onChange, disabled }: Props) {
           {(["A", "B", "C", "D"] as const).map((k) => (
             <label key={k} className="flex items-center gap-2 text-sm text-slate-700">
               <input type="radio" name="cmp" checked={form.compCorrect === k} onChange={() => onChange({ compCorrect: k })} />
-              <span className="font-semibold">{k}.</span> {t(`bank.types.comparison.labels.${k}`)}
+              <span className="font-semibold">{optionLabel(k, form.language)}.</span> {t(`bank.types.comparison.labels.${k}`)}
             </label>
           ))}
         </div>

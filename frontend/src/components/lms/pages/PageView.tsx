@@ -49,26 +49,33 @@ export function PageView({ pageId, embedded = false, preview = null }: {
 
   const staff = isStaffPage(page) ? page : null;
   const staffRole = canEdit && !!staff;
+  const draftBadge = staff && !staff.published ? <Badge tone="neutral">{t("pages.draft")}</Badge> : undefined;
+  const variantsNav = page.variants.length > 0 ? (
+    <nav aria-label={t("pages.view.variants")} className="mt-3 flex flex-wrap items-center gap-2">
+      <span className="text-sm text-slate-600">{t("pages.view.variants")}</span>
+      <LangChip label={t(`pages.lang.${page.language}`)} selected />
+      {page.variants.map((v) => (
+        <LangChip key={v.id} label={t(`pages.lang.${v.language}`)} href={preview ? preview.variantHref(v.id) : `${base}/pages/${v.id}${fromModule ? "?from=module" : ""}`} />
+      ))}
+    </nav>
+  ) : null;
   return (
     <article className="max-w-3xl">
-      <PageHeader
-        title={page.title}
-        breadcrumbs={embedded || preview || !staffRole ? undefined : [{ label: t("pages.title"), href: `${base}/pages` }, { label: page.title }]}
-        badge={staff && !staff.published ? <Badge tone="neutral">{t("pages.draft")}</Badge> : undefined}
-        primaryAction={staffRole && !preview ? (
-          <LinkButton href={`${base}/pages/${page.id}?tab=edit`} leftIcon={<Pencil className="h-4 w-4" aria-hidden="true" />}>{t("pages.view.edit")}</LinkButton>
-        ) : undefined}
-      >
-        {page.variants.length > 0 && (
-          <nav aria-label={t("pages.view.variants")} className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-sm text-slate-600">{t("pages.view.variants")}</span>
-            <LangChip label={t(`pages.lang.${page.language}`)} selected />
-            {page.variants.map((v) => (
-              <LangChip key={v.id} label={t(`pages.lang.${v.language}`)} href={preview ? preview.variantHref(v.id) : `${base}/pages/${v.id}${fromModule ? "?from=module" : ""}`} />
-            ))}
-          </nav>
-        )}
-      </PageHeader>
+      {preview ? (
+        // R7: the page object's header above the Preview tab already shows the title; no second title here.
+        (draftBadge || variantsNav) && <div className="mb-6">{draftBadge}{variantsNav}</div>
+      ) : (
+        <PageHeader
+          title={page.title}
+          breadcrumbs={embedded || !staffRole ? undefined : [{ label: t("pages.title"), href: `${base}/pages` }, { label: page.title }]}
+          badge={draftBadge}
+          primaryAction={staffRole ? (
+            <LinkButton href={`${base}/pages/${page.id}?tab=edit`} leftIcon={<Pencil className="h-4 w-4" aria-hidden="true" />}>{t("pages.view.edit")}</LinkButton>
+          ) : undefined}
+        >
+          {variantsNav}
+        </PageHeader>
+      )}
       <SafeHtml html={page.body_html} />
       <p className="mt-6 text-xs text-slate-600">{t("pages.view.updated", { date: fmtShortDateTime(page.updated_at, lang) })}</p>
       {/* 8a UX M7: a page opened from a module offers the way back as the next step */}

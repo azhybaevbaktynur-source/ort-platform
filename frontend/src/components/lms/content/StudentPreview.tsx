@@ -5,6 +5,7 @@ import { useTranslation } from "@/lib/i18n/context";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import { TemplatePassage } from "@/components/lms/PlainPassage";
 import type { StudentQuestionOut } from "@/lib/lms/contentTypes";
+import { optionLabel } from "@/lib/lms/optionLabel";
 
 /** Read-only render of the student view (no key). */
 export function StudentPreview({ q }: { q: StudentQuestionOut }) {
@@ -43,7 +44,7 @@ export function StudentPreview({ q }: { q: StudentQuestionOut }) {
             <ul className="space-y-2">
               {(["A", "B", "C", "D"] as const).map((k) => (
                 <li key={k} className="flex items-center gap-3 rounded-xl border border-slate-200 px-3 py-2 text-sm">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-bold">{k}</span>
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-bold">{optionLabel(k, q.language)}</span>
                   {t(`bank.types.comparison.labels.${k}`)}
                 </li>
               ))}
@@ -54,7 +55,7 @@ export function StudentPreview({ q }: { q: StudentQuestionOut }) {
           <ul className="mt-4 space-y-2">
             {(d.choices || []).map((c) => (
               <li key={c.id} className="flex items-start gap-3 rounded-xl border border-slate-200 px-3 py-2 text-sm">
-                <span className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold">{c.id}</span>
+                <span className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold">{optionLabel(c.id, q.language)}</span>
                 <div>
                   {c.text && <MathRenderer content={c.text} />}
                   {c.image_url && (
