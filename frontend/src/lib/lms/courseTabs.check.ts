@@ -3,7 +3,7 @@
  * Run: cd frontend && npx tsc --outDir /tmp/agy_tabs --module commonjs --target es2020 --skipLibCheck \
  *   src/lib/lms/courseTabs.ts src/lib/lms/courseTabs.check.ts && node /tmp/agy_tabs/courseTabs.check.js
  */
-import { courseTabs, shownTabs, tabOfPath, type CourseTabKey, type CourseTabsCourse } from "./courseTabs";
+import { courseTabs, isLessonReturn, shownTabs, tabOfPath, type CourseTabKey, type CourseTabsCourse } from "./courseTabs";
 
 let failed = 0;
 function ok(cond: boolean, msg: string) {
@@ -12,7 +12,7 @@ function ok(cond: boolean, msg: string) {
 
 const t = (k: string) => k;
 const base = "/ru/courses/c1";
-const NONE = { modules: false, files: false, announcements: false, practice: false, tests: false, hand_ins: false };
+const NONE = { modules: false, files: false, announcements: false, practice: false, tests: false, hand_ins: false, lesson_quizzes: false };
 const course = (f: Partial<typeof NONE> | null): CourseTabsCourse => ({ id: "c1", features: f === null ? null : { ...NONE, ...f } });
 const keys = (c: CourseTabsCourse, opts = {}) => courseTabs(c, base, t, opts).tabs.map((x) => x.key).join(",");
 
@@ -68,6 +68,29 @@ ok(hid({}, "/assessments/a1") === null, "object pages are never refused here (th
 ok(hid({}, "") === null, "Обзор is never hidden");
 ok(hid(null, "/saved") === null, "older backend: nothing hidden");
 ok(hid({ hand_ins: true }, "/saved") === "saved", "hand-ins only: /saved hidden");
+
+// lesson course requests C3 (R3): lesson quizzes give Аналитика and Повторение, never Тесты
+ok(keys(course({ modules: true, lesson_quizzes: true })) === "overview,lessons,analytics,saved", "lesson-only course with lesson quizzes: Обзор · Уроки · Аналитика · Повторение");
+ok(keys(course({ modules: true, tests: true, lesson_quizzes: true })) === "overview,lessons,tests,analytics,saved", "lesson quizzes and tests: all five");
+ok(hid({ modules: true, lesson_quizzes: true }, "/tests") === "tests", "lesson quizzes only: /tests hidden");
+ok(hid({ modules: true, lesson_quizzes: true }, "/saved") === null, "lesson quizzes: /saved shown");
+
+// a page's declared parent tab (the lobby / result of a lesson quiz -> Уроки)
+const act = (suffix: string, parent: CourseTabKey | null) =>
+  courseTabs(course({ modules: true, tests: true }), base + suffix, t, { parent }).tabs.filter((x) => x.active).map((x) => x.key).join(",");
+ok(act("/attempts/t1/result", "lessons") === "lessons", "lesson quiz result: Уроки active, Тесты not");
+ok(act("/assessments/a1", "lessons") === "lessons", "lesson quiz lobby: Уроки active");
+ok(act("/attempts/t1/result", null) === "tests", "no declaration: Тесты as before");
+ok(courseTabs(course({ modules: true }), "/ru/courses/c2/tests", t, { parent: "lessons" }).active === null, "a declaration never marks another course's path");
+
+// a `return` into Уроки
+ok(isLessonReturn(`${base}/modules/m1/items/i1`, base), "return to a lesson page");
+ok(isLessonReturn(`${base}/lessons`, base), "return to Уроки");
+ok(isLessonReturn(`${base}/modules/m1/items/i1?x=1#y`, base), "query and hash ignored");
+ok(!isLessonReturn(`${base}/tests`, base), "return to Тесты is no lesson");
+ok(!isLessonReturn("/ru/courses/c2/modules/m1/items/i1", base), "another course's lesson is not this course's");
+ok(!isLessonReturn(`${base}/modulesX`, base), "a longer segment is no lesson");
+ok(!isLessonReturn(null, base), "no return");
 
 if (failed) {
   console.error(`${failed} check(s) failed`);

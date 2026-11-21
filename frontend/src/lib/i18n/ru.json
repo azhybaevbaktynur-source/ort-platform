@@ -2291,6 +2291,9 @@
     "actions": {
       "reviewMistakes": "Разобрать ошибки",
       "nextTest": "Следующий тест"
+    },
+    "lesson": {
+      "backToLesson": "Вернуться к уроку"
     }
   },
   "schemes": {
@@ -5579,7 +5582,22 @@
       "fileBody": "Файл к этому уроку.",
       "prevShort": "Назад",
       "positionShort": "{n}/{total}",
-      "nextShort": "Далее"
+      "nextShort": "Далее",
+      "quiz": {
+        "eyebrow": "Тест к уроку",
+        "questions": "{count} вопросов",
+        "questions_one": "{count} вопрос",
+        "questions_few": "{count} вопроса",
+        "questions_many": "{count} вопросов",
+        "questions_other": "{count} вопроса",
+        "best": "Лучший результат: {percent}%",
+        "done": "Пройден",
+        "start": "Начать",
+        "again": "Ещё раз",
+        "resume": "Продолжить",
+        "accessCode": "Для этого теста нужен код доступа. Введите его на странице теста.",
+        "toLobby": "Открыть страницу теста"
+      }
     }
   },
   "courseNav": {
