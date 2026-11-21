@@ -1,4 +1,4 @@
-import { Inter } from "next/font/google";
+import { Inter, Noto_Sans } from "next/font/google";
 
 /*
  * Student UI U1 (docs/phases/STUDENT_UI_DESIGN.md §1): Inter for the student shell only. Self-hosted by Next at build
@@ -14,5 +14,19 @@ export const inter = Inter({
   subsets: ["latin", "cyrillic", "cyrillic-ext"],
   display: "swap",
   variable: "--font-inter",
+  preload: false,
+});
+
+/*
+ * Lesson course requests R6 / C6 (docs/phases/LESSON_COURSE_REQUESTS.md): Noto Sans for rendered pages and lessons
+ * only (`.page-body`, SafeHtml). Variable weight (the page CSS uses 400–700); `cyrillic-ext` carries ң ө ү.
+ * `noto.variable` defines `--font-noto-sans`; SafeHtml puts it on its own element and `.page-body` reads it
+ * (globals.css), falling back to "PT Sans", system-ui. `preload: false` like Inter: fetched only where a page renders.
+ */
+export const noto = Noto_Sans({
+  subsets: ["latin", "cyrillic", "cyrillic-ext"],
+  style: ["normal", "italic"],
+  display: "swap",
+  variable: "--font-noto-sans",
   preload: false,
 });

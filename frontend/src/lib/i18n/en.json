@@ -5116,6 +5116,7 @@
       "empty": "The preview appears here as you type. Write formulas between dollar signs, for example $x^2$."
     },
     "view": {
+      "hideAnswer": "Hide answer",
       "edit": "Edit",
       "variants": "Language",
       "updated": "Updated {date}",

@@ -6,7 +6,8 @@ import { cn, focusRing } from "@/components/ui";
 import { useTranslation } from "@/lib/i18n/context";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import type { StudentQuestion } from "@/lib/lms/attemptTypes";
-import { letter, orderedChoices, type ResponseObj } from "./playerUtils";
+import { orderedChoices, type ResponseObj } from "./playerUtils";
+import { optionLabel } from "@/lib/lms/optionLabel"; // R5: А Б В Г Д for ru/ky content
 import { FillBlankAnswer, MatchingAnswer, OrderingAnswer } from "./StructuredAnswers"; // Phase 10 S1
 
 // S7b: one type family (sans) for stem, choices and comparison labels (P7); every option is at least 44 px tall.
@@ -14,7 +15,8 @@ const OPTION_BASE = `flex min-h-11 w-full items-center gap-3 rounded-xl border p
 const OPTION_ON = "border-brand-600 bg-brand-50/40 ring-1 ring-brand-600 font-medium text-slate-900";
 const OPTION_OFF = "border-slate-200 bg-white text-slate-800 hover:border-brand-300 hover:bg-slate-50/50";
 
-function Badge({ on, children, square }: { on: boolean; children: React.ReactNode; square?: boolean }) {
+/** The option letter badge; also used by the review card (R5) so both show the same label. */
+export function OptionBadge({ on, children, square }: { on: boolean; children: React.ReactNode; square?: boolean }) {
   return (
     <span
       className={`flex h-7 w-7 shrink-0 items-center justify-center text-sm font-semibold ${square ? "rounded-md" : "rounded-full"} ${
@@ -103,7 +105,7 @@ export function ItemView({
                 onClick={() => onChange({ choice_id: on ? null : c.id })}
                 className={`${OPTION_BASE} ${on ? OPTION_ON : OPTION_OFF}`}
               >
-                <Badge on={on}>{letter(i)}</Badge>
+                <OptionBadge on={on}>{optionLabel(i, question.language)}</OptionBadge>
                 <ChoiceBody text={c.text} imageUrl={c.image_url} />
               </button>
             );
@@ -128,7 +130,7 @@ export function ItemView({
                 className={`${OPTION_BASE} ${on ? OPTION_ON : OPTION_OFF}`}
               >
                 {/* S7b, P12: the letter stays when selected; the filled badge and the check mark show the choice. */}
-                <Badge on={on} square>{letter(i)}</Badge>
+                <OptionBadge on={on} square>{optionLabel(i, question.language)}</OptionBadge>
                 <ChoiceBody text={c.text} imageUrl={c.image_url} />
                 <Check className={`h-5 w-5 shrink-0 text-brand-700 ${on ? "" : "invisible"}`} aria-hidden="true" />
               </button>
@@ -185,7 +187,7 @@ export function ItemView({
                   onClick={() => onChange({ choice: on ? null : id })}
                   className={`${OPTION_BASE} ${on ? OPTION_ON : OPTION_OFF}`}
                 >
-                  <Badge on={on}>{id}</Badge>
+                  <OptionBadge on={on}>{optionLabel(id, question.language)}</OptionBadge>
                   <span className="flex-1 leading-relaxed text-slate-900">{t(`bank.types.comparison.labels.${id}`)}</span>
                 </button>
               );
