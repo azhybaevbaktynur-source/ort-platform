@@ -139,6 +139,7 @@ def _listable(user_id: str, now: datetime, used):
     quiz = and_(
         Assignment.kind == "quiz", Assessment.deleted_at.is_(None), Assessment.status == "published",
         Assessment.published_version_id.isnot(None),
+        Assessment.placement != "lesson",  # LESSON_COURSE_REQUESTS C2: a lesson quiz is not a test
         or_(allowed == -1, used < allowed),
         ~open_,
     )
@@ -171,14 +172,16 @@ def _course_rows(uid: str, now: datetime):
     in_progress, resume_attempt_id, resume_assessment_id, resume_title, the `feature_columns` flags, org_name,
     org_kind). The resume columns: the caller's newest open (non-preview, non-practice) attempt of a live test of the
     enrollment, one correlated subquery in the join (STUDENT_IA_DESIGN 6.2.2)."""
+    lesson_quiz = exists().where(Assessment.id == Attempt.assessment_id, Assessment.placement == "lesson")  # C2
     in_progress = exists().where(Attempt.enrollment_id == Enrollment.id, Attempt.user_id == uid,
                                  Attempt.status == "in_progress", Attempt.is_preview.is_(False),
-                                 Attempt.is_practice.is_(False))
+                                 Attempt.is_practice.is_(False), ~lesson_quiz)
     open_a, open_x = aliased(Attempt, name="open_attempt"), aliased(Assessment, name="open_assessment")
     resume_a, resume_x = aliased(Attempt, name="resume_attempt"), aliased(Assessment, name="resume_assessment")
     newest = (select(open_a.id).join(open_x, open_x.id == open_a.assessment_id)
               .where(open_a.enrollment_id == Enrollment.id, open_a.user_id == uid, open_a.status == "in_progress",
-                     open_a.is_preview.is_(False), open_a.is_practice.is_(False), open_x.deleted_at.is_(None))
+                     open_a.is_preview.is_(False), open_a.is_practice.is_(False), open_x.deleted_at.is_(None),
+                     open_x.placement != "lesson")  # LESSON_COURSE_REQUESTS C2
               .order_by(open_a.started_at.desc(), open_a.id.desc()).limit(1)
               .correlate(Enrollment).scalar_subquery())
     return course_scopes.with_card_org(
@@ -345,7 +348,7 @@ def _in_progress(db: Session, uid: str) -> list[sch.HomeInProgressOut]:
         .join(Assessment, Assessment.id == Attempt.assessment_id)
         .where(_mine(uid), Attempt.user_id == uid, Attempt.status == "in_progress", Attempt.is_preview.is_(False),
                Attempt.is_practice.is_(False),
-               Assessment.deleted_at.is_(None))
+               Assessment.deleted_at.is_(None), Assessment.placement != "lesson")  # C2
         .order_by(Attempt.started_at.desc(), Attempt.id.desc()).limit(sch.IN_PROGRESS_MAX)
     ).all()
     return [sch.HomeInProgressOut(attempt_id=aid, assessment_id=asid, assessment_title=at, course_id=cid,
@@ -396,7 +399,7 @@ def _todo(db: Session, uid: str, now: datetime, listable: list) -> list[sch.Home
         .outerjoin(O, and_(O.assignment_id == Assignment.id, O.enrollment_id == Enrollment.id))
         .where(_mine(uid), Attempt.user_id == uid, Attempt.status == "in_progress", Attempt.is_preview.is_(False),
                Attempt.is_practice.is_(False),
-               Assessment.deleted_at.is_(None))
+               Assessment.deleted_at.is_(None), Assessment.placement != "lesson")  # C2
         .order_by(due.is_(None), due, Attempt.started_at.desc(), Attempt.id.desc()).limit(sch.TODO_MAX)
     ).all()
 

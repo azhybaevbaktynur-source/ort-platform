@@ -57,9 +57,11 @@ def require_exam_prep(course: Course) -> None:
 # ------------------------------------------------------------------ shared predicates
 
 def _visible_test(course_id: uuid.UUID):
-    """A published, live, non-practice test of the course: what the student's test list shows as startable."""
+    """A published, live, non-practice test of the course: what the student's test list shows as startable. A lesson
+    quiz (`placement = 'lesson'`, LESSON_COURSE_REQUESTS C2) lives in its lesson and is never a test."""
     return and_(Assessment.course_id == course_id, Assessment.deleted_at.is_(None), Assessment.is_practice.is_(False),
-                Assessment.status == "published", Assessment.published_version_id.isnot(None))
+                Assessment.status == "published", Assessment.published_version_id.isnot(None),
+                Assessment.placement != "lesson")
 
 
 def _window_open(now: datetime):
@@ -207,7 +209,8 @@ def _open_attempt(db: Session, course: Course, user_id: str, gate: Gate = OPEN_G
         select(Attempt.id, Attempt.assessment_id, Assessment.title, Attempt.assessment_version_id,
                gate.locked_sql(Assessment).label("locked"))
         .select_from(Attempt).join(Assessment, Assessment.id == Attempt.assessment_id)
-        .where(_mine(user_id, course.id), Attempt.status == "in_progress", Assessment.deleted_at.is_(None))
+        .where(_mine(user_id, course.id), Attempt.status == "in_progress", Assessment.deleted_at.is_(None),
+               Assessment.placement != "lesson")  # C2: a lesson quiz is resumed from its lesson
         .order_by(Attempt.started_at.desc(), Attempt.id.desc()).limit(OPEN_SCAN_MAX)
     ).all()
     for row in rows:

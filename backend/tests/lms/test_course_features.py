@@ -11,7 +11,7 @@ from tests.lms.modules_support import C, make_assignment, published_quiz, struct
 from tests.lms.s3_support import teacher
 
 NONE = {"modules": False, "files": False, "announcements": False, "practice": False, "tests": False,
-        "hand_ins": False}
+        "hand_ins": False, "lesson_quizzes": False}
 
 
 async def course_flags(api, user, course_id) -> dict:

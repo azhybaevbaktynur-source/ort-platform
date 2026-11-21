@@ -199,6 +199,7 @@ class ItemTargetOut(BaseModel):
     language: Optional[str] = None            # page
     assignment_kind: Optional[str] = None     # assignment: none | text | file | quiz
     assessment_id: Optional[uuid.UUID] = None  # quiz assignment: opens /assessments/{id}/edit
+    placement: Optional[str] = None            # quiz assignment: tests | lesson (LESSON_COURSE_REQUESTS C1)
 
 
 class ItemStaffOut(BaseModel):
@@ -272,6 +273,7 @@ class ItemLinkOut(BaseModel):
     assessment_id: Optional[uuid.UUID] = None
     assignment_kind: Optional[str] = None
     url: Optional[str] = None
+    placement: Optional[str] = None  # quiz assignment: tests | lesson (LESSON_COURSE_REQUESTS C1)
 
 
 class VideoOut(BaseModel):

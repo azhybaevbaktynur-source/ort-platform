@@ -90,6 +90,18 @@ def default_access_tier(db: Session, course: Course) -> str:
     return "paid" if is_platform_path(path) else "free"
 
 
+def _placement_not_allowed() -> ValidationFailed:
+    return ValidationFailed("A lesson quiz must be a plain quiz (no preset, not practice)",
+                            code="placement_not_allowed",
+                            details=[{"loc": ["placement"], "msg": "lesson needs preset none and not practice"}])
+
+
+def _apply_lesson_placement(a: Assessment) -> None:
+    """LESSON_COURSE_REQUESTS C1 / R4: a lesson quiz is practice, not a grade; its quiz assignment mirrors this."""
+    if a.placement == "lesson":
+        a.omit_from_total = True
+
+
 def create_assessment(db: Session, ctx: AuthzContext, course: Course, data: sch.AssessmentCreateIn,
                       *, practice: bool = False, access_tier: Optional[str] = None) -> Assessment:
     """`practice=True` (Phase 10 S2): the forced settings, one section, no quiz assignment; flushes only, the caller
@@ -97,6 +109,8 @@ def create_assessment(db: Session, ctx: AuthzContext, course: Course, data: sch.
     (`paid` in a platform course, `free` elsewhere); the ORT seed passes `free`."""
     require_course(ctx, A.CONTENT_MANAGE, course)
     assert_not_sandbox(course)  # Phase 8b fix L1: the sample quiz is never published; no other assessments
+    if data.placement == "lesson" and (practice or data.preset != "none"):
+        raise _placement_not_allowed()  # LESSON_COURSE_REQUESTS C1
     # --- Phase 7b S2 begin --- (PHASE_7B_DESIGN 5.3 / 9.1: the template branch; `preset` and a template never mix.
     # The ORT preset path below is untouched: a template assessment always has preset 'none'.)
     if data.exam_template_id is not None or data.exam_template_version_id is not None:
@@ -111,6 +125,10 @@ def create_assessment(db: Session, ctx: AuthzContext, course: Course, data: sch.
                                             version_id=data.exam_template_version_id)
         a = _inst.instantiate(db, ctx, course, version, data.parameters or {}, title=data.title,
                               description=data.description, languages=list(data.languages))
+        if data.placement == "lesson":  # LESSON_COURSE_REQUESTS C1 (a template exam is preset none)
+            a.placement = "lesson"
+            _apply_lesson_placement(a)
+            assignment_sync.mirror_from_assessment(db, a)
         db.commit()
         return a
     # --- Phase 7b S2 end ---
@@ -130,6 +148,8 @@ def create_assessment(db: Session, ctx: AuthzContext, course: Course, data: sch.
         grading_scheme_version_id=PRESET_SCHEME_VERSIONS.get(data.preset),
     )
     a.access_tier = access_tier or default_access_tier(db, course)  # S3 access
+    a.placement = data.placement  # LESSON_COURSE_REQUESTS C1
+    _apply_lesson_placement(a)
     # --- Phase 10 S2 begin --- (PHASE_10_DESIGN 3: no assignments row, so grades and lists never see the set)
     if practice:
         a.is_practice, a.allowed_attempts, a.score_policy, a.show_correct_answers = True, -1, "latest", True
@@ -164,6 +184,11 @@ def update_assessment(db: Session, ctx: AuthzContext, course: Course, aid: uuid.
         raise Conflict("The assessment was changed by someone else", code="draft_conflict",
                        details={"draft_rev": a.draft_rev})
     fields = data.model_fields_set - {"draft_rev"}
+    # --- LESSON_COURSE_REQUESTS C1 --- (`lesson` only on a plain quiz; not snapshot content, no new version)
+    if "placement" in fields and data.placement == "lesson" and (a.is_practice or (a.preset or "none") != "none"):
+        raise _placement_not_allowed()
+    placement_only = "placement" in fields and fields <= {"placement", "omit_from_total"}
+    was_in_sync = a.published_version_id is not None and a.published_draft_rev == a.draft_rev
     # --- Phase 10 S2 --- (PHASE_10_DESIGN 3)
     if a.is_practice and fields & PRACTICE_FIXED_FIELDS:
         raise Conflict("Fixed for a practice set", code="practice_fixed",
@@ -216,10 +241,14 @@ def update_assessment(db: Session, ctx: AuthzContext, course: Course, aid: uuid.
         elif f == "languages":
             value = list(value)
         setattr(a, f, value)
+    if "placement" in fields:
+        _apply_lesson_placement(a)  # LESSON_COURSE_REQUESTS C1: `lesson` also sets omit_from_total
     if (a.grading_scheme_version_id, a.score_policy, utc(a.due_at)) != before:
         a.grading_changed_at = clock.now()  # drives the gradebook's stale_count (P4-12, P4-15)
     if not a.is_practice:  # Phase 10 S2: mirroring would create the assignments row a practice set must not have
         assignment_sync.mirror_from_assessment(db, a)  # --- Phase 7a S1 --- (mirror rule, 3.2)
+    if placement_only and was_in_sync:
+        a.published_draft_rev = a.draft_rev + 1  # C1: placement is not snapshot content; nothing to republish
     _commit(db, a)
     return a
 
@@ -911,6 +940,7 @@ def _summary_fields(a: Assessment, totals: dict, counts: dict, version_nos: dict
         attempt_counts=sch.AttemptCountsOut(**counts.get(a.id, {"in_progress": 0, "submitted": 0})),
         available_from=a.available_from, available_until=a.available_until, deleted_at=a.deleted_at,
         has_access_code=a.access_code_hash is not None,  # --- Phase 7a S4 ---
+        placement=a.placement or "tests",  # LESSON_COURSE_REQUESTS C1
     )
 
 
@@ -1151,7 +1181,8 @@ def list_student(db: Session, ctx: AuthzContext, course: Course, *, cursor: Opti
             allowed_attempts=_e.allowed_attempts, attempts_used=used, in_progress_attempt_id=open_id,
             last_result=last, due_at=utc(_e.due_at),
             scheme=sch.scheme_student_ref(briefs.get(a.grading_scheme_version_id)),
-            access_tier=a.access_tier, locked=locked_for(db, gate, a, atts)))  # S3 access
+            access_tier=a.access_tier, locked=locked_for(db, gate, a, atts),  # S3 access
+            placement=a.placement or "tests"))  # LESSON_COURSE_REQUESTS C1
     return out, nxt
 
 
@@ -1197,7 +1228,8 @@ def lobby(db: Session, ctx: AuthzContext, course: Course, aid: uuid.UUID) -> sch
         time_limit_s=_total_limit(snap), navigation=snap.get("navigation", "free"),
         allowed_attempts=a.allowed_attempts, attempts_used=used, available_from=a.available_from,
         available_until=a.available_until, in_progress_attempt_id=open_id, can_start=can_start, reason=reason,
-        due_at=utc(a.due_at), scheme=sch.scheme_student_ref(briefs.get(a.grading_scheme_version_id)))
+        due_at=utc(a.due_at), scheme=sch.scheme_student_ref(briefs.get(a.grading_scheme_version_id)),
+        placement=a.placement or "tests")  # LESSON_COURSE_REQUESTS C1
     # --- Phase 7a S4 begin --- (the caller's own effective values; never the word "override", only the dates)
     from app.lms.attempts import timing as _timing
 
