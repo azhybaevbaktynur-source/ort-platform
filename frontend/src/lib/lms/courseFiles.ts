@@ -15,7 +15,8 @@ export const deleteCourseFile = (courseId: string, fileId: string) =>
   lmsFetch<void>(`${base(courseId)}/${e(fileId)}`, { method: "DELETE" });
 const getDownload = (courseId: string, fileId: string) => lmsFetch<DownloadOut>(`${base(courseId)}/${e(fileId)}/download`);
 
-function toError(status: number, text: string): LmsApiError {
+/** An XHR / raw fetch error body as `LmsApiError` (also used by the video upload in modules.ts). */
+export function toError(status: number, text: string): LmsApiError {
   let data: { error?: { code?: string; message?: string; details?: Record<string, unknown> } } | undefined;
   try { data = text ? JSON.parse(text) : undefined; } catch { data = undefined; }
   const err = data?.error;

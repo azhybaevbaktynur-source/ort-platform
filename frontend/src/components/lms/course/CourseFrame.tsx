@@ -33,7 +33,7 @@ import { ExamCountdown, ExamGoalLine } from "./ExamHeaderBlock";
 
 const COURSE_CACHE: SwrOptions = { ttl: 60_000, storage: "session" };
 const FADE = "linear-gradient(to right, #000 calc(100% - 32px), transparent)";
-const LESSON_KINDS = new Set(["page", "file", "url"]);
+const LESSON_KINDS = new Set(["page", "file", "url", "video"]);
 
 export function isExamCourse(course: CourseOut): boolean {
   return templateUi(course).studentLayout === "exam_prep";

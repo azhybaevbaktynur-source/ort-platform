@@ -14,7 +14,7 @@ import { useAssignmentErrorText } from "@/components/lms/assignments/assignmentU
 import { fmtShortDateTime } from "@/components/lms/home/format";
 
 type IconT = React.ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" }>;
-const ITEM_ICON: Record<ItemKind, IconT> = { page: FileText, file: FileIcon, assignment: ListChecks, url: Link2, header: Heading };
+const ITEM_ICON: Record<ItemKind, IconT> = { page: FileText, file: FileIcon, assignment: ListChecks, url: Link2, header: Heading, video: PlayCircle };
 const ASSIGNMENT_ICON: Record<AssignmentKind, IconT> = { quiz: ListChecks, text: FileText, file: Upload, none: UserCheck };
 
 /** Decorative icon of an item kind (always next to its text). */

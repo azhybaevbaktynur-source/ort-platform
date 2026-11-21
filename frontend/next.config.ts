@@ -29,7 +29,8 @@ const CSP = [
   `img-src 'self' data: blob: ${API_ORIGIN} ${R2_PUBLIC}`.replace(/\s+/g, " "),
   "font-src 'self' data:", // KaTeX fonts are bundled
   `connect-src 'self' ${API_ORIGIN} ${R2_PUBLIC}${IS_DEV ? " ws:" : ""}`.replace(/\s+/g, " "),
-  "media-src 'self'",
+  // LESSON_VIDEOS V4: hosted lesson videos (R2 presigned, or the API's dev stream); blob: carries the captions track
+  `media-src 'self' blob: https://*.r2.cloudflarestorage.com ${API_ORIGIN}`.replace(/\s+/g, " ").trim(),
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
